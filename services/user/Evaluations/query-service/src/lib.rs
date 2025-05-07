@@ -55,13 +55,19 @@ mod service {
             &self,
             evaluation_owner: AccountNumber,
             evaluation_id: u32,
-            group_number: u32,
+            group_number: Option<u32>,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+            let mut conditions = vec![
+                format!("owner = '{}'", evaluation_owner),
+                format!("evaluation_id = {}", evaluation_id),
+            ];
+        
+            if let Some(group_num) = group_number {
+                conditions.push(format!("group_number = {}", group_num));
+            }
+        
             EventQuery::new("history.evaluations.group_finished")
-                .condition(format!(
-                    "owner = '{}' AND evaluation_id = {} AND group_number = {}",
-                    evaluation_owner, evaluation_id, group_number
-                ))
+                .condition(conditions.join(" AND "))
                 .query()
         }
 
