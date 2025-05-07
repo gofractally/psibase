@@ -14,8 +14,10 @@ mod service {
     #[derive(Deserialize, SimpleObject)]
     struct KeysSet {
         owner: AccountNumber,
-        evaluation_id: String,
-        group_number: String,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        group_number: u32,
         keys: Vec<Vec<u8>>,
         hash: String,
     }
