@@ -228,7 +228,7 @@ class TestPsibase(unittest.TestCase):
                 self.assertIn('Minimal', l)
                 self.assertIn('Explorer', l)
                 self.assertIn('Sites', l)
-                self.assertIn('foo', l)
+                self.assertIn('foo 2.0.0', l)
 
             l = get_list('--installed')
             self.assertIn('Explorer', l)
@@ -236,7 +236,7 @@ class TestPsibase(unittest.TestCase):
 
             l = get_list('--available')
             self.assertNotIn('Explorer', l)
-            self.assertIn('foo', l)
+            self.assertIn('foo 2.0.0', l)
 
             l = get_list('--updates')
             self.assertEqual(l, "")
@@ -246,13 +246,13 @@ class TestPsibase(unittest.TestCase):
 
             l = get_list('--installed')
             self.assertIn('Explorer', l)
-            self.assertIn('foo', l)
+            self.assertIn('foo 1.0.0', l)
 
             l = get_list('--available')
             self.assertEqual(l, "")
 
             l = get_list('--updates')
-            self.assertIn('foo', l)
+            self.assertIn('foo 1.0.0->2.0.0', l)
 
             a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
             a.wait(new_block())

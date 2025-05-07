@@ -1554,14 +1554,18 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     .await
 }
 
-async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
+async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    if args.all
-        || (args.installed && args.available)
-        || (!args.all & !args.installed && !args.available && !args.updates)
-    {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    // Resolve selection shortcuts
+    if args.all || (!args.installed && !args.available && !args.updates) {
+        args.installed = true;
+        args.available = true;
+        args.updates = true;
+    }
+    // Load the lists of packages that we need
+    let installed =
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    let reglist = if args.updates || args.available {
         let package_registry = get_package_registry(
             &args.node_args.api,
             Some(args.sender.into()),
@@ -1569,45 +1573,36 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
             client.clone(),
         )
         .await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for name in installed.union(reglist).into_vec() {
-            println!("{}", name);
-        }
-    } else if args.installed {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        for name in installed.into_vec() {
-            println!("{}", name);
-        }
-    } else if args.available {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(
-            &args.node_args.api,
-            Some(args.sender.into()),
-            &args.package_source,
-            client.clone(),
-        )
-        .await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for name in reglist.difference(installed).into_vec() {
-            println!("{}", name);
-        }
-    } else if args.updates {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(
-            &args.node_args.api,
-            Some(args.sender.into()),
-            &args.package_source,
-            client.clone(),
-        )
-        .await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for (name, prev, next) in installed.updates(reglist)? {
-            println!("{} {}->{}", name, prev, next);
+        PackageList::from_registry(&package_registry)?
+    } else {
+        PackageList::new()
+    };
+
+    // Show installed packages
+    if args.installed || args.updates {
+        for (name, version) in installed.max_versions()? {
+            let updated = if args.updates {
+                reglist.get_update(name, version)?
+            } else {
+                None
+            };
+            if let Some(next_version) = updated {
+                println!("{} {}->{}", name, version, next_version);
+            } else if args.installed {
+                println!("{} {}", name, version);
+            }
         }
     }
+
+    // Show packages that are not installed
+    if args.available {
+        for (name, version) in reglist.max_versions()? {
+            if !installed.contains_package(name) {
+                println!("{} {}", name, version);
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -2055,7 +2050,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Some(help) = &args.help {
         return print_help(help);
     }
-    let Some(command) = &args.command else {
+    let Some(command) = args.command else {
         return print_help(&[]);
     };
     match command {
@@ -2076,16 +2071,16 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::Publish(args) => publish(&args).await?,
         Command::Install(args) => install(&args).await?,
         Command::Upgrade(args) => upgrade(&args).await?,
-        Command::List(args) => list(&args).await?,
+        Command::List(args) => list(args).await?,
         Command::Search(args) => search(&args).await?,
         Command::Info(args) => package_info(&args).await?,
         Command::CreateToken(args) => {
             create_token(Duration::seconds(args.expires_after), &args.mode)?
         }
-        Command::Login(args) => handle_login(args).await?,
-        Command::Config(config) => handle_cli_config_cmd(config)?,
-        Command::Help { command } => print_help(command)?,
-        Command::External(argv) => handle_external(argv)?,
+        Command::Login(args) => handle_login(&args).await?,
+        Command::Config(config) => handle_cli_config_cmd(&config)?,
+        Command::Help { command } => print_help(&command)?,
+        Command::External(argv) => handle_external(&argv)?,
     }
 
     Ok(())

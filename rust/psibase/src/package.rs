@@ -1438,15 +1438,15 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
     }
 }
 
-fn max_version(versions: HashMap<String, (Meta, PackageOrigin)>) -> Result<String, anyhow::Error> {
-    let mut iter = versions.into_keys();
+fn max_version(versions: &HashMap<String, (Meta, PackageOrigin)>) -> Result<&str, anyhow::Error> {
+    let mut iter = versions.keys();
     let mut result = iter.next().ok_or_else(|| anyhow!("No version"))?;
     for version in iter {
         if Version::new(&result)? < Version::new(&version)? {
             result = version
         }
     }
-    Ok(result)
+    Ok(&*result)
 }
 
 impl PackageList {
@@ -1502,6 +1502,10 @@ impl PackageList {
     }
     pub fn insert_installed(&mut self, info: InstalledPackageInfo) {
         self.insert(info.meta(), PackageOrigin::Installed { owner: info.owner });
+    }
+
+    pub fn contains_package(&self, name: &str) -> bool {
+        self.packages.get(name).is_some()
     }
 
     fn contains_version(&self, name: &str, version: &str) -> bool {
@@ -1597,34 +1601,24 @@ impl PackageList {
     ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
         self.get_by_ref(&make_ref(package)?)
     }
-    pub fn into_vec(mut self) -> Vec<String> {
-        let mut result: Vec<String> = self.packages.drain().map(|(k, _)| k).collect();
-        result.sort_unstable();
-        result
-    }
-    pub fn union(mut self, mut other: Self) -> Self {
-        for (name, versions) in other.packages.drain() {
-            self.packages.insert(name, versions);
-        }
-        self
-    }
-    pub fn difference(mut self, other: Self) -> Self {
-        for package in other.packages.keys() {
-            self.packages.remove(package);
-        }
-        self
-    }
-    pub fn updates(self, mut other: Self) -> Result<Vec<(String, String, String)>, anyhow::Error> {
+    pub fn max_versions(&self) -> Result<Vec<(&str, &str)>, anyhow::Error> {
         let mut result = Vec::new();
-        for (name, versions) in self.packages {
-            let current = max_version(versions)?;
-            if let Some(other_versions) = other.packages.remove(&name) {
-                let best = max_version(other_versions)?;
-                if Version::new(&current)? < Version::new(&best)? {
-                    result.push((name, current, best))
-                }
-            }
+        for (name, versions) in &self.packages {
+            result.push((name.as_str(), max_version(versions)?));
         }
+        result.sort_unstable();
         Ok(result)
+    }
+    pub fn get_update(&self, package: &str, version: &str) -> Result<Option<&str>, anyhow::Error> {
+        Ok(if let Some(versions) = self.packages.get(package) {
+            let best = max_version(versions)?;
+            if Version::new(version)? < Version::new(best)? {
+                Some(best)
+            } else {
+                None
+            }
+        } else {
+            None
+        })
     }
 }
