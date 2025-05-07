@@ -368,6 +368,9 @@ struct ListArgs {
     /// List installed apps
     #[clap(long)]
     installed: bool,
+    /// List installed apps that have updates available
+    #[clap(long)]
+    updates: bool,
 
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
@@ -1555,7 +1558,7 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
     if args.all
         || (args.installed && args.available)
-        || (!args.all & !args.installed && !args.available)
+        || (!args.all & !args.installed && !args.available && !args.updates)
     {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
@@ -1589,6 +1592,20 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
+        }
+    } else if args.updates {
+        let installed =
+            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
+        let reglist = PackageList::from_registry(&package_registry)?;
+        for (name, prev, next) in installed.updates(reglist)? {
+            println!("{} {}->{}", name, prev, next);
         }
     }
     Ok(())

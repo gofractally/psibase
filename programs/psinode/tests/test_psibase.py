@@ -213,6 +213,54 @@ class TestPsibase(unittest.TestCase):
             self.assertIn('name: foo-1.0.0', info)
 
     @testutil.psinode_test
+    def test_list(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def get_list(*options):
+                return a.run_psibase(['list', '--package-source', dir] + list(options) + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            for args in [(), ('--all',), ('--all', '--installed'), ('--installed', '--available', '--updates')]:
+                l = get_list(*args)
+                self.assertIn('Minimal', l)
+                self.assertIn('Explorer', l)
+                self.assertIn('Sites', l)
+                self.assertIn('foo', l)
+
+            l = get_list('--installed')
+            self.assertIn('Explorer', l)
+            self.assertNotIn('foo', l)
+
+            l = get_list('--available')
+            self.assertNotIn('Explorer', l)
+            self.assertIn('foo', l)
+
+            l = get_list('--updates')
+            self.assertEqual(l, "")
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.wait(new_block())
+
+            l = get_list('--installed')
+            self.assertIn('Explorer', l)
+            self.assertIn('foo', l)
+
+            l = get_list('--available')
+            self.assertEqual(l, "")
+
+            l = get_list('--updates')
+            self.assertIn('foo', l)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.wait(new_block())
+
+            l = get_list('--updates')
+            self.assertEqual(l, "")
+
+    @testutil.psinode_test
     def test_configure_sources(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])

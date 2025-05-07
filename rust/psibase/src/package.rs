@@ -1438,6 +1438,17 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
     }
 }
 
+fn max_version(versions: HashMap<String, (Meta, PackageOrigin)>) -> Result<String, anyhow::Error> {
+    let mut iter = versions.into_keys();
+    let mut result = iter.next().ok_or_else(|| anyhow!("No version"))?;
+    for version in iter {
+        if Version::new(&result)? < Version::new(&version)? {
+            result = version
+        }
+    }
+    Ok(result)
+}
+
 impl PackageList {
     pub fn new() -> PackageList {
         PackageList {
@@ -1602,5 +1613,18 @@ impl PackageList {
             self.packages.remove(package);
         }
         self
+    }
+    pub fn updates(self, mut other: Self) -> Result<Vec<(String, String, String)>, anyhow::Error> {
+        let mut result = Vec::new();
+        for (name, versions) in self.packages {
+            let current = max_version(versions)?;
+            if let Some(other_versions) = other.packages.remove(&name) {
+                let best = max_version(other_versions)?;
+                if Version::new(&current)? < Version::new(&best)? {
+                    result.push((name, current, best))
+                }
+            }
+        }
+        Ok(result)
     }
 }
