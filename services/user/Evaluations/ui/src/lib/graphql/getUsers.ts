@@ -17,11 +17,18 @@ export const zGroup = z.object({
     keySubmitter: z.string().nullable(),
 });
 
+export const zResult = z.object({
+    groupNumber: z.number(),
+    result: z.number().array(),
+    users: zAccount.array()
+})
+
 export type User = z.infer<typeof zUser>;
 
 export const FunctionResponse = z.object({
     users: zUser.array(),
     groups: zGroup.array(),
+    results: zResult.array()
 });
 
 export const getUsersAndGroups = async (
@@ -47,6 +54,13 @@ export const getUsersAndGroups = async (
                     keySubmitter 
                 } 
             }
+        	getGroupResult(evaluationOwner: "${owner}", evaluationId: ${evaluationId}) {
+                nodes {
+                    groupNumber
+                    result
+                    users
+                }
+            }
         }`,
         "evaluations",
     );
@@ -60,6 +74,9 @@ export const getUsersAndGroups = async (
                 getGroups: z.object({
                     nodes: zGroup.array(),
                 }),
+                getGroupResult: z.object({
+                    nodes: zResult.array()
+                })
             }),
         })
         .parse(res);
@@ -67,5 +84,6 @@ export const getUsersAndGroups = async (
     return FunctionResponse.parse({
         users: response.data.getUsers.nodes,
         groups: response.data.getGroups.nodes,
+        results: response.data.getGroupResult.nodes
     });
 };

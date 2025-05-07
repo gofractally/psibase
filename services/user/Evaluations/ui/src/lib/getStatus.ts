@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { type Evaluation } from "@lib/graphql/getEvaluation";
 import { Account } from "./zod/Account";
-import { User } from "./graphql/getUsers";
+import { User, zResult } from "./graphql/getUsers";
 import { Group, zGroup } from "./graphql/getGroups";
 
 const zTimeStatus = z.enum([
@@ -90,7 +90,7 @@ const AwaitingUserSubmission = z.object({
 const CanWatchResults = z.object({
     type: z.literal(Types.CanWatchResults),
     submissionDeadline: Unix,
-    groups: zGroup.array(),
+    results: zResult.array()
 });
 
 const EvaluationNotStartedInTime = z.object({
@@ -115,6 +115,7 @@ export const getStatus = (
     currentUser: Account,
     users: User[],
     groups: Group[],
+    results: z.infer<typeof zResult>[]
 ): z.infer<typeof zStatus> => {
     const currentTime = dayjs().unix();
     const timeStatus = getTimeStatus(evaluation, currentTime);
@@ -184,14 +185,14 @@ export const getStatus = (
             if (group) {
                 return CanWatchResults.parse({
                     type: Types.CanWatchResults,
-                    groups,
+                    results,
                     submissionDeadline: evaluation.finishBy,
                 });
             } else {
                 if (user.attestation && user.attestation.length > 0) {
                     return CanWatchResults.parse({
                         type: Types.CanWatchResults,
-                        groups,
+                        results,
                         submissionDeadline: evaluation.finishBy,
                     });
                 } else {
@@ -205,7 +206,7 @@ export const getStatus = (
         } else {
             return CanWatchResults.parse({
                 type: Types.CanWatchResults,
-                groups,
+                results,
                 submissionDeadline: evaluation.finishBy,
             });
         }

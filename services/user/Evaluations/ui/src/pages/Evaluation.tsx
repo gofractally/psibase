@@ -25,17 +25,18 @@ export const EvaluationPage = () => {
         defaultRefreshInterval,
     );
     const [ticks, setTick] = useState<number>(0);
-    const { data: evaluation } = useEvaluation(
-        owner,
-        Number(id),
-    );
+    const { data: evaluation } = useEvaluation(owner, Number(id));
     const { mutate: register, isPending: isRegisterPending } = useRegister();
     const { mutate: unregister, isPending: isUnregisterPending } =
         useUnregister();
 
     const { data: usersAndGroups, error: usersAndGroupsError } =
         useUsersAndGroups(owner, evaluation?.id, refreshInterval);
-    const { users, groups } = usersAndGroups || { users: [], groups: [] };
+    const { users, groups, results } = usersAndGroups || {
+        users: [],
+        groups: [],
+        results: [],
+    };
 
     const {
         mutateAsync: startEvaluation,
@@ -70,7 +71,7 @@ export const EvaluationPage = () => {
         users &&
         currentUser &&
         groups &&
-        getStatus(evaluation, currentUser, users, groups);
+        getStatus(evaluation, currentUser, users, groups, results);
 
     console.log({
         status,
@@ -262,7 +263,6 @@ export const EvaluationPage = () => {
                                 startEvaluation({
                                     owner: zAccount.parse(owner),
                                     id: evaluation!.id,
-
                                 });
                             }}
                         >
@@ -297,7 +297,7 @@ export const EvaluationPage = () => {
                                 onClick={() => {
                                     closeEvaluation({
                                         owner: evaluation!.owner,
-                                        evaluationId: evaluation.id
+                                        evaluationId: evaluation.id,
                                     });
                                 }}
                             >
@@ -322,22 +322,19 @@ export const EvaluationPage = () => {
             )}
             {status.type === Types.CanWatchResults && (
                 <div className="grid w-full grid-cols-2 gap-2  sm:grid-cols-3">
-                    {status.groups.map((group) => (
-                        <div key={group.number} className="rounded-sm border">
+                    {status.results.map((group) => (
+                        <div
+                            key={group.groupNumber}
+                            className="rounded-sm border"
+                        >
                             <div className="text-center text-lg font-semibold">
-                                Group {group.number}
+                                Group {group.groupNumber}
                             </div>
-  
-                            <div>
-                                Members:{" "}
-                                {users
-                                    .filter(
-                                        (u) => u.groupNumber === group.number,
-                                    )
-                                    .map((u) => u.user)
-                                    .sort((a, b) => a.localeCompare(b))
-                                    .join(", ")}
+                            <div className="flex flex-col gap-1 text-center">
+                                {group.result.map(num => <div key={num}>{num}</div>)}
                             </div>
+
+                            <div>Members: {group.users.join(", ")}</div>
                         </div>
                     ))}
                 </div>
