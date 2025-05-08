@@ -1,4 +1,12 @@
-#[crate::service(name = "eval-hooks", dispatch = false, psibase_mod = "crate")]
+#[crate::service(
+    name = "eval-hooks",
+    actions = "HooksActions",
+    wrapper = "HooksWrapper",
+    structs = "HooksStructs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
 #[allow(non_snake_case, unused_variables)]
 pub mod Hooks {
     use crate::AccountNumber;
@@ -17,6 +25,12 @@ pub mod Hooks {
     fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
         unimplemented!()
     }
+}
+
+#[crate::service(name = "evaluations", dispatch = false, psibase_mod = "crate")]
+#[allow(non_snake_case, unused_variables)]
+pub mod Service {
+    use crate::AccountNumber;
 
     /// Creates and schedules a new evaluation with specified phases and parameters.
     ///
