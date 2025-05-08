@@ -265,6 +265,28 @@ class TestPsibase(unittest.TestCase):
             self.assertEqual(l, "")
 
     @testutil.psinode_test
+    def test_search(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def search(*options):
+                return a.run_psibase(['search', '--package-source', dir] + list(options) + a.node_args(), stdout=subprocess.PIPE, text=True).stdout
+
+            def check_repo():
+                self.assertEqual(search('foo'), 'foo 2.0.0\n')
+                self.assertEqual(search('The original'), 'foo 1.0.0\n')
+                self.assertEqual(search('Min.*up'), 'foo 1.1.0\n')
+                self.assertEqual(search('bar'), '')
+                self.assertEqual(search('foo', 'original'), 'foo 1.0.0\n')
+            check_repo()
+            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+            check_repo()
+            self.assertIn('Transact ', search('^transact$'))
+
+    @testutil.psinode_test
     def test_configure_sources(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
