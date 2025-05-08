@@ -221,6 +221,17 @@ class TestPsibase(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
+        # A non-existent account should be an error
+        for source in ['neminis', 'http://neminis.a/']:
+            status = a.run_psibase(['list', '--package-source', source] + a.node_args(), encoding='utf-8', stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, check=False)
+            self.assertNotEqual(status.returncode, 0)
+            self.assertIn("account 'neminis' does not exist", status.stderr)
+
+        # An existing account is okay even if it wasn't intended as a package repo
+        for source in ['transact', 'http://transact.a']:
+            l = a.run_psibase(['list', '--available', '--package-source', 'transact'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            self.assertEqual(l, "")
+
         foo = Foo()
 
         with tempfile.TemporaryDirectory() as dir:
