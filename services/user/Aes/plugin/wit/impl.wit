@@ -4,4 +4,5 @@ world impl {
     include kdf:plugin/imports;
 
     export with-password;
+    export with-key;
 }
