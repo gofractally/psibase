@@ -173,6 +173,10 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_info(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
+        info = a.run_psibase(['info', 'Explorer'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+        self.assertIn('status: not installed', info)
+        self.assertIn('Explorer', info)
+
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo = Foo()
