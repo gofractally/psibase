@@ -11,7 +11,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
 `psibase` [`-a` *url*] `info` *packages*\.\.\.  
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
-`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
@@ -174,7 +174,7 @@ Install packages to the chain along with all dependencies. If any of the request
 
 ### list
 
-`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
 
 Prints a list of packages from the chain and/or package repositories
 
@@ -189,6 +189,10 @@ Prints a list of packages from the chain and/or package repositories
 - `--installed`
 
   Prints packages that are currently installed
+
+- `--updates`
+
+  Prints installed packages that have newer versions available in the repository
 
 - `--package-source` *url*
 
