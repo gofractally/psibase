@@ -4,6 +4,7 @@ fn main() {
     cxx_build::bridge("src/bridge.rs")
         .file("tests/test.cpp")
         .file("../../libraries/psio/src/chrono.cpp")
+        .file("../../libraries/psio/src/from_json.cpp")
         .file("../../libraries/psio/src/schema.cpp")
         .file("../../libraries/psio/src/fpconv.c")
         .flag("-std=gnu++2a")

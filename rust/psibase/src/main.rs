@@ -10,23 +10,25 @@ use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, login_action,
-    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
+    get_tapos_for_head, login_action, new_account_action, push_transaction, push_transactions,
+    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
+    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, Checksum256,
+    DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta,
+    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
+    PackageRegistry, PackagedService, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload,
+    Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::cell::Cell;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -259,6 +261,25 @@ struct UploadArgs {
 }
 
 #[derive(Args, Debug)]
+struct PublishArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Package files to publish
+    packages: Vec<PathBuf>,
+
+    /// Sender to use (required). Files are uploaded to this account's subdomain.
+    #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+    sender: ExactAccountNumber,
+}
+
+#[derive(Args, Debug)]
 struct InstallArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -297,6 +318,43 @@ struct InstallArgs {
 }
 
 #[derive(Args, Debug)]
+struct UpgradeArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Packages to update
+    packages: Vec<OsString>,
+
+    /// Set all accounts to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+
+    /// Sender to use for installing. The packages and all accounts
+    /// that they create will be owned by this account.
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
+
+    /// Install the latest version
+    #[clap(long)]
+    latest: bool,
+
+    /// Configure compression level to use for uploaded files
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+    compression_level: u32,
+}
+
+#[derive(Args, Debug)]
 struct ListArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -314,6 +372,10 @@ struct ListArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -328,6 +390,10 @@ struct SearchArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -342,6 +408,10 @@ struct InfoArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -393,8 +463,14 @@ enum Command {
     /// Upload a file to a service
     Upload(UploadArgs),
 
+    /// Publish a package
+    Publish(PublishArgs),
+
     /// Install apps to the chain
     Install(InstallArgs),
+
+    /// Upgrade apps
+    Upgrade(UpgradeArgs),
 
     /// Prints a list of apps
     List(ListArgs),
@@ -839,30 +915,44 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
 }
 
 async fn add_package_registry(
+    base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
-    client: reqwest::Client,
+    mut client: reqwest::Client,
     result: &mut JointRegistry<BufReader<File>>,
 ) -> Result<(), anyhow::Error> {
-    if sources.is_empty() {
+    let chain_sources = if let Some(account) = account {
+        get_package_sources(base_url, &mut client, account).await?
+    } else {
+        Vec::new()
+    };
+    if sources.is_empty() && chain_sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
         for source in sources {
             if source.starts_with("http:") || source.starts_with("https:") {
                 result.push(HTTPRegistry::new(Url::parse(source)?, client.clone()).await?)?;
+            } else if let Ok(owner) = AccountNumber::from_exact(&*source) {
+                result.push(HTTPRegistry::with_account(base_url, owner, client.clone()).await?)?;
             } else {
                 result.push(DirectoryRegistry::new(source.into()))?;
             }
+        }
+        for source in chain_sources {
+            result.push(HTTPRegistry::with_source(base_url, source, client.clone()).await?)?;
         }
     }
     Ok(())
 }
 
 async fn get_package_registry(
+    base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
     client: reqwest::Client,
 ) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
     let mut result = JointRegistry::new();
-    add_package_registry(sources, client, &mut result).await?;
+    add_package_registry(base_url, account, sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -878,7 +968,14 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         package_registry.push(files)?;
         packages
     };
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        None,
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let mut packages = package_registry.resolve(&package_names).await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
@@ -1014,6 +1111,115 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+
+    // Read package metadata and determine which packages are already published
+    let mut query_existing = "query {".to_string();
+
+    let mut all_meta = Vec::new();
+
+    for (i, path) in args.packages.iter().enumerate() {
+        let f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        let package = PackagedService::new(BufReader::new(f))?;
+        let meta = package.meta();
+        use std::fmt::Write;
+        write!(
+            &mut query_existing,
+            " p{}: package(owner: {}, name: {}, version: {}) {{ sha256 }}",
+            i,
+            serde_json::to_string(&args.sender)?,
+            serde_json::to_string(&meta.name)?,
+            serde_json::to_string(&meta.version)?
+        )?;
+        all_meta.push(meta.clone());
+    }
+
+    query_existing += " }";
+
+    let existing = psibase::gql_query::<serde_json::Value>(
+        &args.node_args.api,
+        &mut client,
+        packages::SERVICE,
+        query_existing,
+    )
+    .await?;
+    let existing = existing.as_object().unwrap();
+    let num_new = existing.values().filter(|p| p.is_null()).count();
+
+    let progress = ProgressBar::new(num_new as u64).with_style(ProgressStyle::with_template(
+        "{wide_bar} {pos}/{len}\n{msg}",
+    )?);
+    progress.set_message("Preparing transactions");
+
+    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+
+    let action_limit: usize = 1024 * 1024;
+    let mut builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &args.sig_args.proposer, false),
+                &args.sig_args.sign,
+            )?)
+        },
+    );
+
+    for (i, path) in args.packages.iter().enumerate() {
+        let mut f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        // Read the file
+        let mut content = Vec::new();
+        f.read_to_end(&mut content)?;
+        // Calculate the package hash
+        let hash: [u8; 32] = Sha256::digest(&content).into();
+        let existing_info = &existing[&format!("p{}", i)];
+        let meta = &all_meta[i];
+        if existing_info.is_null() {
+            let dest = format!("/packages/{}-{}.psi", &meta.name, &meta.version);
+            builder.set_label(format!("Publishing {}-{}", &meta.name, &meta.version));
+            builder.push(vec![
+                sites::Wrapper::pack_from(args.sender.into()).storeSys(
+                    dest.clone(),
+                    "application/zip".to_string(),
+                    None,
+                    content.into(),
+                ),
+                packages::Wrapper::pack_from(args.sender.into()).publish(
+                    meta.clone(),
+                    hash.into(),
+                    dest,
+                ),
+            ])?;
+            progress.inc(1);
+        } else if &serde_json::from_value::<Checksum256>(existing_info["sha256"].clone())?.0
+            != &hash
+        {
+            progress.suspend(|| {
+                eprintln!(
+                    "{}-{} has already been published",
+                    &meta.name, &meta.version
+                );
+            })
+        }
+    }
+    progress.reset();
+
+    let transactions = builder.finish()?;
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
+
+    push_transactions(
+        &args.node_args.api,
+        client,
+        transactions,
+        args.tx_args.trace,
+        args.tx_args.console,
+        &progress,
+    )
+    .await?;
+    finish_progress(&args.sig_args, progress, num_transactions);
+    Ok(())
+}
+
 fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>>(
     accounts: Vec<AccountNumber>,
     out: &mut TransactionBuilder<F>,
@@ -1063,11 +1269,13 @@ async fn apply_packages<
     key: &Option<AnyPublicKey>,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
+    let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
             PackageOp::Install(info) => {
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
+                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
@@ -1083,12 +1291,14 @@ async fn apply_packages<
                     sender,
                     true,
                     compression_level,
+                    &mut schemas,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
+                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -1112,6 +1322,7 @@ async fn apply_packages<
                     sender,
                     true,
                     compression_level,
+                    &mut schemas,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
@@ -1127,18 +1338,18 @@ async fn apply_packages<
     Ok(())
 }
 
-async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
-    let mut package_registry = JointRegistry::new();
-    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
-    package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
-    let to_install = installed
-        .resolve_changes(&package_registry, &packages, args.reinstall)
-        .await?;
-
-    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+async fn do_install<T: Read + Seek>(
+    mut client: reqwest::Client,
+    package_registry: JointRegistry<T>,
+    to_install: Vec<PackageOp>,
+    sender: AccountNumber,
+    node_args: &NodeArgs,
+    sig_args: &SigArgs,
+    tx_args: &TxArgs,
+    key: &Option<AnyPublicKey>,
+    compression_level: u32,
+) -> Result<(), anyhow::Error> {
+    let tapos = get_tapos_for_head(&node_args.api, client.clone()).await?;
 
     let mut id_bytes = <[u8; 8]>::default();
     getrandom::getrandom(&mut id_bytes)?;
@@ -1154,11 +1365,11 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         let auto_exec = auto_exec_cell.get();
         actions.insert(
             0,
-            packages::Wrapper::pack_from(args.sender.into()).checkOrder(id.clone(), index),
+            packages::Wrapper::pack_from(sender).checkOrder(id.clone(), index),
         );
         Ok(sign_transaction(
-            with_tapos(&tapos, actions, &args.sig_args.proposer, auto_exec),
-            &args.sig_args.sign,
+            with_tapos(&tapos, actions, &sig_args.proposer, auto_exec),
+            &sig_args.sign,
         )?)
     };
 
@@ -1166,43 +1377,40 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     let new_accounts = get_accounts_to_create(
-        &args.node_args.api,
+        &node_args.api,
         &mut client,
         &get_package_accounts(&to_install),
-        args.sender.into(),
+        sender,
     )
     .await?;
-    create_accounts(new_accounts, &mut trx_builder, args.sender.into())?;
+    create_accounts(new_accounts, &mut trx_builder, sender)?;
 
-    let uploader = StagedUpload::new(
-        id.clone(),
-        args.sig_args.proposer.unwrap_or(args.sender).into(),
-    );
+    let uploader = StagedUpload::new(id.clone(), sig_args.proposer.map_or(sender, |s| s.into()));
 
     let mut upload_builder = TransactionBuilder::new(
         action_limit,
         |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
             Ok(sign_transaction(
                 with_tapos(&tapos, actions, &None, false),
-                &args.sig_args.sign,
+                &sig_args.sign,
             )?)
         },
     );
     apply_packages(
-        &args.node_args.api,
+        &node_args.api,
         &mut client,
         &package_registry,
         to_install,
         uploader,
         &mut trx_builder,
         &mut upload_builder,
-        args.sender.into(),
-        &args.key,
-        args.compression_level,
+        sender,
+        key,
+        compression_level,
     )
     .await?;
 
-    trx_builder.push(packages::Wrapper::pack_from(args.sender.into()).removeOrder(id.clone()))?;
+    trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
 
     let upload_transactions = upload_builder.finish()?;
     {
@@ -1224,11 +1432,11 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             for trx in transactions {
                 let len = trx.transaction.len() as u64;
                 let result = push_transaction(
-                    &args.node_args.api,
+                    &node_args.api,
                     client.clone(),
                     trx.packed(),
-                    args.tx_args.trace,
-                    args.tx_args.console,
+                    tx_args.trace,
+                    tx_args.console,
                     Some(&progress),
                 )
                 .await;
@@ -1255,18 +1463,92 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
 
     push_transactions(
-        &args.node_args.api,
+        &node_args.api,
         client.clone(),
         transactions,
-        args.tx_args.trace,
-        args.tx_args.console,
+        tx_args.trace,
+        tx_args.console,
         &progress,
     )
     .await?;
 
-    finish_progress(&args.sig_args, progress, num_transactions);
+    finish_progress(sig_args, progress, num_transactions);
 
     Ok(())
+}
+
+async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let mut package_registry = JointRegistry::new();
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
+    package_registry.push(files)?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
+    let to_install = installed
+        .resolve_changes(&package_registry, &packages, args.reinstall)
+        .await?;
+
+    do_install(
+        client,
+        package_registry,
+        to_install,
+        args.sender.into(),
+        &args.node_args,
+        &args.sig_args,
+        &args.tx_args,
+        &args.key,
+        args.compression_level,
+    )
+    .await
+}
+
+async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let mut package_registry = JointRegistry::new();
+
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
+    package_registry.push(files)?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
+
+    let to_install = installed
+        .resolve_upgrade(
+            &package_registry,
+            &packages,
+            if args.latest {
+                PackagePreference::Latest
+            } else {
+                PackagePreference::Compatible
+            },
+        )
+        .await?;
+
+    do_install(
+        client,
+        package_registry,
+        to_install,
+        args.sender.into(),
+        &args.node_args,
+        &args.sig_args,
+        &args.tx_args,
+        &args.key,
+        args.compression_level,
+    )
+    .await
 }
 
 async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
@@ -1277,7 +1559,13 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
@@ -1291,7 +1579,13 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     } else if args.available {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -1307,7 +1601,13 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+    let package_registry = get_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+    )
+    .await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -1385,9 +1685,35 @@ async fn show_package<T: PackageRegistry + ?Sized>(
     client: &mut reqwest::Client,
     package: &Meta,
     origin: &PackageOrigin,
+    alt: Option<&(Meta, PackageOrigin)>,
 ) -> Result<(), anyhow::Error> {
     let mut manifest = get_manifest(reg, base_url, client, package, origin).await?;
     println!("name: {}-{}", &package.name, &package.version);
+    let alt_version = if let Some((alt_package, _)) = alt {
+        if &alt_package.version != &package.version {
+            Some(&alt_package.version)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    match origin {
+        PackageOrigin::Installed { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: upgrade to {} available", alt_version);
+            } else {
+                println!("status: installed");
+            }
+        }
+        PackageOrigin::Repo { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: version {} installed", alt_version);
+            } else {
+                println!("status: not installed");
+            }
+        }
+    }
     println!("description: {}", &package.description);
     let mut services: Vec<_> = manifest.services.into_iter().collect();
     services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
@@ -1440,26 +1766,43 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
     for package in &packages {
         if let Some((meta, origin)) = installed.get_by_name(package)? {
+            let alt = reglist.get_by_ref(&PackageRef {
+                name: meta.name.clone(),
+                version: format!(">{}", &meta.version),
+            })?;
             show_package(
                 &package_registry,
                 &args.node_args.api,
                 &mut client,
                 meta,
                 origin,
+                alt,
             )
             .await?;
         } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
+            let alt = installed.get_by_ref(&PackageRef {
+                name: meta.name.clone(),
+                version: "*".to_string(),
+            })?;
             show_package(
                 &package_registry,
                 &args.node_args.api,
                 &mut client,
                 meta,
                 origin,
+                alt,
             )
             .await?;
         } else {
@@ -1713,7 +2056,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 upload(&args).await?
             }
         }
+        Command::Publish(args) => publish(&args).await?,
         Command::Install(args) => install(&args).await?,
+        Command::Upgrade(args) => upgrade(&args).await?,
         Command::List(args) => list(&args).await?,
         Command::Search(args) => search(&args).await?,
         Command::Info(args) => package_info(&args).await?,

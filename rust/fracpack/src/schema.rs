@@ -961,6 +961,18 @@ impl<'a> CompiledSchema<'a> {
         }
         result
     }
+    pub fn extend(&mut self, ty: &'a AnyType) {
+        let mut custom_indexes = Vec::new();
+        self.add(self.schema, &mut custom_indexes, ty);
+        while !self.queue.is_empty() {
+            for (id, ty) in std::mem::take(&mut self.queue) {
+                self.complete(self.schema, &mut custom_indexes, id, ty);
+            }
+        }
+        for idx in custom_indexes {
+            self.resolve_custom(idx);
+        }
+    }
     fn add(&mut self, schema: &'a Schema, custom: &mut Vec<usize>, ty: &'a AnyType) -> usize {
         let p: *const AnyType = &*ty;
         if let Some(id) = self.type_map.get(&p) {
@@ -1122,7 +1134,10 @@ impl<'a> CompiledSchema<'a> {
         }
     }
     fn get_by_id(&self, id: usize) -> &CompiledType {
-        &self.types[id]
+        match &self.types[id] {
+            CompiledType::Alias(next) => &self.types[*next],
+            ty => ty,
+        }
     }
 
     /// Looks up a CompiledType
@@ -1219,6 +1234,20 @@ impl<'a> CompiledSchema<'a> {
             &mut result,
         )?;
         Ok(result)
+    }
+
+    /// If ty is a fixed-size, single element struct, return its element type.
+    /// Otherwise return ty.
+    pub fn unwrap_struct(&'a self, ty: &'a CompiledType) -> &'a CompiledType {
+        use CompiledType::*;
+        match ty {
+            Struct {
+                is_variable_size: false,
+                children,
+                ..
+            } if children.len() == 1 => self.get_by_id(children[0].1),
+            _ => ty,
+        }
     }
 }
 
@@ -2081,7 +2110,7 @@ fn json2frac(
             schema.custom.json2frac(*id, schema, repr, val, dest)
         }
 
-        _ => unimplemented!(),
+        _ => unimplemented!("{:?}", ty),
     }
 }
 

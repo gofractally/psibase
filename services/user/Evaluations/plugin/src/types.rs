@@ -4,7 +4,6 @@ use crate::errors::ErrorType::*;
 use host::common::types as CommonTypes;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Deserialize;
-use std::ops::{Deref, DerefMut};
 
 pub trait TryParseGqlResponse: Sized {
     fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
@@ -40,20 +39,6 @@ pub struct GetGroup {
 #[serde(rename_all = "camelCase")]
 pub struct GetGroupUsers {
     pub nodes: Vec<Node>,
-}
-
-impl Deref for GetGroupUsers {
-    type Target = Vec<Node>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.nodes
-    }
-}
-
-impl DerefMut for GetGroupUsers {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.nodes
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -100,12 +85,11 @@ impl TryFrom<String> for GetUserSettingsResponse {
 #[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyHistory {
-    pub evaluation_id: String,
+    pub evaluation_id: u32,
     pub hash: String,
-    pub group_number: String,
+    pub group_number: u32,
     pub keys: Vec<Vec<u8>>,
 }
-
 
 #[derive(Deserialize, Pack, Unpack, Debug)]
 pub struct KeyHistoryRoot {

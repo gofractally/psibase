@@ -47,10 +47,7 @@ export const addUserToCache = (
                 ],
             };
 
-            const abandoned = FunctionResponse.parse(newResponse);
-            console.log({ abandoned }, "should be the new response...");
-
-            return abandoned;
+            return FunctionResponse.parse(newResponse);
         },
     );
 };

@@ -29,7 +29,8 @@ pub fn create_new_symmetric_key(
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
     let user_settings =
-        fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?.get_user_settings;
+        fetch_user_settings(sorted_users.nodes.iter().map(|u| u.user.clone()).collect())?
+            .get_user_settings;
 
     let creator_public_key = user_settings
         .iter()
@@ -47,6 +48,7 @@ pub fn create_new_symmetric_key(
     let symmetric_key = key_table::SymmetricKey::generate(creator_public_key);
 
     let payloads: Vec<Vec<u8>> = sorted_users
+        .nodes
         .iter()
         .map(|user| {
             let setting = user_settings
@@ -67,7 +69,10 @@ pub fn create_new_symmetric_key(
         hash,
     }
     .packed();
-    add_action_to_transaction(evaluations::action_structs::group_key::ACTION_NAME, &packed_args)?;
+    add_action_to_transaction(
+        evaluations::action_structs::group_key::ACTION_NAME,
+        &packed_args,
+    )?;
     Ok(symmetric_key)
 }
 
@@ -78,29 +83,22 @@ pub fn get_decrypted_proposals(
     sender: AccountNumber,
 ) -> Result<Vec<(AccountNumber, Option<Vec<u8>>)>, Error> {
     let res = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
-    let mut proposals = res.get_group_users.ok_or(ErrorType::UsersNotFound)?;
-
-    proposals.sort_by(|a, b| {
-        parse_account_number(&a.user)
-            .map(|a| a.value)
-            .unwrap_or(0)
-            .cmp(&parse_account_number(&b.user).map(|b| b.value).unwrap_or(0))
-    });
+    let proposals = res.get_group_users.ok_or(ErrorType::UsersNotFound)?;
 
     let symmetric_key = get_symmetric_key(evaluation_owner, evaluation_id, group_number, sender)?;
 
     let proposals = proposals
+        .nodes
         .iter()
         .map(|s| {
-            let user =
-                parse_account_number(&s.user).map_err(|_| ErrorType::InvalidAccountNumber)?;
+            let user = parse_account_number(&s.user).unwrap();
             Ok(if s.proposal.is_some() {
                 (
                     user,
                     Some(
                         bindings::aes::plugin::with_password::decrypt(
                             &symmetric_key.key,
-                            s.proposal.as_ref().ok_or(ErrorType::DecryptionFailed)?,
+                            s.proposal.as_ref().unwrap(),
                             symmetric_key.salt_base_64().as_str(),
                         )
                         .map_err(|_| ErrorType::DecryptionFailed)?,
@@ -173,6 +171,7 @@ pub fn decrypt_existing_key(
     let sorted_users = sort_users_by_account(users)?;
 
     let my_index = sorted_users
+        .nodes
         .iter()
         .position(|user| {
             parse_account_number(&user.user)
@@ -181,12 +180,12 @@ pub fn decrypt_existing_key(
         })
         .ok_or(ErrorType::UserNotFound)?;
 
-    let key_history = fetch_key_history(evaluation_id, group_number)?;
+    let key_history = fetch_key_history(evaluation_owner, evaluation_id, group_number)?;
     let edge = key_history
         .get_group_key
         .edges
         .iter()
-        .find(|edge| edge.node.evaluation_id == evaluation_id.to_string())
+        .find(|edge| edge.node.evaluation_id == evaluation_id)
         .ok_or(ErrorType::FailedToFindEvaluation)?;
 
     let my_cipher = &edge.node.keys[my_index];
@@ -207,7 +206,7 @@ pub fn decrypt_existing_key(
 
 pub fn sort_users_by_account(users: &types::GetGroupUsers) -> Result<types::GetGroupUsers, Error> {
     let mut sorted = users.clone();
-    sorted.sort_by(|a, b| {
+    sorted.nodes.sort_by(|a, b| {
         let a_value = parse_account_number(&a.user).map(|a| a.value).unwrap_or(0);
         let b_value = parse_account_number(&b.user).map(|b| b.value).unwrap_or(0);
         a_value.cmp(&b_value)

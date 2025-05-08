@@ -12,7 +12,7 @@ export const getProposal = async (
         method: "getProposal",
         params: [owner, evaluationId, groupId],
         service: "evaluations",
-        intf: "api",
+        intf: "user",
     };
     const res = await supervisor.functionCall(pars);
 

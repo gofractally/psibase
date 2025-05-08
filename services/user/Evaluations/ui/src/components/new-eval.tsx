@@ -5,58 +5,50 @@ import { useAppForm } from "./app-form";
 import { humanize } from "@lib/humanize";
 import { NumbersField } from "./numbers-field";
 
+
 dayjs.extend(duration);
-
-const lowestFifth = (minute: number) => minute - (minute % 5);
-
-const now = dayjs();
-
-const registration = now;
-const deliberation = now.add(10, "seconds");
-const submission = deliberation.add(30, "seconds");
-const finishBy = submission.add(10, "seconds");
 
 export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
     const { mutateAsync: createEvaluation } = useCreateEvaluation();
 
     const form = useAppForm({
         defaultValues: {
-            registration: registration.toDate(),
-            deliberation: deliberation.toDate(),
-            submission: submission.toDate(),
-            finishBy: finishBy.toDate(),
-            allowableGroupSizes: [1, 2, 3, 4, 5, 6],
+            registration: new Date(),
+            deliberationSeconds: 120,
+            submissionSeconds: 120,
+            finishBySeconds: 120,
+            allowableGroupSizes: [4, 5, 6],
             numOptions: 6,
         },
         validators: {
-            onSubmit: (data) => {
-                const now = dayjs();
-                const { deliberation } = data.value;
-
-                if (now.valueOf() > deliberation.valueOf()) {
-                    return "Deliberation phase has already started";
-                }
-            },
             onSubmitAsync: async (data) => {
                 const {
                     registration,
+                    deliberationSeconds,
+                    submissionSeconds,
+                    finishBySeconds,
+                    allowableGroupSizes,
+                    numOptions,
+                } = data.value;
+
+                const registrationUnix = dayjs(registration).unix();
+                const deliberation = registrationUnix + deliberationSeconds;
+                const submission = deliberation + submissionSeconds;
+                const finishBy = submission + finishBySeconds;
+
+                const pars = {
+                    registration: registrationUnix,
                     deliberation,
                     submission,
                     finishBy,
                     allowableGroupSizes,
                     numOptions,
-                } = data.value;
+                    useHooks: false,
+                }
 
+                console.log({ registrationUnix, deliberation, submission, finishBy, pars })
                 try {
-                    await createEvaluation({
-                        deliberation: dayjs(deliberation).unix(),
-                        finishBy: dayjs(finishBy).unix(),
-                        registration: dayjs(registration).unix(),
-                        submission: dayjs(submission).unix(),
-                        allowableGroupSizes,
-                        numOptions,
-                        useHooks: false,
-                    });
+                    await createEvaluation(pars);
                 } catch (error) {
                     console.error(error);
                     return "Failed to create evaluation";
@@ -81,23 +73,14 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
             >
                 <form.AppField
                     name="registration"
-                    listeners={{
-                        onChange: ({ value }) => {
-                            if (value > form.getFieldValue("deliberation")) {
-                                form.setFieldValue(
-                                    "deliberation",
-                                    dayjs(value).add(1, "hour").toDate(),
-                                );
-                            }
-                        },
-                    }}
+
                     children={(field) => (
                         <field.DateTimeField
-                            label="Registration phase"
+                            label="Registration starts from"
                             description={
                                 dayjs(field.state.value).isBefore(now)
                                     ? "Now"
-                                    : "In " +
+                                    : 
                                       humanize(
                                           dayjs(field.state.value).diff(now),
                                       )
@@ -106,34 +89,10 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     )}
                 />
                 <form.AppField
-                    name="deliberation"
-                    validators={{
-                        onChange: ({ value, fieldApi }) => {
-                            if (
-                                value <
-                                fieldApi.form.getFieldValue("registration")
-                            ) {
-                                return "Deliberation must be after registration";
-                            }
-
-                            if (new Date().valueOf() > deliberation.valueOf()) {
-                                return "Deliberation phase has already started";
-                            }
-                        },
-                    }}
-                    listeners={{
-                        onChange: ({ value }) => {
-                            if (value > form.getFieldValue("submission")) {
-                                form.setFieldValue(
-                                    "submission",
-                                    dayjs(value).add(1, "hour").toDate(),
-                                );
-                            }
-                        },
-                    }}
+                    name="deliberationSeconds"
                     children={(field) => (
-                        <field.DateTimeField
-                            label="Deliberation phase"
+                        <field.DurationField
+                            label="Registration duration"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("registration")),
@@ -143,46 +102,26 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     )}
                 />
                 <form.AppField
-                    name="submission"
-                    listeners={{
-                        onChange: ({ value }) => {
-                            if (value > form.getFieldValue("finishBy")) {
-                                form.setFieldValue(
-                                    "finishBy",
-                                    dayjs(value).add(1, "hour").toDate(),
-                                );
-                            }
-                        },
-                    }}
+                    name="submissionSeconds"
                     children={(field) => (
-                        <field.DateTimeField
-                            label="Submission phase"
+                        <field.DurationField
+                            label="Deliberation duration"
                             description={humanize(
                                 dayjs(field.state.value).diff(
-                                    dayjs(form.getFieldValue("deliberation")),
+                                    dayjs(form.getFieldValue("deliberationSeconds")),
                                 ),
                             )}
                         />
                     )}
                 />
                 <form.AppField
-                    name="finishBy"
-                    validators={{
-                        onChange: ({ value, fieldApi }) => {
-                            if (
-                                value <
-                                fieldApi.form.getFieldValue("submission")
-                            ) {
-                                return "Finish by must be after submission";
-                            }
-                        },
-                    }}
+                    name="finishBySeconds"
                     children={(field) => (
-                        <field.DateTimeField
-                            label="Finish by"
+                        <field.DurationField
+                            label="Submission duration"
                             description={humanize(
                                 dayjs(field.state.value).diff(
-                                    dayjs(form.getFieldValue("submission")),
+                                    dayjs(form.getFieldValue("submissionSeconds")),
                                 ),
                             )}
                         />

@@ -7,7 +7,6 @@ import { z } from "zod";
 const StartParams = z.object({
     owner: zAccount,
     id: z.number(),
-    entropy: z.number(),
 });
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -19,7 +18,7 @@ export const useStartEvaluation = () =>
             void (await getSupervisor().functionCall({
                 method: "start",
                 service: "evaluations",
-                intf: "api",
+                intf: "admin",
                 params: [owner, id],
             }));
             await wait(3000);

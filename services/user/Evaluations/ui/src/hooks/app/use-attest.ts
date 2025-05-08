@@ -15,7 +15,7 @@ export const useAttest = () =>
             void (await getSupervisor().functionCall({
                 method: "attest",
                 service: "evaluations",
-                intf: "api",
+                intf: "user",
                 params: [params.owner, params.evaluationId, params.groupNumber],
             }));
         },

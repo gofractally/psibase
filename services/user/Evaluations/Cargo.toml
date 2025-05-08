@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["service", "plugin", "tests"]
+members = ["service", "plugin", "query-service"]
 
 [workspace.package]
 version = "0.16.0"
@@ -10,7 +10,7 @@ publish = false
 
 [package]
 name = "evaluations-pkg"                  # Crate name
-description = "Evaluate in random groups"
+description = "Facilitates the discovery of one or more groups' rank-ordered preferences over a list of elements"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true

@@ -95,7 +95,7 @@ pub mod impls {
     use crate::helpers::{
         calculate_results, get_current_time_seconds, EvaluationStatus, GroupResult,
     };
-    use psibase::services::evaluations::Hooks::Wrapper as EvalHooks;
+    use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
     use psibase::services::subgroups::Wrapper as Subgroups;
     use psibase::{AccountNumber, Table};
     use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
@@ -392,9 +392,10 @@ pub mod impls {
                 .collect();
 
             let population = users.len() as u32;
-            let chunk_sizes = Subgroups::call()
-                .gmp(population, allowable_group_sizes)
-                .expect("unable to group users");
+            let chunk_sizes = psibase::check_some(
+                Subgroups::call().gmp(population, allowable_group_sizes),
+                "unable to group users",
+            );
 
             for (index, &chunk_size) in chunk_sizes.iter().enumerate() {
                 let group_number = (index as u32) + 1;
@@ -494,18 +495,14 @@ pub mod impls {
                 );
             }
 
-            let users = self
-                .get_users()
-                .into_iter()
-                .map(|account| account.user.to_string())
-                .collect();
+            let users = self.get_users().into_iter().map(|user| user.user).collect();
 
             crate::Wrapper::emit().history().group_finished(
-                self.owner.to_string(),
-                self.evaluation_id.to_string(),
-                self.number.to_string(),
+                self.owner,
+                self.evaluation_id,
+                self.number,
                 users,
-                result.into_iter().map(|res| res.to_string()).collect(),
+                result,
             );
             
             self.delete();

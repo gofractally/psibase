@@ -1,16 +1,24 @@
+import { zAccount } from "@lib/zod/Account";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { z } from "zod";
+
+
+const Params = z.object({
+    owner: zAccount,
+    evaluationId: z.number()
+})
 
 export const useCloseEvaluation = () => {
     const navigate = useNavigate();
     return useMutation({
-        mutationFn: async (evaluationId: number) => {
+        mutationFn: async (params: z.infer<typeof Params>) => {
             void (await getSupervisor().functionCall({
                 method: "close",
                 service: "evaluations",
-                intf: "api",
-                params: [evaluationId],
+                intf: "admin",
+                params: [params.owner, params.evaluationId],
             }));
             navigate(`/`);
         },
