@@ -80,6 +80,7 @@ pub mod service {
         Wrapper::emit()
             .history()
             .evaluation_created(get_sender(), new_evaluation.id);
+
         new_evaluation.id
     }
 

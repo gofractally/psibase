@@ -285,10 +285,6 @@ pub mod impls {
             result
         }
 
-        pub fn is_groups(&self) -> bool {
-            self.get_groups().len() > 0
-        }
-
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
             let table = GroupTable::new();
             let result = table
@@ -481,16 +477,10 @@ pub mod impls {
         pub fn declare_result(&self, result: Vec<u8>) {
             let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
 
-            let users = self.get_users();
-
             if parent_eval.use_hooks {
-
-                
                 EvalHooks::call_from(crate::Wrapper::SERVICE).evalGroupFin(
-                    self.owner,
                     self.evaluation_id,
                     self.number,
-                    users.into_iter().map(|user| user.user).collect(),
                     result.clone(),
                 );
             }
@@ -504,7 +494,7 @@ pub mod impls {
                 users,
                 result,
             );
-            
+
             self.delete();
         }
 
