@@ -1,8 +1,8 @@
 #[crate::service(
     name = "eval-hooks",
-    actions = "HooksActions",
-    wrapper = "HooksWrapper",
-    structs = "HooksStructs",
+    actions = "hooks_actions",
+    wrapper = "hooks_wrapper",
+    structs = "hooks_structs",
     dispatch = false,
     pub_constant = false,
     psibase_mod = "crate"

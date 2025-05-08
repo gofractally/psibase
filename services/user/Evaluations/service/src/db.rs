@@ -95,7 +95,7 @@ pub mod impls {
     use crate::helpers::{
         calculate_results, get_current_time_seconds, EvaluationStatus, GroupResult,
     };
-    use psibase::services::evaluations::Hooks::HooksWrapper as EvalHooks;
+    use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
     use psibase::services::subgroups::Wrapper as Subgroups;
     use psibase::{AccountNumber, Table};
     use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
