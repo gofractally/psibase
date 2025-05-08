@@ -12,13 +12,14 @@ pub mod service {
     use std::collections::HashMap;
 
     #[action]
-    fn create_fractal(name: String, mission: String) {
+    fn create_fractal(fractal_account: AccountNumber, name: String, mission: String) {
         let sender = get_sender();
+        psibase::services::auth_delegate::Wrapper::call().newAccount(fractal_account, sender);
 
-        check_none(Fractal::get(sender), "fractal already exists");
-        Fractal::add(sender, name, mission);
+        Fractal::add(fractal_account, name, mission);
+        Member::add(fractal_account, sender, MemberStatus::Citizen);
 
-        Wrapper::emit().history().created_fractal(sender);
+        Wrapper::emit().history().created_fractal(fractal_account);
     }
 
     #[action]
@@ -177,7 +178,6 @@ pub mod service {
                 member.feed_new_score(new_score);
             });
         }
-
     }
 
     #[event(history)]

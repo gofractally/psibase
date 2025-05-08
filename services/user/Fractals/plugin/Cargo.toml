@@ -25,6 +25,8 @@ world = "impl"
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
+
 
 [dev-dependencies]
 fractals-pkg = { path = "..", version = "0.16.0" }

@@ -15,6 +15,9 @@ import {
 
 import { getSupervisor } from "@psibase/common-lib";
 import { useForm } from "@tanstack/react-form";
+import { useSetSchedule } from "@hooks/use-set-schedule";
+import { Account } from "@lib/zod/Account";
+import { z } from "zod";
 const supervisor = getSupervisor();
 
 
@@ -33,13 +36,34 @@ export const App = () => {
 
     const { data: currentUser } = useLoggedInUser();
 
+    const { mutateAsync: setSchedule } = useSetSchedule();
+
+
+    const setTheSchedule = async(fractalAccount: Account) => {
+        
+        const startFrom = Math.floor(new Date().getTime() / 1000);
+
+        setSchedule({
+            fractal: fractalAccount,
+            registration: startFrom,
+            deliberation: startFrom + 30,
+            submission: startFrom + 60,
+            finishBy: startFrom + 90,
+            forceDelete: false,
+            intervalSeconds: 600
+        });
+
+    }
+
     const newFractalForm = useForm({
         defaultValues: {
+            account: '',
             name: "",
             mission: "",
         },
         onSubmit: async ({ value }) => {
-            await fc('createFractal', [value.name, value.mission])
+            console.log('submit', value)
+            await fc('createFractal', [value.account, value.name, value.mission])
 
         },
     });
@@ -94,6 +118,18 @@ export const App = () => {
                         }}
                     >
                         <newFractalForm.Field
+                            name="account"
+                            children={(field) => (
+                                <Input
+                                    placeholder="Account name"
+                                    value={field.state.value}
+                                    onChange={(e) =>
+                                        field.handleChange(e.target.value)
+                                    }
+                                />
+                            )}
+                        />
+                        <newFractalForm.Field
                             name="name"
                             children={(field) => {
                                 return (
@@ -123,7 +159,7 @@ export const App = () => {
                         />
                         <newFractalForm.Subscribe 
                             selector={(state) => [state.isSubmitting, state.isSubmitSuccessful]}
-                            children={([submitting, isSuccessful]) => <Button>{isSuccessful ? "Success": submitting ?  "Saving" : "Save"}</Button>}
+                            children={([submitting, isSuccessful]) => <Button type="submit">{isSuccessful ? "Success": submitting ?  "Saving" : "Save"}</Button>}
                         />
                     </form>
                 </div>
@@ -133,6 +169,13 @@ export const App = () => {
                 <div className="flex flex-col gap-2">
                     
                 </div>
+            </div>
+            <div>
+                <Button onClick={() => {
+                    setTheSchedule(z.string().parse(window.prompt()))
+                }}>
+                    Set schedule
+                </Button>
             </div>
         </div>
     );
