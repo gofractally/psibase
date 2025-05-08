@@ -3,6 +3,6 @@
     "sender": "workshop",
     "service": "sites",
     "method": "enablespa",
-    "rawData": "010001"
+    "data": { "enable": true }
   }
 ]

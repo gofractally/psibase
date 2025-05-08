@@ -22,6 +22,37 @@ namespace UserService
    };
    PSIO_REFLECT(PackageMeta, name, version, description, depends, accounts)
 
+   struct PublishedPackage
+   {
+      psibase::AccountNumber              owner;
+      std::string                         name;
+      std::string                         version;
+      std::string                         description;
+      std::vector<PackageRef>             depends;
+      std::vector<psibase::AccountNumber> accounts;
+      psibase::Checksum256                sha256;
+      std::string                         file;
+
+      using Key = psibase::CompositeKey<&PublishedPackage::owner,
+                                        &PublishedPackage::name,
+                                        &PublishedPackage::version>;
+   };
+   PSIO_REFLECT(PublishedPackage, name, version, description, depends, accounts, sha256, file)
+
+   struct PackageSource
+   {
+      std::optional<std::string>            url;
+      std::optional<psibase::AccountNumber> account;
+   };
+   PSIO_REFLECT(PackageSource, url, account)
+
+   struct PackageSources
+   {
+      psibase::AccountNumber     owner;
+      std::vector<PackageSource> sources;
+   };
+   PSIO_REFLECT(PackageSources, owner, sources)
+
    struct PackageKey
    {
       std::string            name;
@@ -87,6 +118,10 @@ namespace UserService
    PSIO_REFLECT_TYPENAME(PackageManifestTable)
    using TransactionOrderTable = psibase::Table<TransactionOrder, TransactionOrder::Key{}>;
    PSIO_REFLECT_TYPENAME(TransactionOrderTable)
+   using PublishedPackageTable = psibase::Table<PublishedPackage, PublishedPackage::Key{}>;
+   PSIO_REFLECT_TYPENAME(PublishedPackageTable)
+   using PackageSourcesTable = psibase::Table<PackageSources, &PackageSources::owner>;
+   PSIO_REFLECT_TYPENAME(PackageSourcesTable)
 
    struct Packages : psibase::Service
    {
@@ -94,10 +129,16 @@ namespace UserService
       using Tables                  = psibase::ServiceTables<InstalledPackageTable,
                                                              PackageManifestTable,
                                                              TransactionOrderTable,
-                                                             InstalledSchemaTable>;
+                                                             InstalledSchemaTable,
+                                                             PublishedPackageTable,
+                                                             PackageSourcesTable>;
       // This should be the last action run when installing a package
       void postinstall(PackageMeta package, std::vector<char> manifest);
       void setSchema(psibase::ServiceSchema schema);
+
+      void publish(PackageMeta package, psibase::Checksum256 sha256, std::string file);
+
+      void setSources(std::vector<PackageSource> sources);
 
       /// Used to ensure that the transactions that install packages
       /// are executed in order.
@@ -110,6 +151,8 @@ namespace UserService
    PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),
                 method(setSchema, account, schema),
+                method(publish, package, sha256, file),
+                method(setSources, sources),
                 method(checkOrder, id, index),
                 method(removeOrder, id))
    PSIBASE_REFLECT_TABLES(Packages, Packages::Tables)

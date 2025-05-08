@@ -195,7 +195,7 @@ pub fn process_action_schema(
 
     *insertions = quote! {
         #insertions
-        actions.insert(#name_str.to_string(), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
+        actions.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
     }
 }
 

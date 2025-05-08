@@ -72,7 +72,7 @@ namespace
             s.storeData(actions);
          }
 
-         s.postinstall(actions);
+         s.postinstall(actions, service_packages);
       }
 
       transactor<Producers> psys{Producers::service, Producers::service};
