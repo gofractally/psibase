@@ -5,8 +5,8 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AccountNameStatus } from "./useAccountStatus";
 import { z } from "zod";
-import { appMetadataQueryKey } from "./useAppMetadata";
 import { AwaitTime } from "@/lib/globals";
+import QueryKey from "@/lib/queryKeys";
 
 const Params = z.object({
   account: Account,
@@ -17,7 +17,7 @@ const Result = z.enum(["Created", "Added"]);
 
 export const useCreateApp = () =>
   useMutation<z.infer<typeof Result>, Error, z.infer<typeof Params>>({
-    mutationKey: ["createApp"],
+    mutationKey: QueryKey.createApp(),
     mutationFn: async (params) => {
       const { account, allowExistingAccount } = Params.parse(params);
       try {
@@ -41,10 +41,10 @@ export const useCreateApp = () =>
         () => AccountNameStatus.Enum.Taken
       );
 
-      queryClient.setQueryData(appMetadataQueryKey(account), () => null);
+      queryClient.setQueryData(QueryKey.appMetaData(account), () => null);
       setTimeout(() => {
         queryClient.invalidateQueries({
-          queryKey: appMetadataQueryKey(account),
+          queryKey: QueryKey.appMetaData(account),
         });
       }, AwaitTime);
 

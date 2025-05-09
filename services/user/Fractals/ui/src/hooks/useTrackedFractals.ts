@@ -5,9 +5,10 @@ import { z } from "zod";
 
 import { Account } from "@/lib/zodTypes";
 
-import { appMetadataQueryKey, fetchMetadata } from "./useAppMetadata";
+import {  fetchMetadata } from "./useAppMetadata";
 import { useCurrentFractal } from "./useCurrentFractal";
 import { wait } from "./wait";
+import QueryKey from "@/lib/queryKeys";
 
 type AccountType = z.infer<typeof Account>;
 
@@ -21,7 +22,7 @@ const cacheApps = async (accountNames: z.infer<typeof Account>[]) => {
     for (const account of accountNames) {
         await wait(1000);
         queryClient.prefetchQuery({
-            queryKey: appMetadataQueryKey(account),
+            queryKey: QueryKey.appMetaData(account),
             queryFn: async () => {
                 return fetchMetadata(account);
             },

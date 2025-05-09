@@ -1,10 +1,11 @@
+import QueryKey from "@/lib/queryKeys";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 export const useConnectedAccounts = () =>
   useQuery({
-    queryKey: ["connectedAccounts"],
+    queryKey: QueryKey.connectedAccounts(),
     initialData: [],
     queryFn: async () =>
       z

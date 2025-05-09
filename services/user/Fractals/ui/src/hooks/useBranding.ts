@@ -1,10 +1,11 @@
+import QueryKey from "@/lib/queryKeys";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 export const useBranding = () =>
   useQuery({
-    queryKey: ["branding"],
+    queryKey: QueryKey.branding(),
     queryFn: async () => {
       const res = await supervisor.functionCall({
         service: "branding",

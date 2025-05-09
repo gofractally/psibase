@@ -22,7 +22,6 @@ import {
 import { useChainId } from "@/hooks/use-chain-id";
 import {
     MetadataResponse,
-    appMetadataQueryKey,
     useAppMetadata,
 } from "@/hooks/useAppMetadata";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
@@ -31,6 +30,7 @@ import { createIdenticon } from "@/lib/createIdenticon";
 
 import { CreateFractalModal } from "./create-fractal-modal";
 import { Button } from "./ui/button";
+import QueryKey from "@/lib/queryKeys";
 
 const buildImageSrc = (mimeType: string, icon: string) =>
     `data:${mimeType};base64,${icon}`;
@@ -111,7 +111,7 @@ export function AppSwitcher() {
                         {fractals.map((fractal) => {
                             const metadata = MetadataResponse.safeParse(
                                 queryClient.getQueryData(
-                                    appMetadataQueryKey(fractal.account),
+                                    QueryKey.appMetaData(fractal.account),
                                 ),
                             );
                             const displayName =

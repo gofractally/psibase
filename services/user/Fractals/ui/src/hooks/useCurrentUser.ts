@@ -1,8 +1,7 @@
+import QueryKey from "@/lib/queryKeys";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-
-export const queryKey = ["loggedInUser"];
 
 export type GetCurrentUserRes = string | null;
 
@@ -18,7 +17,7 @@ export const queryFn = async () => {
 
 export const useCurrentUser = (refetchInterval?: number) =>
   useQuery({
-    queryKey,
+    queryKey: QueryKey.currentUser(),
     queryFn,
     refetchInterval,
     staleTime: 60000,

@@ -1,4 +1,5 @@
 import { AwaitTime } from "@/lib/globals";
+import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
@@ -7,7 +8,7 @@ import { toast } from "sonner";
 
 export const useSelectAccount = () =>
   useMutation<void, Error, string>({
-    mutationKey: ["selectAccount"],
+    mutationKey: QueryKey.selectAccount(),
     mutationFn: async (accountName: string) => {
       void (await supervisor.functionCall({
         method: "login",

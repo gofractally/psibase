@@ -1,3 +1,4 @@
+import QueryKey from "@/lib/queryKeys";
 import { Account, Metadata } from "@/lib/zodTypes";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
@@ -12,11 +13,6 @@ export const MetadataResponse = z.object({
     status: Status,
   }),
 });
-
-export const appMetadataQueryKey = (appName: string | undefined | null) => [
-  "appMetadata",
-  appName,
-];
 
 export const fetchMetadata = async (account: string) => {
   const appName = Account.parse(account);
@@ -43,7 +39,7 @@ export const fetchMetadata = async (account: string) => {
 
 export const useAppMetadata = (appName: string | undefined | null) =>
   useQuery({
-    queryKey: appMetadataQueryKey(appName),
+    queryKey: QueryKey.appMetaData(appName),
     enabled: !!appName,
     queryFn: async () => {
       return fetchMetadata(Account.parse(appName));
