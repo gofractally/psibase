@@ -9,6 +9,9 @@ publish.workspace = true
 server = "r-fractals"
 plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
+]
 
 
 [dependencies]
