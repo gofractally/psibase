@@ -13,7 +13,7 @@ export default defineConfig({
   base: "/common/plugin-tester/",
   plugins: [
     react(),
-    createSharedViteConfig({
+    ...createSharedViteConfig({
       projectDir: serviceDir,
       manualChunks: {},
     }),
@@ -27,10 +27,8 @@ export default defineConfig({
     ],
   },
   build: {
-        // Enable build cache in a project-specific directory
-        cacheDir: path.resolve(serviceDir, ".vite-cache"),
-        // Enable sourcemap for better caching
-        sourcemap: true,
+    // Enable sourcemap for better caching
+    sourcemap: true,
     minify: false,
   },
 });

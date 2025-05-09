@@ -12,7 +12,10 @@ export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
   plugins: [
     react(),
     createSharedViteConfig({
-        projectDir: serviceDir,
+      projectDir: serviceDir,
+      manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom']
+      },
     }),
     ...createPsibaseConfig({
       service: "psibase",

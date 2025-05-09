@@ -1,4 +1,4 @@
-import { Plugin, UserConfig } from 'vite'
+import { Plugin } from 'vite'
 import path from 'path'
 import fs from 'fs'
 import alias from '@rollup/plugin-alias'
@@ -10,46 +10,46 @@ export interface SharedViteConfigOptions {
   uiFramework?: string
 }
 
-export function createSharedViteConfig(options: SharedViteConfigOptions): UserConfig {
-  const { projectDir, uiFramework = "react", manualChunks = {
-    vendor: ['react', 'react-dom', 'react-router-dom'],
+export function createSharedViteConfig(options: SharedViteConfigOptions): Plugin[] {
+  const { uiFramework = "react", manualChunks = {
+    vendor: ['react', 'react-dom'],
   }, additionalManualChunks = {} } = options
 
   const rollupOptions = {
         cache: true,
-        outDir: 'dist',
-        emptyOutDir: true,
         output: {
-          entryFileNames: 'index.js',
-          assetFileNames: '[name][extname]',
-          manualChunks: {
-            // Core UI libraries
-            ...manualChunks,
-            ...additionalManualChunks
-          }
+          ...(Object.keys(manualChunks).length > 0 ? {
+            entryFileNames: 'index.js',
+            assetFileNames: '[name][extname]',
+            manualChunks: {
+              // Core UI libraries
+              ...manualChunks,
+              ...additionalManualChunks
+            }
+          } : {})
         }
       };
+
   return [{
     name: 'shared-vite-config',
-    build: {
-      // Disable sourcemaps in production for better caching
-      sourcemap: process.env.NODE_ENV === 'development',
-      minify: process.env.NODE_ENV !== 'development',
-      rollupOptions,
-      // Increase chunk size warning limit
-      chunkSizeWarningLimit: 1000
-    },
-    optimizeDeps: {
-      // Enable dependency pre-bundling
-      include: uiFramework === "react" ? [
-        'react',
-        'react-dom',
-        'react-router-dom'
-      ] : [],
-    },
-  },
-]
-} 
+    config: () => ({
+      build: {
+        // Disable sourcemaps in production for better caching
+        sourcemap: process.env.NODE_ENV === 'development',
+        minify: process.env.NODE_ENV !== 'development',
+        outDir: 'dist',
+        emptyOutDir: true,
+        rollupOptions,
+        // Increase chunk size warning limit
+        chunkSizeWarningLimit: 1000
+      },
+      optimizeDeps: {
+        // Enable dependency pre-bundling
+        include: (uiFramework === "react" ? (manualChunks?.vendor || []) : [])
+      }
+    })
+  }]
+}
 
 export function verifyViteCache(dirname: any) {
     // Ensure cache directory exists

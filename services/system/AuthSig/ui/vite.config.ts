@@ -12,6 +12,9 @@ export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     createSharedViteConfig({
+      manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom']
+      },
       projectDir: serviceDir,
     }),
     ...createPsibaseConfig({

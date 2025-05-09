@@ -12,7 +12,10 @@ export default defineConfig(({ command }) => ({
   plugins: [
     react(), 
     createSharedViteConfig({
-        projectDir: serviceDir,
+      manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom']
+      },
+      projectDir: serviceDir,
     }),
     ...createPsibaseConfig({
       service: "producers",

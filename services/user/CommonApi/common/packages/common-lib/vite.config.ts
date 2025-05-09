@@ -19,7 +19,7 @@ export default defineConfig({
     },
     plugins: [
         dts(),
-        createSharedViteConfig({
+        ...createSharedViteConfig({
             projectDir: serviceDir,
             manualChunks: {},
         }),
