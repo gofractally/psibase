@@ -1,38 +1,33 @@
-import { HoverBorderGradient } from "@shadcn/hover-border-gradient";
+import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+import { useBranding } from "@/hooks/useBranding";
 import { siblingUrl } from "@psibase/common-lib";
-import { ModeToggle } from "./mode-toggle";
-import { AccountSwitcher } from "./account-switcher";
+import { SettingsDropdown } from "./settings-dropdown";
 
 function HoverBorderGradientDemo() {
-    return (
-        <div className=" flex justify-center text-center">
-            <HoverBorderGradient
-                as="div"
-                containerClassName="rounded-full"
-                className="flex items-center space-x-2 bg-white text-black dark:bg-black dark:text-white"
-            >
-                <span>psibase</span>
-            </HoverBorderGradient>
-        </div>
-    );
+  const { data: networkName } = useBranding();
+
+  return (
+    <div className="flex justify-center text-center">
+      <HoverBorderGradient
+        as="div"
+        containerClassName="rounded-full"
+        className="flex items-center space-x-2 bg-white text-black dark:bg-black dark:text-white"
+      >
+        <span>{networkName || "Network"}</span>
+      </HoverBorderGradient>
+    </div>
+  );
 }
 
-export const Nav = ({ title }: { title?: string }) => {
-    const home = siblingUrl();
-    return (
-        <div className="mt-4 flex w-full justify-between px-2">
-            <a href={home}>
-                <HoverBorderGradientDemo />
-            </a>
-            {title && (
-                <div className="flex flex-col justify-center text-2xl font-semibold">
-                    {title}
-                </div>
-            )}
-            <div className="flex items-center gap-2">
-                <AccountSwitcher />
-                <ModeToggle />
-            </div>
-        </div>
-    );
+export const Nav = () => {
+  return (
+    <div className="mt-4 flex w-full justify-between">
+      <a href={siblingUrl()}>
+        <HoverBorderGradientDemo />
+      </a>
+      <div>
+        <SettingsDropdown />
+      </div>
+    </div>
+  );
 };
