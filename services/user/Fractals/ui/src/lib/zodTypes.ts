@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const Account = z
+export const zAccount = z
   .string()
   .min(1, { message: "Account must be at least 1 character." })
   .max(18, { message: "Account must be at most 18 characters." })
@@ -18,25 +18,8 @@ export const Account = z
     message: "Account may not start with 'x-'.",
   });
 
-export const Metadata = z.object({
-  name: z.string().max(30),
-  shortDescription: z.string().max(100),
-  longDescription: z.string().max(1000),
-  icon: z.string(), // Base64 string
-  iconMimeType: z.string(), // MIME type of the icon
-  tosSubpage: z
-    .string()
-    .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
-  privacyPolicySubpage: z
-    .string()
-    .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
-  appHomepageSubpage: z
-    .string()
-    .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
-  redirectUris: z.string().array(),
-  owners: Account.array().default([]),
-  tags: z.string().array().max(3),
-});
+export type Account = z.infer<typeof zAccount>;
+
 
 export const Path = z.string().transform((path) => {
   const normalizedPath = path.replace(/\/+/g, "/");

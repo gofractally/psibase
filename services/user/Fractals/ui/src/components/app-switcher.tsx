@@ -21,9 +21,9 @@ import {
 
 import { useChainId } from "@/hooks/use-chain-id";
 import {
-    MetadataResponse,
-    useAppMetadata,
-} from "@/hooks/useAppMetadata";
+    Fractal,
+    useFractal,
+} from "@/hooks/useFractal";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
 import { useTrackedFractals } from "@/hooks/useTrackedFractals";
 import { createIdenticon } from "@/lib/createIdenticon";
@@ -31,9 +31,6 @@ import { createIdenticon } from "@/lib/createIdenticon";
 import { CreateFractalModal } from "./create-fractal-modal";
 import { Button } from "./ui/button";
 import QueryKey from "@/lib/queryKeys";
-
-const buildImageSrc = (mimeType: string, icon: string) =>
-    `data:${mimeType};base64,${icon}`;
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -49,15 +46,8 @@ export function AppSwitcher() {
     const [showCreateFractalModal, setShowCreateFractalModal] = useState(false);
 
     const currentFractal = useCurrentFractal();
-    const { data: fractal } = useAppMetadata(currentFractal);
+    const { data: fractal } = useFractal(currentFractal);
 
-    const currentSrc =
-        fractal &&
-        fractal.appMetadata.icon &&
-        buildImageSrc(
-            fractal.appMetadata.iconMimeType,
-            fractal.appMetadata.icon,
-        );
 
     return (
         <SidebarMenu>
@@ -77,7 +67,7 @@ export function AppSwitcher() {
                                 <img
                                     className="size-4"
                                     src={
-                                        currentSrc ||
+                         
                                         createIdenticon(
                                             chainId + selectedFractalAccount,
                                         )
@@ -87,7 +77,7 @@ export function AppSwitcher() {
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">
                                     {fractal
-                                        ? fractal.appMetadata.name
+                                        ? fractal.name
                                         : selectedFractalAccount}
                                 </span>
                                 {fractal && (
@@ -109,26 +99,18 @@ export function AppSwitcher() {
                             Fractals
                         </DropdownMenuLabel>
                         {fractals.map((fractal) => {
-                            const metadata = MetadataResponse.safeParse(
+                            const metadata = Fractal.safeParse(
                                 queryClient.getQueryData(
-                                    QueryKey.appMetaData(fractal.account),
+                                    QueryKey.fractal(fractal.account),
                                 ),
                             );
                             const displayName =
                                 metadata.success &&
-                                metadata.data.appMetadata.name;
+                                metadata.data.name;
 
-                            const src =
-                                metadata.success &&
-                                metadata.data.appMetadata.icon
-                                    ? buildImageSrc(
-                                          metadata.data.appMetadata
-                                              .iconMimeType,
-                                          metadata.data.appMetadata.icon,
-                                      )
-                                    : createIdenticon(
-                                          chainId + fractal.account,
-                                      );
+                            const src = createIdenticon(
+                                chainId + fractal.account,
+                            );
 
                             return (
                                 <DropdownMenuItem

@@ -1,6 +1,6 @@
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
@@ -12,7 +12,7 @@ export const useSelectAccount = () =>
     mutationFn: async (accountName: string) => {
       void (await supervisor.functionCall({
         method: "login",
-        params: [Account.parse(accountName)],
+        params: [zAccount.parse(accountName)],
         service: "accounts",
         intf: "activeApp",
       }));

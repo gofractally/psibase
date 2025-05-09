@@ -3,28 +3,26 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { useEffect } from "react";
 import { z } from "zod";
 
-import { Account } from "@/lib/zodTypes";
+import { Account, zAccount } from "@/lib/zodTypes";
 
-import {  fetchMetadata } from "./useAppMetadata";
 import { useCurrentFractal } from "./useCurrentFractal";
 import { wait } from "./wait";
 import QueryKey from "@/lib/queryKeys";
-
-type AccountType = z.infer<typeof Account>;
+import { getFractal } from "@/lib/graphql/getFractal";
 
 const AppItem = z.object({
-    account: Account,
+    account: zAccount,
 });
 
 export const Apps = AppItem.array();
 
-const cacheApps = async (accountNames: z.infer<typeof Account>[]) => {
+const cacheApps = async (accountNames: Account[]) => {
     for (const account of accountNames) {
         await wait(1000);
         queryClient.prefetchQuery({
-            queryKey: QueryKey.appMetaData(account),
+            queryKey: QueryKey.fractal(account),
             queryFn: async () => {
-                return fetchMetadata(account);
+                return getFractal(account);
             },
         });
     }
@@ -67,7 +65,7 @@ export const useTrackedFractals = () => {
         cacheApps(fractals.map((fractal) => fractal.account));
     }, []);
 
-    const addFractal = (newFractal: AccountType): void => {
+    const addFractal = (newFractal: Account): void => {
         const isAlreadyExisting = fractals.some(
             (fractal) => fractal.account == newFractal,
         );
@@ -82,7 +80,7 @@ export const useTrackedFractals = () => {
         );
     };
 
-    const removeFractal = (fractalBeingRemoved: AccountType) => {
+    const removeFractal = (fractalBeingRemoved: Account) => {
         const isExisting = fractals.some(
             (fractal) => fractal.account == fractalBeingRemoved,
         );

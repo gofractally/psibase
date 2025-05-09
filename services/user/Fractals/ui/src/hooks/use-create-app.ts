@@ -1,65 +1,57 @@
-import { Account } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AccountNameStatus } from "./useAccountStatus";
 import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
+import { zAccount } from "@/lib/zodTypes";
+
+import { AccountNameStatus } from "./useAccountStatus";
 
 const Params = z.object({
-  account: Account,
-  allowExistingAccount: z.boolean(),
+    account: zAccount,
+    name: z.string(),
+    mission: z.string(),
 });
 
-const Result = z.enum(["Created", "Added"]);
+export const useCreateFractal = () =>
+    useMutation<null, Error, z.infer<typeof Params>>({
+        mutationKey: QueryKey.createFractal(),
+        mutationFn: async (params) => {
+            const { account, mission, name } = Params.parse(params);
+            void (await supervisor.functionCall({
+                method: "createFractal",
+                params: [zAccount.parse(account), name, mission],
+                service: "fractals",
+                intf: "api",
+            }));
+            return null;
+        },
+        onSuccess: (_, { account }) => {
+            queryClient.setQueryData(
+                QueryKey.userAccount(account),
+                () => AccountNameStatus.Enum.Taken,
+            );
 
-export const useCreateApp = () =>
-  useMutation<z.infer<typeof Result>, Error, z.infer<typeof Params>>({
-    mutationKey: QueryKey.createApp(),
-    mutationFn: async (params) => {
-      const { account, allowExistingAccount } = Params.parse(params);
-      try {
-        void (await supervisor.functionCall({
-          method: "createApp",
-          params: [Account.parse(account)],
-          service: "workshop",
-          intf: "registry",
-        }));
-        return Result.Enum.Created;
-      } catch (e) {
-        const isExistingAccount =
-          e instanceof Error && e.message.includes("account already exists");
-        if (!isExistingAccount || !allowExistingAccount) throw e;
-        return Result.Enum.Added;
-      }
-    },
-    onSuccess: (result, { account }) => {
-      queryClient.setQueryData(
-        ["userAccount", account],
-        () => AccountNameStatus.Enum.Taken
-      );
+            queryClient.setQueryData(QueryKey.fractal(account), () => null);
+            setTimeout(() => {
+                queryClient.invalidateQueries({
+                    queryKey: QueryKey.fractal(account),
+                });
+            }, AwaitTime);
+            
+            toast.success(`Created fractal ${account}`);
 
-      queryClient.setQueryData(QueryKey.appMetaData(account), () => null);
-      setTimeout(() => {
-        queryClient.invalidateQueries({
-          queryKey: QueryKey.appMetaData(account),
-        });
-      }, AwaitTime);
-
-      if (result === Result.Enum.Added) {
-        toast.success(`Added app ${account}`);
-      } else if (result == Result.Enum.Created) {
-        toast.success(`Created app ${account}`);
-      }
-    },
-    onError: (error) => {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("Unrecognized error, check the logs for details.");
-        console.error(error);
-      }
-    },
-  });
+        },
+        onError: (error) => {
+            if (error instanceof Error) {
+                toast.error(error.message);
+            } else {
+                toast.error("Unrecognized error, check the logs for details.");
+                console.error(error);
+            }
+        },
+    });

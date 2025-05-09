@@ -14,10 +14,12 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
-import { Account } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zodTypes";
 
 const FormSchema = z.object({
-    fractalName: Account,
+    fractalName: zAccount,
+    name: z.string(),
+    mission: z.string()
 });
 
 type FormSchemaType = z.infer<typeof FormSchema>;
@@ -49,13 +51,42 @@ export const CreateFractalForm = ({ onSubmit }: Props) => {
                     name="fractalName"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Fractal account name</FormLabel>
+                            <FormLabel>Account name</FormLabel>
                             <FormControl>
                                 <Input {...field} />
                             </FormControl>
                             <FormDescription>
                                 This is your fractal's unique identifier.
                             </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
+                            <FormDescription>
+                                Fractals display name.
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="mission"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Mission</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}

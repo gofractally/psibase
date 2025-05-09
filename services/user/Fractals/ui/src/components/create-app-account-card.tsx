@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import {
     Card,
     CardContent,
@@ -6,40 +8,40 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 
-import { useCreateApp } from "@/hooks/use-create-app";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
-import { Account } from "@/lib/zodTypes";
 
+import { CreateFractalModal } from "./create-fractal-modal";
 import { Button } from "./ui/button";
 
 export const CreateAppAccountCard = () => {
     const currentFractal = useCurrentFractal();
-    const { mutateAsync: createApp, isPending, error } = useCreateApp();
+
+    const [showModal, setShowModal] = useState(false);
 
     return (
         <Card>
+            <CreateFractalModal
+                show={showModal}
+                openChange={(e) => {
+                    setShowModal(e);
+                }}
+            />
             <CardHeader>
-                <CardTitle>Account not found</CardTitle>
+                <CardTitle>Fractal not found</CardTitle>
             </CardHeader>
             <CardContent className="text-muted-foreground">
-                Account {currentFractal} does not exist, click continue to
-                create <span className="text-primary"> {currentFractal}</span>{" "}
-                as fractal.
+                Fractal {currentFractal} does not exist, click continue to
+                create an account{" "}
+                <span className="text-primary"> {currentFractal}</span> as a
+                fractal.
             </CardContent>
             <CardFooter>
-                {error && (
-                    <div className="text-destructive">{error.message}</div>
-                )}
                 <Button
-                    disabled={isPending}
                     onClick={() => {
-                        createApp({
-                            account: Account.parse(currentFractal),
-                            allowExistingAccount: true,
-                        });
+                        setShowModal(true);
                     }}
                 >
-                    Create account
+                    Create fractal
                 </Button>
             </CardFooter>
         </Card>
