@@ -53,20 +53,28 @@ mod service {
                 .await
         }
 
+        async fn member(
+            &self,
+            fractal: AccountNumber,
+            member: AccountNumber,   
+        ) -> Option<Member> {
+            MemberTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&(fractal, member))
+        }
+
         async fn members(
             &self,
-            fractal: String,
+            fractal: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Member>> {
 
-            let account_name = AccountNumber::from(fractal.as_str());
-            
             TableQuery::subindex::<AccountNumber>(
                 MemberTable::with_service(fractals::SERVICE).get_index_pk(),
-                &(account_name)
+                &(fractal)
             )
             .first(first)
             .last(last)

@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
     Card,
     CardContent,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
@@ -11,7 +10,6 @@ import {
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
 
 import { CreateFractalModal } from "./create-fractal-modal";
-import { Button } from "./ui/button";
 
 export const CreateAppAccountCard = () => {
     const currentFractal = useCurrentFractal();
@@ -30,20 +28,8 @@ export const CreateAppAccountCard = () => {
                 <CardTitle>Fractal not found</CardTitle>
             </CardHeader>
             <CardContent className="text-muted-foreground">
-                Fractal {currentFractal} does not exist, click continue to
-                create an account{" "}
-                <span className="text-primary"> {currentFractal}</span> as a
-                fractal.
+                Fractal {currentFractal} does not exist.
             </CardContent>
-            <CardFooter>
-                <Button
-                    onClick={() => {
-                        setShowModal(true);
-                    }}
-                >
-                    Create fractal
-                </Button>
-            </CardFooter>
         </Card>
     );
 };

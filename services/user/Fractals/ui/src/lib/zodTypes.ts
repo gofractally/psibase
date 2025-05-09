@@ -20,6 +20,17 @@ export const zAccount = z
 
 export type Account = z.infer<typeof zAccount>;
 
+export const zDateTime = z.string().datetime({ offset: true });
+
+export type DateTime = z.infer<typeof zDateTime>;
+
+export enum MemberStatus {
+  Visa = 1,
+  Citizen = 2,
+  Exiled = 3,
+}
+
+export const zMemberStatus = z.nativeEnum(MemberStatus);
 
 export const Path = z.string().transform((path) => {
   const normalizedPath = path.replace(/\/+/g, "/");

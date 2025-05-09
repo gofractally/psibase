@@ -36,29 +36,31 @@ export const useTrackedFractals = () => {
 
     const currentFractal = useCurrentFractal();
 
+    console.log({ currentFractal, fractals })
+
     useEffect(() => {
-        const firstFractal = fractals[0];
-        const currentFractalIsntFirst =
-            firstFractal?.account !== currentFractal;
+        // const firstFractal = fractals[0];
+        // const currentFractalIsntFirst =
+        //     firstFractal?.account !== currentFractal;
 
-        if (firstFractal && currentFractalIsntFirst && currentFractal) {
-            AppItem.parse(firstFractal);
-            const currentFractalStored = fractals.find(
-                (fractal) => fractal.account === currentFractal,
-            );
-            if (currentFractalStored) {
-                setFractals((preExistingFractals) => {
-                    const newData = AppItem.array().parse([
-                        currentFractalStored,
-                        ...preExistingFractals.filter(
-                            (fractal) => fractal.account !== currentFractal,
-                        ),
-                    ]);
+        // if (firstFractal && currentFractalIsntFirst && currentFractal) {
+        //     AppItem.parse(firstFractal);
+        //     const currentFractalStored = fractals.find(
+        //         (fractal) => fractal.account === currentFractal,
+        //     );
+        //     if (currentFractalStored) {
+        //         setFractals((preExistingFractals) => {
+        //             const newData = AppItem.array().parse([
+        //                 currentFractalStored,
+        //                 ...preExistingFractals.filter(
+        //                     (fractal) => fractal.account !== currentFractal,
+        //                 ),
+        //             ]);
 
-                    return newData;
-                });
-            }
-        }
+        //             return newData;
+        //         });
+        //     }
+        // }
     }, [currentFractal, fractals]);
 
     useEffect(() => {

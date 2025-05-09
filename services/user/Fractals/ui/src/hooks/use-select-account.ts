@@ -18,9 +18,9 @@ export const useSelectAccount = () =>
       }));
     },
     onSuccess: (_, accountName) => {
-      queryClient.setQueryData(["loggedInUser"], () => accountName);
+      queryClient.setQueryData(QueryKey.currentUser(), () => accountName);
       setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+        queryClient.refetchQueries({ queryKey: QueryKey.currentUser() });
       }, AwaitTime);
     },
     onError: (error) => {
