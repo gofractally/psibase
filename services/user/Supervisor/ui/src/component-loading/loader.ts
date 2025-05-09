@@ -1,15 +1,21 @@
-import { transpile } from "@bytecodealliance/jco";
 import { rollup } from "@rollup/browser";
 import { plugin } from "./index.js";
 
-const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
-import hostShimCode from "./host-api.js?raw";
-import privilegedShimCode from "./privileged-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI, Functions } from "../witExtraction.js";
 import { assert } from "../utils.js";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
 import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
+import { generate, GenerateOptions } from "@bytecodealliance/jco/component";
+
+// Raw imports
+import hostShimCode from "./host-api.js?raw";
+import privilegedShimCode from "./privileged-api.js?raw";
+import cliShimCode from "../../node_modules/@bytecodealliance/preview2-shim/lib/browser/cli.js?raw";
+import clocksShimCode from "../../node_modules/@bytecodealliance/preview2-shim/lib/browser/clocks.js?raw";
+import filesystemShimCode from "../../node_modules/@bytecodealliance/preview2-shim/lib/browser/filesystem.js?raw";
+import ioShimCode from "../../node_modules/@bytecodealliance/preview2-shim/lib/browser/io.js?raw";
+import randomShimCode from "../../node_modules/@bytecodealliance/preview2-shim/lib/browser/random.js?raw";
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -89,41 +95,58 @@ async function getWasiImports(): Promise<ImportDetails> {
       As we discover that plugins need additional wasi imports, we can add them, but each added
       shim should be validated.
     */
+    const shimPaths = {
+        cli: "./cli.js",
+        clocks: "./clocks.js",
+        filesystem: "./filesystem.js",
+        io: "./io.js",
+        random: "./random.js",
+    };
 
-    const wasi_shimName = "./wasi-shim.js"; // Internal name used by bundler
-    const wasi_nameMapping: Array<[PkgId, FilePath]> = [
-        // e.g. importing an entire package ["wasi:cli/*", `${wasi_shimName}#*`],
-
-        ["wasi:cli/environment", `${wasi_shimName}#environment`],
-        ["wasi:cli/exit", `${wasi_shimName}#exit`],
-        ["wasi:io/error", `${wasi_shimName}#error`],
-        ["wasi:io/streams", `${wasi_shimName}#streams`],
-        ["wasi:cli/stdin", `${wasi_shimName}#stdin`],
-        ["wasi:cli/stdout", `${wasi_shimName}#stdout`],
-        ["wasi:cli/stderr", `${wasi_shimName}#stderr`],
-        ["wasi:clocks/wall-clock", `${wasi_shimName}#wallClock`],
-        ["wasi:clocks/monotonic-clock", `${wasi_shimName}#monotonicClock`],
-        ["wasi:filesystem/types", `${wasi_shimName}#types`],
-        ["wasi:filesystem/preopens", `${wasi_shimName}#preopens`],
-        ["wasi:random/random", `${wasi_shimName}#random`],
-        // ["wasi:io/*", `${wasi_shimName}#*`],
-        // ["wasi:sockets/*", `${wasi_shimName}#*`],
+    // Mapping from WIT identifiers to internal shim paths and the specific export
+    const nameMapping: Array<[PkgId, FilePath]> = [
+        // CLI
+        ["wasi:cli/environment", `${shimPaths.cli}#environment`],
+        ["wasi:cli/exit", `${shimPaths.cli}#exit`],
+        ["wasi:cli/stdin", `${shimPaths.cli}#stdin`],
+        ["wasi:cli/stdout", `${shimPaths.cli}#stdout`],
+        ["wasi:cli/stderr", `${shimPaths.cli}#stderr`],
+        // Clocks
+        ["wasi:clocks/wall-clock", `${shimPaths.clocks}#wallClock`],
+        ["wasi:clocks/monotonic-clock", `${shimPaths.clocks}#monotonicClock`],
+        // Filesystem
+        ["wasi:filesystem/types", `${shimPaths.filesystem}#types`],
+        ["wasi:filesystem/preopens", `${shimPaths.filesystem}#preopens`],
+        // IO
+        ["wasi:io/error", `${shimPaths.io}#error`],
+        ["wasi:io/streams", `${shimPaths.io}#streams`],
+        // Random
+        ["wasi:random/random", `${shimPaths.random}#random`],
 
         //  ~~~~~~~~~~~~~~~ BLACKLISTED ~~~~~~~~~~~~~~~
-        // ["wasi:http/*", `${wasi_shimName}#*`],
+        // ["wasi:http/*", `${shimPaths.http}#*`],
         // We should not provide the http shim.
         // Plugins should not be able to make HTTP requests except those that are wrapped in an
         //   interface provided by the host imports.
+
+        // ["wasi:sockets/*", `${wasi_shimName}#*`],
+        // Sockets are not actually supported in the browser shim.
     ];
     // If the transpiled library contains bizarre inputs, such as:
     //    import {  as _, } from './shim.js';
     // It is very likely an issue with an invalid import mapping.
 
-    const wasi_shimCode = await fetch(wasiShimURL).then((r) => r.text());
-    const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
+    const wasi_shimFiles: Array<[FilePath, Code]> = [
+        [shimPaths.cli, cliShimCode],
+        [shimPaths.clocks, clocksShimCode],
+        [shimPaths.filesystem, filesystemShimCode],
+        [shimPaths.io, ioShimCode],
+        [shimPaths.random, randomShimCode],
+    ];
+
     return {
-        importMap: wasi_nameMapping,
-        files: [wasi_ShimFile],
+        importMap: nameMapping,
+        files: wasi_shimFiles, // Provide the dynamically loaded shim code
     };
 }
 
@@ -188,46 +211,73 @@ export async function loadPlugin(
     return pluginModule;
 }
 
-async function load(
+// transpile WASM, bundle with shims/imports, and load the module
+async function loadWasmComponent(
     wasmBytes: Uint8Array,
-    imports: ImportDetails,
+    importMap: Array<[PkgId, FilePath]>,
+    importFiles: Array<[FilePath, Code]>,
+    useSetupFunction: boolean,
     debugFileName: string,
 ) {
     const name = "component";
-    const opts = {
+    const opts: GenerateOptions = {
         name,
-        map: imports.importMap ?? {},
-        validLiftingOptimization: false,
         noTypescript: true,
+        map: importMap ?? [],
+        base64Cutoff: 4096,
         noNodejsCompat: true,
         tlaCompat: false,
-        base64Cutoff: 4096,
-    } as any;
-    // todo: delete "as any" after bytecodealliance/jco#462 is addressed.
-    //       and also after the type annotations of `opts.map` has been fixed
+        validLiftingOptimization: false,
+        noNamespacedExports: true,
+    };
 
-    const {
-        files,
-        imports: _imports,
-        exports: _exports,
-    } = await transpile(wasmBytes, opts);
-    const files_2 = files as unknown as Array<[string, Uint8Array]>; // todo: can delete this once type annotations for transpile are fixed
+    const { files: transpiledFiles } = await generate(wasmBytes, opts);
+
+    const onwarn = (warning: any, warn: (warning: any) => void) => {
+        if (warning.code !== "CIRCULAR_DEPENDENCY") {
+            warn(warning);
+        }
+    };
 
     const bundleCode: string = await rollup({
         input: name + ".js",
-        plugins: [plugin([...files_2, ...imports.files], true, debugFileName)],
+        plugins: [
+            plugin(
+                [...transpiledFiles, ...importFiles],
+                useSetupFunction,
+                debugFileName,
+            ),
+        ],
+        onwarn,
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
 
     const namedBundleCode = `${bundleCode}\n//# sourceURL=${debugFileName}`;
-
     const blob = new Blob([namedBundleCode], { type: "text/javascript" });
     const url = URL.createObjectURL(blob);
 
-    const mod = await import(/* @vite-ignore */ url);
+    try {
+        const mod = await import(url);
+        return mod;
+    } finally {
+        URL.revokeObjectURL(url); // Lets the browser know not to keep the file ref any longer
+    }
+}
 
-    return mod;
+async function load(
+    wasmBytes: Uint8Array,
+    imports: ImportDetails,
+    debugFileName: string,
+) {
+    const pluginModule = await loadWasmComponent(
+        wasmBytes,
+        imports.importMap,
+        imports.files,
+        true,
+        debugFileName,
+    );
+    return pluginModule;
 }
 
 // Loads a transpiled component into an ES module, while only satisfying wasi imports
@@ -236,31 +286,12 @@ async function load(
 //   components.
 export async function loadBasic(wasmBytes: Uint8Array, debugFileName: string) {
     const wasiImports = await getWasiImports();
-    const name = "component";
-    const opts = {
-        name,
-        map: wasiImports.importMap,
-        validLiftingOptimization: false,
-        noNodejsCompat: true,
-        tlaCompat: false,
-        base64Cutoff: 4096,
-    } as any; // todo: delete "as any" after bytecodealliance/jco#462 is addressed.
-
-    const { files } = await transpile(wasmBytes, opts);
-    const files_2 = files as unknown as Array<[string, Uint8Array]>; // todo: delete after transpile type annotations fixed
-
-    const bundleCode: string = await rollup({
-        input: name + ".js",
-        plugins: [plugin(files_2, false, debugFileName)],
-    })
-        .then((bundle) => bundle.generate({ format: "es" }))
-        .then(({ output }) => output[0].code);
-
-    const namedBundleCode = `${bundleCode}\n//# sourceURL=${debugFileName}`;
-    const blob = new Blob([namedBundleCode], { type: "text/javascript" });
-    const url = URL.createObjectURL(blob);
-
-    const mod = await import(/* @vite-ignore */ url);
-
-    return mod;
+    const basicModule = await loadWasmComponent(
+        wasmBytes,
+        wasiImports.importMap,
+        wasiImports.files,
+        false,
+        debugFileName,
+    );
+    return basicModule;
 }

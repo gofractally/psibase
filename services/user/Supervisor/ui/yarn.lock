@@ -173,7 +173,7 @@
     "@bytecodealliance/wizer" "^7.0.5"
     es-module-lexer "^1.6.0"
 
-"@bytecodealliance/jco@^1.3.1", "@bytecodealliance/jco@^1.9.1":
+"@bytecodealliance/jco@1.10.2", "@bytecodealliance/jco@^1.9.1":
   version "1.10.2"
   resolved "https://registry.yarnpkg.com/@bytecodealliance/jco/-/jco-1.10.2.tgz#433a37302d14b167447c10ce5a191db8d9fe7c30"
   integrity sha512-ShBb9Jul4CYo4asmfDdjmYE2+4TgJLSHhsRMyVDvROA5j6s+cAKMmlsUjOrS6QM5TL8GJb48G9jsxif6na6qYg==
