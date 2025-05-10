@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 export function shouldSkipBuild(projectDir, buildDirs = []) {
-  // Skip if REBUILD_ALWAYS is set to true
+  // Skip if PSIREBUILD is set to true
   if (process.env.PSIREBUILD === 'true') {
     console.log('No-rebuild functionality disabled (PSIREBUILD=true)');
     return false;

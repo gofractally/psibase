@@ -11,8 +11,8 @@ export interface SharedViteConfigOptions {
 }
 
 export function createSharedViteConfig(options: SharedViteConfigOptions): UserConfig {
-  const { projectDir, uiFramework = "react", manualChunks = {
-    vendor: ['react', 'react-dom', 'react-router-dom'],
+  const { uiFramework = "react", manualChunks = {
+    vendor: ['react', 'react-dom'],
   }, additionalManualChunks = {} } = options
 
   const rollupOptions = {
@@ -20,13 +20,15 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
         outDir: 'dist',
         emptyOutDir: true,
         output: {
-          entryFileNames: 'index.js',
-          assetFileNames: '[name][extname]',
-          manualChunks: {
-            // Core UI libraries
-            ...manualChunks,
-            ...additionalManualChunks
-          }
+            entryFileNames: 'index.js',
+            assetFileNames: '[name][extname]',
+            ...(Object.keys(manualChunks).length > 0 ? {
+                manualChunks: {
+                  // Core UI libraries
+                  ...manualChunks,
+                  ...additionalManualChunks
+                }
+              } : {})
         }
       };
   return [{
@@ -41,11 +43,8 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
     },
     optimizeDeps: {
       // Enable dependency pre-bundling
-      include: uiFramework === "react" ? [
-        'react',
-        'react-dom',
-        'react-router-dom'
-      ] : [],
+      // TODO: this isn't right; what about manualChunks other than vendor?
+      include: uiFramework === "react" ? (manualChunks.vendor || []) : [],
     },
   },
 ]
