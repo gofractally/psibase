@@ -1,6 +1,7 @@
-import { getMembership, MembershipResult } from "@/lib/graphql/getMembership";
+import { getMembership, MembershipResult } from "@/lib/graphql/fractals/getMembership";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
-import { MemberStatus, zAccount } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zod/Account";
+import { MemberStatus } from "@/lib/zod/MemberStatus";
 import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 

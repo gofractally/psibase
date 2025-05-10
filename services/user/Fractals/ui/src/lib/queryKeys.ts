@@ -1,4 +1,4 @@
-import { Account } from "./zodTypes";
+import { Account } from "./zod/Account";
 
 type QueryKeyGenerator<Prefix extends string = string> = (
     ...args: any[]

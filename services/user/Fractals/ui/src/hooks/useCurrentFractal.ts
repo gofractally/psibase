@@ -1,5 +1,5 @@
+import { Account, zAccount } from "@/lib/zod/Account";
 import { useLocation } from "react-router-dom";
-import { Account, zAccount } from "@/lib/zodTypes";
 
 export const useCurrentFractal = (): Account | undefined => {
     const location = useLocation();

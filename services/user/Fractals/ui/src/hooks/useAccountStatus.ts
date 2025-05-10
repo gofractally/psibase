@@ -1,5 +1,5 @@
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zod/Account";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";

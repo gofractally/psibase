@@ -3,12 +3,12 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { useEffect } from "react";
 import { z } from "zod";
 
-import { Account, zAccount } from "@/lib/zodTypes";
 
 import { useCurrentFractal } from "./useCurrentFractal";
 import { wait } from "./wait";
 import QueryKey from "@/lib/queryKeys";
-import { getFractal } from "@/lib/graphql/getFractal";
+import { getFractal } from "@/lib/graphql/fractals/getFractal";
+import { Account, zAccount } from "@/lib/zod/Account";
 
 const AppItem = z.object({
     account: zAccount,

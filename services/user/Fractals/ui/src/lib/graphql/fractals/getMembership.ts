@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { graphql } from "../graphql";
-import { Account, MemberStatus, zAccount, zDateTime } from "../zodTypes";
-
-
+import { graphql } from "../../graphql";
+import { Account, zAccount } from "@/lib/zod/Account";
+import { zDateTime } from "@/lib/zod/DateTime";
+import { MemberStatus } from "@/lib/zod/MemberStatus";
 
 export const zMember = z.object({
     fractal: zAccount,

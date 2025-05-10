@@ -6,9 +6,9 @@ import { supervisor } from "@/supervisor";
 
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zodTypes";
 
 import { setDefaultMembership } from "./useMembership";
+import { zAccount } from "@/lib/zod/Account";
 
 const Params = z.object({
     fractal: zAccount,

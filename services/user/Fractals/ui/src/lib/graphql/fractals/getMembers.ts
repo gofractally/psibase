@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-import { graphql } from "../graphql";
-import { Account, MemberStatus, zAccount, zDateTime } from "../zodTypes";
+import { graphql } from "../../graphql";
+import { Account, zAccount } from "@/lib/zod/Account";
+import { MemberStatus } from "@/lib/zod/MemberStatus";
+import { zDateTime } from "@/lib/zod/DateTime";
 
 export const zMemberListInstance = z.object({
     account: zAccount,

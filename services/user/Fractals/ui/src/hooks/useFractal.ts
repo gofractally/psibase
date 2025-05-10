@@ -1,8 +1,9 @@
-import { getFractal } from "@/lib/graphql/getFractal";
+import { getFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
-import { Account,  zAccount } from "@/lib/zodTypes";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { useCurrentFractal } from "./useCurrentFractal";
+import { Account, zAccount } from "@/lib/zod/Account";
 
 export const Fractal = z.object({
   account: zAccount,
@@ -11,9 +12,13 @@ export const Fractal = z.object({
   mission: z.string(),
 })
 
-export const useFractal = (account: Account | undefined | null) =>
-  useQuery({
-    queryKey: QueryKey.fractal(account),
-    enabled: !!account,
-    queryFn: async () => getFractal(zAccount.parse(account)),
+export const useFractal = (account?: Account | undefined | null) => {
+
+  const accountSelected = account || useCurrentFractal();
+
+  return useQuery({
+    queryKey: QueryKey.fractal(accountSelected),
+    enabled: !!accountSelected,
+    queryFn: async () => getFractal(zAccount.parse(accountSelected)),
   });
+}

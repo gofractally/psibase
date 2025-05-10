@@ -4,14 +4,9 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useFractal } from "@/hooks/useFractal";
 import { useJoinFractal } from "@/hooks/useJoinFractal";
 import { useMembership } from "@/hooks/useMembership";
-import { MemberStatus } from "@/lib/zodTypes";
+import { getMemberLabel } from "@/lib/getMemberLabel";
 
-const getMemberLabel = (status: MemberStatus): string =>
-    status == MemberStatus.Citizen
-        ? "Citizen"
-        : status == MemberStatus.Visa
-          ? "Visa"
-          : "Exiled";
+
 
 export const MyMembership = () => {
     const fractalAccount = useCurrentFractal();

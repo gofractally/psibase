@@ -1,6 +1,6 @@
-import { getMembers } from "@/lib/graphql/getMembers";
+import { getMembers } from "@/lib/graphql/fractals/getMembers";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zod/Account";
 import { useQuery } from "@tanstack/react-query";
 
 export const useMembers = (account: OptionalAccount) =>

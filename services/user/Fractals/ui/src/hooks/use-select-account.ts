@@ -1,6 +1,6 @@
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zod/Account";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";

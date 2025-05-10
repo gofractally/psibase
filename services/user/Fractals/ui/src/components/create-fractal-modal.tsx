@@ -32,14 +32,14 @@ export const CreateFractalModal = ({
                     <CreateFractalForm
                         onSubmit={async (data) => {
                             void (await createApp({
-                                account: data.fractalName,
-                                mission: '',
-                                name: ''
+                                account: data.account,
+                                mission: data.mission,
+                                name: data.name
                             }));
 
-                            addFractal(data.fractalName);
+                            addFractal(data.account);
                             openChange(false);
-                            navigate(`/fractal/${data.fractalName}`);
+                            navigate(`/fractal/${data.account}`);
                             return data;
                         }}
                     />

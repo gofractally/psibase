@@ -7,9 +7,9 @@ import { supervisor } from "@/supervisor";
 
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zodTypes";
 
 import { AccountNameStatus } from "./useAccountStatus";
+import { zAccount } from "@/lib/zod/Account";
 
 const Params = z.object({
     account: zAccount,
