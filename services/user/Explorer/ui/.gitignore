@@ -1,0 +1,5 @@
+.svelte-kit
+build
+*.log*
+node_modules
+.vite-cache

@@ -1,0 +1,5 @@
+{
+  "tabWidth": 4,
+  "plugins": ["./node_modules/prettier-plugin-tailwindcss"],
+  "bracketSameLine": true
+}
