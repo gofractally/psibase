@@ -1696,6 +1696,7 @@ __metadata:
     "@poppanator/sveltekit-svg": "npm:^5.0.0"
     "@psibase/common-lib": "workspace:*"
     "@rollup/plugin-alias": "npm:^3.1.9"
+    "@sveltejs/adapter-auto": "npm:^6.0.0"
     "@sveltejs/adapter-static": "npm:^3.0.6"
     "@sveltejs/kit": "npm:^2.8.1"
     "@sveltejs/vite-plugin-svelte": "npm:^4.0.1"
@@ -3475,6 +3476,17 @@ __metadata:
   peerDependencies:
     acorn: ^8.9.0
   checksum: 10c0/5f5393ca3afc3d532baa3d418b51972ad26966ff352e13a46c6baa6d7099655acf2668be1d693e9daba2d3994a40b4c9a6b3157340e9cdfe2ffb52e4334630fd
+  languageName: node
+  linkType: hard
+
+"@sveltejs/adapter-auto@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "@sveltejs/adapter-auto@npm:6.0.0"
+  dependencies:
+    import-meta-resolve: "npm:^4.1.0"
+  peerDependencies:
+    "@sveltejs/kit": ^2.0.0
+  checksum: 10c0/056d801c8e601f4c3c83e2547bfd3998ecfb9aaa642a4831eee436a512d62d8c0f264d3728136e30367a47eb0f13140292d6831a874e33798a16d302098d70d7
   languageName: node
   linkType: hard
 

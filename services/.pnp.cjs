@@ -2506,6 +2506,7 @@ const RAW_RUNTIME_STATE =
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/explorer-ui", "workspace:user/Explorer/ui"],\
           ["@rollup/plugin-alias", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:3.1.9"],\
+          ["@sveltejs/adapter-auto", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:6.0.0"],\
           ["@sveltejs/adapter-static", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:3.0.8"],\
           ["@sveltejs/kit", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:2.20.8"],\
           ["@sveltejs/vite-plugin-svelte", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:4.0.4"],\
@@ -4867,6 +4868,29 @@ const RAW_RUNTIME_STATE =
         "packagePeers": [\
           "@types/acorn",\
           "acorn"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@sveltejs/adapter-auto", [\
+      ["npm:6.0.0", {\
+        "packageLocation": "../.caches/yarn/@sveltejs-adapter-auto-npm-6.0.0-4f9ef62a82-056d801c8e.zip/node_modules/@sveltejs/adapter-auto/",\
+        "packageDependencies": [\
+          ["@sveltejs/adapter-auto", "npm:6.0.0"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:6.0.0", {\
+        "packageLocation": "./.yarn/__virtual__/@sveltejs-adapter-auto-virtual-8d0de5d86c/2/.caches/yarn/@sveltejs-adapter-auto-npm-6.0.0-4f9ef62a82-056d801c8e.zip/node_modules/@sveltejs/adapter-auto/",\
+        "packageDependencies": [\
+          ["@sveltejs/adapter-auto", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:6.0.0"],\
+          ["@sveltejs/kit", "virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:2.20.8"],\
+          ["@types/sveltejs__kit", null],\
+          ["import-meta-resolve", "npm:4.1.0"]\
+        ],\
+        "packagePeers": [\
+          "@sveltejs/kit",\
+          "@types/sveltejs__kit"\
         ],\
         "linkType": "HARD"\
       }]\
