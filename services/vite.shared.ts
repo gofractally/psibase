@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { Plugin } from 'vite'
 import path from 'path'
 import fs from 'fs'
