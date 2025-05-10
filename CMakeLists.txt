@@ -219,64 +219,12 @@ ExternalProject_Add(
     INSTALL_COMMAND     ""
 )
 
-# UIs built with yarn
-set(JS_DIRS
-    services/system/Accounts/ui:Accounts_js
-    services/system/AuthSig/ui:AuthSig_js
-    services/system/Producers/ui:Producers_js
-    services/user/Branding/ui:Branding_js
-    services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
-    services/user/Explorer/ui:Explorer_js
-    services/user/Homepage/ui:Homepage_js
-    services/user/Identity/ui:Identity_js
-    services/user/Invite/ui:Invite_js
-    services/user/Permissions/ui:Permissions_js
-    services/user/Supervisor/ui:Supervisor_js
-    services/user/Workshop/ui:Workshop_js
-)
-set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
-set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
-
-function(add_js_target TARGET_TUPLE OUTPUT_FILE)
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
-    set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
-    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/yarn.lock)
-
-    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
-    add_custom_command(
-        OUTPUT ${OUTPUT_FILEPATH}
-        BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
-        DEPENDS ${SOURCES} ${ARGN}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
-    )
-    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
-    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
-    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
-endfunction()
-
-# Static (not built) resource dependencies
-file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
-file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
-
-# Builds the Common files that the UIs (just below) depend on
-add_js_target(${COMMON_LIB_DIR} common-lib.js)
-
-# Build each UI
-# Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
-foreach(ROW ${JS_DIRS})
-    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP})
-endforeach()
-
 # Static (not built) resource dependencies
 file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
 
 # Build each component
 include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
-add_rs_component(services/user/XAdmin/ui/wasm:XAdminWasm x_admin.wasm wasm32-wasip1)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(services/:Plugins 
@@ -301,21 +249,6 @@ add_rs_component_workspace(services/:Plugins
     producers
 )
 
-set(XADMIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui)
-set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_PATH}/wasm-transpiled/x_admin.core.wasm)
-add_js_target(${ADMIN_DIR} index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
-add_dependencies(XAdmin_js XAdminWasm)
-
-add_custom_command(
-    OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
-    WORKING_DIRECTORY ${XADMIN_PATH}
-    COMMAND yarn --mutex network
-    COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
-)
-add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
-add_dependencies(xadmin-wasm-transpiled rust)
-
 function(psinode_files target pfx)
     add_custom_target(
     ${target}
@@ -333,7 +266,6 @@ function(psinode_files target pfx)
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(XAdmin_js xadmin-wasm-transpiled CommonApiCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
@@ -385,7 +317,7 @@ psibase_package(
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
-    DEPENDS ${Accounts_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/index.html
+    DEPENDS Accounts_js
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
@@ -489,7 +421,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
         FLAGS isAuthService
-    DEPENDS ${AuthSig_js_DEP}
+    DEPENDS AuthSig_js
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
@@ -525,9 +457,9 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
-    DEPENDS ${CommonApiCommonLib_js_DEP}
+    DEPENDS CommonApiCommonLib_js
     DEPENDS ${ComponentParser_DEP}
-    DEPENDS ${PluginTester_js_DEP}
+    DEPENDS PluginTester_js
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
@@ -596,13 +528,13 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/ui/dist/*  /
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Profiles(^${PSIBASE_VERSION})"
-    DEPENDS ${Homepage_js_DEP}
+    DEPENDS Homepage_js
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
     PATH services/user/Identity
-    DEPENDS ${Identity_js_DEP}
+    DEPENDS Identity_js
 )
 
 psibase_package(
@@ -649,7 +581,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
-    DEPENDS ${Producers_js_DEP}
+    DEPENDS Producers_js
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})"
 )
 
@@ -764,7 +696,7 @@ psibase_package(
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
-    DEPENDS ${Supervisor_js_DEP}
+    DEPENDS Supervisor_js
 )
 
 psibase_package(
@@ -777,7 +709,7 @@ psibase_package(
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /
-    DEPENDS ${Permissions_js_DEP}
+    DEPENDS Permissions_js
     DEPENDS ${Plugins_DEP}
 )
 
@@ -843,7 +775,7 @@ psibase_package(
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
-    DEPENDS ${Workshop_js_DEP}
+    DEPENDS Workshop_js
     DEPENDS ${Plugins_DEP}
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/postinstall.json
 )

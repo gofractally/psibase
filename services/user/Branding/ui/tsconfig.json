@@ -3,9 +3,9 @@
         "target": "ESNext",
         "useDefineForClassFields": true,
         "lib": [
+            "ESNext",
             "DOM",
-            "DOM.Iterable",
-            "ESNext"
+            "DOM.Iterable"
         ],
         "allowJs": false,
         "baseUrl": "./",
@@ -43,15 +43,18 @@
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
-        "module": "esnext",
-        "moduleResolution": "Node",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
-        "jsx": "react-jsx"
+        "jsx": "react-jsx",
+        "incremental": true,
+        "tsBuildInfoFile": ".tsbuildinfo"
     },
     "include": [
-        "src",
+        "src"
     ],
     "references": [
         {

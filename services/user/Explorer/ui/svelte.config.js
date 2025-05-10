@@ -9,6 +9,10 @@ const config = {
             assets: "dist",
             fallback: "index.html",
         }),
+        alias: {
+            '/common': '../../CommonApi/common',
+            '@psibase/common-lib': '../../CommonApi/common/packages/common-lib/src'
+        }
     },
     preprocess: preprocess({
         postcss: true,

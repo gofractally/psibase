@@ -7,11 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+.yarn
 dist
 dist-ssr
 *.local
-wasm-transpiled
+.vite-cache
 
 # Editor directories and files
 .vscode/*
@@ -23,3 +23,5 @@ wasm-transpiled
 *.njsproj
 *.sln
 *.sw?
+
+wasm-transpiled/*

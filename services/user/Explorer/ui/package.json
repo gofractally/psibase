@@ -1,15 +1,16 @@
 {
-  "name": "tester",
+  "name": "@psibase/explorer-ui",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --strictPort",
     "prepare": "svelte-kit sync",
-    "build": "tsc && vite build",
+    "build": "node ../../../if-build-needed.mjs src 'tsc && vite build'",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@psibase/common-lib": "workspace:*",
     "@rollup/plugin-alias": "^3.1.9",
     "@sveltejs/vite-plugin-svelte": "^4.0.1",
     "@types/node": "^18.7.15",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@poppanator/sveltekit-svg": "^5.0.0",
+    "@sveltejs/adapter-auto": "^6.0.0",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.8.1",
     "@tailwindcss/forms": "^0.5.2",
@@ -25,7 +27,7 @@
     "autoprefixer": "^10.4.8",
     "classnames": "^2.3.1",
     "eslint": "9.15.0",
-    "eslint-config-prettier": "^8.5.0",
+    "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-svelte": "^2.46.0",
@@ -34,7 +36,7 @@
     "postcss-load-config": "^4.0.1",
     "prettier": "^3.3.3",
     "prettier-plugin-svelte": "^3.2.8",
-    "prettier-plugin-tailwindcss": "^0.1.13",
+    "prettier-plugin-tailwindcss": "^0.5.13",
     "react": "^18.2.0",
     "svelte": "^5.2.4",
     "svelte-check": "^4.0.9",
@@ -44,5 +46,6 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vite-plugin-iso-import": "^1.2.0"
-  }
+  },
+  "packageManager": "yarn@4.9.1"
 }

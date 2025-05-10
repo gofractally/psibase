@@ -10,7 +10,6 @@ import router from "./router";
 
 export const queryClient = new QueryClient();
 
-
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <QueryClientProvider client={queryClient}>
