@@ -113,7 +113,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
     const buildAliases: buildAlias[] = [
         {
             find: /^\/common(?!\/(?:fonts))(.*)$/,
-            replacement: path.resolve(`${servicesDir}/CommonApi/common/resources$1`),
+            replacement: path.resolve(`${servicesDir}/user/CommonApi/common/resources$1`),
         },
         {
             find: "@",
@@ -126,7 +126,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
         buildAliases.push({
             find: /^@psibase\/common-lib.*$/,
             replacement: path.resolve(
-                `${servicesDir}/CommonApi/common/packages/common-lib/src`
+                `${servicesDir}/user/CommonApi/common/packages/common-lib/src`
             ),
         });
     }
