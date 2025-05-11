@@ -8,20 +8,28 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/common-lib.js",
-            "require": "./dist/common-lib.umd.cjs"
+            "import": "./dist/index.js",
+            "require": "./dist/index.js",
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
         },
         "./rpc": {
             "import": "./dist/rpc.js",
-            "require": "./dist/rpc.umd.cjs"
+            "require": "./dist/rpc.js",
+            "types": "./dist/rpc.d.ts",
+            "default": "./dist/rpc.js"
         },
         "./messaging": {
             "import": "./dist/messaging/index.js",
-            "require": "./dist/messaging/index.umd.cjs"
+            "require": "./dist/messaging/index.js",
+            "types": "./dist/messaging/index.d.ts",
+            "default": "./dist/messaging/index.js"
         },
         "./messaging/*": {
             "import": "./dist/messaging/*.js",
-            "require": "./dist/messaging/*.umd.cjs"
+            "require": "./dist/messaging/*.js",
+            "types": "./dist/messaging/*.d.ts",
+            "default": "./dist/messaging/*.js"
         }
     },
     "files": [
@@ -29,7 +37,7 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../../../if-build-needed.mjs src 'vite build'",
+        "build": "node ../../../../../if-build-needed.mjs src 'tsc -b && vite build'",
         "preview": "vite preview",
         "format": "prettier --write 'src/**/*.ts'"
     },

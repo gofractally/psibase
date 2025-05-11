@@ -17,7 +17,7 @@ export interface SharedViteConfigOptions {
   uiFramework?: string
 }
 
-export function createSharedViteConfig(options: SharedViteConfigOptions): UserConfig {
+export function createSharedViteConfig(options: SharedViteConfigOptions): Plugin {
   const { uiFramework = "react", manualChunks = {
     vendor: ['react', 'react-dom'],
   }, additionalManualChunks = {} } = options
@@ -37,8 +37,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
               } : {})
         }
       };
-  return [{
-    name: 'shared-vite-config',
+  const userConfig: UserConfig = {
     build: {
       // Disable sourcemaps in production for better caching
       sourcemap: process.env.NODE_ENV === 'development',
@@ -52,8 +51,16 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
       // TODO: this isn't right; what about manualChunks other than vendor?
       include: uiFramework === "react" ? (manualChunks.vendor || []) : [],
     },
-  },
-]
+  }
+  return (uiFramework === "svelte") ? {
+        name: 'shared-vite-config',
+        ...userConfig
+    } : {
+        name: 'shared-vite-config',
+        config: () => ({
+            ...userConfig
+        })
+    }
 } 
 
 export function verifyViteCache(dirname: any) {

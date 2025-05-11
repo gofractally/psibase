@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../../../if-build-needed.mjs src 'vite build'",
+    "build": "node ../../../if-build-needed.mjs src 'tsc -b && vite build'",
     "lint": "eslint .",
     "preview": "vite preview"
   },
