@@ -10,10 +10,10 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
+import { useMembers } from "@/hooks/fractals/useMembers";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
-import { useMembers } from "@/hooks/useMembers";
-import { cn } from "@/lib/utils";
 import { getMemberLabel } from "@/lib/getMemberLabel";
+import { cn } from "@/lib/utils";
 
 export const AllMembers = () => {
     const { data: members, error } = useMembers(useCurrentFractal());
@@ -45,7 +45,9 @@ export const AllMembers = () => {
                                 {member.account}
                             </TableCell>
                             <TableCell>{member.reputation}</TableCell>
-                            <TableCell>{getMemberLabel(member.memberStatus)}</TableCell>
+                            <TableCell>
+                                {getMemberLabel(member.memberStatus)}
+                            </TableCell>
                             <TableCell>
                                 {dayjs(member.createdAt).format("MMMM D, YYYY")}
                             </TableCell>

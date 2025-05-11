@@ -1853,6 +1853,7 @@ dependencies = [
  "fractals",
  "psibase",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 

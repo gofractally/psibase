@@ -19,18 +19,16 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 
+import { useFractal } from "@/hooks/fractals/useFractal";
 import { useChainId } from "@/hooks/use-chain-id";
-import {
-    Fractal,
-    useFractal,
-} from "@/hooks/useFractal";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
 import { useTrackedFractals } from "@/hooks/useTrackedFractals";
 import { createIdenticon } from "@/lib/createIdenticon";
+import { zFractal } from "@/lib/graphql/fractals/getFractal";
+import QueryKey from "@/lib/queryKeys";
 
 import { CreateFractalModal } from "./create-fractal-modal";
 import { Button } from "./ui/button";
-import QueryKey from "@/lib/queryKeys";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -47,7 +45,6 @@ export function AppSwitcher() {
 
     const currentFractal = useCurrentFractal();
     const { data: fractal } = useFractal(currentFractal);
-
 
     return (
         <SidebarMenu>
@@ -66,12 +63,9 @@ export function AppSwitcher() {
                             <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-background text-sidebar-primary-foreground">
                                 <img
                                     className="size-4"
-                                    src={
-                         
-                                        createIdenticon(
-                                            chainId + selectedFractalAccount,
-                                        )
-                                    }
+                                    src={createIdenticon(
+                                        chainId + selectedFractalAccount,
+                                    )}
                                 />
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
@@ -99,13 +93,14 @@ export function AppSwitcher() {
                             Fractals
                         </DropdownMenuLabel>
                         {fractals.map((fractal) => {
-                            const metadata = Fractal.safeParse(
+                            const metadata = zFractal.safeParse(
                                 queryClient.getQueryData(
                                     QueryKey.fractal(fractal.account),
                                 ),
                             );
                             const displayName =
                                 metadata.success &&
+                                metadata.data &&
                                 metadata.data.name;
 
                             const src = createIdenticon(

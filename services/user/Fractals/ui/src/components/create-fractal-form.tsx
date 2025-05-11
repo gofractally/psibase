@@ -70,7 +70,6 @@ export const CreateFractalForm = ({ onSubmit }: Props) => {
 
             <form.AppForm>
                 <form.SubmitButton
-                    submitOnce
                     labels={[
                         "Create fractal",
                         "Creating fractal...",

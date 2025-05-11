@@ -13,12 +13,14 @@ const QueryKey = {
     createFractal: () => ["createFractal"] as const,
     selectAccount: () => ["selectAccount"] as const,
     userAccount: (account: string | undefined) => ["userAccount", account],
-    fractal: (account: OptionalAccount) =>
-        ["fractal", account] as const,
+    fractal: (account: OptionalAccount) => ["fractal", account] as const,
     branding: () => ["branding"] as const,
-    logout: () => ['logout'] as const,
+    logout: () => ["logout"] as const,
     members: (account: OptionalAccount) => ["members", account] as const,
-    membership: (fractal: OptionalAccount, user: OptionalAccount) => ["membership", fractal, user] as const,
+    membership: (fractal: OptionalAccount, user: OptionalAccount) =>
+        ["membership", fractal, user] as const,
+    evaluation: (evaluationId: number | undefined | null) =>
+        ["evaluation", evaluationId] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

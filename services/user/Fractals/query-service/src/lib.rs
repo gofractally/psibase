@@ -5,11 +5,20 @@ mod service {
     use fractals::tables::tables::{Fractal, FractalTable, Member, MemberTable};
     use psibase::*;
     use serde::Deserialize;
+    use serde_aux::field_attributes::deserialize_number_from_string;
+
 
     #[derive(Deserialize, SimpleObject)]
     struct HistoricalUpdate {
         old_thing: String,
         new_thing: String,
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    struct EvaluationFinish {
+        owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32
     }
 
     struct Query;
@@ -28,6 +37,18 @@ mod service {
                 .last(last)
                 .before(before)
                 .after(after)
+                .query()
+        }
+
+        async fn evaluation_finishes(
+            &self,
+            fractal: AccountNumber
+        ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
+            EventQuery::new("history.fractals.evaluation_finished")
+                .condition(format!(
+                    "fractal_account = '{}'",
+                    fractal
+                ))
                 .query()
         }
 

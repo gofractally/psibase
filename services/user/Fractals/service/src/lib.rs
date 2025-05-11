@@ -54,6 +54,10 @@ pub mod service {
             });
         }
 
+        Wrapper::emit()
+            .history()
+            .evaluation_finished(fractal.account, fractal.scheduled_evaluation.unwrap());
+
         fractal.schedule_next_evaluation();
     }
 
@@ -185,6 +189,9 @@ pub mod service {
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
+
+    #[event(history)]
+    pub fn evaluation_finished(fractal_account: AccountNumber, evaluation_id: u32) {}
 }
 
 #[cfg(test)]

@@ -8,13 +8,9 @@ type SubmitButtonLabels = [
 ];
 
 export const SubmitButton = ({
-  submitOnce = false,
   labels = ["Save", "Saving...", "Saved"],
-  canPristineSubmit,
 }: {
-  submitOnce?: boolean;
   labels?: SubmitButtonLabels;
-  canPristineSubmit?: boolean;
 }) => {
   const form = useFormContext();
   const [label, submittingLabel, submittedLabel] = labels;
@@ -25,23 +21,20 @@ export const SubmitButton = ({
         state.isValid,
         state.isSubmitting,
         state.isSubmitSuccessful,
-        state.isPristine,
       ]}
     >
-      {([isValid, isSubmitting, isSubmitSuccessful, isPristine]) => {
+      {([isValid, isSubmitting, isSubmitSuccessful]) => {
         return (
           <Button
             type="submit"
             disabled={
               !isValid ||
-              isSubmitting ||
-              (!canPristineSubmit && isPristine) ||
-              (isSubmitSuccessful && submitOnce)
+              isSubmitting
             }
           >
             {isSubmitting
               ? submittingLabel
-              : submitOnce && isSubmitSuccessful
+              : isSubmitSuccessful
                 ? submittedLabel
                 : label}
           </Button>
