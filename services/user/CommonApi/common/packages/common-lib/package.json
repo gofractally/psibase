@@ -8,10 +8,10 @@
     "types": "./dist/index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.js",
-            "require": "./dist/index.js",
+            "import": "./dist/common-lib.js",
+            "require": "./dist/common-lib.umd.cjs",
             "types": "./dist/index.d.ts",
-            "default": "./dist/index.js"
+            "default": "./dist/common-lib.js"
         },
         "./rpc": {
             "import": "./dist/rpc.js",

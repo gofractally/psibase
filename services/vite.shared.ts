@@ -37,6 +37,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): Plugin
               } : {})
         }
       };
+
   const userConfig: UserConfig = {
     build: {
       // Disable sourcemaps in production for better caching

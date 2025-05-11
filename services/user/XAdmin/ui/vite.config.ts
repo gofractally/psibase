@@ -25,7 +25,6 @@ export default defineConfig(({ command }) => ({
             manualChunks: {
                 vendor: ['react', 'react-dom', 'react-router-dom']
             },
-            additionalSrcDirs: [wasmDir]
         }),
         ...createPsibaseConfig({
             service: "x-admin",

@@ -16,13 +16,14 @@ export default defineConfig({
             name: "@psibase/common-lib",
             fileName: "common-lib",
         },
+        minify: false,
     },
     plugins: [
         dts(),
-        createSharedViteConfig({
-            projectDir: serviceDir,
-            manualChunks: {},
-        }),
+        // createSharedViteConfig({
+        //     projectDir: serviceDir,
+        //     manualChunks: {},
+        // }),
     ],
 });
 
