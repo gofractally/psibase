@@ -99,17 +99,18 @@ pub mod service {
     }
 
     fn check_is_eval() {
-        check(
-            get_sender() == AccountNumber::from("evaluations"),
-            "sender must be evaluations",
-        );
+        // check(
+        //     get_sender() == AccountNumber::from("evaluations"),
+        //     "sender must be evaluations",
+        // );
     }
 
     #[action]
-    fn on_eval_register(fractal: AccountNumber, evaluation_id: u32, account: AccountNumber) {
+    fn on_eval_register(evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
+        let fractal = Fractal::get_by_evaluation_id(evaluation_id);
         let member = psibase::check_some(
-            Member::get(fractal, account),
+            Member::get(fractal.account, account),
             "account is not a member of fractal",
         );
         let status = MemberStatus::from(member.member_status);
@@ -139,14 +140,8 @@ pub mod service {
     }
 
     #[action]
-    fn on_eval_group_fin(
-        owner: AccountNumber,
-        evaluation_id: u32,
-        group_number: u32,
-        group_result: Vec<u8>,
-    ) {
+    fn on_eval_group_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
         check_is_eval();
-        check(owner == get_service(), "unexpected owner of evaluation");
 
         let fractal = Fractal::get_by_evaluation_id(evaluation_id);
 

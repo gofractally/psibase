@@ -12,8 +12,8 @@ mod errors;
 use errors::ErrorType;
 use psibase::AccountNumber;
 
+use bindings::evaluations::plugin::user::{attest, propose, register, unregister};
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
-
 struct ProposeLatch;
 
 impl ProposeLatch {
@@ -32,6 +32,27 @@ impl Drop for ProposeLatch {
 struct FractallyPlugin;
 
 impl Api for FractallyPlugin {
+    fn register(fractal: String, evaluation_id: u32) -> Result<(), Error> {
+        register(&fractal, evaluation_id)
+    }
+
+    fn unregister(fractal: String, evaluation_id: u32) -> Result<(), Error> {
+        unregister(&fractal, evaluation_id)
+    }
+
+    fn attest(fractal: String, evaluation_id: u32, group_number: u32) -> Result<(), Error> {
+        attest(&fractal, evaluation_id, group_number)
+    }
+
+    fn propose(
+        fractal: String,
+        evaluation_id: u32,
+        group_number: u32,
+        proposal: Vec<String>,
+    ) -> Result<(), Error> {
+        propose(&fractal, evaluation_id, group_number, &proposal)
+    }
+
     fn set_schedule(
         fractal: String,
         registration: u32,
@@ -65,6 +86,17 @@ impl Api for FractallyPlugin {
         }
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
+    }
+
+    fn close_eval(fractal: String) -> Result<(), Error> {
+        let packed_args = fractals::action_structs::close_eval {
+            fractal: AccountNumber::from(fractal.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::close_eval::ACTION_NAME,
+            &packed_args,
+        )
     }
 
     fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {

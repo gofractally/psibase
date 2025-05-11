@@ -15,7 +15,7 @@ const Params = z.object({
     fractal: zAccount,
 });
 
-export const useJoinFractal = () =>
+export const useCloseEvaluation = () =>
     useMutation<undefined, Error, z.infer<typeof Params>>({
         mutationFn: async (params) => {
             const { fractal } = Params.parse(params);

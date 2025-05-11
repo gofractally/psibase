@@ -5,11 +5,12 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
+import { fractalsService } from "@/lib/constants";
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
+import { zAccount } from "@/lib/zod/Account";
 
 import { AccountNameStatus } from "./useAccountStatus";
-import { zAccount } from "@/lib/zod/Account";
 
 const Params = z.object({
     account: zAccount,
@@ -25,7 +26,7 @@ export const useCreateFractal = () =>
             void (await supervisor.functionCall({
                 method: "createFractal",
                 params: [zAccount.parse(account), name, mission],
-                service: "fractals",
+                service: fractalsService,
                 intf: "api",
             }));
             return null;
@@ -42,9 +43,8 @@ export const useCreateFractal = () =>
                     queryKey: QueryKey.fractal(account),
                 });
             }, AwaitTime);
-            
-            toast.success(`Created fractal ${account}`);
 
+            toast.success(`Created fractal ${account}`);
         },
         onError: (error) => {
             if (error instanceof Error) {

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
+import { fractalsService } from "@/lib/constants";
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
@@ -45,7 +46,7 @@ export const useSetSchedule = () =>
                     intervalSeconds,
                     forceDelete,
                 ],
-                service: "fractals",
+                service: fractalsService,
                 intf: "api",
             }));
         },

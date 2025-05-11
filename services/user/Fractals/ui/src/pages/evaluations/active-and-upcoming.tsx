@@ -1,34 +1,50 @@
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
+
 import { EmptyBlock } from "@/components/EmptyBlock";
 
 import { useEvaluation } from "@/hooks/fractals/useEvaluation";
 import { useFractal } from "@/hooks/fractals/useFractal";
+import { useRegister } from "@/hooks/fractals/useRegister";
+import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { fractalsService } from "@/lib/constants";
+import { OptionalNumber } from "@/lib/queryKeys";
+
+const useNextEvaluations = (
+    interval: OptionalNumber,
+    startTime: OptionalNumber,
+    amount = 6,
+): Date[] => {
+    if (interval && startTime) {
+        return [...new Array(amount)].map((_, index) =>
+            dayjs.unix((index + 1) * interval + startTime).toDate(),
+        );
+    }
+    return [];
+};
 
 export const ActiveAndUpcoming = () => {
-    const { data: fractal, isLoading } = useFractal();
-    console.log({ fractal });
-
+    const { data: fractal } = useFractal();
     const { data: evaluation } = useEvaluation(fractal?.scheduledEvaluation);
+
     const navigate = useNavigate();
 
-    console.log({ evaluation });
-    if (isLoading) return null;
+    const status = useEvaluationStatus();
 
-    const nextEvaluations =
-        evaluation && fractal?.evaluationInterval
-            ? [...new Array(6)].map((_, index) => {
-                  return {
-                      date: dayjs
-                          .unix(
-                              (index + 1) * fractal.evaluationInterval! +
-                                  evaluation.registrationStarts,
-                          )
-                          .format("MMMM D, YYYY HH:mm"),
-                  };
-              })
-            : [];
+    const { mutateAsync: register, isPending: isRegistering } = useRegister();
+    const { data: currentUser } = useCurrentUser();
+
+    console.log({ status });
+
+    const nextSchedules = useNextEvaluations(
+        fractal?.evaluationInterval,
+        evaluation?.registrationStarts,
+    );
+
+    console.log(nextSchedules, "are next schedules");
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -45,21 +61,33 @@ export const ActiveAndUpcoming = () => {
                 />
             ) : (
                 <div>
-                    <div>
-                        <div>Next evaluation</div>
-                        {evaluation && (
-                            <div>
-                                {dayjs
-                                    .unix(evaluation.registrationStarts)
-                                    .format("MMMM D, YYYY HH:mm")}
-                            </div>
-                        )}
+                    {status?.type == "failed" && (
                         <div>
-                            {nextEvaluations.map((data) => (
-                                <div key={data.date}>{data.date} </div>
-                            ))}
+                            Fractal failed to commence the evaluation, please
+                            close to schedule next one.
                         </div>
-                    </div>
+                    )}
+                    {status?.type == "registration" && (
+                        <div>
+                            Awaiting registration
+                            {status.isRegistered ? (
+                                <Button variant="secondary">Unregister</Button>
+                            ) : (
+                                <Button
+                                    disabled={isRegistering}
+                                    onClick={() => {
+                                        register({
+                                            id: evaluation!.id,
+                                            owner: fractalsService,
+                                            registrant: currentUser!,
+                                        });
+                                    }}
+                                >
+                                    {isRegistering ? "Registering" : "Register"}
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

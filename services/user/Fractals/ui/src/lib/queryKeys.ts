@@ -5,6 +5,7 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
 export type OptionalAccount = Account | undefined | null;
+export type OptionalNumber = number | undefined | null;
 
 const QueryKey = {
     currentUser: () => ["currentUser"] as const,
@@ -19,8 +20,10 @@ const QueryKey = {
     members: (account: OptionalAccount) => ["members", account] as const,
     membership: (fractal: OptionalAccount, user: OptionalAccount) =>
         ["membership", fractal, user] as const,
-    evaluation: (evaluationId: number | undefined | null) =>
+    evaluation: (evaluationId: OptionalNumber) =>
         ["evaluation", evaluationId] as const,
+    usersAndGroups: (evaluationId: OptionalNumber) =>
+        ["usersAndGroups", evaluationId] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
