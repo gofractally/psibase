@@ -73,7 +73,7 @@ export const Proposed = () => {
     console.log(values, "are the values");
 
     return (
-        <div className="w-full  p-4 px-6">
+        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <div className="flex justify-between">
                 <h1 className="text-lg font-semibold">Proposed</h1>
                 <Dialog

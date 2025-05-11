@@ -6,41 +6,16 @@ import { EmptyBlock } from "@/components/EmptyBlock";
 import { useEvaluation } from "@/hooks/fractals/useEvaluation";
 import { useFractal } from "@/hooks/fractals/useFractal";
 
-// import { Evaluation } from "@/lib/graphql/evaluations/getEvaluation";
-
-// const NextEvaluationCard = ({ evaluation }: { evaluation: Evaluation }) => {
-//     return <div>{evaluation.registrationStarts}</div>;
-// };
-
-const NothingScheduled = () => {
-    const navigate = useNavigate();
-
-    return (
-        <div className="mx-auto w-full max-w-3xl">
-            <EmptyBlock
-                title="No evaluations scheduled"
-                buttonLabel="Schedule evaluation"
-                description="This fractal has no scheduled evaluations."
-                onButtonClick={() => {
-                    navigate("proposed?modal=true");
-                }}
-            />
-        </div>
-    );
-};
-
 export const ActiveAndUpcoming = () => {
     const { data: fractal, isLoading } = useFractal();
     console.log({ fractal });
 
     const { data: evaluation } = useEvaluation(fractal?.scheduledEvaluation);
+    const navigate = useNavigate();
 
     console.log({ evaluation });
     if (isLoading) return null;
 
-    if (fractal?.scheduledEvaluation === null) {
-        return <NothingScheduled />;
-    }
     const nextEvaluations =
         evaluation && fractal?.evaluationInterval
             ? [...new Array(6)].map((_, index) => {
@@ -56,10 +31,18 @@ export const ActiveAndUpcoming = () => {
             : [];
 
     return (
-        <div className="w-full max-w-screen-xl p-4">
-            <h1 className="text-lg font-semibold">Active & upcoming</h1>
-            {fractal?.evaluationInterval == null ? (
-                <div>Fractal has not set an evaluation schedule.</div>
+        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+            <h1 className="mb-3 text-lg font-semibold">Active & upcoming</h1>
+
+            {fractal?.scheduledEvaluation == null ? (
+                <EmptyBlock
+                    title="No evaluations scheduled"
+                    buttonLabel="Schedule evaluation"
+                    description="This fractal has no scheduled evaluations."
+                    onButtonClick={() => {
+                        navigate("proposed?modal=true");
+                    }}
+                />
             ) : (
                 <div>
                     <div>
