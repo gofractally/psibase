@@ -13,6 +13,9 @@ export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
     react(),
     createSharedViteConfig({
         projectDir: serviceDir,
+        manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom']
+        }
     }),
     ...createPsibaseConfig({
       service: "psibase",

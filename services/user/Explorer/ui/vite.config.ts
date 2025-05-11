@@ -25,6 +25,7 @@ export default defineConfig(({ command }) => ({
         ...createPsibaseConfig({
             service: "explorer",
             serviceDir,
+            uiFramework: 'svelte',
             isServing: command === "serve",
         }),
         // @ts-ignore

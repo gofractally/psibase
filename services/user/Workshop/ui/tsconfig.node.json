@@ -18,12 +18,13 @@
     "noFallthroughCasesInSwitch": true,
     "types": [
       "node",
-      "vite/client"
+      "vite/client",
+      "react",
+      "react-dom"
     ]
   },
   "include": [
     "vite.config.ts",
     "../../../vite.shared.ts",
-    "../../../types.d.ts"
   ]
 }

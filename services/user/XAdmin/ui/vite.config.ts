@@ -20,7 +20,13 @@ export default defineConfig(({ command }) => ({
                 },
             },
         }),
-        createSharedViteConfig({ projectDir: serviceDir, additionalSrcDirs: [wasmDir] }),
+        createSharedViteConfig({
+            projectDir: serviceDir,
+            manualChunks: {
+                vendor: ['react', 'react-dom', 'react-router-dom']
+            },
+            additionalSrcDirs: [wasmDir]
+        }),
         ...createPsibaseConfig({
             service: "x-admin",
             serviceDir,

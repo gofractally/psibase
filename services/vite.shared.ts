@@ -5,6 +5,11 @@ import path from 'path'
 import fs from 'fs'
 import alias from '@rollup/plugin-alias'
 
+const outDirParams = {
+    outDir: 'dist',
+    emptyOutDir: true,
+}
+
 export interface SharedViteConfigOptions {
   projectDir: string
   manualChunks?: Record<string, string[]>
@@ -19,8 +24,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
 
   const rollupOptions = {
         cache: true,
-        outDir: 'dist',
-        emptyOutDir: true,
+        ...(uiFramework === "svelte" ? outDirParams : {}),
         output: {
             entryFileNames: 'index.js',
             assetFileNames: '[name][extname]',
@@ -61,6 +65,7 @@ export function verifyViteCache(dirname: any) {
 }
 
 export interface PsibaseConfigOptions {
+    uiFramework: string;
     service: string;
     serviceDir: string;
     isServing?: boolean;
@@ -99,6 +104,7 @@ const servicesDir = path.resolve(__dirname);
 
 export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
     const {
+        uiFramework = "react",
         service,
         serviceDir,
         isServing = false,
@@ -183,6 +189,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
             name: "psibase",
             config: () => ({
                 build: {
+                    ...(uiFramework !== "svelte" ? outDirParams : {}),
                     assetsDir: "",
                     cssCodeSplit: false,
                     rollupOptions: {

@@ -18,6 +18,9 @@ export default defineConfig({
         svgr(),
         createSharedViteConfig({
             projectDir: serviceDir,
+            manualChunks: {
+                vendor: ['react', 'react-dom', 'react-router-dom']
+            },
             additionalManualChunks: {
                 // Radix UI components
                 'radix-ui': [

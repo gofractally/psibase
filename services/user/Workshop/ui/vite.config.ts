@@ -1,4 +1,3 @@
-/// <reference path="../../../types.d.ts" />
 /// <reference types="vite/client" />
 
 import { defineConfig } from "vite";
@@ -16,6 +15,9 @@ export default defineConfig(() => ({
     react(), 
     createSharedViteConfig({
         projectDir: serviceDir,
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom']
+      },
     }),
     ...createPsibaseConfig({
       service: "workshop",
