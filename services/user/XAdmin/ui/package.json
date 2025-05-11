@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "cd ./wasm && cargo-component build --release && cd .. && node ../../../if-build-needed.mjs src wasm:wasm-transpiled 'tsc -b && vite build'",
+        "build": "cd ./wasm && cargo-component build --release && cd .. && node ../../../if-build-needed.mjs src wasm:wasm-transpiled 'tsc --noEmit --skipLibCheck && vite build'",
         "preview": "vite preview"
     },
     "dependencies": {
