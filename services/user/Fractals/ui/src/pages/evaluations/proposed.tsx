@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { useState } from "react";
+import { parseAsBoolean, useQueryState } from "nuqs";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,10 @@ export const Proposed = () => {
     const fractal = useCurrentFractal();
 
     const navigate = useNavigate();
-    const [showModal, setShowModal] = useState(false);
+    const [showModal, setShowModal] = useQueryState(
+        "modal",
+        parseAsBoolean.withDefault(false),
+    );
 
     useParams();
 

@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 
 import { EmptyBlock } from "@/components/EmptyBlock";
 
@@ -12,13 +13,17 @@ import { useFractal } from "@/hooks/fractals/useFractal";
 // };
 
 const NothingScheduled = () => {
+    const navigate = useNavigate();
+
     return (
         <div className="mx-auto w-full max-w-3xl">
             <EmptyBlock
                 title="No evaluations scheduled"
                 buttonLabel="Schedule evaluation"
                 description="This fractal has no scheduled evaluations."
-                onButtonClick={() => {}}
+                onButtonClick={() => {
+                    navigate("proposed?modal=true");
+                }}
             />
         </div>
     );
