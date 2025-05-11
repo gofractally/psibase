@@ -65,7 +65,7 @@ export function verifyViteCache(dirname: any) {
 }
 
 export interface PsibaseConfigOptions {
-    uiFramework: string;
+    uiFramework?: string;
     service: string;
     serviceDir: string;
     isServing?: boolean;

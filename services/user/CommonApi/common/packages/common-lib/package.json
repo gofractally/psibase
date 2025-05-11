@@ -29,7 +29,7 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../../../if-build-needed.mjs src 'tsc -b && vite build'",
+        "build": "node ../../../../../if-build-needed.mjs src 'vite build'",
         "preview": "vite preview",
         "format": "prettier --write 'src/**/*.ts'"
     },
