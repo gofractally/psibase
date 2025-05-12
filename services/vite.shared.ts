@@ -28,6 +28,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): Plugin
         output: {
             entryFileNames: 'index.js',
             assetFileNames: '[name][extname]',
+            dir: "dist",
             ...(Object.keys(manualChunks).length > 0 ? {
                 manualChunks: {
                   // Core UI libraries
@@ -162,7 +163,6 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
                 bypass: (req: any, _res: any, _opt: any) => {
                     const host = req.headers.host || "";
                     const subdomain = host.split(".")[0];
-                    // TODO: this list doesn't match the list in XAdmin
                     const baseConditions = [
                         subdomain === service,
                         req.method !== "POST",

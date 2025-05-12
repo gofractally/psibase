@@ -5,9 +5,9 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../if-build-needed.mjs src 'tsc --noEmit --skipLibCheck && vite build'",
+        "preview": "vite preview",
         "format": "prettier --write 'src/**/*.ts'",
-        "preview": "vite preview"
+        "build": "node ../../../if-build-needed.mjs src 'tsc --noEmit --skipLibCheck && vite build'"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",

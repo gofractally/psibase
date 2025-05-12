@@ -27,7 +27,6 @@ export default defineConfig({
     ],
   },
   build: {
-    // Enable sourcemap for better caching
     sourcemap: true,
     minify: false,
   },
