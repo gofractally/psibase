@@ -204,11 +204,6 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
                         external: [
                             "/common/rootdomain.mjs",
                             "/common/common-lib.js",
-                            "@bytecodealliance/preview2-shim/cli",
-                            "@bytecodealliance/preview2-shim/clocks",
-                            "@bytecodealliance/preview2-shim/filesystem",
-                            "@bytecodealliance/preview2-shim/io",
-                            "@bytecodealliance/preview2-shim/random"
                         ],
                         makeAbsoluteExternalsRelative: false,
                     },
