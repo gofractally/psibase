@@ -9,6 +9,52 @@
 using namespace psibase;
 using namespace SystemService;
 
+namespace
+{
+   // Tell native that a transaction is ready.
+   // Must be run inside a subjective transaction.
+   void setTransactionReady()
+   {
+      auto key = notifyKey(NotifyType::nextTransaction);
+      if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+      {
+         if (!std::ranges::any_of(existing->actions, [](const auto& act)
+                                  { return act.service == RTransact::service; }))
+         {
+            existing->actions.push_back(
+                {.service = RTransact::service, .method = MethodNumber{"next"}});
+            kvPut(DbId::nativeSubjective, key, *existing);
+         }
+      }
+      else
+      {
+         kvPut(DbId::nativeSubjective, key,
+               NotifyRow{NotifyType::nextTransaction,
+                         {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
+      }
+   }
+
+   // Tell native that there are no transactions ready
+   // Must be run inside a subjective transaction.
+   void clearTransactionReady()
+   {
+      auto key = notifyKey(NotifyType::nextTransaction);
+      if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+      {
+         std::erase_if(existing->actions,
+                       [](const auto& act) { return act.service == RTransact::service; });
+         if (existing->actions.empty())
+         {
+            kvRemove(DbId::nativeSubjective, key);
+         }
+         else
+         {
+            kvPut(DbId::nativeSubjective, key, *existing);
+         }
+      }
+   }
+}  // namespace
+
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
@@ -16,6 +62,12 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    auto nextSequence = unapplied.get({}).value_or(UnappliedTransactionRecord{0}).nextSequence;
    auto included     = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
    std::optional<SignedTransaction> result;
+
+   // if the verify services have changed, flush the queue,
+   // and start verifying signatures from scratch.
+   //
+   // getStatus().current.consensusState == saved consensus state
+
    PSIBASE_SUBJECTIVE_TX
    {
       auto table = Subjective{}.open<PendingTransactionTable>();
@@ -36,21 +88,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       unapplied.put({nextSequence});
       if (!result)
       {
-         // Unregister callback
-         auto key = notifyKey(NotifyType::nextTransaction);
-         if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
-         {
-            std::erase_if(existing->actions,
-                          [](const auto& act) { return act.service == RTransact::service; });
-            if (existing->actions.empty())
-            {
-               kvRemove(DbId::nativeSubjective, key);
-            }
-            else
-            {
-               kvPut(DbId::nativeSubjective, key, *existing);
-            }
-         }
+         clearTransactionReady();
       }
    }
    return result;
@@ -177,6 +215,86 @@ namespace
       }
    };
 
+   // Must be run in a subjective transaction
+   void queueTransaction(const Checksum256& id, TimePointSec expiration)
+   {
+      auto pending = RTransact{}.open<PendingTransactionTable>();
+      // Find the next sequence number
+      auto available = RTransact{}.open<AvailableSequenceTable>();
+      auto sequence  = available.get({}).value_or(AvailableSequenceRecord{0}).nextSequence;
+      available.put({sequence + 1});
+      pending.put({.id         = id,
+                   .expiration = expiration,
+                   .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
+                       std::chrono::system_clock::now()),
+                   .sequence = sequence});
+
+      // Tell native that we have a transaction
+      setTransactionReady();
+   }
+
+   struct TrxReply
+   {
+      std::optional<TraceClientRow> row;
+      bool                          json = false;
+      bool                          bin  = false;
+      void                          send(psio::view<const TransactionTrace> pruned);
+      explicit                      operator bool() const { return row.has_value(); }
+   };
+
+   TrxReply claimTrxReply(const Checksum256& id)
+   {
+      auto     clients = RTransact{}.open<TraceClientTable>();
+      TrxReply result{clients.get(id)};
+      if (result.row)
+      {
+         clients.remove(*result.row);
+         for (auto client : result.row->clients)
+         {
+            if (client.json)
+               result.json = true;
+            else
+               result.bin = true;
+            to<HttpServer>().claimReply(client.socket);
+         }
+      }
+      return result;
+   }
+
+   void TrxReply::send(psio::view<const TransactionTrace> trace)
+   {
+      TransactionTraceRef pruned = PruneTrace{true}(trace);
+
+      if (json)
+      {
+         JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json",
+                                                   .body{pruned}};
+         ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
+         auto                                action = http.sendReply(0, reply);
+
+         for (auto client : row->clients)
+            if (client.json)
+            {
+               psio::get<0>(action->rawData().value()) = client.socket;
+               call(action.data(), action.size());
+            }
+      }
+      if (bin)
+      {
+         FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
+                                                       .body{pruned}};
+         ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
+         auto                                    action = http.sendReply(0, reply);
+
+         for (auto client : row->clients)
+            if (!client.json)
+            {
+               psio::get<0>(action->rawData().value()) = client.socket;
+               call(action.data(), action.size());
+            }
+      }
+   }
+
 }  // namespace
 
 void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
@@ -184,57 +302,12 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    check(getSender() == AccountNumber{}, "Wrong sender");
    printf("trace size: %zu\n", find_view_span(trace).size());
 
-   TransactionTraceRef pruned = PruneTrace{true}(trace);
-
-   auto                          clients = Subjective{}.open<TraceClientTable>();
-   std::optional<TraceClientRow> row;
-   bool                          json;
-   bool                          bin;
+   TrxReply reply;
    PSIBASE_SUBJECTIVE_TX
    {
-      json = false;
-      bin  = false;
-      row  = clients.get(id);
-      if (row)
-      {
-         clients.remove(*row);
-         for (auto client : row->clients)
-         {
-            if (client.json)
-               json = true;
-            else
-               bin = true;
-            to<HttpServer>().claimReply(client.socket);
-         }
-      }
+      reply = claimTrxReply(id);
    }
-   if (json)
-   {
-      JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json", .body{pruned}};
-      ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
-      auto                                action = http.sendReply(0, reply);
-
-      for (auto client : row->clients)
-         if (client.json)
-         {
-            psio::get<0>(action->rawData().value()) = client.socket;
-            call(action.data(), action.size());
-         }
-   }
-   if (bin)
-   {
-      FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
-                                                    .body{pruned}};
-      ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
-      auto                                    action = http.sendReply(0, reply);
-
-      for (auto client : row->clients)
-         if (!client.json)
-         {
-            psio::get<0>(action->rawData().value()) = client.socket;
-            call(action.data(), action.size());
-         }
-   }
+   reply.send(trace);
 #ifdef __wasm32__
    printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
 #endif
@@ -302,10 +375,85 @@ void RTransact::onBlock()
    }
 }
 
+void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> trace)
+{
+   check(getSender() == AccountNumber{}, "Wrong sender");
+   auto     pendingVerifies        = open<PendingVerifyTable>();
+   auto     unverifiedTransactions = open<UnverifiedTransactionTable>();
+   TrxReply errorReply;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto row = pendingVerifies.get(id);
+      check(!!row, "Can't find transaction id");
+      auto tx = unverifiedTransactions.get(row->txid);
+      check(tx->remainingVerifies > 0, "Refcount underflow");
+      if (!tx->hasError && trace.error())
+      {
+         tx->hasError = true;
+         open<TransactionDataTable>().erase(tx->id);
+         errorReply = claimTrxReply(tx->id);
+      }
+      if (--tx->remainingVerifies == 0)
+      {
+         if (!tx->hasError)
+         {
+            queueTransaction(tx->id, tx->expiration);
+         }
+         unverifiedTransactions.remove(*tx);
+      }
+      else
+      {
+         unverifiedTransactions.put(*tx);
+      }
+   }
+   if (errorReply)
+   {
+      errorReply.send(trace);
+   }
+}
+
 namespace
 {
    using Subjective = RTransact::Subjective;
    using WriteOnly  = RTransact::WriteOnly;
+
+   // Must be run inside PSIBASE_SUBJECTIVE_TX
+   void scheduleVerify(const Checksum256& id, const SignedTransaction& trx)
+   {
+      auto pendingVerifies        = RTransact{}.open<PendingVerifyTable>();
+      auto unverifiedTransactions = RTransact{}.open<UnverifiedTransactionTable>();
+
+      auto claims = trx.transaction->claims();
+      check(claims.size() == trx.proofs.size(), "Claims and proofs must have the same size");
+      for (auto&& [claim, proof] : std::views::zip(claims, trx.proofs))
+      {
+         VerifyArgs args{id, claim, proof};
+         Action     act{.sender  = RTransact::service,
+                        .service = claim.service(),
+                        .rawData = psio::to_frac(args)};
+
+         RunRow row{
+             .id           = 0,
+             .mode         = RunMode::verify,
+             .maxTime      = std::chrono::milliseconds(50),
+             .action       = std::move(act),
+             .continuation = {.service = RTransact::service, .method = MethodNumber{"onVerify"}},
+         };
+         if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
+            row.id = prev->id + 1;
+
+         kvPut(RunRow::db, row.key(), row);
+         pendingVerifies.put({.txid = id, .runid = row.id});
+      }
+      UnverifiedTransactionRecord row{
+          .id                = id,
+          .expiration        = trx.transaction->tapos().expiration(),
+          .remainingVerifies = trx.transaction->claims().size(),
+          .hasError          = false,
+      };
+      unverifiedTransactions.put(row);
+   }
+
    bool pushTransaction(const Checksum256& id, const SignedTransaction& trx)
    {
       PSIBASE_SUBJECTIVE_TX
@@ -315,37 +463,18 @@ namespace
          {
             return false;
          }
-         // Find the next sequence number
-         auto available = Subjective{}.open<AvailableSequenceTable>();
-         auto sequence  = available.get({}).value_or(AvailableSequenceRecord{0}).nextSequence;
-         available.put({sequence + 1});
-         pending.put({.id         = id,
-                      .expiration = trx.transaction->tapos().expiration(),
-                      .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
-                          std::chrono::system_clock::now()),
-                      .sequence = sequence});
+         auto unverified = RTransact{}.open<UnverifiedTransactionTable>();
+         if (auto row = unverified.get(id))
+         {
+            // TODO: report an error. Maybe we should defer sending
+            // the error until all verification has reported back...
+            return false;
+         }
+         scheduleVerify(id, trx);
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
 
          // Tell native that we have a transaction
-         {
-            auto key = notifyKey(NotifyType::nextTransaction);
-            if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
-            {
-               if (!std::ranges::any_of(existing->actions, [](const auto& act)
-                                        { return act.service == RTransact::service; }))
-               {
-                  existing->actions.push_back(
-                      {.service = RTransact::service, .method = MethodNumber{"next"}});
-                  kvPut(DbId::nativeSubjective, key, *existing);
-               }
-            }
-            else
-            {
-               kvPut(DbId::nativeSubjective, key,
-                     NotifyRow{NotifyType::nextTransaction,
-                               {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
-            }
-         }
+         setTransactionReady();
       }
       return true;
    }

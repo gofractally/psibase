@@ -22,6 +22,7 @@ namespace psibase
    static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
    static constexpr NativeTableNum logTruncateTable           = 13;  // subjective
    static constexpr NativeTableNum socketTable                = 14;  // subjective
+   static constexpr NativeTableNum runTable                   = 15;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -305,6 +306,91 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> SocketKeyType;
       PSIO_REFLECT(SocketRow, fd, info)
+   };
+
+   enum class RunMode : std::uint8_t
+   {
+      // No database access, and only services with isAuthService
+      // are allowed.
+      verify,
+      // Access is equivalent to transactions. Changes to the
+      // chain state are allowed, but will be discarded after
+      // the continuation completes.
+      speculative,
+      // Read-only access to chain state. Read/write access
+      // to chain-independent databases.
+      rpc,
+   };
+
+   //struct ContinuationArgs
+   //{
+   //   std::uint64_t id;
+   //   TransactionTrace trace;
+   //   PSIO_REFLECT(ContinuationArgs, id, trace)
+   //};
+
+   struct BoundMethod
+   {
+      AccountNumber service;
+      MethodNumber  method;
+      PSIO_REFLECT(BoundMethod, service, method)
+   };
+
+   using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
+   auto runPrefix() -> KeyPrefixType;
+   auto runKey(std::uint64_t id) -> RunKeyType;
+
+   // The run table holds actions to be run concurrently.
+   // An entry may begin executing whenever it is not
+   // currently running. Rows with a lower id are preferred,
+   // but the order is not guaranteed. After the action
+   // finishes, whether successfully or not, the continuation
+   // will be run with the trace.
+   //
+   // The state used to run the action is the head block state
+   // whenever execution begins. The continuation is run in the
+   // same context as the action.
+   //
+   // Execution can be terminated at any time. It is the
+   // continuation's resposibility to remove the row. Native
+   // code does not remove or modify entries in the table.
+   // If the row is still present, it will start execution
+   // from the beginning.
+   //
+   // Note: The server itself may be terminated abruptly
+   // and this cannot be prevented. When this happens, it is
+   // impossible to resume where we left off. Changes committed
+   // by commitSubjective (including PSIBASE_SUBJECTIVE_TX)
+   // will persist.
+   //
+   // To implement async cancellation, replace the
+   // action with a no-op and the continuation with a
+   // cancel handler. N.B. Do not implement cancellation
+   // by deleting the row. Deleting it anywhere except the
+   // continuation makes it impossible to re-use the id safely.
+   //
+   // If the row is deleted (don't) or the continuation is
+   // changed after execution starts, it is unspecified which
+   // version of the continuation is run.
+   struct RunRow
+   {
+      // queue management
+      std::uint64_t id;
+      // permitted database access.
+      RunMode mode;
+      // The initial time limit for the action. If the
+      // action has sufficient permissions, it can change
+      // the limit using setMaxTransactionTime. The limit
+      // only applies to the action. The continuation is
+      // not limited and therefore should be a system service.
+      MicroSeconds maxTime;
+      // the action to run
+      Action      action;
+      BoundMethod continuation;
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> RunKeyType;
+      PSIO_REFLECT(RunRow, id, mode, maxTime, action, continuation)
    };
 
 }  // namespace psibase

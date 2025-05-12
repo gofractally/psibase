@@ -12,6 +12,9 @@ namespace SystemService
 {
    // Does not follow forks. Transactions are added asynchronously and removed
    // at irreversible.
+   //
+   // This row exists iff there is a PendingTransactionRecord or an
+   // UnverifiedTransactionRecord with hasError == false for the id.
    struct TransactionData
    {
       psibase::Checksum256       id;
@@ -51,6 +54,29 @@ namespace SystemService
 
    using AvailableSequenceTable = psibase::Table<AvailableSequenceRecord, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AvailableSequenceTable)
+
+   struct UnverifiedTransactionRecord
+   {
+      psibase::Checksum256  id;
+      psibase::TimePointSec expiration;
+      std::uint32_t         remainingVerifies;
+      bool                  hasError;
+      PSIO_REFLECT(UnverifiedTransactionRecord, id, expiration, remainingVerifies, hasError)
+   };
+
+   using UnverifiedTransactionTable =
+       psibase::Table<UnverifiedTransactionRecord, &UnverifiedTransactionRecord::id>;
+   PSIO_REFLECT_TYPENAME(UnverifiedTransactionTable)
+
+   struct PendingVerifyRecord
+   {
+      psibase::Checksum256 txid;
+      std::uint64_t        runid;
+      PSIO_REFLECT(PendingVerifyRecord, txid, runid)
+   };
+
+   using PendingVerifyTable = psibase::Table<PendingVerifyRecord, &PendingVerifyRecord::runid>;
+   PSIO_REFLECT_TYPENAME(PendingVerifyTable)
 
    // Follows forks
    struct UnappliedTransactionRecord
@@ -107,7 +133,11 @@ namespace SystemService
    };
    PSIO_REFLECT(LoginReply, access_token, token_type)
 
-   class RTransact : psibase::Service
+   // Transactions enter this service through the push_transaction endpoint
+   // or over p2p (recv). Speculative execution and signature verification
+   // are dispatched asynchronously. When they complete, the transaction
+   // is pushed onto the queue to be included in blocks.
+   class RTransact : public psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber{"r-transact"};
@@ -115,13 +145,17 @@ namespace SystemService
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
                                                                 TraceClientTable,
-                                                                JWTKeyTable>;
+                                                                JWTKeyTable,
+                                                                UnverifiedTransactionTable,
+                                                                PendingVerifyTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
       // Callbacks used to track successful/expired transactions
       void onTrx(const psibase::Checksum256& id, psio::view<const psibase::TransactionTrace> trace);
+      // Callback run when after signature verification
+      void onVerify(std::uint64_t id, psio::view<const psibase::TransactionTrace> trace);
       void onBlock();
       auto serveSys(const psibase::HttpRequest& request,
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
