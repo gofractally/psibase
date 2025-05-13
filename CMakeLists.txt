@@ -318,7 +318,7 @@ psibase_package(
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
-    DEPENDS Accounts_js_DEP
+    DEPENDS ${Accounts_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
@@ -422,7 +422,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
         FLAGS isAuthService
-    DEPENDS AuthSig_js_DEP
+    DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
@@ -529,13 +529,13 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/ui/dist/*  /
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Profiles(^${PSIBASE_VERSION})"
-    DEPENDS Homepage_js_DEP
+    DEPENDS ${Homepage_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
     PATH services/user/Identity
-    DEPENDS Identity_js_DEP
+    DEPENDS ${Identity_js_DEP}
 )
 
 psibase_package(
@@ -582,7 +582,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
-    DEPENDS Producers_js_DEP
+    DEPENDS ${Producers_js_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})"
 )
 
@@ -650,7 +650,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
         SERVER explorer
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Explorer/ui/dist /
-    DEPENDS Explorer_js_DEP
+    DEPENDS ${Explorer_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
@@ -710,7 +710,7 @@ psibase_package(
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /
-    DEPENDS Permissions_js_DEP
+    DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
 
@@ -776,7 +776,7 @@ psibase_package(
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
-    DEPENDS Workshop_js_DEP
+    DEPENDS ${Workshop_js_DEP}
     DEPENDS ${Plugins_DEP}
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/postinstall.json
 )
