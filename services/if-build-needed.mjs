@@ -12,7 +12,6 @@ const sourceOutpuDirPairs = process.argv.slice(2, -1);
 let needSrcDistPair = true;
 // Parse source:output directory pairs
 const buildDirs = sourceOutpuDirPairs.map(dir => {
-  
   const [source, output] = dir.split(':');
   if (source === "src" || output === "dist") {
     needSrcDistPair = false;
@@ -25,7 +24,10 @@ const buildDirs = sourceOutpuDirPairs.map(dir => {
 
 // Add src:dist if not present
 if (needSrcDistPair) {
-  sourceOutpuDirPairs.push("src:dist");
+  buildDirs.push({
+    source: path.resolve(projectDir, "src"),
+    output: path.resolve(projectDir, "dist")
+  });
 }
 
 // Add common-lib source directory if this isn't the common-lib project itself
