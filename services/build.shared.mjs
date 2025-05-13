@@ -41,7 +41,7 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
         
         if (stat.isDirectory()) {
           // Skip target and dist directories as they are build outputs
-          if (file === 'target' || file === 'dist') continue;
+          if (file === 'target' || file === 'dist' || file === '.vite-cache') continue;
           hash.update(calculateHash(filePath));
         } else {
           hash.update(fs.readFileSync(filePath));
