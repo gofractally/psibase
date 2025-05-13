@@ -24,6 +24,8 @@ const QueryKey = {
         ["evaluation", evaluationId] as const,
     usersAndGroups: (evaluationId: OptionalNumber) =>
         ["usersAndGroups", evaluationId] as const,
+    groupUsers: (evaluationId: OptionalNumber, groupNumber: OptionalNumber) =>
+        ["groupUsers", evaluationId, groupNumber] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

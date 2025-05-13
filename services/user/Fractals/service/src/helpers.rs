@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use psibase::AccountNumber;
+use std::collections::HashMap;
 
 /// Translates a vector of rank numbers into a sorted list of accounts based on their `AccountNumber` values.
 ///
@@ -33,7 +33,10 @@ use psibase::AccountNumber;
 /// let result = parse_rank_to_accounts(group_result, group_members);
 /// // Result: [David, Charlie, Alice, Fred, Edward]
 /// ```
-pub fn parse_rank_to_accounts(group_result: Vec<u8>, group_members: Vec<AccountNumber>) -> Vec<AccountNumber> {
+pub fn parse_rank_to_accounts(
+    group_result: Vec<u8>,
+    group_members: Vec<AccountNumber>,
+) -> Vec<AccountNumber> {
     let mut rank_amount_to_account_dictionary: HashMap<u8, AccountNumber> = HashMap::new();
     let mut group_members = group_members.clone();
 
@@ -41,9 +44,12 @@ pub fn parse_rank_to_accounts(group_result: Vec<u8>, group_members: Vec<AccountN
     group_members.sort_by(|a, b| a.value.cmp(&b.value));
 
     // Map each index to an account
-    group_members.into_iter().enumerate().for_each(|(index, account)| {
-        rank_amount_to_account_dictionary.insert(index as u8, account);
-    });
+    group_members
+        .into_iter()
+        .enumerate()
+        .for_each(|(index, account)| {
+            rank_amount_to_account_dictionary.insert(index as u8, account);
+        });
 
     // Map rank numbers to accounts
     group_result

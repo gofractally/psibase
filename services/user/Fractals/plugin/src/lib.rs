@@ -1,6 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
+use std::str::FromStr;
+
 use bindings::exports::fractals::plugin::api::Guest as Api;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
@@ -9,10 +11,11 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::fracpack::Pack;
 
 mod errors;
+mod helpers;
 use errors::ErrorType;
 use psibase::AccountNumber;
 
-use bindings::evaluations::plugin::user::{attest, propose, register, unregister};
+use bindings::evaluations::plugin::user::{attest, get_group_users, propose, register, unregister};
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 struct ProposeLatch;
 
@@ -44,13 +47,33 @@ impl Api for FractallyPlugin {
         attest(&fractal, evaluation_id, group_number)
     }
 
+    fn get_group_users(evaluation_id: u32, group_number: u32) -> Result<Vec<String>, Error> {
+        get_group_users(&"fractals", evaluation_id, group_number)
+    }
+
     fn propose(
         fractal: String,
         evaluation_id: u32,
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<(), Error> {
-        propose(&fractal, evaluation_id, group_number, &proposal)
+        let all_users: Vec<AccountNumber> =
+            get_group_users(&"fractals", evaluation_id, group_number)?
+                .iter()
+                .map(|account| AccountNumber::from_str(account).unwrap())
+                .collect();
+
+        let ranked_accounts: Vec<AccountNumber> = proposal
+            .iter()
+            .map(|user| AccountNumber::from_str(user).unwrap())
+            .collect();
+
+        let res: Vec<String> = helpers::parse_accounts_to_ranks(all_users, ranked_accounts)
+            .into_iter()
+            .map(|num| num.to_string())
+            .collect();
+
+        propose(&fractal, evaluation_id, group_number, &res)
     }
 
     fn set_schedule(

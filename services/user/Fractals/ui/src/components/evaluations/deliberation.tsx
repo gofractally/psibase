@@ -19,7 +19,7 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
             <Button
                 onClick={() => {
                     navigate(
-                        `${fractal.scheduledEvaluation}/group/${status.groupNumber}`,
+                        `/fractal/${fractal.account}/evaluations/${fractal.scheduledEvaluation}/group/${status.groupNumber}`,
                     );
                 }}
             >
