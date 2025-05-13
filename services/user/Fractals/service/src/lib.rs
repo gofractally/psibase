@@ -99,10 +99,15 @@ pub mod service {
     }
 
     fn check_is_eval() {
-        // check(
-        //     get_sender() == AccountNumber::from("evaluations"),
-        //     "sender must be evaluations",
-        // );
+
+
+        // keep action names less than 12 chars
+        // go psibase::service:: get the name
+
+        check(
+            get_sender() == AccountNumber::from("evaluations"),
+            "sender must be evaluations",
+        );
     }
 
     #[action]
