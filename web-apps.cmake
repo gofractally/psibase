@@ -1,25 +1,25 @@
 include(ExternalProject)
 
 # Static (not built) resource dependencies
-file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/resources/*)
-file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/resources/fonts/*)
+file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
+file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
 
 add_custom_target(YarnInstall
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && yarn --version && yarn #&& yarn install-dev-tools
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn --version && yarn #&& yarn install-dev-tools
     COMMENT "Installing yarn dependencies"
     BUILD_ALWAYS 1
 )
 
 # Common library that other UIs depend on
 ExternalProject_Add(CommonApiCommonLib_js
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/packages/common-lib
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib
     DEPENDS YarnInstall
-    BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/packages/common-lib && yarn build
+    BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib && yarn build
     CONFIGURE_COMMAND ""
     BUILD_BYPRODUCTS 
-        ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/packages/common-lib/dist/common-lib.js
-        ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
-        ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/packages/common-lib/dist/index.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/index.d.ts
     INSTALL_COMMAND ""
     BUILD_ALWAYS 1
 )
@@ -46,17 +46,19 @@ set(UI_PROJECTS
 foreach(UI ${UI_PROJECTS})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${UI})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${UI})
+    set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}/dist/index.html)
     ExternalProject_Add(${TARGET_NAME}
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
-        BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn build
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}
+        BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH} && yarn build
         CONFIGURE_COMMAND ""
-        BUILD_BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html
+        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
         # TODO: does yarn build fail if these common- dir/files don't exist? If so, we don't need this DEPENDS
         # ${common-misc-resources} ${common-fonts}
         DEPENDS CommonApiCommonLib_js YarnInstall
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
     )
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH})
 endforeach()
 
 # Special handling for XAdmin which has additional dependencies

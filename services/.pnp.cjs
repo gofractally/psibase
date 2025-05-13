@@ -2732,6 +2732,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/CommonApi/common/packages/plugin-tester/ui", {\
         "packageLocation": "./user/CommonApi/common/packages/plugin-tester/ui/",\
         "packageDependencies": [\
+          ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/plugin-tester-ui", "workspace:user/CommonApi/common/packages/plugin-tester/ui"],\
           ["@types/node", "npm:22.15.2"],\
           ["@types/react", "npm:18.3.20"],\
@@ -2819,6 +2820,7 @@ const RAW_RUNTIME_STATE =
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
           ["@rollup/browser", "npm:4.40.0"],\
+          ["@rollup/plugin-alias", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:5.1.1"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.36.1"],\
           ["@types/node", "npm:22.15.2"],\
           ["@types/react", "npm:18.3.20"],\
@@ -2900,6 +2902,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./user/XAdmin/ui/",\
         "packageDependencies": [\
           ["@bytecodealliance/jco", "npm:1.10.2"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
           ["@hookform/resolvers", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:3.10.0"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/xadmin-ui", "workspace:user/XAdmin/ui"],\

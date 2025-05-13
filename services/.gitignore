@@ -2,4 +2,4 @@
 !.yarn/sdks/
 !.yarn/sdks/**
 .yarn
-./**/.vite-cache
+**/.vite-cache
