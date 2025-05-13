@@ -10,6 +10,7 @@
         "build": "node ../../../if-build-needed.mjs src 'tsc --noEmit --skipLibCheck && vite build'"
     },
     "devDependencies": {
+        "@rollup/plugin-alias": "^5.1.1",
         "@types/node": "^22.15.0",
         "@types/react": "^18.2.15",
         "@types/react-dom": "^18.2.7",
