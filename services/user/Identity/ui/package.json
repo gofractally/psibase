@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../../../if-build-needed.mjs src 'tsc --noEmit --skipLibCheck && vite build'",
+    "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && vite build'",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

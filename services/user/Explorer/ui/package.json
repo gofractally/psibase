@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --strictPort",
     "prepare": "svelte-kit sync",
-    "build": "node ../../../if-build-needed.mjs src 'tsc --noEmit --skipLibCheck && vite build'",
+    "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && vite build'",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../if-build-needed.mjs src 'tsc --noEmit --skipLibCheck && vite build'",
+        "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && vite build'",
         "preview": "vite preview",
         "lint": "eslint --ext .ts,.tsx --ignore-path .gitignore src",
         "lint:fix": "yarn lint --fix",
