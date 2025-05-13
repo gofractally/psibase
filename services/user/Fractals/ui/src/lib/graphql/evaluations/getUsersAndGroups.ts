@@ -26,14 +26,14 @@ export const zResult = z.object({
     users: zAccount.array(),
 });
 
-export const FunctionResponse = z.object({
+export const UsersAndGroupsResponse = z.object({
     users: zUser.array(),
     groups: zGroup.array(),
     results: zResult.array(),
 });
 
 export type GroupResult = z.infer<typeof zResult>;
-export type UsersAndGroups = z.infer<typeof FunctionResponse>;
+export type UsersAndGroups = z.infer<typeof UsersAndGroupsResponse>;
 
 export const getUsersAndGroups = async (
     owner: Account,
@@ -87,7 +87,7 @@ export const getUsersAndGroups = async (
 
     console.log({ response });
 
-    return FunctionResponse.parse({
+    return UsersAndGroupsResponse.parse({
         users: response.getUsers.nodes,
         groups: response.getGroups.nodes,
         results: response.getGroupResult.nodes,

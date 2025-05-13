@@ -7,27 +7,22 @@ import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
 const Params = z.object({
-    owner: zAccount,
     evaluationId: z.number(),
     groupNumber: z.number(),
-    proposal: z.number().array(),
+    proposal: zAccount.array(),
 });
 
 export const usePropose = () =>
     useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
-            const { owner, evaluationId, groupNumber, proposal } =
+            const { evaluationId, groupNumber, proposal } =
                 Params.parse(params);
+
             const pars = {
                 method: "propose",
                 service: fractalsService,
                 intf: "api",
-                params: [
-                    owner,
-                    evaluationId,
-                    groupNumber,
-                    proposal.map(String),
-                ],
+                params: [evaluationId, groupNumber, proposal],
             };
             console.log("Proposing...", pars);
 

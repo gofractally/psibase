@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { z } from "zod";
 
 import { Evaluation } from "./graphql/evaluations/getEvaluation";
@@ -77,6 +76,7 @@ const zSubmissionPhase = z.object({
     groupNumber: z.number().optional(),
     submissionDeadline: zUnix,
     results: zResult.array(),
+    isParticipant: z.boolean(),
 });
 
 export type SubmissionPhase = z.infer<typeof zSubmissionPhase>;
@@ -103,10 +103,10 @@ export const getStatus = (
     currentUser: Account,
     usersAndGroups: UsersAndGroups,
     isOwner: boolean,
+    currentTime: number,
 ): EvaluationStatus => {
     const { groups, results, users } = usersAndGroups;
 
-    const currentTime = dayjs().unix();
     const timeStatus = getTimeStatus(evaluation, currentTime);
 
     if (timeStatus === PENDING) {
@@ -149,25 +149,34 @@ export const getStatus = (
 
         const user = users.find((user) => user.user === currentUser);
         if (user) {
-            const group = groups.find(
-                (group) => group.number === user.groupNumber,
+            const isGroupResult = results.some(
+                (result) => result.groupNumber === user.groupNumber,
             );
-            const hasSubmitted =
+
+            const userHasSubmitted =
                 user.attestation && user.attestation.length > 0;
-            return zSubmissionPhase.parse({
+
+            const res: SubmissionPhase = {
                 type: "submission",
-                mustSubmit: !hasSubmitted && !!group,
-                groupNumber: user.groupNumber,
+                mustSubmit:
+                    !userHasSubmitted &&
+                    !isGroupResult &&
+                    timeStatus === "SUBMISSION",
+                groupNumber: user.groupNumber!,
                 submissionDeadline: evaluation.finishBy,
                 results,
-            });
+                isParticipant: true,
+            };
+            return zSubmissionPhase.parse(res);
         } else {
-            return zSubmissionPhase.parse({
+            const res: SubmissionPhase = {
                 type: "submission",
                 mustSubmit: false,
                 submissionDeadline: evaluation.finishBy,
                 results,
-            });
+                isParticipant: false,
+            };
+            return zSubmissionPhase.parse(res);
         }
     } else {
         throw new Error("Invalid status calculation");

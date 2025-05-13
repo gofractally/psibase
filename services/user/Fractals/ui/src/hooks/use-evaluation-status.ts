@@ -7,7 +7,9 @@ import { useFractal } from "./fractals/useFractal";
 import { useUsersAndGroups } from "./fractals/useUsersAndGroups";
 import { useCurrentUser } from "./useCurrentUser";
 
-export const useEvaluationStatus = (): EvaluationStatus | undefined => {
+export const useEvaluationStatus = (
+    now: number,
+): EvaluationStatus | undefined => {
     const {
         data: fractal,
         isLoading: isLoadingFractal,
@@ -62,6 +64,7 @@ export const useEvaluationStatus = (): EvaluationStatus | undefined => {
         currentUser!,
         usersAndGroups!,
         currentUserCanActOnBehalfOfFractal,
+        now,
     );
 
     if (currentStatus.type == "waitingStart" && !pingUsersAndGroups) {
@@ -70,6 +73,5 @@ export const useEvaluationStatus = (): EvaluationStatus | undefined => {
         setPingUsersAndGroups(false);
     }
 
-    console.count("hook");
     return currentStatus;
 };

@@ -15,10 +15,12 @@ interface api {
     
     register: func(evaluation-id: u32) -> result<_, error>;
     unregister: func(evaluation-id: u32) -> result<_, error>;
-    attest: func(fractal: string, evaluation-id: u32, group-number: u32) -> result<_, error>;
-    propose: func(fractal: string, evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
+    attest: func(evaluation-id: u32, group-number: u32) -> result<_, error>;
+    propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
 
     get-group-users: func(evaluation-id: u32, group-number: u32) -> result<list<string>, error>;
+
+    get-proposal: func(evaluation-id: u32, group-number: u32) -> result<list<string>, error>;
 
     start: func(fractal: string) -> result<_, error>;
 

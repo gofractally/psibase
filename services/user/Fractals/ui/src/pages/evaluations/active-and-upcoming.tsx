@@ -11,7 +11,6 @@ import { Start } from "@/components/evaluations/start";
 import { useEvaluation } from "@/hooks/fractals/useEvaluation";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useNowUnix } from "@/hooks/useNowUnix";
 import { OptionalNumber } from "@/lib/queryKeys";
 
 const useNextEvaluations = (
@@ -33,12 +32,10 @@ export const ActiveAndUpcoming = () => {
 
     const navigate = useNavigate();
 
-    const status = useEvaluationStatus();
+    const status = useEvaluationStatus(dayjs().unix());
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
-    const now = useNowUnix();
-
-    console.log({ status, now });
+    console.log({ status });
 
     const nextSchedules = useNextEvaluations(
         fractal?.evaluationInterval,
@@ -86,7 +83,9 @@ export const ActiveAndUpcoming = () => {
                     {status?.type == "waitingStart" && (
                         <Start status={status} />
                     )}
-                    {status?.type == "deliberation" && (
+                    {(status?.type == "deliberation" ||
+                        (status?.type == "submission" &&
+                            status.mustSubmit)) && (
                         <Deliberation status={status} />
                     )}
                 </div>
