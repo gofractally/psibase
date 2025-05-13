@@ -30,8 +30,8 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
     }
   }
 
-  function calculateHash(dir) {
-    const hash = createHash('md5');
+  function calculateFileHashes(dir) {
+    const fileHashes = new Map();
     
     if (fs.existsSync(dir)) {
       const files = fs.readdirSync(dir);
@@ -41,45 +41,73 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
         
         if (stat.isDirectory()) {
           // Skip target and dist directories as they are build outputs
-          if (file === 'target' || file === 'dist' || file === '.vite-cache') continue;
-          hash.update(calculateHash(filePath));
+          if (file === 'target' || file === 'dist' || file === '.vite-cache' || file === '.svelte-kit' || file === '.tsbuildinfo') continue;
+          const subHashes = calculateFileHashes(filePath);
+          for (const [subPath, hash] of subHashes) {
+            fileHashes.set(subPath, hash);
+          }
         } else {
+          const hash = createHash('md5');
           hash.update(fs.readFileSync(filePath));
+          fileHashes.set(path.relative(projectDir, filePath), hash.digest('hex'));
         }
       }
     }
     
-    return hash.digest('hex');
+    return fileHashes;
   }
 
-  // Calculate hash for all source directories
-  const hash = createHash('md5');
+  // Calculate hashes for all source directories
+  const currentFileHashes = new Map();
   for (const { source } of buildDirs) {
-    hash.update(calculateHash(source));
+    const sourceHashes = calculateFileHashes(source);
+    for (const [filePath, hash] of sourceHashes) {
+      currentFileHashes.set(filePath, hash);
+    }
   }
-
-  const currentHash = hash.digest('hex');
 
   const cacheFile = path.resolve(projectDir, '.vite-cache/hash.json');
-  let previousHash = '';
+  let previousFileHashes = new Map();
 
   try {
     if (fs.existsSync(cacheFile)) {
-      previousHash = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')).hash;
+      const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+      previousFileHashes = new Map(Object.entries(cache.fileHashes || {}));
     }
   } catch (e) {
     console.warn('Error reading cache file', e);
   }
 
-  if (currentHash === previousHash) {
+  // Find changed files
+  const changedFiles = [];
+  for (const [filePath, currentHash] of currentFileHashes) {
+    const previousHash = previousFileHashes.get(filePath);
+    if (!previousHash || previousHash !== currentHash) {
+      changedFiles.push(filePath);
+    }
+  }
+
+  // Check for deleted files
+  for (const [filePath] of previousFileHashes) {
+    if (!currentFileHashes.has(filePath)) {
+      changedFiles.push(filePath + ' (deleted)');
+    }
+  }
+
+  if (changedFiles.length === 0) {
     console.log('Not building; No source changes.');
     return true;
   }
 
-  console.log('Rebuilding (source files changed)');
+  console.log('Rebuilding (source files changed):');
+  for (const file of changedFiles) {
+    console.log(`  ${file}`);
+  }
 
   // Ensure cache directory exists
   fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
-  fs.writeFileSync(cacheFile, JSON.stringify({ hash: currentHash }));
+  fs.writeFileSync(cacheFile, JSON.stringify({
+    fileHashes: Object.fromEntries(currentFileHashes)
+  }));
   return false;
 } 
