@@ -205,7 +205,7 @@ export const CreatePage = () => {
                     producerName: bpName,
                     blockSigningPubKey,
                     txSigningPubKey: txSigningKeyPair?.publicKey,
-                    compression: 7,
+                    compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
                             const [_, completed, started, labels] = state;
