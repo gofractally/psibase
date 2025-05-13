@@ -11,6 +11,7 @@ import { Start } from "@/components/evaluations/start";
 import { useEvaluation } from "@/hooks/fractals/useEvaluation";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
+import { paths } from "@/lib/paths";
 import { OptionalNumber } from "@/lib/queryKeys";
 
 const useNextEvaluations = (
@@ -57,7 +58,11 @@ export const ActiveAndUpcoming = () => {
     useEffect(() => {
         if (isAwaitingStart && status?.type == "deliberation") {
             navigate(
-                `${fractal!.scheduledEvaluation}/group/${status.groupNumber}`,
+                paths.fractal.evaluationGroup(
+                    fractal!.account,
+                    fractal!.scheduledEvaluation!,
+                    status.groupNumber!,
+                ),
             );
         }
     }, [isAwaitingStart, status]);

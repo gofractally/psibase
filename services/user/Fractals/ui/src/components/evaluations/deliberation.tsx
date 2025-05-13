@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { DeliberationPhase, SubmissionPhase } from "@/lib/getStatus";
+import { paths } from "@/lib/paths";
 
 import { Button } from "../ui/button";
 
@@ -22,7 +23,11 @@ export const Deliberation = ({
             <Button
                 onClick={() => {
                     navigate(
-                        `/fractal/${fractal.account}/evaluations/${fractal.scheduledEvaluation}/group/${status.groupNumber}`,
+                        paths.fractal.evaluationGroup(
+                            fractal.account,
+                            fractal.scheduledEvaluation!,
+                            status.groupNumber!,
+                        ),
                     );
                 }}
             >
