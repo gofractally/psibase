@@ -2181,10 +2181,10 @@ hasown@^2.0.2:
   dependencies:
     function-bind "^1.1.2"
 
-humanize-duration@^3.32.1:
-  version "3.32.1"
-  resolved "https://registry.npmjs.org/humanize-duration/-/humanize-duration-3.32.1.tgz"
-  integrity sha512-inh5wue5XdfObhu/IGEMiA1nUXigSGcaKNemcbLRKa7jXYGDZXr3LoT9pTIzq2hPEbld7w/qv9h+ikWGz8fL1g==
+humanize-duration@^3.32.2:
+  version "3.32.2"
+  resolved "https://registry.yarnpkg.com/humanize-duration/-/humanize-duration-3.32.2.tgz#c80287a1b89f1aa7c7fe8fae33417a302b77b427"
+  integrity sha512-jcTwWYeCJf4dN5GJnjBmHd42bNyK94lY49QTkrsAQrMTUoIYLevvDpmQtg5uv8ZrdIRIbzdasmSNZ278HHUPEg==
 
 ignore@^5.2.0, ignore@^5.3.1:
   version "5.3.2"

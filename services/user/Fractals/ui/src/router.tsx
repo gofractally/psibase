@@ -78,7 +78,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/evaluations/:evaluationId/deliberation/:groupNumber",
+                path: ":fractalName/evaluations/:evaluationId/group/:groupNumber",
                 element: (
                     <ProtectedRoute>
                         <AppExists>

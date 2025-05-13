@@ -11,6 +11,7 @@ import { Start } from "@/components/evaluations/start";
 import { useEvaluation } from "@/hooks/fractals/useEvaluation";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
+import { useNowUnix } from "@/hooks/useNowUnix";
 import { OptionalNumber } from "@/lib/queryKeys";
 
 const useNextEvaluations = (
@@ -35,7 +36,9 @@ export const ActiveAndUpcoming = () => {
     const status = useEvaluationStatus();
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
-    console.log({ status });
+    const now = useNowUnix();
+
+    console.log({ status, now });
 
     const nextSchedules = useNextEvaluations(
         fractal?.evaluationInterval,
@@ -56,7 +59,9 @@ export const ActiveAndUpcoming = () => {
 
     useEffect(() => {
         if (isAwaitingStart && status?.type == "deliberation") {
-            navigate("/evaluation/derp");
+            navigate(
+                `${fractal!.scheduledEvaluation}/group/${status.groupNumber}`,
+            );
         }
     }, [isAwaitingStart, status]);
 

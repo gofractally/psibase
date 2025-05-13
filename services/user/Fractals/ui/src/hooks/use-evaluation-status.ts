@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
 
 import { useEvaluation } from "./fractals/useEvaluation";
@@ -19,12 +21,18 @@ export const useEvaluationStatus = (): EvaluationStatus | undefined => {
     } = useEvaluation(fractal?.scheduledEvaluation);
 
     const { data: currentUser } = useCurrentUser();
+
+    const [pingUsersAndGroups, setPingUsersAndGroups] = useState(false);
+
     const {
         data: usersAndGroups,
         isLoading: isLoadingUsersAndGroups,
         error: usersAndGroupsError,
         status,
-    } = useUsersAndGroups(fractal?.scheduledEvaluation);
+    } = useUsersAndGroups(
+        pingUsersAndGroups ? 1000 : 10000,
+        fractal?.scheduledEvaluation,
+    );
 
     const isNoScheduledEvaluation = !fractal?.scheduledEvaluation;
 
@@ -49,10 +57,19 @@ export const useEvaluationStatus = (): EvaluationStatus | undefined => {
         usersAndGroups,
         currentUserCanActOnBehalfOfFractal,
     });
-    return getStatus(
+    const currentStatus = getStatus(
         evaluation!,
         currentUser!,
         usersAndGroups!,
         currentUserCanActOnBehalfOfFractal,
     );
+
+    if (currentStatus.type == "waitingStart" && !pingUsersAndGroups) {
+        setPingUsersAndGroups(true);
+    } else if (currentStatus.type !== "waitingStart" && pingUsersAndGroups) {
+        setPingUsersAndGroups(false);
+    }
+
+    console.count("hook");
+    return currentStatus;
 };
