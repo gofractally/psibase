@@ -9,7 +9,6 @@ lerna-debug.log*
 
 dist-ssr
 *.local
-.vite-cache
 
 # Editor directories and files
 .vscode/*
