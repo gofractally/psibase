@@ -128,6 +128,14 @@ interface user {
     /// * `evaluation-id`: Unique identifier for the evaluation.
     /// * `group-number`: Identifier for the group whose proposal is being retrieved.
     get-proposal: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
+
+    /// Retrieves the users participating in a group.
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    /// * `group-number`: Identifier for the group whose proposal is being retrieved.
+    get-group-users: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<list<string>, error>;
 }
 
 world imports {
