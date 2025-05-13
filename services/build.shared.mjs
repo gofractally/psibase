@@ -30,7 +30,7 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
     }
   }
 
-  function calculateHash(dir, recursive = true) {
+  function calculateHash(dir) {
     const hash = createHash('md5');
     
     if (fs.existsSync(dir)) {
@@ -40,14 +40,9 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
         const stat = fs.statSync(filePath);
         
         if (stat.isDirectory()) {
-          if (recursive) {
-            // Skip target and dist directories as they are build outputs
-            if (file === 'target' || file === 'dist' || file === '.vite-cache') continue;
-            hash.update(calculateHash(filePath));
-          } else {
-            // When non-recursive, just hash the directory name to detect changes
-            hash.update(file);
-          }
+          // Skip target and dist directories as they are build outputs
+          if (file === 'target' || file === 'dist') continue;
+          hash.update(calculateHash(filePath));
         } else {
           hash.update(fs.readFileSync(filePath));
         }
@@ -59,8 +54,8 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
 
   // Calculate hash for all source directories
   const hash = createHash('md5');
-  for (const { source, recursive } of buildDirs) {
-    hash.update(calculateHash(source, recursive));
+  for (const { source } of buildDirs) {
+    hash.update(calculateHash(source));
   }
 
   const currentHash = hash.digest('hex');
