@@ -49,8 +49,7 @@ impl Boot for XAdminPlugin {
             services.push(PackagedService::new(Cursor::new(&s[..])).map_err(|e| e.to_string())?);
         }
 
-        let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-        let expiration = TimePointSec::from(now_plus_120secs);
+        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(240));
         let prod = ExactAccountNumber::from_str(&producer).map_err(|e| e.to_string())?;
 
         let initial_key = parse_public_key_pem(block_signing_key)?;

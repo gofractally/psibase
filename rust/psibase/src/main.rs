@@ -958,8 +958,7 @@ async fn get_package_registry(
 
 async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     let (client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let now_plus_120secs = Utc::now() + Duration::seconds(120);
-    let expiration = TimePointSec::from(now_plus_120secs);
+    let expiration = TimePointSec::from(Utc::now() + Duration::seconds(240));
     let mut package_registry = JointRegistry::new();
     let package_names = if args.services.is_empty() {
         vec!["DevDefault".to_string()]
