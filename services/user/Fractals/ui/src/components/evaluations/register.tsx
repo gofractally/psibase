@@ -1,0 +1,46 @@
+import { useEvaluation } from "@/hooks/fractals/useEvaluation";
+import { useFractal } from "@/hooks/fractals/useFractal";
+import { useRegister } from "@/hooks/fractals/useRegister";
+import { useUnregister } from "@/hooks/fractals/useUnregister";
+import { RegistrationPhase } from "@/lib/getStatus";
+
+import { Button } from "../ui/button";
+
+export const Register = ({ status }: { status: RegistrationPhase }) => {
+    const { data: fractal } = useFractal();
+    const { data: evaluation } = useEvaluation(fractal?.scheduledEvaluation);
+
+    const { mutateAsync: register, isPending: isRegistering } = useRegister();
+    const { mutateAsync: unregister, isPending: isUnregistering } =
+        useUnregister();
+
+    return (
+        <div>
+            Awaiting registration
+            {status.isRegistered ? (
+                <Button
+                    variant="secondary"
+                    disabled={isUnregistering}
+                    onClick={() => {
+                        unregister({
+                            evaluationId: evaluation!.id,
+                        });
+                    }}
+                >
+                    Unregister
+                </Button>
+            ) : (
+                <Button
+                    disabled={isRegistering}
+                    onClick={() => {
+                        register({
+                            evaluationId: evaluation!.id,
+                        });
+                    }}
+                >
+                    {isRegistering ? "Registering" : "Register"}
+                </Button>
+            )}
+        </div>
+    );
+};

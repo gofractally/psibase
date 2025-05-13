@@ -5,24 +5,15 @@ import { getSupervisor } from "@psibase/common-lib";
 
 import { fractalsService } from "@/lib/constants";
 
-import { useCurrentUser } from "../useCurrentUser";
-
 const Params = z.object({
     evaluationId: z.number(),
 });
 
-export const useRegister = () => {
-    const { data: currentUser } = useCurrentUser();
-    return useMutation({
+export const useUnregister = () =>
+    useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
-            if (!currentUser) {
-                throw new Error("User not found");
-            }
-
-            console.log({ params }, "are the params");
-
             void (await getSupervisor().functionCall({
-                method: "register",
+                method: "unregister",
                 service: fractalsService,
                 intf: "api",
                 params: [params.evaluationId],
@@ -32,4 +23,3 @@ export const useRegister = () => {
             // addUserToCache(params.owner, params.id, currentUser);
         },
     });
-};

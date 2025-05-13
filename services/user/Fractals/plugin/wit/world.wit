@@ -13,10 +13,13 @@ interface api {
     close-eval: func(fractal: string) -> result<_, error>;
  
     
-    register: func(fractal: string, evaluation-id: u32) -> result<_, error>;
-    unregister: func(fractal: string, evaluation-id: u32) -> result<_, error>;
+    register: func(evaluation-id: u32) -> result<_, error>;
+    unregister: func(evaluation-id: u32) -> result<_, error>;
     attest: func(fractal: string, evaluation-id: u32, group-number: u32) -> result<_, error>;
     propose: func(fractal: string, evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
+
+
+    start: func(fractal: string) -> result<_, error>;
 
 }
 

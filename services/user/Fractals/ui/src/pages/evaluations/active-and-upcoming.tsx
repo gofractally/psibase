@@ -1,16 +1,16 @@
 import dayjs from "dayjs";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-
 import { EmptyBlock } from "@/components/EmptyBlock";
+import { Deliberation } from "@/components/evaluations/deliberation";
+import { Failed } from "@/components/evaluations/failed";
+import { Register } from "@/components/evaluations/register";
+import { Start } from "@/components/evaluations/start";
 
 import { useEvaluation } from "@/hooks/fractals/useEvaluation";
 import { useFractal } from "@/hooks/fractals/useFractal";
-import { useRegister } from "@/hooks/fractals/useRegister";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { fractalsService } from "@/lib/constants";
 import { OptionalNumber } from "@/lib/queryKeys";
 
 const useNextEvaluations = (
@@ -33,9 +33,7 @@ export const ActiveAndUpcoming = () => {
     const navigate = useNavigate();
 
     const status = useEvaluationStatus();
-
-    const { mutateAsync: register, isPending: isRegistering } = useRegister();
-    const { data: currentUser } = useCurrentUser();
+    const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
     console.log({ status });
 
@@ -45,11 +43,26 @@ export const ActiveAndUpcoming = () => {
     );
 
     console.log(nextSchedules, "are next schedules");
+    useEffect(() => {
+        if (
+            status?.type == "registration" ||
+            (status?.type == "waitingStart" && !isAwaitingStart)
+        ) {
+            setIsAwaitingStart(true);
+        }
+    }, [status]);
+
+    console.log({ isAwaitingStart });
+
+    useEffect(() => {
+        if (isAwaitingStart && status?.type == "deliberation") {
+            navigate("/evaluation/derp");
+        }
+    }, [isAwaitingStart, status]);
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <h1 className="mb-3 text-lg font-semibold">Active & upcoming</h1>
-
             {fractal?.scheduledEvaluation == null ? (
                 <EmptyBlock
                     title="No evaluations scheduled"
@@ -61,32 +74,15 @@ export const ActiveAndUpcoming = () => {
                 />
             ) : (
                 <div>
-                    {status?.type == "failed" && (
-                        <div>
-                            Fractal failed to commence the evaluation, please
-                            close to schedule next one.
-                        </div>
-                    )}
+                    {status?.type == "failed" && <Failed />}
                     {status?.type == "registration" && (
-                        <div>
-                            Awaiting registration
-                            {status.isRegistered ? (
-                                <Button variant="secondary">Unregister</Button>
-                            ) : (
-                                <Button
-                                    disabled={isRegistering}
-                                    onClick={() => {
-                                        register({
-                                            id: evaluation!.id,
-                                            owner: fractalsService,
-                                            registrant: currentUser!,
-                                        });
-                                    }}
-                                >
-                                    {isRegistering ? "Registering" : "Register"}
-                                </Button>
-                            )}
-                        </div>
+                        <Register status={status} />
+                    )}
+                    {status?.type == "waitingStart" && (
+                        <Start status={status} />
+                    )}
+                    {status?.type == "deliberation" && (
+                        <Deliberation status={status} />
                     )}
                 </div>
             )}

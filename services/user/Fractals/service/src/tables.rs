@@ -1,5 +1,3 @@
-
-
 #[psibase::service_tables]
 pub mod tables {
     use std::u64;
@@ -26,7 +24,7 @@ pub mod tables {
         pub mission: String,
         pub scheduled_evaluation: Option<u32>,
         pub evaluation_interval: Option<u32>,
-        pub reward_wait_period: u32
+        pub reward_wait_period: u32,
     }
 
     impl Fractal {
@@ -50,7 +48,7 @@ pub mod tables {
                 name,
                 scheduled_evaluation: None,
                 evaluation_interval: None,
-                reward_wait_period: 86400 * 7 * 1
+                reward_wait_period: 86400 * 7 * 1,
             }
         }
 
@@ -79,8 +77,28 @@ pub mod tables {
 
             if vec.len() == 1 {
                 vec.remove(0)
-            } else {
+            } else if vec.len() == 0 {
                 abort_message(format!("failed to find fractal by ID {}", evaluation_id).as_str())
+            } else {
+                // TODO: fix this and remove awkward bandaid...
+                let res = vec.into_iter().find(|fractal| {
+                    if fractal.scheduled_evaluation.is_some() {
+                        return fractal.scheduled_evaluation.unwrap() == evaluation_id;
+                    } else {
+                        return false;
+                    }
+                });
+                if res.is_some() {
+                    return res.unwrap();
+                } else {
+                    abort_message(
+                        format!(
+                            "found several evaluations but failed to find one of ID {}",
+                            evaluation_id
+                        )
+                        .as_str(),
+                    )
+                }
             }
         }
 
@@ -268,22 +286,23 @@ pub mod tables {
 
         fn deposit(&mut self, amount: u64) {
             psibase::check(amount > 0, "amount must be greater than 0");
-        
+
             let current_time = TransactSvc::call().currentBlock().time.seconds();
-        
+
             let elapsed = if current_time.seconds >= self.reward_start_time.seconds {
                 (current_time.seconds - self.reward_start_time.seconds) as u64
             } else {
                 0
             };
-        
+
             let original_balance = self.reward_balance;
             let new_balance = original_balance.saturating_add(amount);
-        
+
             let reward_wait_period = Fractal::get_assert(self.fractal).reward_wait_period;
-        
-            let remaining_waiting = reward_wait_period as u64 - elapsed.min(reward_wait_period as u64);
-        
+
+            let remaining_waiting =
+                reward_wait_period as u64 - elapsed.min(reward_wait_period as u64);
+
             let weight_original = if new_balance == 0 {
                 0.0
             } else {
@@ -294,13 +313,14 @@ pub mod tables {
             } else {
                 amount as f64 / new_balance as f64
             };
-        
+
             let new_period = if original_balance == 0 {
                 reward_wait_period as f64
             } else {
-                (weight_original * remaining_waiting as f64) + (weight_new * reward_wait_period as f64)
+                (weight_original * remaining_waiting as f64)
+                    + (weight_new * reward_wait_period as f64)
             };
-        
+
             self.reward_wait = new_period.ceil().min(u32::MAX as f64) as u32;
             self.reward_balance = new_balance;
             self.save();
@@ -325,7 +345,6 @@ pub mod tables {
                 let withdrawable_amount = percent_waited * (self.reward_balance as f64).floor();
                 withdrawable_amount as u64
             }
-
         }
 
         fn withdraw(mut self) {
@@ -340,7 +359,7 @@ pub mod tables {
             self.reward_start_time = current_time;
 
             let reward_wait_period = Fractal::get_assert(self.fractal).reward_wait_period;
-            
+
             self.reward_wait = if self.reward_balance == 0 {
                 reward_wait_period
             } else {

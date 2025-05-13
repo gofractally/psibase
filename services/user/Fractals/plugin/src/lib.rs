@@ -32,12 +32,12 @@ impl Drop for ProposeLatch {
 struct FractallyPlugin;
 
 impl Api for FractallyPlugin {
-    fn register(fractal: String, evaluation_id: u32) -> Result<(), Error> {
-        register(&fractal, evaluation_id)
+    fn register(evaluation_id: u32) -> Result<(), Error> {
+        register("fractals", evaluation_id)
     }
 
-    fn unregister(fractal: String, evaluation_id: u32) -> Result<(), Error> {
-        unregister(&fractal, evaluation_id)
+    fn unregister(evaluation_id: u32) -> Result<(), Error> {
+        unregister("fractals", evaluation_id)
     }
 
     fn attest(fractal: String, evaluation_id: u32, group_number: u32) -> Result<(), Error> {
@@ -76,6 +76,20 @@ impl Api for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::set_schedule::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn start(fractal: String) -> Result<(), Error> {
+        let _latch = ProposeLatch::new(&fractal);
+
+        let packed_args = fractals::action_structs::start_eval {
+            fractal: AccountNumber::from(fractal.as_str()),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::start_eval::ACTION_NAME,
             &packed_args,
         )
     }

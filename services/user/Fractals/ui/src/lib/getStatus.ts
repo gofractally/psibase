@@ -39,28 +39,39 @@ const getTimeStatus = (
     return PENDING;
 };
 
-const WaitingPhase = z.object({
-    type: z.literal("waiting"),
-    nextPhase: z.enum(["registration", "submission"]),
-    nextPhaseStart: zUnix,
+const zWaitingRegistration = z.object({
+    type: z.literal("waitingRegistration"),
+    registrationStart: zUnix,
+});
+
+export type WaitingRegistration = z.infer<typeof zWaitingRegistration>;
+
+const zWaitingStart = z.object({
+    type: z.literal("waitingStart"),
     isOwner: z.boolean(),
 });
 
-const RegistrationPhase = z.object({
+export type WaitingStart = z.infer<typeof zWaitingStart>;
+
+const zRegistrationPhase = z.object({
     type: z.literal("registration"),
     isRegistered: z.boolean(),
     deliberationStarts: zUnix,
     isOwner: z.boolean(),
 });
 
-const DeliberationPhase = z.object({
+export type RegistrationPhase = z.infer<typeof zRegistrationPhase>;
+
+const zDeliberationPhase = z.object({
     type: z.literal("deliberation"),
     isParticipant: z.boolean(),
     groupNumber: z.number().optional(),
     deliberationDeadline: zUnix,
 });
 
-const SubmissionPhase = z.object({
+export type DeliberationPhase = z.infer<typeof zDeliberationPhase>;
+
+const zSubmissionPhase = z.object({
     type: z.literal("submission"),
     mustSubmit: z.boolean(),
     groupNumber: z.number().optional(),
@@ -68,16 +79,21 @@ const SubmissionPhase = z.object({
     results: zResult.array(),
 });
 
-const FailedEvaluation = z.object({
+export type SubmissionPhase = z.infer<typeof zSubmissionPhase>;
+
+const zFailedEvaluation = z.object({
     type: z.literal("failed"),
 });
 
+export type FailedEvaluation = z.infer<typeof zFailedEvaluation>;
+
 const zStatus = z.discriminatedUnion("type", [
-    WaitingPhase,
-    RegistrationPhase,
-    DeliberationPhase,
-    SubmissionPhase,
-    FailedEvaluation,
+    zWaitingRegistration,
+    zRegistrationPhase,
+    zWaitingStart,
+    zDeliberationPhase,
+    zSubmissionPhase,
+    zFailedEvaluation,
 ]);
 
 export type EvaluationStatus = z.infer<typeof zStatus>;
@@ -94,15 +110,14 @@ export const getStatus = (
     const timeStatus = getTimeStatus(evaluation, currentTime);
 
     if (timeStatus === PENDING) {
-        return WaitingPhase.parse({
-            type: "waiting",
-            nextPhase: "registration",
-            nextPhaseStart: evaluation.registrationStarts,
-            isOwner,
-        });
+        const res: z.infer<typeof zWaitingRegistration> = {
+            type: "waitingRegistration",
+            registrationStart: evaluation.registrationStarts,
+        };
+        return res;
     } else if (timeStatus === REGISTRATION) {
         const isRegistered = users.some((user) => user.user === currentUser);
-        return RegistrationPhase.parse({
+        return zRegistrationPhase.parse({
             type: "registration",
             isRegistered,
             deliberationStarts: evaluation.deliberationStarts,
@@ -111,15 +126,14 @@ export const getStatus = (
     } else if (timeStatus === DELIBERATION) {
         const awaitingStart = users.some((user) => !user.groupNumber);
         if (awaitingStart) {
-            return WaitingPhase.parse({
-                type: "waiting",
-                nextPhase: "submission",
-                nextPhaseStart: evaluation.submissionStarts,
+            const res: z.infer<typeof zWaitingStart> = {
                 isOwner,
-            });
+                type: "waitingStart",
+            };
+            return res;
         }
         const place = users.find((user) => user.user === currentUser);
-        return DeliberationPhase.parse({
+        return zDeliberationPhase.parse({
             type: "deliberation",
             isParticipant: !!place,
             groupNumber: place?.groupNumber,
@@ -128,7 +142,7 @@ export const getStatus = (
     } else if (timeStatus === SUBMISSION || timeStatus === FINISHED) {
         const noGroupsCreated = groups.length === 0;
         if (noGroupsCreated) {
-            return FailedEvaluation.parse({
+            return zFailedEvaluation.parse({
                 type: "failed",
             });
         }
@@ -140,7 +154,7 @@ export const getStatus = (
             );
             const hasSubmitted =
                 user.attestation && user.attestation.length > 0;
-            return SubmissionPhase.parse({
+            return zSubmissionPhase.parse({
                 type: "submission",
                 mustSubmit: !hasSubmitted && !!group,
                 groupNumber: user.groupNumber,
@@ -148,7 +162,7 @@ export const getStatus = (
                 results,
             });
         } else {
-            return SubmissionPhase.parse({
+            return zSubmissionPhase.parse({
                 type: "submission",
                 mustSubmit: false,
                 submissionDeadline: evaluation.finishBy,

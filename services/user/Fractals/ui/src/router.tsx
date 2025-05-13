@@ -11,6 +11,8 @@ import { AppExists } from "@/components/app-exists";
 import { Layout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/protected-route";
 
+import { EvaluationDeliberation } from "./pages/evaluations/evaluation-deliberation";
+
 export const router = createBrowserRouter([
     {
         path: "/",
@@ -71,6 +73,16 @@ export const router = createBrowserRouter([
                     <ProtectedRoute>
                         <AppExists>
                             <Completed />
+                        </AppExists>
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: ":fractalName/evaluations/:evaluationId/deliberation/:groupNumber",
+                element: (
+                    <ProtectedRoute>
+                        <AppExists>
+                            <EvaluationDeliberation />
                         </AppExists>
                     </ProtectedRoute>
                 ),
