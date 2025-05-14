@@ -55,11 +55,11 @@ foreach(UI ${UI_PROJECTS})
         BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH} && yarn build
         CONFIGURE_COMMAND ""
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATH} ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}/dist
-        DEPENDS ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP} YarnInstall
+        DEPENDS ${CommonApiCommonLib_js_DEP} YarnInstall
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
     )
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH})
 endforeach()
 
 # Special handling for XAdmin which has additional dependencies
