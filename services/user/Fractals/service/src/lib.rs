@@ -7,7 +7,7 @@ pub mod service {
 
     use crate::helpers::parse_rank_to_accounts;
     use crate::tables::tables::{
-        EvalType, EvalTypeU32, EvaluationInstance, Fractal, Member, MemberStatus,
+        EvalTypeU32, EvaluationInstance, Fractal, Member, MemberStatus, Score,
     };
 
     use psibase::*;
@@ -34,13 +34,13 @@ pub mod service {
 
         let registered_evaluation_users = evaluation.users(None).unwrap();
 
-        fractal_members.into_iter().for_each(|mut member| {
+        fractal_members.into_iter().for_each(|member| {
             let is_partcipating = registered_evaluation_users
                 .iter()
                 .any(|user| user.user == member.account);
 
             if !is_partcipating {
-                member.feed_new_score(0.0);
+                Score::get(fractal.account, member.account, evaluation_type).feed_new_score(0.0);
             }
         });
 
@@ -58,9 +58,7 @@ pub mod service {
         let remaining_users = evaluation.users(None).unwrap();
 
         for user in remaining_users {
-            Member::get(fractal.account, user.user).map(|mut member| {
-                member.feed_new_score(0.0);
-            });
+            Score::get(fractal.account, user.user, evaluation_type).feed_new_score(0.0);
         }
 
         Wrapper::emit()
@@ -186,9 +184,7 @@ pub mod service {
             });
 
         for (account, new_score) in new_member_scores.into_iter() {
-            Member::get(evaluation.fractal, account).map(|mut member| {
-                member.feed_new_score(new_score);
-            });
+            Score::get(evaluation.fractal, account, evaluation.eval_type).feed_new_score(new_score);
         }
     }
 

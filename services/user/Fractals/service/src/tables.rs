@@ -102,7 +102,6 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
-        pub reputation: f32,
         pub member_status: StatusU32,
 
         pub reward_balance: u64,
@@ -122,7 +121,6 @@ pub mod tables {
                 account,
                 fractal,
                 created_at: now,
-                reputation: 0.0,
                 member_status: status as StatusU32,
                 reward_balance: 0,
                 reward_start_time: now,
@@ -239,11 +237,6 @@ pub mod tables {
         pub fn save(&self) {
             let table = MemberTable::new();
             table.put(&self).expect("failed to save");
-        }
-
-        pub fn feed_new_score(&mut self, incoming_score: f32) {
-            self.reputation = calculate_ema(incoming_score, self.reputation, 0.2);
-            self.save();
         }
     }
 
@@ -464,7 +457,7 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub eval_type: EvalTypeU32,
-        pub value: u32,
+        pub value: f32,
         pub pending: Option<u32>,
     }
 
@@ -472,6 +465,24 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, EvalTypeU32) {
             (self.fractal, self.account, self.eval_type)
+        }
+
+        pub fn get(fractal: AccountNumber, account: AccountNumber, eval_type: EvalTypeU32) -> Self {
+            let table = ScoreTable::new();
+            check_some(
+                table.get_index_pk().get(&(fractal, account, eval_type)),
+                "failed to find score",
+            )
+        }
+
+        pub fn feed_new_score(&mut self, incoming_score: f32) {
+            self.value = calculate_ema(incoming_score, self.value, 0.2);
+            self.save();
+        }
+
+        pub fn save(&self) {
+            let table = ScoreTable::new();
+            table.put(&self).expect("failed to save");
         }
     }
 }

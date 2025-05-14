@@ -1,29 +1,26 @@
 import { z } from "zod";
 
-import { graphql } from "../../graphql";
 import { Account, zAccount } from "@/lib/zod/Account";
-import { MemberStatus } from "@/lib/zod/MemberStatus";
 import { zDateTime } from "@/lib/zod/DateTime";
+import { MemberStatus } from "@/lib/zod/MemberStatus";
+
+import { graphql } from "../../graphql";
 
 export const zMemberListInstance = z.object({
     account: zAccount,
     createdAt: zDateTime,
-    reputation: z.number(),
     memberStatus: z.nativeEnum(MemberStatus),
 });
 
 export type MembershipListInstance = z.infer<typeof zMemberListInstance>;
 
-export const getMembers = async (
-    fractalAccount: Account,
-) => {
+export const getMembers = async (fractalAccount: Account) => {
     const member = await graphql(
         `
     {
         members(fractal: "${fractalAccount}") {
             nodes {     
                 account
-                reputation
                 memberStatus
                 createdAt
         }} 
@@ -34,7 +31,7 @@ export const getMembers = async (
     return z
         .object({
             members: z.object({
-                nodes: zMemberListInstance.array()
+                nodes: zMemberListInstance.array(),
             }),
         })
         .parse(member).members.nodes;

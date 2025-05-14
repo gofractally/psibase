@@ -18,9 +18,8 @@ import { cn } from "@/lib/utils";
 export const AllMembers = () => {
     const { data: members, error } = useMembers(useCurrentFractal());
 
-    const sortedMembers = members
-        ?.slice()
-        .sort((a, b) => b.reputation - a.reputation);
+    const sortedMembers = members?.slice();
+    // .sort((a, b) => b.reputation - a.reputation);
 
     console.log({ members, error });
     return (
@@ -44,7 +43,7 @@ export const AllMembers = () => {
                             <TableCell className="font-medium">
                                 {member.account}
                             </TableCell>
-                            <TableCell>{member.reputation}</TableCell>
+                            <TableCell>{`member.reputation`}</TableCell>
                             <TableCell>
                                 {getMemberLabel(member.memberStatus)}
                             </TableCell>
