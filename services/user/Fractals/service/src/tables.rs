@@ -13,6 +13,7 @@ pub mod tables {
 
     use serde::{Deserialize, Serialize};
 
+    use crate::helpers::parse_rank_to_accounts;
     use crate::scoring::calculate_ema;
 
     #[table(name = "FractalTable", index = 0)]
@@ -222,7 +223,15 @@ pub mod tables {
         pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
             let new_instance = Self::new(fractal, account, status);
             new_instance.save();
+
+            new_instance.initialize_score(EvalType::Repuation);
+            new_instance.initialize_score(EvalType::Favor);
+
             new_instance
+        }
+
+        pub fn initialize_score(&self, eval_type: EvalType) {
+            Score::add(self.fractal, eval_type, self.account);
         }
 
         pub fn get(fractal: AccountNumber, account: AccountNumber) -> Option<Member> {
@@ -240,7 +249,7 @@ pub mod tables {
         }
     }
 
-    #[derive(PartialEq)]
+    #[derive(PartialEq, Clone)]
     pub enum EvalType {
         Repuation = 1,
         Favor = 2,
@@ -255,6 +264,12 @@ pub mod tables {
                 2 => EvalType::Favor,
                 _ => abort_message("invalid evaluation type"),
             }
+        }
+    }
+
+    impl From<EvalType> for u32 {
+        fn from(eval_type: EvalType) -> u32 {
+            eval_type as u32
         }
     }
 
@@ -278,37 +293,34 @@ pub mod tables {
             (self.evaluation_id, self.eval_type, self.fractal)
         }
 
-        pub fn get(fractal: AccountNumber, eval_type: EvalTypeU32) -> Option<Self> {
+        pub fn get(fractal: AccountNumber, eval_type: EvalType) -> Option<Self> {
             let table = EvaluationInstanceTable::new();
-            table.get_index_pk().get(&(fractal, eval_type))
+            table.get_index_pk().get(&(fractal, eval_type.into()))
         }
 
-        pub fn get_assert(fractal: AccountNumber, eval_type: EvalTypeU32) -> Self {
+        pub fn get_assert(fractal: AccountNumber, eval_type: EvalType) -> Self {
             check_some(
                 Self::get(fractal, eval_type),
                 "failed to find evaluation instance",
             )
         }
 
-        fn new(fractal: AccountNumber, eval_type: EvalTypeU32, interval: u32) -> Self {
+        fn new(fractal: AccountNumber, eval_type: EvalType, interval: u32) -> Self {
             Self {
-                eval_type,
+                eval_type: eval_type.into(),
                 evaluation_id: None,
                 fractal,
                 interval,
             }
         }
 
-        pub fn add(fractal: AccountNumber, eval_type: EvalTypeU32, interval: u32) -> Self {
+        pub fn add(fractal: AccountNumber, eval_type: EvalType, interval: u32) -> Self {
             Self::new(fractal, eval_type, interval)
         }
 
-        pub fn get_or_create(
-            fractal: AccountNumber,
-            eval_type: EvalTypeU32,
-            interval: u32,
-        ) -> Self {
-            Self::get(fractal, eval_type).unwrap_or_else(|| Self::add(fractal, eval_type, interval))
+        pub fn get_or_create(fractal: AccountNumber, eval_type: EvalType, interval: u32) -> Self {
+            Self::get(fractal, eval_type.clone().into())
+                .unwrap_or_else(|| Self::add(fractal, eval_type, interval))
         }
 
         pub fn get_by_evaluation_id(eval_id: u32) -> Self {
@@ -449,6 +461,45 @@ pub mod tables {
             let table = EvaluationInstanceTable::new();
             table.put(&self).expect("failed to save");
         }
+
+        fn scores(&self) -> Vec<Score> {
+            let table = ScoreTable::new();
+
+            table
+                .get_index_pk()
+                .range(
+                    (self.fractal, self.eval_type, AccountNumber::from(0))
+                        ..=(self.fractal, self.eval_type, AccountNumber::from(u64::MAX)),
+                )
+                .collect()
+        }
+
+        pub fn set_pending_scores(&self, pending_score: f32) {
+            self.scores().into_iter().for_each(|mut account| {
+                account.set_pending_score(pending_score);
+            });
+        }
+
+        pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
+            let group_members = self.users(Some(group_number)).unwrap();
+
+            let fractal_group_result = parse_rank_to_accounts(
+                vanilla_group_result,
+                group_members.into_iter().map(|user| user.user).collect(),
+            );
+
+            for (index, account) in fractal_group_result.into_iter().enumerate() {
+                let level = (6 as usize) - index;
+                Score::get(self.fractal, self.eval_type.into(), account)
+                    .set_pending_score(level as f32);
+            }
+        }
+
+        pub fn save_pending_scores(&self) {
+            self.scores().into_iter().for_each(|mut account| {
+                account.save_pending_score();
+            });
+        }
     }
 
     #[table(name = "ScoreTable", index = 3)]
@@ -458,31 +509,61 @@ pub mod tables {
         pub account: AccountNumber,
         pub eval_type: EvalTypeU32,
         pub value: f32,
-        pub pending: Option<u32>,
+        pub pending: Option<f32>,
     }
 
     impl Score {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, EvalTypeU32) {
-            (self.fractal, self.account, self.eval_type)
+        fn pk(&self) -> (AccountNumber, EvalTypeU32, AccountNumber) {
+            (self.fractal, self.eval_type, self.account)
         }
 
-        pub fn get(fractal: AccountNumber, account: AccountNumber, eval_type: EvalTypeU32) -> Self {
+        pub fn get(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
             let table = ScoreTable::new();
             check_some(
-                table.get_index_pk().get(&(fractal, account, eval_type)),
+                table
+                    .get_index_pk()
+                    .get(&(fractal, eval_type.into(), account)),
                 "failed to find score",
             )
         }
 
-        pub fn feed_new_score(&mut self, incoming_score: f32) {
-            self.value = calculate_ema(incoming_score, self.value, 0.2);
+        pub fn new(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
+            Self {
+                account,
+                eval_type: eval_type.into(),
+                fractal,
+                value: 0.0,
+                pending: None,
+            }
+        }
+
+        pub fn add(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
+            let new_instance = Self::new(fractal, eval_type, account);
+            new_instance.save();
+            new_instance
+        }
+
+        pub fn set_pending_score(&mut self, incoming_score: f32) {
+            self.pending = Some(incoming_score);
+            self.save();
+        }
+
+        pub fn save_pending_score(&mut self) {
+            self.value = calculate_ema(
+                check_some(
+                    self.pending,
+                    "tried saving a pending score that does not exist",
+                ),
+                self.value,
+                0.2,
+            );
             self.save();
         }
 
         pub fn save(&self) {
             let table = ScoreTable::new();
-            table.put(&self).expect("failed to save");
+            table.put(&self).expect("failed to save score");
         }
     }
 }
