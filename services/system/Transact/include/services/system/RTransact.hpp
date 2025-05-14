@@ -167,6 +167,7 @@ namespace SystemService
                 method(recv, transaction),
                 method(onTrx, id, trace),
                 method(onBlock),
+                method(onVerify, id, trace),
                 method(serveSys, request, socket),
                 method(getUser, request))
    PSIBASE_REFLECT_TABLES(RTransact, RTransact::Subjective, RTransact::WriteOnly)

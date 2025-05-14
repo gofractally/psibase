@@ -328,6 +328,69 @@ namespace psibase
       return {};
    }
 
+   void BlockContext::callRun(psio::view<const RunRow> row)
+   {
+      auto action = row.action().unpack();
+
+      DbMode mode = DbMode::rpc();
+      switch (row.mode().unpack())
+      {
+         case RunMode::verify:
+            mode = DbMode::verify();
+            break;
+         case RunMode::speculative:
+            mode = DbMode::transaction();
+            break;
+         case RunMode::rpc:
+            mode = DbMode::rpc();
+            break;
+         default:
+            PSIBASE_LOG(trxLogger, warning) << "Wrong run mode should be caught earlier";
+            break;
+      }
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, mode};
+      auto&              atrace = trace.actionTraces.emplace_back();
+
+      auto session = db.startWrite(writer);
+      try
+      {
+         tc.execNonTrxAction(0, action, atrace);
+         PSIBASE_LOG(trxLogger, debug)
+             << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, debug) << "async " << action.service.str()
+                                       << "::" << action.method.str() << " failed: " << e.what();
+      }
+
+      try
+      {
+         // Run the continuation
+         Action             action{.sender  = {},
+                                   .service = row.continuation().service(),
+                                   .method  = row.continuation().method(),
+                                   .rawData = psio::to_frac(std::tuple(row.id().unpack(), trace))};
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, DbMode::rpc()};
+         auto&              atrace = trace.actionTraces.emplace_back();
+         tc.execNonTrxAction(0, action, atrace);
+         PSIBASE_LOG(trxLogger, debug) << "async continuation " << action.service.str()
+                                       << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, warning) << "async continuation " << action.service.str()
+                                         << "::" << action.method.str() << " failed: " << e.what();
+      }
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());

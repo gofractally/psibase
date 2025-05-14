@@ -2038,6 +2038,7 @@ namespace psibase
       }
 
       void onChangeNextTransaction(auto&& fn) { dbCallbacks.nextTransaction = fn; }
+      void onChangeRunQueue(auto&& fn) { dbCallbacks.runQueue = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {

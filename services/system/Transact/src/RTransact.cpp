@@ -430,6 +430,7 @@ namespace
          VerifyArgs args{id, claim, proof};
          Action     act{.sender  = RTransact::service,
                         .service = claim.service(),
+                        .method  = MethodNumber("verifySys"),
                         .rawData = psio::to_frac(args)};
 
          RunRow row{
@@ -445,13 +446,20 @@ namespace
          kvPut(RunRow::db, row.key(), row);
          pendingVerifies.put({.txid = id, .runid = row.id});
       }
-      UnverifiedTransactionRecord row{
-          .id                = id,
-          .expiration        = trx.transaction->tapos().expiration(),
-          .remainingVerifies = trx.transaction->claims().size(),
-          .hasError          = false,
-      };
-      unverifiedTransactions.put(row);
+      if (claims.empty())
+      {
+         queueTransaction(id, trx.transaction->tapos().expiration());
+      }
+      else
+      {
+         UnverifiedTransactionRecord row{
+             .id                = id,
+             .expiration        = trx.transaction->tapos().expiration(),
+             .remainingVerifies = trx.transaction->claims().size(),
+             .hasError          = false,
+         };
+         unverifiedTransactions.put(row);
+      }
    }
 
    bool pushTransaction(const Checksum256& id, const SignedTransaction& trx)
