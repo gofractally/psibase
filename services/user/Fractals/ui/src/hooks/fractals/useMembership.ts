@@ -30,7 +30,6 @@ export const setDefaultMembership = (
             account: zAccount.parse(user),
             createdAt: new Date().toISOString(),
             memberStatus: MemberStatus.Citizen,
-            reputation: 0,
             rewardBalance: 0,
             rewardStartTime: "",
             rewardWait: 0,

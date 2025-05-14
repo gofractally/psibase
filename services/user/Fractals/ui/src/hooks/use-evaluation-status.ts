@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
+import { EvalType } from "@/lib/zod/EvaluationType";
 
 import { useEvaluation } from "./fractals/useEvaluation";
 import { useEvaluationInstance } from "./fractals/useEvaluationInstance";
@@ -10,10 +11,11 @@ import { useCurrentUser } from "./useCurrentUser";
 
 export const useEvaluationStatus = (
     now: number,
+    type: EvalType = EvalType.Repuation,
 ): EvaluationStatus | undefined => {
     const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
 
-    const { evaluation, evaluationInstance } = useEvaluationInstance();
+    const { evaluation, evaluationInstance } = useEvaluationInstance(type);
 
     const { isLoading: isLoadingEvaluation, error: evaluationError } =
         useEvaluation(evaluationInstance?.evaluationId);

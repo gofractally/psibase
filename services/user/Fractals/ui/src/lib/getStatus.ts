@@ -81,6 +81,14 @@ const zSubmissionPhase = z.object({
 
 export type SubmissionPhase = z.infer<typeof zSubmissionPhase>;
 
+const zFinishedPhase = z.object({
+    type: z.literal("finished"),
+    mustClose: z.boolean(),
+    submissionDeadline: zUnix,
+});
+
+export type FinishedPhase = z.infer<typeof zFinishedPhase>;
+
 const zFailedEvaluation = z.object({
     type: z.literal("failed"),
 });
@@ -94,6 +102,7 @@ const zStatus = z.discriminatedUnion("type", [
     zDeliberationPhase,
     zSubmissionPhase,
     zFailedEvaluation,
+    zFinishedPhase,
 ]);
 
 export type EvaluationStatus = z.infer<typeof zStatus>;
@@ -139,8 +148,8 @@ export const getStatus = (
             groupNumber: place?.groupNumber,
             deliberationDeadline: evaluation.submissionStarts,
         });
-    } else if (timeStatus === SUBMISSION || timeStatus === FINISHED) {
-        const noGroupsCreated = groups.length === 0;
+    } else if (timeStatus === SUBMISSION) {
+        const noGroupsCreated = groups.length === 0 && results.length == 0;
         if (noGroupsCreated) {
             return zFailedEvaluation.parse({
                 type: "failed",
@@ -178,6 +187,13 @@ export const getStatus = (
             };
             return zSubmissionPhase.parse(res);
         }
+    } else if (timeStatus === FINISHED) {
+        const res: FinishedPhase = {
+            mustClose: true,
+            submissionDeadline: evaluation.finishBy,
+            type: "finished",
+        };
+        return zFinishedPhase.parse(res);
     } else {
         throw new Error("Invalid status calculation");
     }

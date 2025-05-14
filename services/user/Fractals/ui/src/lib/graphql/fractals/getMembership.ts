@@ -11,7 +11,6 @@ export const zMember = z
         fractal: zAccount,
         account: zAccount,
         createdAt: zDateTime,
-        reputation: z.number(),
         memberStatus: z.nativeEnum(MemberStatus),
         rewardBalance: z.number(),
         rewardStartTime: zDateTime,
@@ -32,7 +31,6 @@ export const getMembership = async (
             fractal
             account
             createdAt
-            reputation
             memberStatus
             rewardBalance
             rewardStartTime

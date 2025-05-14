@@ -6,6 +6,8 @@ import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 import { useAttest } from "@/hooks/fractals/useAttest";
+import { useCloseEvaluation } from "@/hooks/fractals/useCloseEvaluation";
+import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
 import { useGroupUsers } from "@/hooks/fractals/useGroupUsers";
 import { setCachedProposal, useProposal } from "@/hooks/fractals/useProposal";
 import { usePropose } from "@/hooks/fractals/usePropose";
@@ -112,17 +114,41 @@ const useWatchAttest = (now: number) => {
     if (
         status?.type == "submission" &&
         status.mustSubmit &&
-        isPending &&
+        !isPending &&
         !isError &&
         !isSuccess
     ) {
-        console.log("attesting!");
         attest({
             evaluationId,
             groupNumber,
         });
-    } else {
-        console.log("not gonna attest");
+    }
+    return isPending;
+};
+
+const useWatchClose = (now: number) => {
+    const {
+        mutateAsync: closeEvaluation,
+        isError,
+        isPending,
+        isSuccess,
+    } = useCloseEvaluation();
+    const status = useEvaluationStatus(now);
+    const instanceData = useEvaluationInstance();
+
+    if (
+        status &&
+        instanceData &&
+        instanceData.evaluationInstance &&
+        status.type == "finished" &&
+        !isError &&
+        !isPending &&
+        !isSuccess
+    ) {
+        closeEvaluation({
+            evalType: instanceData.evaluationInstance.evalType,
+            fractal: instanceData.evaluationInstance.fractal,
+        });
     }
 
     return isPending;
@@ -135,6 +161,7 @@ const GroupStatus = () => {
 
     const status = useEvaluationStatus(now);
     const isAttesting = useWatchAttest(now);
+    const isClosing = useWatchClose(now);
 
     let description = "";
 
@@ -150,6 +177,8 @@ const GroupStatus = () => {
         } else {
             description = "you dont need to submit";
         }
+    } else if (isClosing) {
+        description = "Closing evaluation...";
     }
 
     return (
@@ -165,7 +194,7 @@ export const EvaluationDeliberation = () => {
         useRanking();
 
     return (
-        <div className="flex max-w-screen-lg flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-screen-lg flex-col gap-4">
             <GroupStatus />
 
             <div>

@@ -18,8 +18,6 @@ export const MyMembership = () => {
     );
     const { mutateAsync: joinFractal } = useJoinFractal();
 
-    console.log({ fractalAccount, currentUser, membership });
-
     const status =
         membership == null
             ? "Not a member"

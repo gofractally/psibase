@@ -6,6 +6,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalTable, Member, MemberTable,
+        Score, ScoreTable,
     };
     use psibase::*;
     use serde::Deserialize;
@@ -63,6 +64,16 @@ mod service {
             EvaluationInstanceTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .range((fractal, 0)..=(fractal, u32::MAX))
+                .collect()
+        }
+
+        async fn scores(&self, fractal: String, member: String) -> Vec<Score> {
+            let fractal = AccountNumber::from_str(&fractal).expect("invalid account name");
+            let member = AccountNumber::from_str(&member).expect("invalid account name");
+
+            ScoreTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .range((fractal, 0, member)..=(fractal, u32::MAX, member))
                 .collect()
         }
 

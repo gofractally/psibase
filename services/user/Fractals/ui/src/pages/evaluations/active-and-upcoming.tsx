@@ -11,6 +11,7 @@ import { Start } from "@/components/evaluations/start";
 import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
+import { useNowUnix } from "@/hooks/useNowUnix";
 import { paths } from "@/lib/paths";
 import { OptionalNumber } from "@/lib/queryKeys";
 import { EvalType } from "@/lib/zod/EvaluationType";
@@ -22,7 +23,7 @@ const useNextEvaluations = (
 ): Date[] => {
     if (interval && startTime) {
         return [...new Array(amount)].map((_, index) =>
-            dayjs.unix((index + 1) * interval + startTime).toDate(),
+            dayjs.unix(index * interval + startTime).toDate(),
         );
     }
     return [];
@@ -35,7 +36,12 @@ export const ActiveAndUpcoming = () => {
 
     const navigate = useNavigate();
 
-    const status = useEvaluationStatus(dayjs().unix());
+    const now = useNowUnix();
+
+    const status = useEvaluationStatus(now);
+
+    console.log({ status });
+
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
     const nextSchedules = useNextEvaluations(
@@ -96,6 +102,7 @@ export const ActiveAndUpcoming = () => {
                             status.mustSubmit)) && (
                         <Deliberation status={status} />
                     )}
+                    <div>{JSON.stringify(status)}</div>
                 </div>
             )}
         </div>
