@@ -242,14 +242,14 @@ function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
     file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/yarn.lock)
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json)
 
     # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
         OUTPUT ${OUTPUT_FILEPATH}
         BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
         DEPENDS ${SOURCES} ${ARGN}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
     )
     # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
     add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
@@ -310,7 +310,7 @@ add_custom_command(
     OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
     WORKING_DIRECTORY ${XADMIN_PATH}
-    COMMAND yarn --mutex network
+    COMMAND yarn
     COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
 )
 add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
