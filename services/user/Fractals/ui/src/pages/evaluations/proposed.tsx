@@ -15,6 +15,7 @@ import { useAppForm } from "@/components/form/app-form";
 
 import { useSetSchedule } from "@/hooks/fractals/useSetSchedule";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { zEvalType } from "@/lib/zod/EvaluationType";
 
 export const Proposed = () => {
     const { mutateAsync: setSchedule } = useSetSchedule();
@@ -53,6 +54,7 @@ export const Proposed = () => {
                 const finishBy = submission + submissionSeconds;
 
                 await setSchedule({
+                    evalType: zEvalType.enum.Repuation,
                     registration,
                     deliberation,
                     submission,

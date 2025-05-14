@@ -92,6 +92,7 @@ impl Api for FractallyPlugin {
     }
 
     fn set_schedule(
+        evaluation_type: u32,
         fractal: String,
         registration: u32,
         deliberation: u32,
@@ -103,6 +104,7 @@ impl Api for FractallyPlugin {
         let _latch = ProposeLatch::new(&fractal);
 
         let packed_args = fractals::action_structs::set_schedule {
+            evaluation_type,
             deliberation,
             finish_by,
             interval_seconds,
@@ -118,11 +120,12 @@ impl Api for FractallyPlugin {
         )
     }
 
-    fn start(fractal: String) -> Result<(), Error> {
+    fn start(fractal: String, evaluation_type: u32) -> Result<(), Error> {
         let _latch = ProposeLatch::new(&fractal);
 
         let packed_args = fractals::action_structs::start_eval {
             fractal: AccountNumber::from(fractal.as_str()),
+            evaluation_type,
         }
         .packed();
 
@@ -140,9 +143,10 @@ impl Api for FractallyPlugin {
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
 
-    fn close_eval(fractal: String) -> Result<(), Error> {
+    fn close_eval(fractal: String, evaluation_type: u32) -> Result<(), Error> {
         let packed_args = fractals::action_structs::close_eval {
             fractal: AccountNumber::from(fractal.as_str()),
+            evaluation_type,
         }
         .packed();
         add_action_to_transaction(

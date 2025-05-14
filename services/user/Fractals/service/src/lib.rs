@@ -6,7 +6,10 @@ pub mod tables;
 pub mod service {
 
     use crate::helpers::parse_rank_to_accounts;
-    use crate::tables::tables::{Fractal, Member, MemberStatus};
+    use crate::tables::tables::{
+        EvalType, EvalTypeU32, EvaluationInstance, Fractal, Member, MemberStatus,
+    };
+
     use psibase::*;
 
     use std::collections::HashMap;
@@ -23,12 +26,13 @@ pub mod service {
     }
 
     #[action]
-    fn start_eval(fractal: AccountNumber) {
-        let fractal = Fractal::get_assert(fractal);
-        let evaluation_id = check_some(fractal.scheduled_evaluation, "no evaluation is scheduled");
+    fn start_eval(fractal: AccountNumber, evaluation_type: u32) {
+        let evaluation = EvaluationInstance::get_assert(fractal, evaluation_type);
 
+        let fractal = Fractal::get_assert(evaluation.fractal);
         let fractal_members = fractal.members();
-        let registered_evaluation_users = fractal.evaluation_users(None);
+
+        let registered_evaluation_users = evaluation.users(None).unwrap();
 
         fractal_members.into_iter().for_each(|mut member| {
             let is_partcipating = registered_evaluation_users
@@ -40,13 +44,18 @@ pub mod service {
             }
         });
 
-        psibase::services::evaluations::Wrapper::call().start(get_service(), evaluation_id);
+        psibase::services::evaluations::Wrapper::call().start(
+            get_service(),
+            check_some(evaluation.evaluation_id, "no set evaluation id"),
+        );
     }
 
     #[action]
-    fn close_eval(fractal: AccountNumber) {
-        let mut fractal = Fractal::get_assert(fractal);
-        let remaining_users = fractal.evaluation_users(None);
+    fn close_eval(fractal: AccountNumber, evaluation_type: u32) {
+        let mut evaluation = EvaluationInstance::get_assert(fractal, evaluation_type);
+
+        let fractal = Fractal::get_assert(fractal);
+        let remaining_users = evaluation.users(None).unwrap();
 
         for user in remaining_users {
             Member::get(fractal.account, user.user).map(|mut member| {
@@ -56,9 +65,9 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .evaluation_finished(fractal.account, fractal.scheduled_evaluation.unwrap());
+            .evaluation_finished(fractal.account, evaluation.evaluation_id.unwrap());
 
-        fractal.schedule_next_evaluation();
+        evaluation.schedule_next_evaluation();
     }
 
     #[action]
@@ -79,6 +88,7 @@ pub mod service {
 
     #[action]
     fn set_schedule(
+        evaluation_type: EvalTypeU32,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -86,9 +96,10 @@ pub mod service {
         interval_seconds: u32,
         force_delete: bool,
     ) {
-        let mut fractal = Fractal::get_assert(get_sender());
+        let mut evaluation =
+            EvaluationInstance::get_or_create(get_sender(), evaluation_type, interval_seconds);
 
-        fractal.set_evaluation_schedule(
+        evaluation.set_evaluation_schedule(
             registration,
             deliberation,
             submission,
@@ -99,8 +110,6 @@ pub mod service {
     }
 
     fn check_is_eval() {
-
-
         // keep action names less than 12 chars
         // go psibase::service:: get the name
 
@@ -113,9 +122,9 @@ pub mod service {
     #[action]
     fn on_eval_register(evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
-        let fractal = Fractal::get_by_evaluation_id(evaluation_id);
+        let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
         let member = psibase::check_some(
-            Member::get(fractal.account, account),
+            Member::get(evaluation.fractal, account),
             "account is not a member of fractal",
         );
         let status = MemberStatus::from(member.member_status);
@@ -136,8 +145,10 @@ pub mod service {
         user: AccountNumber,
         attestation: Vec<u8>,
     ) {
-        let fractal = Fractal::get_by_evaluation_id(evaluation_id);
-        let acceptable_numbers = fractal.evaluation_users(Some(group_number)).len();
+        let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
+            .users(Some(group_number))
+            .unwrap()
+            .len();
         let is_valid_attestion = attestation
             .iter()
             .all(|num| *num as usize <= acceptable_numbers);
@@ -148,14 +159,11 @@ pub mod service {
     fn on_eval_group_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
         check_is_eval();
 
-        let fractal = Fractal::get_by_evaluation_id(evaluation_id);
+        let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
 
-        let evaluation = check_some(
-            fractal.evaluation().map(|eval| eval.num_options),
-            "failed getting evaluation",
-        );
-        let group_members: Vec<AccountNumber> = fractal
-            .evaluation_users(Some(group_number))
+        let group_members: Vec<AccountNumber> = evaluation
+            .users(Some(group_number))
+            .unwrap()
             .into_iter()
             .map(|user| user.user)
             .collect();
@@ -172,13 +180,13 @@ pub mod service {
             .into_iter()
             .enumerate()
             .for_each(|(index, ranked_member)| {
-                let level = (evaluation as usize) - index;
+                let level = (6 as usize) - index;
                 let score = level as f32;
                 new_member_scores.insert(ranked_member, score);
             });
 
         for (account, new_score) in new_member_scores.into_iter() {
-            Member::get(fractal.account, account).map(|mut member| {
+            Member::get(evaluation.fractal, account).map(|mut member| {
                 member.feed_new_score(new_score);
             });
         }

@@ -5,7 +5,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
+        abort_message, check_some, get_service, AccountNumber, Fracpack, Pack, Table, TimePointSec,
         ToKey, ToSchema,
     };
 
@@ -22,7 +22,7 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
-        pub scheduled_evaluation: Option<u32>,
+
         pub evaluation_interval: Option<u32>,
         pub reward_wait_period: u32,
     }
@@ -33,11 +33,6 @@ pub mod tables {
             self.account
         }
 
-        #[secondary_key(1)]
-        pub fn by_pending_evaluation(&self) -> (AccountNumber, Option<u32>) {
-            (self.account, self.scheduled_evaluation)
-        }
-
         fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
 
@@ -46,7 +41,6 @@ pub mod tables {
                 created_at: now,
                 mission,
                 name,
-                scheduled_evaluation: None,
                 evaluation_interval: None,
                 reward_wait_period: 86400 * 7 * 1,
             }
@@ -65,43 +59,6 @@ pub mod tables {
             check_some(Self::get(fractal), "fractal does not exist")
         }
 
-        pub fn get_by_evaluation_id(evaluation_id: u32) -> Self {
-            let table = FractalTable::new();
-            let mut vec: Vec<Fractal> = table
-                .get_index_by_pending_evaluation()
-                .range(
-                    (AccountNumber::new(0), Some(evaluation_id))
-                        ..=(AccountNumber::new(u64::MAX), Some(evaluation_id)),
-                )
-                .collect();
-
-            if vec.len() == 1 {
-                vec.remove(0)
-            } else if vec.len() == 0 {
-                abort_message(format!("failed to find fractal by ID {}", evaluation_id).as_str())
-            } else {
-                // TODO: fix this and remove awkward bandaid...
-                let res = vec.into_iter().find(|fractal| {
-                    if fractal.scheduled_evaluation.is_some() {
-                        return fractal.scheduled_evaluation.unwrap() == evaluation_id;
-                    } else {
-                        return false;
-                    }
-                });
-                if res.is_some() {
-                    return res.unwrap();
-                } else {
-                    abort_message(
-                        format!(
-                            "found several evaluations but failed to find one of ID {}",
-                            evaluation_id
-                        )
-                        .as_str(),
-                    )
-                }
-            }
-        }
-
         pub fn save(&self) {
             let table = FractalTable::new();
             table.put(&self).expect("failed to save");
@@ -116,118 +73,6 @@ pub mod tables {
                         ..=(self.account, AccountNumber::new(u64::MAX)),
                 )
                 .collect()
-        }
-
-        pub fn evaluation_users(&self, group_number: Option<u32>) -> Vec<User> {
-            let fractals_service = get_service();
-            let evaluation_id = check_some(self.scheduled_evaluation, "no scheduled evaluation");
-
-            match group_number {
-                Some(group_number) => UserTable::with_service(evaluations::SERVICE)
-                    .get_index_by_group()
-                    .range(
-                        (
-                            fractals_service,
-                            evaluation_id,
-                            Some(group_number),
-                            AccountNumber::new(0),
-                        )
-                            ..=(
-                                fractals_service,
-                                evaluation_id,
-                                Some(group_number),
-                                AccountNumber::new(u64::MAX),
-                            ),
-                    )
-                    .collect(),
-                None => UserTable::with_service(evaluations::SERVICE)
-                    .get_index_pk()
-                    .range(
-                        (fractals_service, evaluation_id, AccountNumber::new(0))
-                            ..=(
-                                fractals_service,
-                                evaluation_id,
-                                AccountNumber::new(u64::MAX),
-                            ),
-                    )
-                    .collect(),
-            }
-        }
-
-        pub fn evaluation(&self) -> Option<Evaluation> {
-            EvaluationTable::with_service(evaluations::SERVICE)
-                .get_index_pk()
-                .get(&(
-                    get_service(),
-                    psibase::check_some(self.scheduled_evaluation, "no secheduled eval"),
-                ))
-        }
-
-        fn create_evaluation(
-            &mut self,
-            registration: u32,
-            deliberation: u32,
-            submission: u32,
-            finish_by: u32,
-            interval_seconds: u32,
-        ) {
-            let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(
-                registration,
-                deliberation,
-                submission,
-                finish_by,
-                // TODO: Change back to 4,5,6;
-                vec![2, 3, 4, 5, 6],
-                6,
-                true,
-            );
-
-            self.scheduled_evaluation = Some(eval_id);
-            self.evaluation_interval = Some(interval_seconds);
-            self.save();
-        }
-
-        pub fn set_evaluation_schedule(
-            &mut self,
-            registration: u32,
-            deliberation: u32,
-            submission: u32,
-            finish_by: u32,
-            interval_seconds: u32,
-            force_delete: bool,
-        ) {
-            if self.scheduled_evaluation.is_some() {
-                psibase::services::evaluations::Wrapper::call()
-                    .delete(self.scheduled_evaluation.unwrap(), force_delete);
-            };
-
-            self.create_evaluation(
-                registration,
-                deliberation,
-                submission,
-                finish_by,
-                interval_seconds,
-            );
-        }
-
-        pub fn schedule_next_evaluation(&mut self) {
-            let interval = self.evaluation_interval.unwrap();
-            let evaluation = check_some(
-                self.evaluation(),
-                "expected existing evaluation to set the next one",
-            );
-
-            let old_evaluation_id = self.scheduled_evaluation.unwrap().clone();
-
-            self.create_evaluation(
-                evaluation.registration_starts + interval,
-                evaluation.deliberation_starts + interval,
-                evaluation.submission_starts + interval,
-                evaluation.finish_by + interval,
-                interval,
-            );
-
-            psibase::services::evaluations::Wrapper::call().close(get_service(), old_evaluation_id);
         }
     }
 
@@ -399,6 +244,234 @@ pub mod tables {
         pub fn feed_new_score(&mut self, incoming_score: f32) {
             self.reputation = calculate_ema(incoming_score, self.reputation, 0.2);
             self.save();
+        }
+    }
+
+    #[derive(PartialEq)]
+    pub enum EvalType {
+        Repuation = 1,
+        Favor = 2,
+    }
+
+    pub type EvalTypeU32 = u32;
+
+    impl From<EvalTypeU32> for EvalType {
+        fn from(eval_type: EvalTypeU32) -> Self {
+            match eval_type {
+                1 => EvalType::Repuation,
+                2 => EvalType::Favor,
+                _ => abort_message("invalid evaluation type"),
+            }
+        }
+    }
+
+    #[table(name = "EvaluationInstanceTable", index = 2)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct EvaluationInstance {
+        pub fractal: AccountNumber,
+        pub eval_type: EvalTypeU32,
+        pub interval: u32,
+        pub evaluation_id: Option<u32>,
+    }
+
+    impl EvaluationInstance {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, EvalTypeU32) {
+            (self.fractal, self.eval_type)
+        }
+
+        #[secondary_key(1)]
+        pub fn by_evaluation(&self) -> (Option<u32>, EvalTypeU32, AccountNumber) {
+            (self.evaluation_id, self.eval_type, self.fractal)
+        }
+
+        pub fn get(fractal: AccountNumber, eval_type: EvalTypeU32) -> Option<Self> {
+            let table = EvaluationInstanceTable::new();
+            table.get_index_pk().get(&(fractal, eval_type))
+        }
+
+        pub fn get_assert(fractal: AccountNumber, eval_type: EvalTypeU32) -> Self {
+            check_some(
+                Self::get(fractal, eval_type),
+                "failed to find evaluation instance",
+            )
+        }
+
+        fn new(fractal: AccountNumber, eval_type: EvalTypeU32, interval: u32) -> Self {
+            Self {
+                eval_type,
+                evaluation_id: None,
+                fractal,
+                interval,
+            }
+        }
+
+        pub fn add(fractal: AccountNumber, eval_type: EvalTypeU32, interval: u32) -> Self {
+            Self::new(fractal, eval_type, interval)
+        }
+
+        pub fn get_or_create(
+            fractal: AccountNumber,
+            eval_type: EvalTypeU32,
+            interval: u32,
+        ) -> Self {
+            Self::get(fractal, eval_type).unwrap_or_else(|| Self::add(fractal, eval_type, interval))
+        }
+
+        pub fn get_by_evaluation_id(eval_id: u32) -> Self {
+            // TODO: Fix this
+
+            let table = EvaluationInstanceTable::new();
+            let vec: Vec<EvaluationInstance> = table
+                .get_index_by_evaluation()
+                .range(
+                    (Some(eval_id), 0, AccountNumber::new(0))
+                        ..=(Some(eval_id), u32::MAX, AccountNumber::new(u64::MAX)),
+                )
+                .collect();
+
+            check_some(
+                vec.into_iter()
+                    .find(|evaluation| evaluation.evaluation_id.is_some_and(|id| eval_id == id)),
+                "failed finding evaluation by id",
+            )
+        }
+
+        fn internal(&self) -> Option<Evaluation> {
+            EvaluationTable::with_service(evaluations::SERVICE)
+                .get_index_pk()
+                .get(&(
+                    get_service(),
+                    psibase::check_some(self.evaluation_id, "no secheduled eval"),
+                ))
+        }
+
+        pub fn users(&self, group_number: Option<u32>) -> Option<Vec<User>> {
+            let fractals_service = get_service();
+            let evaluation_id = check_some(self.evaluation_id, "no scheduled evaluation");
+
+            let res = match group_number {
+                Some(group_number) => UserTable::with_service(evaluations::SERVICE)
+                    .get_index_by_group()
+                    .range(
+                        (
+                            fractals_service,
+                            evaluation_id,
+                            Some(group_number),
+                            AccountNumber::new(0),
+                        )
+                            ..=(
+                                fractals_service,
+                                evaluation_id,
+                                Some(group_number),
+                                AccountNumber::new(u64::MAX),
+                            ),
+                    )
+                    .collect(),
+                None => UserTable::with_service(evaluations::SERVICE)
+                    .get_index_pk()
+                    .range(
+                        (fractals_service, evaluation_id, AccountNumber::new(0))
+                            ..=(
+                                fractals_service,
+                                evaluation_id,
+                                AccountNumber::new(u64::MAX),
+                            ),
+                    )
+                    .collect(),
+            };
+
+            Some(res)
+        }
+
+        fn create_evaluation(
+            &mut self,
+            registration: u32,
+            deliberation: u32,
+            submission: u32,
+            finish_by: u32,
+            interval_seconds: u32,
+        ) {
+            let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(
+                registration,
+                deliberation,
+                submission,
+                finish_by,
+                // TODO: Change back to 4,5,6;
+                vec![2, 3, 4, 5, 6],
+                6,
+                true,
+            );
+
+            self.evaluation_id = Some(eval_id);
+            self.interval = interval_seconds;
+            self.save();
+        }
+
+        pub fn schedule_next_evaluation(&mut self) {
+            let interval = self.interval;
+
+            let evaluation = check_some(
+                self.internal(),
+                "expected existing evaluation to set the next one",
+            );
+
+            let old_evaluation_id = self.evaluation_id.unwrap().clone();
+
+            self.create_evaluation(
+                evaluation.registration_starts + interval,
+                evaluation.deliberation_starts + interval,
+                evaluation.submission_starts + interval,
+                evaluation.finish_by + interval,
+                interval,
+            );
+
+            psibase::services::evaluations::Wrapper::call().close(get_service(), old_evaluation_id);
+        }
+
+        pub fn set_evaluation_schedule(
+            &mut self,
+            registration: u32,
+            deliberation: u32,
+            submission: u32,
+            finish_by: u32,
+            interval_seconds: u32,
+            force_delete: bool,
+        ) {
+            if self.evaluation_id.is_some() {
+                psibase::services::evaluations::Wrapper::call()
+                    .delete(self.evaluation_id.unwrap(), force_delete);
+            };
+
+            self.create_evaluation(
+                registration,
+                deliberation,
+                submission,
+                finish_by,
+                interval_seconds,
+            );
+        }
+
+        pub fn save(&self) {
+            let table = EvaluationInstanceTable::new();
+            table.put(&self).expect("failed to save");
+        }
+    }
+
+    #[table(name = "ScoreTable", index = 3)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct Score {
+        pub fractal: AccountNumber,
+        pub account: AccountNumber,
+        pub eval_type: EvalTypeU32,
+        pub value: u32,
+        pub pending: Option<u32>,
+    }
+
+    impl Score {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, EvalTypeU32) {
+            (self.fractal, self.account, self.eval_type)
         }
     }
 }

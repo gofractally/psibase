@@ -3,6 +3,7 @@ import { PluginError } from "@psibase/common-lib";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { useStart } from "@/hooks/fractals/useStart";
 import { WaitingStart } from "@/lib/getStatus";
+import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { ErrorCard } from "../error-card";
 import { Button } from "../ui/button";
@@ -35,7 +36,10 @@ export const Start = ({ status }: { status: WaitingStart }) => {
                     <Button
                         disabled={isStarting}
                         onClick={() => {
-                            startEvaluation(fractal.account);
+                            startEvaluation({
+                                fractal: fractal.account,
+                                evaluationType: zEvalType.enum.Repuation,
+                            });
                         }}
                     >
                         Start evaluation

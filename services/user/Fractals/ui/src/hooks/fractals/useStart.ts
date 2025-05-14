@@ -1,16 +1,23 @@
 import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { PluginError, getSupervisor } from "@psibase/common-lib";
 
 import { fractalsService } from "@/lib/constants";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
+import { zEvalType } from "@/lib/zod/EvaluationType";
+
+const Params = z.object({
+    fractal: zAccount,
+    evaluationType: zEvalType,
+});
 
 export const useStart = () => {
-    return useMutation<undefined, PluginError, Account>({
-        mutationFn: async (fractal: Account) => {
+    return useMutation<undefined, PluginError, z.infer<typeof Params>>({
+        mutationFn: async (params) => {
             await getSupervisor().functionCall({
                 method: "start",
-                params: [fractal],
+                params: [params.fractal, params.evaluationType],
                 service: fractalsService,
                 intf: "api",
             });

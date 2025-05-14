@@ -8,11 +8,13 @@ import { fractalsService } from "@/lib/constants";
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
+import { zEvalType } from "@/lib/zod/EvaluationType";
 import { zUnix } from "@/lib/zod/Unix";
 
 import { setDefaultMembership } from "./useMembership";
 
 const Params = z.object({
+    evalType: zEvalType,
     fractal: zAccount,
     registration: zUnix,
     deliberation: zUnix,
@@ -33,11 +35,13 @@ export const useSetSchedule = () =>
                 finishBy,
                 intervalSeconds,
                 forceDelete,
+                evalType,
             } = Params.parse(params);
 
             void (await supervisor.functionCall({
                 method: "setSchedule",
                 params: [
+                    evalType,
                     fractal,
                     registration,
                     deliberation,
