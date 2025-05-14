@@ -7,6 +7,7 @@ export const paths = {
             fractal: Account,
             evaluationId: number,
             groupNumber: number,
-        ) => `/fractal/${fractal}/evaluations/${evaluationId}/${groupNumber}`,
+        ) =>
+            `/fractal/${fractal}/evaluations/${evaluationId}/group/${groupNumber}`,
     },
 };
