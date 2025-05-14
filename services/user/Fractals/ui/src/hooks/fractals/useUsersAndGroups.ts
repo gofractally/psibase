@@ -15,19 +15,15 @@ import { assertUser } from "../useCurrentUser";
 export const useUsersAndGroups = (
     interval = 10000,
     evaluationId: number | undefined | null,
-) => {
-    return useQuery({
+) =>
+    useQuery({
         queryKey: QueryKey.usersAndGroups(evaluationId),
         enabled: !!evaluationId,
         refetchInterval: interval,
         queryFn: async () => {
-            const res = await getUsersAndGroups(fractalsService, evaluationId!);
-
-            console.log(res, "is back from the zodded promise?");
-            return res;
+            return getUsersAndGroups(fractalsService, evaluationId!);
         },
     });
-};
 
 export const updateAttestation = (
     evaluationId: number,

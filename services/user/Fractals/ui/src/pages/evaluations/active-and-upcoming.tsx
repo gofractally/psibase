@@ -8,11 +8,12 @@ import { Failed } from "@/components/evaluations/failed";
 import { Register } from "@/components/evaluations/register";
 import { Start } from "@/components/evaluations/start";
 
-import { useEvaluation } from "@/hooks/fractals/useEvaluation";
+import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { paths } from "@/lib/paths";
 import { OptionalNumber } from "@/lib/queryKeys";
+import { EvalType } from "@/lib/zod/EvaluationType";
 
 const useNextEvaluations = (
     interval: OptionalNumber,
@@ -29,17 +30,16 @@ const useNextEvaluations = (
 
 export const ActiveAndUpcoming = () => {
     const { data: fractal } = useFractal();
-    const { data: evaluation } = useEvaluation(fractal?.scheduledEvaluation);
+
+    const { evaluation, evaluationInstance } = useEvaluationInstance();
 
     const navigate = useNavigate();
 
     const status = useEvaluationStatus(dayjs().unix());
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
-    console.log({ status });
-
     const nextSchedules = useNextEvaluations(
-        fractal?.evaluationInterval,
+        evaluationInstance?.interval,
         evaluation?.registrationStarts,
     );
 
@@ -59,8 +59,11 @@ export const ActiveAndUpcoming = () => {
         if (isAwaitingStart && status?.type == "deliberation") {
             navigate(
                 paths.fractal.evaluationGroup(
-                    fractal!.account,
-                    fractal!.scheduledEvaluation!,
+                    fractal!.fractal!.account,
+                    fractal!.evaluations.find(
+                        (evaluation) =>
+                            evaluation.evalType == EvalType.Repuation,
+                    )!.evaluationId,
                     status.groupNumber!,
                 ),
             );
@@ -70,7 +73,7 @@ export const ActiveAndUpcoming = () => {
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <h1 className="mb-3 text-lg font-semibold">Active & upcoming</h1>
-            {fractal?.scheduledEvaluation == null ? (
+            {fractal?.evaluations.length == 0 ? (
                 <EmptyBlock
                     title="No evaluations scheduled"
                     buttonLabel="Schedule evaluation"

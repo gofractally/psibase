@@ -1,5 +1,4 @@
-import { useEvaluation } from "@/hooks/fractals/useEvaluation";
-import { useFractal } from "@/hooks/fractals/useFractal";
+import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
 import { useRegister } from "@/hooks/fractals/useRegister";
 import { useUnregister } from "@/hooks/fractals/useUnregister";
 import { useNowUnix } from "@/hooks/useNowUnix";
@@ -9,8 +8,7 @@ import { humanize } from "@/lib/humanize";
 import { Button } from "../ui/button";
 
 export const Register = ({ status }: { status: RegistrationPhase }) => {
-    const { data: fractal } = useFractal();
-    const { data: evaluation } = useEvaluation(fractal?.scheduledEvaluation);
+    const { evaluation, evaluationInstance } = useEvaluationInstance();
 
     const { mutateAsync: register, isPending: isRegistering } = useRegister();
     const { mutateAsync: unregister, isPending: isUnregistering } =
@@ -30,7 +28,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     disabled={isUnregistering}
                     onClick={() => {
                         unregister({
-                            evaluationId: evaluation!.id,
+                            evaluationId: evaluationInstance!.evaluationId,
                         });
                     }}
                 >
@@ -41,7 +39,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     disabled={isRegistering}
                     onClick={() => {
                         register({
-                            evaluationId: evaluation!.id,
+                            evaluationId: evaluationInstance!.evaluationId,
                         });
                     }}
                 >

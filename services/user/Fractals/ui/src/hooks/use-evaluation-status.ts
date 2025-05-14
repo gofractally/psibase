@@ -3,6 +3,7 @@ import { useState } from "react";
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
 
 import { useEvaluation } from "./fractals/useEvaluation";
+import { useEvaluationInstance } from "./fractals/useEvaluationInstance";
 import { useFractal } from "./fractals/useFractal";
 import { useUsersAndGroups } from "./fractals/useUsersAndGroups";
 import { useCurrentUser } from "./useCurrentUser";
@@ -10,17 +11,12 @@ import { useCurrentUser } from "./useCurrentUser";
 export const useEvaluationStatus = (
     now: number,
 ): EvaluationStatus | undefined => {
-    const {
-        data: fractal,
-        isLoading: isLoadingFractal,
-        error: fractalError,
-    } = useFractal();
+    const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
 
-    const {
-        data: evaluation,
-        isLoading: isLoadingEvaluation,
-        error: evaluationError,
-    } = useEvaluation(fractal?.scheduledEvaluation);
+    const { evaluation, evaluationInstance } = useEvaluationInstance();
+
+    const { isLoading: isLoadingEvaluation, error: evaluationError } =
+        useEvaluation(evaluationInstance?.evaluationId);
 
     const { data: currentUser } = useCurrentUser();
 
@@ -33,10 +29,10 @@ export const useEvaluationStatus = (
         status,
     } = useUsersAndGroups(
         pingUsersAndGroups ? 1000 : 10000,
-        fractal?.scheduledEvaluation,
+        evaluationInstance?.evaluationId,
     );
 
-    const isNoScheduledEvaluation = !fractal?.scheduledEvaluation;
+    const isNoScheduledEvaluation = !evaluationInstance;
 
     if (isNoScheduledEvaluation) {
         return undefined;

@@ -71,7 +71,7 @@ export function AppSwitcher() {
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">
                                     {fractal
-                                        ? fractal.name
+                                        ? fractal?.fractal?.name
                                         : selectedFractalAccount}
                                 </span>
                                 {fractal && (

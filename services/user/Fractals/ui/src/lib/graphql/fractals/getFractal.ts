@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
+import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { graphql } from "../../graphql";
 
@@ -11,13 +12,25 @@ export const zFractal = z
         createdAt: zDateTime,
         name: z.string(),
         mission: z.string(),
-        scheduledEvaluation: z.number().or(z.null()),
-        evaluationInterval: z.number().or(z.null()),
         rewardWaitPeriod: z.number().or(z.null()),
     })
     .or(z.null());
 
-export type Fractal = z.infer<typeof zFractal>;
+export const zEvaluation = z
+    .object({
+        fractal: zAccount,
+        evalType: zEvalType,
+        interval: z.number(),
+        evaluationId: z.number(),
+    })
+    .array();
+
+const FractalRes = z.object({
+    fractal: zFractal,
+    evaluations: zEvaluation,
+});
+
+export type FractalRes = z.infer<typeof FractalRes>;
 
 export const getFractal = async (owner: Account) => {
     const fractal = await graphql(
@@ -28,16 +41,16 @@ export const getFractal = async (owner: Account) => {
             createdAt
             name
             mission
-            scheduledEvaluation
-            evaluationInterval
             rewardWaitPeriod
-        } 
+        }
+        evaluations(fractal: "${owner}") {
+            fractal
+            evalType
+            interval
+            evaluationId
+        }
     }`,
     );
 
-    return z
-        .object({
-            fractal: zFractal,
-        })
-        .parse(fractal).fractal;
+    return FractalRes.parse(fractal);
 };

@@ -24,7 +24,6 @@ pub mod tables {
         pub name: String,
         pub mission: String,
 
-        pub evaluation_interval: Option<u32>,
         pub reward_wait_period: u32,
     }
 
@@ -42,7 +41,6 @@ pub mod tables {
                 created_at: now,
                 mission,
                 name,
-                evaluation_interval: None,
                 reward_wait_period: 86400 * 7 * 1,
             }
         }

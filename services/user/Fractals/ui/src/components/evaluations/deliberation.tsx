@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
+import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
 import { useFractal } from "@/hooks/fractals/useFractal";
 import { DeliberationPhase, SubmissionPhase } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
@@ -14,7 +15,9 @@ export const Deliberation = ({
     const { data: fractal } = useFractal();
     const navigate = useNavigate();
 
-    if (!fractal) return null;
+    const { evaluationInstance } = useEvaluationInstance();
+
+    if (!fractal || !evaluationInstance) return null;
 
     return status.isParticipant ? (
         <div>
@@ -24,8 +27,8 @@ export const Deliberation = ({
                 onClick={() => {
                     navigate(
                         paths.fractal.evaluationGroup(
-                            fractal.account,
-                            fractal.scheduledEvaluation!,
+                            evaluationInstance.fractal,
+                            evaluationInstance.evaluationId!,
                             status.groupNumber!,
                         ),
                     );

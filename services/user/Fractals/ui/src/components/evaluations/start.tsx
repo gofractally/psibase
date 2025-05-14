@@ -37,7 +37,7 @@ export const Start = ({ status }: { status: WaitingStart }) => {
                         disabled={isStarting}
                         onClick={() => {
                             startEvaluation({
-                                fractal: fractal.account,
+                                fractal: fractal.fractal!.account,
                                 evaluationType: zEvalType.enum.Repuation,
                             });
                         }}

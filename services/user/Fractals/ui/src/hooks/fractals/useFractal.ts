@@ -1,11 +1,7 @@
 import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
-import {
-    Fractal,
-    getFractal,
-    zFractal,
-} from "@/lib/graphql/fractals/getFractal";
+import { FractalRes, getFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
@@ -15,20 +11,11 @@ import { setDefaultMembership } from "./useMembership";
 export const useFractal = (account?: Account | undefined | null) => {
     const accountSelected = account || useCurrentFractal();
 
-    return useQuery<Fractal>({
+    return useQuery<FractalRes>({
         queryKey: QueryKey.fractal(accountSelected),
         enabled: !!accountSelected,
         queryFn: async () => getFractal(zAccount.parse(accountSelected)),
     });
-};
-
-export const setFractal = (
-    account: Account,
-    updater: (fractal: Fractal | undefined) => Fractal,
-) => {
-    queryClient.setQueryData(QueryKey.fractal(account), (fractalData: any) =>
-        zFractal.parse(updater(fractalData)),
-    );
 };
 
 export const setDefaultFractal = (
@@ -40,14 +27,15 @@ export const setDefaultFractal = (
     setDefaultMembership(account, firstUser);
 
     queryClient.setQueryData(QueryKey.fractal(account), () => {
-        const defaultFractal: Fractal = {
-            account,
-            createdAt: new Date().toISOString(),
-            evaluationInterval: null,
-            mission,
-            name,
-            rewardWaitPeriod: 86400,
-            scheduledEvaluation: null,
+        const defaultFractal: FractalRes = {
+            fractal: {
+                account,
+                createdAt: new Date().toISOString(),
+                mission,
+                name,
+                rewardWaitPeriod: 86400,
+            },
+            evaluations: [],
         };
         return defaultFractal;
     });
