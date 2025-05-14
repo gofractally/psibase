@@ -15,8 +15,6 @@ if(NOT DEFINED ICU_LIBRARY_DIR )
     set(ICU_LIBRARY_DIR $ENV{ICU_LIBRARY_DIR})
 endif()
 
-include(web-apps.cmake)
-
 option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
 if (${FORCE_COLORED_OUTPUT})
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -219,6 +217,8 @@ ExternalProject_Add(
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
+
+include(web-apps.cmake)
 
 # Static (not built) resource dependencies
 file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
@@ -458,9 +458,9 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
-    DEPENDS CommonApiCommonLib_js
+    DEPENDS ${CommonApiCommonLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
-    DEPENDS PluginTester_js
+    DEPENDS ${PluginTester_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )

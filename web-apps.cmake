@@ -17,6 +17,7 @@ ExternalProject_Add(CommonApiCommonLib_js
     BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib && yarn build
     CONFIGURE_COMMAND ""
     BUILD_BYPRODUCTS 
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/index.d.ts
@@ -42,6 +43,8 @@ set(UI_PROJECTS
     user/XAdmin/ui:XAdmin_js
 )
 
+message(STATUS "common-fonts: ${common-fonts}")
+message(STATUS "common-misc-resources: ${common-misc-resources}")
 # Create ExternalProject for each UI
 foreach(UI ${UI_PROJECTS})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${UI})
@@ -51,14 +54,12 @@ foreach(UI ${UI_PROJECTS})
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}
         BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH} && yarn build
         CONFIGURE_COMMAND ""
-        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
-        # TODO: does yarn build fail if these common- dir/files don't exist? If so, we don't need this DEPENDS
-        # ${common-misc-resources} ${common-fonts}
-        DEPENDS CommonApiCommonLib_js YarnInstall
+        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH} ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}/dist
+        DEPENDS ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP} YarnInstall
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
     )
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH})
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
 endforeach()
 
 # Special handling for XAdmin which has additional dependencies
