@@ -3,6 +3,7 @@ import {
     CalendarClock,
     CalendarPlus2,
     Contact,
+    Search,
     Users,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -15,7 +16,22 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+import { useCurrentFractal } from "@/hooks/useCurrentFractal";
 import { cn } from "@/lib/utils";
+
+const browseMenu = [
+    {
+        groupLabel: "Global",
+        path: "",
+        menus: [
+            {
+                title: "Browse",
+                icon: Search,
+                path: "",
+            },
+        ],
+    },
+];
 
 export const fractalMenus = [
     {
@@ -60,17 +76,25 @@ export const fractalMenus = [
 export function NavMain() {
     const location = useLocation();
 
-    const fractalName = location.pathname.split("/")[2];
+    const fractalName = useCurrentFractal();
+
+    const isBrowse = !location.pathname.startsWith("/fractal");
+
+    const menus = isBrowse ? browseMenu : fractalMenus;
 
     return (
         <>
-            {fractalMenus.map((item) => (
+            {menus.map((item) => (
                 <SidebarGroup>
                     <SidebarGroupLabel>{item.groupLabel}</SidebarGroupLabel>
                     <SidebarMenu>
                         {item.menus.map((menu) => (
                             <NavLink
-                                to={`/fractal/${fractalName}/${item.path}/${menu.path}`}
+                                to={
+                                    isBrowse
+                                        ? item.path
+                                        : `/fractal/${fractalName}/${item.path}/${menu.path}`
+                                }
                                 end
                             >
                                 {({ isActive }) => (

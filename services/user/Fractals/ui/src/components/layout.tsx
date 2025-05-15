@@ -17,24 +17,35 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar";
 
+import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+
 import { fractalMenus } from "./nav-main";
 
-export const Layout = () => {
+const pathNameIndex = (index: number) => {
     const location = useLocation();
+    return location.pathname.split("/")[index];
+};
 
-    const fractalName = location.pathname.split("/")[2];
+export const Layout = () => {
+    const fractal = useCurrentFractal();
 
     const selectedGroup = fractalMenus.find(
-        (menu) => location.pathname.split("/")[3] == menu.path,
+        (menu) => pathNameIndex(3) == menu.path,
     );
 
-    const selectedGroupName = selectedGroup?.groupLabel || "Evaluations";
+    const selectedGroupName = selectedGroup?.groupLabel;
 
     const selectedPage = selectedGroup?.menus.find(
-        (menu) => location.pathname.split("/")[4] == menu.path,
+        (menu) => pathNameIndex(4) == menu.path,
     );
 
-    const pageName = selectedPage?.title || "Active & upcoming";
+    const pageName = selectedPage?.title;
+
+    const breadCrumbs: (string | undefined)[] = [
+        fractal || "Browse",
+        selectedGroupName,
+        pageName,
+    ];
 
     return (
         <SidebarProvider>
@@ -49,21 +60,26 @@ export const Layout = () => {
                         />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink>
-                                        {fractalName}
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage>
-                                        {selectedGroupName}
-                                    </BreadcrumbPage>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage>{pageName}</BreadcrumbPage>
-                                </BreadcrumbItem>
+                                {breadCrumbs
+                                    .filter(Boolean)
+                                    .map((breadcrumb, index, arr) => (
+                                        <>
+                                            <BreadcrumbItem className="hidden md:block">
+                                                {index === 0 ? (
+                                                    <BreadcrumbLink>
+                                                        {breadcrumb}
+                                                    </BreadcrumbLink>
+                                                ) : (
+                                                    <BreadcrumbPage>
+                                                        {breadcrumb}
+                                                    </BreadcrumbPage>
+                                                )}
+                                            </BreadcrumbItem>
+                                            {arr.length - 1 !== index && (
+                                                <BreadcrumbSeparator className="hidden md:block" />
+                                            )}
+                                        </>
+                                    ))}
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>

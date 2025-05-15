@@ -8,6 +8,7 @@ export type OptionalAccount = Account | undefined | null;
 export type OptionalNumber = number | undefined | null;
 
 const QueryKey = {
+    fractals: () => ["fractals"] as const,
     currentUser: () => ["currentUser"] as const,
     chainId: () => ["chainId"] as const,
     connectedAccounts: () => ["connectedAccounts"] as const,

@@ -10,7 +10,7 @@ import {
 import { useCreateFractal } from "@/hooks/use-create-app";
 import { useTrackedFractals } from "@/hooks/useTrackedFractals";
 
-import { CreateFractalForm } from "./create-fractal-form";
+import { useAppForm } from "./form/app-form";
 
 export const CreateFractalModal = ({
     show,
@@ -20,29 +20,73 @@ export const CreateFractalModal = ({
     openChange: (show: boolean) => void;
 }) => {
     const { addFractal } = useTrackedFractals();
-    const { mutateAsync: createApp } = useCreateFractal();
+    const { mutateAsync: createFractal } = useCreateFractal();
 
     const navigate = useNavigate();
+
+    const form = useAppForm({
+        defaultValues: {
+            account: "",
+            mission: "",
+            name: "",
+        },
+        validators: {
+            onSubmitAsync: async (data) => {
+                await createFractal(data.value);
+                addFractal(data.value.account);
+                openChange(false);
+                navigate(`/fractal/${data.value.account}`);
+            },
+        },
+    });
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add a fractal</DialogTitle>
-                    <CreateFractalForm
-                        onSubmit={async (data) => {
-                            void (await createApp({
-                                account: data.account,
-                                mission: data.mission,
-                                name: data.name
-                            }));
-
-                            addFractal(data.account);
-                            openChange(false);
-                            navigate(`/fractal/${data.account}`);
-                            return data;
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            void form.handleSubmit();
                         }}
-                    />
+                        className="w-full space-y-6"
+                    >
+                        <form.AppField
+                            name="account"
+                            children={(field) => (
+                                <field.TextField
+                                    label="Account name"
+                                    description="Unique identifier"
+                                />
+                            )}
+                        />
+                        <form.AppField
+                            name="name"
+                            children={(field) => (
+                                <field.TextField
+                                    label="Name"
+                                    description="Display name"
+                                />
+                            )}
+                        />
+                        <form.AppField
+                            name="mission"
+                            children={(field) => (
+                                <field.TextField label="Mission" />
+                            )}
+                        />
+
+                        <form.AppForm>
+                            <form.SubmitButton
+                                labels={[
+                                    "Create fractal",
+                                    "Creating fractal...",
+                                    "Created fractal",
+                                ]}
+                            />
+                        </form.AppForm>
+                    </form>
                 </DialogHeader>
             </DialogContent>
         </Dialog>

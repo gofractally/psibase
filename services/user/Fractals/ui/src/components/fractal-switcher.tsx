@@ -1,7 +1,7 @@
 import { queryClient } from "@/queryClient";
-import { ChevronsUpDown, Plus, X } from "lucide-react";
+import { ChevronsUpDown, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import {
     DropdownMenu,
@@ -32,10 +32,8 @@ import { Button } from "./ui/button";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
-    const location = useLocation();
 
     const navigate = useNavigate();
-    const selectedFractalAccount = location.pathname.split("/")[2];
 
     const { fractals, removeFractal } = useTrackedFractals();
 
@@ -44,6 +42,7 @@ export function AppSwitcher() {
     const [showCreateFractalModal, setShowCreateFractalModal] = useState(false);
 
     const currentFractal = useCurrentFractal();
+
     const { data: fractal } = useFractal(currentFractal);
 
     return (
@@ -64,7 +63,7 @@ export function AppSwitcher() {
                                 <img
                                     className="size-4"
                                     src={createIdenticon(
-                                        chainId + selectedFractalAccount,
+                                        chainId + currentFractal,
                                     )}
                                 />
                             </div>
@@ -72,11 +71,11 @@ export function AppSwitcher() {
                                 <span className="truncate font-semibold">
                                     {fractal
                                         ? fractal?.fractal?.name
-                                        : selectedFractalAccount}
+                                        : currentFractal}
                                 </span>
                                 {fractal && (
                                     <span className="truncate text-xs">
-                                        {selectedFractalAccount}
+                                        {currentFractal}
                                     </span>
                                 )}
                             </div>
@@ -89,6 +88,22 @@ export function AppSwitcher() {
                         side={isMobile ? "bottom" : "right"}
                         sideOffset={4}
                     >
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                            Global
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem className="flex items-center justify-between gap-2 p-2">
+                            <div
+                                className="flex flex-1 items-center gap-2"
+                                onClick={() => navigate(`/browse`)}
+                            >
+                                <div className="flex size-6 items-center justify-center rounded-sm">
+                                    <Search />
+                                </div>
+                                Explore
+                            </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+
                         <DropdownMenuLabel className="text-xs text-muted-foreground">
                             Fractals
                         </DropdownMenuLabel>

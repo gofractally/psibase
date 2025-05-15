@@ -1,22 +1,33 @@
 import { createBrowserRouter, redirect } from "react-router-dom";
 
 import { Loader } from "@/pages/Loader";
-import { ActiveAndUpcoming } from "@/pages/evaluations/active-and-upcoming";
-import { Completed } from "@/pages/evaluations/completed";
-import { Proposed } from "@/pages/evaluations/proposed";
-import { AllMembers } from "@/pages/membership/all-members";
-import { MyMembership } from "@/pages/membership/my-membership";
+import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
+import { Completed } from "@/pages/fractal/evaluations/completed";
+import { Proposed } from "@/pages/fractal/evaluations/proposed";
+import { AllMembers } from "@/pages/fractal/membership/all-members";
+import { MyMembership } from "@/pages/fractal/membership/my-membership";
 
 import { AppExists } from "@/components/app-exists";
 import { Layout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/protected-route";
 
-import { EvaluationDeliberation } from "./pages/evaluations/evaluation-deliberation";
+import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
+import { Browse } from "./pages/global/browse";
 
 export const router = createBrowserRouter([
     {
         path: "/",
         element: <Loader />,
+    },
+    {
+        path: "/browse",
+        element: <Layout />,
+        children: [
+            {
+                path: "",
+                element: <Browse />,
+            },
+        ],
     },
     {
         path: "/fractal",
@@ -25,7 +36,7 @@ export const router = createBrowserRouter([
             {
                 path: ":fractalName",
                 index: true,
-                loader: () => redirect("evaluations"),
+                loader: () => redirect("evaluations/"),
             },
             {
                 path: ":fractalName/membership",
