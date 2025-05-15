@@ -1,12 +1,12 @@
 {
-  "name": "tester",
+  "name": "@psibase/explorer-ui",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --strictPort",
     "prepare": "svelte-kit sync",
-    "build": "tsc && vite build",
+    "build": "svelte-kit sync && tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

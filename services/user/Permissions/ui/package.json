@@ -1,5 +1,5 @@
 {
-    "name": "permissions",
+    "name": "@psibase/permissions-ui",
     "private": true,
     "version": "0.0.0",
     "type": "module",
