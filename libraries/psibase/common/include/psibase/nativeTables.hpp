@@ -132,8 +132,7 @@ namespace psibase
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
 
-      uint32_t             numRefs = 0;   // number accounts that ref this
-      std::vector<uint8_t> code    = {};  // actual code, TODO: compressed
+      std::vector<uint8_t> code = {};  // actual code, TODO: compressed
 
       // The code table is in native. The native code
       // verifies codeHash and the key. This prevents a poison block
@@ -141,7 +140,7 @@ namespace psibase
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> CodeByHashKeyType;
-      PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
+      PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, code)
    };
 
    auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
