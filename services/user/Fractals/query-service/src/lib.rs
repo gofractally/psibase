@@ -93,10 +93,62 @@ mod service {
                 .await
         }
 
+        async fn fractals_list(&self, fractals: Vec<String>) -> Vec<Option<Fractal>> {
+            fractals
+                .into_iter()
+                .map(|account| {
+                    FractalTable::with_service(fractals::SERVICE)
+                        .get_index_pk()
+                        .get(&AccountNumber::from(account.as_str()))
+                })
+                .collect()
+        }
+
         async fn member(&self, fractal: AccountNumber, member: AccountNumber) -> Option<Member> {
             MemberTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .get(&(fractal, member))
+        }
+
+        async fn memberships(
+            &self,
+            member: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Member>> {
+            TableQuery::subindex::<AccountNumber>(
+                MemberTable::with_service(fractals::SERVICE).get_index_by_member(),
+                &(member),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
+        async fn fractal_memberships(&self, member: AccountNumber) -> Vec<Fractal> {
+            let memberships: Vec<Member> = MemberTable::with_service(fractals::SERVICE)
+                .get_index_by_member()
+                .range((member, AccountNumber::from(0))..=(member, AccountNumber::from(u64::MAX)))
+                .collect();
+
+            let fractal_accounts: Vec<AccountNumber> = memberships
+                .into_iter()
+                .map(|membership| membership.fractal)
+                .collect();
+
+            fractal_accounts
+                .into_iter()
+                .filter_map(|account| {
+                    FractalTable::with_service(fractals::SERVICE)
+                        .get_index_pk()
+                        .get(&account)
+                })
+                .collect()
         }
 
         async fn members(

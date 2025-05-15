@@ -10,7 +10,8 @@ import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
-import { AccountNameStatus } from "./useAccountStatus";
+import { AccountNameStatus } from "../useAccountStatus";
+import { cacheAddFractalMembership } from "./useFractalMemberships";
 
 const Params = z.object({
     account: zAccount,
@@ -31,7 +32,7 @@ export const useCreateFractal = () =>
             }));
             return null;
         },
-        onSuccess: (_, { account }) => {
+        onSuccess: (_, { account, mission, name }) => {
             queryClient.setQueryData(
                 QueryKey.userAccount(account),
                 () => AccountNameStatus.Enum.Taken,
@@ -44,7 +45,11 @@ export const useCreateFractal = () =>
                 });
             }, AwaitTime);
 
-            toast.success(`Created fractal ${account}`);
+            cacheAddFractalMembership([
+                { account, createdAt: new Date().toISOString(), mission, name },
+            ]);
+
+            toast.success(`Created fractal ${name || account}`);
         },
         onError: (error) => {
             if (error instanceof Error) {

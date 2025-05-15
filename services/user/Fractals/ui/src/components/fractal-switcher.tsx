@@ -1,5 +1,5 @@
 import { queryClient } from "@/queryClient";
-import { ChevronsUpDown, Plus, Search, X } from "lucide-react";
+import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -20,22 +20,23 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useFractal } from "@/hooks/fractals/useFractal";
+import { useFractalMemberships } from "@/hooks/fractals/useFractalMemberships";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentFractal } from "@/hooks/useCurrentFractal";
-import { useTrackedFractals } from "@/hooks/useTrackedFractals";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { zFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
 
 import { CreateFractalModal } from "./create-fractal-modal";
-import { Button } from "./ui/button";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
 
     const navigate = useNavigate();
 
-    const { fractals, removeFractal } = useTrackedFractals();
+    const { data: currentUser } = useCurrentUser();
+    const { data: fractals } = useFractalMemberships(currentUser);
 
     const { data: chainId } = useChainId();
 
@@ -107,7 +108,7 @@ export function AppSwitcher() {
                         <DropdownMenuLabel className="text-xs text-muted-foreground">
                             Fractals
                         </DropdownMenuLabel>
-                        {fractals.map((fractal) => {
+                        {fractals?.map((fractal) => {
                             const metadata = zFractal.safeParse(
                                 queryClient.getQueryData(
                                     QueryKey.fractal(fractal.account),
@@ -140,27 +141,6 @@ export function AppSwitcher() {
                                         </div>
                                         {displayName || fractal.account}
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="size-4 p-3 hover:bg-destructive/10"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const nextFractal = fractals.find(
-                                                (f) =>
-                                                    f.account !==
-                                                    fractal.account,
-                                            );
-                                            navigate(
-                                                nextFractal
-                                                    ? `/fractal/${nextFractal.account}`
-                                                    : "/",
-                                            );
-                                            removeFractal(fractal.account);
-                                        }}
-                                    >
-                                        <X className="size-3" />
-                                    </Button>
                                 </DropdownMenuItem>
                             );
                         })}

@@ -114,6 +114,11 @@ pub mod tables {
             (self.fractal, self.account)
         }
 
+        #[secondary_key(1)]
+        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+            (self.account, self.fractal)
+        }
+
         fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
             Self {

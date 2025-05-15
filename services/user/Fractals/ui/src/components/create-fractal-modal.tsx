@@ -7,8 +7,9 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 
-import { useCreateFractal } from "@/hooks/use-create-app";
-import { useTrackedFractals } from "@/hooks/useTrackedFractals";
+import { useCreateFractal } from "@/hooks/fractals/useCreateFractal";
+import { useFractalMemberships } from "@/hooks/fractals/useFractalMemberships";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 import { useAppForm } from "./form/app-form";
 
@@ -19,8 +20,10 @@ export const CreateFractalModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { addFractal } = useTrackedFractals();
     const { mutateAsync: createFractal } = useCreateFractal();
+
+    const { data: currentUser } = useCurrentUser();
+    const { refetch } = useFractalMemberships(currentUser);
 
     const navigate = useNavigate();
 
@@ -33,9 +36,11 @@ export const CreateFractalModal = ({
         validators: {
             onSubmitAsync: async (data) => {
                 await createFractal(data.value);
-                addFractal(data.value.account);
                 openChange(false);
                 navigate(`/fractal/${data.value.account}`);
+                setTimeout(() => {
+                    refetch();
+                }, 3500);
             },
         },
     });
