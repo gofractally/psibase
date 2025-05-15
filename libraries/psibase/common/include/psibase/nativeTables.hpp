@@ -320,6 +320,10 @@ namespace psibase
       // Read-only access to chain state. Read/write access
       // to chain-independent databases.
       rpc,
+      // Read-only access to objective state, Read/write access
+      // to subjective state. When running in an async context,
+      // changes to chain state will be discarded.
+      callback,
    };
 
    //struct ContinuationArgs

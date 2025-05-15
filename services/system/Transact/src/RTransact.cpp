@@ -383,6 +383,7 @@ void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> tr
    TrxReply errorReply;
    PSIBASE_SUBJECTIVE_TX
    {
+      kvRemove(RunRow::db, runKey(id));
       auto row = pendingVerifies.get(id);
       check(!!row, "Can't find transaction id");
       auto tx = unverifiedTransactions.get(row->txid);

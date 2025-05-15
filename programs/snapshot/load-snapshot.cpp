@@ -20,7 +20,8 @@ using psibase::DbId;
 using psibase::KvMerkle;
 using namespace psibase::snapshot;
 
-namespace raw = psibase::tester::raw;
+namespace tester = psibase::tester;
+namespace raw    = psibase::tester::raw;
 
 bool read_u32(std::uint32_t& result, auto& stream)
 {
@@ -232,9 +233,7 @@ int verifySignatures(std::uint32_t                  authServices,
       psibase::Action     act{.service = sig.claim.service,
                               .method  = psibase::MethodNumber{"verifySys"},
                               .rawData = psio::to_frac(args)};
-      auto                packed = psio::to_frac(act);
-      auto                size   = raw::verify(authServices, packed.data(), packed.size());
-      auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
+      auto trace = tester::runAction(authServices, psibase::RunMode::verify, false, act);
       if (!trace.error || trace.error->empty())
       {
          if (isProducer(consensus.current, sig))

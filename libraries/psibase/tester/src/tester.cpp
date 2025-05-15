@@ -56,6 +56,17 @@ namespace
 using psibase::tester::raw::selectedChain;
 using namespace SystemService::AuthSig;
 
+psibase::TransactionTrace psibase::tester::runAction(std::uint32_t chain,
+                                                     RunMode       mode,
+                                                     bool          head,
+                                                     const Action& act)
+{
+   auto packedAction = psio::to_frac(act);
+   auto traceSize =
+       tester::raw::runAction(chain, mode, head, packedAction.data(), packedAction.size());
+   return psio::from_frac<TransactionTrace>(psibase::getResult(traceSize));
+}
+
 psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
 
 bool psibase::TraceResult::succeeded()
@@ -281,13 +292,66 @@ psibase::SignedTransaction psibase::TestChain::signTransaction(Transaction trx, 
    return pushTransaction(signTransaction(std::move(trx), keys));
 }
 
+std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction()
+{
+   if (auto row = kvGet<NotifyRow>(DbId::nativeSubjective, notifyKey(NotifyType::nextTransaction)))
+   {
+      for (auto& act : row->actions)
+      {
+         check(act.sender == AccountNumber{} && act.rawData.empty(),
+               "Invalid nextTransaction callback");
+         act.rawData = psio::to_frac(std::tuple());
+         auto trace  = tester::runAction(id, RunMode::callback, false, act);
+         if (trace.error)
+            abortMessage("nextTransaction failed");
+         check(trace.actionTraces.size() == 1, "Wrong number of action traces");
+         if (auto tx = psio::from_frac<std::optional<SignedTransaction>>(
+                 trace.actionTraces.front().rawRetval))
+         {
+            return pushTransaction(*tx);
+         }
+      }
+   }
+   return {};
+}
+
+bool psibase::TestChain::runQueueItem()
+{
+   if (auto row = kvGreaterEqual<RunRow>(RunRow::db, runPrefix(),
+                                         psio::convert_to_key(runPrefix()).size()))
+   {
+      auto continuationArgs =
+          psio::to_frac(std::tuple(row->id, tester::runAction(id, row->mode, true, row->action)));
+      auto continuation      = Action{.service = row->continuation.service,
+                                      .method  = row->continuation.method,
+                                      .rawData = std::move(continuationArgs)};
+      auto continuationTrace = tester::runAction(id, RunMode::rpc, true, continuation);
+      if (continuationTrace.error)
+         abortMessage("Continuation failed: " + *continuationTrace.error);
+      return true;
+   }
+   else
+   {
+      return false;
+   }
+}
+
+void psibase::TestChain::runAll()
+{
+   while (pushNextTransaction() || runQueueItem())
+   {
+   }
+}
+
 psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
 {
    if (producing && isAutoBlockStart)
       finishBlock();
 
    std::vector<char> packed_request = psio::convert_to_frac(request);
-   auto        fd = tester::raw::httpRequest(id, packed_request.data(), packed_request.size());
+   auto fd = tester::raw::httpRequest(id, packed_request.data(), packed_request.size());
+   if (isAutoRun)
+      runAll();
    std::size_t size;
    if (auto err = tester::raw::socketRecv(fd, &size))
    {

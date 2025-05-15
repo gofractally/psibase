@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN
 
 #include <psibase/DefaultTestChain.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
@@ -88,5 +89,47 @@ TEST_CASE("Test login")
       req.headers.push_back({"Authorization", "Bearer " + token});
       auto user = t.http<std::optional<AccountNumber>>(req);
       CHECK(user == std::optional{alice});
+   }
+}
+
+TEST_CASE("Test push_transaction")
+{
+   DefaultTestChain t;
+
+   auto httpPush = [&](const SignedTransaction& trx)
+   {
+      return Result<void>(t.post<TransactionTrace>(Transact::service, "/push_transaction",
+                                                   FracPackBody{std::move(trx)}));
+   };
+
+   SECTION("No signature")
+   {
+      auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}));
+      CHECK(httpPush(trx).succeeded());
+      CHECK(t.from("alice"_a).to<Accounts>().exists("alice"_a).returnVal() == true);
+   }
+
+   SECTION("With signature")
+   {
+      auto alice    = t.addAccount("alice", aliceKeys.first);
+      auto accounts = transactor<Accounts>{alice, Accounts::service};
+      auto act      = accounts.setAuthServ(AuthAny::service);
+      auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
+      CHECK(httpPush(trx).succeeded());
+      CHECK(t.from("alice"_a).to<Accounts>().getAuthOf(alice).returnVal() == AuthAny::service);
+   }
+
+   SECTION("Invalid signature")
+   {
+      auto alice    = t.addAccount("alice", aliceKeys.first);
+      auto accounts = transactor<Accounts>{alice, Accounts::service};
+      auto act      = accounts.setAuthServ(AuthAny::service);
+      auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
+      trx.proofs[0].clear();
+      CHECK(httpPush(trx).failed("signature invalid"));
+      CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+            AuthSig::AuthSig::service);
    }
 }

@@ -173,6 +173,7 @@ namespace psibase
       std::optional<psibase::StatusRow> status;
       bool                              producing        = false;
       bool                              isAutoBlockStart = true;
+      bool                              isAutoRun        = true;
       bool                              isPublicChain;
 
       explicit TestChain(uint32_t chain_id, bool clone, bool pub = true);
@@ -226,6 +227,14 @@ namespace psibase
       void setAutoBlockStart(bool enable);
 
       /**
+       * By default the TestChain will automatically process
+       * the run table and transactions provided by services.
+       * When autoRun is disabled, the chain will only run
+       * them manually.
+       */
+      void setAutoRun(bool enable);
+
+      /**
        * Start a new pending block.  If a block is currently pending, finishes it first.
        * May push additional blocks if any time is skipped.
        *
@@ -268,6 +277,24 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
+
+      /**
+       * Runs the nextTransaction callback to find the
+       * next transaction and pushes it. If there was
+       * a transaction, returns its trace.
+       */
+      std::optional<TransactionTrace> pushNextTransaction();
+      /**
+       * Reads the first RunRow and executes it. Returns true
+       * if there was anything to do.
+       */
+      bool runQueueItem();
+      /**
+       * Runs pending work to completion.
+       * - pushNextTransaction
+       * - runQueueItem
+       */
+      void runAll();
 
       /**
        * Creates a POST request with a JSON body
