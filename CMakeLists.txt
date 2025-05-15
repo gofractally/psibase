@@ -966,6 +966,8 @@ install(
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/CpuLimit.psi
+          ${SERVICE_DIR}/DevDefault.psi
+          ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
