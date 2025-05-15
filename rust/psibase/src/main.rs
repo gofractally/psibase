@@ -18,13 +18,14 @@ use psibase::{
     PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
     PackageRegistry, PackagedService, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload,
     Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
-    TransactionTrace,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
+use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
@@ -368,6 +369,9 @@ struct ListArgs {
     /// List installed apps
     #[clap(long)]
     installed: bool,
+    /// List installed apps that have updates available
+    #[clap(long)]
+    updates: bool,
 
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
@@ -922,7 +926,7 @@ async fn add_package_registry(
     result: &mut JointRegistry<BufReader<File>>,
 ) -> Result<(), anyhow::Error> {
     let chain_sources = if let Some(account) = account {
-        get_package_sources(base_url, &mut client, account).await?
+        handle_unbooted(get_package_sources(base_url, &mut client, account).await)?
     } else {
         Vec::new()
     };
@@ -1551,14 +1555,18 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     .await
 }
 
-async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
+async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    if args.all
-        || (args.installed && args.available)
-        || (!args.all & !args.installed && !args.available)
-    {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    // Resolve selection shortcuts
+    if args.all || (!args.installed && !args.available && !args.updates) {
+        args.installed = true;
+        args.available = true;
+        args.updates = true;
+    }
+    // Load the lists of packages that we need
+    let installed =
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    let reglist = if args.updates || args.available {
         let package_registry = get_package_registry(
             &args.node_args.api,
             Some(args.sender.into()),
@@ -1566,41 +1574,47 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
             client.clone(),
         )
         .await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for name in installed.union(reglist).into_vec() {
-            println!("{}", name);
-        }
-    } else if args.installed {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        for name in installed.into_vec() {
-            println!("{}", name);
-        }
-    } else if args.available {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(
-            &args.node_args.api,
-            Some(args.sender.into()),
-            &args.package_source,
-            client.clone(),
-        )
-        .await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for name in reglist.difference(installed).into_vec() {
-            println!("{}", name);
+        PackageList::from_registry(&package_registry)?
+    } else {
+        PackageList::new()
+    };
+
+    // Show installed packages
+    if args.installed || args.updates {
+        for (name, version) in installed.max_versions()? {
+            let updated = if args.updates {
+                reglist.get_update(name, version)?
+            } else {
+                None
+            };
+            if let Some(next_version) = updated {
+                println!("{} {}->{}", name, version, next_version);
+            } else if args.installed {
+                println!("{} {}", name, version);
+            }
         }
     }
+
+    // Show packages that are not installed
+    if args.available {
+        for (name, version) in reglist.max_versions()? {
+            if !installed.contains_package(name) {
+                println!("{} {}", name, version);
+            }
+        }
+    }
+
     Ok(())
 }
 
 async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
     let mut compiled = vec![];
     for pattern in &args.patterns {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
-    // TODO: search installed packages as well
+    let mut packages =
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
     let package_registry = get_package_registry(
         &args.node_args.api,
         Some(args.sender.into()),
@@ -1608,33 +1622,45 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
         client.clone(),
     )
     .await?;
+    for info in package_registry.index()? {
+        packages.insert_info(info)
+    }
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
-    for info in package_registry.index()? {
+    for (meta, _) in packages.into_info() {
         let mut name_matched = 0;
         let mut description_matched = 0;
         for re in &compiled[..] {
-            if re.is_match(&info.name) {
+            if re.is_match(&meta.name) {
                 name_matched += 1;
-            } else if re.is_match(&info.description) {
+            } else if re.is_match(&meta.description) {
                 description_matched += 1;
             } else {
                 break;
             }
         }
         if name_matched == compiled.len() {
-            primary_matches.push(info);
+            primary_matches.push(meta);
         } else if name_matched + description_matched == compiled.len() {
-            secondary_matches.push(info);
+            secondary_matches.push(meta);
         }
     }
-    primary_matches.sort_unstable_by(|a, b| a.name.cmp(&b.name));
-    secondary_matches.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    fn package_order(a: &Meta, b: &Meta) -> Ordering {
+        a.name.cmp(&b.name).then_with(|| {
+            Version::new(&b.version)
+                .unwrap()
+                .cmp(&Version::new(&a.version).unwrap())
+        })
+    }
+    primary_matches.sort_unstable_by(package_order);
+    primary_matches.dedup_by(|a, b| &a.name == &b.name);
+    secondary_matches.sort_unstable_by(package_order);
+    secondary_matches.dedup_by(|a, b| &a.name == &b.name);
     for result in primary_matches {
-        println!("{}", result.name);
+        println!("{} {}", result.name, result.version);
     }
     for result in secondary_matches {
-        println!("{}", result.name);
+        println!("{} {}", result.name, result.version);
     }
     Ok(())
 }
@@ -1747,13 +1773,13 @@ async fn show_package<T: PackageRegistry + ?Sized>(
 }
 
 // an unbooted chain has no packages installed
-fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageList, anyhow::Error> {
+fn handle_unbooted<T: Default>(list: Result<T, anyhow::Error>) -> Result<T, anyhow::Error> {
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
             .contains("Node is not connected to any psibase network.")
         {
-            return Ok(PackageList::new());
+            return Ok(T::default());
         }
     }
     list
@@ -2038,7 +2064,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Some(help) = &args.help {
         return print_help(help);
     }
-    let Some(command) = &args.command else {
+    let Some(command) = args.command else {
         return print_help(&[]);
     };
     match command {
@@ -2059,16 +2085,16 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::Publish(args) => publish(&args).await?,
         Command::Install(args) => install(&args).await?,
         Command::Upgrade(args) => upgrade(&args).await?,
-        Command::List(args) => list(&args).await?,
+        Command::List(args) => list(args).await?,
         Command::Search(args) => search(&args).await?,
         Command::Info(args) => package_info(&args).await?,
         Command::CreateToken(args) => {
             create_token(Duration::seconds(args.expires_after), &args.mode)?
         }
-        Command::Login(args) => handle_login(args).await?,
-        Command::Config(config) => handle_cli_config_cmd(config)?,
-        Command::Help { command } => print_help(command)?,
-        Command::External(argv) => handle_external(argv)?,
+        Command::Login(args) => handle_login(&args).await?,
+        Command::Config(config) => handle_cli_config_cmd(&config)?,
+        Command::Help { command } => print_help(&command)?,
+        Command::External(argv) => handle_external(&argv)?,
     }
 
     Ok(())

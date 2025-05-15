@@ -248,6 +248,14 @@ struct EmptyTrailing
 };
 PSIO_REFLECT(EmptyTrailing, v0, v1)
 
+struct MultipleOptionals
+{
+   std::optional<std::uint8_t> v0;
+   std::optional<std::uint8_t> v1;
+   std::optional<std::uint8_t> v2;
+};
+PSIO_REFLECT(MultipleOptionals, v0, v1, v2)
+
 struct Untagged
 {
    std::string value;
@@ -330,6 +338,12 @@ int main()
    builder.add<std::map<std::string, std::string>>("string-map",
                                                    {{}, {{"foo", "x"}, {"bar", "y"}}});
    builder.add<std::variant<V0, Untagged>>("untagged-alternative", {V0{}, Untagged{"foo"}});
+   builder.add<MultipleOptionals>(
+       "multiple-optionals",
+       {MultipleOptionals{}, MultipleOptionals{.v0 = 1}, MultipleOptionals{.v1 = 2},
+        MultipleOptionals{.v2 = 3}, MultipleOptionals{.v0 = 1, .v1 = 2},
+        MultipleOptionals{.v0 = 1, .v2 = 3}, MultipleOptionals{.v0 = 1, .v2 = 3},
+        MultipleOptionals{.v0 = 1, .v1 = 2, .v2 = 3}});
 
    // Compatible serialization
    builder.add_compat("(i32)", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),

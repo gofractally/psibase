@@ -173,6 +173,10 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_info(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
+        info = a.run_psibase(['info', 'Explorer'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+        self.assertIn('status: not installed', info)
+        self.assertIn('Explorer', info)
+
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo = Foo()
@@ -211,6 +215,87 @@ class TestPsibase(unittest.TestCase):
             self.assertIn('status: version 2.0.0 installed', info)
             self.assertIn('description: The original foo', info)
             self.assertIn('name: foo-1.0.0', info)
+
+    @testutil.psinode_test
+    def test_list(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        # A non-existent account should be an error
+        for source in ['neminis', 'http://neminis.a/']:
+            status = a.run_psibase(['list', '--package-source', source] + a.node_args(), encoding='utf-8', stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, check=False)
+            self.assertNotEqual(status.returncode, 0)
+            self.assertIn("account 'neminis' does not exist", status.stderr)
+
+        # An existing account is okay even if it wasn't intended as a package repo
+        for source in ['transact', 'http://transact.a']:
+            l = a.run_psibase(['list', '--available', '--package-source', 'transact'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            self.assertEqual(l, "")
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def get_list(*options):
+                return a.run_psibase(['list', '--package-source', dir] + list(options) + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            for args in [(), ('--all',), ('--all', '--installed'), ('--installed', '--available', '--updates')]:
+                l = get_list(*args)
+                self.assertIn('Minimal', l)
+                self.assertIn('Explorer', l)
+                self.assertIn('Sites', l)
+                self.assertIn('foo 2.0.0', l)
+
+            l = get_list('--installed')
+            self.assertIn('Explorer', l)
+            self.assertNotIn('foo', l)
+
+            l = get_list('--available')
+            self.assertNotIn('Explorer', l)
+            self.assertIn('foo 2.0.0', l)
+
+            l = get_list('--updates')
+            self.assertEqual(l, "")
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.wait(new_block())
+
+            l = get_list('--installed')
+            self.assertIn('Explorer', l)
+            self.assertIn('foo 1.0.0', l)
+
+            l = get_list('--available')
+            self.assertEqual(l, "")
+
+            l = get_list('--updates')
+            self.assertIn('foo 1.0.0->2.0.0', l)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.wait(new_block())
+
+            l = get_list('--updates')
+            self.assertEqual(l, "")
+
+    @testutil.psinode_test
+    def test_search(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def search(*options):
+                return a.run_psibase(['search', '--package-source', dir] + list(options) + a.node_args(), stdout=subprocess.PIPE, text=True).stdout
+
+            def check_repo():
+                self.assertEqual(search('foo'), 'foo 2.0.0\n')
+                self.assertEqual(search('The original'), 'foo 1.0.0\n')
+                self.assertEqual(search('Min.*up'), 'foo 1.1.0\n')
+                self.assertEqual(search('bar'), '')
+                self.assertEqual(search('foo', 'original'), 'foo 1.0.0\n')
+            check_repo()
+            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+            check_repo()
+            self.assertIn('Transact ', search('^transact$'))
 
     @testutil.psinode_test
     def test_configure_sources(self, cluster):
