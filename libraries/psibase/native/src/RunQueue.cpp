@@ -80,7 +80,7 @@ namespace psibase
                search_key.push_back(0);
                continue;
             }
-            if (std::ranges::contains(running, row.id().unpack()))
+            if (std::ranges::find(running, row.id().unpack()) != running.end())
             {
                // TODO: Don't ignore available rows in the middle
                // of the running set.
