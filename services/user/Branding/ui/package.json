@@ -1,5 +1,5 @@
 {
-    "name": "@psibase/branding-ui",
+    "name": "branding",
     "private": true,
     "version": "0.0.0",
     "type": "module",

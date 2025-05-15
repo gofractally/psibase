@@ -242,7 +242,7 @@ function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
     file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json)
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/yarn.lock)
 
     # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
