@@ -22,7 +22,7 @@ export default defineConfig(({ command }) => ({
                 vendor: ['svelte', '@sveltejs/kit']
             }
         }),
-        ...createPsibaseConfig({
+        createPsibaseConfig({
             service: "explorer",
             serviceDir,
             uiFramework: 'svelte',

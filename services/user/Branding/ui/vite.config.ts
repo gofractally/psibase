@@ -39,7 +39,7 @@ export default defineConfig(({ command }) => {
                     ],
                 }
             }),
-            ...createPsibaseConfig({
+            createPsibaseConfig({
                 service: "branding",
                 serviceDir,
                 isServing: command === "serve",

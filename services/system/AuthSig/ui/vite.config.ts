@@ -17,7 +17,7 @@ export default defineConfig(({ command }) => ({
           vendor: ['react', 'react-dom', 'react-router-dom']
       }
     }),
-    ...createPsibaseConfig({
+    createPsibaseConfig({
       service: "auth-sig",
       serviceDir: serviceDir,
       isServing: command === "serve"

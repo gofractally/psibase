@@ -17,17 +17,11 @@ export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
             vendor: ['react', 'react-dom', 'react-router-dom']
         }
     }),
-    ...createPsibaseConfig({
+    createPsibaseConfig({
       service: "psibase",
       serviceDir,
       isServing: command === "serve",
       proxyPort: 8079,
-      additionalAliases: [
-        {
-          find: "@",
-          replacement: path.resolve("./src")
-        }
-      ],
       additionalProxyBypassConditions: [
         (req) => {
           const host = req.headers.host || "";

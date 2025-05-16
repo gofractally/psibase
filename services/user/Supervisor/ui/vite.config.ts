@@ -14,7 +14,7 @@ export default defineConfig(({ command }) => ({
         createSharedViteConfig({
             projectDir: serviceDir,
         }),
-        ...createPsibaseConfig({
+        createPsibaseConfig({
             service: "supervisor",
             serviceDir,
             isServing: command === "serve"

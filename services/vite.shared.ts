@@ -1,9 +1,8 @@
 /// <reference types="node" />
 
-import { Plugin, UserConfig } from 'vite'
+import { Plugin, UserConfig, Alias } from 'vite'
 import path from 'path'
 import fs from 'fs'
-import alias from '@rollup/plugin-alias'
 
 const outDirParams = {
     outDir: 'dist',
@@ -104,14 +103,9 @@ interface ServerConfig {
     };
 }
 
-export interface buildAlias{
-    find: string | RegExp;
-    replacement: string;
-};
-
 const servicesDir = path.resolve(__dirname);
 
-export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
+export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
     const {
         uiFramework = "react",
         service,
@@ -124,19 +118,24 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
         additionalProxies = [],
     } = options;
 
-    const buildAliases: buildAlias[] = [
+    const buildAliases: Alias[] = [
+        {
+            find: "@",
+            replacement: path.resolve(serviceDir, "./src"),
+        },
         {
             find: /^\/common(?!\/(?:fonts))(.*)$/,
             replacement: path.resolve(`${servicesDir}/user/CommonApi/common/resources$1`),
         },
         {
-            find: "@",
-            replacement: path.resolve(serviceDir, "./src"),
+            find: /^@psibase\/common-lib.*$/,
+            replacement: "/common/common-lib.js",
         },
         ...additionalAliases,
     ];
 
     if (isServing) {
+        // TODO: this is contradictory to the above L131
         buildAliases.push({
             find: /^@psibase\/common-lib.*$/,
             replacement: path.resolve(
@@ -151,13 +150,9 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
         proxy: {
             ...additionalProxies,
             "/": {
-                // Q: need to support both?
                 target: `${useHttps ? 'https' : 'http'}://psibase.127.0.0.1.sslip.io:${proxyPort}/`,
-                // Q: needed?
                 changeOrigin: true,
-                // Q: needed?
                 secure: !useHttps,
-                // Q: needed?
                 autoRewrite: true,
                 timeout: 10000,
                 bypass: (req: any, _res: any, _opt: any) => {
@@ -170,7 +165,6 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
                         !req.url.startsWith("/common"),
                         !req.url.startsWith("/api"),
                     ];
-                    // following is just a big if statement
                     return req.url === "/" || [...baseConditions, ...additionalProxyBypassConditions].every(condition => 
                         typeof condition === 'function' ? condition(req) : condition
                     ) ? req.url : undefined;
@@ -192,36 +186,25 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
         };
     }
 
-    return [
-        {
-            name: "psibase",
-            config: () => ({
-                build: {
-                    ...(uiFramework !== "svelte" ? outDirParams : {}),
-                    assetsDir: "",
-                    cssCodeSplit: false,
-                    rollupOptions: {
-                        external: [
-                            "/common/rootdomain.mjs",
-                            "/common/common-lib.js",
-                        ],
-                        makeAbsoluteExternalsRelative: false,
-                    },
+    return {
+        name: "psibase",
+        config: () => ({
+            build: {
+                ...(uiFramework !== "svelte" ? outDirParams : {}),
+                assetsDir: "",
+                cssCodeSplit: false,
+                rollupOptions: {
+                    external: [
+                        "/common/rootdomain.mjs",
+                        "/common/common-lib.js",
+                    ],
+                    makeAbsoluteExternalsRelative: false,
                 },
-                // TODO: No server entry in Producers at all
-                server: baseServerConfig,
-                resolve: {
-                    alias: buildAliases,
-                },
-            }),
-        },
-        alias({
-            entries: [
-                {
-                    find: /^@psibase\/common-lib.*$/,
-                    replacement: "/common/common-lib.js",
-                },
-            ],
+            },
+            server: baseServerConfig,
+            resolve: {
+                alias: buildAliases,
+            },
         }),
-    ];
+    };
 }

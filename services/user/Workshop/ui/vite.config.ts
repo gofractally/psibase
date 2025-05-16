@@ -19,7 +19,7 @@ export default defineConfig(() => ({
           vendor: ['react', 'react-dom', 'react-router-dom']
       },
     }),
-    ...createPsibaseConfig({
+    createPsibaseConfig({
       service: "workshop",
       serviceDir,
       isServing: process.env.NODE_ENV === 'development'

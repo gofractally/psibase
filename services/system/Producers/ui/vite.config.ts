@@ -17,7 +17,7 @@ export default defineConfig(({ command }) => ({
             vendor: ['react', 'react-dom', 'react-router-dom']
         }
     }),
-    ...createPsibaseConfig({
+    createPsibaseConfig({
       service: "producers",
       serviceDir: serviceDir,
       isServing: command === "serve"

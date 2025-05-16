@@ -15,7 +15,7 @@ export default defineConfig({
       projectDir: serviceDir,
 
     }),
-    ...createPsibaseConfig({
+    createPsibaseConfig({
       service: "identity",
       serviceDir,
       isServing: process.env.NODE_ENV === 'development'

@@ -17,7 +17,6 @@
     "react-router-dom": "^6.23.1"
   },
   "devDependencies": {
-    "@rollup/plugin-alias": "^5.1.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^22.15.2",
     "@types/react": "^18.2.0",

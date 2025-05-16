@@ -57,13 +57,14 @@ export default defineConfig({
                 avatar: ['@dicebear/core', '@dicebear/collection']
             }
         }),
-        ...createPsibaseConfig({
+        createPsibaseConfig({
             service: "homepage",
             serviceDir,
             isServing: process.env.NODE_ENV === 'development',
         })
     ],
     resolve: {
+        // TODO: this is partially covered in vite.shared.ts. Combine them.
         alias: {
             '/common': path.resolve(serviceDir, '../../CommonApi/common'),
             '@psibase/common-lib': path.resolve(serviceDir, '../../CommonApi/common/packages/common-lib/src'),

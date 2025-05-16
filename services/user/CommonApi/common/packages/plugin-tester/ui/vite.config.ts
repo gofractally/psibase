@@ -19,12 +19,9 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: [
-      {
-        find: /^@psibase\/common-lib.*$/,
-        replacement: path.resolve("../../common-lib/src"),
-      },
-    ],
+    alias: {
+      '@psibase/common-lib/*': path.resolve(serviceDir, '../../CommonApi/common/packages/common-lib/src/*')
+    },
   },
   build: {
     sourcemap: true,
