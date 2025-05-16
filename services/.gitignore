@@ -1,0 +1,5 @@
+# Don't ignore yarn dev SDK files, but ignore all other .yarn stuff
+!.yarn/sdks/
+!.yarn/sdks/**
+.yarn
+**/.vite-cache

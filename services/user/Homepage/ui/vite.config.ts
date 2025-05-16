@@ -1,96 +1,74 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-import alias from "@rollup/plugin-alias";
-import svgr from "vite-plugin-svgr";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+import svgr from 'vite-plugin-svgr'
+import { fileURLToPath } from 'url'
+import { createSharedViteConfig, verifyViteCache, createPsibaseConfig } from '../../../vite.shared'
 
-const psibase = (appletContract: string, isServing?: boolean) => {
-    const buildAliases = [
-        {
-            find: "@",
-            replacement: path.resolve(__dirname, "./src"),
-        },
-    ];
+const __filename = fileURLToPath(import.meta.url)
 
-    if (isServing) {
-        buildAliases.push({
-            find: /^@psibase\/common-lib.*$/,
-            replacement: path.resolve(
-                "../../CommonApi/common/packages/common-lib/src"
-            ),
-        });
-    }
+const serviceDir = path.resolve(__dirname);
 
-    return [
-        {
-            name: "psibase",
-            config: () => {
-                return {
-                    build: {
-                        assetsDir: "",
-                        cssCodeSplit: false,
-                        rollupOptions: {
-                            external: [
-                                "/common/rootdomain.mjs",
-                                "/common/common-lib.js",
-                            ],
-                            makeAbsoluteExternalsRelative: false,
-                            output: {
-                                entryFileNames: "index.js",
-                                assetFileNames: "[name][extname]",
-                            },
-                        },
-                    },
-                    server: {
-                        host: "psibase.127.0.0.1.sslip.io",
-                        port: 8081,
-                        proxy: {
-                            "/": {
-                                target: "http://psibase.127.0.0.1.sslip.io:8079/",
-                                bypass: (req, _res, _opt) => {
-                                    const host = req.headers.host || "";
-                                    const subdomain = host.split(".")[0];
-                                    if (
-                                        subdomain === appletContract &&
-                                        req.method !== "POST" &&
-                                        req.headers.accept !==
-                                            "application/json" &&
-                                        !req.url.startsWith("/common") &&
-                                        !req.url.startsWith("/api")
-                                    ) {
-                                        return req.url;
-                                    }
-                                },
-                            },
-                        },
-                    },
-                    resolve: {
-                        alias: buildAliases,
-                    },
-                };
-            },
-        },
-        alias({
-            entries: [
-                {
-                    find: /^@psibase\/common-lib.*$/,
-                    replacement: "/common/common-lib.js",
-                },
-            ],
-        }),
-    ];
-};
+verifyViteCache(serviceDir);
 
-// https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig({
     plugins: [
         react(),
-        svgr({ exportAsDefault: true }),
-        psibase("psibase", command === "serve"),
+        svgr(),
+        createSharedViteConfig({
+            projectDir: serviceDir,
+            manualChunks: {
+                vendor: ['react', 'react-dom', 'react-router-dom']
+            },
+            additionalManualChunks: {
+                // Radix UI components
+                'radix-ui': [
+                    '@radix-ui/react-alert-dialog',
+                    '@radix-ui/react-avatar',
+                    '@radix-ui/react-collapsible',
+                    '@radix-ui/react-dialog',
+                    '@radix-ui/react-dropdown-menu',
+                    '@radix-ui/react-label',
+                    '@radix-ui/react-scroll-area',
+                    '@radix-ui/react-select',
+                    '@radix-ui/react-separator',
+                    '@radix-ui/react-slot',
+                    '@radix-ui/react-tabs',
+                    '@radix-ui/react-tooltip'
+                ],
+                // Animation libraries
+                animation: ['@react-spring/web', 'framer-motion'],
+                // Form handling
+                forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+                // UI utilities
+                'ui-utils': [
+                    'class-variance-authority',
+                    'clsx',
+                    'tailwind-merge',
+                    'tailwindcss-animate',
+                    'lucide-react',
+                    'sonner'
+                ],
+                // State management
+                state: ['jotai', 'usehooks-ts'],
+                // Date handling
+                date: ['dayjs'],
+                // Avatar generation
+                avatar: ['@dicebear/core', '@dicebear/collection']
+            }
+        }),
+        createPsibaseConfig({
+            service: "homepage",
+            serviceDir,
+            isServing: process.env.NODE_ENV === 'development',
+        })
     ],
     resolve: {
+        // TODO: this is partially covered in vite.shared.ts. Combine them.
         alias: {
-            "@": path.resolve(__dirname, "./src"),
-        },
-    },
-}));
+            '/common': path.resolve(serviceDir, '../../CommonApi/common'),
+            '@psibase/common-lib': path.resolve(serviceDir, '../../CommonApi/common/packages/common-lib/src'),
+            '@psibase/common-lib/*': path.resolve(serviceDir, '../../CommonApi/common/packages/common-lib/src/*')
+        }
+    }
+})
