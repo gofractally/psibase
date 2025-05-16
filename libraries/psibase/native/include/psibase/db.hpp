@@ -64,13 +64,19 @@ namespace psibase
    struct DatabaseCallbacks
    {
       std::function<void()> nextTransaction;
+      std::function<void()> runQueue;
       static const unsigned nextTransactionFlag = 1;
+      static const unsigned runQueueFlag        = 2;
       using Flags                               = unsigned;
       void run(Flags& flags)
       {
          if ((flags & nextTransactionFlag) != 0 && nextTransaction)
          {
             nextTransaction();
+         }
+         if ((flags & runQueueFlag) && runQueue)
+         {
+            runQueue();
          }
          flags = 0;
       }

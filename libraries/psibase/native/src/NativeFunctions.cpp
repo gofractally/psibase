@@ -286,6 +286,19 @@ namespace psibase
          }
       }
 
+      void verifySubjectiveRunTableRow(Database&          db,
+                                       psio::input_stream key,
+                                       psio::input_stream value)
+      {
+         // The runTable is only processed subjectively
+         if (psio::fracpack_validate<RunRow>({value.pos, value.end}))
+         {
+            auto row =
+                psio::view<const NotifyRow>(psio::prevalidated{std::span{value.pos, value.end}});
+            db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
+         }
+      }
+
       void verifyScheduledSnapshotRow(psio::input_stream key, psio::input_stream value)
       {
          check(psio::fracpack_validate_strict<ScheduledSnapshotRow>({value.pos, value.end}),
@@ -333,6 +346,8 @@ namespace psibase
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == notifyTable)
             verifySubjectiveNotifyTableRow(db, key, value);
+         else if (table == runTable)
+            verifySubjectiveRunTableRow(db, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }

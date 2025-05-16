@@ -1,10 +1,13 @@
 #define CATCH_CONFIG_MAIN
 
 #include <psibase/DefaultTestChain.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
+#include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VerifySig.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -88,5 +91,91 @@ TEST_CASE("Test login")
       req.headers.push_back({"Authorization", "Bearer " + token});
       auto user = t.http<std::optional<AccountNumber>>(req);
       CHECK(user == std::optional{alice});
+   }
+}
+
+TEST_CASE("Test push_transaction")
+{
+   DefaultTestChain t;
+
+   auto httpPush = [&](const SignedTransaction& trx)
+   {
+      return Result<void>(t.post<TransactionTrace>(Transact::service, "/push_transaction",
+                                                   FracPackBody{std::move(trx)}));
+   };
+
+   SECTION("No signature")
+   {
+      auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}));
+      CHECK(httpPush(trx).succeeded());
+      CHECK(t.from("alice"_a).to<Accounts>().exists("alice"_a).returnVal() == true);
+   }
+
+   SECTION("With signature")
+   {
+      auto alice    = t.addAccount("alice", aliceKeys.first);
+      auto accounts = transactor<Accounts>{alice, Accounts::service};
+      auto act      = accounts.setAuthServ(AuthAny::service);
+      auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
+      SECTION("Valid")
+      {
+         CHECK(httpPush(trx).succeeded());
+         CHECK(t.from("alice"_a).to<Accounts>().getAuthOf(alice).returnVal() == AuthAny::service);
+      }
+      SECTION("Invalid")
+      {
+         trx.proofs[0].clear();
+         CHECK(httpPush(trx).failed("signature invalid"));
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
+      SECTION("Missing")
+      {
+         trx.proofs.pop_back();
+         auto reply = t.post(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+         CHECK(reply.status == HttpStatus::internalServerError);
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
+      SECTION("Extra")
+      {
+         trx.proofs.push_back({});
+         auto reply = t.post(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+         CHECK(reply.status == HttpStatus::internalServerError);
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
+   }
+
+   SECTION("Change verify service")
+   {
+      auto           alice    = t.addAccount("alice", aliceKeys.first);
+      auto           accounts = transactor<Accounts>{alice, Accounts::service};
+      auto           act      = accounts.setAuthServ(AuthAny::service);
+      auto           trx = t.signTransaction(t.makeTransaction({std::move(act)}, 5), {aliceKeys});
+      constexpr auto verifysig = VerifySig::service;
+
+      t.setAutoRun(false);
+      auto reply =
+          t.asyncPost(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+      // Verify signatures
+      while (t.runQueueItem())
+      {
+      }
+
+      // Remove the verify service
+      REQUIRE(t.from(verifysig)
+                  .to<SetCode>()
+                  .setCode(verifysig, 0, 0, std::vector<char>())
+                  .succeeded());
+      t.startBlock();
+
+      // Now push the transaction
+      t.runAll();
+
+      auto trace = reply.get<TransactionTrace>();
+      CHECK(Result<void>(std::move(trace)).failed("service account has no code"));
    }
 }
