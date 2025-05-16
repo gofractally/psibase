@@ -154,7 +154,7 @@ TEST_CASE("Test push_transaction")
       auto           alice    = t.addAccount("alice", aliceKeys.first);
       auto           accounts = transactor<Accounts>{alice, Accounts::service};
       auto           act      = accounts.setAuthServ(AuthAny::service);
-      auto           trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
+      auto           trx = t.signTransaction(t.makeTransaction({std::move(act)}, 5), {aliceKeys});
       constexpr auto verifysig = VerifySig::service;
 
       t.setAutoRun(false);

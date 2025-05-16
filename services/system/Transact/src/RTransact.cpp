@@ -1,6 +1,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
+#include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 
 #include <psibase/dispatch.hpp>
@@ -11,6 +12,9 @@ using namespace SystemService;
 
 namespace
 {
+   // Must be run inside PSIBASE_SUBJECTIVE_TX
+   void scheduleVerify(const Checksum256& id, const SignedTransaction& trx);
+
    // Tell native that a transaction is ready.
    // Must be run inside a subjective transaction.
    void setTransactionReady()
@@ -54,6 +58,32 @@ namespace
       }
    }
 
+   // Flushes the transaction queue and schedules all the
+   // transactions in it to have their signatures verified again.
+   // verifyId identifies the set of verify services.
+   //
+   // must be run inside a subjective-tx.
+   std::uint64_t flushTransactions(ReverifySignaturesTable& reverify, const Checksum256& verifyId)
+   {
+      auto available     = RTransact{}.open<AvailableSequenceTable>();
+      auto nextAvailable = available.get({}).value_or(AvailableSequenceRecord{0}).nextSequence;
+      reverify.put({.endSequence = nextAvailable, .verifyId = verifyId});
+
+      transactor<RTransact> rtransact{RTransact::service, RTransact::service};
+      RunRow                row{
+                         .id      = 0,
+                         .mode    = RunMode::rpc,
+                         .maxTime = std::chrono::milliseconds(0),
+                         .action  = rtransact.requeue(),
+                         .continuation = {.service = RTransact::service, .method = MethodNumber{"onRequeue"}},
+      };
+      if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
+         row.id = prev->id + 1;
+
+      kvPut(RunRow::db, row.key(), row);
+      return nextAvailable;
+   }
+
    void validateTransaction(const SignedTransaction& trx)
    {
       check(trx.transaction->claims().size() == trx.proofs.size(),
@@ -66,19 +96,23 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto unapplied    = WriteOnly{}.open<UnappliedTransactionTable>();
+   auto reverify     = open<ReverifySignaturesTable>();
    auto nextSequence = unapplied.get({}).value_or(UnappliedTransactionRecord{0}).nextSequence;
    auto included     = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
    std::optional<SignedTransaction> result;
 
-   // if the verify services have changed, flush the queue,
-   // and start verifying signatures from scratch.
-   //
-   // getStatus().current.consensusState == saved consensus state
+   auto verifyId = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
 
    PSIBASE_SUBJECTIVE_TX
    {
-      auto table = Subjective{}.open<PendingTransactionTable>();
-      auto index = table.getIndex<1>();
+      auto invalidated = reverify.get({}).value_or(ReverifySignaturesRecord{0});
+      if (invalidated.verifyId != verifyId)
+      {
+         invalidated.endSequence = flushTransactions(reverify, verifyId);
+      }
+      nextSequence = std::max(nextSequence, invalidated.endSequence);
+      auto table   = Subjective{}.open<PendingTransactionTable>();
+      auto index   = table.getIndex<1>();
       for (auto iter = index.lower_bound(nextSequence), end = index.end(); iter != end; ++iter)
       {
          auto item    = *iter;
@@ -240,6 +274,31 @@ namespace
       setTransactionReady();
    }
 
+   // Checks whether the set of verify services has changed
+   // and flushes the transaction queue if they have.
+   // Should be run at the end of a block.
+   void checkReverify(const Checksum256& headId)
+   {
+      auto verifyIdTable = RTransact{}.open<VerifyIdTable>();
+      auto verifySeq     = to<SetCode>().verifySeq();
+      auto verifyId      = verifyIdTable.get({}).value_or(VerifyIdRecord{});
+      if (verifyId.verifyCodeSequence != verifySeq)
+      {
+         verifyId = {verifySeq, headId};
+         verifyIdTable.put(verifyId);
+      }
+
+      auto reverify = RTransact{}.open<ReverifySignaturesTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto row = reverify.get({}).value_or(ReverifySignaturesRecord{});
+         if (verifyId.verifyId != row.verifyId)
+         {
+            flushTransactions(reverify, verifyId.verifyId);
+         }
+      }
+   }
+
    struct TrxReply
    {
       std::optional<TraceClientRow> row;
@@ -327,6 +386,12 @@ void RTransact::onBlock()
    auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    if (!stat)
       return;
+
+   if (stat->head)
+   {
+      checkReverify(stat->head->blockId);
+   }
+
    auto commitNum  = stat->current.commitNum;
    auto reversible = WriteOnly{}.open<ReversibleBlocksTable>();
    reversible.put({.blockNum = stat->current.blockNum, .time = stat->current.time});
@@ -417,6 +482,14 @@ void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> tr
    if (errorReply)
    {
       errorReply.send(trace);
+   }
+}
+
+void RTransact::onRequeue(std::uint64_t id, psio::view<const TransactionTrace> trace)
+{
+   PSIBASE_SUBJECTIVE_TX
+   {
+      kvRemove(RunRow::db, runKey(id));
    }
 }
 
@@ -720,6 +793,35 @@ namespace
    }
 
 }  // namespace
+
+void RTransact::requeue()
+{
+   auto reverify = RTransact{}.open<ReverifySignaturesTable>();
+   auto txdata   = RTransact{}.open<TransactionDataTable>();
+   // TODO: Split this into smaller transactions to reduce interference
+   PSIBASE_SUBJECTIVE_TX
+   {
+      std::uint64_t nextSequence = 0;
+      auto          endSequence = reverify.get({}).value_or(ReverifySignaturesRecord{}).endSequence;
+
+      auto table = RTransact{}.open<PendingTransactionTable>();
+      auto index = table.getIndex<1>();
+      for (auto iter = index.lower_bound(nextSequence), end = index.end(); iter != end; ++iter)
+      {
+         auto item = *iter;
+         auto data = txdata.get(item.id);
+         check(!!data, "Missing transaction data");
+
+         scheduleVerify(item.id, data->trx);
+
+         table.remove(item);
+
+         nextSequence = item.sequence + 1;
+         if (nextSequence >= endSequence)
+            break;
+      }
+   }
+}
 
 void RTransact::recv(const SignedTransaction& trx)
 {
