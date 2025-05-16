@@ -5,7 +5,9 @@
 #include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
+#include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VerifySig.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -145,5 +147,35 @@ TEST_CASE("Test push_transaction")
          CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
                AuthSig::AuthSig::service);
       }
+   }
+
+   SECTION("Change verify service")
+   {
+      auto           alice    = t.addAccount("alice", aliceKeys.first);
+      auto           accounts = transactor<Accounts>{alice, Accounts::service};
+      auto           act      = accounts.setAuthServ(AuthAny::service);
+      auto           trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
+      constexpr auto verifysig = VerifySig::service;
+
+      t.setAutoRun(false);
+      auto reply =
+          t.asyncPost(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+      // Verify signatures
+      while (t.runQueueItem())
+      {
+      }
+
+      // Remove the verify service
+      REQUIRE(t.from(verifysig)
+                  .to<SetCode>()
+                  .setCode(verifysig, 0, 0, std::vector<char>())
+                  .succeeded());
+      t.startBlock();
+
+      // Now push the transaction
+      t.runAll();
+
+      auto trace = reply.get<TransactionTrace>();
+      CHECK(Result<void>(std::move(trace)).failed("service account has no code"));
    }
 }

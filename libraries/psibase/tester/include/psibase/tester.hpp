@@ -162,6 +162,62 @@ namespace psibase
       T                 value;
    };
 
+   template <typename R>
+   R unpackReply(HttpReply&& response)
+   {
+      if constexpr (std::is_convertible_v<HttpReply, R>)
+      {
+         return std::move(response);
+      }
+      else
+      {
+         if (response.status != HttpStatus::ok)
+         {
+            if (response.contentType == "text/html")
+            {
+               abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
+                            std::string(response.body.begin(), response.body.end()));
+            }
+            else
+            {
+               abortMessage("Request returned " +
+                            std::to_string(static_cast<std::uint16_t>(response.status)));
+            }
+         }
+         if (response.contentType != "application/json")
+            abortMessage("Wrong Content-Type " + response.contentType);
+         response.body.push_back('\0');
+         psio::json_token_stream stream(response.body.data());
+         return psio::from_json<R>(stream);
+      }
+   }
+
+   struct AsyncHttpReply
+   {
+      std::int32_t             fd;
+      std::optional<HttpReply> poll();
+      template <typename R>
+      std::optional<R> poll()
+      {
+         if (auto reply = poll())
+         {
+            return unpackReply<R>(std::move(*reply));
+         }
+         else
+         {
+            return {};
+         }
+      }
+      template <typename R = HttpReply>
+      R get()
+      {
+         auto reply = poll();
+         if (!reply)
+            abortMessage("HTTP response not available");
+         return unpackReply<R>(std::move(*reply));
+      }
+   };
+
    /**
     * Manages a chain.
     * The test chain uses simulated time.
@@ -348,32 +404,7 @@ namespace psibase
       template <typename R>
       R http(const HttpRequest& request)
       {
-         auto response = http(request);
-         if constexpr (std::is_convertible_v<HttpReply, R>)
-         {
-            return response;
-         }
-         else
-         {
-            if (response.status != HttpStatus::ok)
-            {
-               if (response.contentType == "text/html")
-               {
-                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
-                               std::string(response.body.begin(), response.body.end()));
-               }
-               else
-               {
-                  abortMessage("Request returned " +
-                               std::to_string(static_cast<std::uint16_t>(response.status)));
-               }
-            }
-            if (response.contentType != "application/json")
-               abortMessage("Wrong Content-Type " + response.contentType);
-            response.body.push_back('\0');
-            psio::json_token_stream stream(response.body.data());
-            return psio::from_json<R>(stream);
-         }
+         return unpackReply<R>(http(request));
       }
 
       template <typename R = HttpReply, typename T>
@@ -386,6 +417,17 @@ namespace psibase
       R get(AccountNumber account, std::string_view target)
       {
          return http<R>(makeGet(account, target));
+      }
+
+      AsyncHttpReply asyncHttp(const HttpRequest& request);
+      template <typename T>
+      AsyncHttpReply asyncPost(AccountNumber account, std::string_view target, const T& data)
+      {
+         return asyncHttp(makePost(account, target, data));
+      }
+      AsyncHttpReply asyncGet(AccountNumber account, std::string_view target)
+      {
+         return asyncHttp(makeGet(account, target));
       }
 
       template <typename Action>

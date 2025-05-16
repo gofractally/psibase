@@ -207,6 +207,11 @@ void psibase::TestChain::setAutoBlockStart(bool enable)
    isAutoBlockStart = enable;
 }
 
+void psibase::TestChain::setAutoRun(bool enable)
+{
+   isAutoRun = enable;
+}
+
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
    auto time = status ? status->current.time : TimePointSec{};
@@ -343,7 +348,7 @@ void psibase::TestChain::runAll()
    }
 }
 
-psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
+psibase::AsyncHttpReply psibase::TestChain::asyncHttp(const HttpRequest& request)
 {
    if (producing && isAutoBlockStart)
       finishBlock();
@@ -352,12 +357,18 @@ psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
    auto fd = tester::raw::httpRequest(id, packed_request.data(), packed_request.size());
    if (isAutoRun)
       runAll();
+
+   return AsyncHttpReply{fd};
+}
+
+std::optional<psibase::HttpReply> psibase::AsyncHttpReply::poll()
+{
    std::size_t size;
    if (auto err = tester::raw::socketRecv(fd, &size))
    {
       if (err == EAGAIN)
       {
-         abortMessage("Query did not return a synchronous response");
+         return {};
       }
       else
       {
@@ -365,7 +376,13 @@ psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
       }
    }
 
+   fd = -1;
    return psio::from_frac<HttpReply>(getResult(size));
+}
+
+psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
+{
+   return asyncHttp(request).get();
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
