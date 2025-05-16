@@ -38,19 +38,19 @@ struct FractallyPlugin;
 
 impl Api for FractallyPlugin {
     fn register(evaluation_id: u32) -> Result<(), Error> {
-        register("fractals", evaluation_id)
+        register(&"fractals".to_string(), evaluation_id)
     }
 
     fn unregister(evaluation_id: u32) -> Result<(), Error> {
-        unregister("fractals", evaluation_id)
+        unregister(&"fractals".to_string(), evaluation_id)
     }
 
     fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<String>>, Error> {
-        match get_proposal("fractals", evaluation_id, group_number)? {
+        match get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
             None => Ok(None),
             Some(rank_numbers) => {
                 let users: Vec<AccountNumber> =
-                    get_group_users("fractals", evaluation_id, group_number)?
+                    get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
                         .iter()
                         .map(|account| AccountNumber::from_str(account).unwrap())
                         .collect();
@@ -66,16 +66,16 @@ impl Api for FractallyPlugin {
     }
 
     fn attest(evaluation_id: u32, group_number: u32) -> Result<(), Error> {
-        attest("fractals", evaluation_id, group_number)
+        attest(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn get_group_users(evaluation_id: u32, group_number: u32) -> Result<Vec<String>, Error> {
-        get_group_users("fractals", evaluation_id, group_number)
+        get_group_users(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn propose(evaluation_id: u32, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
         let all_users: Vec<AccountNumber> =
-            get_group_users("fractals", evaluation_id, group_number)?
+            get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
                 .iter()
                 .map(|account| AccountNumber::from_str(account).unwrap())
                 .collect();
@@ -90,7 +90,7 @@ impl Api for FractallyPlugin {
             .map(|num| num.to_string())
             .collect();
 
-        propose("fractals", evaluation_id, group_number, &res)
+        propose(&"fractals".to_string(), evaluation_id, group_number, &res)
     }
 
     fn set_schedule(
