@@ -63,15 +63,16 @@ mod service {
     ///
     /// # Arguments
     /// * `members` - The members of the group
-    /// * `keys` - The symmetric decryption key, encrypted for each user in the group using their public encryption key
-    /// * `key_digest` - The sha256 hash of the symmetric key, used for each member to verify their decrypted symmetric key
+    /// * `secrets` - The secret, encrypted for each user in the group using their public encryption key.
+    ///               This secret is used with a KDF to generate the symmetric key for the group.
+    /// * `key_digest` - The sha256 hash of the symmetric key, used for each member to verify their decrypted symmetric key.
     /// * `expiry` - The time at which the group is closed (no more messages can be sent) and can be deleted by anyone.
     /// * `name` - The name of the group (encrypted)
     /// * `description` - The description of the group (encrypted)
     #[action]
     fn create_group(
         members: Vec<AccountNumber>,
-        keys: Vec<Vec<u8>>,
+        secrets: Vec<Vec<u8>>,
         key_digest: Checksum256,
         expiry: Option<TimePointSec>,
         name: Option<Vec<u8>>,
@@ -101,14 +102,15 @@ mod service {
 
     /// Rotate the key for a group. Only callable by a group member.
     ///
-    /// The order of the keys must match the ordering of the accounts in the group
+    /// The order of the secrets must match the ordering of the accounts in the group
     ///
     /// # Arguments
     /// * `id` - The group id
-    /// * `keys` - The new symmetric keys, encrypted for each user in the group using their public encryption key
+    /// * `secrets` - The secret, encrypted for each user in the group using their public encryption key.
+    ///               This secret is used with a KDF to generate the symmetric key for the group.
     /// * `key_digest` - The sha256 hash of the new symmetric key, used for each member to verify their decrypted symmetric key
     #[action]
-    fn rotate_key(id: Checksum256, keys: Vec<Vec<u8>>, key_digest: Checksum256) {
+    fn rotate_key(id: Checksum256, secrets: Vec<Vec<u8>>, key_digest: Checksum256) {
         unimplemented!()
     }
 }

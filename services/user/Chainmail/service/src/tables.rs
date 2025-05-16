@@ -61,7 +61,7 @@ pub mod tables {
     pub struct UserGroup {
         pub member: AccountNumber,
         pub group_id: Checksum256,
-        pub key: Vec<u8>,
+        pub secret: Vec<u8>,
     }
 
     impl UserGroup {
@@ -75,7 +75,7 @@ pub mod tables {
             (self.group_id.clone(), self.member)
         }
 
-        pub fn add(member: AccountNumber, group_id: Checksum256, key: Vec<u8>) {
+        pub fn add(member: AccountNumber, group_id: Checksum256, secret: Vec<u8>) {
             let group = GroupTable::new().get_index_pk().get(&group_id);
             check(group.is_some(), "group does not exist");
 
@@ -87,15 +87,15 @@ pub mod tables {
                 .put(&UserGroup {
                     member,
                     group_id,
-                    key,
+                    secret,
                 })
                 .unwrap();
         }
 
-        pub fn set_key(&mut self, key: Vec<u8>) {
-            check(key.len() > 0, "key must be non-empty");
+        pub fn set_secret(&mut self, secret: Vec<u8>) {
+            check(secret.len() > 0, "secret must be non-empty");
 
-            self.key = key;
+            self.secret = secret;
             UserGroupsTable::new().put(&self).unwrap();
         }
     }
@@ -119,7 +119,7 @@ pub mod tables {
     impl Group {
         pub fn add(
             users: Vec<AccountNumber>,
-            keys: Vec<Vec<u8>>,
+            secrets: Vec<Vec<u8>>,
             key_digest: Checksum256,
             expiry: Option<TimePointSec>,
             name: Option<Vec<u8>>,
@@ -173,7 +173,7 @@ pub mod tables {
             group_table.put(&group).unwrap();
 
             for (i, user) in users.into_iter().enumerate() {
-                UserGroup::add(user, id.clone(), keys[i].clone());
+                UserGroup::add(user, id.clone(), secrets[i].clone());
             }
 
             (true, id)
@@ -224,11 +224,11 @@ pub mod tables {
             GroupTable::new().remove(&self);
         }
 
-        pub fn rotate_key(&mut self, keys: Vec<Vec<u8>>, key_digest: Checksum256) {
+        pub fn rotate_key(&mut self, secrets: Vec<Vec<u8>>, key_digest: Checksum256) {
             let members = self.get_members();
             check(
-                members.len() == keys.len(),
-                "All members need the symmetric key",
+                members.len() == secrets.len(),
+                "All members need the secret to generate the symmetric key",
             );
 
             self.key_rotated = now();
@@ -236,7 +236,7 @@ pub mod tables {
             GroupTable::new().put(&self).unwrap();
 
             for (i, mut member) in members.into_iter().enumerate() {
-                member.set_key(keys[i].clone());
+                member.set_secret(secrets[i].clone());
             }
         }
 

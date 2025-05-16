@@ -63,6 +63,28 @@ mod service {
                 .collect::<Vec<_>>()
         }
 
+        /// Gets information about a particular private messaging group.
+        async fn get_group_info(&self, group_id: Checksum256) -> Option<Group> {
+            GroupTable::with_service(chainmail::SERVICE)
+                .get_index_pk()
+                .get(&group_id)
+        }
+
+        /// Gets the secret for a particular user in a private messaging group.
+        /// The secret can be decrypted with the user's private key, and then used
+        /// with a KDF to generate the group's symmetric key for message
+        /// encryption/decryption.
+        async fn get_group_secret(
+            &self,
+            user: AccountNumber,
+            group_id: Checksum256,
+        ) -> Option<Vec<u8>> {
+            UserGroupsTable::with_service(chainmail::SERVICE)
+                .get_index_pk()
+                .get(&(user, group_id))
+                .map(|group| group.secret)
+        }
+
         /// Gets historical events related to a particular private messaging group.
         ///
         /// Events:
