@@ -20,7 +20,7 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     struct EvaluationFinish {
-        owner: AccountNumber,
+        fractal_account: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
     }

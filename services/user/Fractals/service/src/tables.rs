@@ -553,15 +553,10 @@ pub mod tables {
         }
 
         pub fn save_pending_score(&mut self) {
-            self.value = calculate_ema(
-                check_some(
-                    self.pending,
-                    "tried saving a pending score that does not exist",
-                ),
-                self.value,
-                0.2,
-            );
-            self.save();
+            if self.pending.is_some() {
+                self.value = calculate_ema(self.pending.unwrap(), self.value, 0.2);
+                self.save();
+            }
         }
 
         pub fn save(&self) {

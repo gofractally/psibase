@@ -9,6 +9,7 @@ import {
 } from "@/lib/graphql/evaluations/getUsersAndGroups";
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
+import { Account } from "@/lib/zod/Account";
 
 import { assertUser } from "../useCurrentUser";
 
@@ -24,6 +25,36 @@ export const useUsersAndGroups = (
             return getUsersAndGroups(fractalsService, evaluationId!);
         },
     });
+
+export const updateParticipants = (
+    evaluationId: number,
+    user: Account,
+    add = true,
+) => {
+    queryClient.setQueryData(
+        QueryKey.usersAndGroups(evaluationId),
+        (data: any) => {
+            if (data) {
+                const existingData = UsersAndGroupsResponse.parse(data);
+
+                const res: z.infer<typeof UsersAndGroupsResponse> = {
+                    ...existingData,
+                    users: [
+                        ...existingData.users,
+                        {
+                            attestation: null,
+                            evaluationId,
+                            groupNumber: null,
+                            proposal: null,
+                            user,
+                        },
+                    ].filter((userData) => add || userData.user !== user),
+                };
+                return res;
+            }
+        },
+    );
+};
 
 export const updateAttestation = (
     evaluationId: number,

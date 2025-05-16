@@ -72,7 +72,7 @@ export function AppSwitcher() {
                                 <span className="truncate font-semibold">
                                     {fractal
                                         ? fractal?.fractal?.name
-                                        : currentFractal}
+                                        : currentFractal || "Explore"}
                                 </span>
                                 {fractal && (
                                     <span className="truncate text-xs">
@@ -105,9 +105,11 @@ export function AppSwitcher() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
 
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">
-                            Fractals
-                        </DropdownMenuLabel>
+                        {fractals && fractals?.length > 0 && (
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                Fractals
+                            </DropdownMenuLabel>
+                        )}
                         {fractals?.map((fractal) => {
                             const metadata = zFractal.safeParse(
                                 queryClient.getQueryData(
@@ -144,7 +146,9 @@ export function AppSwitcher() {
                                 </DropdownMenuItem>
                             );
                         })}
-                        <DropdownMenuSeparator />
+                        {fractals && fractals.length > 0 && (
+                            <DropdownMenuSeparator />
+                        )}
                         <DropdownMenuItem
                             className="gap-2 p-2"
                             onClick={() => {
@@ -155,7 +159,7 @@ export function AppSwitcher() {
                                 <Plus className="size-4" />
                             </div>
                             <div className="font-medium text-muted-foreground">
-                                Add or create fractal
+                                Create fractal
                             </div>
                         </DropdownMenuItem>
                     </DropdownMenuContent>

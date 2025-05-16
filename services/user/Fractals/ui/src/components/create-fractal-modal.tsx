@@ -61,7 +61,7 @@ export const CreateFractalModal = ({
                             name="account"
                             children={(field) => (
                                 <field.TextField
-                                    label="Account name"
+                                    label="Username"
                                     description="Unique identifier"
                                 />
                             )}
@@ -69,10 +69,7 @@ export const CreateFractalModal = ({
                         <form.AppField
                             name="name"
                             children={(field) => (
-                                <field.TextField
-                                    label="Name"
-                                    description="Display name"
-                                />
+                                <field.TextField label="Name" />
                             )}
                         />
                         <form.AppField

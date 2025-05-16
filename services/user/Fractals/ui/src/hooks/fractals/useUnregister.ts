@@ -1,9 +1,15 @@
+import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
 import { fractalsService } from "@/lib/constants";
+import QueryKey from "@/lib/queryKeys";
+
+import { assertUser } from "../useCurrentUser";
+import { updateParticipants } from "./useUsersAndGroups";
 
 const Params = z.object({
     evaluationId: z.number(),
@@ -12,14 +18,20 @@ const Params = z.object({
 export const useUnregister = () =>
     useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
+            updateParticipants(params.evaluationId, assertUser(), false);
+
             void (await getSupervisor().functionCall({
                 method: "unregister",
                 service: fractalsService,
                 intf: "api",
                 params: [params.evaluationId],
             }));
-
-            // TODO:
-            // addUserToCache(params.owner, params.id, currentUser);
+        },
+        onError: (error, params) => {
+            updateParticipants(params.evaluationId, assertUser(), true);
+            toast.error(error.message);
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.usersAndGroups(params.evaluationId),
+            });
         },
     });

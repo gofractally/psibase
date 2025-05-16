@@ -278,11 +278,10 @@ pub mod impls {
 
         pub fn get_groups(&self) -> Vec<Group> {
             let table = GroupTable::new();
-            let result = table
+            table
                 .get_index_pk()
                 .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
-                .collect();
-            result
+                .collect()
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
@@ -337,16 +336,12 @@ pub mod impls {
 
         pub fn assert_status(&self, expected_status: EvaluationStatus) {
             let current_phase = self.get_current_phase();
-            let phase_name = match current_phase {
-                EvaluationStatus::Pending => "Pending",
-                EvaluationStatus::Registration => "Registration",
-                EvaluationStatus::Deliberation => "Deliberation",
-                EvaluationStatus::Submission => "Submission",
-                EvaluationStatus::Closed => "Closed",
-            };
             psibase::check(
                 current_phase == expected_status,
-                format!("evaluation must be in {phase_name} phase").as_str(),
+                format!(
+                    "invalid evaluation phase, expected: {expected_status} actual: {current_phase}"
+                )
+                .as_str(),
             );
         }
 

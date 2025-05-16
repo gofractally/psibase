@@ -1,25 +1,24 @@
+import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
 import { fractalsService } from "@/lib/constants";
+import QueryKey from "@/lib/queryKeys";
 
-import { useCurrentUser } from "../useCurrentUser";
+import { assertUser } from "../useCurrentUser";
+import { updateParticipants } from "./useUsersAndGroups";
 
 const Params = z.object({
     evaluationId: z.number(),
 });
 
 export const useRegister = () => {
-    const { data: currentUser } = useCurrentUser();
     return useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
-            if (!currentUser) {
-                throw new Error("User not found");
-            }
-
-            console.log({ params }, "are the params");
+            updateParticipants(params.evaluationId, assertUser(), true);
 
             void (await getSupervisor().functionCall({
                 method: "register",
@@ -27,9 +26,13 @@ export const useRegister = () => {
                 intf: "api",
                 params: [params.evaluationId],
             }));
-
-            // TODO:
-            // addUserToCache(params.owner, params.id, currentUser);
+        },
+        onError: (error, params) => {
+            updateParticipants(params.evaluationId, assertUser(), false);
+            toast.error(error.message);
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.usersAndGroups(params.evaluationId),
+            });
         },
     });
 };
