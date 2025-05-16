@@ -16,8 +16,8 @@ use psibase::{
     AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, Checksum256,
     DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta,
     PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
-    PackageRegistry, PackagedService, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload,
-    Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
     TransactionTrace, Version,
 };
 use regex::Regex;
@@ -126,6 +126,21 @@ struct BootArgs {
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
     compression_level: u32,
+}
+
+#[derive(Args, Debug)]
+struct PushArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Actions to push
+    actions: Vec<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -455,6 +470,9 @@ enum Command {
     /// Boot a development chain
     Boot(BootArgs),
 
+    /// Push a transaction to the chain
+    Push(PushArgs),
+
     /// Create or modify an account
     Create(CreateArgs),
 
@@ -574,6 +592,75 @@ fn finish_progress(sig_args: &SigArgs, progress: ProgressBar, num_transactions: 
     } else {
         progress.finish_with_message("Ok");
     }
+}
+
+async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut actions: Vec<PrettyAction> = Vec::new();
+
+    if args.actions.is_empty() {
+        args.actions.push("-".to_string().into());
+    }
+
+    for file in args.actions {
+        let contents = if file.as_os_str() == "-" {
+            std::io::read_to_string(std::io::stdin().lock())?
+        } else {
+            std::io::read_to_string(
+                File::open(&file).with_context(|| format!("Cannot open {}", file.display()))?,
+            )?
+        };
+        let mut new_actions: Vec<PrettyAction> = serde_json::from_str(&contents)?;
+        actions.append(&mut new_actions);
+    }
+
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
+    let mut schemas = SchemaMap::new();
+
+    for action in &actions {
+        if !schemas.contains_key(&action.service) {
+            schemas.insert(
+                action.service,
+                crate::as_json(
+                    client.get(
+                        packages::SERVICE
+                            .url(&args.node_args.api)?
+                            .join(&format!("/schema?service={}", action.service))?,
+                    ),
+                )
+                .await?,
+            );
+        }
+    }
+
+    let actions: Vec<Action> = actions
+        .into_iter()
+        .map(|act| act.into_action(&schemas))
+        .collect::<Result<_, _>>()?;
+
+    let trx = with_tapos(
+        &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
+        actions,
+        &args.sig_args.proposer,
+        true,
+    );
+
+    progress.set_message("Pushing transaction");
+
+    push_transaction(
+        &args.node_args.api,
+        client,
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        args.tx_args.trace,
+        args.tx_args.console,
+        Some(&progress),
+    )
+    .await?;
+
+    finish_progress(&args.sig_args, progress, 1);
+    Ok(())
 }
 
 async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
@@ -2069,6 +2156,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
     match command {
         Command::Boot(args) => boot(&args).await?,
+        Command::Push(args) => push(args).await?,
         Command::Create(args) => create(&args).await?,
         Command::Modify(args) => modify(&args).await?,
         Command::Deploy(args) => deploy(&args).await?,

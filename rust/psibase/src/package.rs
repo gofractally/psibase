@@ -221,7 +221,7 @@ pub struct PrettyAction {
 }
 
 impl PrettyAction {
-    fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+    pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
         let raw_data = match self.raw_data {
             Some(raw_data) => raw_data,
             None => {
