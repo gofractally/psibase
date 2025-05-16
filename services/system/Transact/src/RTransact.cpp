@@ -53,6 +53,13 @@ namespace
          }
       }
    }
+
+   void validateTransaction(const SignedTransaction& trx)
+   {
+      check(trx.transaction->claims().size() == trx.proofs.size(),
+            "proofs and claims must have same size");
+   }
+
 }  // namespace
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
@@ -717,6 +724,7 @@ namespace
 void RTransact::recv(const SignedTransaction& trx)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
+   validateTransaction(trx);
    auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
    if (pushTransaction(id, trx))
       forwardTransaction(trx);
@@ -766,8 +774,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
    {
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
-      auto trx  = psio::from_frac<SignedTransaction>(request.body);
-      auto id   = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      auto trx = psio::from_frac<SignedTransaction>(request.body);
+      auto id  = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      validateTransaction(trx);
       bool json = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {

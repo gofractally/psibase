@@ -1452,6 +1452,18 @@ struct callbacks
       {
          socket->logResponse();
       }
+      else if (!tc.ownedSockets.owns(*chain.sys->sockets, *socket))
+      {
+         trace.error  = atrace.error;
+         auto  error  = trace.error;
+         auto& logger = chain.logger;
+         BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+         if (error)
+            PSIBASE_LOG(logger, warning)
+                << psibase::proxyServiceNum.str() << "::serve failed: " << *error;
+         else
+            PSIBASE_LOG(logger, info) << psibase::proxyServiceNum.str() << "::serve succeeded";
+      }
 
       return fd;
    }

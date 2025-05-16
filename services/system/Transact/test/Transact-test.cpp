@@ -117,19 +117,33 @@ TEST_CASE("Test push_transaction")
       auto accounts = transactor<Accounts>{alice, Accounts::service};
       auto act      = accounts.setAuthServ(AuthAny::service);
       auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
-      CHECK(httpPush(trx).succeeded());
-      CHECK(t.from("alice"_a).to<Accounts>().getAuthOf(alice).returnVal() == AuthAny::service);
-   }
-
-   SECTION("Invalid signature")
-   {
-      auto alice    = t.addAccount("alice", aliceKeys.first);
-      auto accounts = transactor<Accounts>{alice, Accounts::service};
-      auto act      = accounts.setAuthServ(AuthAny::service);
-      auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}), {aliceKeys});
-      trx.proofs[0].clear();
-      CHECK(httpPush(trx).failed("signature invalid"));
-      CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
-            AuthSig::AuthSig::service);
+      SECTION("Valid")
+      {
+         CHECK(httpPush(trx).succeeded());
+         CHECK(t.from("alice"_a).to<Accounts>().getAuthOf(alice).returnVal() == AuthAny::service);
+      }
+      SECTION("Invalid")
+      {
+         trx.proofs[0].clear();
+         CHECK(httpPush(trx).failed("signature invalid"));
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
+      SECTION("Missing")
+      {
+         trx.proofs.pop_back();
+         auto reply = t.post(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+         CHECK(reply.status == HttpStatus::internalServerError);
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
+      SECTION("Extra")
+      {
+         trx.proofs.push_back({});
+         auto reply = t.post(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+         CHECK(reply.status == HttpStatus::internalServerError);
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
    }
 }
