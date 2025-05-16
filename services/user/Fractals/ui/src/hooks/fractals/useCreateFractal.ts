@@ -20,17 +20,21 @@ const Params = z.object({
 });
 
 export const useCreateFractal = () =>
-    useMutation<null, Error, z.infer<typeof Params>>({
+    useMutation<undefined, Error, z.infer<typeof Params>>({
         mutationKey: QueryKey.createFractal(),
         mutationFn: async (params) => {
             const { account, mission, name } = Params.parse(params);
-            void (await supervisor.functionCall({
-                method: "createFractal",
-                params: [zAccount.parse(account), name, mission],
-                service: fractalsService,
-                intf: "api",
-            }));
-            return null;
+            toast.promise(
+                async () => {
+                    void (await supervisor.functionCall({
+                        method: "createFractal",
+                        params: [zAccount.parse(account), name, mission],
+                        service: fractalsService,
+                        intf: "api",
+                    }));
+                },
+                { description: `Created fractal ${name || account}` },
+            );
         },
         onSuccess: (_, { account, mission, name }) => {
             queryClient.setQueryData(
@@ -38,7 +42,6 @@ export const useCreateFractal = () =>
                 () => AccountNameStatus.Enum.Taken,
             );
 
-            queryClient.setQueryData(QueryKey.fractal(account), () => null);
             setTimeout(() => {
                 queryClient.invalidateQueries({
                     queryKey: QueryKey.fractal(account),

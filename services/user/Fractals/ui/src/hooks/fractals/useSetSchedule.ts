@@ -1,5 +1,6 @@
 import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
@@ -38,21 +39,26 @@ export const useSetSchedule = () =>
                 evalType,
             } = Params.parse(params);
 
-            void (await supervisor.functionCall({
-                method: "setSchedule",
-                params: [
-                    evalType,
-                    fractal,
-                    registration,
-                    deliberation,
-                    submission,
-                    finishBy,
-                    intervalSeconds,
-                    forceDelete,
-                ],
-                service: fractalsService,
-                intf: "api",
-            }));
+            toast.promise(
+                async () => {
+                    void (await supervisor.functionCall({
+                        method: "setSchedule",
+                        params: [
+                            evalType,
+                            fractal,
+                            registration,
+                            deliberation,
+                            submission,
+                            finishBy,
+                            intervalSeconds,
+                            forceDelete,
+                        ],
+                        service: fractalsService,
+                        intf: "api",
+                    }));
+                },
+                { description: "Scheduled evaluation" },
+            );
         },
         onSuccess: (_, params) => {
             const { fractal } = Params.parse(params);

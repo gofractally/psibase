@@ -45,22 +45,24 @@ impl Api for FractallyPlugin {
         unregister("fractals", evaluation_id)
     }
 
-    fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Vec<String>, Error> {
-        let rank_numbers = get_proposal("fractals", evaluation_id, group_number)
-            .unwrap()
-            .unwrap();
+    fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<String>>, Error> {
+        match get_proposal("fractals", evaluation_id, group_number)? {
+            None => Ok(None),
+            Some(rank_numbers) => {
+                let users: Vec<AccountNumber> =
+                    get_group_users(&"fractals", evaluation_id, group_number)?
+                        .iter()
+                        .map(|account| AccountNumber::from_str(account).unwrap())
+                        .collect();
 
-        let users: Vec<AccountNumber> = get_group_users(&"fractals", evaluation_id, group_number)?
-            .iter()
-            .map(|account| AccountNumber::from_str(account).unwrap())
-            .collect();
+                let res: Vec<String> = helpers::parse_rank_to_accounts(rank_numbers, users)
+                    .into_iter()
+                    .map(|user| user.to_string())
+                    .collect();
 
-        let res: Vec<String> = helpers::parse_rank_to_accounts(rank_numbers, users)
-            .into_iter()
-            .map(|user| user.to_string())
-            .collect();
-
-        Ok(res)
+                Ok(Some(res))
+            }
+        }
     }
 
     fn attest(evaluation_id: u32, group_number: u32) -> Result<(), Error> {

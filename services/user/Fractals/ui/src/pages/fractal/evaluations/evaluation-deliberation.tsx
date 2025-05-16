@@ -5,12 +5,11 @@ import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 
-import { useAttest } from "@/hooks/fractals/useAttest";
-import { useCloseEvaluation } from "@/hooks/fractals/useCloseEvaluation";
-import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
 import { useGroupUsers } from "@/hooks/fractals/useGroupUsers";
 import { setCachedProposal, useProposal } from "@/hooks/fractals/useProposal";
 import { usePropose } from "@/hooks/fractals/usePropose";
+import { useWatchAttest } from "@/hooks/fractals/useWatchAttest";
+import { useWatchClose } from "@/hooks/fractals/useWatchClose";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useNowUnix } from "@/hooks/useNowUnix";
 import { arrayMove } from "@/lib/arrayMove";
@@ -105,68 +104,18 @@ const useRanking = () => {
     };
 };
 
-const useWatchAttest = (now: number) => {
-    const { mutateAsync: attest, isPending, isError, isSuccess } = useAttest();
-
-    const { evaluationId, groupNumber } = usePageParams();
-    const status = useEvaluationStatus(now);
-
-    if (
-        status?.type == "submission" &&
-        status.mustSubmit &&
-        !isPending &&
-        !isError &&
-        !isSuccess
-    ) {
-        attest({
-            evaluationId,
-            groupNumber,
-        });
-    }
-    return isPending;
-};
-
-const useWatchClose = (now: number) => {
-    const {
-        mutateAsync: closeEvaluation,
-        isError,
-        isPending,
-        isSuccess,
-    } = useCloseEvaluation();
-    const status = useEvaluationStatus(now);
-    const instanceData = useEvaluationInstance();
-
-    if (
-        status &&
-        instanceData &&
-        instanceData.evaluationInstance &&
-        status.type == "finished" &&
-        !isError &&
-        !isPending &&
-        !isSuccess
-    ) {
-        closeEvaluation({
-            evalType: instanceData.evaluationInstance.evalType,
-            fractal: instanceData.evaluationInstance.fractal,
-        });
-    }
-
-    return isPending;
-};
-
 const GroupStatus = () => {
     const { groupNumber } = usePageParams();
 
     const now = useNowUnix();
-
     const status = useEvaluationStatus(now);
-    const isAttesting = useWatchAttest(now);
-    const isClosing = useWatchClose(now);
+
+    const isAttesting = useWatchAttest(status);
+    const isClosing = useWatchClose(status);
 
     let description = "";
 
     if (status?.type == "deliberation") {
-        status.deliberationDeadline;
         const secondsUntilDeliberation = status.deliberationDeadline - now;
         description = `Finishes in ${humanize(secondsUntilDeliberation)}`;
     } else if (status?.type == "submission") {

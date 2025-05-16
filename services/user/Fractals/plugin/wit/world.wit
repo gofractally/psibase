@@ -20,7 +20,7 @@ interface api {
 
     get-group-users: func(evaluation-id: u32, group-number: u32) -> result<list<string>, error>;
 
-    get-proposal: func(evaluation-id: u32, group-number: u32) -> result<list<string>, error>;
+    get-proposal: func(evaluation-id: u32, group-number: u32) -> result<option<list<string>>, error>;
 
     start: func(fractal: string, evaluation-type: u32) -> result<_, error>;
 

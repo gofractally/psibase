@@ -65,9 +65,17 @@ export const useEvaluationStatus = (
         now,
     );
 
-    if (currentStatus.type == "waitingStart" && !pingUsersAndGroups) {
+    const pingOnStatuses: EvaluationStatus["type"][] = [
+        "waitingStart",
+        "finished",
+    ];
+
+    if (pingOnStatuses.includes(currentStatus.type) && !pingUsersAndGroups) {
         setPingUsersAndGroups(true);
-    } else if (currentStatus.type !== "waitingStart" && pingUsersAndGroups) {
+    } else if (
+        !pingOnStatuses.includes(currentStatus.type) &&
+        pingUsersAndGroups
+    ) {
         setPingUsersAndGroups(false);
     }
 

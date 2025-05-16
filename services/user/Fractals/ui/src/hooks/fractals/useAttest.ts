@@ -1,10 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
 import { fractalsService } from "@/lib/constants";
+import { paths } from "@/lib/paths";
 
+import { useCurrentFractal } from "../useCurrentFractal";
 import { updateAttestation } from "./useUsersAndGroups";
 
 const Params = z.object({
@@ -12,15 +16,20 @@ const Params = z.object({
     groupNumber: z.number(),
 });
 
-export const useAttest = () =>
-    useMutation({
+export const useAttest = () => {
+    const navigate = useNavigate();
+    const fractal = useCurrentFractal();
+
+    return useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
+            let toastId = toast.loading("Sending attest...");
             void (await getSupervisor().functionCall({
                 method: "attest",
                 service: fractalsService,
                 intf: "api",
                 params: [params.evaluationId, params.groupNumber],
             }));
+            toast.dismiss(toastId);
 
             // HACK
             // for optimistic update purposes
@@ -29,5 +38,8 @@ export const useAttest = () =>
             // the real attestation will be over-written by the next graphql query
             updateAttestation(params.evaluationId, [1, 2, 3, 4, 5, 6]);
         },
+        onSuccess: () => {
+            navigate(paths.fractal.evaluations(fractal!));
+        },
     });
-    
+};

@@ -74,9 +74,9 @@ const zSubmissionPhase = z.object({
     type: z.literal("submission"),
     mustSubmit: z.boolean(),
     groupNumber: z.number().optional(),
+    evaluationId: z.number(),
     submissionDeadline: zUnix,
     results: zResult.array(),
-    isParticipant: z.boolean(),
 });
 
 export type SubmissionPhase = z.infer<typeof zSubmissionPhase>;
@@ -172,9 +172,9 @@ export const getStatus = (
                     !isGroupResult &&
                     timeStatus === "SUBMISSION",
                 groupNumber: user.groupNumber!,
+                evaluationId: evaluation.id,
                 submissionDeadline: evaluation.finishBy,
                 results,
-                isParticipant: true,
             };
             return zSubmissionPhase.parse(res);
         } else {
@@ -182,8 +182,8 @@ export const getStatus = (
                 type: "submission",
                 mustSubmit: false,
                 submissionDeadline: evaluation.finishBy,
+                evaluationId: evaluation.id,
                 results,
-                isParticipant: false,
             };
             return zSubmissionPhase.parse(res);
         }
