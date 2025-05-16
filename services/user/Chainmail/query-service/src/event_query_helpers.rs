@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use crate::helpers::validate_user;
+use psibase::services::{accounts::Wrapper as AccountsSvc, r_events::Wrapper as REventsSvc};
+use psibase::{AccountNumber, Hex, HttpReply, HttpRequest};
 
-use psibase::services::r_events::Wrapper as REventsSvc;
-use psibase::{Hex, HttpReply, HttpRequest};
+fn validate_user(user: &str) -> bool {
+    AccountsSvc::call().exists(AccountNumber::from(user))
+}
 
 fn build_query_by_id(params: HashMap<String, String>) -> Option<String> {
     if params.get("id").is_none() {

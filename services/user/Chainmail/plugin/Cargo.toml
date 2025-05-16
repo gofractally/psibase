@@ -2,8 +2,6 @@
 name = "plugin"
 version.workspace = true
 rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
 edition.workspace = true
 publish = false
 
@@ -17,7 +15,7 @@ serde-aux = "4.5.0"
 chrono = "0.4"
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.16.0" }
+chainmail-pkg = { path = "..", version = "0.16.0" }
 
 [lib]
 crate-type = ["cdylib"]

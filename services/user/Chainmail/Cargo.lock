@@ -412,17 +412,19 @@ name = "chainmail"
 version = "0.16.0"
 dependencies = [
  "async-graphql",
- "chainmail_package",
+ "chainmail-pkg",
  "psibase",
  "serde",
+ "sha2",
 ]
 
 [[package]]
-name = "chainmail_package"
+name = "chainmail-pkg"
 version = "0.16.0"
 dependencies = [
  "chainmail",
  "plugin",
+ "r-chainmail",
 ]
 
 [[package]]
@@ -1673,7 +1675,7 @@ name = "plugin"
 version = "0.16.0"
 dependencies = [
  "chainmail",
- "chainmail_package",
+ "chainmail-pkg",
  "chrono",
  "psibase",
  "serde",
@@ -1831,6 +1833,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "r-chainmail"
+version = "0.16.0"
+dependencies = [
+ "async-graphql",
+ "chainmail",
+ "psibase",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

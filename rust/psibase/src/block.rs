@@ -9,6 +9,16 @@ use serde::{Deserialize, Serialize};
 // TODO: move
 pub type Checksum256 = Hex<[u8; 32]>;
 
+impl Checksum256 {
+    pub fn min() -> Self {
+        Self([0; 32])
+    }
+
+    pub fn max() -> Self {
+        Self([255; 32])
+    }
+}
+
 pub type BlockNum = u32;
 pub type BlockTime = TimePointUSec;
 

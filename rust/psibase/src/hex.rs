@@ -21,7 +21,7 @@ trait FromHex: ToHex {
 ///
 /// `Hex<Vec<u8>>`, `Hex<&[u8]>`, and `Hex<[u8; SIZE]>` store binary
 /// data. This wrapper does not support other inner types.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Hex<T>(pub T);
 
 impl<T> Default for Hex<T>
