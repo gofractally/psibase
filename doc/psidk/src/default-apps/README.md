@@ -25,7 +25,6 @@ Psibase also comes with various apps meant to demonstrate additional functionali
 - [x-admin](x-admin.md)
 - [docs](docs.md)
 - [explorer]()
-- [fractal]()
 - [invite](invite.md)
 - [nft]()
 - [sites](sites.md)
