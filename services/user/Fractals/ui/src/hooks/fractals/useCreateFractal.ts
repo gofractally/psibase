@@ -51,8 +51,6 @@ export const useCreateFractal = () =>
             cacheAddFractalMembership([
                 { account, createdAt: new Date().toISOString(), mission, name },
             ]);
-
-            toast.success(`Created fractal ${name || account}`);
         },
         onError: (error) => {
             if (error instanceof Error) {

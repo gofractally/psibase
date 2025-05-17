@@ -3,7 +3,6 @@ import { useState } from "react";
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
 import { EvalType } from "@/lib/zod/EvaluationType";
 
-import { useEvaluation } from "./fractals/useEvaluation";
 import { useEvaluationInstance } from "./fractals/useEvaluationInstance";
 import { useFractal } from "./fractals/useFractal";
 import { useUsersAndGroups } from "./fractals/useUsersAndGroups";
@@ -17,9 +16,6 @@ export const useEvaluationStatus = (
 
     const { evaluation, evaluationInstance } = useEvaluationInstance(type);
 
-    const { isLoading: isLoadingEvaluation, error: evaluationError } =
-        useEvaluation(evaluationInstance?.evaluationId);
-
     const { data: currentUser } = useCurrentUser();
 
     const [pingUsersAndGroups, setPingUsersAndGroups] = useState(false);
@@ -28,7 +24,6 @@ export const useEvaluationStatus = (
         data: usersAndGroups,
         isLoading: isLoadingUsersAndGroups,
         error: usersAndGroupsError,
-        status,
     } = useUsersAndGroups(
         pingUsersAndGroups ? 1000 : 10000,
         evaluationInstance?.evaluationId,
@@ -40,23 +35,16 @@ export const useEvaluationStatus = (
         return undefined;
     }
 
-    const isLoading =
-        isLoadingEvaluation || isLoadingFractal || isLoadingUsersAndGroups;
+    const isLoading = isLoadingFractal || isLoadingUsersAndGroups;
 
     const currentUserCanActOnBehalfOfFractal = true;
 
     if (isLoading) return undefined;
-    if (usersAndGroupsError || evaluationError || fractalError) {
-        console.error(usersAndGroupsError || evaluationError || fractalError);
+    if (usersAndGroupsError || fractalError) {
+        console.error(usersAndGroupsError || fractalError);
         return undefined;
     }
 
-    console.log("expected data", status, {
-        evaluation,
-        currentUser,
-        usersAndGroups,
-        currentUserCanActOnBehalfOfFractal,
-    });
     const currentStatus = getStatus(
         evaluation!,
         currentUser!,
@@ -64,6 +52,15 @@ export const useEvaluationStatus = (
         currentUserCanActOnBehalfOfFractal,
         now,
     );
+
+    console.log("expected data", {
+        evaluation,
+        currentUser,
+        currentStatus,
+        usersAndGroups,
+        currentUserCanActOnBehalfOfFractal,
+        pingUsersAndGroups,
+    });
 
     const pingOnStatuses: EvaluationStatus["type"][] = [
         "waitingStart",

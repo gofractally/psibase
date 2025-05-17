@@ -33,6 +33,12 @@ export const useCloseEvaluation = () => {
         onSuccess: () => {
             setTimeout(() => {
                 queryClient.invalidateQueries({
+                    queryKey: QueryKey.evaluation(
+                        evaluationInstance!.evaluationId,
+                    ),
+                });
+
+                queryClient.invalidateQueries({
                     queryKey: QueryKey.usersAndGroups(
                         evaluationInstance!.evaluationId,
                     ),
