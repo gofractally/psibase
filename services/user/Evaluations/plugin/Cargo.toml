@@ -1,0 +1,36 @@
+[package]
+name = "plugin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+evaluations = { path = "../service/", version = "0.16.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+ecies = { version = "0.2", default-features = false, features = ["pure"] }
+rand = "0.9.1"
+average = "0.16.0"
+sha2 = "0.10.8"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "evaluations:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
+
+[dev-dependencies]

@@ -41,7 +41,6 @@ function(add suffix)
     target_include_directories(services_user${suffix} INTERFACE
         CommonApi/include
         Events/include
-        Fractal/include
         Invite/include
         Nft/include
         Packages/include
@@ -58,7 +57,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(CommonApi)
     add_subdirectory(Events)
     add_subdirectory(Explorer)
-    add_subdirectory(Fractal)
     add_subdirectory(Invite)
     add_subdirectory(SimpleService)
     add_subdirectory(Nft)

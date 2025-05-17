@@ -94,7 +94,7 @@ if(DEFINED WASI_SDK_PREFIX)
     )
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
-        CoreFractal CpuLimit Events Explorer Fractal Invite Nft
+        CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
@@ -225,6 +225,8 @@ set(JS_DIRS
     services/system/AuthSig/ui:AuthSig_js
     services/system/Producers/ui:Producers_js
     services/user/Branding/ui:Branding_js
+    services/user/Evaluations/ui:Evaluations_js
+    services/user/Fractals/ui:Fractals_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
     services/user/Explorer/ui:Explorer_js
     services/user/Homepage/ui:Homepage_js
@@ -444,6 +446,19 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
     PATH services/user/Profiles
 )
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Evaluations.psi
+    PATH services/user/Evaluations
+    DEPENDS ${Evaluations_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Fractals.psi
+    PATH services/user/Fractals
+    DEPENDS ${Fractally_js_DEP}
+)
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
@@ -849,20 +864,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Fractal.psi
-    NAME Fractal
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Fractal service"
-    SERVICE fractal
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Fractal.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Fractal-schema.json
-    SERVICE core-fractal
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CoreFractal-schema.json
-    DEPENDS wasm
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}
@@ -894,7 +895,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs Evaluations Events Fractals Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -904,7 +905,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs Events Explorer HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -941,7 +942,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs Events Evaluations Fractals Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -962,8 +963,9 @@ install(
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
+          ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
-          ${SERVICE_DIR}/Fractal.psi
+          ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
