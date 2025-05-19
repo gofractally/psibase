@@ -12,7 +12,7 @@ namespace psibase
    class DefaultTestChain : public TestChain
    {
      public:
-      // default excludes Docs and TokenUsers
+      // default excludes Docs
       static std::vector<std::string> defaultPackages();
       DefaultTestChain();
       DefaultTestChain(const std::vector<std::string>& packageNames,

@@ -3,9 +3,8 @@ package tokens:plugin;
 world impl {
     include host:common/imports;
     include transact:plugin/imports;
+    include sites:plugin/imports;
 
-    export types;
-    export intf;
-    export transfer;
+    export api;
     export queries;
 }

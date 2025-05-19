@@ -36,8 +36,6 @@ if(DEFINED IS_WASM)
     install(DIRECTORY user/Invite/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/Nft/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/Sites/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
-    install(DIRECTORY user/Symbol/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
-    install(DIRECTORY user/Tokens/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
