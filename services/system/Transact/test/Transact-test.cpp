@@ -185,6 +185,17 @@ TEST_CASE("Test push_transaction")
       }
    }
 
+   SECTION("Not verify service")
+   {
+      auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto trx      = signTransaction(t.makeTransaction({std::move(act)}, 5),
+                                      {{AccountNumber{"nop"}, aliceKeys}});
+
+      CHECK(httpPush(trx).failed("cannot be used in verify"));
+      CHECK(t.from(Accounts::service).to<Accounts>().exists("alice"_a).returnVal() == false);
+   }
+
    SECTION("Change verify service")
    {
       auto           alice    = t.addAccount("alice", aliceKeys.first);
