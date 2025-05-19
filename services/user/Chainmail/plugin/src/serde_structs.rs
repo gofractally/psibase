@@ -22,15 +22,10 @@ impl PartialOrd for Message {
 
 impl Ord for Message {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.msg_id < other.msg_id {
-            Ordering::Less
-        } else if self.msg_id == other.msg_id {
-            Ordering::Equal
-        } else {
-            Ordering::Greater
-        }
+        self.msg_id.cmp(&other.msg_id)
     }
 }
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct TempMessageForDeserEvents {
     #[serde(deserialize_with = "deserialize_number_from_string")]
