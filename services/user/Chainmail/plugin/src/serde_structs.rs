@@ -59,9 +59,10 @@ pub struct TempMessageForDeserGqlResponseNodes {
 pub struct TempMessageForDeserGqlResponseData {
     pub getSavedMsgs: TempMessageForDeserGqlResponseNodes,
 }
-#[derive(Debug, Deserialize)]
-pub struct TempMessageForDeserGqlResponse {
-    pub data: TempMessageForDeserGqlResponseData,
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ResponseRoot<T> {
+    pub data: T,
 }
 
 fn deserialize_timepoint<'d, D>(deserializer: D) -> Result<i64, D::Error>

@@ -4,70 +4,62 @@
 
 #[allow(warnings)]
 mod bindings;
+use bindings::*;
+
 mod errors;
+use errors::ErrorType::*;
+
 mod queries;
 mod serde_structs;
 
-use bindings::accounts::plugin as AccountPlugin;
-use bindings::exports::chainmail::plugin::{
+use accounts::plugin::api::get_current_user;
+use chrono::DateTime;
+use exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
 };
-use bindings::host::common::server as CommonServer;
-use bindings::transact::plugin::intf as Transact;
-use chrono::DateTime;
-use errors::ErrorType;
-use psibase::fracpack::Pack;
-use psibase::AccountNumber;
+use host::common::server as CommonServer;
+use psibase::{fracpack::Pack, services::chainmail::action_structs as Actions, HasActionName};
 use queries::{get_msg_by_id, query_messages_endpoint};
-use serde_structs::TempMessageForDeserGqlResponse;
+use serde_structs::{ResponseRoot, TempMessageForDeserGqlResponseData};
+use transact::plugin::intf as Transact;
 
 struct ChainmailPlugin;
 
+pub fn schedule_action<T: HasActionName + Pack>(action: T) -> Result<(), Error> {
+    Transact::add_action_to_transaction(T::ACTION_NAME, &action.packed())
+}
+
 fn get_unix_time_from_iso8601_str(dt_str: String) -> Result<i64, Error> {
     Ok(DateTime::parse_from_str(dt_str.as_str(), "%+")
-        .map_err(|e| ErrorType::DateTimeConversion(e.to_string()))?
+        .map_err(|e| DateTimeConversion(e.to_string()))?
         .timestamp())
 }
 
 impl Api for ChainmailPlugin {
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "send",
-            &chainmail::action_structs::send {
-                receiver: AccountNumber::from(receiver.as_str()),
-                subject,
-                body,
-            }
-            .packed(),
-        )?;
-        Ok(())
+        schedule_action(Actions::send {
+            receiver: receiver.as_str().into(),
+            subject,
+            body,
+        })
     }
 
     fn archive(msg_id: u64) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "archive",
-            &chainmail::action_structs::archive { msg_id }.packed(),
-        )?;
-        Ok(())
+        schedule_action(Actions::archive { msg_id })
     }
 
     fn save(msg_id: u64) -> Result<(), Error> {
         let msg = get_msg_by_id(msg_id)?;
 
-        Transact::add_action_to_transaction(
-            "save",
-            &chainmail::action_structs::save {
-                subject: msg.subject,
-                body: msg.body,
-                receiver: AccountNumber::from(msg.receiver.as_str()),
-                msg_id: msg.msg_id,
-                sender: AccountNumber::from(msg.sender.as_str()),
-                datetime: get_unix_time_from_iso8601_str(msg.datetime)?,
-            }
-            .packed(),
-        )?;
-        Ok(())
+        schedule_action(Actions::save {
+            subject: msg.subject,
+            body: msg.body,
+            receiver: msg.receiver.as_str().into(),
+            msg_id: msg.msg_id,
+            sender: msg.sender.as_str().into(),
+            datetime: get_unix_time_from_iso8601_str(msg.datetime)?,
+        })
     }
 }
 
@@ -97,18 +89,24 @@ impl Query for ChainmailPlugin {
     fn get_saved_msgs(receiver: Option<String>) -> Result<Vec<Message>, Error> {
         let rcvr = match receiver {
             Some(r) => r,
-            None => AccountPlugin::api::get_current_user()?.expect("No receiver specified"),
+            None => get_current_user()?.expect("No receiver specified"),
         };
         // lib: construct gql query from types; generate schema
         // - generate obj based on gql schema with query methods on it
+
         let graphql_str = format!(
-            "query {{ getSavedMsgs(receiver:\"{}\") {{ nodes {{ msgId, receiver, sender, subject, body, datetime }} }} }}",
-            rcvr
+            r#"query {{
+                getSavedMsgs(receiver: "{receiver}") {{
+                    nodes {{ msgId, receiver, sender, subject, body, datetime }}
+                }}
+            }}"#,
+            receiver = rcvr
         );
 
         let gql_res_str = CommonServer::post_graphql_get_json(&graphql_str)?;
-        let summary_val = serde_json::from_str::<TempMessageForDeserGqlResponse>(&gql_res_str)
-            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        let summary_val =
+            serde_json::from_str::<ResponseRoot<TempMessageForDeserGqlResponseData>>(&gql_res_str)
+                .map_err(|err| QueryResponseParseError(err.to_string()))?;
 
         Ok(summary_val
             .data
