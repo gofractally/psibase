@@ -1,6 +1,8 @@
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 
+#include <psibase/serviceEntry.hpp>
+
 #include <secp256k1.h>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
@@ -55,6 +57,14 @@ namespace
 
 using psibase::tester::raw::selectedChain;
 using namespace SystemService::AuthSig;
+
+psibase::TransactionTrace psibase::tester::pushTransaction(std::uint32_t            chain,
+                                                           const SignedTransaction& signedTrx)
+{
+   std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
+   auto size = tester::raw::pushTransaction(chain, packed_trx.data(), packed_trx.size());
+   return psio::from_frac<TransactionTrace>(getResult(size));
+}
 
 psibase::TransactionTrace psibase::tester::runAction(std::uint32_t chain,
                                                      RunMode       mode,
@@ -286,9 +296,24 @@ psibase::SignedTransaction psibase::TestChain::signTransaction(Transaction trx, 
 {
    if (!producing)
       startBlock();
-   std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
-   auto              size = tester::raw::pushTransaction(id, packed_trx.data(), packed_trx.size());
-   return psio::from_frac<TransactionTrace>(getResult(size));
+   auto trxId  = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
+   auto claims = signedTrx.transaction->claims();
+   if (signedTrx.proofs.size() != claims.size())
+   {
+      return TransactionTrace{.error = "proofs and claims must have same size"};
+   }
+   for (auto&& [claim, proof] : std::views::zip(claims, signedTrx.proofs))
+   {
+      VerifyArgs args{trxId, claim, proof};
+      Action     act{.sender  = AccountNumber{},
+                     .service = claim.service(),
+                     .method  = MethodNumber("verifySys"),
+                     .rawData = psio::to_frac(args)};
+      auto       trace = tester::runAction(id, RunMode::verify, true, act);
+      if (trace.error)
+         return trace;
+   }
+   return tester::pushTransaction(id, signedTrx);
 }
 
 [[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(Transaction    trx,
@@ -313,7 +338,9 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
          if (auto tx = psio::from_frac<std::optional<SignedTransaction>>(
                  trace.actionTraces.front().rawRetval))
          {
-            return pushTransaction(*tx);
+            if (!producing)
+               startBlock();
+            return tester::pushTransaction(id, *tx);
          }
       }
    }

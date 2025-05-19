@@ -106,5 +106,6 @@ namespace psibase::tester::raw
 
 namespace psibase::tester
 {
+   TransactionTrace pushTransaction(std::uint32_t chain, const SignedTransaction& signedTrx);
    TransactionTrace runAction(std::uint32_t chain, RunMode mode, bool head, const Action& act);
-}
+}  // namespace psibase::tester
