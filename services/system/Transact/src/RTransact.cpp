@@ -452,31 +452,64 @@ void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> tr
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto     pendingVerifies        = open<PendingVerifyTable>();
    auto     unverifiedTransactions = open<UnverifiedTransactionTable>();
+   auto     reverify               = open<ReverifySignaturesTable>();
+   auto     runVerifyId = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
    TrxReply errorReply;
    PSIBASE_SUBJECTIVE_TX
    {
       kvRemove(RunRow::db, runKey(id));
-      auto row = pendingVerifies.get(id);
-      check(!!row, "Can't find transaction id");
-      auto tx = unverifiedTransactions.get(row->txid);
-      check(tx->remainingVerifies > 0, "Refcount underflow");
-      if (!tx->hasError && trace.error())
+      if (auto row = pendingVerifies.get(id))
       {
-         tx->hasError = true;
-         open<TransactionDataTable>().erase(tx->id);
-         errorReply = claimTrxReply(tx->id);
-      }
-      if (--tx->remainingVerifies == 0)
-      {
-         if (!tx->hasError)
+         pendingVerifies.remove(*row);
+         auto tx = unverifiedTransactions.get(row->txid);
+         check(tx.has_value(), "Missing unverified transaction");
+         check(std::ranges::contains(tx->remainingVerifies, id),
+               "Unverified transaction should contain run id of verify");
+         std::erase(tx->remainingVerifies, id);
+         auto headVerifyId = reverify.get({}).value_or(ReverifySignaturesRecord{}).verifyId;
+         if (tx->verifyId == Checksum256{})
+            tx->verifyId = runVerifyId;
+         if (!trace.error() && headVerifyId == tx->verifyId && tx->verifyId == runVerifyId)
          {
-            queueTransaction(tx->id, tx->expiration);
+            if (tx->remainingVerifies.empty())
+            {
+               queueTransaction(tx->id, tx->expiration);
+               unverifiedTransactions.remove(*tx);
+            }
+            else
+            {
+               unverifiedTransactions.put(*tx);
+            }
          }
-         unverifiedTransactions.remove(*tx);
-      }
-      else
-      {
-         unverifiedTransactions.put(*tx);
+         else
+         {
+            // Cancel all the other outstanding verifies
+            for (auto cancel : tx->remainingVerifies)
+            {
+               pendingVerifies.erase(cancel);
+               RunRow cancelledRun{
+                   .id           = cancel,
+                   .mode         = RunMode::rpc,
+                   .maxTime      = std::chrono::milliseconds(0),
+                   .action       = Action{.service = AccountNumber{"nop"}},
+                   .continuation = {.service = RTransact::service,
+                                    .method  = MethodNumber{"onVerify"}},
+               };
+               kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+            }
+            if (trace.error())
+            {
+               unverifiedTransactions.remove(*tx);
+               open<TransactionDataTable>().erase(tx->id);
+               errorReply = claimTrxReply(tx->id);
+            }
+            else
+            {
+               auto data = open<TransactionDataTable>().get(tx->id);
+               check(data.has_value(), "Missing transaction data");
+               scheduleVerify(tx->id, data->trx);
+            }
+         }
       }
    }
    if (errorReply)
@@ -504,6 +537,8 @@ namespace
       auto pendingVerifies        = RTransact{}.open<PendingVerifyTable>();
       auto unverifiedTransactions = RTransact{}.open<UnverifiedTransactionTable>();
 
+      std::vector<std::uint64_t> remaining;
+
       auto claims = trx.transaction->claims();
       check(claims.size() == trx.proofs.size(), "Claims and proofs must have the same size");
       for (auto&& [claim, proof] : std::views::zip(claims, trx.proofs))
@@ -524,6 +559,8 @@ namespace
          if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
             row.id = prev->id + 1;
 
+         remaining.push_back(row.id);
+
          kvPut(RunRow::db, row.key(), row);
          pendingVerifies.put({.txid = id, .runid = row.id});
       }
@@ -536,7 +573,7 @@ namespace
          UnverifiedTransactionRecord row{
              .id                = id,
              .expiration        = trx.transaction->tapos().expiration(),
-             .remainingVerifies = trx.transaction->claims().size(),
+             .remainingVerifies = std::move(remaining),
              .hasError          = false,
          };
          unverifiedTransactions.put(row);

@@ -239,9 +239,14 @@ void psibase::TestChain::startBlock(std::string_view time)
 
 void psibase::TestChain::startBlock(BlockTime tp)
 {
+   if (producing)
+      finishBlock();
    // Guarantee that there is a recent block for fillTapos to use.
    if (status && status->current.time + Seconds(1) < tp)
+   {
       tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count());
+      finishBlock();
+   }
    tester::raw::startBlock(id, tp.time_since_epoch().count());
    status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
@@ -251,6 +256,8 @@ void psibase::TestChain::finishBlock()
 {
    tester::raw::finishBlock(id);
    producing = false;
+   if (isAutoRun)
+      runAll();
 }
 
 void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
@@ -416,6 +423,16 @@ std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId     
                                                               psio::input_stream key)
 {
    auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
+   if (size == -1)
+      return std::nullopt;
+   return psibase::getResult(size);
+}
+
+std::optional<std::vector<char>> psibase::TestChain::kvGreaterEqualRaw(DbId               db,
+                                                                       psio::input_stream key,
+                                                                       uint32_t matchKeySize)
+{
+   auto size = tester::raw::kvGreaterEqual(id, db, key.pos, key.remaining(), matchKeySize);
    if (size == -1)
       return std::nullopt;
    return psibase::getResult(size);

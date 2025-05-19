@@ -57,12 +57,17 @@ namespace SystemService
 
    struct UnverifiedTransactionRecord
    {
-      psibase::Checksum256  id;
-      psibase::TimePointSec expiration;
-      std::uint32_t         remainingVerifies;
-      psibase::Checksum256  verifyBlock;
-      bool                  hasError;
-      PSIO_REFLECT(UnverifiedTransactionRecord, id, expiration, remainingVerifies, hasError)
+      psibase::Checksum256       id;
+      psibase::TimePointSec      expiration;
+      std::vector<std::uint64_t> remainingVerifies;
+      psibase::Checksum256       verifyId;
+      bool                       hasError;
+      PSIO_REFLECT(UnverifiedTransactionRecord,
+                   id,
+                   expiration,
+                   remainingVerifies,
+                   verifyId,
+                   hasError)
    };
 
    using UnverifiedTransactionTable =

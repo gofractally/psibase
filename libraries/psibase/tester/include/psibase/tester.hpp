@@ -519,6 +519,19 @@ namespace psibase
       {
          return kvGet<V>(psibase::DbId::service, key);
       }
+
+      std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
+                                                         psio::input_stream key,
+                                                         uint32_t           matchKeySize);
+
+      template <typename V, typename K>
+      inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
+      {
+         auto v = kvGreaterEqualRaw(db, psio::convert_to_key(key), matchKeySize);
+         if (!v)
+            return std::nullopt;
+         return psio::from_frac<V>(*v);
+      }
    };  // TestChain
 
 }  // namespace psibase

@@ -32,6 +32,42 @@ namespace
                            "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
                            "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
                            "-----END PRIVATE KEY-----\n")};
+
+   auto bobKeys =
+       KeyPair{pubFromPem("-----BEGIN PUBLIC KEY-----\n"
+                          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjfORN+7dsPa5EocZN+jUEYFwqNNH\n"
+                          "C+Tk1RRTUNauVE0SGP+6UMK2QDQyjBjka6XheCyaKjaFQNP87v32zildTA==\n"
+                          "-----END PUBLIC KEY-----\n"),
+               privFromPem("-----BEGIN PRIVATE KEY-----\n"
+                           "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQggslLlsITfk40AloZ\n"
+                           "LIBPQ6CIYjeRapOKRdm/M3Olx16hRANCAASN85E37t2w9rkShxk36NQRgXCo00cL\n"
+                           "5OTVFFNQ1q5UTRIY/7pQwrZANDKMGORrpeF4LJoqNoVA0/zu/fbOKV1M\n"
+                           "-----END PRIVATE KEY-----\n")};
+
+   struct KeyWithAccount
+   {
+      AccountNumber service;
+      KeyPair       key;
+   };
+
+   SignedTransaction signTransaction(Transaction trx, const std::vector<KeyWithAccount>& keys)
+   {
+      for (auto& [account, key] : keys)
+         trx.claims.push_back({
+             .service = account,
+             .rawData = {key.first.data.begin(), key.first.data.end()},
+         });
+      SignedTransaction signedTrx;
+      signedTrx.transaction = trx;
+      auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
+      for (auto& [account, key] : keys)
+      {
+         auto proof = sign(key.second, hash);
+         signedTrx.proofs.push_back({proof.begin(), proof.end()});
+      }
+      return signedTrx;
+   }
+
 }  // namespace
 
 struct LoginInterface
@@ -169,6 +205,68 @@ TEST_CASE("Test push_transaction")
       REQUIRE(t.from(verifysig)
                   .to<SetCode>()
                   .setCode(verifysig, 0, 0, std::vector<char>())
+                  .succeeded());
+      t.startBlock();
+
+      // Now push the transaction
+      t.runAll();
+
+      auto trace = reply.get<TransactionTrace>();
+      CHECK(Result<void>(std::move(trace)).failed("service account has no code"));
+   }
+   SECTION("Change verify service 2 keys")
+   {
+      constexpr auto verifysig = VerifySig::service;
+
+      // make a second verify service
+      auto verify2 = t.addService("verify2", "VerifySig.wasm");
+      REQUIRE(t.from(SetCode::service)
+                  .to<SetCode>()
+                  .setFlags(verify2, VerifySig::serviceFlags)
+                  .succeeded());
+
+      auto alice    = t.addAccount("alice", aliceKeys.first);
+      auto accounts = transactor<Accounts>{alice, Accounts::service};
+      auto act      = accounts.setAuthServ(AuthAny::service);
+      auto trx      = signTransaction(t.makeTransaction({std::move(act)}, 5),
+                                      {{verifysig, aliceKeys}, {verify2, bobKeys}});
+
+      t.startBlock();
+
+      t.setAutoRun(false);
+      auto reply =
+          t.asyncPost(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+
+      // Count items in queue
+      std::size_t                       queueSize = 0;
+      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio::convert_to_key(runPrefix()),
+                                                 false};
+      for (auto _ : runIndex)
+      {
+         ++queueSize;
+      }
+
+      auto n = GENERATE_COPY(range(std::size_t{0}, queueSize + 1));
+      // We expect queueSize to be the same every time
+      REQUIRE(n <= queueSize);
+
+      INFO(std::format("queue processed: {}/{}", n, queueSize));
+
+      // Verify some signatures
+      for (std::size_t i = 0; i < n; ++i)
+         t.runQueueItem();
+
+      // If there were more items pushed onto the queue,
+      // we need to rethink how to test this.
+      if (n == queueSize)
+         CHECK(runIndex.empty());
+
+      auto removedService = GENERATE_COPY(verifysig, verify2);
+      INFO("removed: " << removedService.str());
+      // Remove the verify service
+      REQUIRE(t.from(removedService)
+                  .to<SetCode>()
+                  .setCode(removedService, 0, 0, std::vector<char>())
                   .succeeded());
       t.startBlock();
 
