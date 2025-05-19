@@ -2,6 +2,10 @@ use crate::services::{accounts, auth_sig, http_server, setcode};
 use crate::{account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber};
 use fracpack::Pack;
 
+pub trait HasActionName {
+    const ACTION_NAME: &'static str;
+}
+
 macro_rules! account {
     ($name:expr) => {
         AccountNumber::new(account_raw!($name))

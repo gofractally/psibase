@@ -111,6 +111,10 @@ pub fn process_action_args(
         impl #fn_name {
             pub const ACTION_NAME: &'static str = stringify!(#fn_name);
         }
+
+        impl #psibase_mod::HasActionName for #fn_name {
+            const ACTION_NAME: &'static str = Self::ACTION_NAME;
+        }
     };
 
     if let Some(db) = event_db {
