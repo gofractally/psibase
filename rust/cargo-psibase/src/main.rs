@@ -27,7 +27,11 @@ use package::*;
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
-const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
+const SERVICE_ARGS_RUSTC: &[&str] = &[
+    "--",
+    "-C",
+    "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
+];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
