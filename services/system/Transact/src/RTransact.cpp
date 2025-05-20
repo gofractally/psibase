@@ -73,7 +73,7 @@ namespace
       RunRow                row{
                          .id      = 0,
                          .mode    = RunMode::rpc,
-                         .maxTime = std::chrono::milliseconds(0),
+                         .maxTime = MicroSeconds::max(),
                          .action  = rtransact.requeue(),
                          .continuation = {.service = RTransact::service, .method = MethodNumber{"onRequeue"}},
       };
@@ -552,7 +552,7 @@ namespace
          RunRow row{
              .id           = 0,
              .mode         = RunMode::verify,
-             .maxTime      = std::chrono::milliseconds(50),
+             .maxTime      = std::chrono::milliseconds(200),
              .action       = std::move(act),
              .continuation = {.service = RTransact::service, .method = MethodNumber{"onVerify"}},
          };

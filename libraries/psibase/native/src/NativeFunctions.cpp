@@ -2,6 +2,7 @@
 
 #include <psibase/ActionContext.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/saturating.hpp>
 
 #include <random>
 
@@ -480,12 +481,9 @@ namespace psibase
       // Ensure no overflow by capping the value. The exact value is not visible to
       // wasm and does not affect consensus and there's no way a transaction can
       // run for 300 years.
-      static constexpr uint64_t maxTransactionTime = INT64_MAX;
-      nanoseconds                                  = std::min(nanoseconds, maxTransactionTime);
       if (transactionContext.blockContext.isProducing)
-         transactionContext.setWatchdog(
-             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                 std::chrono::nanoseconds{nanoseconds}));
+         transactionContext.setWatchdog(saturatingCast<CpuClock::duration>(
+             std::chrono::duration<std::uint64_t, std::nano>(nanoseconds)));
    }
 
    uint32_t NativeFunctions::getCurrentAction()
