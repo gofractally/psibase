@@ -3,11 +3,13 @@
 The code used to generate the sample wasm is found below.
 
 The command used to build these wasms is the same as what is used in the first step of `cargo psibase`:
+
 ```
-cargo rustc --lib --crate-type=cdylib -p example --release --target=wasm32-wasip1 --message-format=json-diagnostic-rendered-ansi --color=always -- -C target-feature=+simd128,+bulk-memory,+sign-ext
+cargo rustc --lib --crate-type=cdylib -p example --release --target=wasm32-wasip1 --message-format=json-diagnostic-rendered-ansi --color=always -- -C target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint
 ```
 
 ## `simple.wasm`
+
 ```rust
 #[psibase::service]
 #[allow(non_snake_case)]
