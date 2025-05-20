@@ -58,6 +58,7 @@ fn main() {
         OptimizationOptions::new_opt_level_2()
             .shrink_level(wasm_opt::ShrinkLevel::Level1)
             .enable_feature(wasm_opt::Feature::BulkMemory)
+            .enable_feature(wasm_opt::Feature::TruncSat)
             .enable_feature(wasm_opt::Feature::SignExt)
             .enable_feature(wasm_opt::Feature::Simd)
             .debug_info(debug_build)
