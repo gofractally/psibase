@@ -11,6 +11,7 @@ use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
+use psibase::Quantity;
 
 struct TokensPlugin;
 
@@ -18,6 +19,14 @@ impl Api for TokensPlugin {
     fn set_example_thing(thing: String) {
         // let packed_example_thing_args = tokens::action_structs::setExampleThing { thing }.packed();
         // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+    }
+
+    fn create(max_supply: String, precision: String) {
+        let precision: u8 = precision.parse().unwrap();
+        let max_supply = Quantity::from_str(&max_supply, precision.into()).unwrap();
+        let packed_args = tokens::action_structs::create { max_supply }.packed();
+        add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
+            .unwrap();
     }
 }
 

@@ -2,6 +2,8 @@ package tokens:plugin;
 
 interface api {
     set-example-thing: func(thing: string);
+
+    create: func(max-supply: string, precision: string);
 }
 
 interface queries {

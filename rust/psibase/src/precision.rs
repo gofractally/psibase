@@ -23,8 +23,8 @@ pub struct Precision {
 
 impl From<u8> for Precision {
     fn from(value: u8) -> Self {
-        if value <= 18 {
-            panic!("invalid precision")
+        if value > 18 {
+            panic!("max precision is 18")
         }
         Self { value }
     }
