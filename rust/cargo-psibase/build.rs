@@ -40,7 +40,11 @@ fn main() {
             .args(["--target-dir", &target_dir])
             .args(["--manifest-path", &(package_dir + "/Cargo.toml")])
             .args(["--release"])
-            .args(["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"])
+            .args([
+                "--",
+                "-C",
+                "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
+            ])
             .status()
             .unwrap()
             .success()
