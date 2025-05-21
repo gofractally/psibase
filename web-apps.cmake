@@ -5,7 +5,7 @@ file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DI
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
 
 add_custom_target(YarnInstall
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn --version && yarn #&& yarn install-dev-tools
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn --version && yarn
     COMMENT "Installing yarn dependencies"
     BUILD_ALWAYS 1
 )
@@ -35,8 +35,6 @@ set(UI_PROJECTS
     user/Explorer/ui:Explorer_js
     user/Homepage/ui:Homepage_js
     user/Identity/ui:Identity_js
-    # TODO: ask about empty Invite ui?
-    # user/Invite/ui:Invite_js
     user/Permissions/ui:Permissions_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
@@ -61,6 +59,3 @@ foreach(UI ${UI_PROJECTS})
     )
     set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH})
 endforeach()
-
-# Special handling for XAdmin which has additional dependencies
-# add_dependencies(xadmin_js XAdminWasm)
