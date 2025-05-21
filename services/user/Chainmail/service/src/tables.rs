@@ -138,7 +138,7 @@ pub mod tables {
             }
 
             let group_table = GroupTable::new();
-            let id = crate::get_group_id(users.clone());
+            let id = crate::get_group_id(&users);
             let group = group_table.get_index_pk().get(&id);
             if group.is_some() {
                 let mut group = group.unwrap();

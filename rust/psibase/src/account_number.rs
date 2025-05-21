@@ -21,7 +21,9 @@ custom_error! { pub AccountNumberError
 /// use psibase::AccountNumber;
 /// let hello = AccountNumber::from("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Hash, Pack, Unpack, ToKey, ToSchema)]
+#[derive(
+    Debug, Default, PartialEq, Eq, Copy, Clone, Hash, Pack, Unpack, ToKey, ToSchema, PartialOrd, Ord,
+)]
 #[fracpack(
     definition_will_not_change,
     fracpack_mod = "fracpack",

@@ -4,8 +4,10 @@ mod tables;
 use psibase::{fracpack::Pack, AccountNumber, Checksum256};
 use sha2::{Digest, Sha256};
 
-pub fn get_group_id(mut users: Vec<AccountNumber>) -> Checksum256 {
-    users.sort_by(|a, b| a.value.cmp(&b.value));
+pub fn get_group_id(users: &Vec<AccountNumber>) -> Checksum256 {
+    let mut users = users.clone();
+    users.dedup();
+    users.sort();
     Checksum256::from(<[u8; 32]>::from(Sha256::digest(&users.packed())))
 }
 
@@ -122,19 +124,20 @@ pub mod service {
     /// Store a public key that can be used to allow others to send you private messages
     ///
     /// # Arguments
-    /// * `key` - The sender's public secp256k1 encryption key in DER format
+    /// * `key` - The sender's public secp256k1 encryption key in compressed DER format
     #[action]
     fn set_key(key: Vec<u8>) {
+        check(key.len() == 33, "key must be compressed (33 bytes)");
         UserSettings::add(get_sender(), key);
     }
 
     /// Create a private messaging group. The group is only created once. If a second user from the group tries to create
     /// it, the call will succeed, but won't do anything.
     ///
-    /// If an expiry is provided, the group will expire, at which time no more messages can be sent. The group can only
-    /// be deleted by a group member *after* the provided expiry.
+    /// If an expiry is provided, the group will expire, at which time no more messages can be sent. The group can
+    /// be deleted by anyone *after* the provided expiry.
     ///
-    /// If no expiry is provided, the group will be open indefinitely but can be deleted by anyone at any time.
+    /// If no expiry is provided, the group will be open indefinitely but can be deleted by any group member at any time.
     ///
     /// If a group is created and an expired one already exists, the expiry will be updated to the new value. Nothing else
     /// about the group changes.
