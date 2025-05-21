@@ -458,7 +458,7 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
-    DEPENDS ${CommonApiCommonLib_js}
+    DEPENDS CommonApiCommonLib_js
     DEPENDS ${ComponentParser_DEP}
     DEPENDS ${PluginTester_js_DEP}
     DEPENDS wasm

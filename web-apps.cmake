@@ -53,7 +53,7 @@ foreach(UI ${UI_PROJECTS})
         BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH} && yarn build
         CONFIGURE_COMMAND ""
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATH} ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}/dist
-        DEPENDS ${CommonApiCommonLib_js} YarnInstall
+        DEPENDS CommonApiCommonLib_js YarnInstall
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
     )
