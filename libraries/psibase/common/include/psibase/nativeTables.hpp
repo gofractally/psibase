@@ -184,6 +184,9 @@ namespace psibase
       rejectTransaction,
       // Returns a transaction to apply
       nextTransaction,
+      // Determines which signatures (if any) have
+      // already been verified.
+      preverifyTransaction,
    };
 
    using NotifyKeyType = std::tuple<std::uint16_t, std::uint8_t, NotifyType>;
@@ -326,11 +329,37 @@ namespace psibase
       callback,
    };
 
+   // A RunToken is an opaque value that can be used to
+   // prove that a particular execution succeeded. Operations
+   // that take tokens may skip execution if a token is provided.
+   //
+   // A token matches an execution if it was created by an
+   // execution with the same action, mode, and context.
+   //
+   // - If the mode is verify, the context consists of all
+   //   the verify services.
+   // - If the mode is transaction, the context consists of
+   //   all objective chain state.
+   // - If the mode is rpc or callback, every execution has
+   //   a distinct context.
+   //
+   // - If the token matches, the implementation MAY skip execution
+   // - On an active block producer, if the token does not
+   //   match, the implementation MUST NOT skip execution
+   // - If the implementation receives a non-matching
+   //   token, it SHOULD issue a warning
+   // - Services that use tokens MUST ensure that only
+   //   matching tokens are passed to native
+   // - It is implementation-defined whether tokens can
+   //   be transferred between nodes.
+   using RunToken = std::vector<char>;
+
    //struct ContinuationArgs
    //{
    //   std::uint64_t id;
    //   TransactionTrace trace;
-   //   PSIO_REFLECT(ContinuationArgs, id, trace)
+   //   std::optional<RunToken> token;
+   //   PSIO_REFLECT(ContinuationArgs, id, trace, token)
    //};
 
    struct BoundMethod

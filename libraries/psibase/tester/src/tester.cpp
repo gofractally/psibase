@@ -53,6 +53,7 @@ namespace
          result |= __WASI_RIGHTS_FD_WRITE;
       return result;
    }
+
 }  // namespace
 
 using psibase::tester::raw::selectedChain;
@@ -298,27 +299,90 @@ psibase::SignedTransaction psibase::TestChain::signTransaction(Transaction trx, 
    return signedTrx;
 }
 
+namespace
+{
+   struct RunTokenData
+   {
+      bool success;
+      PSIO_REFLECT(RunTokenData, success)
+   };
+
+   std::vector<std::optional<RunTokenData>> getRunTokens(psibase::TestChain&               chain,
+                                                         const psibase::SignedTransaction& trx)
+   {
+      using namespace psibase;
+      std::vector<std::optional<RunTokenData>> tokens;
+      if (trx.proofs.empty())
+         return tokens;
+      if (auto row = chain.kvGet<NotifyRow>(DbId::nativeSubjective,
+                                            notifyKey(NotifyType::preverifyTransaction)))
+      {
+         for (auto& act : row->actions)
+         {
+            check(act.sender == AccountNumber{} && act.rawData.empty(),
+                  "Invalid nextTransaction callback");
+            act.rawData = psio::to_frac(std::tuple(trx));
+            auto trace  = tester::runAction(chain.nativeHandle(), RunMode::callback, false, act);
+            if (trace.error)
+               abortMessage("preverify failed: " + *trace.error);
+            check(trace.actionTraces.size() == 1, "Wrong number of action traces");
+            if (auto result = psio::from_frac<std::optional<std::vector<std::optional<RunToken>>>>(
+                    trace.actionTraces.front().rawRetval))
+            {
+               for (const auto& token : *result)
+               {
+                  if (token)
+                  {
+                     tokens.push_back(psio::from_frac<RunTokenData>(*token));
+                  }
+                  else
+                  {
+                     tokens.emplace_back();
+                  }
+               }
+               break;
+            }
+         }
+      }
+      tokens.resize(trx.proofs.size());
+      return tokens;
+   }
+   psibase::TransactionTrace verifySignatures(psibase::TestChain&               chain,
+                                              const psibase::SignedTransaction& trx)
+   {
+      using namespace psibase;
+      auto trxId  = sha256(trx.transaction.data(), trx.transaction.size());
+      auto claims = trx.transaction->claims();
+      if (trx.proofs.size() != claims.size())
+      {
+         return TransactionTrace{.error = "proofs and claims must have same size"};
+      }
+      auto tokens = getRunTokens(chain, trx);
+      for (auto&& [claim, proof, token] : std::views::zip(claims, trx.proofs, tokens))
+      {
+         if (token && token->success)
+            continue;
+         VerifyArgs args{trxId, claim, proof};
+         Action     act{.sender  = AccountNumber{},
+                        .service = claim.service(),
+                        .method  = MethodNumber("verifySys"),
+                        .rawData = psio::to_frac(args)};
+         auto       trace = tester::runAction(chain.nativeHandle(), RunMode::verify, true, act);
+         if (trace.error)
+            return trace;
+      }
+      return {};
+   }
+}  // namespace
+
 [[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
     const SignedTransaction& signedTrx)
 {
    if (!producing)
       startBlock();
-   auto trxId  = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
-   auto claims = signedTrx.transaction->claims();
-   if (signedTrx.proofs.size() != claims.size())
+   if (auto trace = verifySignatures(*this, signedTrx); trace.error)
    {
-      return TransactionTrace{.error = "proofs and claims must have same size"};
-   }
-   for (auto&& [claim, proof] : std::views::zip(claims, signedTrx.proofs))
-   {
-      VerifyArgs args{trxId, claim, proof};
-      Action     act{.sender  = AccountNumber{},
-                     .service = claim.service(),
-                     .method  = MethodNumber("verifySys"),
-                     .rawData = psio::to_frac(args)};
-      auto       trace = tester::runAction(id, RunMode::verify, true, act);
-      if (trace.error)
-         return trace;
+      return trace;
    }
    return tester::pushTransaction(id, signedTrx);
 }
@@ -345,9 +409,7 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
          if (auto tx = psio::from_frac<std::optional<SignedTransaction>>(
                  trace.actionTraces.front().rawRetval))
          {
-            if (!producing)
-               startBlock();
-            return tester::pushTransaction(id, *tx);
+            return pushTransaction(*tx);
          }
       }
    }
@@ -359,8 +421,10 @@ bool psibase::TestChain::runQueueItem()
    if (auto row = kvGreaterEqual<RunRow>(RunRow::db, runPrefix(),
                                          psio::convert_to_key(runPrefix()).size()))
    {
+      auto trace = tester::runAction(id, row->mode, true, row->action);
+      auto token = psio::to_frac(RunTokenData{!trace.error});
       auto continuationArgs =
-          psio::to_frac(std::tuple(row->id, tester::runAction(id, row->mode, true, row->action)));
+          psio::to_frac(std::tuple(row->id, std::move(trace), std::move(token)));
       auto continuation      = Action{.service = row->continuation.service,
                                       .method  = row->continuation.method,
                                       .rawData = std::move(continuationArgs)};

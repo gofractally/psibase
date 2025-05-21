@@ -262,6 +262,15 @@ namespace psibase
       }
    }
 
+   namespace
+   {
+      struct VerifyTokenData
+      {
+         bool success;
+         PSIO_REFLECT(VerifyTokenData, success)
+      };
+   }  // namespace
+
    std::optional<SignedTransaction> BlockContext::callNextTransaction()
    {
       auto notifyType = NotifyType::nextTransaction;
@@ -373,11 +382,13 @@ namespace psibase
 
       try
       {
+         auto token = psio::to_frac(VerifyTokenData{!trace.error});
          // Run the continuation
          Action             action{.sender  = {},
                                    .service = row.continuation().service(),
                                    .method  = row.continuation().method(),
-                                   .rawData = psio::to_frac(std::tuple(row.id().unpack(), trace))};
+                                   .rawData = psio::to_frac(
+                           std::tuple(row.id().unpack(), trace, std::optional{std::move(token)}))};
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();

@@ -31,13 +31,15 @@ namespace SystemService
       psibase::TimePointSec expiration;
       psibase::TimePointSec ctime;
       std::uint64_t         sequence;
+      // One for each claim/proof
+      std::vector<psibase::RunToken> verifies;
 
       using CTimeKey      = psibase::CompositeKey<&PendingTransactionRecord::ctime,
                                                   &PendingTransactionRecord::sequence>;
       using ExpirationKey = psibase::CompositeKey<&PendingTransactionRecord::expiration,
                                                   &PendingTransactionRecord::sequence>;
    };
-   PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence);
+   PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence, verifies);
 
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
@@ -57,17 +59,13 @@ namespace SystemService
 
    struct UnverifiedTransactionRecord
    {
-      psibase::Checksum256       id;
-      psibase::TimePointSec      expiration;
-      std::vector<std::uint64_t> remainingVerifies;
-      psibase::Checksum256       verifyId;
-      bool                       hasError;
-      PSIO_REFLECT(UnverifiedTransactionRecord,
-                   id,
-                   expiration,
-                   remainingVerifies,
-                   verifyId,
-                   hasError)
+      using VerifyStatus = std::variant<std::uint64_t, psibase::RunToken>;
+      psibase::Checksum256      id;
+      psibase::TimePointSec     expiration;
+      std::vector<VerifyStatus> verifies;
+      psibase::Checksum256      verifyId;
+      bool                      hasError;
+      PSIO_REFLECT(UnverifiedTransactionRecord, id, expiration, verifies, verifyId, hasError)
    };
 
    using UnverifiedTransactionTable =
@@ -176,13 +174,17 @@ namespace SystemService
                                                                 ReverifySignaturesTable>;
       using WriteOnly =
           psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable, VerifyIdTable>;
-      std::optional<psibase::SignedTransaction> next();
+      std::optional<psibase::SignedTransaction>                    next();
+      std::optional<std::vector<std::optional<psibase::RunToken>>> preverify(
+          psio::view<const psibase::SignedTransaction> trx);
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
       // Callbacks used to track successful/expired transactions
       void onTrx(const psibase::Checksum256& id, psio::view<const psibase::TransactionTrace> trace);
       // Callback run when after signature verification
-      void onVerify(std::uint64_t id, psio::view<const psibase::TransactionTrace> trace);
+      void onVerify(std::uint64_t                               id,
+                    psio::view<const psibase::TransactionTrace> trace,
+                    std::optional<psibase::RunToken>            token);
       void requeue();
       void onRequeue(std::uint64_t id, psio::view<const psibase::TransactionTrace> trace);
       void onBlock();
@@ -193,10 +195,11 @@ namespace SystemService
    };
    PSIO_REFLECT(RTransact,
                 method(next),
+                method(preverify, transaction),
                 method(recv, transaction),
                 method(onTrx, id, trace),
                 method(onBlock),
-                method(onVerify, id, trace),
+                method(onVerify, id, trace, token),
                 method(requeue),
                 method(onRequeue, id, trace),
                 method(serveSys, request, socket),

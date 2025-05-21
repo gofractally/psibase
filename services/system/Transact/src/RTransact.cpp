@@ -15,6 +15,21 @@ namespace
    // Must be run inside PSIBASE_SUBJECTIVE_TX
    void scheduleVerify(const Checksum256& id, const SignedTransaction& trx);
 
+   void initPreverifyTransaction()
+   {
+      auto key      = notifyKey(NotifyType::preverifyTransaction);
+      auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key);
+      if (!existing)
+         existing = NotifyRow{NotifyType::nextTransaction};
+      if (!std::ranges::any_of(existing->actions,
+                               [](const auto& act) { return act.service == RTransact::service; }))
+      {
+         existing->actions.push_back(
+             {.service = RTransact::service, .method = MethodNumber{"preverify"}});
+         kvPut(DbId::nativeSubjective, key, *existing);
+      }
+   }
+
    // Tell native that a transaction is ready.
    // Must be run inside a subjective transaction.
    void setTransactionReady()
@@ -133,6 +148,25 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       }
    }
    return result;
+}
+
+std::optional<std::vector<std::optional<RunToken>>> RTransact::preverify(
+    psio::view<const SignedTransaction> trx)
+{
+   auto id = sha256(trx.transaction().data(), trx.transaction().size());
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (auto pending = open<PendingTransactionTable>().get(id))
+      {
+         std::vector<std::optional<RunToken>> result;
+         for (auto& token : pending->verifies)
+         {
+            result.push_back(std::move(token));
+         }
+         return result;
+      }
+      return {};
+   }
 }
 
 namespace
@@ -256,8 +290,21 @@ namespace
       }
    };
 
+   std::vector<RunToken> resolveVerifies(
+       std::vector<UnverifiedTransactionRecord::VerifyStatus>&& tokens)
+   {
+      std::vector<RunToken> result;
+      for (auto& token : tokens)
+      {
+         result.push_back(std::move(std::get<RunToken>(token)));
+      }
+      return result;
+   }
+
    // Must be run in a subjective transaction
-   void queueTransaction(const Checksum256& id, TimePointSec expiration)
+   void queueTransaction(const Checksum256&                                       id,
+                         TimePointSec                                             expiration,
+                         std::vector<UnverifiedTransactionRecord::VerifyStatus>&& verifies)
    {
       auto pending = RTransact{}.open<PendingTransactionTable>();
       // Find the next sequence number
@@ -268,10 +315,12 @@ namespace
                    .expiration = expiration,
                    .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
                        std::chrono::system_clock::now()),
-                   .sequence = sequence});
+                   .sequence = sequence,
+                   .verifies = resolveVerifies(std::move(verifies))});
 
       // Tell native that we have a transaction
       setTransactionReady();
+      initPreverifyTransaction();
    }
 
    // Checks whether the set of verify services has changed
@@ -447,7 +496,9 @@ void RTransact::onBlock()
    }
 }
 
-void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> trace)
+void RTransact::onVerify(std::uint64_t                      id,
+                         psio::view<const TransactionTrace> trace,
+                         std::optional<RunToken>            token)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto     pendingVerifies        = open<PendingVerifyTable>();
@@ -463,17 +514,25 @@ void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> tr
          pendingVerifies.remove(*row);
          auto tx = unverifiedTransactions.get(row->txid);
          check(tx.has_value(), "Missing unverified transaction");
-         check(std::ranges::contains(tx->remainingVerifies, id),
-               "Unverified transaction should contain run id of verify");
-         std::erase(tx->remainingVerifies, id);
+         bool ready = true;
+         for (auto& v : tx->verifies)
+         {
+            if (auto* vid = std::get_if<std::uint64_t>(&v))
+            {
+               if (*vid == id)
+                  v = std::move(token.value());
+               else
+                  ready = false;
+            }
+         }
          auto headVerifyId = reverify.get({}).value_or(ReverifySignaturesRecord{}).verifyId;
          if (tx->verifyId == Checksum256{})
             tx->verifyId = runVerifyId;
          if (!trace.error() && headVerifyId == tx->verifyId && tx->verifyId == runVerifyId)
          {
-            if (tx->remainingVerifies.empty())
+            if (ready)
             {
-               queueTransaction(tx->id, tx->expiration);
+               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies));
                unverifiedTransactions.remove(*tx);
             }
             else
@@ -484,18 +543,21 @@ void RTransact::onVerify(std::uint64_t id, psio::view<const TransactionTrace> tr
          else
          {
             // Cancel all the other outstanding verifies
-            for (auto cancel : tx->remainingVerifies)
+            for (const auto& v : tx->verifies)
             {
-               pendingVerifies.erase(cancel);
-               RunRow cancelledRun{
-                   .id           = cancel,
-                   .mode         = RunMode::rpc,
-                   .maxTime      = std::chrono::milliseconds(0),
-                   .action       = Action{.service = AccountNumber{"nop"}},
-                   .continuation = {.service = RTransact::service,
-                                    .method  = MethodNumber{"onVerify"}},
-               };
-               kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+               if (auto* cancelId = std::get_if<std::uint64_t>(&v))
+               {
+                  pendingVerifies.erase(*cancelId);
+                  RunRow cancelledRun{
+                      .id           = *cancelId,
+                      .mode         = RunMode::rpc,
+                      .maxTime      = std::chrono::milliseconds(0),
+                      .action       = Action{.service = AccountNumber{"nop"}},
+                      .continuation = {.service = RTransact::service,
+                                       .method  = MethodNumber{"onVerify"}},
+                  };
+                  kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+               }
             }
             if (trace.error())
             {
@@ -537,7 +599,7 @@ namespace
       auto pendingVerifies        = RTransact{}.open<PendingVerifyTable>();
       auto unverifiedTransactions = RTransact{}.open<UnverifiedTransactionTable>();
 
-      std::vector<std::uint64_t> remaining;
+      std::vector<UnverifiedTransactionRecord::VerifyStatus> remaining;
 
       auto claims = trx.transaction->claims();
       check(claims.size() == trx.proofs.size(), "Claims and proofs must have the same size");
@@ -566,15 +628,15 @@ namespace
       }
       if (claims.empty())
       {
-         queueTransaction(id, trx.transaction->tapos().expiration());
+         queueTransaction(id, trx.transaction->tapos().expiration(), std::move(remaining));
       }
       else
       {
          UnverifiedTransactionRecord row{
-             .id                = id,
-             .expiration        = trx.transaction->tapos().expiration(),
-             .remainingVerifies = std::move(remaining),
-             .hasError          = false,
+             .id         = id,
+             .expiration = trx.transaction->tapos().expiration(),
+             .verifies   = std::move(remaining),
+             .hasError   = false,
          };
          unverifiedTransactions.put(row);
       }
