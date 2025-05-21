@@ -31,6 +31,7 @@ set(UI_PROJECTS
     system/AuthSig/ui:AuthSig_js
     system/Producers/ui:Producers_js
     user/Branding/ui:Branding_js
+    user/Evaluations/ui:Evaluations_js
     user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
     user/Explorer/ui:Explorer_js
     user/Homepage/ui:Homepage_js
