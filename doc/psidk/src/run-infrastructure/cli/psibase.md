@@ -14,6 +14,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
+`psibase` [`-a` *url*] `push` *files*\.\.\.  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
 `psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
@@ -227,6 +228,16 @@ Publish packages to a package repository. A package will be skipped if the sende
 - *files*
 
   Package files to publish
+
+### push
+
+`psibase` [`-a` *url*] `push` *files*\.\.\.  
+
+Push a transaction to the chain.
+
+- *files*
+
+  Each file should be JSON containing a list of actions to run. All the actions from all files will be merged into one transaction. If no files are provided, reads the actions from stdin.
 
 ### search
 
