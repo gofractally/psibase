@@ -27,23 +27,29 @@ mod service {
         pub datetime: TimePointSec,
     }
     impl SavedMessage {
-        fn by_msg_id(&self) -> u64 {
-            self.msg_id
+        fn by_msg_id(&self) -> &u64 {
+            &self.msg_id
         }
         fn by_receiver(&self) -> AccountNumber {
             self.receiver
         }
     }
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    struct InitRow {}
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {
+        #[primary_key]
+        pk: (),
+    }
 
     impl InitRow {
-        fn pk(&self) {}
+        fn pk(&self) -> &() {
+            &self.pk
+        }
     }
     #[allow(dead_code)]
     fn init() {
         let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
+        table.put(&InitRow { pk: () }).unwrap();
         SitesSvc::call().enableSpa(true);
         EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
@@ -321,7 +327,7 @@ mod service {
         type PrimaryKey = ();
         const SECONDARY_KEYS: u8 = 0u8;
         const DB: psibase::DbId = psibase::DbId::Service;
-        fn get_primary_key(&self) -> Self::PrimaryKey {
+        fn get_primary_key(&self) -> &Self::PrimaryKey {
             self.pk()
         }
         fn get_secondary_keys(&self) -> Vec<psibase::RawKey> {
@@ -351,7 +357,7 @@ mod service {
         type PrimaryKey = u64;
         const SECONDARY_KEYS: u8 = 1u8;
         const DB: psibase::DbId = psibase::DbId::Service;
-        fn get_primary_key(&self) -> Self::PrimaryKey {
+        fn get_primary_key(&self) -> &Self::PrimaryKey {
             self.by_msg_id()
         }
         fn get_secondary_keys(&self) -> Vec<psibase::RawKey> {

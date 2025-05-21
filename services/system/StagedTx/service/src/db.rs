@@ -11,10 +11,15 @@ pub mod tables {
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    pub struct InitRow {}
-    impl InitRow {
+    pub struct InitRow {
         #[primary_key]
-        fn pk(&self) {}
+        pk: (),
+    }
+
+    impl InitRow {
+        fn pk(&self) -> &() {
+            &self.pk
+        }
     }
 
     /// A table that contains all of the transactions currently staged.

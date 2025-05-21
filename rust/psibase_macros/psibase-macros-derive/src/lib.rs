@@ -444,3 +444,11 @@ pub fn table_query(item: TokenStream) -> TokenStream {
 pub fn table_query_subindex(item: TokenStream) -> TokenStream {
     table_query_subindex_macro_impl(item)
 }
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn service_init(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input2: proc_macro2::TokenStream = item.into();
+    let output2 = psibase_macros_lib::service_init_macro::service_init_macro_impl(input2);
+    output2.into()
+}

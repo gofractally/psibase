@@ -20,21 +20,20 @@ mod service {
         MethodNumber, RawKey, Table, TableQuery, TimePointSec,
     };
 
-    #[action]
+    #[service_init]
     fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-
+        // Removed manual InitRow initialization, now handled by the macro
         SitesSvc::call().enableSpa(true);
 
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
     }
 
-    /// Send message
+    /// Send a message to another account. The message is recorded in history
     /// by emiting a `sent` event
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
+        check_init();
         check(
             AccountsSvc::call().exists(receiver),
             &format!("receiver account {} doesn't exist", receiver),
