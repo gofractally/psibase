@@ -1,9 +1,11 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::tokens::plugin::api::Guest as Api;
+use bindings::exports::tokens::plugin::intf::Guest as Intf;
 use bindings::exports::tokens::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
+use bindings::exports::tokens::plugin::transfer::Guest as Transfer;
+use bindings::exports::tokens::plugin::types as Types;
+
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -13,46 +15,87 @@ mod errors;
 use errors::ErrorType;
 use psibase::Quantity;
 
+pub mod query {
+    pub mod fetch_token;
+}
+
 struct TokensPlugin;
 
-impl Api for TokensPlugin {
-    fn set_example_thing(thing: String) {
-        // let packed_example_thing_args = tokens::action_structs::setExampleThing { thing }.packed();
-        // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
-    }
-
-    fn create(max_supply: String, precision: String) {
-        let precision: u8 = precision.parse().unwrap();
+impl Intf for TokensPlugin {
+    fn create(precision: u8, max_supply: String) -> Result<(), Error> {
         let max_supply = Quantity::from_str(&max_supply, precision.into()).unwrap();
-        let packed_args = tokens::action_structs::create { max_supply }.packed();
+
+        let packed_args = tokens::action_structs::create {
+            max_supply,
+            precision,
+        }
+        .packed();
+
         add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
-            .unwrap();
+    }
+
+    fn burn(token_id: String, amount: String, memo: String, account: String) -> Result<(), Error> {
+        if (account.len() as u8) == 0 {
+            //
+        } else {
+            // add_action_to_transaction(tokens::action_structs::burn, packed_args)
+        }
+
+        Ok(())
+    }
+
+    fn mint(
+        token_id: String,
+        amount: String,
+        memo: String,
+    ) -> Result<(), bindings::exports::tokens::plugin::intf::Error> {
+        Ok(())
     }
 }
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
+impl Transfer for TokensPlugin {
+    fn credit(
+        token_id: String,
+        account: String,
+        amount: String,
+        memo: String,
+    ) -> Result<(), Error> {
+        // build the asset?
+
+        Ok(())
+    }
+
+    fn debit(
+        token_id: String,
+        creditor: String,
+        amount: String,
+        memo: String,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn uncredit(
+        token_id: String,
+        creditor: String,
+        amount: String,
+        memo: String,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Queries for TokensPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        let graphql_str = "query { exampleThing }";
+    fn token_owner(token_id: String) -> Result<Types::TokenDetail, Error> {
+        let token = query::fetch_token::fetch_token(token_id)?;
 
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let examplething_val =
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(examplething_val.data.example_thing)
+        Ok(Types::TokenDetail {
+            id: token.id,
+            owner: token.owner.to_string(),
+            symbol_id: "fwep".to_string(),
+            precision: token.precision,
+            current_supply: token.current_supply.to_string(),
+            max_supply: token.max_supply.to_string(),
+        })
     }
 }
 

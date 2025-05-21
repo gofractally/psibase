@@ -3,7 +3,7 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::precision::Precision;
+use crate::{precision::Precision, Asset};
 
 #[derive(Debug, PartialEq)]
 pub enum ConversionError {
@@ -14,25 +14,44 @@ pub enum ConversionError {
 }
 
 #[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Copy,
+    Default,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "QuantityInput")]
 pub struct Quantity {
     pub value: u64,
-    pub precision: Precision,
+}
+
+impl From<u64> for Quantity {
+    fn from(value: u64) -> Self {
+        Self { value }
+    }
 }
 
 impl Quantity {
-    pub fn new(value: u64, precision: Precision) -> Self {
-        Self { precision, value }
+    pub fn new(value: u64) -> Self {
+        Self { value }
     }
 
     pub fn from_str(amount: &str, precision: Precision) -> Result<Self, ConversionError> {
-        if !amount.chars().all(|c| c.is_ascii_digit()) {
+        if !amount
+            .chars()
+            .filter(|&c| c != '.')
+            .all(|c| c.is_ascii_digit())
+        {
             return Err(ConversionError::InvalidNumber);
         }
-        let value: u64 = match amount.split_once('.') {
+        let value = match amount.split_once('.') {
             Some((integer_part, fraction_part)) => {
                 let integer_value: u64 = integer_part
                     .parse()
@@ -67,7 +86,11 @@ impl Quantity {
             }
         };
 
-        Ok(Self { precision, value })
+        Ok(Self { value })
+    }
+
+    pub fn to_asset(self, precision: Precision) -> Asset {
+        Asset::new(self, precision)
     }
 }
 
@@ -78,39 +101,17 @@ pub enum MathError {
 }
 
 impl Add for Quantity {
-    type Output = Result<Quantity, MathError>;
+    type Output = Quantity;
 
-    fn add(self, rhs: Quantity) -> Result<Quantity, MathError> {
-        if self.precision != rhs.precision {
-            return Err(MathError::PrecisionMismatch);
-        };
-        let new_value = self
-            .value
-            .checked_add(rhs.value)
-            .ok_or(MathError::Overflow)?;
-
-        Ok(Quantity {
-            value: new_value,
-            precision: self.precision,
-        })
+    fn add(self, rhs: Quantity) -> Quantity {
+        self.value.checked_add(rhs.value).unwrap().into()
     }
 }
 
 impl Sub for Quantity {
-    type Output = Result<Quantity, MathError>;
+    type Output = Quantity;
 
-    fn sub(self, rhs: Self) -> Result<Quantity, MathError> {
-        if self.precision != rhs.precision {
-            return Err(MathError::PrecisionMismatch);
-        };
-        let new_value = self
-            .value
-            .checked_sub(rhs.value)
-            .ok_or(MathError::Overflow)?;
-
-        Ok(Quantity {
-            value: new_value,
-            precision: self.precision,
-        })
+    fn sub(self, rhs: Self) -> Quantity {
+        self.value.checked_sub(rhs.value).unwrap().into()
     }
 }

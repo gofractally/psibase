@@ -2,9 +2,9 @@ pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::{Balance, InitRow, InitTable, SharedBalance, Token};
+    use crate::tables::tables::{InitRow, InitTable, SharedBalance, Token};
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::{Quantity, *};
+    use psibase::*;
 
     #[action]
     fn init() {
@@ -13,8 +13,14 @@ pub mod service {
         let init_instance = InitRow { last_used_id: 0 };
         table.put(&init_instance).unwrap();
 
-        // Create the native token.
-        Token::add(Quantity::from_str("21000000", 4.into()).unwrap());
+        let precision: u8 = 4;
+
+        let native_token = Token::add(
+            Quantity::from_str("1000000", precision.into()).unwrap(),
+            precision,
+        );
+
+        check(native_token.id == 1, "expected native token to be ID of 1");
     }
 
     #[pre_action(exclude(init))]
@@ -27,9 +33,9 @@ pub mod service {
     }
 
     #[action]
-    fn create(max_supply: Quantity) -> u64 {
+    fn create(max_supply: Quantity, precision: u8) -> u32 {
         check(max_supply.value > 0, "max supply must be greator than 0");
-        let new_token = Token::add(max_supply);
+        let new_token = Token::add(max_supply, precision);
 
         let creator = get_sender();
 
@@ -45,20 +51,22 @@ pub mod service {
     }
 
     #[action]
-    fn credit(token_id: u64, receiver: AccountNumber, amount: Quantity, memo: String) {
-        let mut balance = Balance::get(get_sender(), token_id);
-        balance.transfer(receiver, amount);
+    fn credit(token_id: u32, receiver: AccountNumber, amount: Quantity, memo: String) {
+        let mut shared_balance = SharedBalance::get(get_sender(), receiver, token_id);
+        shared_balance.credit(amount);
     }
 
     #[action]
-    fn debit(token_id: u64, creditor: AccountNumber, amount: Quantity) {
-        let debitor = get_sender();
-        let mut shared_balance = SharedBalance::get(creditor, debitor, token_id);
-        shared_balance.transfer(debitor, amount);
+    fn debit(token_id: u32, creditor: AccountNumber, amount: Quantity) {
+        let mut shared_balance = SharedBalance::get(creditor, get_sender(), token_id);
+        shared_balance.debit(amount);
     }
 
     #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
+    pub fn credited(token_id: u32, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
+
+    #[event(history)]
+    pub fn debited(token_id: u32, creditor: AccountNumber, debitor: AccountNumber) {}
 }
 
 #[cfg(test)]
