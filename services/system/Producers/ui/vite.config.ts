@@ -1,35 +1,26 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+
+const serviceDir = path.resolve(__dirname);
+
+verifyViteCache(serviceDir);
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
-    react(),
-    {
-      name: "psibase",
-      config: () => ({
-        build: {
-          assetsDir: "",
-          rollupOptions: {
-            external: ["/common/rootdomain.mjs", "/common/common-lib.js"],
-            makeAbsoluteExternalsRelative: false,
-            output: {
-              entryFileNames: "index.js",
-              assetFileNames: "[name][extname]",
-            },
-          },
-        },
-      }),
-    },
+    react(), 
+    createSharedViteConfig({
+        projectDir: serviceDir,
+        manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom']
+        }
+    }),
+    createPsibaseConfig({
+      service: "producers",
+      serviceDir: serviceDir,
+      isServing: command === "serve"
+    }),
   ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@psibase/common-lib": "/common/common-lib.js",
-    },
-  },
-  build: {
-    minify: false,
-  },
-});
+}));
