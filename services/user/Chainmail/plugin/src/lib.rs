@@ -12,22 +12,29 @@ use errors::ErrorType::*;
 mod queries;
 mod serde_structs;
 
+mod db;
+use db::*;
+
 use accounts::plugin::api::get_current_user;
 use chrono::DateTime;
 use exports::chainmail::plugin::{
     api::{Error, Guest as Api},
+    groups::Guest as Groups,
     queries::{Guest as Query, Message},
 };
 use host::common::server as CommonServer;
-use psibase::{fracpack::Pack, services::chainmail::action_structs as Actions, HasActionName};
+use psibase::{
+    check, fracpack::Pack, services::chainmail::action_structs as Actions, HasActionName,
+    TimePointSec,
+};
 use queries::{get_msg_by_id, query_messages_endpoint};
 use serde_structs::{ResponseRoot, TempMessageForDeserGqlResponseData};
 use transact::plugin::intf as Transact;
 
 struct ChainmailPlugin;
 
-pub fn schedule_action<T: HasActionName + Pack>(action: T) -> Result<(), Error> {
-    Transact::add_action_to_transaction(T::ACTION_NAME, &action.packed())
+pub fn schedule_action<T: HasActionName + Pack>(action: T) {
+    Transact::add_action_to_transaction(T::ACTION_NAME, &action.packed()).unwrap();
 }
 
 fn get_unix_time_from_iso8601_str(dt_str: String) -> Result<i64, Error> {
@@ -42,11 +49,13 @@ impl Api for ChainmailPlugin {
             receiver: receiver.as_str().into(),
             subject,
             body,
-        })
+        });
+        Ok(())
     }
 
     fn archive(msg_id: u64) -> Result<(), Error> {
-        schedule_action(Actions::archive { msg_id })
+        schedule_action(Actions::archive { msg_id });
+        Ok(())
     }
 
     fn save(msg_id: u64) -> Result<(), Error> {
@@ -59,7 +68,16 @@ impl Api for ChainmailPlugin {
             msg_id: msg.msg_id,
             sender: msg.sender.as_str().into(),
             datetime: get_unix_time_from_iso8601_str(msg.datetime)?,
-        })
+        });
+        Ok(())
+    }
+
+    fn enable_private_messaging() {
+        let _ = PrivateMessaging::init();
+    }
+
+    fn rotate_pm_key() {
+        PrivateMessaging::init().rotate();
     }
 }
 
@@ -115,6 +133,38 @@ impl Query for ChainmailPlugin {
             .into_iter()
             .map(|m| m.into())
             .collect())
+    }
+}
+
+impl Groups for ChainmailPlugin {
+    fn create_group(
+        members: Vec<String>,
+        expiry: Option<String>,
+        name: Option<String>,
+        description: Option<String>,
+    ) -> Result<(), Error> {
+        let _ = PrivateMessaging::init();
+
+        check(
+            members.len() >= 2,
+            "At least 2 members are required to create a group",
+        );
+
+        let g = Group::init(members, expiry, name, description);
+
+        Ok(g.id())
+    }
+
+    fn delete_group(id: String) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn send_to_group(id: String, subject: String, body: String) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn rotate_key(id: String) -> Result<(), Error> {
+        todo!()
     }
 }
 

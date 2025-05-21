@@ -30,20 +30,38 @@ interface queries {
 interface api {
     use host:common/types.{error};
 
-    // Send an email
+    /// Sets a private message key for the current user, allowing them to
+    /// receive private messages from other users.
+    /// Does nothing if the current user already has a private message key.
+    enable-private-messaging: func();
+
+    /// Rotates the currently logged-in user's private messaging key.
+    rotate-pm-key: func();
+
+    /// Send a public message
     send: func(receiver: string, subject: string, body: string) -> result<_, error>;
-    
-    // Archive an email
-    // Archiving is equivalent to deleting, given message can't be truly deleted.
-    // Archiving is a proactive action equivalent to a node pruning an message (an message's historical event)
+
+    /// Archive a public message
+    /// A message cannot be deleted (since it's a historical event), but it can be 
+    /// archived to prevent seeing it in the inbox.
     archive: func(msg-id: u64) -> result<_, error>;
     
-    // Save an email
-    // Saving a message moves it to state, making it long-lasting (immune to pruning)
+    /// Save a public message by storing it in state, which will prevent it from being pruned
+    /// even if the event log is pruned.
     save: func(msg-id: u64) -> result<_, error>;
+}
+
+interface groups {
+    use host:common/types.{error};
+
+    create-group: func(members: list<string>, expiry: option<string>, name: option<string>, description: option<string>) -> result<_, error>;
+    delete-group: func(id: string) -> result<_, error>;
+    send-to-group: func(id: string, subject: string, body: string) -> result<_, error>;
+    rotate-key: func(id: string) -> result<_, error>;
 }
 
 world imports {
     import api;
     import queries;
+    import groups;
 }
