@@ -1,10 +1,10 @@
 {
-  "name": "ui",
+  "name": "@psibase/fractals-ui",
   "private": true,
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && vite build'",
     "lint": "eslint .",
     "preview": "vite preview"
   },
