@@ -8,7 +8,7 @@ pub fn verify_auth_method(method: &str) {
         // if access not granted, redirect calling app to this app's /permissions endpoint
         prompt_user(
             Some("permissions"),
-            Some(&format!("\{\"caller\":\"{}\",\"method\":\"setExampleThing\",\"prompt\":\"app1 is requesting full access to setExampleThing method.\"\}", caller)),
+            Some(&r#"{"caller":"{}","method":"setExampleThing","prompt":"app1 is requesting full access to setExampleThing method."}"#.replace("{}", &caller)),
         )
         .unwrap();
     }
