@@ -68,7 +68,6 @@ namespace psibase
          codeObj->vmVersion = vmVersion;
          codeObj->code.assign(code.pos, code.end);
       }
-      ++codeObj->numRefs;
       database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
    }  // setCode
 

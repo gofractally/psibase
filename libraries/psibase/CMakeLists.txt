@@ -161,7 +161,6 @@ function(add suffix)
             ../../services/system/Transact/include
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
-            ../../services/user/Fractal/include
             ../../services/user/Invite/include
             ../../services/user/Nft/include
             ../../services/user/Packages/include

@@ -583,7 +583,6 @@ class Node(API):
     def run_psibase(self, args, *, check=True, **kw):
         self._find_psibase()
         result = subprocess.run([self.psibase] + args, check=check, **kw)
-        result.check_returncode()
         return result
     def log(self):
         return open(self.logpath, 'r')

@@ -1,17 +1,22 @@
 // vite.config.ts
-import { resolve } from "path";
+import path from "path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
+const serviceDir = path.resolve(__dirname);
 
 // https://vitejs.dev/guide/build.html#library-mode
 export default defineConfig({
     build: {
         lib: {
-            entry: resolve(__dirname, "src/index.ts"),
+            entry: path.resolve(serviceDir, "src/index.ts"),
             name: "@psibase/common-lib",
             fileName: "common-lib",
         },
         minify: false,
     },
-    plugins: [dts()],
+    plugins: [
+        dts()
+    ],
 });
+
+

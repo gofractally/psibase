@@ -78,6 +78,7 @@ inline constexpr int32_t polyfill_root_dir_fd = 3;
 
 /** WASI Types */
 using wasi_errno_t                                = uint16_t;
+inline constexpr wasi_errno_t wasi_errno_success  = 0;
 inline constexpr wasi_errno_t wasi_errno_again    = 6;
 inline constexpr wasi_errno_t wasi_errno_badf     = 8;
 inline constexpr wasi_errno_t wasi_errno_fault    = 21;
@@ -390,8 +391,8 @@ struct test_chain
 
       // These are not the correct values if we want the chain to actually
       // sync correctly, but it's sufficient for the tester to test services.
-      auto term      = status->current.term;
-      auto commitNum = status->current.blockNum;
+      auto term      = status ? status->current.term : 0;
+      auto commitNum = status ? status->current.blockNum : 0;
 
       blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();
@@ -1157,6 +1158,26 @@ struct callbacks
       return 0;
    }
 
+   uint32_t wasi_fd_tell(wasi_fd_t fd, wasm_ptr<wasi_filesize_t> newoffset)
+   {
+      // Validate file descriptor
+      auto* file = get_file(fd);
+      if (!file)
+         return wasi_errno_badf;
+
+      // Get the current file position using ftell
+      auto position = ftell(file->f);
+      if (position < 0)
+      {
+         return wasi_errno_io;
+      }
+
+      // Store the position in the provided wasm_ptr<wasi_filesize_t>
+      *newoffset = position;
+
+      return wasi_errno_success;
+   }
+
    int32_t testerExecute(span<const char> command) { return system(span_str(command).c_str()); }
 
    test_chain& assert_chain(uint32_t chain, bool require_context = true)
@@ -1733,6 +1754,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::wasi_fd_read>("wasi_snapshot_preview1", "fd_read");
    rhf_t::add<&callbacks::wasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
    rhf_t::add<&callbacks::wasi_fd_seek>("wasi_snapshot_preview1", "fd_seek");
+   rhf_t::add<&callbacks::wasi_fd_tell>("wasi_snapshot_preview1", "fd_tell");
    rhf_t::add<&callbacks::wasi_fd_write>("wasi_snapshot_preview1", "fd_write");
    rhf_t::add<&callbacks::wasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
    rhf_t::add<&callbacks::wasi_path_open>("wasi_snapshot_preview1", "path_open");

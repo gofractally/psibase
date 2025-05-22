@@ -107,6 +107,28 @@ class Foo:
 
 class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
+    def test_push(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+        def make_input(account):
+            return json.dumps(
+                [{"sender":"root",
+                  "service":"accounts",
+                  "method":"newAccount",
+                  "data":{"name":account,"authService":"auth-any","requireNew":False}}])
+        a.run_psibase(['push'] + a.node_args(), input=make_input('a1'), text=True)
+        a.run_psibase(['push', '-'] + a.node_args(), input=make_input('a2'), text=True)
+        with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8') as f:
+            f.write(make_input('a3'))
+            f.flush()
+            a.run_psibase(['push', f.name] + a.node_args())
+
+        a.wait(new_block())
+        for account in ['a1', 'a2', 'a3']:
+            res = a.graphql('accounts', 'query { getAccount(account: "%s") { authService } }' % account)
+            self.assertEqual(res['getAccount']['authService'], 'auth-any')
+
+    @testutil.psinode_test
     def test_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
@@ -220,6 +242,17 @@ class TestPsibase(unittest.TestCase):
     def test_list(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        # A non-existent account should be an error
+        for source in ['neminis', 'http://neminis.a/']:
+            status = a.run_psibase(['list', '--package-source', source] + a.node_args(), encoding='utf-8', stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, check=False)
+            self.assertNotEqual(status.returncode, 0)
+            self.assertIn("account 'neminis' does not exist", status.stderr)
+
+        # An existing account is okay even if it wasn't intended as a package repo
+        for source in ['transact', 'http://transact.a']:
+            l = a.run_psibase(['list', '--available', '--package-source', 'transact'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            self.assertEqual(l, "")
 
         foo = Foo()
 
