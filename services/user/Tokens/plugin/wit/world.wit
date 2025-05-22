@@ -13,6 +13,8 @@ interface types {
         owner: string,
         precision: u8,
         symbol-id: string,
+        current-supply: string,
+        max-supply: string,
     }
 
     record balance {

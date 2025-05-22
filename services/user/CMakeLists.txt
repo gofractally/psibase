@@ -45,8 +45,6 @@ function(add suffix)
         Nft/include
         Packages/include
         Sites/include
-        Symbol/include
-        Tokens/include
     )
 endfunction(add)
 
@@ -63,8 +61,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(Nop)
     add_subdirectory(Packages)
     add_subdirectory(Sites)
-    add_subdirectory(Symbol)
-    add_subdirectory(Tokens)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

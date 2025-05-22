@@ -96,7 +96,7 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTokens RTransact SetCode Symbol
+        RHttpServer RSetCode RTransact SetCode 
         Tokens Transact VerifySig
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService SocketListService SocketAuth)
@@ -244,7 +244,6 @@ add_rs_component_workspace(services/:Plugins
     permissions
     sites
     test
-    tokens
     transact
     workshop
     producers
@@ -376,6 +375,12 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
     PATH services/user/Profiles
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Tokens.psi
+    PATH services/user/Tokens
+    DEPENDS ${Tokens_js_DEP}
 )
 
 cargo_psibase_package(
@@ -732,37 +737,7 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Tokens.psi
-    NAME Tokens
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Token service"
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
-    SERVICE tokens
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Tokens-schema.json
-        DATA ${Plugins_OUTPUT_FILE_tokens} /plugin.wasm
-        SERVER r-tokens
-        INIT
-    SERVICE r-tokens
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTokens-schema.json
-    DEPENDS ${Plugins_DEP}
-    DEPENDS wasm
-)
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    NAME Symbol
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
-    SERVICE symbol
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
-        INIT
-    DEPENDS wasm
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
@@ -788,15 +763,6 @@ psibase_package(
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/postinstall.json
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/TokenUsers.psi
-    NAME TokenUsers
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Initial token users"
-    ACCOUNTS alice bob
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Symbol(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/src/TokenUsers.json
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Packages.psi
@@ -821,7 +787,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Evaluations Events Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
+                    Sites SetCode StagedTx Subgroups Supervisor Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
@@ -831,7 +797,7 @@ psibase_package(
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
+                    Sites SetCode StagedTx Supervisor Tokens Transact Homepage Workshop
 )
 
 
@@ -849,7 +815,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Services used in the tester"
-    PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor
 )
 
 function(write_package_index target dir)
@@ -868,7 +834,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Evaluations Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
+    Sites SetCode StagedTx Subgroups Supervisor Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -909,10 +875,8 @@ install(
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SupervisorTests.psi
-          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/Tokens.psi
-          ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/Workshop.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
