@@ -1,3 +1,5 @@
+cmake_policy(VERSION 3.16.3...3.31.6)
+
 function(json_append_string VAR VALUE)
     set(initial ${${VAR}})
     string(REGEX REPLACE "([\\\"])" "\\\\\\1" result ${VALUE})

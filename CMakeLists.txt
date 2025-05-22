@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-cmake_policy(VERSION 3.16.3...3.25.1)
+cmake_policy(VERSION 3.16.3...3.31.6)
 project(psibase)
 include(ExternalProject)
 
