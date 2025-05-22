@@ -49,5 +49,9 @@ export default defineConfig(({ command }) => {
             topLevelAwait(),
             tsconfigPaths(),
         ],
+        build: {
+            minify: false,
+            sourcemap: true,
+        }
     };
 });
