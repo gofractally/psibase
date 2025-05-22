@@ -217,11 +217,7 @@ namespace psibase::net
          auto expected0 = active_producers[0]->getClaim(producer);
          auto expected1 =
              active_producers[1] ? active_producers[1]->getClaim(producer) : decltype(expected0)();
-         if (!expected0 && !expected1)
-         {
-            return false;
-         }
-         else if (claim != *expected0 && claim != *expected1)
+         if (!(expected0 && claim == *expected0) && !(expected1 && claim == *expected1))
          {
             return false;
          }
