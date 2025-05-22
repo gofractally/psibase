@@ -1,67 +1,38 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import type { IncomingMessage } from "http";
+import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+
+const serviceDir = path.resolve(__dirname);
+
+verifyViteCache(serviceDir);
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
   plugins: [
     react(),
-    {
-      name: "psibase",
-      config: () => ({
-        build: {
-          assetsDir: "",
-          cssCodeSplit: false,
-          rollupOptions: {
-            external: ["/common/rootdomain.mjs", "/common/common-lib.js"],
-            makeAbsoluteExternalsRelative: false,
-            output: {
-              entryFileNames: "index.js",
-              assetFileNames: "[name][extname]",
-            },
-          },
+    createSharedViteConfig({
+        projectDir: serviceDir,
+        manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom']
+        }
+    }),
+    createPsibaseConfig({
+      service: "psibase",
+      serviceDir,
+      isServing: command === "serve",
+      proxyPort: 8079,
+      additionalProxyBypassConditions: [
+        (req) => {
+          const host = req.headers.host || "";
+          const subdomain = host.split(".")[0];
+          return subdomain === "psibase";
         },
-        server: {
-          host: "psibase.127.0.0.1.sslip.io",
-          port: 8081,
-          proxy: {
-            "/": {
-              target: "http://psibase.127.0.0.1.sslip.io:8079/",
-              bypass: (req: IncomingMessage) => {
-                const host = req.headers.host || "";
-                const subdomain = host.split(".")[0];
-                if (
-                  subdomain === "psibase" &&
-                  req.method !== "POST" &&
-                  req.headers.accept !== "application/json" &&
-                  !req.url?.startsWith("/common") &&
-                  !req.url?.startsWith("/api")
-                ) {
-                  return req.url;
-                }
-              },
-            },
-          },
-        },
-        resolve: {
-          alias: [
-            {
-              find: "@",
-              replacement: path.resolve(__dirname, "./src"),
-            },
-          ],
-        },
-      }),
-    },
+        (req) => req.method !== "POST",
+        (req) => req.headers.accept !== "application/json",
+        (req) => !req.url.startsWith("/common"),
+        (req) => !req.url.startsWith("/api")
+      ]
+    }),
   ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@psibase/common-lib": "/common/common-lib.js",
-    },
-  },
-  build: {
-    minify: false,
-  },
-});
+}));

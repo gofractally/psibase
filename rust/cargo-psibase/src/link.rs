@@ -663,6 +663,7 @@ fn new_validator() -> Validator {
         sign_extension: true,
         bulk_memory: true,
         simd: true,
+        saturating_float_to_int: true,
         ..wasmparser::WasmFeatures::default()
     });
     return validator;

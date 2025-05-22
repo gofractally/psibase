@@ -73,8 +73,10 @@
         <ul>
             {#each accounts as a}
                 <li>
-                    <a href="#" on:click={() => goto(`/account/${a.account}`)}
-                        >{a.account}</a>
+                    <button 
+                        class="text-blue-600 hover:text-blue-800 hover:underline"
+                        on:click={() => goto(`/account/${a.account}`)}
+                    >{a.account}</button>
                 </li>
             {/each}
         </ul>
