@@ -320,7 +320,7 @@ namespace
          for (auto& act : row->actions)
          {
             check(act.sender == AccountNumber{} && act.rawData.empty(),
-                  "Invalid nextTransaction callback");
+                  "Invalid preverifyTransaction callback");
             act.rawData = psio::to_frac(std::tuple(trx));
             auto trace  = tester::runAction(chain.nativeHandle(), RunMode::callback, false, act);
             if (trace.error)
