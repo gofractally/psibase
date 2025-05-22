@@ -22,9 +22,9 @@ impl Api for {{project-name | upper_camel_case}}Plugin {
     fn set_example_thing(thing: String) {
         verify_auth_method("setExampleThing");
 
-        // let packed_example_thing_args =
-        //     addperms::action_structs::setExampleThing { thing }.packed();
-        // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+        let packed_example_thing_args =
+            {{project-name}}::action_structs::setExampleThing { thing }.packed();
+        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
     }
 }
 

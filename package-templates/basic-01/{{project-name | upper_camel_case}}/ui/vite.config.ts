@@ -19,7 +19,7 @@ export default defineConfig(({ command }) => ({
                 projectDir: serviceDir,
                 additionalManualChunks: {},
             }),
-        ...createPsibaseConfig({
+        createPsibaseConfig({
             service: serviceName,
             serviceDir,
             isServing: command === "serve",
