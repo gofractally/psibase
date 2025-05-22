@@ -3,7 +3,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::nft::action_structs::debit;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::{check_some, AccountNumber, Quantity};
+    use psibase::{check, check_some, AccountNumber, Quantity};
     use psibase::{services::nft::Wrapper, Fracpack, Table, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -26,6 +26,8 @@ pub mod tables {
         pub precision: u8,
         pub current_supply: Quantity,
         pub max_supply: Quantity,
+        pub recallable: bool,
+        pub burnable: bool,
     }
 
     impl Token {
@@ -54,6 +56,8 @@ pub mod tables {
                 current_supply: 0.into(),
                 max_supply,
                 precision,
+                recallable: true,
+                burnable: true,
             };
 
             token_table
@@ -61,6 +65,37 @@ pub mod tables {
                 .expect("failed to save token");
 
             new_instance
+        }
+
+        pub fn owner(&self) -> AccountNumber {
+            Nfts::call().getNft(self.nft_id).owner
+        }
+
+        pub fn set_recallable(&mut self, recallable: bool) {
+            self.recallable = recallable;
+            self.save();
+        }
+
+        fn save(&mut self) {
+            let table = TokenTable::new();
+            table.put(&self).expect("failed to save token");
+        }
+
+        pub fn mint(&mut self, amount: Quantity, receiver: AccountNumber) {
+            self.current_supply = self.current_supply + amount;
+            psibase::check(self.current_supply <= self.max_supply, "over max supply");
+            self.save();
+
+            let mut user_balance = Balance::get(receiver, self.id);
+            user_balance.add_balance(amount);
+        }
+
+        pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
+            self.current_supply = self.current_supply - amount;
+            self.save();
+
+            let mut user_balance = Balance::get(burnee, self.id);
+            user_balance.sub_balance(amount);
         }
     }
 
@@ -168,6 +203,10 @@ pub mod tables {
         pub fn credit(&mut self, quantity: Quantity) {
             Balance::get(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
+
+            if !TokenHolder::is_manual_debit(self.debitor) {
+                self.debit(quantity);
+            }
         }
 
         pub fn debit(&mut self, quantity: Quantity) {

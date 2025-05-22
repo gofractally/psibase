@@ -1,6 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
+use std::str::FromStr;
+
 use bindings::exports::tokens::plugin::intf::Guest as Intf;
 use bindings::exports::tokens::plugin::queries::Guest as Queries;
 use bindings::exports::tokens::plugin::transfer::Guest as Transfer;
@@ -13,7 +15,7 @@ use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
-use psibase::Quantity;
+use psibase::{AccountNumber, Quantity};
 
 pub mod query {
     pub mod fetch_token;
@@ -35,21 +37,33 @@ impl Intf for TokensPlugin {
     }
 
     fn burn(token_id: String, amount: String, memo: String, account: String) -> Result<(), Error> {
-        if (account.len() as u8) == 0 {
-            //
-        } else {
-            // add_action_to_transaction(tokens::action_structs::burn, packed_args)
-        }
+        let token = query::fetch_token::fetch_token(token_id)?;
+        let from = AccountNumber::from_str(account.as_str()).unwrap();
 
-        Ok(())
+        let amount = Quantity::from_str(&amount, 4.into()).unwrap();
+
+        let packed_args = tokens::action_structs::recall {
+            amount,
+            from,
+            memo,
+            token_id: token.id,
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
     }
 
-    fn mint(
-        token_id: String,
-        amount: String,
-        memo: String,
-    ) -> Result<(), bindings::exports::tokens::plugin::intf::Error> {
-        Ok(())
+    fn mint(token_id: String, amount: String, memo: String) -> Result<(), Error> {
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
+
+        let packed_args = tokens::action_structs::mint {
+            amount,
+            memo,
+            token_id: token.id,
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
 }
 
@@ -60,9 +74,21 @@ impl Transfer for TokensPlugin {
         amount: String,
         memo: String,
     ) -> Result<(), Error> {
-        // build the asset?
+        let token = query::fetch_token::fetch_token(token_id)?;
 
-        Ok(())
+        let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
+
+        let receiver = AccountNumber::from_str(account.as_str()).unwrap();
+
+        let packed_args = tokens::action_structs::credit {
+            amount,
+            memo,
+            receiver,
+            token_id: token.id,
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
     }
 
     fn debit(
@@ -71,7 +97,21 @@ impl Transfer for TokensPlugin {
         amount: String,
         memo: String,
     ) -> Result<(), Error> {
-        Ok(())
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
+
+        let creditor = AccountNumber::from_str(&creditor.as_str()).unwrap();
+
+        let packed_args = tokens::action_structs::debit {
+            amount,
+            creditor,
+            memo,
+            token_id: token.id,
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
     }
 
     fn uncredit(
@@ -91,7 +131,7 @@ impl Queries for TokensPlugin {
         Ok(Types::TokenDetail {
             id: token.id,
             owner: token.owner.to_string(),
-            symbol_id: "fwep".to_string(),
+            symbol_id: "".to_string(),
             precision: token.precision,
             current_supply: token.current_supply.to_string(),
             max_supply: token.max_supply.to_string(),

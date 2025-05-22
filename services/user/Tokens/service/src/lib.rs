@@ -4,11 +4,14 @@ pub mod tables;
 pub mod service {
     use crate::tables::tables::{InitRow, InitTable, SharedBalance, Token};
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::*;
+    use psibase::{Quantity, *};
 
     #[action]
     fn init() {
         check_none(Token::get(1), "init already ran");
+        // if Token::get(1).is_some() {
+        //     return;
+        // }
         let table = InitTable::new();
         let init_instance = InitRow { last_used_id: 0 };
         table.put(&init_instance).unwrap();
@@ -51,13 +54,41 @@ pub mod service {
     }
 
     #[action]
+    fn recall(token_id: u32, from: AccountNumber, amount: Quantity, memo: String) {
+        check(amount.value > 0, "must be greater than 0");
+        let sender = get_sender();
+        let mut token = Token::get_assert(token_id);
+
+        let is_recall = sender != from;
+        if is_recall {
+            check(token.recallable, "token is not recallable");
+            check(token.owner() == sender, "must own token NFT");
+        } else {
+            check(token.burnable, "token is not burnable");
+        }
+
+        token.burn(amount, from);
+    }
+
+    #[action]
+    fn mint(token_id: u32, amount: Quantity, memo: String) {
+        check(amount.value > 0, "must be greater than 0");
+        let sender = get_sender();
+
+        let mut token = Token::get_assert(token_id);
+        check(token.owner() == sender, "must hold the NFT");
+
+        token.mint(amount, sender);
+    }
+
+    #[action]
     fn credit(token_id: u32, receiver: AccountNumber, amount: Quantity, memo: String) {
         let mut shared_balance = SharedBalance::get(get_sender(), receiver, token_id);
         shared_balance.credit(amount);
     }
 
     #[action]
-    fn debit(token_id: u32, creditor: AccountNumber, amount: Quantity) {
+    fn debit(token_id: u32, creditor: AccountNumber, amount: Quantity, memo: String) {
         let mut shared_balance = SharedBalance::get(creditor, get_sender(), token_id);
         shared_balance.debit(amount);
     }

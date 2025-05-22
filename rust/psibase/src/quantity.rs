@@ -1,6 +1,7 @@
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::{precision::Precision, Asset};
@@ -25,6 +26,7 @@ pub enum ConversionError {
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialEq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "QuantityInput")]
@@ -111,7 +113,13 @@ impl Add for Quantity {
 impl Sub for Quantity {
     type Output = Quantity;
 
-    fn sub(self, rhs: Self) -> Quantity {
+    fn sub(self, rhs: Self) -> Self::Output {
         self.value.checked_sub(rhs.value).unwrap().into()
+    }
+}
+
+impl PartialOrd for Quantity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.value.partial_cmp(&other.value)
     }
 }
