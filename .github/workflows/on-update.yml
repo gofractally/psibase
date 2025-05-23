@@ -12,3 +12,5 @@ jobs:
   build:
     name: Run Builds
     uses: ./.github/workflows/ubuntu-builder.yml
+    secrets:
+      publish-package-login: ${{ github.ref == 'refs/heads/main' && secrets.PUBLISH_PACKAGE_LOGIN || null }}
