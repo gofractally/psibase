@@ -225,7 +225,9 @@ void psibase::TestChain::setAutoRun(bool enable)
 
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
-   auto time = status ? status->current.time : TimePointSec{};
+   if (producing)
+      finishBlock();
+   auto time = status ? status->head->header.time : TimePointSec{};
    startBlock(time + MicroSeconds{(1000 + skip_miliseconds) * 1000});
 }
 
@@ -243,7 +245,7 @@ void psibase::TestChain::startBlock(BlockTime tp)
    if (producing)
       finishBlock();
    // Guarantee that there is a recent block for fillTapos to use.
-   if (status && status->current.time + Seconds(1) < tp)
+   if (status && status->head->header.time + Seconds(1) < tp)
    {
       tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count());
       finishBlock();
@@ -256,6 +258,7 @@ void psibase::TestChain::startBlock(BlockTime tp)
 void psibase::TestChain::finishBlock()
 {
    tester::raw::finishBlock(id);
+   status    = kvGet<StatusRow>(StatusRow::db, statusKey());
    producing = false;
    if (isAutoRun)
       runAll();
@@ -303,9 +306,44 @@ namespace
 {
    struct RunTokenData
    {
-      bool success;
-      PSIO_REFLECT(RunTokenData, success)
+      bool                 success;
+      psibase::RunMode     mode;
+      psibase::Action      action;
+      psibase::Checksum256 context;
+      PSIO_REFLECT(RunTokenData, success, mode, action, context)
    };
+
+   psibase::Checksum256 makeRunContext(psibase::TestChain&                      chain,
+                                       psibase::RunMode                         mode,
+                                       const std::optional<psibase::StatusRow>& status)
+   {
+      using namespace psibase;
+      if (mode == RunMode::verify)
+      {
+         std::vector<BlockHeaderAuthAccount> result;
+         if (status)
+         {
+            auto& consensus = status->consensus.next ? status->consensus.next->consensus
+                                                     : status->consensus.current;
+            for (auto service : consensus.services)
+            {
+               if (chain
+                       .kvGet<CodeByHashRow>(
+                           CodeByHashRow::db,
+                           codeByHashKey(service.codeHash, service.vmType, service.vmVersion))
+                       .has_value())
+               {
+                  result.push_back(service);
+               }
+            }
+         }
+         return sha256(result);
+      }
+      else
+      {
+         return Checksum256{};
+      }
+   }
 
    std::vector<std::optional<RunTokenData>> getRunTokens(psibase::TestChain&               chain,
                                                          const psibase::SignedTransaction& trx)
@@ -347,8 +385,29 @@ namespace
       tokens.resize(trx.proofs.size());
       return tokens;
    }
-   psibase::TransactionTrace verifySignatures(psibase::TestChain&               chain,
-                                              const psibase::SignedTransaction& trx)
+
+   void callRejectTransaction(psibase::TestChain&              chain,
+                              const psibase::Checksum256&      id,
+                              const psibase::TransactionTrace& trace)
+   {
+      using namespace psibase;
+      if (auto row = chain.kvGet<NotifyRow>(DbId::native, notifyKey(NotifyType::rejectTransaction)))
+      {
+         for (auto& act : row->actions)
+         {
+            check(act.sender == AccountNumber{} && act.rawData.empty(),
+                  "Invalid rejectTransaction callback");
+            act.rawData = psio::to_frac(std::tie(id, trace));
+            auto trace  = tester::runAction(chain.nativeHandle(), RunMode::callback, false, act);
+            if (trace.error)
+               abortMessage("onTransaction failed: " + *trace.error);
+         }
+      }
+   }
+
+   psibase::TransactionTrace verifySignatures(psibase::TestChain&                      chain,
+                                              const std::optional<psibase::StatusRow>& status,
+                                              const psibase::SignedTransaction&        trx)
    {
       using namespace psibase;
       auto trxId  = sha256(trx.transaction.data(), trx.transaction.size());
@@ -357,19 +416,31 @@ namespace
       {
          return TransactionTrace{.error = "proofs and claims must have same size"};
       }
-      auto tokens = getRunTokens(chain, trx);
+      auto tokens        = getRunTokens(chain, trx);
+      auto verifyContext = makeRunContext(chain, RunMode::verify, status);
       for (auto&& [claim, proof, token] : std::views::zip(claims, trx.proofs, tokens))
       {
-         if (token && token->success)
-            continue;
          VerifyArgs args{trxId, claim, proof};
          Action     act{.sender  = AccountNumber{},
                         .service = claim.service(),
                         .method  = MethodNumber("verifySys"),
                         .rawData = psio::to_frac(args)};
-         auto       trace = tester::runAction(chain.nativeHandle(), RunMode::verify, true, act);
-         if (trace.error)
-            return trace;
+         if (token && token->success && token->mode == RunMode::verify && token->action == act &&
+             token->context == verifyContext)
+         {
+            // skip execution
+         }
+         else
+         {
+            auto trace = tester::runAction(chain.nativeHandle(), RunMode::verify, true, act);
+            if (trace.error)
+            {
+               // We're not running pushTransaction, so we need
+               // to run the failure callback ourselves.
+               callRejectTransaction(chain, trxId, trace);
+               return trace;
+            }
+         }
       }
       return {};
    }
@@ -380,7 +451,7 @@ namespace
 {
    if (!producing)
       startBlock();
-   if (auto trace = verifySignatures(*this, signedTrx); trace.error)
+   if (auto trace = verifySignatures(*this, status, signedTrx); trace.error)
    {
       return trace;
    }
@@ -422,7 +493,8 @@ bool psibase::TestChain::runQueueItem()
                                          psio::convert_to_key(runPrefix()).size()))
    {
       auto trace = tester::runAction(id, row->mode, true, row->action);
-      auto token = psio::to_frac(RunTokenData{!trace.error});
+      auto token = psio::to_frac(RunTokenData{!trace.error, row->mode, row->action,
+                                              makeRunContext(*this, row->mode, status)});
       auto continuationArgs =
           psio::to_frac(std::tuple(row->id, std::move(trace), std::move(token)));
       auto continuation      = Action{.service = row->continuation.service,

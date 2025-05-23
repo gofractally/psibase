@@ -606,7 +606,7 @@ namespace
       for (auto&& [claim, proof] : std::views::zip(claims, trx.proofs))
       {
          VerifyArgs args{id, claim, proof};
-         Action     act{.sender  = RTransact::service,
+         Action     act{.sender  = AccountNumber{},
                         .service = claim.service(),
                         .method  = MethodNumber("verifySys"),
                         .rawData = psio::to_frac(args)};

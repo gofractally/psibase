@@ -9,6 +9,8 @@
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
 
+#include "RemoveCode.hpp"
+
 using namespace psibase;
 using namespace SystemService;
 
@@ -212,18 +214,37 @@ TEST_CASE("Test push_transaction")
       {
       }
 
-      // Remove the verify service
-      REQUIRE(t.from(verifysig)
-                  .to<SetCode>()
-                  .setCode(verifysig, 0, 0, std::vector<char>())
-                  .succeeded());
-      t.startBlock();
+      const char* expectMsg = "";
+      SECTION("Remove service")
+      {
+         REQUIRE(t.from(verifysig)
+                     .to<SetCode>()
+                     .setCode(verifysig, 0, 0, std::vector<char>())
+                     .succeeded());
+         t.startBlock();
+         expectMsg = "service account has no code";
+      }
+      SECTION("Remove code")
+      {
+         auto row        = t.kvGet<CodeRow>(CodeRow::db, codeKey(verifysig)).value();
+         auto removeCode = t.addService("rm-code", "RemoveCode.wasm");
+         REQUIRE(t.from(SetCode::service)
+                     .to<SetCode>()
+                     .setFlags(removeCode, RemoveCode::serviceFlags)
+                     .succeeded());
+         REQUIRE(t.from(removeCode)
+                     .to<RemoveCode>()
+                     .removeCode(row.codeHash, row.vmType, row.vmVersion)
+                     .succeeded());
+         t.startBlock();
+         expectMsg = "service code record is missing";
+      }
 
       // Now push the transaction
       t.runAll();
 
       auto trace = reply.get<TransactionTrace>();
-      CHECK(Result<void>(std::move(trace)).failed("service account has no code"));
+      CHECK(Result<void>(std::move(trace)).failed(expectMsg));
    }
    SECTION("Change verify service 2 keys")
    {
