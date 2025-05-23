@@ -1,5 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
+    use crate::token_settings::TokenSetting;
     use async_graphql::SimpleObject;
     use psibase::services::nft::action_structs::debit;
     use psibase::services::nft::Wrapper as Nfts;
@@ -26,8 +27,7 @@ pub mod tables {
         pub precision: u8,
         pub current_supply: Quantity,
         pub max_supply: Quantity,
-        pub recallable: bool,
-        pub burnable: bool,
+        pub settings_value: u8,
     }
 
     impl Token {
@@ -56,8 +56,7 @@ pub mod tables {
                 current_supply: 0.into(),
                 max_supply,
                 precision,
-                recallable: true,
-                burnable: true,
+                settings_value: TokenSetting::new().value,
             };
 
             token_table
@@ -71,9 +70,21 @@ pub mod tables {
             Nfts::call().getNft(self.nft_id).owner
         }
 
-        pub fn set_recallable(&mut self, recallable: bool) {
-            self.recallable = recallable;
+        pub fn settings(&self) -> TokenSetting {
+            TokenSetting::from(self.settings_value)
+        }
+
+        pub fn save_settings(&mut self, settings: TokenSetting) {
+            self.settings_value = settings.value;
             self.save();
+        }
+
+        pub fn set_recallable(&mut self, recallable: bool) {
+            check(recallable == false, "cannot re-enable recallable once set");
+            let mut current_settings = self.settings();
+            current_settings.set_is_unrecallable(recallable);
+
+            self.save_settings(current_settings);
         }
 
         fn save(&mut self) {

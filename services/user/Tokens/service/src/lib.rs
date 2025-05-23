@@ -1,6 +1,7 @@
 pub mod bitflag;
 pub mod tables;
 pub mod token_balance_settings;
+pub mod token_settings;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::{InitRow, InitTable, SharedBalance, Token};
@@ -59,13 +60,14 @@ pub mod service {
         check(amount.value > 0, "must be greater than 0");
         let sender = get_sender();
         let mut token = Token::get_assert(token_id);
+        let token_settings = token.settings();
 
-        let is_recall = sender != from;
-        if is_recall {
-            check(token.recallable, "token is not recallable");
+        let is_recall_attempt = sender != from;
+        if is_recall_attempt {
+            check(!token_settings.is_unrecallable(), "token is not recallable");
             check(token.owner() == sender, "must own token NFT");
         } else {
-            check(token.burnable, "token is not burnable");
+            check(!token_settings.is_unburnable(), "token is not burnable");
         }
 
         token.burn(amount, from);
