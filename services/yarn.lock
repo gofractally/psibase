@@ -2088,6 +2088,11 @@ __metadata:
     usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     zod: "npm:^3.24.4"
+  dependenciesMeta:
+    "@trivago/prettier-plugin-sort-imports":
+      unplugged: true
+    prettier-plugin-tailwindcss:
+      unplugged: true
   languageName: unknown
   linkType: soft
 
@@ -12615,6 +12620,11 @@ __metadata:
     vite-plugin-wasm: "npm:^3.3.0"
     vite-tsconfig-paths: "npm:^4.3.2"
     zod: "npm:^3.24.2"
+  dependenciesMeta:
+    "@trivago/prettier-plugin-sort-imports@5.2.2":
+      unplugged: true
+    prettier-plugin-tailwindcss@0.5.14:
+      unplugged: true
   languageName: unknown
   linkType: soft
 

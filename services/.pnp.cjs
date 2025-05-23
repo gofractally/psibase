@@ -6854,14 +6854,14 @@ const RAW_RUNTIME_STATE =
     ]],\
     ["@trivago/prettier-plugin-sort-imports", [\
       ["npm:5.2.2", {\
-        "packageLocation": "../.caches/yarn/@trivago-prettier-plugin-sort-imports-npm-5.2.2-f4dcaaedd3-2a4f0464f1.zip/node_modules/@trivago/prettier-plugin-sort-imports/",\
+        "packageLocation": "./.yarn/unplugged/@trivago-prettier-plugin-sort-imports-virtual-60330090eb/node_modules/@trivago/prettier-plugin-sort-imports/",\
         "packageDependencies": [\
           ["@trivago/prettier-plugin-sort-imports", "npm:5.2.2"]\
         ],\
         "linkType": "SOFT"\
       }],\
       ["virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:5.2.2", {\
-        "packageLocation": "./.yarn/__virtual__/@trivago-prettier-plugin-sort-imports-virtual-60330090eb/2/.caches/yarn/@trivago-prettier-plugin-sort-imports-npm-5.2.2-f4dcaaedd3-2a4f0464f1.zip/node_modules/@trivago/prettier-plugin-sort-imports/",\
+        "packageLocation": "./.yarn/unplugged/@trivago-prettier-plugin-sort-imports-virtual-60330090eb/node_modules/@trivago/prettier-plugin-sort-imports/",\
         "packageDependencies": [\
           ["@babel/generator", "npm:7.27.1"],\
           ["@babel/parser", "npm:7.27.2"],\
@@ -15488,14 +15488,14 @@ const RAW_RUNTIME_STATE =
     ]],\
     ["prettier-plugin-tailwindcss", [\
       ["npm:0.5.14", {\
-        "packageLocation": "../.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-ab554dbf84/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["prettier-plugin-tailwindcss", "npm:0.5.14"]\
         ],\
         "linkType": "SOFT"\
       }],\
       ["virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/prettier-plugin-tailwindcss-virtual-7eca7158c3/2/.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-7eca7158c3/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["@ianvs/prettier-plugin-sort-imports", null],\
           ["@prettier/plugin-pug", null],\
@@ -15568,7 +15568,7 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }],\
       ["virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/prettier-plugin-tailwindcss-virtual-ab554dbf84/2/.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-ab554dbf84/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["@ianvs/prettier-plugin-sort-imports", null],\
           ["@prettier/plugin-pug", null],\
@@ -15641,7 +15641,7 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }],\
       ["virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/prettier-plugin-tailwindcss-virtual-09ed13d932/2/.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-09ed13d932/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["@ianvs/prettier-plugin-sort-imports", null],\
           ["@prettier/plugin-pug", null],\
