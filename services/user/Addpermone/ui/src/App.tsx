@@ -1,0 +1,107 @@
+import { useEffect, useState } from "react";
+
+import { Button } from "@shadcn/button";
+import { Label } from "@shadcn/label";
+import { Input } from "@shadcn/input";
+
+import { Nav } from "@components/nav";
+
+import { useCreateConnectionToken } from "@hooks";
+import { useLoggedInUser } from "@hooks/use-logged-in-user";
+
+import { getSupervisor, isRedirectErrorObject } from "@psibase/common-lib";
+const supervisor = getSupervisor();
+
+export const App = () => {
+    const [changesMade, setChangesMade] = useState<boolean>(false);
+    const [exampleThing, setExampleThing] = useState<string>("");
+    const [uploadStatus, setUploadStatus] = useState<string>("");
+    const { data: currentUser } = useLoggedInUser();
+    const thisServiceName = "addpermone"
+
+    const { mutateAsync: onLogin } = useCreateConnectionToken();
+
+    const initApp = async () => {
+        await supervisor.onLoaded();
+        await getExampleThing();
+    };
+
+    useEffect(() => {
+        initApp();
+    }, []);
+
+    const getExampleThing = async () => {
+        const queriedExampleThing = (await supervisor.functionCall({
+            service: thisServiceName,
+            intf: "queries",
+            method: "getExampleThing",
+            params: [],
+        })) as string;
+        setExampleThing(queriedExampleThing);
+    };
+    const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
+        e,
+    ) => {
+        e.preventDefault();
+        try {
+            if (exampleThing) {
+                console.log("setExampleThing::currentUser", currentUser);
+                await supervisor.functionCall({
+                    service: thisServiceName,
+                    intf: "api",
+                    method: "setExampleThing",
+                    params: [exampleThing],
+                });
+            }
+            setChangesMade(false);
+        } catch (e) {
+            console.log("error", e);
+            if (isRedirectErrorObject(e)) {
+                console.log("isRedirect; redirecting to", e.message);
+                 window.location.href = e.message;
+                 return;
+            } else if (e instanceof Error) {
+                console.error(`Error: ${e.message}\nStack: ${e.stack}`);
+                setUploadStatus(`Error: ${e.message}`);
+            } else {
+                console.error(
+                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
+                );
+                setUploadStatus(
+                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
+                );
+            }
+        }
+    };
+
+    return (
+        <div className="mx-auto h-screen w-screen max-w-screen-lg">
+            <Nav title="Example Thing Page" />
+            <form className="mx-auto grid max-w-screen-md grid-cols-6">
+                <div className="col-span-6 mt-6 grid grid-cols-6">
+                    <Label htmlFor="exampleThing" className="col-span-2">
+                        Example Thing
+                    </Label>
+                    <Input
+                        id="exampleThing"
+                        className="col-span-4"
+                        onChange={(e) => {
+                            setExampleThing(e.target.value);
+                            setChangesMade(true);
+                        }}
+                        value={exampleThing}
+                    />
+                </div>
+                <div className="col-span-6 mt-6 font-medium">
+                    <Button
+                        type="submit"
+                        disabled={!changesMade}
+                        onClick={updateAssets}
+                    >
+                        Save
+                    </Button>
+                </div>
+            </form>
+        </div>
+    );
+};
