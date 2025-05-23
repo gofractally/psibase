@@ -1,5 +1,6 @@
+pub mod bitflag;
 pub mod tables;
-
+pub mod token_balance_settings;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::{InitRow, InitTable, SharedBalance, Token};
