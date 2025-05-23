@@ -769,7 +769,8 @@ namespace psibase::http
                auto pos =
                    std::ranges::find_if(server.http_config->services, [&suffix](const auto& entry)
                                         { return entry.first.ends_with(suffix); });
-               if (pos != server.http_config->services.end())
+               if ((req.method() == bhttp::verb::get || req.method() == bhttp::verb::head) &&
+                   pos != server.http_config->services.end())
                {
                   location.append(pos->first);
                   l.unlock();
@@ -792,7 +793,7 @@ namespace psibase::http
 
             SignedTransaction  trx;
             TransactionTrace   trace;
-            TransactionContext tc{bc, trx, trace, true, false, true};
+            TransactionContext tc{bc, trx, trace, DbMode::rpc()};
             ActionTrace&       atrace        = trace.actionTraces.emplace_back();
             auto               startExecTime = steady_clock::now();
 

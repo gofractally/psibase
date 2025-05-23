@@ -32,24 +32,19 @@ namespace psibase
    TransactionContext::TransactionContext(BlockContext&            blockContext,
                                           const SignedTransaction& signedTransaction,
                                           TransactionTrace&        transactionTrace,
-                                          bool                     allowDbRead,
-                                          bool                     allowDbWrite,
-                                          bool                     allowDbReadSubjective,
-                                          bool                     allowDbWriteSubjective)
+                                          DbMode                   dbMode)
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
-         allowDbRead{allowDbRead},
-         allowDbWrite{allowDbWrite},
-         allowDbReadSubjective{allowDbReadSubjective},
-         allowDbWriteSubjective{allowDbWriteSubjective},
+         dbMode(dbMode),
          impl{std::make_unique<TransactionContextImpl>(blockContext.systemContext)}
    {
+      assert(blockContext.writer || dbMode.isReadOnly);
    }
 
    TransactionContext::~TransactionContext()
    {
-      if (!blockContext.isReadOnly)
+      if (blockContext.writer)
       {
          ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets);
          blockContext.db.clearTemporary();
@@ -137,6 +132,15 @@ namespace psibase
       }
    }
 
+   static void reportError(TransactionContext& self, const ActionTrace& atrace)
+   {
+      if (self.blockContext.writer)
+      {
+         self.ownedSockets.close(*self.blockContext.writer,
+                                 *self.blockContext.systemContext.sockets, atrace.error);
+      }
+   }
+
    // TODO: eliminate extra copies
    static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit)
    {
@@ -159,8 +163,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         self.ownedSockets.close(*self.blockContext.writer,
-                                 *self.blockContext.systemContext.sockets, atrace.error);
+         reportError(self, atrace);
          throw;
       }
    }
@@ -209,8 +212,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
@@ -236,8 +238,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
@@ -280,8 +281,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
@@ -307,8 +307,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }

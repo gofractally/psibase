@@ -27,7 +27,11 @@ use package::*;
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
-const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
+const SERVICE_ARGS_RUSTC: &[&str] = &[
+    "--",
+    "-C",
+    "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
+];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -216,6 +220,7 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     OptimizationOptions::new_opt_level_2()
         .shrink_level(wasm_opt::ShrinkLevel::Level1)
         .enable_feature(wasm_opt::Feature::BulkMemory)
+        .enable_feature(wasm_opt::Feature::TruncSat)
         .enable_feature(wasm_opt::Feature::SignExt)
         .enable_feature(wasm_opt::Feature::Simd)
         .debug_info(debug_build)

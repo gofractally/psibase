@@ -101,7 +101,6 @@ namespace psibase
          CodeByHashRow code{.codeHash  = codeHash,
                             .vmType    = vmType,
                             .vmVersion = vmVersion,
-                            .numRefs   = 0,
                             .code      = iter->second->code};
          db.kvPut(CodeByHashRow::db, a, code);
       }

@@ -6,6 +6,15 @@
 
 using namespace SystemService;
 
+namespace
+{
+   void requireAccount(psibase::AccountNumber account)
+   {
+      if (!psibase::to<Accounts>().exists(account))
+         psibase::abortMessage(std::format("account '{}' does not exist", account.str()));
+   }
+}  // namespace
+
 namespace UserService
 {
    struct Query
@@ -60,11 +69,57 @@ namespace UserService
          }
          return result;
       }
+
+      auto package(psibase::AccountNumber owner, std::string name, std::string version) const
+      {
+         requireAccount(owner);
+         return Packages{}.open<PublishedPackageTable>().get(std::tuple(owner, name, version));
+      }
+
+      auto packages(psibase::AccountNumber            owner,
+                    std::optional<std::string>        name,
+                    std::optional<uint32_t>           first,
+                    std::optional<uint32_t>           last,
+                    const std::optional<std::string>& before,
+                    const std::optional<std::string>& after) const
+      {
+         requireAccount(owner);
+
+         using Conn =
+             psibase::Connection<PublishedPackage, psio::FixedString{"PublishedPackageConnection"},
+                                 psio::FixedString{"PublishedPackageEdge"}>;
+         auto published = Packages{}.open<PublishedPackageTable>().getIndex<0>();
+         if (name)
+         {
+            auto index = published.subindex(std::tuple(owner, *name));
+            return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
+         }
+         else
+         {
+            auto index = published.subindex(owner);
+            return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
+         }
+      }
+
+      auto sources(psibase::AccountNumber account) const -> std::vector<PackageSource>
+      {
+         requireAccount(account);
+
+         auto table = Packages{}.open<PackageSourcesTable>();
+         if (auto row = table.get(account))
+         {
+            return std::move(row->sources);
+         }
+         return {};
+      }
    };
    PSIO_REFLECT(  //
        Query,
        method(installed),
-       method(newAccounts, accounts, owner))
+       method(newAccounts, accounts, owner),
+       method(package, owner, name, version),
+       method(packages, owner, name, first, last, before, after),
+       method(sources, account))
 
    struct ManifestQuery
    {
