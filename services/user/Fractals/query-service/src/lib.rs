@@ -9,7 +9,7 @@ mod service {
         Score, ScoreTable,
     };
     use psibase::*;
-    use serde::Deserialize;
+    use serde::{Deserialize, Deserializer};
     use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]
@@ -25,23 +25,38 @@ mod service {
         evaluation_id: u32,
     }
 
-    #[derive(Deserialize, SimpleObject)]
+    #[derive(SimpleObject)]
     struct GroupFinish {
-        owner: AccountNumber,
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        evaluation_id: u32,
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        group_number: u32,
-        users: Vec<AccountNumber>,
-        result: Vec<u8>,
-    }
-
-    #[derive(Deserialize, SimpleObject)]
-    struct GroupFinishResult {
         evaluation_id: u32,
         group_number: u32,
         users: Vec<AccountNumber>,
         result: Vec<AccountNumber>,
+    }
+
+    impl<'de> Deserialize<'de> for GroupFinish {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct GroupFinishRaw {
+                owner: AccountNumber,
+                #[serde(deserialize_with = "deserialize_number_from_string")]
+                evaluation_id: u32,
+                #[serde(deserialize_with = "deserialize_number_from_string")]
+                group_number: u32,
+                users: Vec<AccountNumber>,
+                result: Vec<u8>,
+            }
+
+            let raw = GroupFinishRaw::deserialize(deserializer)?;
+            Ok(GroupFinish {
+                evaluation_id: raw.evaluation_id,
+                group_number: raw.group_number,
+                users: raw.users.clone(),
+                result: fractals::helpers::parse_rank_to_accounts(raw.result, raw.users),
+            })
+        }
     }
 
     struct Query;
@@ -72,34 +87,16 @@ mod service {
                 .query()
         }
 
-        async fn group_finishes(&self, evaluation_id: u32) -> Vec<GroupFinishResult> {
-            let group_finishes: async_graphql::Result<Connection<u64, GroupFinish>> =
-                EventQuery::new("history.evaluations.group_finished")
-                    .condition(format!(
-                        "owner = 'fractals' AND evaluation_id = {}",
-                        evaluation_id
-                    ))
-                    .query();
-
-            let group_finishes: Vec<GroupFinish> = group_finishes
-                .unwrap()
-                .edges
-                .into_iter()
-                .map(|edge| edge.node)
-                .collect();
-
-            group_finishes
-                .into_iter()
-                .map(|group_finish| GroupFinishResult {
-                    evaluation_id: group_finish.evaluation_id,
-                    group_number: group_finish.group_number,
-                    result: fractals::helpers::parse_rank_to_accounts(
-                        group_finish.result,
-                        group_finish.users.clone(),
-                    ),
-                    users: group_finish.users,
-                })
-                .collect()
+        async fn group_finishes(
+            &self,
+            evaluation_id: u32,
+        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+            EventQuery::new("history.evaluations.group_finished")
+                .condition(format!(
+                    "owner = 'fractals' AND evaluation_id = {}",
+                    evaluation_id
+                ))
+                .query()
         }
 
         async fn fractal(&self, fractal: String) -> Option<Fractal> {
@@ -224,9 +221,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query))
-            // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
     }
 }
