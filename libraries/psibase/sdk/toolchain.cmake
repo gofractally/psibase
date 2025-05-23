@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6.0)
+cmake_minimum_required(VERSION 3.16.3)
 
 if(NOT DEFINED WASI_SDK_PREFIX AND DEFINED ENV{WASI_SDK_PREFIX})
     set(WASI_SDK_PREFIX $ENV{WASI_SDK_PREFIX})
