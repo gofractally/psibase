@@ -1,7 +1,7 @@
-import { useCloseEvaluation } from "@/hooks/fractals/useCloseEvaluation";
-import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
-import { useFormatRelative } from "@/hooks/useFormatRelative";
+import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
+import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+import { useFormatRelative } from "@/hooks/use-format-relative";
 import { EvalType } from "@/lib/zod/EvaluationType";
 
 import { Button } from "../ui/button";

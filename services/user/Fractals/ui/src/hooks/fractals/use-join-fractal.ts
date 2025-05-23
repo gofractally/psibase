@@ -9,7 +9,7 @@ import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
-import { setDefaultMembership } from "./useMembership";
+import { setDefaultMembership } from "./use-membership";
 
 const Params = z.object({
     fractal: zAccount,

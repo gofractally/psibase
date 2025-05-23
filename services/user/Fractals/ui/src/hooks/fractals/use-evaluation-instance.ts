@@ -1,7 +1,7 @@
 import { EvalType } from "@/lib/zod/EvaluationType";
 
-import { useEvaluation } from "./useEvaluation";
-import { useFractal } from "./useFractal";
+import { useEvaluation } from "./use-evaluation";
+import { useFractal } from "./use-fractal";
 
 export const useEvaluationInstance = (type: EvalType = EvalType.Repuation) => {
     const { data: fractal } = useFractal();

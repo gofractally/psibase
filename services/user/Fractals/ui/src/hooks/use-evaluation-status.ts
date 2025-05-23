@@ -3,10 +3,10 @@ import { useState } from "react";
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
 import { EvalType } from "@/lib/zod/EvaluationType";
 
-import { useEvaluationInstance } from "./fractals/useEvaluationInstance";
-import { useFractal } from "./fractals/useFractal";
-import { useUsersAndGroups } from "./fractals/useUsersAndGroups";
-import { useCurrentUser } from "./useCurrentUser";
+import { useEvaluationInstance } from "./fractals/use-evaluation-instance";
+import { useFractal } from "./fractals/use-fractal";
+import { useUsersAndGroups } from "./fractals/use-users-and-groups";
+import { useCurrentUser } from "./use-current-user";
 
 export const useEvaluationStatus = (
     now: number,

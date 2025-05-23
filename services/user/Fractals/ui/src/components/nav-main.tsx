@@ -16,7 +16,7 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { cn } from "@/lib/utils";
 
 const browseMenu = [

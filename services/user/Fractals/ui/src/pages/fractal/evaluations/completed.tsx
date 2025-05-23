@@ -1,4 +1,4 @@
-import { EmptyBlock } from "@/components/EmptyBlock";
+import { EmptyBlock } from "@/components/empty-block";
 
 export const Completed = () => {
     return (

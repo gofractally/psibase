@@ -7,7 +7,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
 import { CreateFractalModal } from "./create-fractal-modal";
 

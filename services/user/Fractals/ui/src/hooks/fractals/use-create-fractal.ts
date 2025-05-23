@@ -10,8 +10,8 @@ import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
-import { AccountNameStatus } from "../useAccountStatus";
-import { cacheAddFractalMembership } from "./useFractalMemberships";
+import { AccountNameStatus } from "../use-account-status";
+import { cacheAddFractalMembership } from "./use-fractal-memberships";
 
 const Params = z.object({
     account: zAccount,

@@ -2,7 +2,7 @@ import { Gavel } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { CreateFractalModal } from "../components/create-fractal-modal";
 import { LoginButton } from "../components/login-button";

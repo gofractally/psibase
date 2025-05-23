@@ -1,7 +1,7 @@
 import { PluginError } from "@psibase/common-lib";
 
-import { useFractal } from "@/hooks/fractals/useFractal";
-import { useStart } from "@/hooks/fractals/useStart";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useStart } from "@/hooks/fractals/use-start";
 import { WaitingStart } from "@/lib/getStatus";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 

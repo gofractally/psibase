@@ -11,7 +11,7 @@ import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
 import { Account } from "@/lib/zod/Account";
 
-import { assertUser } from "../useCurrentUser";
+import { assertUser } from "../use-current-user";
 
 export const useUsersAndGroups = (
     interval = 10000,

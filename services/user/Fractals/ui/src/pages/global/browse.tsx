@@ -11,10 +11,10 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
+import { EmptyBlock } from "@/components/empty-block";
 import { CreateFractalModal } from "@/components/create-fractal-modal";
 
-import { useFractals } from "@/hooks/fractals/useFractals";
+import { useFractals } from "@/hooks/fractals/use-fractals";
 
 export const Browse = () => {
     const { data: fractals } = useFractals();

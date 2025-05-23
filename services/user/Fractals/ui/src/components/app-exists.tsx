@@ -1,5 +1,5 @@
-import { useAccountStatus } from "@/hooks/useAccountStatus";
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { useAccountStatus } from "@/hooks/use-account-status";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
 import { CreateAppAccountCard } from "./create-app-account-card";
 

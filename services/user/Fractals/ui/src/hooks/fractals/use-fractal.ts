@@ -5,11 +5,12 @@ import { FractalRes, getFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
-import { useCurrentFractal } from "../useCurrentFractal";
-import { setDefaultMembership } from "./useMembership";
+import { useCurrentFractal } from "../use-current-fractal";
+import { setDefaultMembership } from "./use-membership";
 
 export const useFractal = (account?: Account | undefined | null) => {
-    const accountSelected = account || useCurrentFractal();
+    const currentFractal = useCurrentFractal();
+    const accountSelected = account || currentFractal;
 
     return useQuery<FractalRes>({
         queryKey: QueryKey.fractal(accountSelected),

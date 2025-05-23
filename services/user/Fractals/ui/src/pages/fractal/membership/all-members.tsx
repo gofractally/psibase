@@ -10,8 +10,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { useMembers } from "@/hooks/fractals/useMembers";
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { useMembers } from "@/hooks/fractals/use-members";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 import { cn } from "@/lib/utils";
 

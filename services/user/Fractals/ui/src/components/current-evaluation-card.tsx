@@ -1,8 +1,8 @@
-import { useWatchAttest } from "@/hooks/fractals/useWatchAttest";
-import { useWatchClose } from "@/hooks/fractals/useWatchClose";
-import { useWatchStart } from "@/hooks/fractals/useWatchStart";
+import { useWatchAttest } from "@/hooks/fractals/use-watch-attest";
+import { useWatchClose } from "@/hooks/fractals/use-watch-close";
+import { useWatchStart } from "@/hooks/fractals/use-watch-start";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useNowUnix } from "@/hooks/useNowUnix";
+import { useNowUnix } from "@/hooks/use-now-unix";
 
 import { Deliberation } from "./evaluations/deliberation";
 import { Failed } from "./evaluations/failed";

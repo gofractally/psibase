@@ -5,13 +5,13 @@ import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 
-import { useGroupUsers } from "@/hooks/fractals/useGroupUsers";
-import { setCachedProposal, useProposal } from "@/hooks/fractals/useProposal";
-import { usePropose } from "@/hooks/fractals/usePropose";
-import { useWatchAttest } from "@/hooks/fractals/useWatchAttest";
-import { useWatchClose } from "@/hooks/fractals/useWatchClose";
+import { useGroupUsers } from "@/hooks/fractals/use-group-users";
+import { setCachedProposal, useProposal } from "@/hooks/fractals/use-proposal";
+import { usePropose } from "@/hooks/fractals/use-propose";
+import { useWatchAttest } from "@/hooks/fractals/use-watch-attest";
+import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useNowUnix } from "@/hooks/useNowUnix";
+import { useNowUnix } from "@/hooks/use-now-unix";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
 import { Account } from "@/lib/zod/Account";

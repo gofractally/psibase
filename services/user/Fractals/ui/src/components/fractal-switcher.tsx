@@ -19,11 +19,11 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 
-import { useFractal } from "@/hooks/fractals/useFractal";
-import { useFractalMemberships } from "@/hooks/fractals/useFractalMemberships";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useFractalMemberships } from "@/hooks/fractals/use-fractal-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { zFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";

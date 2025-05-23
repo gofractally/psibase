@@ -1,6 +1,6 @@
 import { EvaluationStatus } from "@/lib/getStatus";
 
-import { useAttest } from "./useAttest";
+import { useAttest } from "./use-attest";
 
 export const useWatchAttest = (status: EvaluationStatus | undefined) => {
     const { mutateAsync: attest, isPending, isError, isSuccess } = useAttest();

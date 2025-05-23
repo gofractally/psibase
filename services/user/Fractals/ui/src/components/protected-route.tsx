@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { Button } from "./ui/button";
 
 import {
@@ -22,7 +22,7 @@ import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useNavigate } from "react-router-dom";
-import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
+import { useExpectCurrentUser } from "@/hooks/use-expect-current-user";
 
 const Other = "-other" as const;
 

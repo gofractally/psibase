@@ -10,12 +10,12 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
+import { EmptyBlock } from "@/components/empty-block";
 import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
 
-import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
-import { useFractal } from "@/hooks/fractals/useFractal";
-import { useNextEvaluations } from "@/hooks/fractals/useNextEvaluations";
+import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 
 export const ActiveAndUpcoming = () => {
     const { data: fractal } = useFractal();

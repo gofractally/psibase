@@ -1,5 +1,5 @@
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
-import { useBranding } from "@/hooks/useBranding";
+import { useBranding } from "@/hooks/use-branding";
 import { siblingUrl } from "@psibase/common-lib";
 import { SettingsDropdown } from "./settings-dropdown";
 

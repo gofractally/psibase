@@ -10,11 +10,11 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
+import { EmptyBlock } from "@/components/empty-block";
 import { useAppForm } from "@/components/form/app-form";
 
-import { useSetSchedule } from "@/hooks/fractals/useSetSchedule";
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
 export const Proposed = () => {

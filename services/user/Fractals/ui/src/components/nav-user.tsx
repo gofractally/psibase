@@ -29,13 +29,13 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
-import { useLogout } from "@/hooks/useLogout";
+import { useLogout } from "@/hooks/use-logout";
 import { useTheme } from "./theme-provider";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";

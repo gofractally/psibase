@@ -12,7 +12,7 @@ import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 import { zUnix } from "@/lib/zod/Unix";
 
-import { setDefaultMembership } from "./useMembership";
+import { setDefaultMembership } from "./use-membership";
 
 const Params = z.object({
     evalType: zEvalType,

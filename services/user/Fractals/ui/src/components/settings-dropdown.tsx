@@ -16,9 +16,9 @@ import { Settings, LogOut, Sun, Moon, UserPlus, LogIn } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useTheme } from "./theme-provider";
-import { useLogout } from "@/hooks/useLogout";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useLogout } from "@/hooks/use-logout";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 
 export const SettingsDropdown = () => {
   const { setTheme } = useTheme();

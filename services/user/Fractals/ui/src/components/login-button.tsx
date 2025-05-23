@@ -1,4 +1,4 @@
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,

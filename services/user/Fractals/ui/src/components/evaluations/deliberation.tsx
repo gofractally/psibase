@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
-import { useEvaluationInstance } from "@/hooks/fractals/useEvaluationInstance";
-import { useFractal } from "@/hooks/fractals/useFractal";
+import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useFractal } from "@/hooks/fractals/use-fractal";
 import { DeliberationPhase } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 

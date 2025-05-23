@@ -1,8 +1,9 @@
 import { humanize } from "@/lib/humanize";
 
-import { useNowUnix } from "./useNowUnix";
+import { useNowUnix } from "./use-now-unix";
 
 export const useFormatRelative = (date: Date | number | undefined | null) => {
+    const now = useNowUnix();
     if (!date)
         return {
             label: "",
@@ -10,7 +11,6 @@ export const useFormatRelative = (date: Date | number | undefined | null) => {
         };
     const then =
         typeof date === "number" ? date : Math.floor(date.getTime() / 1000);
-    const now = useNowUnix();
 
     return {
         label: humanize(now - then),

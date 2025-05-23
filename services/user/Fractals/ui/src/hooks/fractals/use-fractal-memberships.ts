@@ -8,7 +8,7 @@ import {
 } from "@/lib/graphql/fractals/getFractalMemberships";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
 
-import { assertUser } from "../useCurrentUser";
+import { assertUser } from "../use-current-user";
 
 export const useFractalMemberships = (user: OptionalAccount) =>
     useQuery({

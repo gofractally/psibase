@@ -8,31 +8,30 @@ import { getSupervisor } from "@psibase/common-lib";
 import { fractalsService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
-import { assertUser } from "../useCurrentUser";
-import { updateParticipants } from "./useUsersAndGroups";
+import { assertUser } from "../use-current-user";
+import { updateParticipants } from "./use-users-and-groups";
 
 const Params = z.object({
     evaluationId: z.number(),
 });
 
-export const useRegister = () => {
-    return useMutation({
+export const useUnregister = () =>
+    useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
-            updateParticipants(params.evaluationId, assertUser(), true);
+            updateParticipants(params.evaluationId, assertUser(), false);
 
             void (await getSupervisor().functionCall({
-                method: "register",
+                method: "unregister",
                 service: fractalsService,
                 intf: "api",
                 params: [params.evaluationId],
             }));
         },
         onError: (error, params) => {
-            updateParticipants(params.evaluationId, assertUser(), false);
+            updateParticipants(params.evaluationId, assertUser(), true);
             toast.error(error.message);
             queryClient.invalidateQueries({
                 queryKey: QueryKey.usersAndGroups(params.evaluationId),
             });
         },
     });
-};

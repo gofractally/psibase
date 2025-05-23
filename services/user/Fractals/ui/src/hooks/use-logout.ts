@@ -1,6 +1,6 @@
 import { supervisor } from "@/supervisor";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useExpectCurrentUser } from "./useExpectCurrentUser";
+import { useExpectCurrentUser } from "./use-expect-current-user";
 import QueryKey from "@/lib/queryKeys";
 
 export const useLogout = () => {

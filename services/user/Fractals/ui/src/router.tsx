@@ -1,6 +1,6 @@
 import { createBrowserRouter, redirect } from "react-router-dom";
 
-import { Loader } from "@/pages/Loader";
+import { Loader } from "@/pages/loader";
 import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
 import { Completed } from "@/pages/fractal/evaluations/completed";
 import { Proposed } from "@/pages/fractal/evaluations/proposed";

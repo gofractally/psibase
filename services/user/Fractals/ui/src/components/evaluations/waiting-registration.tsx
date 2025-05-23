@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 
-import { useFormatRelative } from "@/hooks/useFormatRelative";
+import { useFormatRelative } from "@/hooks/use-format-relative";
 import { WaitingRegistration as WaitingRegistrationPhase } from "@/lib/getStatus";
 
 export const WaitingRegistration = ({

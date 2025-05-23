@@ -17,17 +17,17 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar";
 
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
 import { fractalMenus } from "./nav-main";
 
-const pathNameIndex = (index: number) => {
-    const location = useLocation();
-    return location.pathname.split("/")[index];
-};
-
 export const Layout = () => {
     const fractal = useCurrentFractal();
+    const location = useLocation();
+
+    const pathNameIndex = (index: number) => {
+        return location.pathname.split("/")[index];
+    };
 
     const selectedGroup = fractalMenus.find(
         (menu) => pathNameIndex(3) == menu.path,

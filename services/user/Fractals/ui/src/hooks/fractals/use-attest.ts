@@ -8,8 +8,8 @@ import { getSupervisor } from "@psibase/common-lib";
 import { fractalsService } from "@/lib/constants";
 import { paths } from "@/lib/paths";
 
-import { useCurrentFractal } from "../useCurrentFractal";
-import { updateAttestation } from "./useUsersAndGroups";
+import { useCurrentFractal } from "../use-current-fractal";
+import { updateAttestation } from "./use-users-and-groups";
 
 const Params = z.object({
     evaluationId: z.number(),

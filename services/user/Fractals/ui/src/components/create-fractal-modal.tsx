@@ -7,9 +7,9 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 
-import { useCreateFractal } from "@/hooks/fractals/useCreateFractal";
-import { useFractalMemberships } from "@/hooks/fractals/useFractalMemberships";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCreateFractal } from "@/hooks/fractals/use-create-fractal";
+import { useFractalMemberships } from "@/hooks/fractals/use-fractal-memberships";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useAppForm } from "./form/app-form";
 

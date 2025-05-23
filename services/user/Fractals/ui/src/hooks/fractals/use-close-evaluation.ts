@@ -10,7 +10,7 @@ import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
-import { useEvaluationInstance } from "./useEvaluationInstance";
+import { useEvaluationInstance } from "./use-evaluation-instance";
 
 const Params = z.object({
     fractal: zAccount,

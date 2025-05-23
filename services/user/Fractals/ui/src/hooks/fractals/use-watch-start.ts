@@ -5,7 +5,7 @@ import { EvaluationStatus } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 import { EvalType } from "@/lib/zod/EvaluationType";
 
-import { useFractal } from "./useFractal";
+import { useFractal } from "./use-fractal";
 
 export const useWatchStart = (status: EvaluationStatus | undefined) => {
     const { data: fractal } = useFractal();

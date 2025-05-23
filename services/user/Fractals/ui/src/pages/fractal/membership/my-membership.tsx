@@ -3,11 +3,11 @@ import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { useFractal } from "@/hooks/fractals/useFractal";
-import { useJoinFractal } from "@/hooks/fractals/useJoinFractal";
-import { useMembership } from "@/hooks/fractals/useMembership";
-import { useCurrentFractal } from "@/hooks/useCurrentFractal";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
+import { useMembership } from "@/hooks/fractals/use-membership";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
 export const MyMembership = () => {
