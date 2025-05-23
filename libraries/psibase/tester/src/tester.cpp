@@ -312,3 +312,13 @@ std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId     
       return std::nullopt;
    return psibase::getResult(size);
 }
+
+std::optional<std::vector<char>> psibase::TestChain::kvGreaterEqualRaw(DbId               db,
+                                                                       psio::input_stream key,
+                                                                       uint32_t matchKeySize)
+{
+   auto size = tester::raw::kvGreaterEqual(id, db, key.pos, key.remaining(), matchKeySize);
+   if (size == -1)
+      return std::nullopt;
+   return psibase::getResult(size);
+}

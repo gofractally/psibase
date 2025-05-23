@@ -377,10 +377,13 @@ namespace psibase
          {
             auto row = db.kvGet<CodeRow>(CodeRow::db, codeKey(name));
             assert(!!row);
-            modifiedAuthServices.push_back({.codeNum   = row->codeNum,
-                                            .codeHash  = row->codeHash,
-                                            .vmType    = row->vmType,
-                                            .vmVersion = row->vmVersion});
+            if (row->codeHash != Checksum256{})
+            {
+               modifiedAuthServices.push_back({.codeNum   = row->codeNum,
+                                               .codeHash  = row->codeHash,
+                                               .vmType    = row->vmType,
+                                               .vmVersion = row->vmVersion});
+            }
          }
       }
       std::ranges::sort(modifiedAuthServices,
@@ -589,9 +592,8 @@ namespace psibase
       tc.execNonTrxAction(0, action, atrace);
    }
 
-   auto BlockContext::execAsyncExport(std::string_view  fn,
-                                      Action&&          action,
-                                      TransactionTrace& trace) -> ActionTrace&
+   auto BlockContext::execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+       -> ActionTrace&
    {
       SignedTransaction  trx;
       auto&              atrace = trace.actionTraces.emplace_back();
