@@ -90,12 +90,20 @@ mod service {
         async fn group_finishes(
             &self,
             evaluation_id: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
             EventQuery::new("history.evaluations.group_finished")
                 .condition(format!(
                     "owner = 'fractals' AND evaluation_id = {}",
                     evaluation_id
                 ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
                 .query()
         }
 
