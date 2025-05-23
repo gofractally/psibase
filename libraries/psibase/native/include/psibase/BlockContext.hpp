@@ -45,6 +45,7 @@ namespace psibase
       void      callOnBlock();
       void      callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
       std::optional<SignedTransaction>         callNextTransaction();
+      void                                     callRun(psio::view<const RunRow> row);
       Checksum256                              makeEventMerkleRoot();
       Checksum256                              makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(

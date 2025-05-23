@@ -1,4 +1,5 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 
@@ -261,6 +262,15 @@ namespace psibase
       }
    }
 
+   namespace
+   {
+      struct VerifyTokenData
+      {
+         bool success;
+         PSIO_REFLECT(VerifyTokenData, success)
+      };
+   }  // namespace
+
    std::optional<SignedTransaction> BlockContext::callNextTransaction()
    {
       auto notifyType = NotifyType::nextTransaction;
@@ -328,6 +338,73 @@ namespace psibase
       return {};
    }
 
+   void BlockContext::callRun(psio::view<const RunRow> row)
+   {
+      auto action = row.action().unpack();
+
+      DbMode mode = DbMode::rpc();
+      switch (row.mode().unpack())
+      {
+         case RunMode::verify:
+            mode = DbMode::verify();
+            break;
+         case RunMode::speculative:
+            mode = DbMode::transaction();
+            break;
+         case RunMode::rpc:
+            mode = DbMode::rpc();
+            break;
+         default:
+            PSIBASE_LOG(trxLogger, warning) << "Wrong run mode should be caught earlier";
+            break;
+      }
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, mode};
+      auto&              atrace = trace.actionTraces.emplace_back();
+
+      auto session = db.startWrite(writer);
+      try
+      {
+         auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
+         tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
+         tc.execNonTrxAction(0, action, atrace);
+         PSIBASE_LOG(trxLogger, debug)
+             << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, debug) << "async " << action.service.str()
+                                       << "::" << action.method.str() << " failed: " << e.what();
+      }
+
+      try
+      {
+         auto token = psio::to_frac(VerifyTokenData{!trace.error});
+         // Run the continuation
+         Action             action{.sender  = {},
+                                   .service = row.continuation().service(),
+                                   .method  = row.continuation().method(),
+                                   .rawData = psio::to_frac(
+                           std::tuple(row.id().unpack(), trace, std::optional{std::move(token)}))};
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, DbMode::rpc()};
+         auto&              atrace = trace.actionTraces.emplace_back();
+         tc.execNonTrxAction(0, action, atrace);
+         PSIBASE_LOG(trxLogger, debug) << "async continuation " << action.service.str()
+                                       << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, warning) << "async continuation " << action.service.str()
+                                         << "::" << action.method.str() << " failed: " << e.what();
+      }
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
@@ -377,10 +454,13 @@ namespace psibase
          {
             auto row = db.kvGet<CodeRow>(CodeRow::db, codeKey(name));
             assert(!!row);
-            modifiedAuthServices.push_back({.codeNum   = row->codeNum,
-                                            .codeHash  = row->codeHash,
-                                            .vmType    = row->vmType,
-                                            .vmVersion = row->vmVersion});
+            if (row->codeHash != Checksum256{})
+            {
+               modifiedAuthServices.push_back({.codeNum   = row->codeNum,
+                                               .codeHash  = row->codeHash,
+                                               .vmType    = row->vmType,
+                                               .vmVersion = row->vmVersion});
+            }
          }
       }
       std::ranges::sort(modifiedAuthServices,

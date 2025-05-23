@@ -344,7 +344,7 @@ namespace psibase
       return impl->watchdog.elapsed();
    }
 
-   void TransactionContext::setWatchdog(std::chrono::steady_clock::duration watchdogLimit)
+   void TransactionContext::setWatchdog(CpuClock::duration watchdogLimit)
    {
       impl->watchdog.setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog
