@@ -11,14 +11,14 @@ import { zAccount } from "@/lib/zod/Account";
 
 import { setDefaultMembership } from "./use-membership";
 
-const Params = z.object({
+const zParams = z.object({
     fractal: zAccount,
 });
 
 export const useJoinFractal = () =>
-    useMutation<undefined, Error, z.infer<typeof Params>>({
+    useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
-            const { fractal } = Params.parse(params);
+            const { fractal } = zParams.parse(params);
 
             void (await supervisor.functionCall({
                 method: "join",
@@ -28,7 +28,7 @@ export const useJoinFractal = () =>
             }));
         },
         onSuccess: (_, params) => {
-            const { fractal } = Params.parse(params);
+            const { fractal } = zParams.parse(params);
 
             const currentUser = zAccount.parse(
                 queryClient.getQueryData(QueryKey.currentUser()),

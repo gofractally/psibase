@@ -1,5 +1,3 @@
-"use client";
-
 import dayjs from "dayjs";
 import { CalendarIcon } from "lucide-react";
 import * as React from "react";
@@ -17,7 +15,13 @@ import { cn } from "@/lib/utils";
 
 import { useFieldContext } from "./app-form";
 
-export function DateTimePicker24h({ label = "No label", description }: { label: string, description?: string | undefined }) {
+export function DateTimePicker24h({
+    label = "No label",
+    description,
+}: {
+    label: string;
+    description?: string | undefined;
+}) {
     const [isOpen, setIsOpen] = React.useState(false);
 
     const field = useFieldContext<Date>();
@@ -68,7 +72,9 @@ export function DateTimePicker24h({ label = "No label", description }: { label: 
                     </Button>
                 </PopoverTrigger>
             </div>
-            <div className="text-sm text-muted-foreground py-2">{description}</div>
+            <div className="py-2 text-sm text-muted-foreground">
+                {description}
+            </div>
             <PopoverContent className="w-auto p-0">
                 <div className="sm:flex">
                     <Calendar

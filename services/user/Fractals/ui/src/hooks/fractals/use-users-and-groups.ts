@@ -4,8 +4,8 @@ import { z } from "zod";
 
 import { fractalsService } from "@/lib/constants";
 import {
-    UsersAndGroupsResponse,
     getUsersAndGroups,
+    zUsersAndGroupsResponse,
 } from "@/lib/graphql/evaluations/getUsersAndGroups";
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
@@ -33,11 +33,11 @@ export const updateParticipants = (
 ) => {
     queryClient.setQueryData(
         QueryKey.usersAndGroups(evaluationId),
-        (data: any) => {
+        (data: unknown) => {
             if (data) {
-                const existingData = UsersAndGroupsResponse.parse(data);
+                const existingData = zUsersAndGroupsResponse.parse(data);
 
-                const res: z.infer<typeof UsersAndGroupsResponse> = {
+                const res: z.infer<typeof zUsersAndGroupsResponse> = {
                     ...existingData,
                     users: [
                         ...existingData.users,
@@ -64,11 +64,11 @@ export const updateAttestation = (
 
     queryClient.setQueryData(
         QueryKey.usersAndGroups(evaluationId),
-        (data: any) => {
+        (data: unknown) => {
             if (data) {
-                const existingData = UsersAndGroupsResponse.parse(data);
+                const existingData = zUsersAndGroupsResponse.parse(data);
 
-                const res: z.infer<typeof UsersAndGroupsResponse> = {
+                const res: z.infer<typeof zUsersAndGroupsResponse> = {
                     ...existingData,
                     users: updateArray(
                         existingData.users,

@@ -11,8 +11,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { EmptyBlock } from "@/components/empty-block";
 import { CreateFractalModal } from "@/components/create-fractal-modal";
+import { EmptyBlock } from "@/components/empty-block";
 
 import { useFractals } from "@/hooks/fractals/use-fractals";
 

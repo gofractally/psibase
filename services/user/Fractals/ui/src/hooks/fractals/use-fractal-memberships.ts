@@ -22,11 +22,12 @@ export const cacheAddFractalMembership = (
 ) => {
     queryClient.setQueryData(
         QueryKey.fractalMemberships(assertUser()),
-        (existingFractals: any) => {
+        (existingFractals: unknown) => {
             if (existingFractals) {
                 const parsedExistingFractals =
                     zFractalMembershipListInstance.parse(existingFractals);
-                const newFractalsList = zFractalMembershipListInstance.parse(newFractals);
+                const newFractalsList =
+                    zFractalMembershipListInstance.parse(newFractals);
 
                 return [...parsedExistingFractals, ...newFractalsList];
             }

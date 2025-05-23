@@ -12,16 +12,16 @@ import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { useEvaluationInstance } from "./use-evaluation-instance";
 
-const Params = z.object({
+const zParams = z.object({
     fractal: zAccount,
     evalType: zEvalType,
 });
 
 export const useCloseEvaluation = () => {
     const { evaluationInstance } = useEvaluationInstance();
-    return useMutation<undefined, Error, z.infer<typeof Params>>({
+    return useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
-            const { fractal, evalType } = Params.parse(params);
+            const { fractal, evalType } = zParams.parse(params);
 
             void (await supervisor.functionCall({
                 method: "closeEval",

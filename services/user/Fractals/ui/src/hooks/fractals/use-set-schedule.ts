@@ -14,7 +14,7 @@ import { zUnix } from "@/lib/zod/Unix";
 
 import { setDefaultMembership } from "./use-membership";
 
-const Params = z.object({
+const zParams = z.object({
     evalType: zEvalType,
     fractal: zAccount,
     registration: zUnix,
@@ -26,7 +26,7 @@ const Params = z.object({
 });
 
 export const useSetSchedule = () =>
-    useMutation<undefined, Error, z.infer<typeof Params>>({
+    useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             const {
                 fractal,
@@ -37,7 +37,7 @@ export const useSetSchedule = () =>
                 intervalSeconds,
                 forceDelete,
                 evalType,
-            } = Params.parse(params);
+            } = zParams.parse(params);
 
             toast.promise(
                 async () => {
@@ -61,7 +61,7 @@ export const useSetSchedule = () =>
             );
         },
         onSuccess: (_, params) => {
-            const { fractal } = Params.parse(params);
+            const { fractal } = zParams.parse(params);
 
             const currentUser = zAccount.parse(
                 queryClient.getQueryData(QueryKey.currentUser()),

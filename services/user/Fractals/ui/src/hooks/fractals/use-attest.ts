@@ -11,7 +11,7 @@ import { paths } from "@/lib/paths";
 import { useCurrentFractal } from "../use-current-fractal";
 import { updateAttestation } from "./use-users-and-groups";
 
-const Params = z.object({
+const zParams = z.object({
     evaluationId: z.number(),
     groupNumber: z.number(),
 });
@@ -21,8 +21,8 @@ export const useAttest = () => {
     const fractal = useCurrentFractal();
 
     return useMutation({
-        mutationFn: async (params: z.infer<typeof Params>) => {
-            let toastId = toast.loading("Sending attest...");
+        mutationFn: async (params: z.infer<typeof zParams>) => {
+            const toastId = toast.loading("Sending attest...");
             void (await getSupervisor().functionCall({
                 method: "attest",
                 service: fractalsService,

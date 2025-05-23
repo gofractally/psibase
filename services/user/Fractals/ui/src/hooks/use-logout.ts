@@ -1,24 +1,27 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { supervisor } from "@/supervisor";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useExpectCurrentUser } from "./use-expect-current-user";
+
 import QueryKey from "@/lib/queryKeys";
 
-export const useLogout = () => {
-  const queryClient = useQueryClient();
-  const [_, setExpectCurrentUser] = useExpectCurrentUser();
+import { useExpectCurrentUser } from "./use-expect-current-user";
 
-  return useMutation({
-    mutationKey: QueryKey.logout(),
-    mutationFn: async () =>
-      supervisor.functionCall({
-        method: "logout",
-        params: [],
-        service: "accounts",
-        intf: "activeApp",
-      }),
-    onSuccess: () => {
-      setExpectCurrentUser(false);
-      queryClient.setQueryData(QueryKey.currentUser(), null);
-    },
-  });
+export const useLogout = () => {
+    const queryClient = useQueryClient();
+    const [_, setExpectCurrentUser] = useExpectCurrentUser();
+
+    return useMutation({
+        mutationKey: QueryKey.logout(),
+        mutationFn: async () =>
+            supervisor.functionCall({
+                method: "logout",
+                params: [],
+                service: "accounts",
+                intf: "activeApp",
+            }),
+        onSuccess: () => {
+            setExpectCurrentUser(false);
+            queryClient.setQueryData(QueryKey.currentUser(), null);
+        },
+    });
 };

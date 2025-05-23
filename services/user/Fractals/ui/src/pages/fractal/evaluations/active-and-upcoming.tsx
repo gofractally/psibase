@@ -10,8 +10,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 
-import { EmptyBlock } from "@/components/empty-block";
 import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
+import { EmptyBlock } from "@/components/empty-block";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFractal } from "@/hooks/fractals/use-fractal";

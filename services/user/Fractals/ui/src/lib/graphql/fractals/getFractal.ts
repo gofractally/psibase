@@ -25,12 +25,12 @@ export const zEvaluation = z
     })
     .array();
 
-const FractalRes = z.object({
+const zFractalRes = z.object({
     fractal: zFractal,
     evaluations: zEvaluation,
 });
 
-export type FractalRes = z.infer<typeof FractalRes>;
+export type FractalRes = z.infer<typeof zFractalRes>;
 
 export const getFractal = async (owner: Account) => {
     const fractal = await graphql(
@@ -52,5 +52,5 @@ export const getFractal = async (owner: Account) => {
     }`,
     );
 
-    return FractalRes.parse(fractal);
+    return zFractalRes.parse(fractal);
 };

@@ -11,13 +11,13 @@ import QueryKey from "@/lib/queryKeys";
 import { assertUser } from "../use-current-user";
 import { updateParticipants } from "./use-users-and-groups";
 
-const Params = z.object({
+const zParams = z.object({
     evaluationId: z.number(),
 });
 
 export const useRegister = () => {
     return useMutation({
-        mutationFn: async (params: z.infer<typeof Params>) => {
+        mutationFn: async (params: z.infer<typeof zParams>) => {
             updateParticipants(params.evaluationId, assertUser(), true);
 
             void (await getSupervisor().functionCall({

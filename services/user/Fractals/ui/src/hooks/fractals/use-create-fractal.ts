@@ -10,20 +10,20 @@ import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
-import { AccountNameStatus } from "../use-account-status";
+import { zAccountNameStatus } from "../use-account-status";
 import { cacheAddFractalMembership } from "./use-fractal-memberships";
 
-const Params = z.object({
+const zParams = z.object({
     account: zAccount,
     name: z.string(),
     mission: z.string(),
 });
 
 export const useCreateFractal = () =>
-    useMutation<undefined, Error, z.infer<typeof Params>>({
+    useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationKey: QueryKey.createFractal(),
         mutationFn: async (params) => {
-            const { account, mission, name } = Params.parse(params);
+            const { account, mission, name } = zParams.parse(params);
             toast.promise(
                 async () => {
                     void (await supervisor.functionCall({
@@ -39,7 +39,7 @@ export const useCreateFractal = () =>
         onSuccess: (_, { account, mission, name }) => {
             queryClient.setQueryData(
                 QueryKey.userAccount(account),
-                () => AccountNameStatus.Enum.Taken,
+                () => zAccountNameStatus.Enum.Taken,
             );
 
             setTimeout(() => {

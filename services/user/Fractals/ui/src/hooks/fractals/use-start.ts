@@ -7,13 +7,13 @@ import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
-const Params = z.object({
+const zParams = z.object({
     fractal: zAccount,
     evaluationType: zEvalType,
 });
 
 export const useStart = () => {
-    return useMutation<undefined, PluginError, z.infer<typeof Params>>({
+    return useMutation<undefined, PluginError, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             await getSupervisor().functionCall({
                 method: "start",

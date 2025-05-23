@@ -1,11 +1,11 @@
 import { createBrowserRouter, redirect } from "react-router-dom";
 
-import { Loader } from "@/pages/loader";
 import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
 import { Completed } from "@/pages/fractal/evaluations/completed";
 import { Proposed } from "@/pages/fractal/evaluations/proposed";
 import { AllMembers } from "@/pages/fractal/membership/all-members";
 import { MyMembership } from "@/pages/fractal/membership/my-membership";
+import { Loader } from "@/pages/loader";
 
 import { AppExists } from "@/components/app-exists";
 import { Layout } from "@/components/layout";

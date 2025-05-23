@@ -6,7 +6,7 @@ import { getSupervisor } from "@psibase/common-lib";
 import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
-const Params = z.object({
+const zParams = z.object({
     evaluationId: z.number(),
     groupNumber: z.number(),
     proposal: zAccount.array(),
@@ -14,9 +14,9 @@ const Params = z.object({
 
 export const usePropose = () =>
     useMutation({
-        mutationFn: async (params: z.infer<typeof Params>) => {
+        mutationFn: async (params: z.infer<typeof zParams>) => {
             const { evaluationId, groupNumber, proposal } =
-                Params.parse(params);
+                zParams.parse(params);
 
             const pars = {
                 method: "propose",
