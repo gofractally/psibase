@@ -1,6 +1,8 @@
 #[psibase::service_tables]
 pub mod tables {
-    use crate::token_settings::TokenSetting;
+    use crate::flags::token_flags::TokenSetting;
+    use crate::flags::token_holder_flags::TokenHolderFlags;
+
     use async_graphql::SimpleObject;
     use psibase::services::nft::action_structs::debit;
     use psibase::services::nft::Wrapper as Nfts;
@@ -89,7 +91,7 @@ pub mod tables {
 
         fn save(&mut self) {
             let table = TokenTable::new();
-            table.put(&self).expect("failed to save token");
+            table.put(&self).unwrap();
         }
 
         pub fn mint(&mut self, amount: Quantity, receiver: AccountNumber) {
@@ -138,7 +140,7 @@ pub mod tables {
 
         fn save(&mut self) {
             let table = BalanceTable::new();
-            table.put(&self).expect("failed to save balance");
+            table.put(&self).unwrap();
         }
 
         fn add_balance(&mut self, quantity: Quantity) {
@@ -152,39 +154,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "TokenHolderTable", index = 3)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct TokenHolder {
-        pub account: AccountNumber,
-        pub manual_debit: bool,
-    }
-
-    impl TokenHolder {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
-
-        pub fn is_manual_debit(account: AccountNumber) -> bool {
-            TokenHolderTable::new()
-                .get_index_pk()
-                .get(&account)
-                .is_some_and(|holder| holder.manual_debit)
-        }
-
-        pub fn set_manual_debit(account: AccountNumber, enabled: bool) {
-            let new_instance = TokenHolder {
-                account,
-                manual_debit: enabled,
-            };
-            let table = TokenHolderTable::new();
-            table
-                .put(&new_instance)
-                .expect("failed to save manual debit");
-        }
-    }
-
-    #[table(name = "SharedBalanceTable", index = 4)]
+    #[table(name = "SharedBalanceTable", index = 3)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct SharedBalance {
         pub creditor: AccountNumber,
@@ -215,9 +185,18 @@ pub mod tables {
             Balance::get(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
 
-            if !TokenHolder::is_manual_debit(self.debitor) {
+            let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
+                .map(|holder| holder.is_auto_debit())
+                .unwrap_or(Holder::get(self.debitor).is_auto_debit());
+
+            if is_auto_debit {
                 self.debit(quantity);
             }
+        }
+
+        pub fn uncredit(&mut self, quantity: Quantity) {
+            self.sub_balance(quantity);
+            Balance::get(self.creditor, self.token_id).add_balance(quantity);
         }
 
         pub fn debit(&mut self, quantity: Quantity) {
@@ -232,12 +211,133 @@ pub mod tables {
 
         fn sub_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance - quantity;
-            self.save();
+
+            if self.balance == 0.into() {
+                let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
+                    .map(|token_holder| token_holder.is_keep_zero_balances())
+                    .unwrap_or(Holder::get(self.creditor).is_keep_zero_balances());
+
+                if keep_zero_balance {
+                    self.save();
+                } else {
+                    self.delete();
+                }
+            } else {
+                self.save();
+            }
+        }
+
+        fn delete(&self) {
+            SharedBalanceTable::new().erase(&(self.pk()));
         }
 
         fn save(&mut self) {
             let table = SharedBalanceTable::new();
-            table.put(&self);
+            table.put(&self).unwrap();
+        }
+    }
+
+    #[table(name = "HolderTable", index = 4)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct Holder {
+        pub account: AccountNumber,
+        pub flags: u8,
+    }
+
+    impl Holder {
+        #[primary_key]
+        fn pk(&self) -> AccountNumber {
+            self.account
+        }
+
+        pub fn get(account: AccountNumber) -> Self {
+            HolderTable::new()
+                .get_index_pk()
+                .get(&account)
+                .unwrap_or(Self { account, flags: 0 })
+        }
+
+        pub fn is_auto_debit(&self) -> bool {
+            self.settings().is_auto_debit()
+        }
+
+        pub fn set_auto_debit(&mut self, enabled: bool) {
+            let mut settings = self.settings();
+            settings.set_is_auto_debit(enabled);
+            self.flags = settings.value;
+            self.save();
+        }
+
+        pub fn is_keep_zero_balances(&self) -> bool {
+            self.settings().is_keep_zero_balances()
+        }
+
+        pub fn set_keep_zero_balances(&mut self, enabled: bool) {
+            let mut settings = self.settings();
+            settings.set_is_keep_zero_balances(enabled);
+            self.flags = settings.value;
+            self.save();
+        }
+
+        fn settings(&self) -> TokenHolderFlags {
+            TokenHolderFlags::from(self.flags)
+        }
+
+        fn save(&mut self) {
+            let table = HolderTable::new();
+            table.put(&self).unwrap();
+        }
+    }
+
+    #[table(name = "TokenHolderTable", index = 5)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct TokenHolder {
+        pub account: AccountNumber,
+        pub token_id: u32,
+        pub flags: u8,
+    }
+
+    impl TokenHolder {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u32) {
+            (self.account, self.token_id)
+        }
+
+        pub fn get(account: AccountNumber, token_id: u32) -> Option<Self> {
+            TokenHolderTable::new()
+                .get_index_pk()
+                .get(&(account, token_id))
+        }
+
+        pub fn is_auto_debit(&self) -> bool {
+            self.settings().is_auto_debit()
+        }
+
+        pub fn set_auto_debit(&mut self, enabled: bool) {
+            let mut settings = self.settings();
+            settings.set_is_auto_debit(enabled);
+            self.flags = settings.value;
+            self.save();
+        }
+
+        pub fn is_keep_zero_balances(&self) -> bool {
+            self.settings().is_keep_zero_balances()
+        }
+
+        pub fn set_keep_zero_balances(&mut self, enabled: bool) {
+            let mut settings = self.settings();
+            settings.set_is_keep_zero_balances(enabled);
+            self.flags = settings.value;
+            self.save();
+        }
+
+        fn settings(&self) -> TokenHolderFlags {
+            TokenHolderFlags::from(self.flags)
+        }
+
+        fn save(&mut self) {
+            let table = TokenHolderTable::new();
+            table.put(&self).unwrap();
         }
     }
 }

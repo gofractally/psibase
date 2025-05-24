@@ -70,7 +70,7 @@ impl Intf for TokensPlugin {
 impl Transfer for TokensPlugin {
     fn credit(
         token_id: String,
-        account: String,
+        debitor: String,
         amount: String,
         memo: String,
     ) -> Result<(), Error> {
@@ -78,12 +78,12 @@ impl Transfer for TokensPlugin {
 
         let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
 
-        let receiver = AccountNumber::from_str(account.as_str()).unwrap();
+        let debitor = AccountNumber::from_str(debitor.as_str()).unwrap();
 
         let packed_args = tokens::action_structs::credit {
             amount,
             memo,
-            receiver,
+            debitor,
             token_id: token.id,
         }
         .packed();
@@ -116,7 +116,7 @@ impl Transfer for TokensPlugin {
 
     fn uncredit(
         token_id: String,
-        creditor: String,
+        debitor: String,
         amount: String,
         memo: String,
     ) -> Result<(), Error> {

@@ -1,4 +1,7 @@
-pub trait BitflagSettings {
+pub mod token_flags;
+pub mod token_holder_flags;
+
+trait BitFlags {
     fn value(&self) -> u8;
     fn set_value(&mut self, value: u8);
 

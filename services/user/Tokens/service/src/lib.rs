@@ -1,7 +1,6 @@
-pub mod bitflag;
+pub mod flags;
 pub mod tables;
-pub mod token_balance_settings;
-pub mod token_settings;
+
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::{InitRow, InitTable, SharedBalance, Token};
@@ -10,10 +9,10 @@ pub mod service {
 
     #[action]
     fn init() {
-        check_none(Token::get(1), "init already ran");
-        // if Token::get(1).is_some() {
-        //     return;
-        // }
+        // check_none(Token::get(1), "init already ran");
+        if Token::get(1).is_some() {
+            return;
+        }
         let table = InitTable::new();
         let init_instance = InitRow { last_used_id: 0 };
         table.put(&init_instance).unwrap();
@@ -85,9 +84,15 @@ pub mod service {
     }
 
     #[action]
-    fn credit(token_id: u32, receiver: AccountNumber, amount: Quantity, memo: String) {
-        let mut shared_balance = SharedBalance::get(get_sender(), receiver, token_id);
+    fn credit(token_id: u32, debitor: AccountNumber, amount: Quantity, memo: String) {
+        let mut shared_balance = SharedBalance::get(get_sender(), debitor, token_id);
         shared_balance.credit(amount);
+    }
+
+    #[action]
+    fn uncredit(token_id: u32, debitor: AccountNumber, amount: Quantity, memo: String) {
+        let mut shared_balance = SharedBalance::get(get_sender(), debitor, token_id);
+        shared_balance.uncredit(amount);
     }
 
     #[action]

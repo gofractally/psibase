@@ -1,4 +1,4 @@
-use crate::bitflag::BitflagSettings;
+use super::BitFlags;
 
 pub const UNBURNABLE: u8 = 1u8 << 0;
 pub const UNTRANSFERABLE: u8 = 1u8 << 1;
@@ -8,7 +8,7 @@ pub struct TokenSetting {
     pub value: u8,
 }
 
-impl BitflagSettings for TokenSetting {
+impl BitFlags for TokenSetting {
     fn value(&self) -> u8 {
         self.value
     }
