@@ -94,6 +94,7 @@ if(DEFINED WASI_SDK_PREFIX)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
         CpuLimit Events Explorer Invite Nft
+        CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
@@ -382,6 +383,12 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH services/user/Evaluations
     DEPENDS ${Evaluations_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Fractals.psi
+    PATH services/user/Fractals
+    DEPENDS ${Fractally_js_DEP}
 )
 
 
@@ -820,7 +827,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Evaluations Events Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs Evaluations Events Fractals Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -830,6 +837,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Docs Events Explorer HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
@@ -867,7 +875,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Evaluations Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs Events Evaluations Fractals Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -883,6 +891,8 @@ install(
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
+          ${SERVICE_DIR}/DevDefault.psi
+          ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/DevDefault.psi
           ${SERVICE_DIR}/ProdDefault.psi
@@ -890,6 +900,7 @@ install(
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
+          ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi

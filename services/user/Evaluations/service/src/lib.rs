@@ -153,6 +153,10 @@ pub mod service {
     #[action]
     fn close(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
+        check(
+            get_sender() == evaluation.owner,
+            "only owner can close an evaluation",
+        );
         evaluation.assert_status(EvaluationStatus::Closed);
 
         evaluation.get_groups().iter().for_each(|group| {
@@ -178,7 +182,7 @@ pub mod service {
             let phase = evaluation.get_current_phase();
             check(
                 phase == EvaluationStatus::Pending || phase == EvaluationStatus::Closed,
-                "evaluation is not deletable unless pending or closed",
+                "evaluation is not deletable unless pending, closed or force is true",
             );
         }
         evaluation.delete();
