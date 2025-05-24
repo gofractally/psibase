@@ -107,6 +107,22 @@ namespace SystemService
    };
    PSIO_REFLECT(LoginReply, access_token, token_type)
 
+   struct BlockTxRecord
+   {
+      psibase::Checksum256      id;
+      psibase::BlockNum         blockNum;
+      psibase::TransactionTrace trace;
+
+      bool successful() const { return !trace.error.has_value(); }
+
+      using ByBlockNum = psibase::CompositeKey<&BlockTxRecord::blockNum, &BlockTxRecord::id>;
+      auto byBlockNum() const { return ByBlockNum{}(*this); }
+   };
+   PSIO_REFLECT(BlockTxRecord, id, blockNum, trace)
+   using BlockTxsTable =
+       psibase::Table<BlockTxRecord, &BlockTxRecord::id, BlockTxRecord::ByBlockNum{}>;
+   PSIO_REFLECT_TYPENAME(BlockTxsTable)
+
    class RTransact : psibase::Service
    {
      public:
@@ -115,7 +131,8 @@ namespace SystemService
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
                                                                 TraceClientTable,
-                                                                JWTKeyTable>;
+                                                                JWTKeyTable,
+                                                                BlockTxsTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
@@ -127,6 +144,15 @@ namespace SystemService
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
+
+     private:
+      auto claimClientReply(const psibase::Checksum256& id)
+          -> std::tuple<TraceClientRow, bool, bool>;
+
+      std::pair<std::vector<psibase::BlockNum>, psibase::BlockTime> finalizeBlocks(
+          const psibase::BlockHeader& current);
+
+      void sendReplies(const std::vector<psibase::Checksum256>& txids);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
