@@ -2,8 +2,16 @@
     "compilerOptions": {
         "composite": true,
         "module": "ESNext",
-        "moduleResolution": "Node",
-        "allowSyntheticDefaultImports": true
+        "moduleResolution": "bundler",
+        "allowSyntheticDefaultImports": true,
+        "types": [
+            "node",
+            "react",
+            "react-dom"
+        ],
     },
-    "include": ["vite.config.ts"]
+    "include": [
+        "vite.config.ts",
+        "../../../vite.shared.ts"
+    ]
 }
