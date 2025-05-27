@@ -63,20 +63,7 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn historical_updates(
-            &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
-            EventQuery::new("history.fractals.updated")
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-        }
+
 
         async fn evaluation_finishes(
             &self,
