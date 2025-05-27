@@ -20,7 +20,7 @@ struct {{project-name | upper_camel_case}}Plugin;
 
 impl Api for {{project-name | upper_camel_case}}Plugin {
     fn set_example_thing(thing: String) {
-        verify_auth_method("setExampleThing");
+        verify_auth_method("setExampleThing")?;
 
         let packed_example_thing_args =
             {{project-name}}::action_structs::setExampleThing { thing }.packed();
@@ -29,13 +29,13 @@ impl Api for {{project-name | upper_camel_case}}Plugin {
 }
 
 impl Admin for {{project-name | upper_camel_case}}Plugin {
-    fn save_perm(caller: String, method: String) {
+    fn save_perm(user: String, caller: String, method: String) {
         let any_value = "1".as_bytes();
-        Keyvalue::set(&format!("{caller}->{method}"), any_value).unwrap();
+        Keyvalue::set(&format!("{user}-{caller}->{method}"), any_value).unwrap();
     }
 
-    fn del_perm(caller: String, method: String) {
-        Keyvalue::delete(&format!("{caller}->{method}"));
+    fn del_perm(user: String, caller: String, method: String) {
+        Keyvalue::delete(&format!("{user}-{caller}->{method}"));
     }
 }
 

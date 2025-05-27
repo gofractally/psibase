@@ -1,8 +1,6 @@
 package addpermone:plugin;
 
 interface admin {
-    // is-valid-request: func(caller: string, callee: string) -> bool;
-    // get-perm: func(user: string, caller: string, method: string) -> bool;
     save-perm: func(user: string, caller: string, method: string);
     del-perm: func(caller: string, method: string);
 }

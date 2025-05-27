@@ -10,6 +10,7 @@ world impl {
     include transact:plugin/imports;
     include sites:plugin/imports;
     include clientdata:plugin/imports;
+    include accounts:plugin/imports;
 
     export admin;
     export api;

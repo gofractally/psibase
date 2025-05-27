@@ -40,8 +40,8 @@ impl Admin for AddpermonePlugin {
         Keyvalue::set(&format!("{user}-{caller}->{method}"), any_value).unwrap();
     }
 
-    fn del_perm(caller: String, method: String) {
-        Keyvalue::delete(&format!("{caller}->{method}"));
+    fn del_perm(user: String, caller: String, method: String) {
+        Keyvalue::delete(&format!("{user}-{caller}->{method}"));
     }
 }
 
