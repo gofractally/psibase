@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "addpermone-pkg"                # Crate name
+name = "addpermone-pkg"   # Crate name
 description = "An example application"
 version.workspace = true
 rust-version.workspace = true

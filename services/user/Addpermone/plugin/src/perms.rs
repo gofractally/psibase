@@ -10,7 +10,6 @@ pub fn verify_auth_method(method: &str) -> Result<(), Error> {
     let user = get_current_user()?.unwrap();
 
     let res = Keyvalue::get(&format!("{user}-{caller}->{method}"));
-    println!("verify_auth_method::res: {:?}", res);
 
     if !res.is_some() {
         // if access not granted, redirect calling app to this app's /permissions endpoint

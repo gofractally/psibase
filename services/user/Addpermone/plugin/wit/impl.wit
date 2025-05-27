@@ -1,7 +1,7 @@
 package addpermone:plugin;
 
 interface admin {
-    save-perm: func(user: string, caller: string, method: string);
+    save-perm: func(caller: string, method: string);
     del-perm: func(caller: string, method: string);
 }
 

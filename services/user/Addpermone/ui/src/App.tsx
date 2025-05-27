@@ -7,27 +7,25 @@ import { Input } from "@shadcn/input";
 import { Nav } from "@components/nav";
 
 import { useCreateConnectionToken } from "@hooks";
-import { useLoggedInUser } from "@hooks/use-logged-in-user";
 
-import { getSupervisor, isRedirectErrorObject } from "@psibase/common-lib";
+import { getSupervisor } from "@psibase/common-lib";
 const supervisor = getSupervisor();
 
 export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
     const [exampleThing, setExampleThing] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
-    const { data: currentUser } = useLoggedInUser();
     const thisServiceName = "addpermone"
 
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
-    const initApp = async () => {
+    const init = async () => {
         await supervisor.onLoaded();
         await getExampleThing();
     };
 
     useEffect(() => {
-        initApp();
+        init();
     }, []);
 
     const getExampleThing = async () => {
@@ -45,7 +43,6 @@ export const App = () => {
         e.preventDefault();
         try {
             if (exampleThing) {
-                console.log("setExampleThing::currentUser", currentUser);
                 await supervisor.functionCall({
                     service: thisServiceName,
                     intf: "api",
@@ -55,12 +52,7 @@ export const App = () => {
             }
             setChangesMade(false);
         } catch (e) {
-            console.log("error", e);
-            if (isRedirectErrorObject(e)) {
-                console.log("isRedirect; redirecting to", e.message);
-                 window.location.href = e.message;
-                 return;
-            } else if (e instanceof Error) {
+            if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);
                 setUploadStatus(`Error: ${e.message}`);
             } else {
