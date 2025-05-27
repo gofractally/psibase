@@ -256,10 +256,7 @@ namespace psibase
       /// each time it's used.
       T operator*() const { return psio::from_frac<T>(psio::prevalidated{*base}); }
 
-      /// get object view
-      ///
-      /// This returns a view of the object in the database. It does not cache; it returns a view of the
-      /// fresh object each time it's used.
+      /// get a shared_view_pointer to the database record pointed to by the iterator
       psio::shared_view_ptr<T> view() const
       {
          return psio::shared_view_ptr<T>{psio::prevalidated{(*base).data()}};
