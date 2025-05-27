@@ -320,7 +320,7 @@ namespace psibase
       auto       add_edge = [&](const auto& it)
       {
          auto cursor = psio::to_hex(it.keyWithoutPrefix());
-         result.edges.push_back(typename Connection::Edge{proj(it.view()), std::move(cursor)});
+         result.edges.push_back(typename Connection::Edge{proj(*it), std::move(cursor)});
       };
 
       if (last && !first)
