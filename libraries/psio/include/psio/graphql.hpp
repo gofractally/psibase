@@ -4,7 +4,6 @@
 #include <cctype>
 #include <charconv>
 #include <chrono>
-#include <numeric>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <psio/shared_view_ptr.hpp>
@@ -440,7 +439,7 @@ namespace psio
 
    struct gql_stream
    {
-      enum token_type
+      enum token_type : uint8_t
       {
          unstarted,
          eof,
@@ -1664,38 +1663,30 @@ namespace psio
                                std::string_view variables,
                                bool             allow_unknown_members = false)
    {
-      std::string                error;
-      pretty_stream<size_stream> measure;
+      std::string error;
+      size_stream measure;
       if (!write_data_json(value, query, variables, allow_unknown_members, measure, error))
       {
          // Measure and write error
-         pretty_stream<size_stream> err_measure;
+         size_stream err_measure;
          write_error_json(error, err_measure);
 
-         std::vector<char>               err_result(err_measure.written());
-         pretty_stream<fixed_buf_stream> error_stream(err_result.data(), err_result.size());
+         std::vector<char> err_result(err_measure.written());
+         fixed_buf_stream  error_stream(err_result.data(), err_result.size());
          write_error_json(error, error_stream);
          return err_result;
       }
 
       // Write valid data
-      std::vector<char>               result(measure.written());
-      pretty_stream<fixed_buf_stream> out(result.data(), result.size());
+      std::vector<char> result(measure.written());
+      fixed_buf_stream  out(result.data(), result.size());
       write_data_json(value, query, variables, allow_unknown_members, out, error);
       return result;
    }
 
-   template <typename T>
-   std::string format_gql_query(const T&         value,
-                                std::string_view query,
-                                bool             allow_unknown_members = false)
-   {
-      return gql_query<pretty_stream<string_stream>>(value, query, allow_unknown_members);
-   }
-
    template <typename T, typename E>
-   auto gql_parse_arg(T& arg, gql_stream& input_stream, const E& error)
-       -> std::enable_if_t<use_json_string_for_gql((T*)nullptr), bool>
+   auto gql_parse_arg(T& arg, gql_stream& input_stream, const E& error) -> bool
+      requires(use_json_string_for_gql((T*)nullptr))
    {
       if (input_stream.current_type == gql_stream::string)
       {
