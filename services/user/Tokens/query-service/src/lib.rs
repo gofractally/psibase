@@ -2,12 +2,14 @@
 #[allow(non_snake_case)]
 mod service {
 
+    use std::u32;
+
     use async_graphql::{connection::Connection, *};
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::{accounts::Account, nft::Wrapper as Nfts};
     use psibase::Asset;
     use psibase::*;
     use serde::Deserialize;
-    use tokens::tables::tables::{Token, TokenTable};
+    use tokens::tables::tables::{Balance, BalanceTable, Token, TokenTable};
 
     #[derive(Deserialize, SimpleObject)]
     struct HistoricalUpdate {
@@ -25,6 +27,13 @@ mod service {
         pub current_supply: Asset,
         pub max_supply: Asset,
         pub owner: AccountNumber,
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    pub struct BalanceInstance {
+        pub account: AccountNumber,
+        pub token_id: u32,
+        pub balance: Quantity,
     }
 
     impl TokenDetail {
@@ -53,6 +62,20 @@ mod service {
                 Nfts::call().getNft(token_id).owner,
             ))
         }
+
+
+        async fn user_balances(&self, user: AccountNumber) -> Vec<BalanceInstance> {
+            let token: Vec<Balance> = BalanceTable::with_service(tokens::SERVICE).get_index_pk().range(
+                (user, 0)..=(user, u32::MAX)
+            ).collect();
+
+            token.into_iter().map(|token| BalanceInstance {
+                account: token.account,
+                balance: token.balance,
+                token_id: token.token_id
+            }).collect()
+        }
+
 
         /// This query gets paginated historical updates of the Example Thing.
         async fn historical_updates(
