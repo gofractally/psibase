@@ -1,0 +1,18 @@
+package auth-delegate:plugin;
+
+interface api {
+    use host:common/types.{error};
+
+    /// Set the owner of the sender account
+    ///
+    /// Whenever a sender using this auth service submits a transaction, authorization
+    /// for the owned account will check authorization for the owner instead.
+    set-owner: func(owner: string) -> result<_, error>;
+
+    /// Create a new account with the specified name, owned by the specified `owner` account.
+    new-account: func(name: string, owner: string) -> result<_, error>;
+}
+
+world imports {
+    import api;
+}

@@ -2,6 +2,7 @@
 
 #include <psibase/Rpc.hpp>
 #include <psibase/psibase.hpp>
+#include <psibase/time.hpp>
 
 #include <services/system/Accounts.hpp>
 #include <services/system/CommonTables.hpp>
@@ -12,7 +13,6 @@ namespace UserService
 {
    namespace InviteNs
    {
-
       /// This service facilitates the creation and redemption of invites
       ///
       /// Invites are generic and their acceptance can, but does not always, result
@@ -24,7 +24,7 @@ namespace UserService
       {
         public:
          using Tables =
-             psibase::ServiceTables<InviteSettingsTable, InviteTable, InitTable, NewAccTable>;
+             psibase::ServiceTables<InviteTable, InitTable, NewAccTable, NextInviteIdTable>;
          /// "invite"
          static constexpr auto service = SystemService::Accounts::inviteService;
          /// "invited-sys"
@@ -41,50 +41,56 @@ namespace UserService
          /// 3. Creates the "invites-sys" system account used to create new accounts
          void init();
 
-         /// Creates and stores an invite object with the specified public key
-         void createInvite(Spki inviteKey);
+         /// Creates and stores a new invite object that can be used to create a new account
+         /// Returns the ID of the newly created invite
+         ///
+         /// Parameters:
+         /// - `inviteKey` is the public key of the invite.
+         /// - `id` is an optional secondary identifier for the invite.
+         /// - `secret` is an optional secret for the invite.
+         /// - `app` is the account responsible for creating the invite. It is optional because it may
+         ///   not be able to be determined.
+         /// - `appDomain` is the domain of the app that created the invite.
+         uint32_t createInvite(Spki                                  inviteKey,
+                               std::optional<uint32_t>               secondaryId,
+                               std::optional<std::string>            secret,
+                               std::optional<psibase::AccountNumber> app,
+                               std::optional<std::string>            appDomain);
 
          /// Called by existing Psibase accounts to accept an invite without creating
          /// a new Psibase account
-         void accept(Spki inviteKey);
+         void accept(uint32_t inviteId);
 
          /// Called by the system account "invited-sys" to accept an invite and
          /// simultaneously create the new account 'acceptedBy', which is
          /// authenticated by the provided 'newAccountKey' public key
          ///
          /// Each invite may be used to redeem a maximum of one new account.
-         void acceptCreate(Spki inviteKey, psibase::AccountNumber acceptedBy, Spki newAccountKey);
+         void acceptCreate(uint32_t               inviteId,
+                           psibase::AccountNumber acceptedBy,
+                           Spki                   newAccountKey);
 
          /// Called by existing accounts or the system account "invited-sys" to reject
          /// an invite. Once an invite is rejected, it cannot be accepted or used to
          /// create a new account
-         void reject(Spki inviteKey);
+         void reject(uint32_t inviteId);
 
          /// Used by the creator of an invite to delete it. Deleted invites are removed
          /// from the database. An invite can be deleted regardless of whether it has been
          /// accepted, rejected, or is still pending
-         void delInvite(Spki inviteKey);
+         void delInvite(uint32_t inviteId);
 
          /// Used by anyone to garbage collect expired invites. Up to 'maxDeleted' invites
          /// can be deleted by calling this action
          void delExpired(uint32_t maxDeleted);
 
-         /// Called by this service itself to restrict the accounts that are
-         /// able to create invites. Only whitelisted accounts may create
-         /// invites
-         void setWhitelist(std::vector<psibase::AccountNumber> accounts);
-
-         /// Called by this service itself to restrict the accounts that are
-         /// able to create invites. Blacklisted accounts may not create invites
-         void setBlacklist(std::vector<psibase::AccountNumber> accounts);
-
          /// Called synchronously by other services to retrieve the invite
          /// record corresponding to the provided 'pubkey' public key
-         std::optional<InviteRecord> getInvite(Spki pubkey);
+         std::optional<InviteRecord> getInvite(uint32_t inviteId);
 
          /// Called synchronously by other services to query whether the invite
          /// record corresponding to the provided `pubkey` public key is expired
-         bool isExpired(Spki pubkey);
+         bool isExpired(uint32_t inviteId);
 
          /// Called synchronously by other services to query whether the specified
          /// actor should be allowed to claim the invite specified by the `pubkey`
@@ -95,28 +101,14 @@ namespace UserService
          /// * The invite must be in the accepted state
          /// * The invite actor must be the same as the specified `actor` parameter
          /// * The invite must not be expired
-         void checkClaim(psibase::AccountNumber actor, Spki pubkey);
-
-         /// Called by the http-server system service when an HttpRequest
-         /// is directed at this invite service
-         std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+         void checkClaim(psibase::AccountNumber actor, uint32_t inviteId);
 
          // clang-format off
          struct Events
          {
-            using AccountNumber = psibase::AccountNumber;
             struct History
             {
-               void inviteCreated(Spki inviteKey,
-                                 AccountNumber inviter);
-               void inviteDeleted(Spki inviteKey);
-               void expInvDeleted(uint32_t  numCheckedRows,
-                                 uint32_t  numDeleted);
-               void inviteAccepted(Spki inviteKey,
-                                 AccountNumber accepter);
-               void inviteRejected(Spki     inviteKey);
-               void whitelistSet(std::vector<AccountNumber> accounts);
-               void blacklistSet(std::vector<AccountNumber> accounts);
+               void updated(uint32_t inviteId, psibase::AccountNumber actor, psibase::TimePointUSec datetime, std::string_view event);
             };
             struct Ui {};
             struct Merkle {};
@@ -127,31 +119,23 @@ namespace UserService
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
-         method(createInvite, inviteKey, inviter),
-         method(accept, inviteKey),
-         method(acceptCreate, inviteKey, acceptedBy, newAccountKey),
-         method(reject, inviteKey),
-         method(delInvite, inviteKey),
+         method(createInvite, inviteKey, secondaryId, secret, app, appDomain),
+         method(accept, inviteId),
+         method(acceptCreate, inviteId, acceptedBy, newAccountKey),
+         method(reject, inviteId),
+         method(delInvite, inviteId),
          method(delExpired, maxDeleted),
-         method(getInvite, pubkey),
-         method(isExpired, pubkey),
-         method(checkClaim, actor, pubkey),
-         method(serveSys, request),
-         method(setWhitelist, accounts),
-         method(setBlacklist, accounts)
+         method(getInvite, inviteId),
+         method(isExpired, inviteId),
+         method(checkClaim, actor, inviteId),
       );
       PSIBASE_REFLECT_EVENTS(Invite);
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
-         method(inviteCreated, inviteKey, inviter),
-         method(inviteDeleted, inviteKey),
-         method(expInvDeleted, numCheckedRows, numDeleted),
-         method(inviteAccepted, inviteKey, accepter),
-         method(inviteRejected, inviteKey),
-         method(whitelistSet, accounts),
-         method(blacklistSet, accounts)
+         method(updated, inviteId, actor, datetime, event),
       );
       PSIBASE_REFLECT_UI_EVENTS(Invite);
       PSIBASE_REFLECT_MERKLE_EVENTS(Invite);
+      PSIBASE_REFLECT_TABLES(Invite, Invite::Tables)
       // clang-format on
    }  // namespace InviteNs
 

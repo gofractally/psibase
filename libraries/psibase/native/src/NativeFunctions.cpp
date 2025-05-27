@@ -3,6 +3,8 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Socket.hpp>
 
+#include <random>
+
 namespace psibase
 {
    namespace
@@ -28,51 +30,53 @@ namespace psibase
              std::chrono::steady_clock::now() - start;
       }
 
+      bool isSubjectiveContext(NativeFunctions& self)
+      {
+         return (self.code.flags & CodeRow::isSubjective) || self.dbMode.isSubjective;
+      }
+
       DbId getDbRead(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
-         if (db == uint32_t(DbId::service))
+         if (db == uint32_t(DbId::service) || db == uint32_t(DbId::native))
+         {
+            check(self.dbMode.isSubjective || self.dbMode.isSync,
+                  "database access disabled during proof verification");
             return (DbId)db;
-         if (db == uint32_t(DbId::native))
-            return (DbId)db;
-         if (db == uint32_t(DbId::subjective))
+         }
+         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary))
          {
             uint64_t prefix = self.code.codeNum.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
             check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
                   "key prefix must match service for accessing the subjective database");
-            if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
-               return (DbId)db;
-         }
-         if (db == uint32_t(DbId::writeOnly))
-         {
-            if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
-               return (DbId)db;
-         }
-         if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
+            check(isSubjectiveContext(self),
+                  "subjective databases cannot be read in a deterministic context");
             return (DbId)db;
+         }
+         if (db == uint32_t(DbId::writeOnly) || db == uint32_t(DbId::blockLog))
+         {
+            check(isSubjectiveContext(self),
+                  "subjective databases cannot be read in a deterministic context");
+            return (DbId)db;
+         }
          if (db == uint32_t(DbId::nativeSubjective))
          {
-            if ((self.code.flags & CodeRow::allowNativeSubjective) &&
-                ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective))
-               return (DbId)db;
+            check(isSubjectiveContext(self),
+                  "subjective databases cannot be read in a deterministic context");
+            check(self.code.flags & CodeRow::allowNativeSubjective, "service may not read this db");
+            return (DbId)db;
          }
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
 
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
       {
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
-         if (self.allowDbReadSubjective || (self.code.flags & CodeRow::isSubjective))
+         if (db == uint32_t(DbId::historyEvent) || db == uint32_t(DbId::uiEvent) ||
+             db == uint32_t(DbId::merkleEvent))
          {
-            if (db == uint32_t(DbId::historyEvent))
-               return (DbId)db;
-            if (db == uint32_t(DbId::uiEvent))
-               return (DbId)db;
-            if (db == uint32_t(DbId::merkleEvent))
-               return (DbId)db;
+            check(isSubjectiveContext(self),
+                  "subjective databases cannot be read in a deterministic context");
+            return (DbId)db;
          }
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
@@ -80,7 +84,7 @@ namespace psibase
       bool keyHasServicePrefix(uint32_t db)
       {
          return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
-                db == uint32_t(DbId::subjective);
+                db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary);
       }
 
       struct Writable
@@ -100,42 +104,45 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         if (db == uint32_t(DbId::subjective) &&
-             (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
-             (self.code.flags & CodeRow::allowWriteSubjective))
-            // Not chargeable since subjective services are skipped during replay
+         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary))
+         {
+            check(isSubjectiveContext(self),
+                  "subjective databases cannot be written in a deterministic context");
+            check((self.code.flags & CodeRow::allowWriteSubjective),
+                  "service may not write this db");
             return {(DbId)db, false, false};
+         }
 
-         if (db == uint32_t(DbId::nativeSubjective) &&
-             (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
-             (self.code.flags & CodeRow::allowNativeSubjective))
+         if (db == uint32_t(DbId::nativeSubjective))
+         {
+            check(isSubjectiveContext(self),
+                  "subjective databases cannot be written in a deterministic context");
+            check((self.code.flags & CodeRow::allowNativeSubjective),
+                  "service may not write this db");
             return {(DbId)db, false, false};
-
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
+         }
 
          if (db == uint32_t(DbId::writeOnly))
          {
-            if (!self.allowDbWriteSubjective)
-            {
-               check(self.allowDbWrite, "database writes disabled during query");
-               check(!(self.code.flags & CodeRow::isSubjective) ||
-                         (self.code.flags & CodeRow::forceReplay),
-                     "subjective services may only write to DbId::subjective");
-            }
+            check(self.dbMode.isSync, "writeOnly database cannot be written in an async context");
+            check(self.transactionContext.dbMode.isSubjective ||
+                      !(self.code.flags & CodeRow::isSubjective) ||
+                      (self.code.flags & CodeRow::forceReplay),
+                  "subjective services may only write to DbId::subjective");
             return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
          }
 
-         check(self.allowDbWrite, "database writes disabled during query");
+         if (db == uint32_t(DbId::service) || db == uint32_t(DbId::native))
+         {
+            check(!isSubjectiveContext(self), "database cannot be written in subjective context");
+            check(self.dbMode.isSync, "database cannot be written in async context");
 
-         // Prevent poison block; subjective services skip execution during replay
-         check(!(self.code.flags & CodeRow::isSubjective),
-               "subjective services may only write to DbId::subjective");
+            if (db == uint32_t(DbId::native))
+               check(self.code.flags & CodeRow::allowWriteNative,
+                     "service may not write this database");
 
-         if (db == uint32_t(DbId::service))
             return {(DbId)db, true, true};
-         if (db == uint32_t(DbId::native) && (self.code.flags & CodeRow::allowWriteNative))
-            return {(DbId)db, true, true};
+         }
          throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
@@ -145,13 +152,9 @@ namespace psibase
       //          functions which call it need to adjust their logic.
       DbId getDbWriteSequential(NativeFunctions& self, uint32_t db)
       {
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
-         check(self.allowDbWrite, "writes disabled during query");
-
-         // Prevent poison block; subjective services skip execution during replay
-         check(!(self.code.flags & CodeRow::isSubjective),
-               "service may not write this db, or must use another intrinsic");
+         check(!isSubjectiveContext(self),
+               "sequential database cannot be written in subjective context");
+         check(self.dbMode.isSync, "sequential database cannot be written in async context");
 
          if (db == uint32_t(DbId::historyEvent))
             return (DbId)db;
@@ -377,6 +380,16 @@ namespace psibase
          self.result_value.assign(o->value.pos, o->value.end);
          return self.result_value.size();
       }
+
+      KvResourceDelta& getDelta(KvResourceMap& deltas, const KvResourceKey& key)
+      {
+         auto pos = std::ranges::lower_bound(deltas, key, {}, &KvResourcePair::first);
+         if (pos == deltas.end())
+         {
+            pos = deltas.insert(pos, KvResourcePair{key, {}});
+         }
+         return pos->second;
+      }
    }  // namespace
 
    uint32_t NativeFunctions::getResult(eosio::vm::span<char> dest, uint32_t offset)
@@ -414,8 +427,7 @@ namespace psibase
 
    int32_t NativeFunctions::clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time)
    {
-      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
-            "only subjective services may call clockGetTime");
+      check(isSubjectiveContext(*this), "clockGetTime cannot be called in a deterministic context");
       clearResult(*this);
       std::chrono::nanoseconds result;
       if (id == 0)
@@ -436,6 +448,13 @@ namespace psibase
       }
       *time = result.count();
       return 0;
+   }
+
+   void NativeFunctions::getRandom(eosio::vm::span<char> dest)
+   {
+      check(isSubjectiveContext(*this), "getRandom cannot be called in a deterministic context");
+      std::random_device rng;
+      std::ranges::generate(dest, [&] { return rng(); });
    }
 
    void NativeFunctions::setMaxTransactionTime(uint64_t nanoseconds)
@@ -531,7 +550,8 @@ namespace psibase
              auto w = getDbWrite(*this, db, {key.data(), key.size()});
              if (w.chargeable)
              {
-                auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{code.codeNum, db}];
+                auto& delta =
+                    getDelta(transactionContext.kvResourceDeltas, KvResourceKey{code.codeNum, db});
                 delta.records += 1;
                 delta.keyBytes += key.size();
                 delta.valueBytes += value.size();
@@ -579,17 +599,20 @@ namespace psibase
                       "value of putSequential must have service account as its first member");
              }
 
-             auto&    dbStatus = transactionContext.blockContext.databaseStatus;
+             auto dbStatus =
+                 database.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+             check(!!dbStatus, "databaseStatus not set");
+
              uint64_t indexNumber;
              if (db == uint32_t(DbId::historyEvent))
-                indexNumber = dbStatus.nextHistoryEventNumber++;
+                indexNumber = dbStatus->nextHistoryEventNumber++;
              else if (db == uint32_t(DbId::uiEvent))
-                indexNumber = dbStatus.nextUIEventNumber++;
+                indexNumber = dbStatus->nextUIEventNumber++;
              else if (db == uint32_t(DbId::merkleEvent))
-                indexNumber = dbStatus.nextMerkleEventNumber++;
+                indexNumber = dbStatus->nextMerkleEventNumber++;
              else
                 check(false, "putSequential: unsupported db");
-             database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
+             database.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
              database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
              return indexNumber;
@@ -607,8 +630,8 @@ namespace psibase
                     {
                        if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
                        {
-                          auto& delta =
-                              transactionContext.kvResourceDeltas[KvResourceKey{code.codeNum, db}];
+                          auto& delta = getDelta(transactionContext.kvResourceDeltas,
+                                                 KvResourceKey{code.codeNum, db});
                           delta.records -= 1;
                           delta.keyBytes -= key.size();
                           delta.valueBytes -= existing->remaining();
@@ -700,10 +723,7 @@ namespace psibase
    //       maybe include intrinsic usage so transact can veto?
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
-      auto seq  = transactionContext.kvResourceDeltas.extract_sequence();
-      auto size = setResult(*this, psio::convert_to_frac(seq));
-      transactionContext.kvResourceDeltas.adopt_sequence(boost::container::ordered_unique_range,
-                                                         std::move(seq));
+      auto size = setResult(*this, psio::convert_to_frac(transactionContext.kvResourceDeltas));
       return size;
    }
 
@@ -723,17 +743,18 @@ namespace psibase
 
    int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
    {
-      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
-            "Sockets are only available during subjective execution");
+      check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
-      return transactionContext.blockContext.systemContext.sockets->send(fd, msg);
+      check(!dbMode.isReadOnly, "Sockets disabled during proof verification or first auth");
+      return transactionContext.blockContext.systemContext.sockets->send(
+          *transactionContext.blockContext.writer, fd, msg);
    }
 
    int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
    {
-      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
-            "Sockets are only available during subjective execution");
+      check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      check(!dbMode.isReadOnly, "Sockets disabled during proof verification or first auth");
       return database.socketAutoClose(fd, value,
                                       *transactionContext.blockContext.systemContext.sockets,
                                       transactionContext.ownedSockets);

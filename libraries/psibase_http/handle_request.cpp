@@ -23,7 +23,7 @@ namespace psibase::http
 {
 
    // Private HTTP headers that are not forwarded to wasm
-   const std::unordered_set<std::string> private_headers = {"authorization", "proxy-authorization"};
+   const std::unordered_set<std::string> private_headers = {"proxy-authorization"};
 
    bool is_private_header(const std::string& name)
    {
@@ -151,7 +151,7 @@ namespace psibase::http
       {
          try
          {
-            token_data token = decode_jwt(auth.key, authorization.substr(prefix.size()));
+            auto token = decodeJWT<token_data>(auth.key, authorization.substr(prefix.size()));
             if (std::chrono::system_clock::now() >
                 std::chrono::system_clock::time_point{std::chrono::seconds(token.exp)})
             {
@@ -244,9 +244,8 @@ namespace psibase::http
    }
 
    // Returns the host and path for the request. See RFC 9112 § 3.2 and 3.3
-   template <typename Body, typename Allocator>
    std::pair<beast::string_view, beast::string_view> parse_request_target(
-       const bhttp::request<Body, bhttp::basic_fields<Allocator>>& request)
+       const http_session_base::request_type& request)
    {
       auto target = request.target();
       if (target.starts_with('/') || target == "*")
@@ -326,6 +325,7 @@ namespace psibase::http
                    session->do_read();
              });
       }
+      virtual SocketInfo                 info() const override { return HttpSocketInfo{}; }
       std::shared_ptr<http_session_base> session;
       F                                  callback;
       E                                  err;
@@ -769,7 +769,8 @@ namespace psibase::http
                auto pos =
                    std::ranges::find_if(server.http_config->services, [&suffix](const auto& entry)
                                         { return entry.first.ends_with(suffix); });
-               if (pos != server.http_config->services.end())
+               if ((req.method() == bhttp::verb::get || req.method() == bhttp::verb::head) &&
+                   pos != server.http_config->services.end())
                {
                   location.append(pos->first);
                   l.unlock();
@@ -792,7 +793,7 @@ namespace psibase::http
 
             SignedTransaction  trx;
             TransactionTrace   trace;
-            TransactionContext tc{bc, trx, trace, true, false, true};
+            TransactionContext tc{bc, trx, trace, DbMode::rpc()};
             ActionTrace&       atrace        = trace.actionTraces.emplace_back();
             auto               startExecTime = steady_clock::now();
 
@@ -814,7 +815,7 @@ namespace psibase::http
                 },
                 [error](const std::string& message)
                 { return error(bhttp::status::internal_server_error, message); });
-            system->sockets->add(socket, &tc.ownedSockets);
+            system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
 
             auto setStatus = psio::finally(
                 [&]
@@ -863,10 +864,19 @@ namespace psibase::http
                   PSIBASE_LOG(logger, info) << proxyServiceNum.str() << "::serve succeeded";
             }
          }  // !native
-         else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
+         else if (req_target == "/native/admin/push_boot" && server.http_config->push_boot_async)
          {
             if (!server.http_config->enable_transactions)
                return send(not_found(req.target()));
+
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(not_found(req.target()));
+            }
+            if (!check_admin_auth(authz::mode_type::write))
+            {
+               return;
+            }
 
             if (req.method() != bhttp::verb::post)
             {
@@ -889,33 +899,6 @@ namespace psibase::http
 
             run_native_handler_json(server.http_config->push_boot_async);
          }  // push_boot
-         else if (req_target == "/native/push_transaction" &&
-                  server.http_config->push_transaction_async)
-         {
-            if (!server.http_config->enable_transactions)
-               return send(not_found(req.target()));
-
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-
-            if (auto content_type = req.find(bhttp::field::content_type); content_type != req.end())
-            {
-               if (content_type->value() != "application/octet-stream")
-               {
-                  return send(error(bhttp::status::unsupported_media_type,
-                                    "Content-Type must be application/octet-stream\n"));
-               }
-            }
-
-            if (forbid_cross_origin())
-            {
-               return;
-            }
-
-            run_native_handler_json(server.http_config->push_transaction_async);
-         }  // push_transaction
          else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
                   !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
                   server.http_config->enable_p2p)
@@ -1294,7 +1277,7 @@ namespace psibase::http
                   return send(auth_error(bhttp::status::unauthorized,
                                          "Bearer scope=\"" + mkscope(required_mode) + "\""));
             }
-            auto token = encode_jwt(*key, params);
+            auto token = encodeJWT(*key, params);
 
             std::vector<char>   data;
             psio::vector_stream out{data};

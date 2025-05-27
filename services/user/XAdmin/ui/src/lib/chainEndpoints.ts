@@ -5,6 +5,8 @@ import {
     getJson,
     postArrayBufferGetJson,
     getArrayBuffer,
+    siblingUrl,
+    throwIfError,
 } from "@psibase/common-lib";
 
 import { recursiveFetch } from "./recursiveFetch";
@@ -12,9 +14,11 @@ import {
     type KeyDevice,
     type PsinodeConfigSelect,
     type PsinodeConfigUpdate,
+    type ServerKey,
     psinodeConfigSchema,
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
+import { util } from "wasm-transpiled";
 
 type Buffer = number[];
 
@@ -160,12 +164,25 @@ class Chain {
         });
     }
 
-    public pushArrayBufferBoot(buffer: Buffer) {
-        return postArrayBufferGetJson("/native/push_boot", buffer);
+    public pushArrayBufferBoot(buffer: ArrayBufferLike) {
+        return postArrayBufferGetJson("/native/admin/push_boot", buffer);
     }
 
-    public pushArrayBufferTransaction(buffer: Buffer) {
-        return postArrayBufferGetJson("/native/push_transaction", buffer);
+    public async pushArrayBufferTransaction(buffer: ArrayBufferLike) {
+        let url = siblingUrl(null, "transact", "/push_transaction");
+        let res = await throwIfError(
+            await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/octet-stream",
+                    Accept: "application/octet-stream",
+                },
+                body: buffer as any,
+            })
+        );
+        return JSON.parse(
+            util.deserializeTrace(new Uint8Array(await res.arrayBuffer()))
+        );
     }
 
     public async restart(): Promise<void> {
@@ -186,12 +203,19 @@ class Chain {
         return schem.parse(await getJson("/native/admin/perf"));
     }
 
-    public addServerKey({ key, device }: { key?: string; device?: string }) {
-        return postJson("/native/admin/keys", {
+    public async addServerKey({
+        key,
+        device,
+    }: {
+        key?: string;
+        device?: string;
+    }): Promise<ServerKey[]> {
+        const res = await postJson("/native/admin/keys", {
             service: "verify-sig",
             rawData: key,
             device,
         });
+        return await res.json();
     }
 
     public getKeyDevices(): Promise<KeyDevice[]> {
@@ -203,6 +227,10 @@ class Chain {
             device,
             pin,
         });
+    }
+
+    public getServerKeys(): Promise<ServerKey[]> {
+        return getJson("/native/admin/keys");
     }
 }
 

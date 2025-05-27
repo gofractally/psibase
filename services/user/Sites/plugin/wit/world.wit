@@ -8,7 +8,7 @@ interface types {
     }
 }
 
-interface sites {
+interface api {
     use types.{file};
     use host:common/types.{error};
 
@@ -21,7 +21,7 @@ interface sites {
     /// file-type of the content is supported. Compression-quality must be 
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     upload: func(file: file, compression-quality: u8) -> result<_, error>;
@@ -35,7 +35,7 @@ interface sites {
     /// file-type of the content is supported. Compression-quality must be 
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     /// 
@@ -49,6 +49,9 @@ interface sites {
     /// of the file that caused the error.
     upload-tree: func(files: list<file>, compression-quality: u8) -> result<u16, error>;
 
+    /// Remove content from the caller's subdomain
+    remove: func(path: string) -> result<_, error>;
+
     /// Enable or disable single-page application mode.
     /// When enabled, all content requests return the root document
     /// except for requests to static assets (files with an extension).
@@ -59,15 +62,18 @@ interface sites {
     /// If no specific or global CSP is set, a default CSP is used.
     set-csp: func(path: string, csp: string) -> result<_, error>;
 
+    /// Delete the Content Security Policy for the specified path (or "*" for the global CSP).
+    delete-csp: func(path: string) -> result<_, error>;
+
     /// Enable or disable caching of responses.
     /// Cache strategy:
     /// - `If-None-Match` header is checked against the hash of the content
     /// - The hash is stored in the `ETag` header
     /// - If the hash matches, a 304 Not Modified response is returned
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
-    enable-cache: func(enable: bool) -> result<_, error>;
+    set-cache-mode: func(enable: bool) -> result<_, error>;
 }
 
 world imports {
-    import sites;
+    import api;
 }

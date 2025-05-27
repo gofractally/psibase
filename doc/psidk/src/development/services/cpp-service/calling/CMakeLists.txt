@@ -22,6 +22,8 @@ psibase_package(
     DESCRIPTION "Calling services"
     SERVICE arithmetic
         TARGET arithmetic
+        SERVER arithmetic
     SERVICE caller
         TARGET caller
+        SERVER caller
 )

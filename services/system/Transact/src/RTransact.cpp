@@ -1,9 +1,10 @@
+#include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <psibase/serveSchema.hpp>
+#include <psibase/jwt.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -11,10 +12,9 @@ using namespace SystemService;
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   auto unapplied = WriteOnly{}.open<UnappliedTransactionTable>();
-   auto nextSequence =
-       unapplied.get(SingletonKey{}).value_or(UnappliedTransactionRecord{0}).nextSequence;
-   auto included = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
+   auto unapplied    = WriteOnly{}.open<UnappliedTransactionTable>();
+   auto nextSequence = unapplied.get({}).value_or(UnappliedTransactionRecord{0}).nextSequence;
+   auto included     = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
    std::optional<SignedTransaction> result;
    PSIBASE_SUBJECTIVE_TX
    {
@@ -56,9 +56,136 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    return result;
 }
 
-void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
+namespace
+{
+   namespace refs
+   {
+      struct InnerTrace;
+      struct Action
+      {
+         AccountNumber         sender;   ///< Account sending the action
+         AccountNumber         service;  ///< Service to execute the action
+         MethodNumber          method;   ///< Service method to execute
+         std::span<const char> rawData;  ///< Data for the method
+      };
+      PSIO_REFLECT(Action, sender, service, method, rawData)
+
+      struct ActionTrace
+      {
+         Action                          action;
+         std::span<const char>           rawRetval;
+         std::vector<InnerTrace>         innerTraces;
+         std::chrono::nanoseconds        totalTime;
+         std::optional<std::string_view> error;
+      };
+      PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
+
+      struct EventTrace
+      {
+         std::string_view      name;
+         std::span<const char> data;
+      };
+      PSIO_REFLECT(EventTrace, name, data)
+
+      struct ConsoleTrace
+      {
+         std::string_view console;
+      };
+      PSIO_REFLECT(ConsoleTrace, console)
+
+      struct InnerTrace
+      {
+         std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
+      };
+      PSIO_REFLECT(InnerTrace, inner)
+
+      struct TransactionTrace
+      {
+         std::vector<ActionTrace>        actionTraces;
+         std::optional<std::string_view> error;
+      };
+      PSIO_REFLECT(TransactionTrace, actionTraces, error)
+   }  // namespace refs
+   using ActionRef           = refs::Action;
+   using ActionTraceRef      = refs::ActionTrace;
+   using EventTraceRef       = refs::EventTrace;
+   using ConsoleTraceRef     = refs::ConsoleTrace;
+   using InnerTraceRef       = refs::InnerTrace;
+   using TransactionTraceRef = refs::TransactionTrace;
+
+   struct PruneTrace
+   {
+      bool                            args = false;
+      std::optional<std::string_view> operator()(psio::view<const std::optional<std::string>> msg)
+      {
+         if (msg)
+         {
+            return static_cast<std::string_view>(*msg);
+         }
+         else
+         {
+            return {};
+         }
+      }
+      ActionRef operator()(psio::view<const Action> action)
+      {
+         return {
+             .sender  = action.sender(),
+             .service = action.service(),
+             .method  = action.method(),
+             .rawData = args ? action.rawData() : std::span<const char>{},
+         };
+      }
+      auto operator()(psio::view<const ConsoleTrace> trace)
+      {
+         return ConsoleTraceRef{trace.console()};
+      }
+      auto operator()(psio::view<const EventTrace> trace)
+      {
+         return EventTraceRef{trace.name(), trace.data()};
+      }
+      auto operator()(psio::view<const ActionTrace> at)
+      {
+         ActionTraceRef pruned;
+         pruned.error     = (*this)(at.error());
+         pruned.totalTime = at.totalTime();
+         pruned.rawRetval = at.rawRetval();
+         pruned.action    = (*this)(at.action());
+         pruned.innerTraces.reserve(at.innerTraces().size());
+         for (const auto& inner : at.innerTraces())
+         {
+            pruned.innerTraces.push_back((*this)(inner));
+         }
+         return pruned;
+      }
+      InnerTraceRef operator()(psio::view<const InnerTrace> inner)
+      {
+         return psio::visit([this](const auto& trace) { return InnerTraceRef{(*this)(trace)}; },
+                            inner.inner());
+      }
+
+      auto operator()(psio::view<const TransactionTrace> trace)
+      {
+         TransactionTraceRef pruned;
+         pruned.error = (*this)(trace.error());
+         pruned.actionTraces.reserve(trace.actionTraces().size());
+         for (const auto& at : trace.actionTraces())
+         {
+            pruned.actionTraces.push_back((*this)(at));
+         }
+         return pruned;
+      }
+   };
+
+}  // namespace
+
+void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
+   printf("trace size: %zu\n", find_view_span(trace).size());
+
+   TransactionTraceRef pruned = PruneTrace{true}(trace);
+
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
    bool                          json;
@@ -83,22 +210,34 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    }
    if (json)
    {
-      HttpReply           reply{.contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
-      to_json(trace, stream);
+      JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json", .body{pruned}};
+      ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
+      auto                                action = http.sendReply(0, reply);
+
       for (auto client : row->clients)
          if (client.json)
-            to<HttpServer>().sendReply(client.socket, reply);
+         {
+            psio::get<0>(action->rawData().value()) = client.socket;
+            call(action.data(), action.size());
+         }
    }
    if (bin)
    {
-      HttpReply           reply{.contentType = "application/octet-stream"};
-      psio::vector_stream stream{reply.body};
-      to_frac(trace, stream);
+      FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
+                                                    .body{pruned}};
+      ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
+      auto                                    action = http.sendReply(0, reply);
+
       for (auto client : row->clients)
          if (!client.json)
-            to<HttpServer>().sendReply(client.socket, reply);
+         {
+            psio::get<0>(action->rawData().value()) = client.socket;
+            call(action.data(), action.size());
+         }
    }
+#ifdef __wasm32__
+   printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
+#endif
 }
 
 void RTransact::onBlock()
@@ -178,8 +317,7 @@ namespace
          }
          // Find the next sequence number
          auto available = Subjective{}.open<AvailableSequenceTable>();
-         auto sequence =
-             available.get(SingletonKey{}).value_or(AvailableSequenceRecord{0}).nextSequence;
+         auto sequence  = available.get({}).value_or(AvailableSequenceRecord{0}).nextSequence;
          available.put({sequence + 1});
          pending.put({.id         = id,
                       .expiration = trx.transaction->tapos().expiration(),
@@ -350,12 +488,90 @@ namespace
       AcceptParser parser;
       for (const auto& header : headers)
       {
-         if (header.name == "accept")
+         if (std::ranges::equal(header.name | std::views::transform(::tolower),
+                                std::string_view("accept")))
          {
             parseHeader(header.value, parser);
          }
       }
       return parser.isJson();
+   }
+
+   struct LoginData
+   {
+      std::string rootHost;
+   };
+   PSIO_REFLECT(LoginData, rootHost)
+
+   struct LoginTokenData
+   {
+      AccountNumber sub;
+      std::string   aud;
+      std::int64_t  exp;
+   };
+   PSIO_REFLECT(LoginTokenData, sub, aud, exp)
+
+   struct LoginReply
+   {
+      std::string access_token;
+      std::string token_type = "bearer";
+   };
+   PSIO_REFLECT(LoginReply, access_token, token_type)
+
+   std::vector<char> getJWTKey()
+   {
+      std::optional<JWTKeyRecord> row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = Subjective{}.open<JWTKeyTable>();
+         auto index = table.getIndex<0>();
+         row        = index.get({});
+         if (!row)
+         {
+            char buf[16];
+            raw::getRandom(buf, sizeof(buf));
+            row = JWTKeyRecord{std::vector(buf, buf + sizeof(buf))};
+            table.put(*row);
+         }
+      }
+      return std::move(row->key);
+   }
+
+   bool checkExp(TimePointSec exp)
+   {
+      auto now =
+          std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now());
+      return now <= exp;
+   }
+
+   bool checkExp(std::int64_t exp)
+   {
+      return checkExp(TimePointSec{std::chrono::seconds{exp}});
+   }
+
+   template <typename T>
+   T parseBody(const psibase::HttpRequest& request)
+   {
+      T result;
+      if (request.contentType == "application/json")
+      {
+         std::vector<char> body;
+         body.reserve(request.body.size() + 1);
+         body.insert(request.body.end(), request.body.begin(), request.body.end());
+         body.push_back('\0');
+         psio::json_token_stream stream(body.data());
+         from_json(result, stream);
+      }
+      else if (request.contentType == "application/octet-stream")
+      {
+         psio::input_stream stream{request.body};
+         from_frac(result, stream);
+      }
+      else
+      {
+         abortMessage("Expected a json or fracpack body");
+      }
+      return result;
    }
 
 }  // namespace
@@ -366,6 +582,41 @@ void RTransact::recv(const SignedTransaction& trx)
    auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
    if (pushTransaction(id, trx))
       forwardTransaction(trx);
+}
+
+std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
+{
+   std::vector<char>            key = getJWTKey();
+   std::optional<AccountNumber> result;
+   for (const auto& header : request.headers)
+   {
+      if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
+      {
+         parseHeader(header.value,
+                     [&](std::string_view value)
+                     {
+                        std::string_view prefix = "Bearer ";
+                        if (value.starts_with(prefix))
+                        {
+                           auto token   = value.substr(prefix.size());
+                           auto decoded = decodeJWT<LoginTokenData>(key, token);
+                           if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+                           {
+                              result = decoded.sub;
+                           }
+                        }
+                     });
+         if (result)
+            return result;
+      }
+   }
+   if (auto token = request.getCookie("__Host-SESSION"))
+   {
+      auto decoded = decodeJWT<LoginTokenData>(key, *token);
+      if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+         return decoded.sub;
+   }
+   return {};
 }
 
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request,
@@ -391,9 +642,52 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       if (pushTransaction(id, trx))
          forwardTransaction(trx);
    }
-   else if (auto res = serveSchema<Transact>(request))
+   else if (request.method == "POST" && request.target == "/login")
    {
-      return res;
+      auto trx = parseBody<SignedTransaction>(request);
+      check(trx.transaction->actions().size() == 1 &&
+                trx.transaction->actions()[0].method() == MethodNumber{"loginSys"},
+            "Expected a login transaction");
+      check(trx.transaction->tapos().flags() & Tapos::do_not_broadcast_flag,
+            "Login transaction must be do_not_broadcast");
+      auto loginAct = trx.transaction->actions()[0];
+      auto sender   = loginAct.sender().unpack();
+      auto app      = loginAct.service().unpack();
+      auto data     = psio::from_frac<LoginData>(loginAct.rawData());
+      if (checkExp(trx.transaction->tapos().expiration()) && data.rootHost == request.rootHost)
+      {
+         // verify signatures
+         auto claims = trx.transaction->claims();
+         if (claims.size() != trx.proofs.size())
+            abortMessage("Proofs and claims must have the same size");
+         for (std::size_t i = 0; i < trx.proofs.size(); ++i)
+         {
+            Actor<VerifyInterface> verify(RTransact::service, claims[i].service());
+            verify.verifySys(sha256(trx.transaction.data(), trx.transaction.size()), claims[i],
+                             trx.proofs[i]);
+         }
+         // check auth
+         auto accountsTables = Accounts::Tables(Accounts::service);
+         auto accountTable   = accountsTables.open<AccountTable>();
+         auto accountIndex   = accountTable.getIndex<0>();
+         auto account        = accountIndex.get(sender);
+         check(!!account, "Account not found");
+         Actor<AuthInterface> auth(RTransact::service, account->authService);
+         auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
+         auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
+                           ServiceMethod{AccountNumber{}, MethodNumber{}},
+                           std::vector<ServiceMethod>{}, claims);
+         // Construct token
+         auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
+             std::chrono::system_clock::now() + std::chrono::days(30));
+         auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
+                                                                           .aud = request.rootHost,
+                                                                           .exp = exp.time_since_epoch().count()});
+         HttpReply           reply{.contentType = "application/json"};
+         psio::vector_stream stream{reply.body};
+         to_json(LoginReply{token}, stream);
+         return reply;
+      }
    }
 
    return {};

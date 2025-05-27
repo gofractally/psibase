@@ -54,7 +54,7 @@ Tokens::Tokens(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().getIndex<0>().get({});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -63,7 +63,7 @@ void Tokens::init()
 {
    // Set initialized flag
    auto initTable = Tables().open<InitTable>();
-   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
+   auto init      = (initTable.getIndex<0>().get({}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -98,9 +98,6 @@ void Tokens::init()
 
    // Register proxy
    to<SystemService::HttpServer>().registerServer(RTokens::service);
-
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Tokens>());
 
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"created"}, 0);
@@ -193,13 +190,14 @@ void Tokens::setUserConf(psibase::EnumElement flag, bool enable)
    auto holder  = getTokenHolder(sender);
    auto flagBit = TokenHolderRecord::Configurations::value(flag);
 
-   check(not holder.config.get(flagBit) == enable, redundantUpdate);
+   if (not holder.config.get(flagBit) == enable)
+   {
+      holder.config.set(flagBit, enable);
 
-   holder.config.set(flagBit, enable);
+      emit().history().userConfSet(sender, flag, enable);
 
-   emit().history().userConfSet(sender, flag, enable);
-
-   Tables().open<TokenHolderTable>().put(holder);
+      Tables().open<TokenHolderTable>().put(holder);
+   }
 }
 
 void Tokens::setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable)

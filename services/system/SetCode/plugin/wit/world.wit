@@ -1,0 +1,14 @@
+package setcode:plugin;
+
+interface api {
+
+    /// Upload compiled service code to the server into the namespace of the logged-in user
+    /// Parameters:
+    /// `account`: The account to which to upload the code
+    /// `code`: The compiled code as a byte array
+    set-service-code: func(account: string, code: list<u8>);
+}
+
+world imports {
+    import api;
+}

@@ -8,7 +8,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 | Function or Type                     |       | Description                                                                                                                                                                                        |
 | ------------------------------------ | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RPCError`                           |       | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [`/native/push_transaction`](#push-transaction-http), if available.                               |
+| `RPCError`                           |       | Error type. This extends `Error` with a new field, `trace`, which contains the trace returned by [push_transaction](../../../default-apps/transact.md#push-transaction), if available.                               |
 | `throwIfError(response)`             |       | Throw an `RPCError` if the argument (a Response object) indicates a failure. Doesn't fill `trace` since traces are only present with status 200. Returns the argument (Response) if not a failure. |
 | `siblingUrl(baseUrl, service, path)` |       | Reexport of `siblingUrl` from [rootdomain and siblingUrl (js)](#rootdomain-and-siblingurl-js).                                                                                                     |
 | `get(url)`                           | async | fetch/GET. Returns Response object if ok or throws `RPCError`.                                                                                                                                     |
@@ -95,10 +95,10 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 `/common/common-lib.js` exports these utility functions:
 
-| Function                                       |       | Description                                                                                                               |
-| ---------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
-| `getRootDomain`                                | async | returns the root domain for the queried node (e.g. `psibase.127.0.0.1.sslip.io`). |
-| `siblingUrlsiblingUrl(baseUrl, service, path)` | async | Sign, pack, and push transaction.                                                                                         |
+| Function                                       |       | Description                                                              |
+|------------------------------------------------|-------|--------------------------------------------------------------------------|
+| `getRootDomain`                                | async | returns the root domain for the queried node (e.g. `psibase.localhost`). |
+| `siblingUrlsiblingUrl(baseUrl, service, path)` | async | Sign, pack, and push transaction.                                        |
 
 
 `getRootDomain` calls the `/common/rootdomain/` endpoint, and the result is cached so subsequent calls will not make additional queries to the node.
@@ -110,8 +110,8 @@ Example uses:
 
 - `siblingUrl(null, '', '/foo/bar')`: Gets URL to `/foo/bar` on the root domain. This form is only usable by scripts running on webpages served by psinode.
 - `siblingUrl(null, 'other-service', '/foo/bar')`: Gets URL to `/foo/bar` on the `other-service` domain. This form is only usable by scripts running on webpages served by psinode.
-- `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', '', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
-- `siblingUrl('http://psibase.127.0.0.1.sslip.io:8080/', 'other-service', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
+- `siblingUrl('http://psibase.localhost:8080/', '', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
+- `siblingUrl('http://psibase.localhost:8080/', 'other-service', '/foo/bar')`: Like above, but usable by scripts running on webpages served outside of psinode.
 
 ## Key Conversions
 

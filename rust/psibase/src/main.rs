@@ -7,25 +7,29 @@ use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate, sites};
+use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, method,
-    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry,
-    JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry,
-    ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
-    TransactionBuilder, TransactionTrace,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
+    get_tapos_for_head, login_action, new_account_action, push_transaction, push_transactions,
+    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
+    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, Checksum256,
+    DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta,
+    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
+    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
+use std::cell::Cell;
+use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -54,7 +58,7 @@ struct NodeArgs {
         long,
         value_name = "URL_OR_HOST_ALIAS",
         env = "PSINODE_URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/",
+        default_value = "http://psibase.localhost:8080/",
         value_parser = parse_api_endpoint
     )]
     api: Url,
@@ -68,10 +72,6 @@ struct NodeArgs {
 #[derive(Args, Debug)]
 #[clap(long_about = None)]
 struct TxArgs {
-    /// Suppress "Ok" message
-    #[clap(long)]
-    suppress_ok: bool,
-
     /// Controls how transaction traces are reported. Possible values are
     /// error, stack, full, or json
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
@@ -89,6 +89,10 @@ struct SigArgs {
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<AnyPrivateKey>,
+
+    /// Stages transactions instead of executing them immediately
+    #[clap(long, value_name = "ACCOUNT")]
+    proposer: Option<ExactAccountNumber>,
 }
 
 #[derive(Args, Debug)]
@@ -100,9 +104,13 @@ struct BootArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
-    /// Set all accounts to authenticate using this key
+    /// Sets the producer account to use this key for transaction authentication
     #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
+    account_key: Option<AnyPublicKey>,
+
+    /// Sets the producer's block signing key
+    #[clap(long, value_name = "BLOCK_KEY")]
+    block_key: Option<AnyPublicKey>,
 
     /// Sets the name of the block producer
     #[clap(short = 'p', long, value_name = "PRODUCER")]
@@ -118,6 +126,21 @@ struct BootArgs {
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
     compression_level: u32,
+}
+
+#[derive(Args, Debug)]
+struct PushArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Actions to push
+    actions: Vec<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -194,6 +217,9 @@ struct DeployArgs {
     /// Filename containing the service
     filename: String,
 
+    /// Filename containing the schema
+    schema: PathBuf,
+
     /// Create the account if it doesn't exist. Also set the account to
     /// authenticate using this key, even if the account already existed.
     #[clap(short = 'c', long, value_name = "KEY")]
@@ -251,6 +277,25 @@ struct UploadArgs {
 }
 
 #[derive(Args, Debug)]
+struct PublishArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Package files to publish
+    packages: Vec<PathBuf>,
+
+    /// Sender to use (required). Files are uploaded to this account's subdomain.
+    #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+    sender: ExactAccountNumber,
+}
+
+#[derive(Args, Debug)]
 struct InstallArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -289,6 +334,43 @@ struct InstallArgs {
 }
 
 #[derive(Args, Debug)]
+struct UpgradeArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Packages to update
+    packages: Vec<OsString>,
+
+    /// Set all accounts to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+
+    /// Sender to use for installing. The packages and all accounts
+    /// that they create will be owned by this account.
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
+
+    /// Install the latest version
+    #[clap(long)]
+    latest: bool,
+
+    /// Configure compression level to use for uploaded files
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+    compression_level: u32,
+}
+
+#[derive(Args, Debug)]
 struct ListArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -302,10 +384,17 @@ struct ListArgs {
     /// List installed apps
     #[clap(long)]
     installed: bool,
+    /// List installed apps that have updates available
+    #[clap(long)]
+    updates: bool,
 
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -320,6 +409,10 @@ struct SearchArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -334,6 +427,10 @@ struct InfoArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -353,10 +450,28 @@ struct CreateTokenArgs {
     mode: String,
 }
 
+#[derive(Args, Debug)]
+struct LoginArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    /// The account logging in
+    user: ExactAccountNumber,
+
+    /// The app to log in to
+    app: ExactAccountNumber,
+}
+
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Boot a development chain
     Boot(BootArgs),
+
+    /// Push a transaction to the chain
+    Push(PushArgs),
 
     /// Create or modify an account
     Create(CreateArgs),
@@ -370,8 +485,14 @@ enum Command {
     /// Upload a file to a service
     Upload(UploadArgs),
 
+    /// Publish a package
+    Publish(PublishArgs),
+
     /// Install apps to the chain
     Install(InstallArgs),
+
+    /// Upgrade apps
+    Upgrade(UpgradeArgs),
 
     /// Prints a list of apps
     List(ListArgs),
@@ -384,6 +505,9 @@ enum Command {
 
     /// Create a bearer token that can be used to access a node
     CreateToken(CreateTokenArgs),
+
+    /// Get a bearer token that can be used to access an app
+    Login(LoginArgs),
 
     /// Setup the psibase local config file
     #[command(subcommand)]
@@ -424,9 +548,18 @@ fn store_sys(
     )
 }
 
-fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
+fn with_tapos(
+    tapos: &TaposRefBlock,
+    mut actions: Vec<Action>,
+    proposer: &Option<ExactAccountNumber>,
+    auto_exec: bool,
+) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec::from(now_plus_10secs);
+    if let Some(proposer) = proposer {
+        actions =
+            vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, auto_exec)];
+    }
     Transaction {
         tapos: Tapos {
             expiration,
@@ -437,6 +570,97 @@ fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
         actions,
         claims: vec![],
     }
+}
+
+fn make_spinner() -> ProgressBar {
+    let progress = ProgressBar::new_spinner().with_style(
+        ProgressStyle::with_template("{spinner}{msg}")
+            .unwrap()
+            .tick_strings(&["⏳ ", "⌛ ", ""]),
+    );
+    progress.enable_steady_tick(core::time::Duration::from_millis(500));
+    progress
+}
+
+fn finish_progress(sig_args: &SigArgs, progress: ProgressBar, num_transactions: usize) {
+    if sig_args.proposer.is_some() {
+        progress.finish_with_message(format!(
+            "Proposed {} transaction{}",
+            num_transactions,
+            if num_transactions == 1 { "" } else { "s" }
+        ));
+    } else {
+        progress.finish_with_message("Ok");
+    }
+}
+
+async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut actions: Vec<PrettyAction> = Vec::new();
+
+    if args.actions.is_empty() {
+        args.actions.push("-".to_string().into());
+    }
+
+    for file in args.actions {
+        let contents = if file.as_os_str() == "-" {
+            std::io::read_to_string(std::io::stdin().lock())?
+        } else {
+            std::io::read_to_string(
+                File::open(&file).with_context(|| format!("Cannot open {}", file.display()))?,
+            )?
+        };
+        let mut new_actions: Vec<PrettyAction> = serde_json::from_str(&contents)?;
+        actions.append(&mut new_actions);
+    }
+
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
+    let mut schemas = SchemaMap::new();
+
+    for action in &actions {
+        if !schemas.contains_key(&action.service) {
+            schemas.insert(
+                action.service,
+                crate::as_json(
+                    client.get(
+                        packages::SERVICE
+                            .url(&args.node_args.api)?
+                            .join(&format!("/schema?service={}", action.service))?,
+                    ),
+                )
+                .await?,
+            );
+        }
+    }
+
+    let actions: Vec<Action> = actions
+        .into_iter()
+        .map(|act| act.into_action(&schemas))
+        .collect::<Result<_, _>>()?;
+
+    let trx = with_tapos(
+        &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
+        actions,
+        &args.sig_args.proposer,
+        true,
+    );
+
+    progress.set_message("Pushing transaction");
+
+    push_transaction(
+        &args.node_args.api,
+        client,
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        args.tx_args.trace,
+        args.tx_args.console,
+        Some(&progress),
+    )
+    .await?;
+
+    finish_progress(&args.sig_args, progress, 1);
+    Ok(())
 }
 
 async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
@@ -460,22 +684,29 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
         ));
     }
 
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
+
+    progress.set_message(format!("Creating {}", args.account));
+
     push_transaction(
         &args.node_args.api,
         client,
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -505,22 +736,28 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
         ));
     }
 
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
+
+    progress.set_message(format!("Setting auth for {}", args.account));
+
     push_transaction(
         &args.node_args.api,
         client,
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -529,6 +766,10 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let wasm = std::fs::read(args.filename.clone())
         .with_context(|| format!("Can not read {}", args.filename))?;
+    let schema: psibase::Schema = serde_json::from_slice(
+        &std::fs::read(&args.schema)
+            .with_context(|| format!("Can not read {}", args.schema.display()))?,
+    )?;
 
     let mut actions: Vec<Action> = Vec::new();
 
@@ -557,14 +798,20 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     }
 
     actions.push(set_code_action(args.account.into(), wasm));
+    actions.push(packages::Wrapper::pack_from(args.account.into()).setSchema(schema));
 
     if args.register_proxy {
         actions.push(reg_server(args.account.into(), args.account.into()));
     }
 
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -572,12 +819,10 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -593,6 +838,9 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
             t.essence_str().to_string()
         }
     };
+
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
 
     let normalized_dest = if let Some(d) = &args.dest {
         if d.starts_with('/') {
@@ -619,6 +867,8 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
 
     push_transaction(
@@ -627,12 +877,10 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -648,7 +896,7 @@ fn fill_tree(
     if md.is_file() {
         let guess = mime_guess::from_path(source);
         if let Some(t) = guess.first() {
-            println!("{} <=== {}   {}", dest, source, t.essence_str());
+            eprintln!("{} <=== {}   {}", dest, source, t.essence_str());
             actions.push((
                 dest.to_owned(),
                 store_sys(
@@ -663,7 +911,7 @@ fn fill_tree(
             if top {
                 return Err(anyhow!("Unknown mime type: {}", source));
             } else {
-                println!("Skip unknown mime type: {}", source);
+                eprintln!("Skip unknown mime type: {}", source);
             }
         }
     } else if md.is_dir() {
@@ -683,7 +931,7 @@ fn fill_tree(
         if top {
             return Err(anyhow!("{} is not a file or directory", source));
         } else {
-            println!("Skip {}", source);
+            eprintln!("Skip {}", source);
         }
     }
     Ok(())
@@ -708,10 +956,10 @@ async fn monitor_trx(
     .await;
     if let Err(err) = result {
         progress.suspend(|| {
-            println!("=====\n{:?}", err);
-            println!("-----\nThese files were in this failed transaction:");
+            eprintln!("=====\n{:?}", err);
+            eprintln!("-----\nThese files were in this failed transaction:");
             for f in files {
-                println!("    {}", f);
+                eprintln!("    {}", f);
             }
         });
         return Err(err);
@@ -758,30 +1006,44 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
 }
 
 async fn add_package_registry(
+    base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
-    client: reqwest::Client,
+    mut client: reqwest::Client,
     result: &mut JointRegistry<BufReader<File>>,
 ) -> Result<(), anyhow::Error> {
-    if sources.is_empty() {
+    let chain_sources = if let Some(account) = account {
+        handle_unbooted(get_package_sources(base_url, &mut client, account).await)?
+    } else {
+        Vec::new()
+    };
+    if sources.is_empty() && chain_sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
         for source in sources {
             if source.starts_with("http:") || source.starts_with("https:") {
                 result.push(HTTPRegistry::new(Url::parse(source)?, client.clone()).await?)?;
+            } else if let Ok(owner) = AccountNumber::from_exact(&*source) {
+                result.push(HTTPRegistry::with_account(base_url, owner, client.clone()).await?)?;
             } else {
                 result.push(DirectoryRegistry::new(source.into()))?;
             }
+        }
+        for source in chain_sources {
+            result.push(HTTPRegistry::with_source(base_url, source, client.clone()).await?)?;
         }
     }
     Ok(())
 }
 
 async fn get_package_registry(
+    base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
     client: reqwest::Client,
 ) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
     let mut result = JointRegistry::new();
-    add_package_registry(sources, client, &mut result).await?;
+    add_package_registry(base_url, account, sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -797,10 +1059,18 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         package_registry.push(files)?;
         packages
     };
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        None,
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let mut packages = package_registry.resolve(&package_names).await?;
-    let (boot_transactions, transactions) = create_boot_transactions(
-        &args.key,
+    let (boot_transactions, groups) = create_boot_transactions(
+        &args.block_key,
+        &args.account_key,
         args.producer.into(),
         true,
         expiration,
@@ -808,27 +1078,32 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
-    let progress = ProgressBar::new((transactions.len() + 1) as u64)
-        .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
+    let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();
+    let progress = ProgressBar::new((num_transactions + boot_transactions.len()) as u64)
+        .with_style(ProgressStyle::with_template(
+            "{wide_bar} {pos}/{len}\n{msg}",
+        )?);
 
+    progress.set_message("Initializing chain");
     push_boot(args, &client, boot_transactions.packed(), &progress).await?;
-    progress.inc(1);
-    for transaction in transactions {
-        push_transaction(
-            &args.node_args.api,
-            client.clone(),
-            transaction.packed(),
-            args.tx_args.trace,
-            args.tx_args.console,
-            Some(&progress),
-        )
-        .await?;
-        progress.inc(1)
+    progress.inc(boot_transactions.len() as u64);
+    for (label, transactions, _) in groups {
+        progress.set_message(label);
+        for trx in transactions {
+            push_transaction(
+                &args.node_args.api,
+                client.clone(),
+                trx.packed(),
+                args.tx_args.trace,
+                args.tx_args.console,
+                Some(&progress),
+            )
+            .await?;
+            progress.inc(1)
+        }
     }
 
-    if !args.tx_args.suppress_ok {
-        println!("Successfully booted {}", args.node_args.api);
-    }
+    progress.finish_with_message(format!("Successfully booted {}", args.node_args.api));
     Ok(())
 }
 
@@ -840,7 +1115,11 @@ async fn push_boot(
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
-            .post(args.node_args.api.join("native/push_boot")?)
+            .post(
+                account!("x-admin")
+                    .url(&args.node_args.api)?
+                    .join("native/admin/push_boot")?,
+            )
             .body(packed),
     )
     .await?;
@@ -896,7 +1175,8 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         }
 
         let (selected_files, selected_actions) = actions.drain(..n).unzip();
-        let trx = with_tapos(&tapos, selected_actions);
+
+        let trx = with_tapos(&tapos, selected_actions, &args.sig_args.proposer, true);
         running.push(monitor_trx(
             args,
             &client,
@@ -918,9 +1198,116 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         return Err(anyhow!("{}/{} failed transactions", num_failed, num_trx));
     }
 
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
+    finish_progress(&args.sig_args, progress, num_trx);
+    Ok(())
+}
+
+async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+
+    // Read package metadata and determine which packages are already published
+    let mut query_existing = "query {".to_string();
+
+    let mut all_meta = Vec::new();
+
+    for (i, path) in args.packages.iter().enumerate() {
+        let f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        let package = PackagedService::new(BufReader::new(f))?;
+        let meta = package.meta();
+        use std::fmt::Write;
+        write!(
+            &mut query_existing,
+            " p{}: package(owner: {}, name: {}, version: {}) {{ sha256 }}",
+            i,
+            serde_json::to_string(&args.sender)?,
+            serde_json::to_string(&meta.name)?,
+            serde_json::to_string(&meta.version)?
+        )?;
+        all_meta.push(meta.clone());
     }
+
+    query_existing += " }";
+
+    let existing = psibase::gql_query::<serde_json::Value>(
+        &args.node_args.api,
+        &mut client,
+        packages::SERVICE,
+        query_existing,
+    )
+    .await?;
+    let existing = existing.as_object().unwrap();
+    let num_new = existing.values().filter(|p| p.is_null()).count();
+
+    let progress = ProgressBar::new(num_new as u64).with_style(ProgressStyle::with_template(
+        "{wide_bar} {pos}/{len}\n{msg}",
+    )?);
+    progress.set_message("Preparing transactions");
+
+    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+
+    let action_limit: usize = 1024 * 1024;
+    let mut builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &args.sig_args.proposer, false),
+                &args.sig_args.sign,
+            )?)
+        },
+    );
+
+    for (i, path) in args.packages.iter().enumerate() {
+        let mut f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        // Read the file
+        let mut content = Vec::new();
+        f.read_to_end(&mut content)?;
+        // Calculate the package hash
+        let hash: [u8; 32] = Sha256::digest(&content).into();
+        let existing_info = &existing[&format!("p{}", i)];
+        let meta = &all_meta[i];
+        if existing_info.is_null() {
+            let dest = format!("/packages/{}-{}.psi", &meta.name, &meta.version);
+            builder.set_label(format!("Publishing {}-{}", &meta.name, &meta.version));
+            builder.push(vec![
+                sites::Wrapper::pack_from(args.sender.into()).storeSys(
+                    dest.clone(),
+                    "application/zip".to_string(),
+                    None,
+                    content.into(),
+                ),
+                packages::Wrapper::pack_from(args.sender.into()).publish(
+                    meta.clone(),
+                    hash.into(),
+                    dest,
+                ),
+            ])?;
+            progress.inc(1);
+        } else if &serde_json::from_value::<Checksum256>(existing_info["sha256"].clone())?.0
+            != &hash
+        {
+            progress.suspend(|| {
+                eprintln!(
+                    "{}-{} has already been published",
+                    &meta.name, &meta.version
+                );
+            })
+        }
+    }
+    progress.reset();
+
+    let transactions = builder.finish()?;
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
+
+    push_transactions(
+        &args.node_args.api,
+        client,
+        transactions,
+        args.tx_args.trace,
+        args.tx_args.console,
+        &progress,
+    )
+    .await?;
+    finish_progress(&args.sig_args, progress, num_transactions);
     Ok(())
 }
 
@@ -941,56 +1328,95 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     Ok(())
 }
 
+fn get_package_accounts(ops: &[PackageOp]) -> Vec<AccountNumber> {
+    let mut accounts = Vec::new();
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                accounts.extend_from_slice(&info.accounts);
+            }
+            PackageOp::Replace(_meta, info) => {
+                accounts.extend_from_slice(&info.accounts);
+            }
+            PackageOp::Remove(_meta) => {}
+        }
+    }
+    accounts
+}
+
 async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+    G: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
 >(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
     reg: &R,
     ops: Vec<PackageOp>,
-    accounts: &mut Vec<AccountNumber>,
+    mut uploader: StagedUpload,
     out: &mut TransactionBuilder<F>,
+    files: &mut TransactionBuilder<G>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
+    let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
             PackageOp::Install(info) => {
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
+                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                files.set_label(format!(
+                    "Uploading files for {}-{}",
+                    &info.name, &info.version
+                ));
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true, compression_level)?;
+                package.install(
+                    &mut actions,
+                    Some(&mut uploader),
+                    sender,
+                    true,
+                    compression_level,
+                    &mut schemas,
+                )?;
                 out.push_all(actions)?;
+                files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
+                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
                     &meta.name, &meta.version, &info.name, &info.version
                 ));
-                // Remove out-dated files. This needs to happen before installing
-                // new files, to handle the case where a service that stores
-                // data files is replaced by a service that does not provide
-                // removeSys.
+                files.set_label(format!(
+                    "Uploading files for {}-{}",
+                    &info.name, &info.version
+                ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
                 old_manifest.upgrade(package.manifest(), out)?;
                 // Install the new package
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true, compression_level)?;
+                package.install(
+                    &mut actions,
+                    Some(&mut uploader),
+                    sender,
+                    true,
+                    compression_level,
+                    &mut schemas,
+                )?;
                 out.push_all(actions)?;
+                files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
@@ -1003,173 +1429,325 @@ async fn apply_packages<
     Ok(())
 }
 
+async fn do_install<T: Read + Seek>(
+    mut client: reqwest::Client,
+    package_registry: JointRegistry<T>,
+    to_install: Vec<PackageOp>,
+    sender: AccountNumber,
+    node_args: &NodeArgs,
+    sig_args: &SigArgs,
+    tx_args: &TxArgs,
+    key: &Option<AnyPublicKey>,
+    compression_level: u32,
+) -> Result<(), anyhow::Error> {
+    let tapos = get_tapos_for_head(&node_args.api, client.clone()).await?;
+
+    let mut id_bytes = <[u8; 8]>::default();
+    getrandom::getrandom(&mut id_bytes)?;
+    let id = u64::from_ne_bytes(id_bytes);
+
+    let index_cell = Cell::new(0);
+
+    let auto_exec_cell = Cell::new(false);
+
+    let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+        let index = index_cell.get();
+        index_cell.set(index + 1);
+        let auto_exec = auto_exec_cell.get();
+        actions.insert(
+            0,
+            packages::Wrapper::pack_from(sender).checkOrder(id.clone(), index),
+        );
+        Ok(sign_transaction(
+            with_tapos(&tapos, actions, &sig_args.proposer, auto_exec),
+            &sig_args.sign,
+        )?)
+    };
+
+    let action_limit: usize = 1024 * 1024;
+
+    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
+    let new_accounts = get_accounts_to_create(
+        &node_args.api,
+        &mut client,
+        &get_package_accounts(&to_install),
+        sender,
+    )
+    .await?;
+    create_accounts(new_accounts, &mut trx_builder, sender)?;
+
+    let uploader = StagedUpload::new(id.clone(), sig_args.proposer.map_or(sender, |s| s.into()));
+
+    let mut upload_builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &None, false),
+                &sig_args.sign,
+            )?)
+        },
+    );
+    apply_packages(
+        &node_args.api,
+        &mut client,
+        &package_registry,
+        to_install,
+        uploader,
+        &mut trx_builder,
+        &mut upload_builder,
+        sender,
+        key,
+        compression_level,
+    )
+    .await?;
+
+    trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
+
+    let upload_transactions = upload_builder.finish()?;
+    {
+        let total_size = upload_transactions
+            .iter()
+            .map(|group| {
+                group
+                    .1
+                    .iter()
+                    .map(|trx| trx.transaction.len())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        let progress = ProgressBar::new(total_size as u64).with_style(
+            ProgressStyle::with_template("{wide_bar} {bytes}/{total_bytes}\n{msg}")?,
+        );
+        for (label, transactions, _carry) in upload_transactions {
+            progress.set_message(label);
+            for trx in transactions {
+                let len = trx.transaction.len() as u64;
+                let result = push_transaction(
+                    &node_args.api,
+                    client.clone(),
+                    trx.packed(),
+                    tx_args.trace,
+                    tx_args.console,
+                    Some(&progress),
+                )
+                .await;
+
+                if let Err(err) = result {
+                    progress.abandon();
+                    return Err(err);
+                }
+                progress.inc(len);
+            }
+        }
+        progress.finish_and_clear();
+    }
+
+    if trx_builder.num_transactions() == 1 {
+        auto_exec_cell.set(true);
+    }
+    let transactions = trx_builder.finish()?;
+
+    let progress = ProgressBar::new(transactions.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
+    );
+
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
+
+    push_transactions(
+        &node_args.api,
+        client.clone(),
+        transactions,
+        tx_args.trace,
+        tx_args.console,
+        &progress,
+    )
+    .await?;
+
+    finish_progress(sig_args, progress, num_transactions);
+
+    Ok(())
+}
+
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
     let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let to_install = installed
         .resolve_changes(&package_registry, &packages, args.reinstall)
         .await?;
 
-    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
-
-    let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-        if actions.first().unwrap().sender != args.sender.into() {
-            actions.insert(
-                0,
-                Action {
-                    sender: args.sender.into(),
-                    service: account!("nop"),
-                    method: method!("nop"),
-                    rawData: Default::default(),
-                },
-            );
-        }
-        Ok(sign_transaction(
-            with_tapos(&tapos, actions),
-            &args.sig_args.sign,
-        )?)
-    };
-
-    let action_limit: usize = 64 * 1024;
-
-    let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
-    let mut new_accounts = vec![];
-
-    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
-    apply_packages(
-        &args.node_args.api,
-        &mut client,
-        &package_registry,
+    do_install(
+        client,
+        package_registry,
         to_install,
-        &mut new_accounts,
-        &mut trx_builder,
         args.sender.into(),
+        &args.node_args,
+        &args.sig_args,
+        &args.tx_args,
         &args.key,
         args.compression_level,
     )
-    .await?;
-
-    new_accounts = get_accounts_to_create(
-        &args.node_args.api,
-        &mut client,
-        &new_accounts,
-        args.sender.into(),
-    )
-    .await?;
-    create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
-
-    let account_transactions = account_builder.finish()?;
-    let transactions = trx_builder.finish()?;
-
-    {
-        let progress = ProgressBar::new(account_transactions.len() as u64).with_style(
-            ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
-        );
-        push_transactions(
-            &args.node_args.api,
-            client.clone(),
-            account_transactions,
-            args.tx_args.trace,
-            args.tx_args.console,
-            &progress,
-        )
-        .await?;
-        progress.finish_and_clear();
-    }
-
-    let progress = ProgressBar::new(transactions.len() as u64).with_style(
-        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
-    );
-
-    push_transactions(
-        &args.node_args.api,
-        client.clone(),
-        transactions,
-        args.tx_args.trace,
-        args.tx_args.console,
-        &progress,
-    )
-    .await?;
-
-    if !args.tx_args.suppress_ok {
-        progress.finish_with_message("Ok");
-    } else {
-        progress.finish_and_clear();
-    }
-
-    Ok(())
+    .await
 }
 
-async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
+async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    if args.all
-        || (args.installed && args.available)
-        || (!args.all & !args.installed && !args.available)
-    {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for name in installed.union(reglist).into_vec() {
-            println!("{}", name);
-        }
-    } else if args.installed {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        for name in installed.into_vec() {
-            println!("{}", name);
-        }
-    } else if args.available {
-        let installed =
-            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
-        let reglist = PackageList::from_registry(&package_registry)?;
-        for name in reglist.difference(installed).into_vec() {
-            println!("{}", name);
+    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let mut package_registry = JointRegistry::new();
+
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
+    package_registry.push(files)?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
+
+    let to_install = installed
+        .resolve_upgrade(
+            &package_registry,
+            &packages,
+            if args.latest {
+                PackagePreference::Latest
+            } else {
+                PackagePreference::Compatible
+            },
+        )
+        .await?;
+
+    do_install(
+        client,
+        package_registry,
+        to_install,
+        args.sender.into(),
+        &args.node_args,
+        &args.sig_args,
+        &args.tx_args,
+        &args.key,
+        args.compression_level,
+    )
+    .await
+}
+
+async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    // Resolve selection shortcuts
+    if args.all || (!args.installed && !args.available && !args.updates) {
+        args.installed = true;
+        args.available = true;
+        args.updates = true;
+    }
+    // Load the lists of packages that we need
+    let installed =
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    let reglist = if args.updates || args.available {
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
+        PackageList::from_registry(&package_registry)?
+    } else {
+        PackageList::new()
+    };
+
+    // Show installed packages
+    if args.installed || args.updates {
+        for (name, version) in installed.max_versions()? {
+            let updated = if args.updates {
+                reglist.get_update(name, version)?
+            } else {
+                None
+            };
+            if let Some(next_version) = updated {
+                println!("{} {}->{}", name, version, next_version);
+            } else if args.installed {
+                println!("{} {}", name, version);
+            }
         }
     }
+
+    // Show packages that are not installed
+    if args.available {
+        for (name, version) in reglist.max_versions()? {
+            if !installed.contains_package(name) {
+                println!("{} {}", name, version);
+            }
+        }
+    }
+
     Ok(())
 }
 
 async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
     let mut compiled = vec![];
     for pattern in &args.patterns {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
-    // TODO: search installed packages as well
-    let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+    let mut packages =
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    let package_registry = get_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+    )
+    .await?;
+    for info in package_registry.index()? {
+        packages.insert_info(info)
+    }
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
-    for info in package_registry.index()? {
+    for (meta, _) in packages.into_info() {
         let mut name_matched = 0;
         let mut description_matched = 0;
         for re in &compiled[..] {
-            if re.is_match(&info.name) {
+            if re.is_match(&meta.name) {
                 name_matched += 1;
-            } else if re.is_match(&info.description) {
+            } else if re.is_match(&meta.description) {
                 description_matched += 1;
             } else {
                 break;
             }
         }
         if name_matched == compiled.len() {
-            primary_matches.push(info);
+            primary_matches.push(meta);
         } else if name_matched + description_matched == compiled.len() {
-            secondary_matches.push(info);
+            secondary_matches.push(meta);
         }
     }
-    primary_matches.sort_unstable_by(|a, b| a.name.cmp(&b.name));
-    secondary_matches.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    fn package_order(a: &Meta, b: &Meta) -> Ordering {
+        a.name.cmp(&b.name).then_with(|| {
+            Version::new(&b.version)
+                .unwrap()
+                .cmp(&Version::new(&a.version).unwrap())
+        })
+    }
+    primary_matches.sort_unstable_by(package_order);
+    primary_matches.dedup_by(|a, b| &a.name == &b.name);
+    secondary_matches.sort_unstable_by(package_order);
+    secondary_matches.dedup_by(|a, b| &a.name == &b.name);
     for result in primary_matches {
-        println!("{}", result.name);
+        println!("{} {}", result.name, result.version);
     }
     for result in secondary_matches {
-        println!("{}", result.name);
+        println!("{} {}", result.name, result.version);
     }
     Ok(())
 }
@@ -1220,9 +1798,35 @@ async fn show_package<T: PackageRegistry + ?Sized>(
     client: &mut reqwest::Client,
     package: &Meta,
     origin: &PackageOrigin,
+    alt: Option<&(Meta, PackageOrigin)>,
 ) -> Result<(), anyhow::Error> {
     let mut manifest = get_manifest(reg, base_url, client, package, origin).await?;
     println!("name: {}-{}", &package.name, &package.version);
+    let alt_version = if let Some((alt_package, _)) = alt {
+        if &alt_package.version != &package.version {
+            Some(&alt_package.version)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    match origin {
+        PackageOrigin::Installed { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: upgrade to {} available", alt_version);
+            } else {
+                println!("status: installed");
+            }
+        }
+        PackageOrigin::Repo { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: version {} installed", alt_version);
+            } else {
+                println!("status: not installed");
+            }
+        }
+    }
     println!("description: {}", &package.description);
     let mut services: Vec<_> = manifest.services.into_iter().collect();
     services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
@@ -1256,13 +1860,13 @@ async fn show_package<T: PackageRegistry + ?Sized>(
 }
 
 // an unbooted chain has no packages installed
-fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageList, anyhow::Error> {
+fn handle_unbooted<T: Default>(list: Result<T, anyhow::Error>) -> Result<T, anyhow::Error> {
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
             .contains("Node is not connected to any psibase network.")
         {
-            return Ok(PackageList::new());
+            return Ok(T::default());
         }
     }
     list
@@ -1275,26 +1879,43 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
     for package in &packages {
         if let Some((meta, origin)) = installed.get_by_name(package)? {
+            let alt = reglist.get_by_ref(&PackageRef {
+                name: meta.name.clone(),
+                version: format!(">{}", &meta.version),
+            })?;
             show_package(
                 &package_registry,
                 &args.node_args.api,
                 &mut client,
                 meta,
                 origin,
+                alt,
             )
             .await?;
         } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
+            let alt = installed.get_by_ref(&PackageRef {
+                name: meta.name.clone(),
+                version: "*".to_string(),
+            })?;
             show_package(
                 &package_registry,
                 &args.node_args.api,
                 &mut client,
                 meta,
                 origin,
+                alt,
             )
             .await?;
         } else {
@@ -1320,6 +1941,47 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     let key: Hmac<Sha256> = Hmac::new_from_slice(key_text.as_bytes())?;
     let token = claims.sign_with_key(&key)?;
     println!("{}", token);
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct LoginReply {
+    access_token: String,
+    token_type: String,
+}
+
+async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+
+    let root_host = args
+        .node_args
+        .api
+        .domain()
+        .expect("api must use a domain name");
+    let actions = vec![login_action(args.user.into(), args.app.into(), root_host)];
+
+    let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+    let tapos = Tapos {
+        expiration: expiration,
+        refBlockSuffix: 0,
+        flags: Tapos::DO_NOT_BROADCAST_FLAG,
+        refBlockIndex: 0,
+    };
+    let trx = Transaction {
+        tapos: tapos,
+        actions,
+        claims: vec![],
+    };
+
+    let reply: LoginReply = as_json(
+        client
+            .post(transact::SERVICE.url(&args.node_args.api)?.join("/login")?)
+            .header("Content-Type", "application/octet-stream")
+            .header("Accept", "application/json")
+            .body(sign_transaction(trx, &args.sig_args.sign)?.packed()),
+    )
+    .await?;
+    println!("{} {}", reply.token_type, reply.access_token);
     Ok(())
 }
 
@@ -1489,11 +2151,12 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Some(help) = &args.help {
         return print_help(help);
     }
-    let Some(command) = &args.command else {
+    let Some(command) = args.command else {
         return print_help(&[]);
     };
     match command {
         Command::Boot(args) => boot(&args).await?,
+        Command::Push(args) => push(args).await?,
         Command::Create(args) => create(&args).await?,
         Command::Modify(args) => modify(&args).await?,
         Command::Deploy(args) => deploy(&args).await?,
@@ -1507,16 +2170,19 @@ async fn main() -> Result<(), anyhow::Error> {
                 upload(&args).await?
             }
         }
+        Command::Publish(args) => publish(&args).await?,
         Command::Install(args) => install(&args).await?,
-        Command::List(args) => list(&args).await?,
+        Command::Upgrade(args) => upgrade(&args).await?,
+        Command::List(args) => list(args).await?,
         Command::Search(args) => search(&args).await?,
         Command::Info(args) => package_info(&args).await?,
         Command::CreateToken(args) => {
             create_token(Duration::seconds(args.expires_after), &args.mode)?
         }
-        Command::Config(config) => handle_cli_config_cmd(config)?,
-        Command::Help { command } => print_help(command)?,
-        Command::External(argv) => handle_external(argv)?,
+        Command::Login(args) => handle_login(&args).await?,
+        Command::Config(config) => handle_cli_config_cmd(&config)?,
+        Command::Help { command } => print_help(&command)?,
+        Command::External(argv) => handle_external(&argv)?,
     }
 
     Ok(())

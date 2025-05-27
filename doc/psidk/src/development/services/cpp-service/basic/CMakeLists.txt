@@ -12,10 +12,13 @@ find_package(psibase REQUIRED)
 add_executable(example example.cpp)
 target_link_libraries(example Psibase::service)
 
+# Create a package
 psibase_package(
     NAME Example
     VERSION 1.0.0
     DESCRIPTION "An example service"
+    # The account that the service will run on
     SERVICE example
-    TARGET example
+        # The CMake target that builds the service
+        TARGET example
 )

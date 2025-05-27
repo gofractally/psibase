@@ -44,7 +44,7 @@ Symbol::Symbol(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get({});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -52,7 +52,7 @@ Symbol::Symbol(psio::shared_view_ptr<psibase::Action> action)
 void Symbol::init()
 {
    auto initTable = Tables().open<InitTable>();
-   auto init      = (initTable.get(SingletonKey{}));
+   auto init      = (initTable.get({}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -102,9 +102,6 @@ void Symbol::init()
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);
-
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Symbol>());
 
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 0);

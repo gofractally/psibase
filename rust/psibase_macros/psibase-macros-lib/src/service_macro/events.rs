@@ -65,7 +65,7 @@ pub fn process_event_name(
 }
 
 pub fn process_event_schema(
-    _psibase_mod: &proc_macro2::TokenStream,
+    psibase_mod: &proc_macro2::TokenStream,
     event_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     insertions: &mut proc_macro2::TokenStream,
@@ -75,7 +75,7 @@ pub fn process_event_schema(
 
     *insertions = quote! {
         #insertions
-        events.insert(#name_str.to_string(), builder.insert::<#event_mod::#name>());
+        events.insert(#psibase_mod::MethodString(#name_str.to_string()), builder.insert::<#event_mod::#name>());
     }
 }
 

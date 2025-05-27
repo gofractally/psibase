@@ -1,6 +1,7 @@
 use std::fmt;
 
-use crate::{Action, Hex, Pack, Unpack};
+use crate::{Action, Hex, Pack};
+use fracpack::Unpack;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
 

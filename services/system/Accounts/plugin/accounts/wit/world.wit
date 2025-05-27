@@ -36,7 +36,7 @@ interface active-app {
 /// This is the typical API intended to be used by third-party plugins or UIs.
 interface api {
     use host:common/types.{error};
-    use types.{account, app-details};
+    use types.{account};
 
     /// Returns true if there is a user logged in to the currently active top-level application.
     is-logged-in: func() -> bool;

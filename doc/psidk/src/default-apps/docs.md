@@ -1,6 +1,6 @@
 # docs app
 
-By default, running psinode will deploy this entire documentation site in the `docs` application. View it by visiting the docs app on your local node's host address (e.g. `docs.psibase.127.0.0.1.sslip.io`).
+By default, running psinode will deploy this entire documentation site in the `docs` application. View it by visiting the docs app on your local node's host address (e.g. `docs.psibase.localhost:8080`).
 
 # Building from source
 

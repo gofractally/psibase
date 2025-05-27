@@ -80,14 +80,43 @@ pub enum PackageOp {
     Remove(Meta),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PackagePreference {
+    // Prefer the latest version
+    Latest,
+    // Prefer the best compatible version
+    Compatible,
+    // Prefer the current version
+    Current,
+}
+
+impl PackagePreference {
+    fn priority<'a>(&self, installed: &Version, v: &'a Version<'a>) -> (u32, &'a Version<'a>) {
+        let pre = if self >= &PackagePreference::Current && v == installed {
+            2
+        } else if self >= &PackagePreference::Compatible && v.is_compat(installed) {
+            1
+        } else {
+            0
+        };
+        (pre, v)
+    }
+}
+
 pub fn solve_dependencies(
     packages: Vec<PackageInfo>,
     input: Vec<PackageRef>,
     existing: Vec<(Meta, PackageDisposition)>,
+    preferred_order: Vec<String>,
     reinstall: bool,
+    request_pref: PackagePreference,
+    non_request_pref: PackagePreference,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let mut graph = DepGraph::new();
     graph.reinstall = reinstall;
+    graph.preferred_order = preferred_order;
+    graph.request_pref = request_pref;
+    graph.non_request_pref = non_request_pref;
     for package in packages {
         graph.add(package);
     }
@@ -104,9 +133,11 @@ pub struct DepGraph<'a> {
     packages: HashMap<String, HashMap<String, (PackageInfo, Lit)>>,
     request: HashMap<String, String>,
     existing: HashMap<String, (Meta, PackageDisposition, bool)>,
+    preferred_order: Vec<String>,
     solver: Solver<'a>,
-    upgrade_all: bool,
     reinstall: bool,
+    request_pref: PackagePreference,
+    non_request_pref: PackagePreference,
 }
 
 fn get_removed_impl(
@@ -172,6 +203,7 @@ fn evaluate_changes(
     mut packages: HashMap<String, PackageInfo>,
     mut existing: HashMap<String, (Meta, PackageDisposition, bool)>,
     request: HashMap<String, String>,
+    preferred_order: Vec<String>,
     reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let existing_refs: Vec<_> = existing
@@ -191,8 +223,10 @@ fn evaluate_changes(
     );
     result.reverse();
 
-    let installed_refs: Vec<_> = packages
-        .keys()
+    let installed_refs: Vec<_> = preferred_order
+        .iter()
+        .filter(|name| packages.contains_key(*name))
+        .chain(packages.keys())
         .map(|name| PackageRef {
             name: name.clone(),
             version: String::new(),
@@ -221,6 +255,68 @@ fn get_selected_version<'a>(
     None
 }
 
+// Optimizes packages
+// - Installing a new package is not preferred
+// - Uninstalling an existing package is not preferred
+// - Otherwise pref determines which version of each package is preferred
+fn improve_solution<
+    'b,
+    'a,
+    I: Iterator<Item = (&'b String, &'b HashMap<String, (PackageInfo, Lit)>)>,
+>(
+    iter: I,
+    solver: &mut Solver<'a>,
+    existing: &HashMap<String, (Meta, PackageDisposition, bool)>,
+    model: &HashSet<Lit>,
+    pref: PackagePreference,
+) -> bool {
+    let mut negated = vec![];
+    for (name, packages) in iter {
+        if let Some(selected) = get_selected_version(packages, model) {
+            let selected_version = Version::new(&selected).unwrap();
+            if let Some(existing) = existing.get(name) {
+                // newer only
+                let existing = Version::new(&existing.0.version).unwrap();
+                for (version, (_, var)) in packages {
+                    if version != selected {
+                        if pref.priority(&existing, &Version::new(&version).unwrap())
+                            < pref.priority(&existing, &selected_version)
+                        {
+                            solver.add_clause(&[!*var]);
+                        } else {
+                            negated.push(*var);
+                        }
+                    }
+                }
+            } else {
+                // newer or none
+                for (version, (_, var)) in packages {
+                    if version == selected {
+                        negated.push(!*var);
+                    } else if &Version::new(&version).unwrap() < &selected_version {
+                        solver.add_clause(&[!*var]);
+                    }
+                }
+            }
+        } else {
+            if existing.contains_key(name) {
+                // allow any
+                for (_, (_, var)) in packages {
+                    negated.push(*var);
+                }
+            } else {
+                // forbid all
+                for (_, (_, var)) in packages {
+                    solver.add_clause(&[!*var]);
+                }
+            }
+        }
+    }
+    solver.add_clause(&negated);
+    solver.assume(&[]);
+    solver.solve().unwrap_or(false)
+}
+
 impl<'a> DepGraph<'a> {
     pub fn new() -> DepGraph<'a> {
         DepGraph {
@@ -228,8 +324,10 @@ impl<'a> DepGraph<'a> {
             request: HashMap::new(),
             existing: HashMap::new(),
             solver: Solver::new(),
-            upgrade_all: false,
+            preferred_order: Vec::new(),
             reinstall: false,
+            request_pref: PackagePreference::Latest,
+            non_request_pref: PackagePreference::Current,
         }
     }
     pub fn add(&mut self, meta: PackageInfo) {
@@ -291,7 +389,13 @@ impl<'a> DepGraph<'a> {
                             }
                         }
                     }
-                    return evaluate_changes(result, self.existing, self.request, self.reinstall);
+                    return evaluate_changes(
+                        result,
+                        self.existing,
+                        self.request,
+                        self.preferred_order,
+                        self.reinstall,
+                    );
                 }
             }
         }
@@ -310,11 +414,24 @@ impl<'a> DepGraph<'a> {
             let packages = self.packages.get(name).unwrap();
             let selected = get_selected_version(packages, model).unwrap();
             let selected_version = Version::new(&selected).unwrap();
+            let existing = self.existing.get(name);
             for (version, (_, var)) in packages {
                 if version == selected {
                     negated.push(!*var);
-                } else if &Version::new(&version).unwrap() < &selected_version {
-                    self.solver.add_clause(&[!*var]);
+                } else {
+                    let version = Version::new(&version).unwrap();
+                    if let Some(existing) = existing {
+                        let existing = Version::new(&existing.0.version).unwrap();
+                        if self.request_pref.priority(&existing, &version)
+                            < self.request_pref.priority(&existing, &selected_version)
+                        {
+                            self.solver.add_clause(&[!*var]);
+                        }
+                    } else {
+                        if &version < &selected_version {
+                            self.solver.add_clause(&[!*var]);
+                        }
+                    }
                 }
             }
         }
@@ -323,63 +440,23 @@ impl<'a> DepGraph<'a> {
         self.solver.solve().unwrap_or(false)
     }
     // Optimizes packages that were not part of the request
-    // - The current state of the package is preferred, unless upgrade_all is set
+    // - pref determines which version of each package is preferred
     // - Uninstalling an existing package is not preferred
     // - Otherwise higher precedence is preferred
     fn improve_non_request_solution(&mut self, model: &HashSet<Lit>) -> bool {
-        let mut negated = vec![];
-        for (name, packages) in &self.packages {
-            if !self.request.contains_key(name) {
-                if let Some(selected) = get_selected_version(packages, model) {
-                    let selected_version = Version::new(&selected).unwrap();
-                    if let Some(existing) = self.existing.get(name) {
-                        // newer only
-                        for (version, (_, var)) in packages {
-                            if version != selected {
-                                if !self.upgrade_all {
-                                    if version == &existing.0.version {
-                                        negated.push(*var);
-                                        continue;
-                                    } else if selected == &existing.0.version {
-                                        self.solver.add_clause(&[!*var]);
-                                        continue;
-                                    }
-                                }
-                                if &Version::new(&version).unwrap() < &selected_version {
-                                    self.solver.add_clause(&[!*var]);
-                                } else {
-                                    negated.push(*var);
-                                }
-                            }
-                        }
-                    } else {
-                        // newer or none
-                        for (version, (_, var)) in packages {
-                            if version == selected {
-                                negated.push(!*var);
-                            } else if &Version::new(&version).unwrap() < &selected_version {
-                                self.solver.add_clause(&[!*var]);
-                            }
-                        }
-                    }
+        improve_solution(
+            self.packages.iter().filter_map(|(name, packages)| {
+                if self.request.contains_key(name) {
+                    None
                 } else {
-                    if self.existing.contains_key(name) {
-                        // allow any
-                        for (_, (_, var)) in packages {
-                            negated.push(*var);
-                        }
-                    } else {
-                        // forbid all
-                        for (_, (_, var)) in packages {
-                            self.solver.add_clause(&[!*var]);
-                        }
-                    }
+                    Some((name, packages))
                 }
-            }
-        }
-        self.solver.add_clause(&negated);
-        self.solver.assume(&[]);
-        self.solver.solve().unwrap_or(false)
+            }),
+            &mut self.solver,
+            &self.existing,
+            model,
+            self.non_request_pref,
+        )
     }
     fn get_matching(&self, pattern: &PackageRef) -> Result<Vec<Lit>, anyhow::Error> {
         let mut result = vec![];
@@ -397,6 +474,12 @@ impl<'a> DepGraph<'a> {
             for (meta, var) in packages.values() {
                 for dep in &meta.depends {
                     let group = self.get_matching(dep)?;
+                    if group.is_empty() {
+                        eprintln!(
+                            "warning: dependency {}-{} -> {} {} not found",
+                            meta.name, meta.version, dep.name, dep.version
+                        );
+                    }
                     any_if(&mut self.solver, *var, group);
                 }
             }

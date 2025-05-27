@@ -1,6 +1,7 @@
 #include <psibase/db.hpp>
 
 #include <boost/filesystem/operations.hpp>
+#include <psibase/Socket.hpp>
 #include <triedent/database.hpp>
 
 namespace psibase
@@ -363,6 +364,15 @@ namespace psibase
       writer.set_top_root(impl->topRoot);
    }
 
+   void SharedDatabase::kvRemoveSubjective(Writer& writer, std::span<const char> key)
+   {
+      std::lock_guard l{impl->subjectiveMutex};
+      writer.remove(impl->subjective[independentIndex(DbId::nativeSubjective)], key);
+      std::lock_guard lock{impl->topMutex};
+      writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+      writer.set_top_root(impl->topRoot);
+   }
+
    std::optional<std::vector<char>> SharedDatabase::kvGetSubjective(Writer&               reader,
                                                                     std::span<const char> key)
    {
@@ -447,6 +457,7 @@ namespace psibase
       std::array<std::size_t, numIndependentDatabases> changeSetPos;
       std::size_t                                      socketChangePos;
       IndependentRevision                              db;
+      DbPtr                                            temporaryDb;
    };
 
    std::array<std::size_t, numIndependentDatabases> getChangeSetPos(
@@ -471,6 +482,7 @@ namespace psibase
       std::vector<char>                        keyBuffer;
       std::vector<char>                        valueBuffer;
 
+      DbPtr                           temporaryDb;
       IndependentChangeSet            subjectiveChanges;
       std::vector<SocketChange>       socketChanges;
       std::vector<SubjectiveRevision> subjectiveRevisions;
@@ -484,6 +496,17 @@ namespace psibase
             check(!subjectiveRevisions.empty(),
                   "subjectiveCheckout is required to access the subjective database");
             return subjectiveRevisions.back().db[independentIndex(db)];
+         }
+         else if (db == DbId::temporary)
+         {
+            if (!subjectiveRevisions.empty())
+            {
+               return subjectiveRevisions.back().temporaryDb;
+            }
+            else
+            {
+               return temporaryDb;
+            }
          }
          else
          {
@@ -592,11 +615,12 @@ namespace psibase
                "checkoutSubjective nesting exceeded limit");
          if (subjectiveRevisions.empty())
          {
-            subjectiveRevisions.push_back({{}, 0, shared.getSubjective()});
+            subjectiveRevisions.push_back({{}, 0, shared.getSubjective(), temporaryDb});
             callbackFlags = 0;
          }
          subjectiveRevisions.push_back({getChangeSetPos(subjectiveChanges), socketChanges.size(),
-                                        subjectiveRevisions.back().db});
+                                        subjectiveRevisions.back().db,
+                                        subjectiveRevisions.back().temporaryDb});
       }
 
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
@@ -607,6 +631,8 @@ namespace psibase
          {
             subjectiveRevisions[subjectiveRevisions.size() - 2].db =
                 std::move(subjectiveRevisions.back().db);
+            subjectiveRevisions[subjectiveRevisions.size() - 2].temporaryDb =
+                std::move(subjectiveRevisions.back().temporaryDb);
             subjectiveRevisions.pop_back();
          }
          else
@@ -619,6 +645,7 @@ namespace psibase
                        std::move(subjectiveChanges), std::move(socketChanges), sockets, closing))
                {
                   subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
+                  subjectiveRevisions[1].temporaryDb     = subjectiveRevisions[0].temporaryDb;
                   subjectiveRevisions[0].changeSetPos    = {};
                   subjectiveRevisions[0].socketChangePos = 0;
                   subjectiveRevisions[1].changeSetPos    = {};
@@ -628,6 +655,7 @@ namespace psibase
                   socketChanges.clear();
                   return false;
                }
+               temporaryDb = std::move(subjectiveRevisions.back().temporaryDb);
                if (callbackFlags && shared.impl->callbacks)
                {
                   shared.impl->callbacks->run(callbackFlags);
@@ -697,6 +725,13 @@ namespace psibase
             subjectiveRevisions.resize(subjectiveLimit);
          }
          subjectiveLimit = depth;
+      }
+
+      void clearTemporary()
+      {
+         check(subjectiveRevisions.empty(),
+               "Cannot clear subjective db while a subjective transaction is pending");
+         temporaryDb.reset();
       }
    };  // DatabaseImpl
 
@@ -819,6 +854,11 @@ namespace psibase
    void Database::restoreSubjective(std::size_t depth)
    {
       impl->restoreSubjective(depth);
+   }
+
+   void Database::clearTemporary()
+   {
+      impl->clearTemporary();
    }
 
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)

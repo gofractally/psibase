@@ -2,7 +2,9 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { supervisor } from "src/main";
+import { getSupervisor } from "@psibase/common-lib";
+
+const supervisor = getSupervisor();
 
 export const useSelectAccount = () => {
     const queryClient = useQueryClient();

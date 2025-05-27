@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.14.0"
+version = "0.16.0"
 rust-version = "1.64"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
@@ -30,12 +30,12 @@ package-name = "Branding"
 services = ["branding"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.14.0"
-Sites = "0.14.0"
+HttpServer = "0.16.0"
+Sites = "0.16.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-branding = { path = "service", version = "0.14.0" }
-plugin = { path = "plugin", version = "0.14.0" }
+branding = { path = "service", version = "0.16.0" }
+plugin = { path = "plugin", version = "0.16.0" }

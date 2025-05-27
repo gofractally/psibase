@@ -30,6 +30,7 @@ echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
 export SCCACHE_IDLE_TIMEOUT=0
 export SCCACHE_CACHE_SIZE=1G
 export RUSTC_WRAPPER=sccache
+# (Note for cargo-generate to be happy) Ensure there's a $USER environment variable set with username corresponding to the uid of the user running the container
 DOCKER="docker run --rm \
   -v ${WORKSPACE_ROOT}:${WORKSPACE_ROOT} \
   -w ${WORKSPACE_ROOT} \
@@ -39,7 +40,9 @@ DOCKER="docker run --rm \
   -e SCCACHE_IDLE_TIMEOUT \
   -e SCCACHE_CACHE_SIZE \
   -e RUSTC_WRAPPER \
-  -e WASM_PACK_CACHE=.wasm-pack-cache \
+  -e WASM_PACK_CACHE=${WORKSPACE_ROOT}/.caches/wasm-pack \
+  -e CARGO_COMPONENT_CACHE_DIR=${WORKSPACE_ROOT}/.caches/cargo-component \
+  -e USER \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
 
@@ -51,7 +54,7 @@ ${DOCKER} sccache -s
 echo "===== build start ====="
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
-${DOCKER} bash -c "cd build && make -j $(nproc) && echo '===== sccache ====='; sccache -s && echo '===== ccache ====='; ccache -s"
+${DOCKER} bash -c "cd build && make -j $(nproc) && ( echo '===== sccache ====='; sccache -s; echo '===== ccache ====='; ccache -s )"
 echo =====
 ${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust --release"
 echo =====
@@ -63,3 +66,5 @@ echo =====
 ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${UBUNTU_BUILD_VER}"
 echo =====
 ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
+echo =====
+${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./services/user/ --init -v --name Buildtest --silent basic-01 && cd services/user/Buildtest && ${WORKSPACE_ROOT}/build/rust/release/cargo-psibase package"

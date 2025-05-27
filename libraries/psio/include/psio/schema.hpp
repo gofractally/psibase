@@ -1,9 +1,12 @@
 #pragma once
 
+#include <charconv>
 #include <concepts>
 #include <map>
 #include <psio/fracpack.hpp>
+#include <psio/from_json/map.hpp>
 #include <psio/get_type_name.hpp>
+#include <psio/json/any.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_json/map.hpp>
 #include <ranges>
@@ -14,6 +17,9 @@ namespace psio
    template <typename T>
       requires Packable<std::remove_cv_t<T>>
    class shared_view_ptr;
+
+   template <typename T>
+   struct nested;
 
    struct FracStream
    {
@@ -47,13 +53,32 @@ namespace psio
       friend void write_colon(StreamBase& self) { self.do_write_colon(); }
       friend void write_newline(StreamBase& self) { self.do_write_newline(); }
 
+      std::size_t written() { return do_written(); }
+      void        rewrite(std::size_t offset, const void* data, std::size_t size)
+      {
+         do_rewrite(offset, data, size);
+      }
+
+      template <typename T>
+      void write_raw(const T& v)
+      {
+         write(&v, sizeof(v));
+      }
+      template <typename T>
+      void rewrite_raw(std::size_t offset, const T& value)
+      {
+         do_rewrite(offset, &value, sizeof(value));
+      }
+
      protected:
-      virtual void do_write(const void* data, std::size_t size) = 0;
-      virtual void do_increase_indent()                         = 0;
-      virtual void do_decrease_indent()                         = 0;
-      virtual void do_write_colon()                             = 0;
-      virtual void do_write_newline()                           = 0;
-      ~StreamBase()                                             = default;
+      virtual void        do_write(const void* data, std::size_t size)                    = 0;
+      virtual void        do_increase_indent()                                            = 0;
+      virtual void        do_decrease_indent()                                            = 0;
+      virtual void        do_write_colon()                                                = 0;
+      virtual void        do_write_newline()                                              = 0;
+      virtual std::size_t do_written()                                                    = 0;
+      virtual void        do_rewrite(std::size_t pos, const void* data, std::size_t size) = 0;
+      ~StreamBase()                                                                       = default;
    };
 
    template <typename T>
@@ -68,6 +93,11 @@ namespace psio
       void do_decrease_indent() override { decrease_indent(stream); }
       void do_write_colon() override { write_colon(stream); }
       void do_write_newline() override { write_newline(stream); }
+      std::size_t do_written() override { return stream.written(); }
+      void        do_rewrite(std::size_t pos, const void* data, std::size_t size) override
+      {
+         stream.rewrite(pos, data, size);
+      };
 
      private:
       T& stream;
@@ -103,6 +133,11 @@ namespace psio
       void to_json(const Box<T>& wrapper, Stream& stream)
       {
          to_json(*wrapper.value, stream);
+      }
+      template <typename T, typename Stream>
+      void from_json(Box<T>& wrapper, Stream& stream)
+      {
+         from_json(*wrapper.value, stream);
       }
 
       template <typename T>
@@ -151,6 +186,7 @@ namespace psio
       struct Member;
 
       void to_json_members(const std::vector<Member>&, auto& stream);
+      void from_json_members(const std::vector<Member>&, auto& stream);
 
       struct Object
       {
@@ -162,6 +198,10 @@ namespace psio
       void to_json(const Object& type, auto& stream)
       {
          to_json_members(type.members, stream);
+      }
+      void from_json(Object& type, auto& stream)
+      {
+         from_json_members(type.members, stream);
       }
 
       inline auto& clio_unwrap_packable(Object& type)
@@ -183,6 +223,10 @@ namespace psio
       void to_json(const Struct& type, auto& stream)
       {
          to_json_members(type.members, stream);
+      }
+      void from_json(Struct& type, auto& stream)
+      {
+         from_json_members(type.members, stream);
       }
 
       inline auto& clio_unwrap_packable(Struct& type)
@@ -212,6 +256,10 @@ namespace psio
       {
          to_json(*type.type, stream);
       }
+      void from_json(List& type, auto& stream)
+      {
+         from_json(*type.type, stream);
+      }
 
       inline auto& clio_unwrap_packable(List& type)
       {
@@ -231,6 +279,10 @@ namespace psio
       void to_json(const Option& type, auto& stream)
       {
          to_json(*type.type, stream);
+      }
+      void from_json(Option& type, auto& stream)
+      {
+         from_json(*type.type, stream);
       }
 
       inline auto& clio_unwrap_packable(Option& type)
@@ -275,6 +327,10 @@ namespace psio
       {
          to_json_members(type.members, stream);
       }
+      void from_json(Variant& type, auto& stream)
+      {
+         from_json_members(type.members, stream);
+      }
 
       inline auto& clio_unwrap_packable(Variant& type)
       {
@@ -296,6 +352,10 @@ namespace psio
       {
          to_json(type.members, stream);
       }
+      void from_json(Tuple& type, auto& stream)
+      {
+         from_json(type.members, stream);
+      }
 
       inline auto& clio_unwrap_packable(Tuple& type)
       {
@@ -316,6 +376,10 @@ namespace psio
       void to_json(const FracPack& type, auto& stream)
       {
          to_json(type.type, stream);
+      }
+      void from_json(FracPack& type, auto& stream)
+      {
+         from_json(type.type, stream);
       }
 
       inline auto& clio_unwrap_packable(FracPack& type)
@@ -340,6 +404,10 @@ namespace psio
       void to_json(const Type& type, auto& stream)
       {
          to_json(type.type, stream);
+      }
+      void from_json(Type& type, auto& stream)
+      {
+         from_json(type.type, stream);
       }
 
       inline auto& clio_unwrap_packable(Type& type)
@@ -389,6 +457,10 @@ namespace psio
       void to_json(const AnyType& type, auto& stream)
       {
          to_json(type.value, stream);
+      }
+      void from_json(AnyType& type, auto& stream)
+      {
+         from_json(type.value, stream);
       }
       inline auto& clio_unwrap_packable(AnyType& type)
       {
@@ -457,11 +529,17 @@ namespace psio
       struct CustomHandler
       {
          template <typename T>
-         CustomHandler(const T&) : match(&T::match), frac2json(&T::frac2json)
+         CustomHandler(const T&)
+             : match(&T::match),
+               frac2json(&T::frac2json),
+               json2frac(&T::json2frac),
+               is_empty_container(&T::is_empty_container)
          {
          }
          bool (*match)(const CompiledType*);
          bool (*frac2json)(const CompiledType*, FracStream& in, StreamBase& out);
+         void (*json2frac)(const CompiledType*, const json::any& in, StreamBase& out);
+         bool (*is_empty_container)(const CompiledType*, const json::any& in);
       };
 
       template <typename T>
@@ -480,6 +558,23 @@ namespace psio
                return false;
             to_json(value, out);
             return true;
+         }
+         static void json2frac(const CompiledType*, const json::any& in, StreamBase& out)
+         {
+            T value = convert_from_json<T>(convert_to_json(in));
+            is_packable<T>::pack(value, out);
+         }
+         static bool is_empty_container(const CompiledType*, const json::any& in)
+         {
+            if constexpr (is_packable<T>::supports_0_offset)
+            {
+               T value = convert_from_json<T>(convert_to_json(in));
+               return is_packable<T>::is_empty_container(value);
+            }
+            else
+            {
+               return false;
+            }
          }
       };
 
@@ -501,6 +596,22 @@ namespace psio
          {
             StreamRef stream{out};
             return impl[index].frac2json(type, in, stream);
+         }
+
+         void json2frac(const CompiledType* type,
+                        std::size_t         index,
+                        const json::any&    in,
+                        auto&               out) const
+         {
+            StreamRef stream{out};
+            impl[index].json2frac(type, in, stream);
+         }
+
+         bool is_empty_container(const CompiledType* type,
+                                 std::size_t         index,
+                                 const json::any&    in) const
+         {
+            return impl[index].is_empty_container(type, in);
          }
 
         private:
@@ -1040,6 +1151,489 @@ namespace psio
       }
 
       template <typename T>
+      struct Json2Int
+      {
+         template <typename V>
+         T operator()(const V& v) const
+         {
+            if constexpr (std::is_integral_v<V>)
+            {
+               return static_cast<T>(v);
+            }
+            else if constexpr (std::is_convertible_v<V, std::string_view>)
+            {
+               std::string_view data{v};
+               T                result;
+               const char*      end = data.data() + data.size();
+               auto             res = std::from_chars(data.data(), end, result);
+               if (res.ec == std::errc::result_out_of_range)
+               {
+                  abort_error(from_json_error::number_out_of_range);
+               }
+               else if (res.ec != std::errc{})
+               {
+                  abort_error(from_json_error::expected_int);
+               }
+               if (res.ptr != end)
+               {
+                  abort_error(from_json_error::expected_int);
+               }
+               return result;
+            }
+            else
+            {
+               abort_error(from_json_error::expected_int);
+            }
+         }
+      };
+
+      template <typename T>
+      struct Json2Float
+      {
+         template <typename V>
+         T operator()(const V& v) const
+         {
+            if constexpr (std::is_arithmetic_v<V>)
+            {
+               return static_cast<T>(v);
+            }
+            else
+            {
+               abort_error(from_json_error::expected_number);
+            }
+         }
+         T operator()(const std::string& s) const
+         {
+            // TODO: use std::from_chars once we have it (LLVM 20).
+            errno = 0;
+            char* end;
+            T     result;
+            if constexpr (std::is_same_v<T, double>)
+            {
+               result = std::strtod(s.c_str(), &end);
+            }
+            else if constexpr (std::is_same_v<T, float>)
+            {
+               result = std::strtof(s.c_str(), &end);
+            }
+            else
+            {
+               static_assert(std::is_same_v<T, float>, "Only float and double are supported");
+            }
+            if (errno || end != s.c_str() + s.size())
+               abort_error(from_json_error::expected_number);
+            return result;
+         }
+      };
+
+      template <typename Signed, typename Unsigned, typename Out>
+      void json2int(const Int& type, const json::any& in, Out& out)
+      {
+         if (type.isSigned)
+         {
+            to_frac(in.visit(Json2Int<Signed>()), out);
+         }
+         else
+         {
+            to_frac(in.visit(Json2Int<Unsigned>()), out);
+         }
+      }
+
+      void scalar_to_frac(const Int& type, const json::any& in, auto& out)
+      {
+         switch (type.bits)
+         {
+            case 1:
+               if (type.isSigned)
+               {
+                  std::int8_t value = in.visit(Json2Int<std::int8_t>());
+                  if (value != 0 && value != -1)
+                     check(false, "invalid i1");
+                  to_frac(value, out);
+               }
+               else
+               {
+                  std::int8_t value = in.visit(Json2Int<std::uint8_t>());
+                  if (value != 0 && value != 1)
+                     check(false, "invalid u1");
+                  to_frac(value, out);
+               }
+               return;
+            case 8:
+               return json2int<std::int8_t, std::uint8_t>(type, in, out);
+            case 16:
+               return json2int<std::int16_t, std::uint16_t>(type, in, out);
+            case 32:
+               return json2int<std::int32_t, std::uint32_t>(type, in, out);
+            case 64:
+               return json2int<std::int64_t, std::uint64_t>(type, in, out);
+            default:
+               abort_error("<<<Unsupported integer width>>>");
+         }
+      }
+
+      void scalar_to_frac(const Float& type, const json::any& in, auto& out)
+      {
+         if (type == Float{.exp = 11, .mantissa = 53})
+         {
+            to_frac(in.visit(Json2Float<double>()), out);
+         }
+         else if (type == Float{.exp = 8, .mantissa = 24})
+         {
+            to_frac(in.visit(Json2Float<float>()), out);
+         }
+         else
+         {
+            abort_error(
+                "<<<Only single and double precision floating point numbers are supported>>>");
+         }
+      }
+
+      void scalar_to_frac(const auto& type, const json::any& in, auto& out)
+      {
+         abort_error("Not implemented");
+      }
+
+      void to_frac(const CompiledType& ty,
+                   const json::any&    v,
+                   auto&               stream,
+                   const CustomTypes&  builtin);
+
+      struct GetMemberValues
+      {
+         const json::any&              value;
+         std::vector<const json::any*> operator()(const std::vector<Member>& members) const
+         {
+            auto* v = value.get_if<json::any_object>();
+            if (!v)
+               abort_error(from_json_error::expected_start_object);
+            // Collect members
+            std::vector<const json::any*> member_values;
+            member_values.reserve(members.size());
+            for (const auto& m : members)
+            {
+               auto pos =
+                   std::ranges::find_if(*v, [&](const auto& entry) { return entry.key == m.name; });
+               member_values.push_back(pos != v->end() ? &pos->value : nullptr);
+            }
+            return member_values;
+         }
+         std::vector<const json::any*> operator()(const Object& ty) const
+         {
+            return (*this)(ty.members);
+         }
+         std::vector<const json::any*> operator()(const Struct& ty) const
+         {
+            return (*this)(ty.members);
+         }
+         std::vector<const json::any*> operator()(const Tuple& ty) const
+         {
+            auto* v = value.get_if<json::any_array>();
+            if (!v)
+               abort_error(from_json_error::expected_start_array);
+            if (v->size() != ty.members.size())
+               abort_error("Expected tuple of length " + std::to_string(ty.members.size()));
+            std::vector<const json::any*> member_values;
+            member_values.reserve(ty.members.size());
+            for (const auto& item : *v)
+            {
+               member_values.push_back(&item);
+            }
+            return member_values;
+         }
+         std::vector<const json::any*> operator()(const auto& ty) const
+         {
+            abort_error("Not implemented");
+         }
+      };
+
+      template <typename To, typename From>
+      To checked_cast(From from)
+      {
+         if constexpr (std::is_signed_v<From>)
+         {
+            if constexpr (std::is_signed_v<To>)
+            {
+               if (from < std::numeric_limits<To>::min() || from > std::numeric_limits<To>::max())
+               {
+                  abort_error("Integer overflow");
+               }
+            }
+            else
+            {
+               if (from < 0 ||
+                   static_cast<std::make_unsigned_t<From>>(from) > std::numeric_limits<To>::max())
+               {
+                  abort_error("Integer overflow");
+               }
+            }
+         }
+         else
+         {
+            if (from > static_cast<std::make_unsigned_t<To>>(std::numeric_limits<To>::max()))
+            {
+               abort_error("Integer overflow");
+            }
+         }
+         return static_cast<To>(from);
+      }
+
+      inline bool is_empty_container(const CompiledType& ty,
+                                     const json::any&    in,
+                                     const CustomTypes&  builtin)
+      {
+         if (ty.custom_id != -1 && ty.is_container())
+         {
+            return builtin.is_empty_container(&ty, ty.custom_id, in);
+         }
+         if (ty.kind == CompiledType::container)
+         {
+            auto* arr = in.get_if<json::any_array>();
+            return arr && arr->size() == 0;
+         }
+         else if (ty.kind == CompiledType::nested)
+         {
+            abort_error("Not implemented");
+         }
+         else
+         {
+            return false;
+         }
+      }
+
+      void object_to_frac(const CompiledType& ty,
+                          bool                extensible,
+                          const json::any&    in,
+                          auto&               out,
+                          const CustomTypes&  builtin)
+      {
+         auto member_values = std::visit(GetMemberValues{in}, ty.original_type->value);
+         // Count trailing empty optionals
+         std::size_t end = ty.children.size();
+         if (extensible)
+         {
+            for (; end > 0; --end)
+            {
+               if (!ty.children[end - 1].is_optional ||
+                   (member_values[end - 1] && !member_values[end - 1]->get_if<json::null_t>()))
+               {
+                  break;
+               }
+            }
+            to_frac(std::uint16_t{0}, out);
+         }
+         auto base_pos = out.written();
+         // Write member fixed data
+         for (std::size_t i = 0; i < end; ++i)
+         {
+            if (ty.children[i].is_optional)
+            {
+               if (!member_values[i] || member_values[i]->get_if<json::null_t>())
+               {
+                  to_frac(std::uint32_t{1}, out);
+                  member_values[i] = nullptr;
+               }
+               else
+               {
+                  to_frac(std::uint32_t{0}, out);
+               }
+            }
+            else
+            {
+               if (!member_values[i])
+                  abort_error("missing field");
+               const CompiledType* member_ty = ty.children[i].type;
+               if (member_ty->is_variable_size)
+               {
+                  to_frac(std::uint32_t{0}, out);
+               }
+               else
+               {
+                  to_frac(*member_ty, *member_values[i], out, builtin);
+                  member_values[i] = nullptr;
+               }
+            }
+         }
+         // Write member variable data and fix up offsets
+         if (extensible)
+         {
+            out.rewrite_raw(base_pos - 2, checked_cast<std::uint16_t>(out.written() - base_pos));
+         }
+         for (std::size_t i = 0; i < end; ++i)
+         {
+            if (member_values[i])
+            {
+               if (!is_empty_container(*ty.children[i].type, *member_values[i], builtin))
+               {
+                  auto pos = base_pos + ty.children[i].fixed_offset;
+                  out.rewrite_raw(pos, checked_cast<std::uint32_t>(out.written() - pos));
+                  to_frac(*ty.children[i].type, *member_values[i], out, builtin);
+               }
+            }
+         }
+      }
+
+      void array_to_frac(const CompiledType& ty,
+                         bool                variable,
+                         const json::any&    in,
+                         auto&               out,
+                         const CustomTypes&  builtin)
+      {
+         auto* arr = in.get_if<json::any_array>();
+         if (!arr)
+         {
+            abort_error(from_json_error::expected_start_array);
+         }
+         const CompiledMember& member = ty.children[0];
+         std::uint32_t fixed_size     = member.type->is_variable_size ? 4 : member.type->fixed_size;
+         if (std::numeric_limits<std::uint32_t>::max() / fixed_size < arr->size())
+            abort_error("Integer overflow");
+         auto size = static_cast<std::uint32_t>(arr->size() * fixed_size);
+         if (variable)
+         {
+            to_frac(size, out);
+         }
+         else
+         {
+            if (size != ty.fixed_size)
+            {
+               abort_error("Wrong array size");
+            }
+         }
+         if (member.is_optional || member.type->is_variable_size)
+         {
+            auto base_pos = out.written();
+            for (const auto& v : *arr)
+            {
+               (void)v;
+               to_frac(std::uint32_t{0}, out);
+            }
+            for (const auto& v : *arr)
+            {
+               if (member.is_optional && v.get_if<json::null_t>())
+               {
+                  out.rewrite_raw(base_pos, std::uint32_t{1});
+               }
+               else
+               {
+                  if (!is_empty_container(*member.type, v, builtin))
+                  {
+                     out.rewrite_raw(base_pos,
+                                     checked_cast<std::uint32_t>(out.written() - base_pos));
+                     to_frac(*member.type, v, out, builtin);
+                  }
+               }
+               base_pos += 4;
+            }
+         }
+         else  // fixed size
+         {
+            for (const json::any& v : *arr)
+            {
+               to_frac(*member.type, v, out, builtin);
+            }
+         }
+      }
+
+      void variant_to_frac(const CompiledType& ty,
+                           const json::any&    in,
+                           auto&               out,
+                           const CustomTypes&  builtin)
+      {
+         auto* obj = in.get_if<json::any_object>();
+         if (!obj)
+         {
+            abort_error(from_json_error::expected_start_object);
+         }
+         if (obj->size() == 1)
+         {
+            const auto& varty = std::get<Variant>(ty.original_type->value);
+            const auto& name  = obj->front().key;
+            auto        pos   = std::ranges::find_if(varty.members,
+                                                     [&](auto& member) { return member.name == name; });
+            if (pos != varty.members.end())
+            {
+               auto alt = checked_cast<std::uint8_t>(pos - varty.members.begin());
+               to_frac(alt, out);
+               to_frac(std::uint32_t{0}, out);
+               auto base_pos = out.written();
+               assert(!ty.children[alt].is_optional);
+               to_frac(*ty.children[alt].type, obj->front().value, out, builtin);
+               out.rewrite_raw(base_pos - 4, checked_cast<std::uint32_t>(out.written() - base_pos));
+               return;
+            }
+         }
+         abort_error("Not implemented");
+      }
+
+      void to_frac(const CompiledType& ty,
+                   const json::any&    v,
+                   auto&               stream,
+                   const CustomTypes&  builtin)
+      {
+         if (ty.custom_id != -1)
+         {
+            return builtin.json2frac(&ty, ty.custom_id, v, stream);
+         }
+         switch (ty.kind)
+         {
+            case CompiledType::scalar:
+            {
+               std::visit([&](auto& ty) { scalar_to_frac(ty, v, stream); },
+                          ty.original_type->value);
+               break;
+            }
+            case CompiledType::struct_:
+            {
+               object_to_frac(ty, false, v, stream, builtin);
+               break;
+            }
+            case CompiledType::object:
+            {
+               object_to_frac(ty, true, v, stream, builtin);
+               break;
+            }
+            case CompiledType::container:
+            {
+               array_to_frac(ty, true, v, stream, builtin);
+               break;
+            }
+            case CompiledType::array:
+            {
+               array_to_frac(ty, false, v, stream, builtin);
+               break;
+            }
+            case CompiledType::variant:
+            {
+               variant_to_frac(ty, v, stream, builtin);
+               break;
+            }
+            case CompiledType::optional:
+            {
+               if (v.get_if<json::null_t>())
+               {
+                  std::uint32_t offset = 1;
+                  to_frac(offset, stream);
+               }
+               else if (is_empty_container(*ty.children[0].type, v, builtin))
+               {
+                  to_frac(std::uint32_t{0}, stream);
+               }
+               else
+               {
+                  std::uint32_t offset = 4;
+                  to_frac(offset, stream);
+                  to_frac(*ty.children[0].type, v, stream, builtin);
+               }
+               break;
+            }
+               // nested,
+            default:
+               abort_error("Not implemented");
+         }
+      }
+
+      template <typename T>
       constexpr bool psio_custom_schema(T*)
       {
          return false;
@@ -1061,9 +1655,11 @@ namespace psio
       }
 
       template <typename T>
-      constexpr bool is_shared_view_ptr_v = false;
+      constexpr bool is_nested_wrapper_v = false;
       template <typename T>
-      constexpr bool is_shared_view_ptr_v<shared_view_ptr<T>> = true;
+      constexpr bool is_nested_wrapper_v<shared_view_ptr<T>> = true;
+      template <typename T>
+      constexpr bool is_nested_wrapper_v<nested<T>> = true;
 
       template <typename T>
       constexpr bool is_duration_v = false;
@@ -1176,7 +1772,7 @@ namespace psio
                   schema.insert(name, insert<std::remove_cvref_t<decltype(clio_unwrap_packable(
                                           std::declval<T&>()))>>());
                }
-               else if constexpr (is_shared_view_ptr_v<T>)
+               else if constexpr (is_nested_wrapper_v<T>)
                {
                   if (expandNested_)
                   {
@@ -1338,6 +1934,16 @@ namespace psio
          stream.write('}');
       }
 
+      void from_json_members(std::vector<Member>& members, auto& stream)
+      {
+         from_json_object(stream,
+                          [&](std::string_view key)
+                          {
+                             members.push_back(Member{std::string(key)});
+                             from_json(members.back().type, stream);
+                          });
+      }
+
       template <typename T>
       bool matchCustomType(const CompiledType* type, T*)
       {
@@ -1401,6 +2007,19 @@ namespace psio
       SchemaDifference match(const Schema&                                   schema1,
                              const Schema&                                   schema2,
                              const std::vector<std::pair<AnyType, AnyType>>& types);
+
+      struct SchemaMatch;
+      struct TypeMatcher
+      {
+        public:
+         TypeMatcher(const Schema& l, const Schema& r, SchemaDifference allowed);
+         ~TypeMatcher();
+         bool match(const AnyType& lhs, const AnyType& rhs);
+
+        private:
+         std::unique_ptr<SchemaMatch> impl;
+         SchemaDifference             allowed;
+      };
    }  // namespace schema_types
 
    using schema_types::match;

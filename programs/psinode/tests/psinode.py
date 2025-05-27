@@ -7,6 +7,7 @@ import tempfile
 import time
 import datetime
 import calendar
+from hashlib import sha256
 from collections import namedtuple
 import psibase
 from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
@@ -94,7 +95,8 @@ class Cluster(object):
         nodes = [self.make_node(name, **kw) for name in names]
         for a in nodes:
             for b in nodes:
-                a.connect(b)
+                if a.dir < b.dir:
+                    a.connect(b)
         return tuple(nodes)
     def line(self, *names, **kw):
         '''Creates nodes connected in a line'''
@@ -137,7 +139,7 @@ class ChainPackContext:
         return fracpack.pack(data, self.get_schema(service).actions[method].params)
     def get_schema(self, service):
         if service not in self._schemas:
-            with self._api.get('/schema', service) as reply:
+            with self._api.get('/schema?service=%s' % service, service='packages') as reply:
                 reply.raise_for_status()
                 self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
         return self._schemas[service]
@@ -151,6 +153,39 @@ class GraphQLError(Exception):
     def __init__(self, json):
         super().__init__(json['errors']['message'])
         self.json = json
+
+class PrivateKey:
+    def __init__(self, data=None):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
+        if data is None:
+            self.private = ec.generate_private_key(ec.SECP256R1)
+        else:
+            try:
+                self.private = load_pem_private_key(data)
+            except ValueError:
+                self.private = load_der_public_key(data)
+            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or self.private.curve != ec.SECP256R1:
+                raise Exception("Only P-256 keys are supported")
+    def sign_prehashed(self, digest):
+        from cryptography.hazmat.primitives.hashes import SHA256
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+        result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
+        (r, s) = utils.decode_dss_signature(result)
+        return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
+    def claim(self):
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
+        pub = self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        return {"service": "verify-sig", "rawData": pub}
+    def pkcs8(self):
+        from cryptography.hazmat.primitives.serialization import PrivateFormat, Encoding, NoEncryption
+        return self.private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
+    def spki(self):
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
+        return self.private.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
+    def spki_der(self):
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
+        return self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
 
 class API:
     '''Provides an interface to the HTTP API of a psinode server based on requests'''
@@ -203,31 +238,44 @@ class API:
         return ChainPackContext(self).pack(trx, Transaction)
     def pack_signed_transaction(self, trx, signatures=[]):
         '''Pack a signed transactions and return the result as bytes'''
-        if isinstance(trx, bytes):
-            trx = trx.hex()
-        elif isinstance(trx, Transaction):
-            trx = self.pack_transaction(trx).hex()
+        if isinstance(trx, Transaction):
+            trx = self.pack_transaction(trx)
         return SignedTransaction.packed({'transaction': trx, 'proofs':signatures})
-    def push_transaction(self, trx):
+    def push_transaction(self, trx, keys=[]):
         '''
         Push a transaction to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
-        packed = self.pack_signed_transaction(trx)
+        if isinstance(trx, Transaction):
+            if keys is not None:
+                trx.claims += [key.claim() for key in keys]
+            trx = self.pack_transaction(trx)
+            digest = sha256(trx).digest()
+            signatures = [key.sign_prehashed(digest) for key in keys]
+            packed = self.pack_signed_transaction(trx, signatures)
+        else:
+            if len(keys) != 0:
+                raise Exception("Transaction is already signed")
+            if isinstance(trx, SignedTransaction):
+                packed = trx.packed()
+            elif isinstance(trx, str):
+                packed = bytes.fromhex(trx)
+            else:
+                packed = trx
         with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
             if trace['error'] is not None:
                 raise TransactionError(trace)
             return trace
-    def push_action(self, sender, service, method, data):
+    def push_action(self, sender, service, method, data, keys=[]):
         '''
         Push a transaction consisting of a single action to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
-        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)], claims=[]))
+        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)], claims=[]), keys=keys)
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):
@@ -340,13 +388,13 @@ class Service(object):
         '''HTTP DELETE request'''
         return self.request('DELETE', path, **kw)
 
-    def push_action(self, sender, method, data):
+    def push_action(self, sender, method, data, keys=[]):
         '''
         Push a transaction consisting of a single action to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
-        return self.api.push_action(sender, self.service, method, data)
+        return self.api.push_action(sender, self.service, method, data, keys)
     def graphql(self, query):
         '''
         Sends a GraphQL query to a service and returns the result as json
@@ -461,9 +509,9 @@ class Node(API):
 
         if hasattr(self, 'tempdir'):
             self.tempdir.cleanup()
-    def shutdown(self):
+    def shutdown(self, force=False):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/native/admin/shutdown', service='x-admin', json={}):
+        with self.post('/native/admin/shutdown', service='x-admin', json={"force":force}):
             pass
         self.session.close()
         try:
@@ -532,9 +580,10 @@ class Node(API):
     def install(self, packages=[], sources=[]):
         '''installs a package'''
         self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
-    def run_psibase(self, args):
+    def run_psibase(self, args, *, check=True, **kw):
         self._find_psibase()
-        subprocess.run([self.psibase] + args).check_returncode()
+        result = subprocess.run([self.psibase] + args, check=check, **kw)
+        return result
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):

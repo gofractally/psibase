@@ -3,6 +3,7 @@
 
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
+#include <services/user/Packages.hpp>
 #include "TestService.hpp"
 
 #define CATCH_CONFIG_MAIN
@@ -113,7 +114,7 @@ TEST_CASE("events")
 
    auto schema = ServiceSchema::make<TestService>();
    std::cout << psio::format_json(schema) << std::endl;
-   expect(testService.to<Events>().setSchema(schema).trace());
+   expect(testService.to<Packages>().setSchema(schema).trace());
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
    expect(testService.to<Events>()

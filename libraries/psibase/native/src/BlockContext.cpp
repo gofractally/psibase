@@ -66,7 +66,6 @@ namespace psibase
          if (!isReadOnly)
             db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
       }
-      databaseStatus = *dbStatus;
 
       current.header.producer = producer;
       current.header.term     = term;
@@ -153,7 +152,7 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, true, false};
+      TransactionContext tc{*this, trx, trace, DbMode::transaction()};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since Transact relies on startBlock
@@ -192,7 +191,7 @@ namespace psibase
             continue;
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -244,7 +243,7 @@ namespace psibase
          action.method  = a.method;
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -296,7 +295,7 @@ namespace psibase
          action.method  = a.method();
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -331,9 +330,12 @@ namespace psibase
 
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
+      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      check(!!dbStatus, "databaseStatus not set");
+
       Merkle m;
-      for (std::uint64_t i   = databaseStatus.blockMerkleEventNumber,
-                         end = databaseStatus.nextMerkleEventNumber;
+      for (std::uint64_t i   = dbStatus->blockMerkleEventNumber,
+                         end = dbStatus->nextMerkleEventNumber;
            i != end; ++i)
       {
          auto data = db.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
@@ -480,8 +482,10 @@ namespace psibase
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
 
-      databaseStatus.blockMerkleEventNumber = databaseStatus.nextMerkleEventNumber;
-      db.kvPut(DatabaseStatusRow::db, databaseStatus.key(), databaseStatus);
+      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      check(!!dbStatus, "databaseStatus not set");
+      dbStatus->blockMerkleEventNumber = dbStatus->nextMerkleEventNumber;
+      db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode
@@ -514,7 +518,7 @@ namespace psibase
       try
       {
          checkActive();
-         TransactionContext t{*this, trx, trace, false, false, false};
+         TransactionContext t{*this, trx, trace, DbMode::verify()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.execVerifyProof(i);
@@ -546,7 +550,7 @@ namespace psibase
       try
       {
          checkActive();
-         TransactionContext t{*this, trx, trace, true, false, false};
+         TransactionContext t{*this, trx, trace, DbMode::firstAuth()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.checkFirstAuth();
@@ -575,37 +579,12 @@ namespace psibase
       current.transactions.push_back(std::move(trx));
    }
 
-   void BlockContext::execNonTrxAction(Action&& action, ActionTrace& atrace)
-   {
-      SignedTransaction  trx;
-      TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-
-      auto session = db.startWrite(writer);
-      tc.execNonTrxAction(0, action, atrace);
-      session.commit();
-   }
-
-   auto BlockContext::execExport(std::string_view  fn,
-                                 Action&&          action,
-                                 TransactionTrace& trace) -> ActionTrace&
-   {
-      SignedTransaction  trx;
-      auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-
-      auto session = db.startWrite(writer);
-      tc.execExport(fn, action, atrace);
-      session.commit();
-      return atrace;
-   }
-
    void BlockContext::execAsyncAction(Action&& action)
    {
       SignedTransaction  trx;
       TransactionTrace   trace;
       auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true};
+      TransactionContext tc{*this, trx, trace, DbMode::rpc()};
 
       tc.execNonTrxAction(0, action, atrace);
    }
@@ -616,7 +595,7 @@ namespace psibase
    {
       SignedTransaction  trx;
       auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true};
+      TransactionContext tc{*this, trx, trace, DbMode::rpc()};
 
       tc.execExport(fn, action, atrace);
       return atrace;
@@ -659,15 +638,19 @@ namespace psibase
          if (enableUndo)
             session = db.startWrite(writer);
 
-         TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
-         if (initialWatchdogLimit)
-            t.setWatchdog(*initialWatchdogLimit);
-         t.execTransaction();
-
-         if (!isProducing)
+         std::vector<std::vector<char>> result;
          {
-            check(t.nextSubjectiveRead == trx.subjectiveData->size(),
-                  "transaction has unread subjective data");
+            TransactionContext t{*this, trx, trace, DbMode::transaction()};
+            if (initialWatchdogLimit)
+               t.setWatchdog(*initialWatchdogLimit);
+            t.execTransaction();
+
+            if (!isProducing)
+            {
+               check(t.nextSubjectiveRead == trx.subjectiveData->size(),
+                     "transaction has unread subjective data");
+            }
+            result = std::move(t.subjectiveData);
          }
 
          if (commit)
@@ -678,7 +661,7 @@ namespace psibase
          }
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction succeeded";
-         return std::move(t.subjectiveData);
+         return result;
       }
       catch (const std::exception& e)
       {

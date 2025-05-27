@@ -1,0 +1,8 @@
+[
+  {
+    "sender": "workshop",
+    "service": "sites",
+    "method": "enablespa",
+    "data": { "enable": true }
+  }
+]

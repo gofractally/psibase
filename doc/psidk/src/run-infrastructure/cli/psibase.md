@@ -8,12 +8,15 @@ psibase - The psibase blockchain command line client
 
 `psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
-`psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
 `psibase` [`-a` *url*] `info` *packages*\.\.\.  
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
-`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
+`psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
+`psibase` [`-a` *url*] `push` *files*\.\.\.  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
+`psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 `psibase` *subcommand* [*args*\.\.\.]  
@@ -26,7 +29,7 @@ psibase - The psibase blockchain command line client
 
 - `-a`, `--api` *url*
 
-  `psinode` API Endpoint. The default is `http://psibase.127.0.0.1.sslip.io/`
+  `psinode` API Endpoint. The default is `http://psibase.localhost/`
   
 - `-h`, `--help`
 
@@ -58,9 +61,15 @@ The boot command deploys a set of system services and web interfaces suitable fo
 
   Packages to install to the chain. If not specifed, a default set will be installed.
 
-- `-k`, `--key` *public-key*
+- `-k`, `--account-key` *public-key*
 
-  Set all accounts to authenticate using this key. The key will also be used for block production. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
+  Set the producer account to use this key for transaction authentication. The public key can be any of the following:
+  - A file containing a PEM or DER encoded public key
+  - A PKCS #11 URI
+
+- `--block-key` *public-key*
+
+  Set the producer's block signing key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
@@ -94,7 +103,7 @@ Create or modify an account
 
 ### deploy
 
-`psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
 
 Deploy a service
 
@@ -102,9 +111,13 @@ Deploy a service
 
   Account to deploy the service on
 
-- *filename*
+- *wasm*
 
-  A wasm file containing the service
+  Path to a wasm file containing the service
+
+- *schema*
+
+  Path to a JSON file containing the schema for the service
 
 - `-c`, `--create-account` *public-key*
 
@@ -162,7 +175,7 @@ Install packages to the chain along with all dependencies. If any of the request
 
 ### list
 
-`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
+`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
 
 Prints a list of packages from the chain and/or package repositories
 
@@ -177,6 +190,10 @@ Prints a list of packages from the chain and/or package repositories
 - `--installed`
 
   Prints packages that are currently installed
+
+- `--updates`
+
+  Prints installed packages that have newer versions available in the repository
 
 - `--package-source` *url*
 
@@ -198,6 +215,30 @@ Modify an account
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
+### publish
+
+`psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
+
+Publish packages to a package repository. A package will be skipped if the sender has already published it with the same version.
+
+- `-S` *sender*
+
+  The account that owns the packages
+
+- *files*
+
+  Package files to publish
+
+### push
+
+`psibase` [`-a` *url*] `push` *files*\.\.\.  
+
+Push a transaction to the chain.
+
+- *files*
+
+  Each file should be JSON containing a list of actions to run. All the actions from all files will be merged into one transaction. If no files are provided, reads the actions from stdin.
+
 ### search
 
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
@@ -211,6 +252,20 @@ Search for packages
 - `--package-source` *url*
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
+### upgrade
+
+`psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
+
+Upgrade installed packages. This will not upgrade packages to a new major version unless `--latest` is used.
+
+- `--latest`
+
+  Don't limit upgrades to versions that are compatible with the current version.
+
+- *packages*
+
+  The names of packages to upgrade. The default is to upgrade all packages that are currently installed.
 
 ### upload
 

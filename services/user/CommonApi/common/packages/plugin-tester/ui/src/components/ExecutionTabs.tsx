@@ -1,7 +1,19 @@
-import { SchemaFunction } from "../types";
+import type { Supervisor } from "@psibase/common-lib";
+import type { SchemaFunction } from "../types";
+
+import { useState } from "react";
+
 import { camelCase, withArgs } from "../utils";
-import { Supervisor } from "@psibase/common-lib";
-import { useState, useEffect } from "react";
+import { TabControl } from "./TabControl";
+
+interface ExecutionTabsProps {
+  selectedFunction: SchemaFunction;
+  service: string;
+  plugin: string;
+  selectedInterfaceName: string;
+  supervisor: Supervisor;
+  paramValues: Record<string, unknown>;
+}
 
 export function ExecutionTabs({
   selectedFunction,
@@ -9,38 +21,24 @@ export function ExecutionTabs({
   plugin,
   selectedInterfaceName,
   supervisor,
-}: {
-  selectedFunction: SchemaFunction;
-  service: string;
-  plugin: string;
-  selectedInterfaceName: string;
-  supervisor: Supervisor;
-}) {
-  const [paramValues, setParamValues] = useState("");
+  paramValues,
+}: ExecutionTabsProps) {
   const [responseText, setResponseText] = useState("No response yet");
   const [executionTab, setExecutionTab] = useState<"Execution" | "Embed">(
     "Execution"
   );
 
-  useEffect(() => {
-    const initialParams = Object.fromEntries(
-      selectedFunction.params.map((p) => [p.name, ""])
+  const getCleanValues = () => {
+    return Object.fromEntries(
+      Object.entries(paramValues).filter(([key]) => !key.endsWith("RawInput"))
     );
-    setParamValues(JSON.stringify(initialParams, null, 2));
-  }, [selectedFunction]);
-
-  useEffect(() => {
-    setResponseText("No response yet");
-    setExecutionTab("Execution");
-  }, [selectedFunction]);
+  };
 
   const parseParams = (): unknown[] => {
-    try {
-      const parsed = JSON.parse(paramValues);
-      return Array.isArray(parsed) ? parsed : Object.values(parsed);
-    } catch {
-      return [];
-    }
+    const cleanValues = getCleanValues();
+    return Array.isArray(cleanValues)
+      ? cleanValues
+      : Object.values(cleanValues);
   };
 
   const handleExecute = async () => {
@@ -57,7 +55,12 @@ export function ExecutionTabs({
       setResponseText(
         response === undefined
           ? "Execution successful"
-          : JSON.stringify(response, null, 2)
+          : JSON.stringify(
+              response,
+              (_key, value) =>
+                typeof value === "bigint" ? value.toString() : value,
+              2
+            )
       );
     } catch (e) {
       console.error(e);
@@ -66,72 +69,42 @@ export function ExecutionTabs({
   };
 
   const generateEmbedCode = (): string => {
+    const cleanValues = getCleanValues();
+    const paramValues = Object.values(cleanValues);
     return `const response = await supervisor.functionCall({
   service: "${service}",
   plugin: "${plugin}",
   intf: "${camelCase(selectedInterfaceName)}",
   method: "${camelCase(selectedFunction.name)}",
-  params: ${JSON.stringify(JSON.parse(paramValues), null, 2)}
+  params: ${JSON.stringify(paramValues)}
 });`;
   };
 
   return (
     <>
-      {selectedFunction.params.length > 0 && (
-        <>
-          <h3 style={{ marginBottom: "0.5rem" }}>Parameters</h3>
-          <textarea
-            className="common-textarea"
-            style={{ marginBottom: "1rem" }}
-            value={paramValues}
-            onChange={(e) => setParamValues(e.target.value)}
-          />
-        </>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          marginBottom: "1rem",
-          borderBottom: "1px solid #555",
-        }}
-      >
-        {["Execution", "Embed"].map((tab) => (
-          <div
-            key={tab}
-            onClick={() => setExecutionTab(tab as "Execution" | "Embed")}
-            className={`tab ${executionTab === tab ? "selected" : ""}`}
-          >
-            {tab}
-          </div>
-        ))}
-      </div>
+      <TabControl
+        selectedTab={executionTab}
+        onTabChange={(tab) => setExecutionTab(tab as "Execution" | "Embed")}
+        tabs={["Execution", "Embed"]}
+      />
 
       {executionTab === "Execution" ? (
         <>
-          <div style={{ marginBottom: "1rem", textAlign: "left" }}>
+          <div className="execution-container">
             <button onClick={handleExecute} className="common-button">
               Execute
             </button>
           </div>
-          <h3 style={{ marginBottom: "0.5rem" }}>Response</h3>
+          <h3 className="response-title">Response</h3>
           <textarea className="common-textarea" readOnly value={responseText} />
         </>
       ) : (
-        <div
-          style={{
-            marginTop: "1rem",
-            whiteSpace: "pre-wrap",
-            fontFamily: "monospace",
-            textAlign: "left",
-          }}
-        >
-          <p style={{ marginBottom: "0.5rem" }}>
+        <div className="embed-container">
+          <p className="embed-description">
             To call this plugin function from your own application, use:
           </p>
           <textarea
-            className="common-textarea"
-            style={{ height: "200px" }}
+            className="common-textarea embed-textarea"
             readOnly
             value={generateEmbedCode()}
           />

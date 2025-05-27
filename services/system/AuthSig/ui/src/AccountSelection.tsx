@@ -1,9 +1,7 @@
-import { useLoggedInUser } from "./hooks/useLoggedInUser";
 import { useCreateConnectionToken } from "./hooks/useCreateConnectionToken";
-import { usePublicToPrivate } from "./hooks/usePrivateToPublicKey";
+import { usePublicToPrivate } from "./hooks/usePrivateFromPublicKey";
 import { siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "./lib/modifyUrlParams";
-import { pemToBase64 } from "./lib/key";
 import { Button } from "./components/ui/button";
 import { useState } from "react";
 import { useAccountLookup } from "./hooks/useAccountLookup";
@@ -38,16 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const ModalState = z.enum(["Off", "Warn", "Show"]);
 
 export const AccountSelection = () => {
-  const { data: currentUser } = useLoggedInUser();
-
   const { data: connectionToken } = useCreateConnectionToken();
-
-  const { data: account } = useAccountLookup(currentUser);
-
-  const { data: privateKey } = usePublicToPrivate(account?.pubkey);
-
-  const key = privateKey && pemToBase64(privateKey);
-  const url = modifyUrlParams(siblingUrl("", "accounts"), { key: key || "" });
 
   const onReveal = () => {
     setModalState(warnUser ? "Warn" : "Show");
@@ -67,6 +56,12 @@ export const AccountSelection = () => {
       );
     }
   );
+
+  const { data: account } = useAccountLookup(selectedAccount);
+  const { data: privateKey } = usePublicToPrivate(account?.pubkey);
+  const url = modifyUrlParams(siblingUrl("", "accounts"), {
+    key: privateKey || "",
+  });
 
   const isLoading = isLoadingConnectedAccounts;
 

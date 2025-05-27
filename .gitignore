@@ -1,9 +1,13 @@
 .caches
 .ccache
+.cache
 .DS_Store
 .nyc_output
 .vscode
 .trunk
+.cursor
+.cursorignore
+.cursorrules
 *.a
 *.log
 *.o
@@ -31,3 +35,4 @@ __pycache__
 ccache.conf
 bindings.rs
 target/
+**/install-state.gz

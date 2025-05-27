@@ -24,6 +24,8 @@ pub struct Options {
     pub pub_constant: bool,
     pub psibase_mod: String,
     pub gql: bool,
+    pub tables: Option<String>,
+    pub generate_schema: Option<bool>,
 }
 
 impl Default for Options {
@@ -43,6 +45,8 @@ impl Default for Options {
             pub_constant: true,
             psibase_mod: "psibase".into(),
             gql: true,
+            tables: None,
+            generate_schema: None,
         }
     }
 }
@@ -191,7 +195,7 @@ pub fn process_action_schema(
 
     *insertions = quote! {
         #insertions
-        actions.insert(#name_str.to_string(), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
+        actions.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
     }
 }
 

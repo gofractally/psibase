@@ -20,6 +20,7 @@ namespace SystemService
    PSIO_REFLECT(TransactionData, id, trx)
 
    using TransactionDataTable = psibase::Table<TransactionData, &TransactionData::id>;
+   PSIO_REFLECT_TYPENAME(TransactionDataTable)
 
    struct PendingTransactionRecord
    {
@@ -28,37 +29,39 @@ namespace SystemService
       psibase::TimePointSec ctime;
       std::uint64_t         sequence;
 
-      auto ctimeKey() const { return std::tuple(ctime, sequence); }
-      auto expirationKey() const { return std::tuple(expiration, sequence); }
+      using CTimeKey      = psibase::CompositeKey<&PendingTransactionRecord::ctime,
+                                                  &PendingTransactionRecord::sequence>;
+      using ExpirationKey = psibase::CompositeKey<&PendingTransactionRecord::expiration,
+                                                  &PendingTransactionRecord::sequence>;
    };
    PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence);
 
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
                                                   &PendingTransactionRecord::sequence,
-                                                  &PendingTransactionRecord::ctimeKey,
-                                                  &PendingTransactionRecord::expirationKey>;
+                                                  PendingTransactionRecord::CTimeKey{},
+                                                  PendingTransactionRecord::ExpirationKey{}>;
+   PSIO_REFLECT_TYPENAME(PendingTransactionTable)
 
    struct AvailableSequenceRecord
    {
       std::uint64_t nextSequence;
-      auto          primary_key() const { return psibase::SingletonKey{}; }
    };
    PSIO_REFLECT(AvailableSequenceRecord, nextSequence);
 
-   using AvailableSequenceTable =
-       psibase::Table<AvailableSequenceRecord, &AvailableSequenceRecord::primary_key>;
+   using AvailableSequenceTable = psibase::Table<AvailableSequenceRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(AvailableSequenceTable)
 
    // Follows forks
    struct UnappliedTransactionRecord
    {
       std::uint64_t nextSequence;
-      auto          primary_key() const { return psibase::SingletonKey{}; }
    };
    PSIO_REFLECT(UnappliedTransactionRecord, nextSequence)
 
    using UnappliedTransactionTable =
-       psibase::Table<UnappliedTransactionRecord, &UnappliedTransactionRecord::primary_key>;
+       psibase::Table<UnappliedTransactionRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(UnappliedTransactionTable)
 
    struct ReversibleBlocksRow
    {
@@ -69,6 +72,7 @@ namespace SystemService
 
    using ReversibleBlocksTable =
        psibase::Table<ReversibleBlocksRow, &ReversibleBlocksRow::blockNum>;
+   PSIO_REFLECT_TYPENAME(ReversibleBlocksTable)
 
    struct TraceClientInfo
    {
@@ -85,6 +89,23 @@ namespace SystemService
    PSIO_REFLECT(TraceClientRow, id, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
+   PSIO_REFLECT_TYPENAME(TraceClientTable)
+
+   struct JWTKeyRecord
+   {
+      std::vector<char> key;
+   };
+   PSIO_REFLECT(JWTKeyRecord, key)
+
+   using JWTKeyTable = psibase::Table<JWTKeyRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(JWTKeyTable)
+
+   struct LoginReply
+   {
+      std::string access_token;
+      std::string token_type = "bearer";
+   };
+   PSIO_REFLECT(LoginReply, access_token, token_type)
 
    class RTransact : psibase::Service
    {
@@ -93,21 +114,26 @@ namespace SystemService
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
-                                                                TraceClientTable>;
+                                                                TraceClientTable,
+                                                                JWTKeyTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
       // Callbacks used to track successful/expired transactions
-      void onTrx(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
+      void onTrx(const psibase::Checksum256& id, psio::view<const psibase::TransactionTrace> trace);
       void onBlock();
       auto serveSys(const psibase::HttpRequest& request,
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
+
+      std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
                 method(recv, transaction),
                 method(onTrx, id, trace),
                 method(onBlock),
-                method(serveSys, request, socket))
+                method(serveSys, request, socket),
+                method(getUser, request))
+   PSIBASE_REFLECT_TABLES(RTransact, RTransact::Subjective, RTransact::WriteOnly)
 }  // namespace SystemService

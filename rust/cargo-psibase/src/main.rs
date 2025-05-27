@@ -5,7 +5,8 @@ use cargo_metadata::Message;
 use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
-use psibase::{ExactAccountNumber, PackageInfo};
+use psibase::{ExactAccountNumber, PackageInfo, Schema};
+use regex::Regex;
 use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File, OpenOptions};
@@ -26,7 +27,11 @@ use package::*;
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
-const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
+const SERVICE_ARGS_RUSTC: &[&str] = &[
+    "--",
+    "-C",
+    "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
+];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -59,6 +64,14 @@ struct Args {
     /// Directory for all generated artifacts
     #[clap(long, global = true, value_name = "DIRECTORY")]
     target_dir: Option<PathBuf>,
+
+    /// Path to psitest executable
+    #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psitest(), env = "CARGO_PSIBASE_PSITEST")]
+    psitest: PathBuf,
+
+    /// Path to psibase executable
+    #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psibase(), env = "CARGO_PSIBASE_PSIBASE")]
+    psibase: PathBuf,
 
     #[clap(subcommand)]
     command: Command,
@@ -126,11 +139,7 @@ struct InstallCommand {
 }
 
 #[derive(Parser, Debug)]
-struct TestCommand {
-    /// Path to psitest executable
-    #[clap(long, default_value = "psitest")]
-    psitest: PathBuf,
-}
+struct TestCommand {}
 
 #[derive(Subcommand, Debug)]
 enum Command {
@@ -167,6 +176,42 @@ fn pretty_path(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
 }
 
+fn find_psibase() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psibase = format!("psibase{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psibase);
+                if sibling.is_file() {
+                    return sibling;
+                }
+            }
+        }
+    }
+    "psibase".to_string().into()
+}
+
+fn find_psitest() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psitest = format!("psitest{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psitest);
+                if sibling.is_file() {
+                    return sibling;
+                }
+                if parent.ends_with("rust/release") {
+                    let in_build_dir = parent.parent().unwrap().parent().unwrap().join(psitest);
+                    if in_build_dir.exists() {
+                        return in_build_dir;
+                    }
+                }
+            }
+        }
+    }
+    "psitest".to_string().into()
+}
+
 fn optimize(code: &mut Module) -> Result<(), Error> {
     let file = tempfile::NamedTempFile::new()?;
     code.emit_wasm_file(file.path())?;
@@ -175,6 +220,7 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     OptimizationOptions::new_opt_level_2()
         .shrink_level(wasm_opt::ShrinkLevel::Level1)
         .enable_feature(wasm_opt::Feature::BulkMemory)
+        .enable_feature(wasm_opt::Feature::TruncSat)
         .enable_feature(wasm_opt::Feature::SignExt)
         .enable_feature(wasm_opt::Feature::Simd)
         .debug_info(debug_build)
@@ -189,17 +235,17 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
 }
 
 fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
-    let timestamp_file = filename.to_string_lossy().to_string() + ".cargo_psibase";
+    let mut timestamp_file = filename.clone();
+    timestamp_file.as_mut_os_string().push(".cargo_psibase");
     let md = fs::metadata(filename)
-        .with_context(|| format!("Failed to get metadata for {}", filename.to_string_lossy()))?;
-    if let Ok(md2) = fs::metadata::<PathBuf>(timestamp_file.as_str().into()) {
+        .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
+    if let Ok(md2) = fs::metadata(&timestamp_file) {
         if md2.modified().unwrap() >= md.modified().unwrap() {
             return Ok(());
         }
     }
 
-    let code = &read(filename)
-        .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
+    let code = &read(filename).with_context(|| format!("Failed to read {}", filename.display()))?;
 
     let debug_build = false;
     let mut config = walrus::ModuleConfig::new();
@@ -217,7 +263,7 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
     optimize(&mut dest_module)?;
 
     write(filename, dest_module.emit_wasm())
-        .with_context(|| format!("Failed to write {}", filename.to_string_lossy()))?;
+        .with_context(|| format!("Failed to write {}", filename.display()))?;
 
     OpenOptions::new()
         .create(true)
@@ -357,6 +403,80 @@ async fn build(
     }
 
     Ok(files)
+}
+
+async fn build_schema(
+    args: &Args,
+    packages: &[&str],
+    extra_args: &[&str],
+) -> Result<Schema, Error> {
+    let mut command = tokio::process::Command::new(get_cargo())
+        .envs(vec![("CARGO_PSIBASE_TEST", "")])
+        .arg("test")
+        .args(extra_args)
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .arg("--lib")
+        .arg("--no-run")
+        .args(SERVICE_ARGS_RUSTC)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files, _) =
+        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    let files = files?;
+    for f in &files {
+        process(f, None)?
+    }
+
+    let mut command = tokio::process::Command::new(&args.psitest)
+        .arg(&files[0])
+        .arg("_psibase_get_schema")
+        .arg("--show-output")
+        .arg("--include-ignored")
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let mut stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let status = command.wait();
+
+    let (status, schema) = tokio::join!(
+        status, //
+        async {
+            let re = Regex::new(r"^psibase-schema-gen-output: (.*)$").unwrap();
+            let mut schema = None;
+            while let Some(line) = stdout.next_line().await? {
+                if schema.is_none() {
+                    if let Some(cap) = re.captures(&line) {
+                        schema = Some(cap[1].to_owned());
+                    }
+                }
+            }
+            Ok::<_, Error>(schema)
+        },
+    );
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    Ok(serde_json::from_str::<Schema>(
+        &schema?.ok_or_else(|| anyhow!("Failed to generate schema"))?,
+    )?)
 }
 
 async fn build_plugin(
@@ -536,7 +656,7 @@ fn get_test_packages<'a>(
 
 async fn test(
     args: &Args,
-    opts: &TestCommand,
+    _opts: &TestCommand,
     metadata: &MetadataIndex<'_>,
     root: &str,
 ) -> Result<(), Error> {
@@ -577,14 +697,11 @@ async fn test(
 
     for test in tests {
         pretty_path("Running", &test);
-        let args = [test.to_str().unwrap(), "--nocapture"];
-        let msg = format!("Failed running: psitest {}", args.join(" "));
-        if !std::process::Command::new(&opts.psitest)
-            .args(args)
-            .status()
-            .context(msg.clone())?
-            .success()
-        {
+        let mut command = std::process::Command::new(&args.psitest);
+        command.arg(test);
+        command.arg("--nocapture");
+        let msg = format!("Failed running: {:?}", command);
+        if !command.status().context(msg.clone())?.success() {
             return Err(anyhow! {msg});
         }
     }
@@ -601,6 +718,10 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
         Err(anyhow!("Expected a single library"))?
     }
 
+    let schema = build_schema(args, &[root], &vec![]).await?;
+    let mut schema_file = tempfile::NamedTempFile::new()?;
+    serde_json::to_writer(&mut schema_file, &schema)?;
+
     let account = if let Some(account) = opts.account {
         account.to_string()
     } else {
@@ -613,32 +734,29 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let mut args = vec!["deploy".into()];
+    let mut command = std::process::Command::new(&args.psibase);
+
+    command.arg("deploy");
     if let Some(api) = &opts.api {
-        args.push("--api".into());
-        args.push(api.to_string());
+        command.args(["--api", api.as_str()]);
     }
-    args.push("--suppress-ok".into());
     if let Some(key) = &opts.create_account {
-        args.append(&mut vec!["--create-account".into(), key.to_string()]);
+        command.args(["--create-account", key.as_str()]);
     }
     if opts.create_insecure_account {
-        args.push("--create-insecure-account".into());
+        command.arg("--create-insecure-account");
     }
     if opts.register_proxy {
-        args.push("--register-proxy".into());
+        command.arg("--register-proxy");
     }
-    args.append(&mut vec!["--sender".into(), opts.sender.to_string()]);
-    args.push(account.clone());
-    args.push(files[0].to_string_lossy().into());
+    command.arg("--sender");
+    command.arg(opts.sender.to_string());
+    command.arg(&account);
+    command.arg(&files[0]);
+    command.arg(schema_file.path());
 
-    let msg = format!("Failed running: psibase {}", args.join(" "));
-    if !std::process::Command::new("psibase")
-        .args(args)
-        .status()
-        .context(msg.clone())?
-        .success()
-    {
+    let msg = format!("Failed running: {:?}", command);
+    if !command.status().context(msg.clone())?.success() {
         Err(anyhow! {msg})?;
     }
 
@@ -666,13 +784,12 @@ async fn install(
     packages.resolve_dependencies()?;
     let index = packages.build(args).await?;
 
-    let mut command = std::process::Command::new("psibase");
+    let mut command = std::process::Command::new(&args.psibase);
 
     command.arg("install");
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
-    command.arg("--suppress-ok");
     if let Some(sender) = &opts.sender {
         command.args(["--sender", &sender.to_string()]);
     }

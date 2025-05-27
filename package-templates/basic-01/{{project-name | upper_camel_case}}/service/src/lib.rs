@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{Fracpack, SingletonKey, ToSchema};
+    use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -20,13 +20,11 @@ pub mod tables {
 
     impl ExampleThing {
         #[primary_key]
-        fn pk(&self) -> SingletonKey {
-            SingletonKey {}
-        }
+        fn pk(&self) {}
     }
 }
 
-#[psibase::service(name = "{{project-name}}")]
+#[psibase::service(name = "{{project-name}}", tables = "tables")]
 pub mod service {
     use crate::tables::{ExampleThing, ExampleThingTable, InitRow, InitTable};
     use psibase::*;
@@ -36,12 +34,9 @@ pub mod service {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
 
-        // Configures this service within the event service
-        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
-
         // Initial service configuration
         let thing_table = ExampleThingTable::new();
-        if thing_table.get_index_pk().get(&SingletonKey {}).is_none() {
+        if thing_table.get_index_pk().get(&()).is_none() {
             thing_table
                 .put(&ExampleThing {
                     thing: String::from("default thing"),
@@ -63,11 +58,7 @@ pub mod service {
     #[allow(non_snake_case)]
     fn setExampleThing(thing: String) {
         let table = ExampleThingTable::new();
-        let old_thing = table
-            .get_index_pk()
-            .get(&SingletonKey {})
-            .unwrap_or_default()
-            .thing;
+        let old_thing = table.get_index_pk().get(&()).unwrap_or_default().thing;
 
         table
             .put(&ExampleThing {
@@ -82,11 +73,7 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getExampleThing() -> String {
         let table = ExampleThingTable::new();
-        table
-            .get_index_pk()
-            .get(&SingletonKey {})
-            .unwrap_or_default()
-            .thing
+        table.get_index_pk().get(&()).unwrap_or_default().thing
     }
 
     #[event(history)]

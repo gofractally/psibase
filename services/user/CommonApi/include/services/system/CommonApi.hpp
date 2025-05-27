@@ -18,6 +18,7 @@ namespace SystemService
       /// This is a standard action that allows common-api to serve http requests.
       ///
       /// common-api responds to GET requests:
+      /// - /common/chainid
       /// - /common/thisservice
       /// - /common/rootdomain
       /// - /common/tapos/head
@@ -31,5 +32,6 @@ namespace SystemService
    PSIO_REFLECT(CommonApi,
       method(serveSys, request),
    )
+   PSIBASE_REFLECT_TABLES(CommonApi)
    // clang-format on
 }  // namespace SystemService

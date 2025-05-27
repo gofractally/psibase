@@ -90,5 +90,7 @@ namespace UserService
    PSIBASE_REFLECT_MERKLE_EVENTS(Nft,
       method(transferred, nftId, creditor, debitor, memo)
    );
+
+   PSIBASE_REFLECT_TABLES(Nft, Nft::Tables)
    // clang-format on
 }  // namespace UserService

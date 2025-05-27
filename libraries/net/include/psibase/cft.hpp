@@ -217,11 +217,7 @@ namespace psibase::net
          auto expected0 = active_producers[0]->getClaim(producer);
          auto expected1 =
              active_producers[1] ? active_producers[1]->getClaim(producer) : decltype(expected0)();
-         if (!expected0 && !expected1)
-         {
-            return false;
-         }
-         else if (claim != *expected0 && claim != *expected1)
+         if (!(expected0 && claim == *expected0) && !(expected1 && claim == *expected1))
          {
             return false;
          }
@@ -236,8 +232,15 @@ namespace psibase::net
             for_each_key(
                 [&](const auto& k)
                 {
-                   network().sendto(new_head->producer,
-                                    ConfirmMessage{current_term, self, new_head->blockNum, k});
+                   try
+                   {
+                      network().sendto(new_head->producer,
+                                       ConfirmMessage{current_term, self, new_head->blockNum, k});
+                   }
+                   catch (std::exception& e)
+                   {
+                      PSIBASE_LOG(logger, warning) << "Failed to confirm: " << e.what();
+                   }
                 });
          }
          Base::on_fork_switch(new_head);
@@ -421,8 +424,16 @@ namespace psibase::net
          for_each_key(
              [&](const auto& k)
              {
-                network().multicast_producers(RequestVoteRequest{
-                    current_term, self, chain().get_head()->blockNum, chain().get_head()->term, k});
+                try
+                {
+                   network().multicast_producers(RequestVoteRequest{current_term, self,
+                                                                    chain().get_head()->blockNum,
+                                                                    chain().get_head()->term, k});
+                }
+                catch (std::exception& e)
+                {
+                   PSIBASE_LOG(logger, warning) << "Failed to request vote: " << e.what();
+                }
              });
          check_votes();
       }
@@ -485,12 +496,19 @@ namespace psibase::net
             for_each_key(
                 [&](const auto& k)
                 {
-                   network().sendto(request.candidate_id,
-                                    RequestVoteResponse{.term         = current_term,
-                                                        .candidate_id = request.candidate_id,
-                                                        .voter_id     = self,
-                                                        .vote_granted = vote_granted,
-                                                        .signer       = k});
+                   try
+                   {
+                      network().sendto(request.candidate_id,
+                                       RequestVoteResponse{.term         = current_term,
+                                                           .candidate_id = request.candidate_id,
+                                                           .voter_id     = self,
+                                                           .vote_granted = vote_granted,
+                                                           .signer       = k});
+                   }
+                   catch (std::exception& e)
+                   {
+                      PSIBASE_LOG(logger, warning) << "Failed to vote: " << e.what();
+                   }
                 });
          }
       }

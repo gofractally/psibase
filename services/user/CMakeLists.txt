@@ -5,6 +5,7 @@ function(add_user_service suffix name)
     )
     target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} services_user${suffix} psibase-service-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+    psibase_schema(${name}${suffix})
 endfunction(add_user_service)
 
 function(add_user_test_impl suffix name)
@@ -40,9 +41,9 @@ function(add suffix)
     target_include_directories(services_user${suffix} INTERFACE
         CommonApi/include
         Events/include
-        Fractal/include
         Invite/include
         Nft/include
+        Packages/include
         Sites/include
         Symbol/include
         Tokens/include
@@ -56,7 +57,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(CommonApi)
     add_subdirectory(Events)
     add_subdirectory(Explorer)
-    add_subdirectory(Fractal)
     add_subdirectory(Invite)
     add_subdirectory(SimpleService)
     add_subdirectory(Nft)

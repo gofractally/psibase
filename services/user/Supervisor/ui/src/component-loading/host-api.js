@@ -34,4 +34,12 @@ export const client = {
     myServiceOrigin() {
         return host.myServiceOrigin();
     },
+
+    getAppUrl(app) {
+        return host.getAppUrl(app);
+    },
+
+    promptUser(subpath, payloadJsonStr) {
+        return host.promptUser(subpath, payloadJsonStr);
+    },
 };

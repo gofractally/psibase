@@ -7,6 +7,7 @@
 #include <psio/reflect.hpp>
 #include <psio/stream.hpp>
 #include <psio/tuple.hpp>
+#include <psio/untagged.hpp>
 #include <type_traits>
 #include <variant>
 
@@ -228,12 +229,6 @@ template <typename S> void to_json(float value, S& stream)              { return
       }
    }
 
-   template <typename T>
-   constexpr bool psio_is_untagged(const T*)
-   {
-      return false;
-   }
-
    template <typename... T, typename S>
    void to_json(const std::variant<T...>& obj, S& stream)
    {
@@ -352,6 +347,18 @@ template <typename S> void to_json(float value, S& stream)              { return
    void to_json(const input_stream& data, S& stream)
    {
       to_json_hex(data.pos, data.end - data.pos, stream);
+   }
+
+   template <typename S>
+   void to_json(const std::span<char>& obj, S& stream)
+   {
+      to_json_hex(obj.data(), obj.size(), stream);
+   }
+
+   template <typename S>
+   void to_json(const std::span<const char>& obj, S& stream)
+   {
+      to_json_hex(obj.data(), obj.size(), stream);
    }
 
    template <typename S>

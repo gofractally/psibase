@@ -41,6 +41,9 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if options.dispatch.is_none() {
         options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
     }
+    if options.generate_schema.is_none() {
+        options.generate_schema = options.dispatch.clone();
+    }
     if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
         options.dispatch = Some(false);
     }
@@ -73,7 +76,6 @@ fn process_mod(
     psibase_mod: &proc_macro2::TokenStream,
     mut impl_mod: ItemMod,
 ) -> TokenStream {
-    let mod_name = &impl_mod.ident;
     let service_account = &options.name;
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
@@ -83,6 +85,18 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let mut tables = options
+        .tables
+        .as_ref()
+        .map(|tables| proc_macro2::TokenStream::from_str(tables.as_str()).unwrap());
+    if tables.is_none() {
+        crate::service_tables_macro::process_mod(psibase_mod, &mut impl_mod);
+        let name = &impl_mod.ident;
+        tables = Some(quote! { #name })
+    }
+
+    let mod_name = &impl_mod.ident;
+
     let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
@@ -214,7 +228,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
-                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::FunctionType> {
+                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::FunctionType> {
                     let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
                     #action_schema_init
                     actions
@@ -458,12 +472,18 @@ fn process_mod(
             }
         });
 
+        let database_wrapper = tables.as_ref().map_or(
+            quote! { #psibase_mod::EmptyDatabase },
+            |tables| quote! { super::#tables::TablesWrapper },
+        );
+
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {
                 type Actions = #actions<#psibase_mod::JustSchema>;
                 type UiEvents = #ui_events;
                 type HistoryEvents = #history_events;
                 type MerkleEvents = #merkle_events;
+                type Database = #database_wrapper;
                 const SERVICE: #psibase_mod::AccountNumber = Self::#constant;
             }
         });
@@ -506,7 +526,7 @@ fn process_mod(
             if !event_fns.contains_key(&id) {
                 items.push( parse_quote! {
                     impl #psibase_mod::ToEventsSchema for #event_name {
-                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
+                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::AnyType> {
                             Default::default()
                         }
                     }
@@ -594,7 +614,7 @@ fn process_mod(
             items.push(parse_quote! {
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
-                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
+                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::AnyType> {
                         let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
                         #event_schema_init
                         events
@@ -689,6 +709,15 @@ fn process_mod(
                 }
             });
         }
+        if let Some(tables) = tables {
+            items.push(parse_quote! {
+                impl #psibase_mod::ServiceTablesWrapper for super::#tables::TablesWrapper {
+                    fn get_service() -> #psibase_mod::AccountNumber {
+                        #constant
+                    }
+                }
+            });
+        }
         // Remove all event functions
         items.retain(|item| {
             if let Item::Fn(f) = item {
@@ -716,6 +745,17 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
+    let schema_gen = if options.generate_schema.unwrap() {
+        quote! {
+            #[test]
+            #[ignore]
+            fn _psibase_get_schema() {
+                #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
+            }
+        }
+    } else {
+        quote! {}
+    };
     quote! {
         #silence
         #impl_mod
@@ -731,6 +771,8 @@ fn process_mod(
         pub use #mod_name::#structs;
 
         #polyfill
+
+        #schema_gen
     }
     .into()
 } // process_mod
@@ -792,6 +834,29 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             #[no_mangle]
             pub unsafe extern "C" fn kvMax(db: DbId, key: *const u8, key_len: u32) -> u32 {
                 tester_raw::kvMax(get_selected_chain(), db, key, key_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvPut(db: DbId, key: *const u8, key_len: u32, value: *const u8, value_len: u32)
+            {
+                tester_raw::kvPut(get_selected_chain(), db, key, key_len, value, value_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn setRetval(_retval: *const u8, _len: u32) -> u32 {
+                panic!("setRetval not supported in tester");
+            }
+            #[no_mangle]
+            pub unsafe extern "C" fn call(action: *const u8, len: u32) -> u32 {
+                panic!("call not supported in tester");
+            }
+            #[no_mangle]
+            pub unsafe extern "C" fn putSequential(_db: DbId, _value: *const u8, _value_len: u32) -> u64 {
+                panic!("putSequential not supported in tester");
+            }
+            #[no_mangle]
+            pub unsafe extern "C" fn getCurrentAction() -> u32 {
+                panic!("getCurrentAction not supported in tester");
             }
         }
     }

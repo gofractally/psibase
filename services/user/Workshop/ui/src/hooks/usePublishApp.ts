@@ -1,11 +1,10 @@
-import { supervisor } from "@/main";
+import { Account } from "@/lib/zodTypes";
+import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-const AccountId = z.string();
-
 const Params = z.object({
-  account: AccountId,
+  account: Account,
   publish: z.boolean(),
 });
 
@@ -18,8 +17,8 @@ export const usePublishApp = () =>
       await supervisor.functionCall({
         method: publish ? "publishApp" : "unpublishApp",
         params: [account],
-        service: "registry",
-        intf: "developer",
+        service: "workshop",
+        intf: "registry",
       });
 
       return null;

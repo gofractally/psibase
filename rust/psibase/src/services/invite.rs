@@ -12,12 +12,24 @@ use serde::{Deserialize, Serialize};
 
 /// An invite object
 pub struct InviteRecord {
+    /// Monotonically increasing ID of the invite
+    inviteId: u32,
+
     /// The public key of the invite. This uniquely identifies an invite and
     ///   may also used to authenticate the transaction accepting the invite.
     pubkey: SubjectPublicKeyInfo,
 
+    /// An optional secondary identifier for the invite
+    secondaryId: Option<u32>,
+
     /// The creator of the invite object
     inviter: AccountNumber,
+
+    /// The application that created the invite
+    app: Option<AccountNumber>,
+
+    /// The domain of the application that created the invite
+    appDomain: Option<String>,
 
     /// The last account to accept or reject the invite
     actor: AccountNumber,
@@ -34,6 +46,9 @@ pub struct InviteRecord {
     ///  - accepted (1)
     ///  - rejected (2)
     state: u8,
+
+    /// Encrypted invite secret
+    secret: Option<String>,
 }
 
 #[derive(Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject)]
@@ -51,39 +66,36 @@ pub const PAYER_ACCOUNT: AccountNumber = account!("invited-sys");
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
-    use crate::{http::HttpRequest, AccountNumber};
+    use crate::{AccountNumber, TimePointUSec};
 
     #[action]
-    fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
-        unimplemented!()
-    }
-
-    #[action]
-    fn createInvite(inviteKey: SubjectPublicKeyInfo) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn accept(inviteKey: SubjectPublicKeyInfo) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn acceptCreate(
+    fn createInvite(
         inviteKey: SubjectPublicKeyInfo,
-        acceptedBy: AccountNumber,
-        newAccountKey: SubjectPublicKeyInfo,
-    ) {
+        secondaryId: Option<u32>,
+        secret: Option<String>,
+        app: Option<AccountNumber>,
+        appDomain: Option<String>,
+    ) -> u32 {
         unimplemented!()
     }
 
     #[action]
-    fn reject(inviteKey: SubjectPublicKeyInfo) {
+    fn accept(inviteId: u32) {
         unimplemented!()
     }
 
     #[action]
-    fn delInvite(inviteKey: SubjectPublicKeyInfo) {
+    fn acceptCreate(inviteId: u32, acceptedBy: AccountNumber, newAccountKey: SubjectPublicKeyInfo) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn reject(inviteId: u32) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn delInvite(inviteId: u32) {
         unimplemented!()
     }
 
@@ -92,27 +104,22 @@ mod service {
         unimplemented!()
     }
 
-    // Admin functions
-    #[action]
-    fn setWhitelist(accounts: Vec<AccountNumber>) {
-        unimplemented!()
-    }
-    #[action]
-    fn setBlacklist(accounts: Vec<AccountNumber>) {
+    #[event(history)]
+    pub fn updated(inviteId: u32, actor: AccountNumber, datetime: TimePointUSec, event: String) {
         unimplemented!()
     }
 
     // For synchronous calls between services:
     #[action]
-    fn getInvite(pubkey: SubjectPublicKeyInfo) -> Option<super::InviteRecord> {
+    fn getInvite(inviteId: u32) -> Option<super::InviteRecord> {
         unimplemented!()
     }
     #[action]
-    fn isExpired(pubkey: SubjectPublicKeyInfo) -> bool {
+    fn isExpired(inviteId: u32) -> bool {
         unimplemented!()
     }
     #[action]
-    fn checkClaim(actor: AccountNumber, pubkey: SubjectPublicKeyInfo) {
+    fn checkClaim(actor: AccountNumber, inviteId: u32) {
         unimplemented!()
     }
 }

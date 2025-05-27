@@ -3,14 +3,17 @@
 /// features such as writing tables, and providing a graphiql
 /// query interface.
 
-#[psibase::service_tables]
-mod tables {
-    use async_graphql::*;
+#[psibase::service]
+#[allow(non_snake_case)]
+mod service {
+    use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::{Deserialize, Serialize};
+    use serde_aux::field_attributes::deserialize_number_from_string;
+
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
-    #[derive(Fracpack, Serialize, Deserialize, SimpleObject)]
+    #[derive(Fracpack, Serialize, Deserialize, SimpleObject, ToSchema)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]
@@ -19,17 +22,6 @@ mod tables {
         /// The result of the calculation
         pub result: i32,
     }
-}
-
-#[psibase::service]
-#[allow(non_snake_case)]
-mod service {
-    use crate::tables::{Answer, AnswerTable};
-    use async_graphql::{connection::Connection, *};
-    use psibase::services::events::Wrapper as EventsSvc;
-    use psibase::*;
-    use serde::{Deserialize, Serialize};
-    use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(SimpleObject, Deserialize)]
     pub struct AddEvent {
@@ -49,9 +41,7 @@ mod service {
     }
 
     #[action]
-    pub fn init() {
-        EventsSvc::call().setSchema(create_schema::<Wrapper>());
-    }
+    pub fn init() {}
 
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
@@ -233,6 +223,8 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             }
         })
     );
+
+    println!("{}", chain.get(SERVICE, "/schema")?.text()?);
 
     Ok(())
 }

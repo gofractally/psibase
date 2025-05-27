@@ -21,24 +21,23 @@ import {
     TicketCheck,
     TriangleAlert,
 } from "lucide-react";
-import { Supervisor, siblingUrl } from "@psibase/common-lib";
+import {  siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "@/lib/modifyUrlParams";
 import { z } from "zod";
-import { supervisor } from "@/main";
+import { supervisor } from "@/supervisor";
 
 dayjs.extend(relativeTime);
 
 const inviteObject = z.object({
     actor: z.string(),
-    app: z.string(),
-    callback: z.string(),
+    app: z.string().optional(),
+    appDomain: z.string(),
     expiry: z.string(),
     inviter: z.string(),
     state: z.enum(["pending", "accepted", "rejected"]),
 });
 
 const fetchInvite = async (token: string) => {
-    await supervisor.onLoaded();
 
     const tokenRes = await supervisor.functionCall({
         service: "invite",
@@ -120,7 +119,7 @@ export const Invite = () => {
 
         const description = isExpired
             ? `This invitation expired ${dayjs().to(invite!.expiry)} (${dayjs(
-                  invite!.expiry
+                  invite!.expiry,
               ).format("YYYY/MM/DD HH:mm")}).`
             : `${inviter} has invited you to create an account
         on the ${chainName} platform.`;
@@ -130,7 +129,7 @@ export const Invite = () => {
             undefined,
             undefined,
             "invite-response",
-            false
+            false,
         );
 
         const link = modifyUrlParams(accountsUrl, {

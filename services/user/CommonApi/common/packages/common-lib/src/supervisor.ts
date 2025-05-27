@@ -14,9 +14,12 @@ import {
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
-    isPluginError,
-    isGenericError,
     buildGetJsonRequest,
+    isPluginErrorObject,
+    isGenericErrorObject,
+    PluginError,
+    GenericError,
+    isRedirectErrorObject,
 } from "./messaging";
 import { assertTruthy } from "./utils";
 
@@ -49,8 +52,34 @@ const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`
 
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
+    private static instance: Supervisor;
     isSupervisorInitialized = false;
     private supervisorSrc: string;
+
+    private constructor(options?: Options) {
+        this.supervisorSrc =
+            options?.supervisorSrc || siblingUrl(undefined, "supervisor");
+        this.listenToRawMessages();
+        setupSupervisorIFrame(this.supervisorSrc);
+    }
+
+    public static getInstance(options?: Options) {
+        if (!Supervisor.instance) {
+            Supervisor.instance = new Supervisor(options);
+            return Supervisor.instance;
+        }
+
+        if (
+            options?.supervisorSrc &&
+            Supervisor.instance.supervisorSrc !== options.supervisorSrc
+        ) {
+            console.warn(
+                "Supervisor has already been instantiated with different options. New options have been ignored.",
+            );
+        }
+
+        return Supervisor.instance;
+    }
 
     private pendingRequests: {
         id: string;
@@ -68,13 +97,6 @@ export class Supervisor {
     }
 
     private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
-
-    constructor(public options?: Options) {
-        this.supervisorSrc =
-            options?.supervisorSrc || siblingUrl(undefined, "supervisor");
-        this.listenToRawMessages();
-        setupSupervisorIFrame(this.supervisorSrc);
-    }
 
     private listenToRawMessages() {
         window.addEventListener("message", (event) =>
@@ -131,19 +153,26 @@ export class Supervisor {
         const resolved = this.removePendingRequestById(response.id);
         assertTruthy(resolved, "Resolved pending request");
 
-        if (isPluginError(result)) {
+        if (isRedirectErrorObject(result)) {
+            console.warn("Redirect directive:", result);
+            pendingRequest.reject(result);
+            return;
+        }
+        if (isPluginErrorObject(result)) {
             const { service, plugin } = result.pluginId;
 
             console.error(`Call to ${resolved.details} failed`);
             console.error(`[${service}:${plugin}] ${result.message}`);
-            pendingRequest.reject(result);
+            const resultAsError = new PluginError(result.pluginId, result.message);
+            pendingRequest.reject(resultAsError);
             return;
         }
 
-        if (isGenericError(result)) {
+        if (isGenericErrorObject(result)) {
             console.error(`Call to ${resolved.details} failed`);
             console.error(result.message);
-            pendingRequest.reject(result);
+            const resultAsError = new GenericError(result.message);
+            pendingRequest.reject(resultAsError);
             return;
         }
 
@@ -216,3 +245,5 @@ export class Supervisor {
         iframe.contentWindow.postMessage(message, this.supervisorSrc);
     }
 }
+
+export const getSupervisor = Supervisor.getInstance;

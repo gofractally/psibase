@@ -19,16 +19,17 @@ struct AsyncResponseRow
 PSIO_REFLECT(AsyncResponseRow, socket, reply, error)
 
 using AsyncResponseTable = psibase::Table<AsyncResponseRow, &AsyncResponseRow::socket>;
+PSIO_REFLECT_TYPENAME(AsyncResponseTable)
 
 struct CounterRow
 {
    std::uint32_t value;
-   auto          key() const { return SingletonKey{}; }
 };
 
 PSIO_REFLECT(CounterRow, value)
 
-using CounterTable = psibase::Table<CounterRow, &CounterRow::key>;
+using CounterTable = psibase::Table<CounterRow, SingletonKey{}>;
+PSIO_REFLECT_TYPENAME(CounterTable)
 
 struct AsyncQueryService : psibase::Service
 {
@@ -39,6 +40,7 @@ struct AsyncQueryService : psibase::Service
                                   std::optional<std::int32_t> socket) -> std::optional<HttpReply>;
 };
 PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
+PSIBASE_REFLECT_TABLES(AsyncQueryService, AsyncQueryService::Subjective)
 
 void wait_until(std::chrono::steady_clock::time_point end)
 {
@@ -153,12 +155,22 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
       auto table = Subjective{}.open<CounterTable>();
       PSIBASE_SUBJECTIVE_TX
       {
-         auto row = table.get(SingletonKey{}).value_or(CounterRow{0});
+         auto row = table.get({}).value_or(CounterRow{0});
          ++row.value;
          table.put(row);
          wait_for(delay);
       }
       to<HttpServer>().sendReply(*socket, reply);
+   }
+   else if (path == "/send_async_with_contention")
+   {
+      auto table = Subjective{}.open<AsyncResponseTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         table.put({.socket = *socket, .reply = reply});
+         to<HttpServer>().deferReply(*socket);
+         wait_for(delay);
+      }
    }
    return {};
 }

@@ -1,15 +1,18 @@
 use crate::services::{
-    accounts, auth_delegate, http_server, packages, psi_brotli::brotli_impl, setcode, sites,
+    accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
+    sites, transact,
 };
 use crate::{
-    new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
-    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
-    GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
+    new_account_action, reg_server, schema_types, set_auth_service_action, set_code_action,
+    set_key_action, solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey,
+    Checksum256, GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition,
+    PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
+use fracpack::CompiledSchema;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,7 +22,6 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use wasm_bindgen::prelude::*;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
@@ -44,6 +46,9 @@ custom_error! {
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
+    UnknownAction{service: AccountNumber, method: MethodNumber} = "{service} does not have an action called {method}",
+    MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
+    InvalidPackageSource = "Invalid package source",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -186,6 +191,7 @@ pub struct PackageManifest {
 pub struct ServiceInfo {
     pub flags: Vec<String>,
     pub server: Option<AccountNumber>,
+    pub schema: Option<Schema>,
 }
 
 pub struct PackagedService<R: Read + Seek> {
@@ -193,6 +199,53 @@ pub struct PackagedService<R: Read + Seek> {
     meta: Meta,
     services: Vec<(AccountNumber, usize, ServiceInfo)>,
     data: Vec<(AccountNumber, usize)>,
+}
+
+pub type SchemaMap = HashMap<AccountNumber, Schema>;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrettyAction {
+    /// Account sending the action
+    pub sender: AccountNumber,
+
+    /// Service to execute the action
+    pub service: AccountNumber,
+
+    /// Service method to execute
+    pub method: MethodNumber,
+
+    /// Data for the method
+    pub raw_data: Option<Hex<Vec<u8>>>,
+    pub data: Option<serde_json::Value>,
+}
+
+impl PrettyAction {
+    pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let raw_data = match self.raw_data {
+            Some(raw_data) => raw_data,
+            None => {
+                let schema = schemas.get(&self.service).unwrap();
+                let custom = schema_types();
+                let mut cschema = CompiledSchema::new(&schema.types, &custom);
+                let Some(act) = schema.actions.get(&MethodString(self.method.to_string())) else {
+                    Err(Error::UnknownAction {
+                        service: self.service,
+                        method: self.method,
+                    })?
+                };
+                cschema.extend(&act.params);
+                let data = self.data.unwrap_or_else(|| serde_json::json!({}));
+                cschema.from_value(&act.params, &data)?.into()
+            }
+        };
+        Ok(Action {
+            sender: self.sender,
+            service: self.service,
+            method: self.method,
+            rawData: raw_data,
+        })
+    }
 }
 
 fn translate_flags(flags: &[String]) -> Result<u64, Error> {
@@ -265,6 +318,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 None => ServiceInfo {
                     flags: vec![],
                     server: None,
+                    schema: None,
                 },
             };
             services.push((account, file, info));
@@ -299,6 +353,30 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+    // This does the same work as get_genesis, for services that
+    // don't need to be installed in the boot block.
+    pub fn install_code(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        // service accounts
+        for (account, index, info) in &self.services {
+            actions.push(set_code_action(
+                *account,
+                read(&mut self.archive.by_index(*index)?)?.into(),
+            ));
+            let flags = translate_flags(&info.flags)?;
+            if flags != 0 {
+                actions.push(setcode::Wrapper::pack().setFlags(*account, flags));
+            }
+        }
+        Ok(())
+    }
+    pub fn set_schema(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if let Some(schema) = &info.schema {
+                actions.push(packages::Wrapper::pack_from(*account).setSchema(schema.clone()))
+            }
+        }
+        Ok(())
+    }
     pub fn has_service(&self, service: AccountNumber) -> bool {
         for (account, _, _) in &self.services {
             if *account == service {
@@ -310,6 +388,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn store_data(
         &mut self,
         actions: &mut Vec<Action>,
+        mut uploader: Option<&mut StagedUpload>,
         compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
@@ -328,14 +407,42 @@ impl<R: Read + Seek> PackagedService<R> {
                 let (content, content_encoding) =
                     compress_content(&content, t.essence_str(), compression_level);
 
-                actions.push(
-                    sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
-                        path.to_string(),
-                        t.essence_str().to_string(),
-                        content_encoding,
-                        content.into(),
-                    ),
-                );
+                if let Some(uploader) = &mut uploader {
+                    let index = uploader.next_file_index();
+                    let tmp_path = format!("/.staged/{:016X}/{}", uploader.id, index);
+                    let tmp_sender = uploader.sender;
+                    let content_hash: [u8; 32] = Sha256::digest(&content).into();
+
+                    uploader.actions.push(
+                        sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE).storeSys(
+                            tmp_path.clone(),
+                            t.essence_str().to_string(),
+                            content_encoding.clone(),
+                            content.into(),
+                        ),
+                    );
+                    actions.push(
+                        sites::Wrapper::pack_from_to(*sender, sites::SERVICE).hardlink(
+                            path.to_string(),
+                            t.essence_str().to_string(),
+                            content_encoding,
+                            content_hash.into(),
+                        ),
+                    );
+                    actions.push(
+                        sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE)
+                            .remove(tmp_path.to_string()),
+                    );
+                } else {
+                    actions.push(
+                        sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
+                            path.to_string(),
+                            t.essence_str().to_string(),
+                            content_encoding,
+                            content.into(),
+                        ),
+                    );
+                }
             } else {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
@@ -355,11 +462,27 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn get_accounts(&self) -> &[AccountNumber] {
         &self.meta.accounts
     }
-    pub fn postinstall(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+    pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
         if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            actions.append(&mut serde_json::de::from_str(&std::io::read_to_string(
-                file,
-            )?)?);
+            Ok(serde_json::de::from_str(&std::io::read_to_string(file)?)?)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+    pub fn postinstall(
+        &mut self,
+        schemas: &SchemaMap,
+        actions: &mut Vec<Action>,
+    ) -> Result<(), anyhow::Error> {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let script: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            actions.append(
+                &mut script
+                    .into_iter()
+                    .map(|act| act.into_action(schemas))
+                    .collect::<Result<Vec<Action>, anyhow::Error>>()?,
+            );
         }
         Ok(())
     }
@@ -439,6 +562,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install_accounts(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
+        mut uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
         key: &Option<AnyPublicKey>,
     ) -> Result<(), anyhow::Error> {
@@ -446,13 +570,34 @@ impl<R: Read + Seek> PackagedService<R> {
         for (account, index, info) in &self.services {
             let mut group = vec![];
             self.create_account(*account, key, sender, &mut group)?;
-            group.push(set_code_action(
-                *account,
-                read(&mut self.archive.by_index(*index)?)?.into(),
-            ));
+            let code = read(&mut self.archive.by_index(*index)?)?;
+            let code_hash: [u8; 32] = Sha256::digest(&code).into();
+            if let Some(uploader) = &mut uploader {
+                uploader
+                    .actions
+                    .push(setcode::Wrapper::pack_from(uploader.sender).stageCode(
+                        *account,
+                        uploader.id.clone(),
+                        0,
+                        0,
+                        code.into(),
+                    ));
+                group.push(setcode::Wrapper::pack_from(*account).setCodeStaged(
+                    uploader.sender,
+                    uploader.id.clone(),
+                    0,
+                    0,
+                    code_hash.into(),
+                ));
+            } else {
+                group.push(set_code_action(*account, code.into()));
+            }
             let flags = translate_flags(&info.flags)?;
             if flags != 0 {
                 group.push(setcode::Wrapper::pack().setFlags(*account, flags));
+            }
+            if let Some(schema) = &info.schema {
+                group.push(packages::Wrapper::pack_from(*account).setSchema(schema.clone()))
             }
             actions.push(group);
         }
@@ -471,16 +616,18 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install(
         &mut self,
         actions: &mut Vec<Action>,
+        uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
         install_ui: bool,
         compression_level: u32,
+        schemas: &SchemaMap,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
-            self.store_data(actions, compression_level)?;
+            self.store_data(actions, uploader, compression_level)?;
         }
 
-        self.postinstall(actions)?;
+        self.postinstall(schemas, actions)?;
         self.commit_install(sender, actions)?;
         Ok(())
     }
@@ -507,7 +654,8 @@ impl<R: Read + Seek> PackagedService<R> {
         }
 
         if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let actions: Vec<Action> = serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            let actions: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
             for act in actions {
                 result.push(act.sender);
                 result.push(act.service);
@@ -519,6 +667,89 @@ impl<R: Read + Seek> PackagedService<R> {
 
         Ok(result)
     }
+
+    // returns accounts whose schemas are required
+    pub fn get_required_schemas(
+        &mut self,
+        out: &mut HashSet<AccountNumber>,
+    ) -> Result<(), anyhow::Error> {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let actions: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            for act in actions {
+                if act.raw_data.is_none() {
+                    out.insert(act.service);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Gets schemas for services in this package.
+    // Removes the accounts found from accounts.
+    pub fn get_schemas(
+        &self,
+        accounts: &mut HashSet<AccountNumber>,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if accounts.remove(account) {
+                schemas.insert(
+                    *account,
+                    info.schema
+                        .clone()
+                        .ok_or_else(|| Error::MissingSchema { service: *account })?,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn load_schemas(
+        &mut self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if let Some(schema) = info.schema.clone() {
+                schemas.insert(*account, schema);
+            }
+        }
+        let mut required = HashSet::new();
+        self.get_required_schemas(&mut required)?;
+        for account in required {
+            if !schemas.contains_key(&account) {
+                schemas.insert(
+                    account,
+                    crate::as_json(
+                        client.get(
+                            packages::SERVICE
+                                .url(base_url)?
+                                .join(&format!("/schema?service={account}"))?,
+                        ),
+                    )
+                    .await?,
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn get_schemas<T: Read + Seek>(
+    packages: &mut [PackagedService<T>],
+) -> Result<(SchemaMap, HashSet<AccountNumber>), anyhow::Error> {
+    let mut accounts = HashSet::new();
+    for package in &mut packages[..] {
+        package.get_required_schemas(&mut accounts)?
+    }
+    let mut schemas = HashMap::new();
+    for package in &mut packages[..] {
+        package.get_schemas(&mut accounts, &mut schemas)?
+    }
+    Ok((schemas, accounts))
 }
 
 pub trait ActionGroup {
@@ -552,6 +783,29 @@ impl ActionSink for Vec<Action> {
     }
 }
 
+pub struct StagedUpload {
+    pub id: u64,
+    pub sender: AccountNumber,
+    pub actions: Vec<Action>,
+    file_index: u32,
+}
+
+impl StagedUpload {
+    pub fn new(id: u64, sender: AccountNumber) -> Self {
+        StagedUpload {
+            id,
+            sender,
+            actions: Vec::new(),
+            file_index: 0,
+        }
+    }
+    fn next_file_index(&mut self) -> u32 {
+        let result = self.file_index;
+        self.file_index += 1;
+        result
+    }
+}
+
 impl PackageManifest {
     // This removes every part of self that is not overwritten by other
     pub fn upgrade<T: ActionSink>(
@@ -564,7 +818,7 @@ impl PackageManifest {
             if !new_files.contains(file) {
                 out.push_action(
                     sites::Wrapper::pack_from_to(file.account, file.service)
-                        .removeSys(file.filename.clone()),
+                        .remove(file.filename.clone()),
                 )?;
             }
         }
@@ -586,7 +840,7 @@ impl PackageManifest {
         for file in &self.data {
             out.push_action(
                 sites::Wrapper::pack_from_to(file.account, file.service)
-                    .removeSys(file.filename.clone()),
+                    .remove(file.filename.clone()),
             )?;
         }
         for (service, info) in &self.services {
@@ -642,8 +896,10 @@ pub fn validate_dependencies<T: Read + Seek>(
     Ok(())
 }
 
-fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> {
-    let re = Regex::new(r"^(.*?)(?:-(\d+\.\d+\.\d+(?:-[0-9a-zA-Z-.]+)?(?:\+[0-9a-zA-Z-.]+)?))?$")?;
+pub fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> {
+    let re = Regex::new(
+        r"^(.*?)(?:-(\d+(?:\.\d+(?:\.\d+(?:-[0-9a-zA-Z-.]+)?(?:\+[0-9a-zA-Z-.]+)?)?)?))?$",
+    )?;
     let mut refs = vec![];
     for package in packages {
         if let Some(captures) = re.captures(package) {
@@ -658,6 +914,54 @@ fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> {
         }
     }
     Ok(refs)
+}
+
+pub fn make_ref(package: &str) -> Result<PackageRef, anyhow::Error> {
+    Ok(make_refs(&[package.to_string()])?.pop().unwrap())
+}
+
+// services that should be installed first
+pub struct EssentialServices {
+    remaining: Vec<AccountNumber>,
+}
+
+impl EssentialServices {
+    pub fn new() -> Self {
+        Self {
+            remaining: vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE],
+        }
+    }
+    pub fn remove(&mut self, accounts: &[AccountNumber]) {
+        for account in accounts {
+            if let Some(idx) = self.remaining.iter().position(|a| a == account) {
+                self.remaining.swap_remove(idx);
+            }
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.remaining.is_empty()
+    }
+    pub fn intersects(&self, accounts: &[AccountNumber]) -> bool {
+        for account in accounts {
+            if self.remaining.iter().find(|a| *a == account).is_some() {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+pub fn get_essential_packages(
+    packages: &Vec<PackageInfo>,
+    essential_services: &EssentialServices,
+) -> Vec<String> {
+    let mut result = Vec::new();
+    for info in packages {
+        if essential_services.intersects(&info.accounts) {
+            result.push(info.name.clone());
+        }
+    }
+    result
 }
 
 #[async_trait(?Send)]
@@ -675,7 +979,17 @@ pub trait PackageRegistry {
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![], false)? {
+        let index = self.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
+        for op in solve_dependencies(
+            index,
+            make_refs(packages)?,
+            vec![],
+            essential,
+            false,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )? {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
@@ -805,6 +1119,22 @@ impl HTTPRegistry {
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
+        // Check if the URL points to an account on chain
+        if let Some(domain) = url.domain() {
+            if let Ok(rootdomain) =
+                crate::as_json::<String>(client.get(url.join("/common/rootdomain")?)).await
+            {
+                let mut root_url = url.clone();
+                root_url.set_host(Some(&rootdomain))?;
+                let account = if domain == &rootdomain {
+                    packages::SERVICE
+                } else {
+                    crate::as_json::<AccountNumber>(client.get(url.join("/common/thisservice")?))
+                        .await?
+                };
+                return Self::with_account(&root_url, account, client).await;
+            }
+        }
         let mut index_url = url.clone();
         index_url
             .path_segments_mut()
@@ -822,6 +1152,56 @@ impl HTTPRegistry {
             client,
             index,
         })
+    }
+    pub async fn with_account(
+        url: &reqwest::Url,
+        owner: AccountNumber,
+        mut client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        let mut index = HashMap::new();
+
+        let mut end_cursor: Option<String> = None;
+        loop {
+            let data = crate::gql_query::<PackagesQuery>(
+                url,
+                &mut client,
+                packages::SERVICE,
+                format!(
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    serde_json::to_string(&owner)?,
+                    serde_json::to_string(&end_cursor)?,
+                ))
+                .await.with_context(|| "Failed to list packages")?;
+            for edge in data.packages.edges {
+                let package = edge.node;
+                if let Some(prev) = index.insert(package.name.clone(), package) {
+                    Err(Error::DuplicatePackage { package: prev.name })?
+                }
+            }
+            if !data.packages.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(data.packages.pageInfo.endCursor);
+        }
+        Ok(HTTPRegistry {
+            index_url: owner.url(url)?,
+            client,
+            index,
+        })
+    }
+    pub async fn with_source(
+        base_url: &reqwest::Url,
+        source: packages::PackageSource,
+        client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        match (source.url, source.account) {
+            (Some(url), Some(account)) => {
+                Self::with_account(&reqwest::Url::parse(&url)?, account, client).await
+            }
+            (None, Some(account)) => Self::with_account(base_url, account, client).await,
+            (Some(url), None) => Self::new(reqwest::Url::parse(&url)?, client).await,
+            (None, None) => return Err(Error::InvalidPackageSource)?,
+        }
     }
     async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
         let url = self.index_url.join(filename)?;
@@ -928,6 +1308,7 @@ pub enum PackageOrigin {
     Repo { sha256: Checksum256, file: String },
 }
 
+#[derive(Default)]
 pub struct PackageList {
     packages: HashMap<String, HashMap<String, (Meta, PackageOrigin)>>,
 }
@@ -962,6 +1343,28 @@ struct NewAccountsQuery {
     newAccounts: Vec<AccountNumber>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesEdge {
+    node: PackageInfo,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<PackagesEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesQuery {
+    packages: PackagesConnection,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SourcesQuery {
+    sources: Vec<packages::PackageSource>,
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub async fn get_accounts_to_create(
     base_url: &reqwest::Url,
@@ -981,6 +1384,25 @@ pub async fn get_accounts_to_create(
     )
     .await?;
     Ok(result.newAccounts)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_package_sources(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    account: AccountNumber,
+) -> Result<Vec<packages::PackageSource>, anyhow::Error> {
+    let result: SourcesQuery = crate::gql_query(
+        base_url,
+        client,
+        packages::SERVICE,
+        format!(
+            "query {{ sources(account: {}) {{ url account }} }}",
+            serde_json::to_string(&account)?
+        ),
+    )
+    .await?;
+    Ok(result.sources)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -1015,6 +1437,17 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
             Ok(package.manifest())
         }
     }
+}
+
+fn max_version(versions: &HashMap<String, (Meta, PackageOrigin)>) -> Result<&str, anyhow::Error> {
+    let mut iter = versions.keys();
+    let mut result = iter.next().ok_or_else(|| anyhow!("No version"))?;
+    for version in iter {
+        if Version::new(&result)? < Version::new(&version)? {
+            result = version
+        }
+    }
+    Ok(&*result)
 }
 
 impl PackageList {
@@ -1072,6 +1505,10 @@ impl PackageList {
         self.insert(info.meta(), PackageOrigin::Installed { owner: info.owner });
     }
 
+    pub fn contains_package(&self, name: &str) -> bool {
+        self.packages.get(name).is_some()
+    }
+
     fn contains_version(&self, name: &str, version: &str) -> bool {
         if let Some(packages) = self.packages.get(name) {
             return packages.contains_key(version);
@@ -1093,11 +1530,38 @@ impl PackageList {
         packages: &[String],
         reinstall: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
         solve_dependencies(
-            reg.index()?,
+            index,
             make_refs(packages)?,
             self.as_upgradable(),
+            essential,
             reinstall,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )
+    }
+    pub async fn resolve_upgrade<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+        pref: PackagePreference,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
+        solve_dependencies(
+            index,
+            make_refs(packages)?,
+            self.as_upgradable(),
+            essential,
+            false,
+            pref,
+            if packages.is_empty() {
+                pref
+            } else {
+                PackagePreference::Current
+            },
         )
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
@@ -1112,65 +1576,50 @@ impl PackageList {
         });
         result
     }
-    pub fn get_by_name(
+    pub fn get_by_ref(
         &self,
-        packages: &str,
+        package: &PackageRef,
     ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
-        for package in make_refs(&[packages.to_string()])? {
-            if let Some(versions) = self.packages.get(&package.name) {
-                let mut found: Option<&(Meta, PackageOrigin)> = None;
-                for (version, item) in versions {
-                    if version_match(&package.version, version)? {
-                        if found.map_or(Ok::<bool, anyhow::Error>(true), |prev| {
-                            Ok(Version::new(&prev.0.version)? < Version::new(version)?)
-                        })? {
-                            found = Some(item)
-                        }
+        if let Some(versions) = self.packages.get(&package.name) {
+            let mut found: Option<&(Meta, PackageOrigin)> = None;
+            for (version, item) in versions {
+                if version_match(&package.version, version)? {
+                    if found.map_or(Ok::<bool, anyhow::Error>(true), |prev| {
+                        Ok(Version::new(&prev.0.version)? < Version::new(version)?)
+                    })? {
+                        found = Some(item)
                     }
                 }
-                return Ok(found);
             }
+            Ok(found)
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
-    pub fn into_vec(mut self) -> Vec<String> {
-        let mut result: Vec<String> = self.packages.drain().map(|(k, _)| k).collect();
+    pub fn get_by_name(
+        &self,
+        package: &str,
+    ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
+        self.get_by_ref(&make_ref(package)?)
+    }
+    pub fn max_versions(&self) -> Result<Vec<(&str, &str)>, anyhow::Error> {
+        let mut result = Vec::new();
+        for (name, versions) in &self.packages {
+            result.push((name.as_str(), max_version(versions)?));
+        }
         result.sort_unstable();
-        result
+        Ok(result)
     }
-    pub fn union(mut self, mut other: Self) -> Self {
-        for (name, versions) in other.packages.drain() {
-            self.packages.insert(name, versions);
-        }
-        self
+    pub fn get_update(&self, package: &str, version: &str) -> Result<Option<&str>, anyhow::Error> {
+        Ok(if let Some(versions) = self.packages.get(package) {
+            let best = max_version(versions)?;
+            if Version::new(version)? < Version::new(best)? {
+                Some(best)
+            } else {
+                None
+            }
+        } else {
+            None
+        })
     }
-    pub fn difference(mut self, other: Self) -> Self {
-        for package in other.packages.keys() {
-            self.packages.remove(package);
-        }
-        self
-    }
-}
-
-fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
-    result.map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-#[wasm_bindgen]
-pub fn js_resolve_packages(
-    js_index: JsValue,
-    js_packages: JsValue,
-    js_pinned: JsValue,
-) -> Result<JsValue, JsValue> {
-    let index: Vec<PackageInfo> = js_err(serde_wasm_bindgen::from_value(js_index))?;
-    let packages: Vec<String> = js_err(serde_wasm_bindgen::from_value(js_packages))?;
-    let pinned: Vec<(Meta, PackageDisposition)> =
-        js_err(serde_wasm_bindgen::from_value(js_pinned))?;
-
-    Ok(serde_wasm_bindgen::to_value(&js_err(solve_dependencies(
-        index,
-        js_err(make_refs(&packages))?,
-        pinned,
-        false,
-    ))?)?)
 }

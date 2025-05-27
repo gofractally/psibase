@@ -24,7 +24,7 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
          throw std::runtime_error("unknown peer");
       }
       send(msg);
-      ctx.post([f]() { f(std::error_code()); });
+      boost::asio::post(ctx, [f]() { f(std::error_code()); });
    }
    template <typename Msg>
    void multicast_producers(const psibase::Checksum256&, const Msg& msg)
@@ -125,7 +125,8 @@ struct FuzzNode
       node.set_producer_id(name);
       node.load_producers();
       node.network().init(network);
-      ctx.post([this]() { node.network().recv(psibase::net::HelloRequest{.committed = true}); });
+      boost::asio::post(
+          ctx, [this]() { node.network().recv(psibase::net::HelloRequest{.committed = true}); });
       ctx.poll();
    }
    boost::asio::io_context ctx;

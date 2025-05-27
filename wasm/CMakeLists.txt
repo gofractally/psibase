@@ -208,6 +208,9 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libsecp256k1.a)
     )
 endif()
 
+# For generating the schema
+include(../libraries/psibase/sdk/pack_service.cmake)
+
 add_subdirectory(../external external)
 add_subdirectory(boost)
 add_subdirectory(sqlite3)

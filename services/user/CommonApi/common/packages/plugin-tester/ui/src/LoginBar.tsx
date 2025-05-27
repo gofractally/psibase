@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
-import { FunctionCallArgs, Supervisor, siblingUrl } from "@psibase/common-lib";
-
-const buttonStyle = {
-  backgroundColor: "#000",
-  color: "#ddd",
-  border: "none",
-  cursor: "pointer",
-  borderRadius: "5px",
-  padding: "0.5rem 1rem",
-};
+import {
+  FunctionCallArgs,
+  siblingUrl,
+  type Supervisor,
+} from "@psibase/common-lib";
 
 function withArgs(
   service: string,
@@ -70,8 +65,8 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", textAlign: "right" }}>
-      <button onClick={handleClick} style={buttonStyle}>
+    <div className="login-bar">
+      <button onClick={handleClick} className="common-button">
         {currentUser ? currentUser : "Connect account"}
       </button>
     </div>

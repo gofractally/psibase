@@ -12,13 +12,13 @@ server = "chainmail"
 plugin = "plugin"
 data = [{ src = "../ui/dist/", dst = "/" }]
 postinstall = [
-    { sender = "chainmail", service = "chainmail", method = "init", rawData = "0000" },
+    { sender = "chainmail", service = "chainmail", method = "init" },
 ]
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/" }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
 async-graphql = "7.0.7"
 serde = { version = "1.0.209", features = ["derive"] }
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.14.0" }
+chainmail_package = { path = "..", version = "0.16.0" }

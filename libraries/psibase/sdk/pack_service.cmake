@@ -1,3 +1,5 @@
+cmake_policy(VERSION 3.16.3...3.31.6)
+
 function(json_append_string VAR VALUE)
     set(initial ${${VAR}})
     string(REGEX REPLACE "([\\\"])" "\\\\\\1" result ${VALUE})
@@ -82,15 +84,13 @@ function(write_meta)
 endfunction()
 
 function(write_service_info)
-    cmake_parse_arguments(PARSE_ARGV 0 "" "" "SERVER;OUTPUT" "FLAGS")
-    set(result)
-    string(APPEND result "{")
-    json_append_list(result "flags" ${_FLAGS})
-    if (_SERVER)
-        json_append_key(result "server" ${_SERVER})
-    endif()
-    string(APPEND result "}")
-    file(GENERATE OUTPUT ${_OUTPUT} CONTENT ${result})
+    cmake_parse_arguments(PARSE_ARGV 0 "" "" "SERVER;OUTPUT;SCHEMA" "FLAGS")
+    add_custom_command(
+        OUTPUT ${_OUTPUT}
+        DEPENDS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake ${_SCHEMA}
+        COMMAND ${CMAKE_COMMAND} -DPSIBASE_OUTPUT=${_OUTPUT} -DPSIBASE_SERVER=${_SERVER} "-DPSIBASE_FLAGS=${_FLAGS}" -DPSIBASE_SCHEMA=${_SCHEMA} -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake
+        VERBATIM
+    )
 endfunction()
 
 # NAME <name>               - The name of the package
@@ -110,7 +110,7 @@ endfunction()
 #   INIT                    - The service has an init action that should be run with no arguments
 #   POSTINSTALL <filename>  - Additional actions that should be run at the end of installation
 function(psibase_package)
-    set(keywords NAME VERSION DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL)
+    set(keywords NAME VERSION DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL SCHEMA)
     foreach(keyword IN LISTS keywords)
         set(_${keyword})
     endforeach()
@@ -165,6 +165,8 @@ function(psibase_package)
                 list(APPEND _FLAGS_${_SERVICE} ${arg})
             elseif(current_keyword STREQUAL "SERVER")
                 set(_SERVER_${_SERVICE} ${arg})
+            elseif(current_keyword STREQUAL "SCHEMA")
+                set(_SCHEMA_${_SERVICE} ${arg})
             elseif(current_keyword STREQUAL "POSTINSTALL")
                 set(_POSTINSTALL ${arg})
             else()
@@ -191,10 +193,19 @@ function(psibase_package)
     set(init-services)
     foreach(service IN LISTS _SERVICES)
         if(_WASM_${service} OR _TARGET_${service})
+            if(NOT _SCHEMA_${service})
+                if(_TARGET_${service})
+                    set(_SCHEMA_${service} ${CMAKE_CURRENT_BINARY_DIR}/${service}-schema.json)
+                    psibase_schema(${_TARGET_${service}} ${_SCHEMA_${service}})
+                else()
+                    message(FATAL_ERROR "Missing schema for ${service}")
+                endif()
+            endif()
             write_service_info(
                 OUTPUT ${outdir}/service/${service}.json
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
+                SCHEMA ${_SCHEMA_${service}}
             )
             list(APPEND zip-deps ${outdir}/service/${service}.json)
             if(_INIT_${service})
@@ -333,7 +344,7 @@ function(cargo_psibase_package)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
-        DEPENDS ${ARG_DEPENDS} cargo-psibase
+        DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
     )
 
     add_custom_command(
@@ -344,4 +355,30 @@ function(cargo_psibase_package)
         VERBATIM
     )
     add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT} cargo-psibase)
+endfunction()
+
+function(psibase_schema target)
+    add_executable(${target}-schema-gen $<TARGET_PROPERTY:${target},SOURCES>)
+    target_compile_definitions(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS> PSIBASE_GENERATE_SCHEMA)
+    target_compile_options(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},COMPILE_OPTIONS>)
+    target_include_directories(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>)
+    if (TARGET psitestlib)
+        target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(psibase-service).*>" psitestlib)
+    else()
+        target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(Psibase::service).*>" Psibase::test)
+    endif()
+
+    if(ARGC GREATER_EQUAL 2)
+        set(_OUTFILE ${ARGV1})
+    else()
+        set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+    endif()
+
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        DEPENDS ${target}
+        COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
+        COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+    )
+    add_custom_target(${target}-schema ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp)
 endfunction()

@@ -18,8 +18,6 @@ namespace psibase::http
 {
    using push_transaction_result   = std::variant<TransactionTrace, std::string>;
    using push_transaction_callback = std::function<void(push_transaction_result)>;
-   using push_transaction_t =
-       std::function<void(std::vector<char> packed_signed_trx, push_transaction_callback)>;
 
    using push_boot_t =
        std::function<void(std::vector<char> packed_signed_transactions, push_transaction_callback)>;
@@ -303,23 +301,22 @@ namespace psibase::http
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
 #endif
-      push_boot_t            push_boot_async        = {};
-      push_transaction_t     push_transaction_async = {};
-      accept_p2p_websocket_t accept_p2p_websocket   = {};
-      shutdown_t             shutdown               = {};
-      get_config_t           get_perf               = {};
-      get_config_t           get_metrics            = {};
-      get_peers_t            get_peers              = {};
-      connect_t              connect                = {};
-      connect_t              disconnect             = {};
-      get_config_t           get_config             = {};
-      connect_t              set_config             = {};
-      get_config_t           get_keys               = {};
-      generic_json_t         new_key                = {};
-      unlock_keyring_t       unlock_keyring         = {};
-      lock_keyring_t         lock_keyring           = {};
-      get_pkcs11_tokens_t    get_pkcs11_tokens      = {};
-      admin_service          admin                  = {};
+      push_boot_t            push_boot_async      = {};
+      accept_p2p_websocket_t accept_p2p_websocket = {};
+      shutdown_t             shutdown             = {};
+      get_config_t           get_perf             = {};
+      get_config_t           get_metrics          = {};
+      get_peers_t            get_peers            = {};
+      connect_t              connect              = {};
+      connect_t              disconnect           = {};
+      get_config_t           get_config           = {};
+      connect_t              set_config           = {};
+      get_config_t           get_keys             = {};
+      generic_json_t         new_key              = {};
+      unlock_keyring_t       unlock_keyring       = {};
+      lock_keyring_t         lock_keyring         = {};
+      get_pkcs11_tokens_t    get_pkcs11_tokens    = {};
+      admin_service          admin                = {};
       std::vector<authz>     admin_authz;
       services_t             services;
       std::atomic<bool>      enable_p2p;

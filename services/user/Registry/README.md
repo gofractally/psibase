@@ -12,7 +12,7 @@ open http://localhost:8080
 
 # back to this directory
 cd Registry
-cargo psibase install && psibase install --reinstall target/wasm32-wasip1/release/packages/registry.psi
+cargo psibase install --reinstall
 
-open http://registry.psibase.127.0.0.1.sslip.io:8080/
+open http://registry.psibase.localhost:8080/
 ```

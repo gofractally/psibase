@@ -59,22 +59,14 @@ namespace SystemService
                                         key.data.size(), "PUBLIC KEY");
       }
 
-      std::string keyFingerprint(const SubjectPublicKeyInfo& key)
+      psibase::Checksum256 keyFingerprint(const SubjectPublicKeyInfo& key)
       {
-         const char* xdigits = "0123456789abcdef";
-         auto        hash    = psibase::sha256(key.data.data(), key.data.size());
-         std::string result;
-         bool        first = true;
-         for (unsigned char ch : hash)
-         {
-            if (first)
-               first = false;
-            else
-               result += ':';
-            result += xdigits[ch & 0xF];
-            result += xdigits[(ch >> 4) & 0xF];
-         }
-         return result;
+         return psibase::sha256(key.data.data(), key.data.size());
+      }
+
+      psibase::Checksum256 SubjectPublicKeyInfo::fingerprint() const
+      {
+         return psibase::sha256(data.data(), data.size());
       }
    }  // namespace AuthSig
 }  // namespace SystemService

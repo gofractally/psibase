@@ -3,7 +3,6 @@ import {
     QualifiedFunctionCallArgs,
     siblingUrl,
     buildFunctionCallResponse,
-    PluginError,
     assertTruthy,
 } from "@psibase/common-lib";
 
@@ -15,6 +14,8 @@ import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { pluginId } from "@psibase/common-lib/messaging/PluginId";
 import { Plugins } from "./plugin/plugins";
 import { PluginLoader } from "./plugin/pluginLoader";
+import { PluginErrorObject, RedirectErrorObject } from "@psibase/common-lib/messaging";
+import { REDIRECT_ERROR_CODE } from "./constants";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -27,8 +28,8 @@ const supervisorOrigination = {
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("transact", "plugin"),
+    pluginId("clientdata", "plugin"),
 ];
-
 interface Account {
     accountNum: string;
     authService: string;
@@ -111,7 +112,7 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
+    public supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         let newContext = false;
         if (!this.context) {
             newContext = true;
@@ -331,9 +332,15 @@ export class Supervisor implements AppInterface {
                 // It is only recoverable at intermediate steps in the callstack.
                 // Since it is the final return value, it is no longer recoverable and is
                 //   converted to a PluginError to be handled by the client.
+                let newError;
+                if (e.payload.code === REDIRECT_ERROR_CODE) {
+                    newError = new RedirectErrorObject(e.payload.producer, e.payload.message);
+                } else {
+                    newError = new PluginErrorObject(e.payload.producer, e.payload.message);
+                }
                 this.replyToParent(
                     id,
-                    new PluginError(e.payload.producer, e.payload.message),
+                    newError
                 );
             } else {
                 this.replyToParent(id, e);

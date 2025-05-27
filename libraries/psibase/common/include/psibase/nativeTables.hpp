@@ -20,7 +20,8 @@ namespace psibase
    static constexpr NativeTableNum consensusChangeTable       = 10;  // subjective
    static constexpr NativeTableNum snapshotTable              = 11;  // subjective
    static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
-   static constexpr NativeTableNum logTruncateTable           = 13;
+   static constexpr NativeTableNum logTruncateTable           = 13;  // subjective
+   static constexpr NativeTableNum socketTable                = 14;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -131,8 +132,7 @@ namespace psibase
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
 
-      uint32_t             numRefs = 0;   // number accounts that ref this
-      std::vector<uint8_t> code    = {};  // actual code, TODO: compressed
+      std::vector<uint8_t> code = {};  // actual code, TODO: compressed
 
       // The code table is in native. The native code
       // verifies codeHash and the key. This prevents a poison block
@@ -140,7 +140,7 @@ namespace psibase
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> CodeByHashKeyType;
-      PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
+      PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, code)
    };
 
    auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
@@ -269,6 +269,41 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> LogTruncateKeyType;
       PSIO_REFLECT(LogTruncateRow, start)
+   };
+
+   struct ProducerMulticastSocketInfo
+   {
+      PSIO_REFLECT(ProducerMulticastSocketInfo)
+      friend bool operator==(const ProducerMulticastSocketInfo&,
+                             const ProducerMulticastSocketInfo&) = default;
+   };
+   struct HttpSocketInfo
+   {
+      PSIO_REFLECT(HttpSocketInfo)
+      friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
+   };
+
+   using SocketInfo = std::variant<ProducerMulticastSocketInfo, HttpSocketInfo>;
+
+   inline auto get_gql_name(SocketInfo*)
+   {
+      return "SocketInfo";
+   }
+
+   using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
+   auto socketPrefix() -> KeyPrefixType;
+   auto socketKey(std::int32_t fd) -> SocketKeyType;
+   struct SocketRow
+   {
+      // Well-known fds
+      static constexpr std::int32_t producer_multicast = 0;
+
+      std::int32_t fd;
+      SocketInfo   info;
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> SocketKeyType;
+      PSIO_REFLECT(SocketRow, fd, info)
    };
 
 }  // namespace psibase

@@ -77,6 +77,7 @@ impl Chain {
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
+            &None,
             AccountNumber::new(account_raw!("prod")),
             false,
             TimePointSec { seconds: 10 },
@@ -89,8 +90,10 @@ impl Chain {
             self.push(&trx).ok()?;
         }
 
-        for trx in subsequent_tx {
-            self.push(&trx).ok()?;
+        for (_, group, _) in subsequent_tx {
+            for trx in group {
+                self.push(&trx).ok()?;
+            }
         }
 
         self.start_block();
@@ -340,6 +343,10 @@ pub struct ChainResult<T: fracpack::UnpackOwned> {
 
 impl<T: fracpack::UnpackOwned> ChainResult<T> {
     pub fn get(&self) -> Result<T, anyhow::Error> {
+        self.get_with_debug(false)
+    }
+
+    pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
         }
@@ -350,10 +357,12 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
-                        println!(
-                            ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
-                            at.action.method, at.raw_retval
-                        );
+                        if debug {
+                            println!(
+                                ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
+                                at.action.method, at.raw_retval
+                            );
+                        }
                         if at.raw_retval.is_empty() {
                             return None;
                         } else {
@@ -365,7 +374,9 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 })
                 .next();
             if let Some(ret) = ret {
-                println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
+                if debug {
+                    println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
+                }
                 let unpacked_ret = T::unpacked(ret)?;
                 return Ok(unpacked_ret);
             }

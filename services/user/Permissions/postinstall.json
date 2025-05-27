@@ -1,0 +1,11 @@
+[
+  {
+    "sender": "permissions",
+    "service": "sites",
+    "method": "setcsp",
+    "data": {
+      "path":"/permissions.html",
+      "csp": "frame-ancestors *"
+    }
+  }
+]

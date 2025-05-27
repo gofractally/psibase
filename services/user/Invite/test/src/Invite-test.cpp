@@ -65,6 +65,10 @@ namespace
        "-----END PRIVATE KEY-----\n");
 }  // namespace
 
+// Helper functions for tests
+auto createInvite = [](auto& user, const auto& pubKey)
+{ return user.createInvite(pubKey, std::nullopt, std::nullopt, std::nullopt, std::nullopt); };
+
 // - Auth
 //    - Alice cannot use AuthInvite
 //    - Accounts can still create new accounts
@@ -112,24 +116,20 @@ SCENARIO("Creating an invite")
 
       THEN("Alice can create an invite")
       {
-         auto createInvite = a.createInvite(invPub);
-         CHECK(createInvite.succeeded());
+         CHECK(createInvite(a, invPub).succeeded());
 
          AND_THEN("Alice cannot create another invite with the same key")
          {
-            auto createInvite2 = a.createInvite(invPub);
-            CHECK(createInvite2.failed(inviteAlreadyExists));
+            CHECK(createInvite(a, invPub).failed(inviteAlreadyExists));
          }
          AND_THEN("Alice can create another invite with a different key")
          {
-            auto createInvite2 = a.createInvite(thrdPub);
-            CHECK(createInvite2.succeeded());
+            CHECK(createInvite(a, thrdPub).succeeded());
          }
       }
       THEN("Invited-sys cannot create an invite")
       {
-         auto createInvite = i.createInvite(userPub);
-         CHECK(createInvite.failed(restrictedActions));
+         CHECK(createInvite(i, userPub).failed(restrictedActions));
       }
    }
 }
@@ -151,47 +151,47 @@ SCENARIO("Rejecting an invite")
       auto bob     = t.from(t.addAccount("bob"_a));
       auto invited = t.from(Invite::payerAccount);
 
+      // Define KeyList objects at the top level for reuse
+      auto userKeyList     = KeyList{{userPub, userPriv}};
+      auto invKeyList      = KeyList{{invPub, invPriv}};
+      auto thrdKeyList     = KeyList{{thrdPub, thrdPriv}};
+      auto combinedKeyList = KeyList{{userPub, userPriv}, {invPub, invPriv}};
+
       t.setAuth<AuthSig::AuthSig>(alice.id, userPub);
       t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
 
+      auto a = alice.with(userKeyList).to<Invite>();
+      auto b = bob.with(combinedKeyList).to<Invite>();
+      auto i = invited.with(invKeyList).to<Invite>();
+
       WHEN("Alice creates an invite")
       {
-         alice.with({{userPub, userPriv}}).to<Invite>().createInvite(invPub);
+         auto id = createInvite(a, invPub).returnVal();
 
          THEN("Invitee can reject an invite as invited-sys")
          {
-            KeyList keys   = {{invPub, invPriv}};
-            auto    reject = invited.with(keys).to<Invite>().reject(invPub);
-            CHECK(reject.succeeded());
+            CHECK(i.reject(id).succeeded());
          }
          THEN("Invitee can reject an invite as a normal user")
          {
-            KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-            auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-            CHECK(reject.succeeded());
+            CHECK(b.reject(id).succeeded());
          }
          THEN("Reject fails if it is already rejected")
          {
-            KeyList keys = {{invPub, invPriv}};
-            invited.with(keys).to<Invite>().reject(invPub);
-            auto reject = invited.with(keys).to<Invite>().reject(invPub);
-            CHECK(reject.failed(alreadyRejected));
+            i.reject(id);
+            CHECK(i.reject(id).failed(alreadyRejected));
          }
          THEN("Reject fails if it is already accepted")
          {
-            KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-            CHECK(accept.succeeded());
-            auto reject = bob.with(keys).to<Invite>().reject(invPub);
-            CHECK(reject.failed(alreadyAccepted));
+            CHECK(b.accept(id).succeeded());
+            CHECK(b.reject(id).failed(alreadyAccepted));
          }
          THEN("Reject fails if transaction isn't signed with the invite public key")
          {
-            KeyList keys   = {{userPub, userPriv}};
-            auto    reject = bob.with(keys).to<Invite>().reject(invPub);
+            auto reject = bob.with(userKeyList).to<Invite>().reject(id);
             CHECK(reject.failed(missingInviteSig));
 
-            auto reject2 = invited.with({}).to<Invite>().reject(invPub);
+            auto reject2 = invited.with({}).to<Invite>().reject(id);
             CHECK(reject2.failed(missingInviteSig));
          }
       }
@@ -214,24 +214,20 @@ SCENARIO("Deleting an invite")
 
       WHEN("Alice creates an invite")
       {
-         a.createInvite(invPub);
+         auto id = createInvite(a, invPub).returnVal();
 
          THEN("Only alice can delete the invite")
          {
-            auto delete1 = b.delInvite(invPub);
-            CHECK(delete1.failed(unauthDelete));
-            auto delete2 = a.delInvite(invPub);
-            CHECK(delete2.succeeded());
+            CHECK(b.delInvite(id).failed(unauthDelete));
+            CHECK(a.delInvite(id).succeeded());
          }
          AND_WHEN("Alice deletes the invite")
          {
-            a.delInvite(invPub);
+            a.delInvite(id);
 
             THEN("The invite no longer exists")
             {
-               auto ret             = a.getInvite(invPub).returnVal();
-               bool inviteIsDeleted = not ret.has_value();
-               CHECK(inviteIsDeleted);
+               CHECK(not a.getInvite(id).returnVal().has_value());
             }
          }
       }
@@ -254,25 +250,27 @@ SCENARIO("Expired invites")
       auto bob     = t.from(t.addAccount("bob"_a));
       auto charlie = t.from(t.addAccount("charlie"_a));
 
+      t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
+
+      auto combinedKeyList = KeyList{{userPub, userPriv}, {invPub, invPriv}};
+
       auto a = alice.to<Invite>();
-      auto b = bob.to<Invite>();
+      auto b = bob.with(combinedKeyList).to<Invite>();
 
       WHEN("Alice creates an invite and it isn't expired")
       {
-         a.createInvite(invPub);
+         auto id = createInvite(a, invPub).returnVal();
 
          int64_t oneWeek  = (60 * 60 * 24 * 7);
          int64_t passTime = oneWeek - 2;  // 2 seconds before expiration
          t.startBlock(passTime * 1000);
 
          // Add another invite that is not close to expiring
-         b.createInvite(thrdPub);
+         auto id2 = createInvite(b, thrdPub).returnVal();
 
          THEN("It can be rejected")
          {
-            KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-            auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-            CHECK(reject.succeeded());
+            CHECK(b.reject(id).succeeded());
          }
 
          AND_WHEN("It expires")
@@ -281,216 +279,25 @@ SCENARIO("Expired invites")
 
             THEN("It cannot be rejected")
             {
-               KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-               auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-               CHECK(reject.failed(inviteExpired));
+               CHECK(b.reject(id).failed(inviteExpired));
             }
             THEN("It cannot be accepted")
             {
-               KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-               auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-               CHECK(accept.failed(inviteExpired));
+               CHECK(b.accept(id).failed(inviteExpired));
             }
             THEN("It can be deleted by the creator")
             {
-               auto delInvite = a.delInvite(invPub);
-               CHECK(delInvite.succeeded());
+               CHECK(a.delInvite(id).succeeded());
             }
             THEN("It can be deleted by anyone")
             {
-               auto delExpired = charlie.to<Invite>().delExpired(5);
-               CHECK(delExpired.succeeded());
+               CHECK(charlie.to<Invite>().delExpired(5).succeeded());
 
                AND_THEN("Only the expired invite was deleted")
                {
-                  auto expiredInvite = a.getInvite(invPub).returnVal();
-                  auto invDNE        = not expiredInvite.has_value();
-                  CHECK(invDNE);
-
-                  auto validInvExists2 = a.getInvite(thrdPub).returnVal().has_value();
-                  CHECK(validInvExists2);
+                  CHECK(not a.getInvite(id).returnVal().has_value());
+                  CHECK(b.getInvite(id2).returnVal().has_value());
                }
-            }
-         }
-      }
-   }
-}
-
-// - Setting a whitelist
-//    - A whitelist can be set by invite
-//    - All whitelisted accounts must exist
-//    - All whitelisted accounts must be unique
-//    - No whitelisted accounts may already be on the blacklist
-//    - Then only whitelisted accounts can create invites
-//    - Setting the whitelist to an empty array should delete the whitelist from the db
-SCENARIO("Setting a whitelist", "[whiteblack]")
-{
-   GIVEN("Chain with initialized invite system")
-   {
-      DefaultTestChain t;
-
-      auto alice = t.from(t.addAccount("alice"_a));
-      auto bob   = t.from(t.addAccount("bob"_a));
-      auto a     = alice.to<Invite>();
-      auto b     = bob.to<Invite>();
-
-      auto invite = t.from(Invite::service).to<Invite>();
-
-      using ListType = std::vector<psibase::AccountNumber>;
-
-      THEN("A whitelist can only be set on the Invite service by invite")
-      {
-         auto setWhitelist = a.setWhitelist(ListType{"alice"_a});
-         CHECK(setWhitelist.failed(missingRequiredAuth));
-
-         auto setWhitelist2 = invite.setWhitelist(ListType{"alice"_a});
-         CHECK(setWhitelist2.succeeded());
-      }
-      THEN("A nonexistent account cannot be added to the whitelist")
-      {
-         auto setWhitelist = invite.setWhitelist(ListType{"asdfg"_a});
-         CHECK(setWhitelist.failed("Account asdfg does not exist"));
-      }
-      THEN("Duplicate accounts cannot be added to the whitelist")
-      {
-         auto setWhitelist = invite.setWhitelist(ListType{"alice"_a, "alice"_a});
-         CHECK(setWhitelist.failed("Account alice duplicated"));
-      }
-      THEN("A blacklist can be set on the invite service")
-      {
-         auto setBlacklist = invite.setBlacklist(ListType{"alice"_a});
-         CHECK(setBlacklist.succeeded());
-      }
-      WHEN("A blacklisted account is set")
-      {
-         invite.setBlacklist(ListType{"alice"_a});
-
-         THEN("The blacklisted account cannot then be added to the whitelist")
-         {
-            auto setWhitelist = invite.setWhitelist(ListType{"alice"_a});
-            CHECK(setWhitelist.failed("Account alice already on blacklist"));
-         }
-         THEN("The blacklist can be cleared")
-         {
-            auto setBlacklist = invite.setBlacklist(ListType{});
-            CHECK(setBlacklist.succeeded());
-
-            AND_THEN("The formerly blacklisted account can be added to the whitelist")
-            {
-               auto setWhitelist = invite.setWhitelist(ListType{"alice"_a});
-               CHECK(setWhitelist.succeeded());
-            }
-         }
-      }
-      WHEN("A whitelist is set")
-      {
-         invite.setWhitelist(ListType{"alice"_a});
-
-         THEN("A non-whitelisted account cannot create an invite")
-         {
-            auto createInvite = b.createInvite(invPub);
-            CHECK(createInvite.failed(onlyWhitelisted));
-         }
-         THEN("A whitelisted account can create an invite")
-         {
-            auto createInvite = a.createInvite(invPub);
-            CHECK(createInvite.succeeded());
-         }
-         THEN("The whitelist can be cleared")
-         {
-            auto setWhitelist = invite.setWhitelist(ListType{});
-            AND_THEN("A formerly non-whitelisted account can create an invite")
-            {
-               auto createInvite = b.createInvite(invPub);
-               CHECK(createInvite.succeeded());
-            }
-         }
-      }
-   }
-}
-
-// - Setting a blacklist
-//    - A blacklist can be set by invite, only if there is no whitelist
-//    - All blacklisted accounts must exist
-//    - All blacklisted accounts must be unique
-//    - Blacklisted accounts cannot create invites
-//    - Setting the blacklist to an empty array should delete the whitelist from the db
-SCENARIO("Setting a blacklist", "[whiteblack]")
-{
-   GIVEN("Chain with initialized invite system")
-   {
-      DefaultTestChain t;
-
-      auto alice = t.from(t.addAccount("alice"_a));
-      auto bob   = t.from(t.addAccount("bob"_a));
-      auto a     = alice.to<Invite>();
-      auto b     = bob.to<Invite>();
-
-      auto invite = t.from(Invite::service).to<Invite>();
-
-      using ListType = std::vector<psibase::AccountNumber>;
-
-      THEN("A whitelist can be set")
-      {
-         auto setWhitelist = invite.setWhitelist(ListType{"alice"_a});
-         CHECK(setWhitelist.succeeded());
-      }
-      WHEN("A whitelist is set")
-      {
-         invite.setWhitelist(ListType{"alice"_a});
-
-         THEN("A blacklist cannot be set or cleared")
-         {
-            auto setBlacklist = invite.setBlacklist(ListType{"bob"_a});
-            CHECK(setBlacklist.failed(whitelistIsSet));
-            auto clearBlacklist = invite.setBlacklist(ListType{});
-            CHECK(clearBlacklist.failed(whitelistIsSet));
-         }
-         THEN("The whitelist can be cleared")
-         {
-            auto clearWhitelist = invite.setWhitelist(ListType{});
-            CHECK(clearWhitelist.succeeded());
-
-            AND_THEN("A blacklist can be set")
-            {
-               auto setBlacklist = invite.setBlacklist(ListType{"bob"_a});
-               CHECK(setBlacklist.succeeded());
-            }
-         }
-      }
-      THEN("A nonexistent account cannot be added to the blacklist")
-      {
-         auto setBlacklist = invite.setBlacklist(ListType{"asdfg"_a});
-         CHECK(setBlacklist.failed("Account asdfg does not exist"));
-      }
-      THEN("A duplicate account cannot be added to the blacklist")
-      {
-         auto setBlacklist = invite.setBlacklist(ListType{"bob"_a, "bob"_a});
-         CHECK(setBlacklist.failed("Account bob duplicated"));
-      }
-      WHEN("An account is blacklisted")
-      {
-         invite.setBlacklist(ListType{"bob"_a});
-
-         THEN("A nonblacklisted account can create an invite")
-         {
-            auto createInvite = a.createInvite(invPub);
-            CHECK(createInvite.succeeded());
-         }
-         THEN("A blacklisted account cannot create an invite")
-         {
-            auto createInvite = b.createInvite(invPub);
-            CHECK(createInvite.failed(noBlacklisted));
-         }
-         THEN("A blacklist can be cleared")
-         {
-            auto clearBlacklist = invite.setBlacklist(ListType{});
-            CHECK(clearBlacklist.succeeded());
-
-            AND_THEN("A formerly blacklisted account can create an invite")
-            {
-               auto createInvite = b.createInvite(invPub);
-               CHECK(createInvite.succeeded());
             }
          }
       }
@@ -525,74 +332,61 @@ SCENARIO("Accepting an invite")
       t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
       t.setAuth<AuthSig::AuthSig>(charlie.id, userPub);
 
+      auto userKeys        = KeyList{{userPub, userPriv}};
+      auto combinedKeyList = KeyList{{userPub, userPriv}, {invPub, invPriv}};
+      auto invitedKeys     = KeyList{{invPub, invPriv}};
+
+      auto a = alice.to<Invite>();
+      auto b = bob.with(combinedKeyList).to<Invite>();
+      auto c = charlie.with(combinedKeyList).to<Invite>();
+      auto i = invited.with(invitedKeys).to<Invite>();
       WHEN("Alice creates an invite")
       {
-         alice.to<Invite>().createInvite(invPub);
+         auto id = createInvite(a, invPub).returnVal();
 
          THEN("The invite can be accepted by a normal user")
          {
-            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-            CHECK(accept.succeeded());
+            CHECK(b.accept(id).succeeded());
          }
          THEN("An invite can be accepted by invited-sys in order to create a new account")
          {
-            KeyList keys{{invPub, invPriv}};
-            auto    acceptCreate =
-                invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-            CHECK(acceptCreate.succeeded());
+            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).succeeded());
          }
          THEN("A normal user may not create a new account")
          {
-            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-            auto    acceptCreate =
-                bob.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-            CHECK(acceptCreate.failed(mustUseInvitedSys));
+            CHECK(b.acceptCreate(id, "rebecca"_a, userPub).failed(mustUseInvitedSys));
          }
          THEN("Invited-sys may not accept without also creating a new account")
          {
-            KeyList keys{{invPub, invPriv}};
-            auto    accept = invited.with(keys).to<Invite>().accept(invPub);
-            CHECK(accept.failed(restrictedActions));
+            CHECK(i.accept(id).failed(restrictedActions));
          }
          WHEN("An invite is accepted with an existing account")
          {
-            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-            bob.with(keys).to<Invite>().accept(invPub);
+            b.accept(id);
 
             THEN("An accepted invite can be accepted again with a different account")
             {
-               auto accept = charlie.with(keys).to<Invite>().accept(invPub);
-               CHECK(accept.succeeded());
+               CHECK(c.accept(id).succeeded());
             }
             THEN("An accepted invite can be accepted again with a created account")
             {
-               KeyList invitedKeys{{invPub, invPriv}};
-               auto    acceptCreate = invited.with(invitedKeys)
-                                       .to<Invite>()
-                                       .acceptCreate(invPub, "rebecca"_a, userPub);
-               CHECK(acceptCreate.succeeded());
+               CHECK(i.acceptCreate(id, "rebecca"_a, userPub).succeeded());
             }
          }
          THEN("Accepting fails if the inviteKey doesn't exist")
          {
-            auto accept = alice.to<Invite>().accept(thrdPub);
-            CHECK(accept.failed(inviteDNE));
+            CHECK(a.accept(id + 1).failed(inviteDNE));
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
          {
-            KeyList keys{{userPub, userPriv}};
-            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-            CHECK(accept.failed(missingInviteSig));
+            CHECK(bob.with(userKeys).to<Invite>().accept(id).failed(missingInviteSig));
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey proof")
          {
-            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-
             // Manually constructing the transaction to avoid adding the proper proof
             transactor<Invite> service(bob, Invite::service);
-            auto               trx = t.makeTransaction({service.accept(invPub)});
-            for (const auto& key : keys)
+            auto               trx = t.makeTransaction({service.accept(id)});
+            for (const auto& key : combinedKeyList)
             {
                trx.claims.push_back({
                    .service = VerifySig::service,
@@ -602,7 +396,7 @@ SCENARIO("Accepting an invite")
             SignedTransaction signedTrx;
             signedTrx.transaction = trx;
             auto hash = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
-            auto key  = keys[0];
+            auto key  = combinedKeyList[0];
             signedTrx.proofs.push_back(psio::convert_to_frac(sign(key.second, hash)));
             auto accept = t.pushTransaction(signedTrx);
 
@@ -638,33 +432,22 @@ SCENARIO("Accepting an invite")
          THEN("Accepting fails if the invite is rejected")
          {
             // Reject the invite
-            KeyList invitedKeys{{invPub, invPriv}};
-            invited.with(invitedKeys).to<Invite>().reject(invPub);
+            i.reject(id);
 
             // Try accept with create
-            auto acceptCreate =
-                invited.with(invitedKeys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-            CHECK(acceptCreate.failed(alreadyRejected));
+            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).failed(alreadyRejected));
 
             // Try accept with existing user
-            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-            CHECK(accept.failed(alreadyRejected));
+            CHECK(b.accept(id).failed(alreadyRejected));
          }
          THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
          {
-            KeyList keys{{invPub, invPriv}};
-            auto    acceptCreate =
-                invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, invPub);
-            CHECK(acceptCreate.failed(needUniquePubkey));
+            CHECK(i.acceptCreate(id, "rebecca"_a, invPub).failed(needUniquePubkey));
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
-            KeyList keys{{invPub, invPriv}};
-            invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-            auto acceptCreate =
-                invited.with(keys).to<Invite>().acceptCreate(invPub, "jonathan"_a, userPub);
-            CHECK(acceptCreate.failed(noNewAccToken));
+            i.acceptCreate(id, "rebecca"_a, userPub);
+            CHECK(i.acceptCreate(id, "jonathan"_a, userPub).failed(noNewAccToken));
          }
       }
    }

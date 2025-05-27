@@ -5,6 +5,7 @@ world impl {
     include transact:plugin/imports;
     include host:common/imports;
     include clientdata:plugin/imports;
+    include permissions:plugin/imports;
 
     include transact:plugin/hook-user-auth;
 

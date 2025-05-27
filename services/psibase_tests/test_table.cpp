@@ -37,6 +37,12 @@ namespace table_test
 
    using test_tables = ServiceTables<table0, table1, table2>;
 
+   struct IntKey
+   {
+      int key;
+   };
+   PSIO_REFLECT(IntKey, key)
+
    void test0(AccountNumber thisService)
    {
       test_tables t{thisService};
@@ -111,6 +117,29 @@ namespace table_test
       t1.remove(S1{3, 4, 5});
       check(!idx0.get(3).has_value(), "remove primary");
       check(!idx1.get(4).has_value(), "remove secondary");
+   }
+
+   void test5(AccountNumber thisService)
+   {
+      test_tables t{thisService};
+      auto        t2   = t.open<table2>();
+      auto        idx1 = t2.getIndex<1>();
+      t2.put(S2{0, 1, 2});
+      t2.put(S2{3, 1, 4});
+      t2.put(S2{5, 6, 7});
+      std::vector<S2> result;
+      printf("starting test5\n");
+      static_assert(std::same_as<decltype(idx1.subindex<int>(1)), TableIndex<S2, int>>);
+      static_assert(std::same_as<decltype(idx1.subindex<std::tuple<int>>(1)),
+                                 TableIndex<S2, std::tuple<int>>>);
+      static_assert(std::same_as<decltype(idx1.subindex<IntKey>(1)), TableIndex<S2, IntKey>>);
+      for (auto x : idx1.subindex<int>(1))
+      {
+         result.push_back(x);
+      }
+      check(result.size() == 2, "iter sz");
+      check(result[0] == S2{0, 1, 2}, "iter val0");
+      check(result[1] == S2{3, 1, 4}, "iter val1");
    }
 
    extern "C" void called(AccountNumber thisService, AccountNumber sender)

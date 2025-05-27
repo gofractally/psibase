@@ -20,7 +20,11 @@ namespace SystemService
          {
             return psibase::compare_wknd(lhs.data, rhs.data);
          }
+
+         psibase::Checksum256 fingerprint() const;
       };
+
+      PSIBASE_REFLECT_KEY_TRANSFORM(&SubjectPublicKeyInfo::fingerprint, "sha256-key-fingerprint")
 
       inline std::vector<unsigned char>& clio_unwrap_packable(SubjectPublicKeyInfo& obj)
       {
@@ -57,6 +61,6 @@ namespace SystemService
          return true;
       }
 
-      std::string keyFingerprint(const SubjectPublicKeyInfo& key);
+      psibase::Checksum256 keyFingerprint(const SubjectPublicKeyInfo& key);
    }  // namespace AuthSig
 }  // namespace SystemService

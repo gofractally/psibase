@@ -178,26 +178,32 @@ namespace SystemService
                 //
    )
 
+   struct VerifyInterface
+   {
+      void verifySys(psibase::Checksum256 transactionHash,
+                     psibase::Claim       claim,
+                     std::vector<char>    proof);
+   };
+   PSIO_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
+
    struct TransactStatus
    {
       bool enforceAuth = true;
 
       std::optional<std::vector<psibase::Checksum256>> bootTransactions;
-
-      std::tuple<> key() const { return {}; }
    };
    PSIO_REFLECT(TransactStatus, enforceAuth, bootTransactions)
-   using TransactStatusTable = psibase::Table<TransactStatus, &TransactStatus::key>;
+   using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(TransactStatusTable)
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
    {
       std::array<uint32_t, 256> blockSuffixes;
-
-      std::tuple<> key() const { return {}; }
    };
    PSIO_REFLECT(BlockSummary, blockSuffixes)
-   using BlockSummaryTable = psibase::Table<BlockSummary, &BlockSummary::key>;
+   using BlockSummaryTable = psibase::Table<BlockSummary, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(BlockSummaryTable)
 
    // This table tracks transaction IDs to detect duplicates.
    struct IncludedTrx
@@ -205,10 +211,11 @@ namespace SystemService
       psibase::TimePointSec expiration;
       psibase::Checksum256  id;
 
-      auto key() const { return std::make_tuple(expiration, id); }
+      using Key = psibase::CompositeKey<&IncludedTrx::expiration, &IncludedTrx::id>;
    };
    PSIO_REFLECT(IncludedTrx, expiration, id)
-   using IncludedTrxTable = psibase::Table<IncludedTrx, &IncludedTrx::key>;
+   using IncludedTrxTable = psibase::Table<IncludedTrx, IncludedTrx::Key{}>;
+   PSIO_REFLECT_TYPENAME(IncludedTrxTable)
 
    enum class CallbackType : std::uint32_t
    {
@@ -225,15 +232,16 @@ namespace SystemService
    PSIO_REFLECT(Callbacks, type, actions)
 
    using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
+   PSIO_REFLECT_TYPENAME(CallbacksTable)
 
    struct SnapshotInfo
    {
       psibase::BlockTime lastSnapshot;
       psibase::Seconds   snapshotInterval;
-      auto               key() const { return psibase::SingletonKey(); }
    };
    PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
-   using SnapshotInfoTable = psibase::Table<SnapshotInfo, &SnapshotInfo::key>;
+   using SnapshotInfoTable = psibase::Table<SnapshotInfo, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(SnapshotInfoTable)
 
    /// All transactions enter the chain through this service
    ///
@@ -359,6 +367,8 @@ namespace SystemService
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime))
+
+   PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
 
    // The status will never be nullopt during transaction execution or during RPC.
    // It will be nullopt when called by a test wasm before the genesis transaction

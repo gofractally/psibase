@@ -1,5 +1,7 @@
 #include <psio/schema.hpp>
 
+#include <psio/to_hex.hpp>
+
 #include <catch2/catch.hpp>
 
 using namespace psio;
@@ -50,6 +52,20 @@ std::string to_json(const CompiledSchema& schema, const std::string& name, std::
    vector_stream     out{data};
    to_json(parser, out);
    return std::string(data.data(), data.size());
+}
+
+std::string to_frac(const CompiledSchema& schema, const std::string& name, std::string json)
+{
+   std::vector<char> data;
+   vector_stream     out{data};
+
+   auto xtype = schema.schema.get(name);
+   check(xtype, "could not find type");
+   auto ctype = schema.get(xtype->resolve(schema.schema));
+   check(ctype != 0, "could not find type");
+   to_frac(*ctype, convert_from_json<json::any>(std::move(json)), out, standard_types());
+
+   return to_hex(data);
 }
 
 TEST_CASE("schema object")
@@ -121,7 +137,7 @@ TEST_CASE("schema generated")
    CHECK(to_json(cschema, "o", "040000002A") == "42");
    CHECK(to_json(cschema, "s", "04002A000000") == R"({"i":42})");
    CHECK(to_json(cschema, "v", "00000000") == "[]");
-   CHECK(to_json(cschema, "v", "040000002A00000000") == "[42]");
+   CHECK(to_json(cschema, "v", "040000002A000000") == "[42]");
    CHECK(to_json(cschema, "var", "00040000002A000000") == R"({"uint32":42})");
    CHECK(to_json(cschema, "x", "2A") == R"({"value":42})");
    CHECK(to_json(cschema, "tup", "01002A") == "[42]");
@@ -129,6 +145,44 @@ TEST_CASE("schema generated")
    CHECK(to_json(cschema, "bool", "01") == "true");
    CHECK(to_json(cschema, "f32", "0000803F") == "1");
    CHECK(to_json(cschema, "f64", "000000000000F03F") == "1");
+
+   CHECK(to_frac(cschema, "u8", "42") == "2A");
+   CHECK(to_frac(cschema, "o", "42") == "040000002A");
+   CHECK(to_frac(cschema, "s", R"({"i":42})") == "04002A000000");
+   CHECK(to_frac(cschema, "v", "[]") == "00000000");
+   CHECK(to_frac(cschema, "v", "[42]") == "040000002A000000");
+   CHECK(to_frac(cschema, "var", R"({"uint32":42})") == "00040000002A000000");
+   CHECK(to_frac(cschema, "x", R"({"value":42})") == "2A");
+   CHECK(to_frac(cschema, "tup", "[42]") == "01002A");
+   CHECK(to_frac(cschema, "a", "[42]") == "2A00");
+   CHECK(to_frac(cschema, "bool", "true") == "01");
+   CHECK(to_frac(cschema, "f32", "1") == "0000803F");
+   CHECK(to_frac(cschema, "f64", "1") == "000000000000F03F");
+}
+
+TEST_CASE("schema serialization")
+{
+   SchemaBuilder builder;
+   builder.insert<std::uint8_t>("u8");
+   builder.insert<std::optional<std::uint8_t>>("o");
+   builder.insert<MyType>("s");
+   builder.insert<std::vector<std::int32_t>>("v");
+   builder.insert<std::variant<std::uint32_t>>("var");
+   builder.insert<MyType2>("x");
+   builder.insert<std::tuple<std::int8_t>>("tup");
+   builder.insert<std::array<std::int16_t, 1>>("a");
+   builder.insert<bool>("bool");
+   builder.insert<float>("f32");
+   builder.insert<double>("f64");
+   Schema schema       = std::move(builder).build();
+   auto   schema_text  = convert_to_json(schema);
+   auto   schema2      = convert_from_json<Schema>(schema_text);
+   auto   schema_text2 = convert_to_json(schema2);
+   CHECK(schema_text == schema_text2);
+   auto schema_bin   = to_frac(schema);
+   auto schema3      = from_frac<Schema>(schema_bin);
+   auto schema_text3 = convert_to_json(schema3);
+   CHECK(schema_text3 == schema_text);
 }
 
 template <typename T, typename U>

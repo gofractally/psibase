@@ -358,6 +358,47 @@ namespace psibase
    using KeySuffix =
        typename key_suffix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>::type;
 
+   template <typename T>
+   struct flatten_key
+   {
+      using type = std::tuple<T>;
+   };
+
+   template <typename T>
+   using flatten_key_t = flatten_key<T>::type;
+
+   template <typename T>
+   struct flatten_key<T&>
+   {
+      using type = flatten_key_t<T>;
+   };
+   template <typename T>
+   struct flatten_key<T&&>
+   {
+      using type = flatten_key_t<T>;
+   };
+   template <typename T>
+   struct flatten_key<const T>
+   {
+      using type = flatten_key_t<T>;
+   };
+
+   template <typename... T>
+   using tuple_cat_t = decltype(std::tuple_cat(std::declval<T>()...));
+
+   template <typename... T>
+   struct flatten_key<std::tuple<T...>>
+   {
+      using type = tuple_cat_t<flatten_key_t<T>...>;
+   };
+   template <typename T>
+      requires psio::Reflected<T>
+   struct flatten_key<T>
+   {
+      using type = flatten_key_t<
+          typename psio::get_struct_tuple_impl<typename psio::reflect<T>::data_members>::type>;
+   };
+
    /// A primary or secondary index in a Table
    ///
    /// Use [Table::getIndex] to get this.
@@ -391,6 +432,8 @@ namespace psibase
          auto copy = prefix;
          return KvIterator<T>(db, std::move(copy), prefix.size(), is_secondary, true);
       }
+
+      bool empty() const { return begin() == end(); }
 
       /// Get iterator to first object with `key >= k`
       ///
@@ -444,7 +487,8 @@ namespace psibase
       /// then `subindex` returns another `TableIndex` which restricts its view
       /// to the subrange. e.g. it will iterate and search for `std::tuple(cValue, dValue)`,
       /// holding `aValue` and `bValue` constant.
-      template <CompatibleKeyPrefix<K> K2>
+      template <typename Dummy = void, CompatibleKeyPrefix<K> K2>
+         requires std::same_as<Dummy, void>
       TableIndex<T, KeySuffix<K2, K>> subindex(K2&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
@@ -452,11 +496,24 @@ namespace psibase
          return TableIndex<T, KeySuffix<K2, K>>(db, std::move(key), is_secondary);
       }
 
+      /// Divide the key space, with an explicit key type for the new index.
+      ///
+      /// The combination of K2 and SubKey must be equivalent to K
+      template <typename SubKey, typename K2>
+         requires std::same_as<flatten_key_t<K>,
+                               tuple_cat_t<flatten_key_t<K2>, flatten_key_t<SubKey>>>
+      TableIndex<T, SubKey> subindex(K2&& k)
+      {
+         KeyView key_base{{prefix.data(), prefix.size()}};
+         auto    key = psio::composite_key(key_base, k);
+         return TableIndex<T, SubKey>(db, std::move(key), is_secondary);
+      }
+
       /// Look up object by key
       ///
       /// If a matching key is found, then it returns a fresh object;
       /// it does not cache.
-      template <compatible_key<K> K2>
+      template <compatible_key<K> K2 = K>
       std::optional<T> get(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
@@ -502,8 +559,35 @@ namespace psibase
       raw::kvPut(db, key, key_len, value, value_len);
    }
 
+   /// A key function that builds a key from multiple subkeys
+   ///
+   /// The key will be a tuple composed from all the subkeys in order.
+   template <auto... K>
+   struct CompositeKey
+   {
+      auto        operator()(const auto& value) const;
+      friend auto operator<=>(const CompositeKey&, const CompositeKey&) = default;
+   };
+
+   /// A key functions that extracts a member of a member
+   ///
+   /// Any level of nesting is supported. The last key can
+   /// be any invokable object. All the other keys must be
+   /// pointers-to-data-members.
+   template <auto... K>
+   struct NestedKey
+   {
+      auto        operator()(const auto& value) const;
+      friend auto operator<=>(const NestedKey&, const NestedKey&) = default;
+   };
+
    namespace detail
    {
+      template <typename C, auto K0, auto... K>
+      decltype(auto) invoke(NestedKey<K0, K...> f, const C& value);
+      template <typename C, auto... K>
+      decltype(auto) invoke(CompositeKey<K...> f, const C& value);
+
       template <typename T, typename C>
       decltype(auto) invoke(T C::*f, const C& value)
       {
@@ -514,7 +598,48 @@ namespace psibase
       {
          return (value.*f)(static_cast<A&&>(a)...);
       }
+      template <typename C>
+      decltype(auto) invoke(NestedKey<> f, const C& value)
+      {
+         return value;
+      }
+      template <typename C, auto K0>
+      decltype(auto) invoke(NestedKey<K0> f, const C& value)
+      {
+         return detail::invoke(K0, value);
+      }
+      template <typename C, auto K0, auto... K>
+      decltype(auto) invoke(NestedKey<K0, K...> f, const C& value)
+      {
+         return detail::invoke(NestedKey<K...>{}, value.*K0);
+      }
+      template <typename C, auto... K>
+      decltype(auto) invoke(CompositeKey<K...> f, const C& value)
+      {
+         return std::tuple(detail::invoke(K, value)...);
+      }
    }  // namespace detail
+
+   template <auto... K>
+   auto CompositeKey<K...>::operator()(const auto& value) const
+   {
+      return detail::invoke(*this, value);
+   }
+
+   template <auto... K>
+   auto NestedKey<K...>::operator()(const auto& value) const
+   {
+      return detail::invoke(*this, value);
+   }
+
+   template <auto V>
+   struct nt_wrap;
+
+#define PSIBASE_REFLECT_KEY_TRANSFORM(fn, name)                                               \
+   inline constexpr const char* psibase_get_key_transform_name(::psibase::nt_wrap<fn>*, auto) \
+   {                                                                                          \
+      return name;                                                                            \
+   }
 
    /// Stores objects in the key-value database
    ///
@@ -525,9 +650,10 @@ namespace psibase
    ///
    /// `Primary` and `Secondary` may be:
    /// - pointer-to-data-member. e.g. `&MyType::key`
-   /// - pointer-to-member-function which returns a key. e.g. `&MyType::keyFunction`
-   /// - non-member function which takes a `const T&` as its only argument and returns a key
-   /// - a callable object which takes a `const T&` as its only argument and returns a key
+   /// - a instance of a standard key type: `NestedKey` or `CompositeKey`
+   /// - pointer-to-member-function which returns a key. e.g. `&MyType::keyFunction`.
+   ///   Be careful when using such functions, as changing the behavior of the function
+   ///   will corrupt the database, and such changes cannot be detected automatically.
    ///
    /// #### Schema changes
    ///
@@ -696,8 +822,15 @@ namespace psibase
          return TableIndex<T, key_type>(db, std::move(index_prefix), Idx > 0);
       }
 
+      using primary_key_type =
+          std::remove_cvref_t<decltype(detail::invoke(Primary, std::declval<T>()))>;
+
       /// Look up table object by key using the first table index by default
-      auto get(auto key) const { return getIndex<0>().get(key); }
+      template <compatible_key<primary_key_type> K = primary_key_type>
+      auto get(K&& key) const
+      {
+         return getIndex<0>().get(std::forward<K>(key));
+      }
 
      private:
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
@@ -713,6 +846,17 @@ namespace psibase
    concept TableType = requires(T table) {
       typename decltype(table)::key_type;
       typename decltype(table)::value_type;
+   };
+
+   template <typename T>
+   struct get_value_type
+   {
+      using type = T::value_type;
+   };
+   template <>
+   struct get_value_type<void>
+   {
+      using type = void;
    };
 
    // TODO: allow tables to be forward declared.  The simplest method is:
@@ -742,6 +886,8 @@ namespace psibase
    template <DbId Db, typename... Tables>
    struct DbTables
    {
+      static constexpr DbId db = Db;
+
       /// Default constructor
       ///
       /// Assumes the desired service is running on the current action receiver account.
@@ -774,10 +920,11 @@ namespace psibase
       /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<MyTable>();`
       ///
       /// Returns a [Table].
-      template <TableType T>
+      template <TableType T, typename I = boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>>
+         requires(I::value < sizeof...(Tables))
       auto open() const
       {
-         return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
+         return open<I::value>();
       }
 
       /// Open by record type
@@ -787,20 +934,15 @@ namespace psibase
       /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<TableRecord>();`
       ///
       /// Returns a [Table].
-      template <typename RecordType>
+      template <typename RecordType,
+                typename I = boost::mp11::mp_find<
+                    boost::mp11::mp_list<typename get_value_type<Tables>::type...>,
+                    RecordType>>
+         requires(I::value < sizeof...(Tables))
       auto open() const
       {
-         return open<
-             boost::mp11::mp_find_if<boost::mp11::mp_list<Tables...>,
-                                     InnerType<RecordType>::template is_contained_by>::value>();
+         return open<I::value>();
       }
-
-      template <typename RecordType>
-      struct InnerType
-      {
-         template <TableType T>
-         using is_contained_by = std::is_same<typename T::value_type, RecordType>;
-      };
 
       AccountNumber account;  ///< the service runs on this account
    };
@@ -817,10 +959,11 @@ namespace psibase
    template <typename... Tables>
    using SubjectiveTables = DbTables<DbId::subjective, Tables...>;
 
+   /// Defines tables in the `temporary` database
+   template <typename... Tables>
+   using TemporaryTables = DbTables<DbId::temporary, Tables...>;
+
    // An empty key that can be used for any singleton table
-   struct SingletonKey
-   {
-      PSIO_REFLECT(SingletonKey);
-   };
+   using SingletonKey = CompositeKey<>;
 
 }  // namespace psibase

@@ -2,7 +2,11 @@
     "compilerOptions": {
         "target": "ESNext",
         "useDefineForClassFields": true,
-        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ESNext"
+        ],
         "allowJs": false,
         "baseUrl": ".",
         "paths": {
@@ -12,7 +16,12 @@
             "@psibase/common-lib/*": [
                 "../../CommonApi/common/packages/common-lib/src/*"
             ],
-            "@/*": ["./src/*"]
+            "@/*": [
+                "./src/*"
+            ],
+            "wasm-transpiled": [
+                "./wasm-transpiled/x_admin.d.ts"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -20,13 +29,22 @@
         "strict": true,
         "forceConsistentCasingInFileNames": true,
         "module": "esnext",
-        "moduleResolution": "Node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
-        "jsx": "react-jsx"
+        "jsx": "react-jsx",
+        "types": [
+            "react",
+            "react-dom",
+            "node"
+        ]
     },
-    "include": ["src", "./wasm-psibase/*.d.ts", "wasm-psibase"],
+    "include": [
+        "src",
+        "./wasm-transpiled/*.d.ts",
+        "wasm-transpiled"
+    ],
     "references": [
         {
             "path": "./tsconfig.node.json"

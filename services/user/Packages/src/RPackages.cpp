@@ -6,13 +6,25 @@
 
 using namespace SystemService;
 
+namespace
+{
+   void requireAccount(psibase::AccountNumber account)
+   {
+      if (!psibase::to<Accounts>().exists(account))
+         psibase::abortMessage(std::format("account '{}' does not exist", account.str()));
+   }
+}  // namespace
+
 namespace UserService
 {
    struct Query
    {
       auto installed() const
       {
-         return Packages::Tables(Packages::service).open<InstalledPackageTable>().getIndex<0>();
+         return Packages::Tables(Packages::service)
+             .open<InstalledPackageTable>()
+             .getIndex<0>()
+             .subindex<PackageKey>(std::tuple{});
       }
       // Returns the accounts that need to be created to install a package.
       // Validates that existing accounts have the correct owner.
@@ -21,9 +33,8 @@ namespace UserService
       {
          std::vector<psibase::AccountNumber> result;
          auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
-         auto ownerIndex   = AuthDelegate::Tables(AuthDelegate::service)
-                               .open<AuthDelegate::AuthDelegateTable>()
-                               .getIndex<0>();
+         auto ownerIndex =
+             AuthDelegate::Tables(AuthDelegate::service).open<AuthDelegateTable>().getIndex<0>();
          for (auto account : accounts)
          {
             if (auto accountRow = accountIndex.get(account))
@@ -58,11 +69,57 @@ namespace UserService
          }
          return result;
       }
+
+      auto package(psibase::AccountNumber owner, std::string name, std::string version) const
+      {
+         requireAccount(owner);
+         return Packages{}.open<PublishedPackageTable>().get(std::tuple(owner, name, version));
+      }
+
+      auto packages(psibase::AccountNumber            owner,
+                    std::optional<std::string>        name,
+                    std::optional<uint32_t>           first,
+                    std::optional<uint32_t>           last,
+                    const std::optional<std::string>& before,
+                    const std::optional<std::string>& after) const
+      {
+         requireAccount(owner);
+
+         using Conn =
+             psibase::Connection<PublishedPackage, psio::FixedString{"PublishedPackageConnection"},
+                                 psio::FixedString{"PublishedPackageEdge"}>;
+         auto published = Packages{}.open<PublishedPackageTable>().getIndex<0>();
+         if (name)
+         {
+            auto index = published.subindex(std::tuple(owner, *name));
+            return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
+         }
+         else
+         {
+            auto index = published.subindex(owner);
+            return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
+         }
+      }
+
+      auto sources(psibase::AccountNumber account) const -> std::vector<PackageSource>
+      {
+         requireAccount(account);
+
+         auto table = Packages{}.open<PackageSourcesTable>();
+         if (auto row = table.get(account))
+         {
+            return std::move(row->sources);
+         }
+         return {};
+      }
    };
    PSIO_REFLECT(  //
        Query,
        method(installed),
-       method(newAccounts, accounts, owner))
+       method(newAccounts, accounts, owner),
+       method(package, owner, name, version),
+       method(packages, owner, name, first, last, before, after),
+       method(sources, account))
 
    struct ManifestQuery
    {
@@ -92,11 +149,48 @@ namespace UserService
       return {};
    }
 
+   struct SchemaQuery
+   {
+      std::string service;
+      PSIO_REFLECT(SchemaQuery, service)
+   };
+
+   std::optional<psibase::HttpReply> serveSchema(psibase::HttpRequest& request)
+   {
+      auto path = request.path();
+      if (request.method == "GET" && path == "/schema")
+      {
+         auto query       = request.query<SchemaQuery>();
+         auto schemaTable = Packages{}.open<InstalledSchemaTable>();
+         if (auto row = schemaTable.get(psibase::AccountNumber{query.service}))
+         {
+            psibase::HttpReply reply{
+                .contentType = "application/json",
+            };
+            psio::vector_stream stream{reply.body};
+            psio::to_json(row->schema, stream);
+            return std::move(reply);
+         }
+         else
+         {
+            std::string msg = "No schema for service '" + query.service + "'";
+            return psibase::HttpReply{
+                .status      = psibase::HttpStatus::notFound,
+                .contentType = "text/html",
+                .body        = {msg.begin(), msg.end()},
+            };
+         }
+      }
+      return {};
+   }
+
    std::optional<psibase::HttpReply> RPackages::serveSys(psibase::HttpRequest request)
    {
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
       if (auto result = servePackageManifest(request))
+         return result;
+      if (auto result = serveSchema(request))
          return result;
       return std::nullopt;
    }

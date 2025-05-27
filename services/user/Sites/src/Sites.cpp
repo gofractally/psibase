@@ -5,7 +5,6 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
-#include <psibase/serveSchema.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <regex>
 #include <services/system/Accounts.hpp>
@@ -119,7 +118,7 @@ namespace SystemService
       // The account that holds the service code implementing the DecompressorInterface
       using decompressor_account                                              = std::string;
       const std::array<std::pair<cci, decompressor_account>, 1> decompressors = {
-          {{"br", "psi-brotli"}}  //
+          {{"br", "brotli-codec"}}  //
       };
 
       // Parses the encoding into a pair of encoding identifier and quality
@@ -252,6 +251,83 @@ namespace SystemService
          return ifNoneMatch && *ifNoneMatch == etag;
       }
 
+      void decRef(Sites::Tables& tables, SitesDataRefTable& refsTable, const Checksum256& hash)
+      {
+         auto prevRefs = refsTable.get(hash);
+         check(prevRefs.has_value(), "Invariant failure: missing ref count");
+         if (--prevRefs->refs == 0)
+         {
+            tables.open<SitesDataTable>().erase(hash);
+            refsTable.remove(*prevRefs);
+         }
+         else
+         {
+            refsTable.put(*prevRefs);
+         }
+      }
+
+      // returns true if the link target exists
+      bool linkImpl(Sites::Tables&             tables,
+                    std::string                path,
+                    std::string                contentType,
+                    std::optional<std::string> contentEncoding,
+                    psibase::Checksum256       contentHash)
+      {
+         auto table = tables.template open<SitesContentTable>();
+
+         check(path.starts_with('/'), "Path doesn't begin with /");
+
+         if (contentEncoding)
+         {
+            check(std::ranges::binary_search(validEncodings, *contentEncoding),
+                  "Unsupported content encoding");
+         }
+
+         bool exists;
+
+         // Update reference counts
+         std::optional<SitesContentRow> prev =
+             table.getIndex<0>().get(std::tuple(getSender(), path));
+         if (prev)
+         {
+            if (prev->contentHash != contentHash)
+            {
+               auto refsTable = tables.open<SitesDataRefTable>();
+               decRef(tables, refsTable, prev->contentHash);
+               auto refs = refsTable.get(contentHash)
+                               .value_or(SitesDataRefRow{.hash = contentHash, .refs = 0});
+               exists = refs.refs > 0;
+               ++refs.refs;
+               refsTable.put(refs);
+            }
+            else
+            {
+               exists = true;
+            }
+         }
+         else
+         {
+            auto            refsTable = tables.open<SitesDataRefTable>();
+            SitesDataRefRow refs      = refsTable.get(contentHash)
+                                       .value_or(SitesDataRefRow{.hash = contentHash, .refs = 0});
+            exists = refs.refs > 0;
+            ++refs.refs;
+            refsTable.put(refs);
+         }
+
+         SitesContentRow row{
+             .account         = getSender(),
+             .path            = std::move(path),
+             .contentType     = std::move(contentType),
+             .contentHash     = contentHash,
+             .contentEncoding = std::move(contentEncoding),
+             .csp             = std::nullopt,
+         };
+         table.put(row);
+
+         return exists;
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -301,7 +377,7 @@ namespace SystemService
          if (content)
          {
             std::string cspHeader = getCspHeader(content, account);
-            auto        etag      = std::to_string(content->hash);
+            auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (useCache(account) && shouldCache(request, etag))
             {
@@ -313,11 +389,23 @@ namespace SystemService
                };
             }
 
-            std::vector<HttpHeader> headers = {{
-                {"Content-Security-Policy", cspHeader},
-                {"Cache-Control", "no-cache"},
-                {"ETag", etag},
-            }};
+            auto reply = HttpReply{
+                .contentType = content->contentType,
+                .headers =
+                    {
+                        {"Content-Security-Policy", cspHeader},
+                        {"Cache-Control", "no-cache"},
+                        {"ETag", etag},
+                    },
+            };
+
+            if (request.method != "HEAD")
+            {
+               auto index = tables.open<SitesDataTable>().getIndex<0>();
+               auto body  = index.get(content->contentHash);
+               check(body.has_value(), "Invariant failure: file content missing");
+               reply.body = std::move(body->data);
+            }
 
             // RFC 7231
             // "A request without an Accept-Encoding header field implies that the
@@ -352,7 +440,7 @@ namespace SystemService
                   const auto encoding = *content->contentEncoding;
                   if (is_accepted(encoding))
                   {
-                     headers.push_back({"Content-Encoding", encoding});
+                     reply.headers.push_back({"Content-Encoding", encoding});
                   }
                   else
                   {
@@ -373,7 +461,7 @@ namespace SystemService
                               "[Fallback decompression error] Decompressor account not found");
 
                         Actor<DecompressorInterface> decoder(Sites::service, decompressorAccount);
-                        content->content = decoder.decompress(content->content);
+                        reply.body = decoder.decompress(std::move(reply.body));
                      }
                   }
                }
@@ -382,18 +470,8 @@ namespace SystemService
             {
                if (content->contentEncoding)
                {
-                  headers.push_back({"Content-Encoding", *content->contentEncoding});
+                  reply.headers.push_back({"Content-Encoding", *content->contentEncoding});
                }
-            }
-
-            auto reply = HttpReply{
-                .contentType = content->contentType,
-                .headers     = std::move(headers),
-            };
-
-            if (request.method != "HEAD")
-            {
-               reply.body = content->content;
             }
 
             return reply;
@@ -414,33 +492,44 @@ namespace SystemService
                         std::vector<char>          content)
    {
       Tables tables{};
-      auto   table = tables.template open<SitesContentTable>();
 
-      check(path.starts_with('/'), "Path doesn't begin with /");
-      auto hash = psio::detail::seahash(std::string_view(content.data(), content.size()));
+      Checksum256 contentHash = sha256(content.data(), content.size());
 
-      if (contentEncoding)
+      if (!linkImpl(tables, std::move(path), std::move(contentType), std::move(contentEncoding),
+                    contentHash))
       {
-         check(std::ranges::binary_search(validEncodings, *contentEncoding),
-               "Unsupported content encoding");
+         tables.open<SitesDataTable>().put({
+             .hash = contentHash,
+             .data = std::move(content),
+         });
       }
-
-      SitesContentRow row{
-          .account         = getSender(),
-          .path            = std::move(path),
-          .contentType     = std::move(contentType),
-          .content         = std::move(content),
-          .hash            = hash,
-          .contentEncoding = std::move(contentEncoding),
-      };
-      table.put(row);
    }
 
-   void Sites::removeSys(std::string path)
+   void Sites::hardlink(std::string                path,
+                        std::string                contentType,
+                        std::optional<std::string> contentEncoding,
+                        psibase::Checksum256       contentHash)
+   {
+      Tables tables{};
+
+      if (!linkImpl(tables, std::move(path), std::move(contentType), std::move(contentEncoding),
+                    contentHash))
+      {
+         abortMessage("Content must exist to use hardlink");
+      }
+   }
+
+   void Sites::remove(std::string path)
    {
       Tables tables{};
       auto   table = tables.open<SitesContentTable>();
-      table.erase(SitesContentKey{getSender(), path});
+      if (auto existing = table.get(SitesContentKey{getSender(), path}))
+      {
+         table.remove(*existing);
+
+         auto refsTable = tables.open<SitesDataRefTable>();
+         decRef(tables, refsTable, existing->contentHash);
+      }
    }
 
    bool Sites::isValidPath(AccountNumber site, std::string path)
@@ -491,23 +580,45 @@ namespace SystemService
    void Sites::setCsp(std::string path, std::string csp)
    {
       Tables tables{};
+
       if (path == "*")
       {
-         auto table = tables.open<GlobalCspTable>();
-         table.put({
-             .account = getSender(),
-             .csp     = std::move(csp),
-         });
+         auto siteTable = tables.open<SiteConfigTable>();
+         auto site = siteTable.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
+         site.globalCsp = std::optional{std::move(csp)};
+         siteTable.put(std::move(site));
       }
       else
       {
-         auto table   = tables.open<SitesContentTable>();
-         auto index   = table.getIndex<0>();
-         auto content = index.get(SitesContentKey{getSender(), path});
-         check(!!content, "Content not found for the specified path");
+         auto contentTable = tables.open<SitesContentTable>();
+         auto content      = contentTable.get(SitesContentKey{getSender(), path});
+         check(!!content, "Invalid path");
 
-         content->csp = std::move(csp);
-         table.put(*content);
+         content->csp = std::optional{std::move(csp)};
+         contentTable.put(*content);
+      }
+   }
+
+   void Sites::deleteCsp(std::string path)
+   {
+      Tables tables{};
+
+      if (path == "*")
+      {
+         auto siteTable = tables.open<SiteConfigTable>();
+         auto site      = siteTable.get(getSender());
+         check(!!site, "Site not found");
+         site->globalCsp = std::nullopt;
+         siteTable.put(*site);
+      }
+      else
+      {
+         auto contentTable = tables.open<SitesContentTable>();
+         auto content      = contentTable.get(SitesContentKey{getSender(), path});
+         check(!!content, "Invalid path");
+
+         content->csp = std::nullopt;
+         contentTable.put(*content);
       }
    }
 
@@ -542,16 +653,16 @@ namespace SystemService
                                    const AccountNumber&                  account)
    {
       std::string cspHeader = DEFAULT_CSP_HEADER;
-      if (content && !content->csp.empty())
+      if (content && content->csp.has_value())
       {
-         cspHeader = content->csp;
+         cspHeader = *content->csp;
       }
       else
       {
-         auto globalCsp = Tables{}.open<GlobalCspTable>().get(account);
-         if (globalCsp)
+         auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
+         if (siteConfig && siteConfig->globalCsp)
          {
-            cspHeader = globalCsp->csp;
+            cspHeader = *siteConfig->globalCsp;
          }
       }
       return cspHeader;
@@ -566,33 +677,62 @@ namespace SystemService
 
    namespace
    {
+      struct SiteConfig
+      {
+         psibase::AccountNumber account;
+         bool                   spa       = false;
+         bool                   cache     = true;
+         std::string            globalCsp = "";
+      };
+      PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
+
       struct Query
       {
          AccountNumber service;
 
-         auto content() const
+         auto getDefaultCsp() const -> std::string { return DEFAULT_CSP_HEADER; }
+
+         auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
-            return Sites::Tables{service}.open<SitesContentTable>().getIndex<0>();
+            auto tables = Sites::Tables{service};
+
+            // Get the site config, or return a default
+            auto record = tables.open<SiteConfigTable>().get(account).value_or(
+                SiteConfigRow{.account = account});
+            return SiteConfig{.account   = record.account,
+                              .spa       = record.spa,
+                              .cache     = record.cache,
+                              .globalCsp = record.globalCsp.value_or("")};
+         }
+
+         auto getContent(AccountNumber account) const
+         {
+            auto tables = Sites::Tables{service};
+
+            auto idx =
+                tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
+
+            return TransformedConnection(idx,
+                                         [](auto&& row)
+                                         {
+                                            row.csp = row.csp.value_or("");
+                                            return row;
+                                         });
          }
       };
-      PSIO_REFLECT(Query, method(content))
+      PSIO_REFLECT(Query,                        //
+                   method(getConfig, account),   //
+                   method(getContent, account),  //
+                   method(getDefaultCsp)         //
+      );
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSitesApp(const HttpRequest& request)
    {
-      if (auto result = psibase::serveActionTemplates<Sites>(request))
-         return result;
-
-      if (auto result = psibase::servePackAction<Sites>(request))
-         return result;
-
-      if (auto result = psibase::serveSchema<Sites>(request))
-         return result;
-
       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
          return result;
 
-      if (auto result = psibase::serveSimpleUI<Sites, true>(request))
+      if (auto result = psibase::serveSimpleUI<Sites, false>(request))
          return result;
 
       return std::nullopt;

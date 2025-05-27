@@ -1,7 +1,4 @@
-use crate::{
-    services::transact, AccountNumber, Action, ActionGroup, ActionSink, SignedTransaction,
-    TransactionTrace,
-};
+use crate::{services::transact, AccountNumber, SignedTransaction, TransactionTrace};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
@@ -9,6 +6,7 @@ use fracpack::{Pack, UnpackOwned};
 use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::io::Write;
 use std::str::FromStr;
 
 custom_error! { Error
@@ -107,22 +105,28 @@ impl TraceFormat {
         trace: TransactionTrace,
         progress: Option<&ProgressBar>,
     ) -> Result<(), anyhow::Error> {
+        match self {
+            TraceFormat::Full => progress.suspend(|| -> Result<(), anyhow::Error> {
+                println!("{}", trace.to_string());
+                Ok(std::io::stdout().flush()?)
+            })?,
+            TraceFormat::Json => progress.suspend(|| -> Result<(), anyhow::Error> {
+                serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?;
+                println!("");
+                Ok(std::io::stdout().flush()?)
+            })?,
+            _ => {}
+        }
         if let Some(e) = &trace.error {
             if !e.is_empty() {
                 let message = match self {
                     TraceFormat::Error => e.to_string(),
                     TraceFormat::Stack => trace.fmt_stack(),
-                    TraceFormat::Full => trace.to_string(),
-                    TraceFormat::Json => serde_json::to_string(&trace)?,
+                    TraceFormat::Full => e.to_string(),
+                    TraceFormat::Json => e.to_string(),
                 };
                 Err(Error::ExecutionFailed { message })?;
             }
-        }
-        match self {
-            TraceFormat::Full => progress.suspend(|| print!("{}", trace.to_string())),
-            TraceFormat::Json => progress
-                .suspend(|| serde_json::to_writer_pretty(std::io::stdout().lock(), &trace))?,
-            _ => {}
         }
         Ok(())
     }
@@ -172,7 +176,10 @@ async fn push_transaction_impl(
     )
     .await?;
     if console {
-        progress.suspend(|| print!("{}", trace.console()));
+        progress.suspend(|| {
+            print!("{}", trace.console());
+            std::io::stdout().flush()
+        })?;
     }
     fmt.error_for_trace(trace, progress)
 }
@@ -189,62 +196,6 @@ pub async fn push_transaction(
         .await
         .context("Failed to push transaction")?;
     Ok(())
-}
-
-pub struct TransactionBuilder<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> {
-    size: usize,
-    action_limit: usize,
-    actions: Vec<Action>,
-    transactions: Vec<(String, Vec<SignedTransaction>, bool)>,
-    f: F,
-}
-
-impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> TransactionBuilder<F> {
-    pub fn new(action_limit: usize, f: F) -> Self {
-        TransactionBuilder {
-            size: 0,
-            action_limit,
-            actions: vec![],
-            transactions: vec![],
-            f,
-        }
-    }
-    pub fn set_label(&mut self, label: String) {
-        self.transactions
-            .push((label, vec![], !self.actions.is_empty()))
-    }
-    pub fn push<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
-        act.append_to_tx(&mut self.actions, &mut self.size);
-        if self.size >= self.action_limit {
-            self.transactions
-                .last_mut()
-                .unwrap()
-                .1
-                .push((self.f)(std::mem::take(&mut self.actions))?);
-        }
-        Ok(())
-    }
-    pub fn push_all<T: ActionGroup>(&mut self, actions: Vec<T>) -> Result<(), anyhow::Error> {
-        for act in actions {
-            self.push(act)?;
-        }
-        Ok(())
-    }
-    pub fn finish(self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
-        let mut result = self.transactions;
-        if !self.actions.is_empty() {
-            result.last_mut().unwrap().1.push((self.f)(self.actions)?);
-        }
-        Ok(result)
-    }
-}
-
-impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> ActionSink
-    for TransactionBuilder<F>
-{
-    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
-        self.push(act)
-    }
 }
 
 pub async fn push_transactions(
@@ -282,6 +233,7 @@ pub async fn push_transactions(
         }
         n += 1;
     }
+    progress.inc(n);
     Ok(())
 }
 

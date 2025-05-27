@@ -1,13 +1,13 @@
 # Administration
 
-Much of the administration of an individual node can be done via the graphical user interface provided at `x-admin.your_host.com`, where `your-host` is the public address of your psibase infrastructure node (e.g. psibase.127.0.0.1.sslip.io for local nodes). To learn more about the administration app, see the documentation on [x-admin](../default-apps/x-admin.md). For more complex administration requirements, psinode exposes many services and configuration options over an http interface.
+Much of the administration of an individual node can be done via the graphical user interface provided at `x-admin.your_host.com`, where `your-host` is the public address of your psibase infrastructure node (e.g. psibase.localhost:8080 for local nodes). To learn more about the administration app, see the documentation on [x-admin](../default-apps/x-admin.md). For more complex administration requirements, psinode exposes many services and configuration options over an http interface.
 
 ## Booting a network
 
 Booting a network is only a valid operation if psinode does not yet have any chain. It can be done either with the [`psibase`](./cli/psibase.md#boot) CLI tool, or by using the GUI provided by the [x-admin](../default-apps/x-admin.md) service.
-Alternatively, the `POST /native/push_boot` endpoint can be used manually in conjunction with `POST /native/push_transaction` to perform a custom boot sequence. 
+Alternatively, the `POST /native/admin/push_boot` endpoint can be used manually in conjunction with the [transact service](../default-apps/transact.md#push-transaction) to perform a custom boot sequence.
 
-The body of the `POST /native/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
+The body of the `POST /native/admin/push_boot` request contains a list of transactions that will each be executed in order in the first block. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
 
 A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::Transact::startBoot].
 
@@ -141,7 +141,7 @@ Each peer has the following fields:
 | `autoconnect`            | Number or Boolean | The target number of out-going connections. If set to true, the server will try to connect to all configured peers.                                                                                       |
 | `producer`               | String            | The name used to produce blocks. If it is empty or if it is not one of the currently active block producers defined by the chain, the node will not participate in block production.                      |
 | `pkcs11-modules`         | Array             | PKCS #11 modules that provide access to cryptographic devices.                                                                                                                                            |
-| `host`                   | String            | The server's hostname.                                                                                                                                                                                    |
+| `hosts`                  | Array             | The server's hostnames.                                                                                                                                                                                   |
 | `listen`                 | Array             | Interfaces that the server will listen on. Changes to the set of interfaces will take effect the next time the server starts.                                                                             |
 | `listen[n].protocol`     | String            | One of `http`, `https`, or `local`                                                                                                                                                                        |
 | `listen[n].address`      | String            | (`http` or `https`) An IP address that refers to a local interface                                                                                                                                        |
@@ -168,7 +168,7 @@ Example:
     "peers": ["http://psibase.io/"],
     "producer": "prod",
     "pkcs11-modules": ["libsofthsm2.so"],
-    "host": "127.0.0.1.sslip.io",
+    "hosts": ["psibase.localhost", "psibase.127.0.0.1.sslip.io"],
     "listen": [
         {
             "protocol": "http",
@@ -183,11 +183,11 @@ Example:
     },
     "services": [
         {
-            "host": "localhost",
+            "host": "x-admin.",
             "root": "/usr/share/psibase/services/x-admin"
         }
     ],
-    "admin": "builtin:*",
+    "admin": "static:*",
     "admin_authz": [{
         "mode": "rw",
         "kind": "bearer",

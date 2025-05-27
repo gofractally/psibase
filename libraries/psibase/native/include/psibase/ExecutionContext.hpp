@@ -47,6 +47,18 @@ namespace psibase
       const char* what() const noexcept override { return "transaction timed out"; }
    };
 
+   struct DbMode
+   {
+      bool                    isSubjective;
+      bool                    isSync;
+      bool                    isReadOnly;
+      static constexpr DbMode transaction() { return {false, true, false}; }
+      static constexpr DbMode verify() { return {false, false, true}; }
+      static constexpr DbMode callback() { return {true, true, false}; }
+      static constexpr DbMode rpc() { return {true, false, false}; }
+      static constexpr DbMode firstAuth() { return {false, true, true}; }
+   };
+
    struct ExecutionContextImpl;
    struct ExecutionContext
    {
@@ -65,7 +77,6 @@ namespace psibase
 
       void execProcessTransaction(ActionContext& actionContext);
       void execCalled(uint64_t callerFlags, ActionContext& actionContext);
-      void execVerify(ActionContext& actionContext);
       void execServe(ActionContext& actionContext);
       void exec(ActionContext& actionContext, std::string_view fn);
 

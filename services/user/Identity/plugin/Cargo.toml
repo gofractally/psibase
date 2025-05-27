@@ -1,14 +1,16 @@
 [package]
-name = "identity-plugin"
-version = "0.1.0"
-edition = "2021"
+name = "plugin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.28.0" }
-psibase = { path = "../../../../rust/psibase/" }
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1.0" }
-identity = { path = "../service/" }
+wit-bindgen-rt = { version = "0.30.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
+identity = { path = "../service/", version = "0.16.0" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -16,7 +18,7 @@ crate-type = ["cdylib"]
 [package.metadata.component]
 # this name must match the package name in world.wit
 # However, it is not authoritative in the operation of the component
-package = "identity:psibase-plugin"
+package = "identity:plugin"
 
 [package.metadata.component.target]
 world = "impl"
@@ -25,3 +27,7 @@ world = "impl"
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+
+[dev-dependencies]
+identity-pkg = { path = "..", version = "0.16.0" }

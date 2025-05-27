@@ -94,10 +94,13 @@ namespace psibase
       Result(TransactionTrace&& t)
           : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
-         auto actionTrace = getTopAction(t, 0);
-         if (actionTrace.rawRetval.size() != 0)
+         if (!_t.error.has_value())
          {
-            _return = psio::from_frac<ReturnType>(actionTrace.rawRetval);
+            auto actionTrace = getTopAction(t, 0);
+            if (actionTrace.rawRetval.size() != 0)
+            {
+               _return = psio::from_frac<ReturnType>(actionTrace.rawRetval);
+            }
          }
       }
 
@@ -149,6 +152,14 @@ namespace psibase
       std::string       contentType() const { return "application/graphql"; }
       std::vector<char> body() const { return {text.begin(), text.end()}; }
       std::string_view  text;
+   };
+
+   template <typename T>
+   struct FracPackBody
+   {
+      std::string       contentType() const { return "application/octet-stream"; }
+      std::vector<char> body() const { return psio::to_frac(value); }
+      T                 value;
    };
 
    /**
@@ -244,6 +255,11 @@ namespace psibase
                                   uint32_t              expire_sec = 2) const;
 
       /**
+       * Signs a transaction with the provided keys.
+       */
+      SignedTransaction signTransaction(Transaction trx, const KeyList& keys = {});
+
+      /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(const SignedTransaction& signedTrx);
@@ -291,7 +307,7 @@ namespace psibase
       {
          return {.host     = account.str() + ".psibase.io",
                  .rootHost = "psibase.io",
-                 .method   = "POST",
+                 .method   = "GET",
                  .target{target}};
       }
 
@@ -316,13 +332,13 @@ namespace psibase
             {
                if (response.contentType == "text/html")
                {
-                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " "
-                               + std::string(response.body.begin(), response.body.end()));
+                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
+                               std::string(response.body.begin(), response.body.end()));
                }
                else
                {
-                  abortMessage("Request returned "
-                               + std::to_string(static_cast<std::uint16_t>(response.status)));
+                  abortMessage("Request returned " +
+                               std::to_string(static_cast<std::uint16_t>(response.status)));
                }
             }
             if (response.contentType != "application/json")

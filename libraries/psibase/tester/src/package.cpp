@@ -2,6 +2,7 @@
 #include <psibase/check.hpp>
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
+#include <psio/schema.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/user/Packages.hpp>
 #include <services/user/Sites.hpp>
@@ -78,6 +79,57 @@ namespace psibase
          }
          check(false, "Cannot determine Mime-Type for " + std::string(filename));
          __builtin_unreachable();
+      }
+
+      struct PrettyAction
+      {
+         AccountNumber                    sender;
+         AccountNumber                    service;
+         MethodNumber                     method;
+         std::optional<std::vector<char>> rawData;
+         std::optional<psio::json::any>   data;
+         PSIO_REFLECT(PrettyAction, sender, service, method, rawData, data)
+      };
+
+      const ServiceSchema* getSchema(std::span<const PackagedService> packages,
+                                     AccountNumber                    service)
+      {
+         for (const auto& package : packages)
+         {
+            for (const auto& [account, _, info] : package.services)
+            {
+               if (service == account)
+               {
+                  if (info.schema)
+                     return &*info.schema;
+                  else
+                     return nullptr;
+               }
+            }
+         }
+         return nullptr;
+      }
+
+      Action to_action(PrettyAction&& act, std::span<const PackagedService> packages)
+      {
+         if (act.rawData)
+         {
+            return Action{act.sender, act.service, act.method, std::move(*act.rawData)};
+         }
+         auto* schema = getSchema(packages, act.service);
+         if (!schema)
+            abortMessage("Cannot find schema for " + act.service.str());
+         auto pos = schema->actions.find(act.method.str());
+         check(pos != schema->actions.end(), "Action not found");
+         const auto&                        ty = pos->second.params;
+         psio::schema_types::CompiledSchema cschema{schema->types, psibase_types(), {&ty}};
+         auto*                              cty = cschema.get(ty.resolve(schema->types));
+         if (!act.data)
+            act.data = psio::json::any_object{};
+         Action              result{act.sender, act.service, act.method};
+         psio::vector_stream stream{result.rawData};
+         to_frac(*cty, *act.data, stream, cschema.builtin);
+         return result;
       }
    }  // namespace
 
@@ -193,6 +245,17 @@ namespace psibase
       }
       return false;
    }
+   void PackagedService::setSchema(std::vector<Action>& actions)
+   {
+      for (const auto& [account, index, info] : services)
+      {
+         if (info.schema)
+         {
+            actions.push_back(
+                transactor<Packages>{account, Packages::service}.setSchema(*info.schema));
+         }
+      }
+   }
    void PackagedService::storeData(std::vector<Action>& actions)
    {
       for (const auto& [sender, index] : data)
@@ -220,18 +283,19 @@ namespace psibase
    {
       return meta.accounts;
    }
-   void PackagedService::postinstall(std::vector<Action>& actions)
+   void PackagedService::postinstall(std::vector<Action>&             actions,
+                                     std::span<const PackagedService> packages)
    {
       if (postinstallScript)
       {
          auto contents = archive.getEntry(*postinstallScript).read();
          contents.push_back('\0');
-         psio::json_token_stream stream(contents.data());
-         std::vector<Action>     tmp;
+         psio::json_token_stream   stream(contents.data());
+         std::vector<PrettyAction> tmp;
          psio::from_json(tmp, stream);
          for (auto&& action : tmp)
          {
-            actions.push_back(std::move(action));
+            actions.push_back(to_action(std::move(action), packages));
          }
       }
    }

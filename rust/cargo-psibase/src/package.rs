@@ -1,9 +1,9 @@
-use crate::{build, build_package_root, build_plugin, Args, SERVICE_POLYFILL};
+use crate::{build, build_package_root, build_plugin, build_schema, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
-    AccountNumber, Action, Checksum256, ExactAccountNumber, Meta, PackageInfo, PackageRef,
-    PackagedService, ServiceInfo,
+    AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, PackagedService, PrettyAction,
+    ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -30,7 +30,7 @@ pub struct PsibaseMetadata {
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
     services: Option<Vec<String>>,
-    postinstall: Option<Vec<Action>>,
+    postinstall: Option<Vec<PrettyAction>>,
     data: Vec<DataFiles>,
 }
 
@@ -110,9 +110,9 @@ pub fn get_package_dir(args: &Args, metadata: &MetadataIndex) -> PathBuf {
 fn should_build_package(
     filename: &Path,
     meta: &Meta,
-    services: &[(&String, ServiceInfo, PathBuf)],
-    data: &[(&String, String, PathBuf)],
-    postinstall: &[Action],
+    services: &[(AccountNumber, ServiceInfo, PathBuf)],
+    data: &[(AccountNumber, String, PathBuf)],
+    postinstall: &[PrettyAction],
 ) -> Result<bool, anyhow::Error> {
     let timestamp = if let Ok(metadata) = filename.metadata() {
         metadata.modified()?
@@ -128,11 +128,10 @@ fn should_build_package(
     if manifest.services.len() != services.len() {
         return Ok(true);
     }
-    for (name, info, path) in services {
+    for (account, info, path) in services {
         if path.metadata()?.modified()? > timestamp {
             return Ok(true);
         }
-        let account: AccountNumber = name.parse()?;
         if let Some(existing_info) = manifest.services.get(&account) {
             if info != existing_info {
                 return Ok(true);
@@ -150,11 +149,10 @@ fn should_build_package(
         existing_data.push((data.service.value, data.filename.as_str()));
     }
     let mut new_data = Vec::new();
-    for (service, dest, src) in data {
+    for (account, dest, src) in data {
         if src.metadata()?.modified()? > timestamp {
             return Ok(true);
         }
-        let account: AccountNumber = service.parse()?;
         new_data.push((account.value, dest.as_str()));
     }
     existing_data.sort();
@@ -163,8 +161,7 @@ fn should_build_package(
         return Ok(true);
     }
     // check postinstall
-    let mut existing_postinstall = Vec::new();
-    existing.postinstall(&mut existing_postinstall)?;
+    let existing_postinstall = existing.read_postinstall()?;
     if &existing_postinstall[..] != postinstall {
         return Ok(true);
     }
@@ -172,10 +169,10 @@ fn should_build_package(
 }
 
 fn add_files<'a>(
-    service: &'a String,
+    service: AccountNumber,
     src: &Path,
     dest: &String,
-    out: &mut Vec<(&'a String, String, PathBuf)>,
+    out: &mut Vec<(AccountNumber, String, PathBuf)>,
 ) -> Result<(), anyhow::Error> {
     if src.is_file() {
         out.push((service, dest.clone(), src.to_path_buf()));
@@ -270,8 +267,6 @@ pub async fn build_package(
             let Some(package) = metadata.packages.get(service) else {
                 Err(anyhow!("Cannot find crate for service {}", service))?
             };
-            let account: ExactAccountNumber = package.name.parse()?;
-            accounts.push(account.into());
             let pmeta: PsibaseMetadata = get_metadata(package)?;
             for (k, v) in pmeta.dependencies {
                 depends_set.insert(PackageRef {
@@ -282,6 +277,7 @@ pub async fn build_package(
             let mut info = ServiceInfo {
                 flags: pmeta.flags,
                 server: None,
+                schema: None,
             };
             if let Some(server) = pmeta.server {
                 info.server = Some(server.parse()?);
@@ -309,7 +305,7 @@ pub async fn build_package(
                 if dest.ends_with('/') {
                     dest.pop();
                 }
-                data_sources.push((&package.name, src, dest));
+                data_sources.push((&package.name, src.into_std_path_buf(), dest));
             }
             services.push((&package.name, info, &package.id.repr));
             if let Some(actions) = &pmeta.postinstall {
@@ -335,14 +331,6 @@ pub async fn build_package(
     let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
     depends.sort_by(|a, b| a.name.cmp(&b.name));
 
-    let meta = Meta {
-        name: package_name.to_string(),
-        version: package_version.to_string(),
-        description: package_description.unwrap_or_else(|| package_name.to_string()),
-        depends,
-        accounts,
-    };
-
     let need_to_build_root = services
         .iter()
         .find(|(_, _, id)| id.as_str() == service.unwrap())
@@ -352,8 +340,21 @@ pub async fn build_package(
             .find(|(_, _, _, id)| id.as_str() == service.unwrap())
             .is_none();
 
+    for (plugin, service, path, id) in plugins {
+        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
+        if paths.len() != 1 {
+            Err(anyhow!(
+                "Plugin {} should produce exactly one wasm target",
+                plugin
+            ))?
+        };
+        data_sources.push((service, paths.pop().unwrap().into(), path.to_string()))
+    }
+
+    let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();
+
     let mut service_wasms = Vec::new();
-    for (service, info, id) in services {
+    for (service, mut info, id) in services {
         let mut paths = build(
             args,
             &[id.as_str()],
@@ -368,18 +369,12 @@ pub async fn build_package(
                 service
             ))?
         };
+        let schema = build_schema(args, &[&id], &["-p", &service]).await?;
+        crate_to_account.insert(service, schema.service.clone());
+        let service = schema.service.clone();
+        info.schema = Some(schema);
         service_wasms.push((service, info, paths.pop().unwrap()));
-    }
-
-    for (plugin, service, path, id) in plugins {
-        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
-        if paths.len() != 1 {
-            Err(anyhow!(
-                "Plugin {} should produce exactly one wasm target",
-                plugin
-            ))?
-        };
-        data_files.push((service, path.to_string(), paths.pop().unwrap()))
+        accounts.push(service);
     }
 
     if need_to_build_root {
@@ -388,8 +383,16 @@ pub async fn build_package(
     }
 
     for (service, src, dest) in data_sources {
-        add_files(service, src.as_std_path(), &dest, &mut data_files)?;
+        add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
     }
+
+    let meta = Meta {
+        name: package_name.to_string(),
+        version: package_version.to_string(),
+        description: package_description.unwrap_or_else(|| package_name.to_string()),
+        depends,
+        accounts,
+    };
 
     let out_dir = get_package_dir(args, metadata);
     let out_path = out_dir.join(package_name.clone() + ".psi");

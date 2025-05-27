@@ -5,50 +5,52 @@
 
 namespace SystemService
 {
-   struct SitesContentKey
-   {
-      psibase::AccountNumber account = {};
-      std::string            path    = {};
-
-      // TODO: upgrade wasi-sdk; <=> for string is missing
-      friend bool operator<(const SitesContentKey& a, const SitesContentKey& b)
-      {
-         return std::tie(a.account, a.path) < std::tie(b.account, b.path);
-      }
-   };
-   PSIO_REFLECT(SitesContentKey, account, path)
-
+   using SitesContentKey = std::tuple<psibase::AccountNumber, std::string>;
    struct SitesContentRow
    {
       psibase::AccountNumber     account         = {};
       std::string                path            = {};
       std::string                contentType     = {};
-      std::vector<char>          content         = {};
-      std::string                csp             = {};
-      uint64_t                   hash            = 0;
+      psibase::Checksum256       contentHash     = {};
       std::optional<std::string> contentEncoding = std::nullopt;
+      std::optional<std::string> csp             = std::nullopt;
 
-      SitesContentKey key() const { return {account, path}; }
+      using Key = psibase::CompositeKey<&SitesContentRow::account, &SitesContentRow::path>;
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp, hash, contentEncoding)
-   using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
+   using SitesContentTable = psibase::Table<SitesContentRow, SitesContentRow::Key{}>;
+   PSIO_REFLECT_TYPENAME(SitesContentTable)
+
+   struct SitesDataRow
+   {
+      psibase::Checksum256 hash;
+      std::vector<char>    data;
+   };
+   PSIO_REFLECT(SitesDataRow, hash, data)
+
+   using SitesDataTable = psibase::Table<SitesDataRow, &SitesDataRow::hash>;
+   PSIO_REFLECT_TYPENAME(SitesDataTable)
+
+   struct SitesDataRefRow
+   {
+      psibase::Checksum256 hash;
+      std::uint32_t        refs;
+   };
+   PSIO_REFLECT(SitesDataRefRow, hash, refs)
+
+   using SitesDataRefTable = psibase::Table<SitesDataRefRow, &SitesDataRefRow::hash>;
+   PSIO_REFLECT_TYPENAME(SitesDataRefTable)
 
    struct SiteConfigRow
    {
-      psibase::AccountNumber account;
-      bool                   spa   = false;
-      bool                   cache = true;
+      psibase::AccountNumber     account;
+      bool                       spa       = false;
+      bool                       cache     = true;
+      std::optional<std::string> globalCsp = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
-
-   struct GlobalCspRow
-   {
-      psibase::AccountNumber account;
-      std::string            csp;
-   };
-   PSIO_REFLECT(GlobalCspRow, account, csp)
-   using GlobalCspTable = psibase::Table<GlobalCspRow, &GlobalCspRow::account>;
+   PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
    /// Decompress content
    ///
@@ -80,7 +82,8 @@ namespace SystemService
    {
      public:
       static constexpr auto service = psibase::AccountNumber("sites");
-      using Tables = psibase::ServiceTables<SitesContentTable, SiteConfigTable, GlobalCspTable>;
+      using Tables                  = psibase::
+          ServiceTables<SitesContentTable, SiteConfigTable, SitesDataTable, SitesDataRefTable>;
 
       /// Serves a request by looking up the content uploaded to the specified subdomain
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
@@ -91,8 +94,14 @@ namespace SystemService
                     std::optional<std::string> contentEncoding,
                     std::vector<char>          content);
 
+      /// Adds a hard-link to a file. The file must already exist.
+      void hardlink(std::string                path,
+                    std::string                contentType,
+                    std::optional<std::string> contentEncoding,
+                    psibase::Checksum256       contentHash);
+
       /// Removes content from the caller's subdomain
-      void removeSys(std::string path);
+      void remove(std::string path);
 
       /// Checks whether a request for content on a site at the given path is valid (such a request will not produce a 404).
       ///
@@ -108,6 +117,9 @@ namespace SystemService
       /// If a specific CSP is set, it takes precedence over the global CSP.
       /// If no specific or global CSP is set, a default CSP is used.
       void setCsp(std::string path, std::string csp);
+
+      /// Deletes the Content Security Policy for the specified path (or "*" for the global CSP).
+      void deleteCsp(std::string path);
 
       /// Enables/disables HTTP caching of responses (Enabled by default)
       /// Cache strategy:
@@ -129,9 +141,13 @@ namespace SystemService
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, contentEncoding, content),
-                method(removeSys, path),
+                method(hardlink, path, contentType, contentEncoding, contentHash),
+                method(remove, path),
                 method(isValidPath, site, path),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
+                method(deleteCsp, path),
                 method(enableCache, enable))
+
+   PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService

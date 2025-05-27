@@ -68,7 +68,6 @@ namespace psibase
          codeObj->vmVersion = vmVersion;
          codeObj->code.assign(code.pos, code.end);
       }
-      ++codeObj->numRefs;
       database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
    }  // setCode
 
@@ -183,12 +182,8 @@ namespace psibase
                            const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
                            AccountNumber       service)
-          : NativeFunctions{transactionContext.blockContext.db,
-                            transactionContext,
-                            transactionContext.allowDbRead,
-                            transactionContext.allowDbWrite,
-                            transactionContext.allowDbReadSubjective,
-                            transactionContext.allowDbWriteSubjective},
+          : NativeFunctions{transactionContext.blockContext.db, transactionContext,
+                            transactionContext.dbMode},
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
@@ -323,6 +318,7 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
       rhf_t::add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
       rhf_t::add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
+      rhf_t::add<&ExecutionContextImpl::getRandom>("env", "getRandom");
       rhf_t::add<&ExecutionContextImpl::setMaxTransactionTime>("env", "setMaxTransactionTime");
       rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&ExecutionContextImpl::call>("env", "call");
@@ -359,7 +355,7 @@ namespace psibase
    {
       // Prevents a poison block
       if (callerFlags & CodeRow::isSubjective &&
-          !actionContext.transactionContext.allowDbReadSubjective)
+          !actionContext.transactionContext.dbMode.isSubjective)
       {
          check(impl->code.flags & CodeRow::isSubjective,
                "subjective services may not call non-subjective ones");
@@ -409,17 +405,6 @@ namespace psibase
 
       if ((impl->code.flags & CodeRow::isSubjective) && !(callerFlags & CodeRow::isSubjective))
          impl->transactionContext.subjectiveData.push_back(actionContext.actionTrace.rawRetval);
-   }
-
-   void ExecutionContext::execVerify(ActionContext& actionContext)
-   {
-      impl->exec(actionContext, [&] {  //
-         // auto startTime = std::chrono::steady_clock::now();
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "verify");
-         // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
-         //     std::chrono::steady_clock::now() - startTime);
-         // std::cout << "verify: " << us.count() << " us\n";
-      });
    }
 
    void ExecutionContext::execServe(ActionContext& actionContext)

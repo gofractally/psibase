@@ -13,12 +13,12 @@ A more in depth guide will be added later, but this is a rough outline of the st
 
 Psibase infrastructure nodes provide virtual hosting. 
 
-For example, for a local node being hosted at the default domain (`psibase.127.0.0.1.sslip.io`), domains fall into two categories:
+For example, for a local node being hosted at the default domain (`psibase.localhost`), domains fall into two categories:
 
-| Category       | Example                                 | Description                                                                     |
-| -------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
-| root domain    | `psibase.127.0.0.1.sslip.io`            | Hosts the main page for the network and provides service-independent endpoints. |
-| service domain | `my-service.psibase.127.0.0.1.sslip.io` | This hosts user interfaces and RPC endpoints for individual services.           |
+| Category       | Example                        | Description                                                                     |
+|----------------|--------------------------------|---------------------------------------------------------------------------------|
+| root domain    | `psibase.localhost`            | Hosts the main page for the network and provides service-independent endpoints. |
+| service domain | `my-service.psibase.localhost` | This hosts user interfaces and RPC endpoints for individual services.           |
 
 Many endpoints are available by default at these domains, and services may even define and handle their own endpoints at service domains. To learn more about standard endpoints and defining custom endpoints, see the [http requests reference docs](./reference/http-requests.md).
 

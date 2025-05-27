@@ -1,0 +1,56 @@
+package aes:plugin;
+
+interface with-password {
+    use host:common/types.{error};
+
+    /// Encrypts data using a password.
+    /// 
+    /// Arguments:
+    /// - password: The password to use for encryption
+    /// - data: The data to encrypt
+    /// - salt: The salt to use for encryption
+    /// 
+    /// Returns:
+    /// - The encrypted data
+    encrypt: func(password: list<u8>, data: list<u8>, salt: string) -> list<u8>;
+
+    /// Decrypts data using a password
+    /// 
+    /// Arguments:
+    /// - password: The password to use for decryption
+    /// - cipher: The encrypted data to decrypt
+    /// - salt: The salt to use for decryption
+    /// 
+    /// Returns:
+    /// - The decrypted data
+    decrypt: func(password: list<u8>, cipher: list<u8>, salt: string) -> result<list<u8>, error>;
+}
+
+interface with-key {
+    use host:common/types.{error};
+
+    /// Encrypts data using a key.
+    /// 
+    /// Arguments:
+    /// - key: The key to use for encryption
+    /// - data: The data to encrypt
+    /// 
+    /// Returns:
+    /// - The encrypted data
+    encrypt: func(key: list<u8>, data: list<u8>) -> list<u8>;
+
+    /// Decrypts data using a key.
+    /// 
+    /// Arguments:
+    /// - key: The key to use for decryption
+    /// - cipher: The encrypted data to decrypt
+    /// 
+    /// Returns:
+    /// - The decrypted data or an error if decryption fails
+    decrypt: func(key: list<u8>, cipher: list<u8>) -> result<list<u8>, error>;
+}
+
+world imports {
+    import with-password;
+    import with-key;
+}
