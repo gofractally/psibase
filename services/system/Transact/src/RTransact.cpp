@@ -184,15 +184,34 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    check(getSender() == AccountNumber{}, "Wrong sender");
    printf("trace size: %zu\n", find_view_span(trace).size());
 
-   auto currentBlock = to<Transact>().currentBlock();
-   auto blockTxs     = Subjective{}.open<BlockTxsTable>();
+   auto    clients = Subjective{}.open<TraceClientTable>();
+   uint8_t waitFor = WaitFor::final_flag;
    PSIBASE_SUBJECTIVE_TX
    {
-      blockTxs.put(BlockTxRecord{
-          .id       = id,
-          .blockNum = currentBlock.blockNum,
-          .trace    = trace.unpack(),
-      });
+      if (auto row = clients.get(id))
+      {
+         waitFor = row->waitFor;
+      }
+   }
+
+   if (waitFor == WaitFor::final_flag)
+   {
+      auto currentBlock = to<Transact>().currentBlock();
+      auto blockTxs     = Subjective{}.open<BlockTxsTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         blockTxs.put(BlockTxRecord{
+             .id       = id,
+             .blockNum = currentBlock.blockNum,
+             .trace    = trace.unpack(),
+         });
+      }
+      return;
+   }
+
+   if (waitFor == WaitFor::applied_flag)
+   {
+      sendReply(id, trace);
    }
 }
 
@@ -221,70 +240,80 @@ std::tuple<TraceClientRow, bool, bool> RTransact::claimClientReply(const Checksu
       }
    }
 
-   abortMessage("No client found for txid");
    return std::make_tuple(TraceClientRow{}, false, false);  // Unreachable
 }
 
-void RTransact::sendReplies(const std::vector<psibase::Checksum256>& txids)
+void RTransact::stopTracking(const std::vector<psibase::Checksum256>& txids)
 {
    auto pendingTxTable = Subjective{}.open<PendingTransactionTable>();
    auto dataTable      = Subjective{}.open<TransactionDataTable>();
-   auto blockTxsTable  = Subjective{}.open<BlockTxsTable>();
 
-   for (auto id : txids)
+   PSIBASE_SUBJECTIVE_TX
    {
-      PSIBASE_SUBJECTIVE_TX
+      for (auto id : txids)
       {
          pendingTxTable.erase(id);
          dataTable.erase(id);
       }
+   }
+}
 
-      auto [client, jsonClient, binClient] = claimClientReply(id);  // Clears from TraceClientTable
+void RTransact::sendReply(const psibase::Checksum256& id, psio::view<const TransactionTrace> trace)
+{
+   TransactionTraceRef pruned           = PruneTrace{true}(trace);
+   auto [client, jsonClient, binClient] = claimClientReply(id);  // Clears from TraceClientTable
 
-      TransactionTrace trace = [&]()
-      {
-         PSIBASE_SUBJECTIVE_TX
+   if (!jsonClient && !binClient)
+      return;
+
+   if (jsonClient)
+   {
+      JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json", .body{pruned}};
+      ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
+      auto                                action = http.sendReply(0, reply);
+
+      for (auto c : client.clients)
+         if (c.json)
          {
-            if (auto blockTx = blockTxsTable.get(id); blockTx.has_value())
-            {
-               blockTxsTable.erase(id);
-               return (*blockTx).trace;
-            }
+            psio::get<0>(action->rawData().value()) = c.socket;
+            call(action.data(), action.size());
          }
+   }
+   if (binClient)
+   {
+      FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
+                                                    .body{pruned}};
+      ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
+      auto                                    action = http.sendReply(0, reply);
 
-         return TransactionTrace{.error = "Transaction expired"};
-      }();
+      for (auto c : client.clients)
+         if (!c.json)
+         {
+            psio::get<0>(action->rawData().value()) = c.socket;
+            call(action.data(), action.size());
+         }
+   }
+}
+
+void RTransact::sendReplies(const std::vector<psibase::Checksum256>& txids)
+{
+   stopTracking(txids);
+   auto blockTxsTable = Subjective{}.open<BlockTxsTable>();
+
+   for (auto id : txids)
+   {
+      auto trace = TransactionTrace{.error = "Transaction expired"};
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto blockTx = blockTxsTable.get(id); blockTx.has_value())
+         {
+            blockTxsTable.erase(id);
+            trace = (*blockTx).trace;
+         }
+      }
       auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{psio::to_frac(trace)}};
-      TransactionTraceRef pruned = PruneTrace{true}(traceView);
 
-      if (jsonClient)
-      {
-         JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json",
-                                                   .body{pruned}};
-         ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
-         auto                                action = http.sendReply(0, reply);
-
-         for (auto c : client.clients)
-            if (c.json)
-            {
-               psio::get<0>(action->rawData().value()) = c.socket;
-               call(action.data(), action.size());
-            }
-      }
-      if (binClient)
-      {
-         FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
-                                                       .body{pruned}};
-         ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
-         auto                                    action = http.sendReply(0, reply);
-
-         for (auto c : client.clients)
-            if (!c.json)
-            {
-               psio::get<0>(action->rawData().value()) = c.socket;
-               call(action.data(), action.size());
-            }
-      }
+      sendReply(id, traceView);
    }
 
 #ifdef __wasm32__
@@ -705,17 +734,20 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
 {
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
-   if (request.method == "POST" && request.target == "/push_transaction")
+   auto target = request.path();
+   if (request.method == "POST" && target == "/push_transaction")
    {
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
-      auto trx  = psio::from_frac<SignedTransaction>(request.body);
-      auto id   = psibase::sha256(trx.transaction.data(), trx.transaction.size());
-      bool json = acceptJson(request.headers);
+
+      auto query = request.query<WaitFor>();
+      auto trx   = psio::from_frac<SignedTransaction>(request.body);
+      auto id    = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      bool json  = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {
          auto clients = Subjective{}.open<TraceClientTable>();
-         auto row     = clients.get(id).value_or(TraceClientRow{.id = id});
+         auto row     = clients.get(id).value_or(TraceClientRow{.id = id, .waitFor = query.flag()});
          row.clients.push_back({*socket, json});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
@@ -723,7 +755,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       if (pushTransaction(id, trx))
          forwardTransaction(trx);
    }
-   else if (request.method == "POST" && request.target == "/login")
+   else if (request.method == "POST" && target == "/login")
    {
       auto trx = parseBody<SignedTransaction>(request);
       check(trx.transaction->actions().size() == 1 &&

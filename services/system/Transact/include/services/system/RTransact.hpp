@@ -84,9 +84,10 @@ namespace SystemService
    struct TraceClientRow
    {
       psibase::Checksum256         id;
+      uint8_t                      waitFor;
       std::vector<TraceClientInfo> clients;
    };
-   PSIO_REFLECT(TraceClientRow, id, clients)
+   PSIO_REFLECT(TraceClientRow, id, waitFor, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
    PSIO_REFLECT_TYPENAME(TraceClientTable)
@@ -123,6 +124,27 @@ namespace SystemService
        psibase::Table<BlockTxRecord, &BlockTxRecord::id, BlockTxRecord::ByBlockNum{}>;
    PSIO_REFLECT_TYPENAME(BlockTxsTable)
 
+   struct WaitFor
+   {
+      std::string wait_for;
+
+      static constexpr uint8_t final_flag   = 1;
+      static constexpr uint8_t applied_flag = 2;
+
+      uint8_t flag() const
+      {
+         if (wait_for == "final")
+            return final_flag;
+         else if (wait_for == "applied")
+            return applied_flag;
+         else if (wait_for.empty())
+            return final_flag;
+         else
+            psibase::abortMessage("Invalid wait_for parameter");
+      }
+   };
+   PSIO_REFLECT(WaitFor, wait_for)
+
    class RTransact : psibase::Service
    {
      public:
@@ -152,7 +174,10 @@ namespace SystemService
       std::pair<std::vector<psibase::BlockNum>, psibase::BlockTime> finalizeBlocks(
           const psibase::BlockHeader& current);
 
+      void stopTracking(const std::vector<psibase::Checksum256>& txids);
       void sendReplies(const std::vector<psibase::Checksum256>& txids);
+      void sendReply(const psibase::Checksum256&                 id,
+                     psio::view<const psibase::TransactionTrace> trace);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
