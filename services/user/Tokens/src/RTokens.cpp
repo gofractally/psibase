@@ -136,14 +136,14 @@ struct TokenQuery
       auto balanceIdx   = tokenService.open<BalanceTable>().getIndex<0>().subindex(
           SplitKey<TID, AccountNumber>{user});
 
-      return TransformedConnection{
-          balanceIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](UserService::BalanceRecord&& balance)
-          {
-             auto tokenOpt = tokenTypeIdx.get(balance.key.tokenId);
-             check(tokenOpt.has_value(), "Invalid token type");
-             return TokenBalance{tokenOpt->symbolId, balance.key.tokenId, tokenOpt->precision,
-                                 balance.balance};
-          }};
+      return TransformedConnection{balanceIdx,
+                                   [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& balance)
+                                   {
+                                      auto tokenOpt = tokenTypeIdx.get(balance.key.tokenId);
+                                      check(tokenOpt.has_value(), "Invalid token type");
+                                      return TokenBalance{tokenOpt->symbolId, balance.key.tokenId,
+                                                          tokenOpt->precision, balance.balance};
+                                   }};
    }
 
    auto userCredits(AccountNumber user) const
@@ -153,7 +153,7 @@ struct TokenQuery
           SplitKey<BalanceKey, AccountNumber>{user});
 
       return TransformedConnection{
-          creditIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](SharedBalanceRecord&& credit)
+          creditIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& credit)
           {
              auto tokenOpt = tokenTypeIdx.get(credit.key.tokenId);
              check(tokenOpt.has_value(), "Invalid token type");
@@ -168,14 +168,14 @@ struct TokenQuery
       auto debitIdx     = tokenService.open<SharedBalanceTable>().getIndex<1>().subindex(
           SplitKey<BalanceKey, AccountNumber>{user});
 
-      return TransformedConnection{
-          debitIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](SharedBalanceRecord&& debit)
-          {
-             auto tokenOpt = tokenTypeIdx.get(debit.key.tokenId);
-             check(tokenOpt.has_value(), "Invalid token type");
-             return Debit{tokenOpt->symbolId, debit.key.tokenId, tokenOpt->precision, debit.balance,
-                          debit.key.creditor};
-          }};
+      return TransformedConnection{debitIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& debit)
+                                   {
+                                      auto tokenOpt = tokenTypeIdx.get(debit.key.tokenId);
+                                      check(tokenOpt.has_value(), "Invalid token type");
+                                      return Debit{tokenOpt->symbolId, debit.key.tokenId,
+                                                   tokenOpt->precision, debit.balance,
+                                                   debit.key.creditor};
+                                   }};
    }
 
    auto userTokens(AccountNumber         user,
