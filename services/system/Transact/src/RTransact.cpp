@@ -434,7 +434,7 @@ namespace
                       .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
                           std::chrono::system_clock::now()),
                       .sequence = sequence});
-         Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
+         Subjective{}.open<TransactionDataTable>().put({.id = id, .trx = std::move(trx)});
 
          // Tell native that we have a transaction
          {
@@ -452,8 +452,12 @@ namespace
             else
             {
                kvPut(DbId::nativeSubjective, key,
-                     NotifyRow{NotifyType::nextTransaction,
-                               {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
+                     NotifyRow{.type    = NotifyType::nextTransaction,
+                               .actions = {
+                                   {//
+                                    .service = RTransact::service,
+                                    .method  = "next"_m}  //
+                               }});
             }
          }
       }
