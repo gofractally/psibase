@@ -434,7 +434,7 @@ namespace
                       .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
                           std::chrono::system_clock::now()),
                       .sequence = sequence});
-         Subjective{}.open<TransactionDataTable>().put({.id = id, .trx = std::move(trx)});
+         Subjective{}.open<TransactionDataTable>().put({.id = id, .trx = trx});
 
          // Tell native that we have a transaction
          {
