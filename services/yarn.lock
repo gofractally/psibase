@@ -2071,7 +2071,6 @@ __metadata:
     debounce: "npm:^2.1.0"
     eslint: "npm:^9.9.0"
     eslint-plugin-react-hooks: "npm:^5.1.0-rc.0"
-    eslint-plugin-react-refresh: "npm:^0.4.9"
     framer-motion: "npm:^11.3.29"
     globals: "npm:^15.9.0"
     humanize-duration: "npm:^3.32.2"
