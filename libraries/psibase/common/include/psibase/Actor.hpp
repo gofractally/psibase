@@ -96,8 +96,9 @@ namespace psibase
          TypedAction<Args> action{sender, receiver, method, {Args(args...)}};
          psio::size_stream ss;
          psio::to_frac(action, ss);
-         psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(psio::size_tag{ss.size});
-         psio::fast_buf_stream                                stream(result.data(), result.size());
+         psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(
+             psio::size_tag{static_cast<uint32_t>(ss.size)});
+         psio::fast_buf_stream stream(result.data(), result.size());
          psio::to_frac(action, stream);
          return result;
       }
