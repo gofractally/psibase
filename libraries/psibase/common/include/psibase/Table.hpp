@@ -5,7 +5,6 @@
 #include <compare>
 #include <concepts>
 #include <cstdint>
-#include <functional>
 #include <psibase/RawNativeFunctions.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
@@ -261,10 +260,9 @@ namespace psibase
       ///
       /// This returns a view of the object in the database. It does not cache; it returns a view of the
       /// fresh object each time it's used.
-      psio::view<T> view() const
+      psio::shared_view_ptr<T> view() const
       {
-         auto buffer = *base;
-         return psio::view<T>{psio::prevalidated{buffer.data()}};
+         return psio::shared_view_ptr<T>{psio::prevalidated{(*base).data()}};
       }
 
       /// Comparisons
