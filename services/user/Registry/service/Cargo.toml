@@ -16,7 +16,7 @@ Sites = "0.16.0"
 [dependencies]
 psibase = { path = "../../../../rust/psibase", version = "0.16.0" }
 serde = { version = "1", features = ["derive"] }
-async-graphql = "7.0.7"
+async-graphql = "=7.0.17"
 serde_json = "1.0.120"
 url = "2.5.2"
 
