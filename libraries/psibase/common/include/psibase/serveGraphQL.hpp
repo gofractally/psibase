@@ -3,6 +3,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+#include <psibase/Actor.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
