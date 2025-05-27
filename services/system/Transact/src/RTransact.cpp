@@ -302,20 +302,32 @@ void RTransact::sendReplies(const std::vector<psibase::Checksum256>& txids)
 
    for (auto id : txids)
    {
-      auto trace = TransactionTrace{.error = "Transaction expired"};
+      std::optional<std::vector<char>> serialized_trace_buffer;
+
       PSIBASE_SUBJECTIVE_TX
       {
          if (auto blockTx = blockTxsTable.get(id); blockTx.has_value())
          {
+            serialized_trace_buffer = psio::to_frac(blockTx->trace);
             blockTxsTable.erase(id);
-            trace = (*blockTx).trace;
          }
       }
-      auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{psio::to_frac(trace)}};
 
-      sendReply(id, traceView);
+      if (serialized_trace_buffer)
+      {
+         auto traceView =
+             psio::view<const TransactionTrace>{psio::prevalidated{*serialized_trace_buffer}};
+         sendReply(id, traceView);
+      }
+      else
+      {
+         std::vector<char> error_frac_buffer =
+             psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+         auto error_trace_view =
+             psio::view<const TransactionTrace>{psio::prevalidated{error_frac_buffer}};
+         sendReply(id, error_trace_view);
+      }
    }
-
 #ifdef __wasm32__
    printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
 #endif
