@@ -2,6 +2,8 @@
 
 #include <services/system/SetCode.hpp>
 #include <services/system/VerifySig.hpp>
+#include "AbortService.hpp"
+#include "RemoveCode.hpp"
 
 using namespace psibase;
 using namespace SystemService;
@@ -50,37 +52,124 @@ namespace
 TEST_CASE("Verify service tracking")
 {
    DefaultTestChain t;
+   t.addService(RemoveCode::service, "RemoveCode.wasm");
+   REQUIRE(t.from(SetCode::service)
+               .to<SetCode>()
+               .setFlags(RemoveCode::service, RemoveCode::serviceFlags)
+               .succeeded());
+   t.addService(AbortService::service, "AbortService.wasm");
+
+   auto removeCode = [&](AccountNumber account)
+   {
+      auto                   row = t.kvGet<CodeRow>(CodeRow::db, codeKey(account)).value();
+      transactor<RemoveCode> removeCode{RemoveCode::service, RemoveCode::service};
+      return removeCode.removeCode(row.codeHash, row.vmType, row.vmVersion);
+   };
+   auto setCodeRow = [&](CodeRow row)
+   {
+      transactor<RemoveCode> removeCode{RemoveCode::service, RemoveCode::service};
+      return removeCode.setCodeRow(row);
+   };
+
+   auto setCode = [&](AccountNumber account, const char* filename = nullptr)
+   {
+      transactor<SetCode> setCode{account, SetCode::service};
+      auto                code = filename ? readWholeFile(filename) : std::vector<char>{};
+      return setCode.setCode(account, 0, 0, code);
+   };
+   auto setFlags = [&](AccountNumber account, std::uint64_t flags)
+   {
+      transactor<SetCode> setCode{SetCode::service, SetCode::service};
+      return setCode.setFlags(account, flags);
+   };
+   auto passOrFail = [&](std::vector<Action> actions)
+   {
+      SECTION("succeed")
+      {
+         expect(t.pushTransaction(t.makeTransaction(std::move(actions))));
+      }
+      SECTION("fail")
+      {
+         transactor<AbortService> abort{AbortService::service, AbortService::service};
+         std::string              message{"abort after setting flags"};
+         actions.push_back(abort.abort(message));
+         expect(t.pushTransaction(t.makeTransaction(std::move(actions))), message);
+      }
+   };
+
+   constexpr auto verify2 = AccountNumber{"verify2"};
+
+   t.setAutoBlockStart(false);
+   t.startBlock();
 
    SECTION("Add new service")
    {
-      auto verify2 = t.addService("verify2", "VerifySig.wasm");
+      t.addAccount(verify2);
+      passOrFail({setCode(verify2, "VerifySig.wasm"), setFlags(verify2, VerifySig::serviceFlags)});
+   }
+   SECTION("Add new service after flag")
+   {
+      t.addAccount(verify2);
+      REQUIRE(t.from(SetCode::service)
+                  .to<SetCode>()
+                  .setFlags(verify2, VerifySig::serviceFlags)
+                  .succeeded());
+      t.startBlock();
+      passOrFail({setCode(verify2, "VerifySig.wasm")});
+   }
+   SECTION("Set flag without service")
+   {
+      t.addAccount(verify2);
       REQUIRE(t.from(SetCode::service)
                   .to<SetCode>()
                   .setFlags(verify2, VerifySig::serviceFlags)
                   .succeeded());
    }
+   SECTION("Set flag for service")
+   {
+      passOrFail({setFlags(RemoveCode::service, CodeRow::isAuthService)});
+   }
    SECTION("Unset flag for service")
    {
-      REQUIRE(t.from(SetCode::service).to<SetCode>().setFlags(VerifySig::service, 0).succeeded());
+      passOrFail({setFlags(VerifySig::service, 0)});
    }
    SECTION("Remove service")
    {
-      REQUIRE(t.from(VerifySig::service)
-                  .to<SetCode>()
-                  .setCode(VerifySig::service, 0, 0, std::vector<char>())
-                  .succeeded());
+      passOrFail({setCode(VerifySig::service, nullptr)});
+   }
+   SECTION("Remove code")
+   {
+      passOrFail({removeCode(VerifySig::service)});
+   }
+   SECTION("Add without code")
+   {
+      passOrFail({setCodeRow({verify2, VerifySig::serviceFlags, sha256("", 0), 0, 0})});
+   }
+   SECTION("Add and...")
+   {
+      t.addService(verify2, "VerifySig.wasm", VerifySig::serviceFlags);
+      SECTION("remove")
+      {
+         passOrFail({setCode(verify2, nullptr)});
+      }
+      SECTION("unset flag")
+      {
+         passOrFail({setFlags(verify2, 0)});
+      }
+      SECTION("remove code")
+      {
+         passOrFail({removeCode(verify2)});
+      }
+   }
+   SECTION("Remove and...")
+   {
+      expect(t.pushTransaction(t.makeTransaction({setCode(VerifySig::service, nullptr)})));
+      SECTION("add")
+      {
+         passOrFail({setCode(VerifySig::service, "VerifySig.wasm")});
+      }
    }
 
    t.finishBlock();
    CHECK(getReported(t) == getActual(t));
-
-   // add new verify service
-   // remove existing verify service
-   // set flags for verify service
-   // remove verify service flags
-   // add without code
-   // remove code
-   // add and remove
-   // remove and add
-   // failed transactions
 }

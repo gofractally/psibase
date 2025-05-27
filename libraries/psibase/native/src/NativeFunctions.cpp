@@ -199,7 +199,7 @@ namespace psibase
          bool isAuth = code.flags() & CodeRow::isAuthService;
          if (oldIsAuth || isAuth)
          {
-            ctx.blockContext.modifiedAuthAccounts[code.codeNum()] = isAuth;
+            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), 1);
          auto expected_key = psio::convert_to_key(codeKey(code.codeNum()));
@@ -215,7 +215,7 @@ namespace psibase
          auto code = psio::view<const CodeRow>(psio::prevalidated{value});
          if (code.flags() & CodeRow::isAuthService)
          {
-            ctx.blockContext.modifiedAuthAccounts[code.codeNum()] = false;
+            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), -1);
       }
@@ -233,6 +233,15 @@ namespace psibase
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeByHashRow has incorrect key");
+      }
+
+      void verifyRemoveCodeByHashRow(TransactionContext& ctx,
+                                     psio::input_stream  key,
+                                     psio::input_stream  value)
+      {
+         auto code = psio::view<const CodeByHashRow>(psio::prevalidated{value});
+         ctx.blockContext.removedCode.insert(
+             codeByHashKey(code.codeHash(), code.vmType(), code.vmVersion()));
       }
 
       void verifyConfigRow(psio::input_stream key, psio::input_stream value)
@@ -347,6 +356,8 @@ namespace psibase
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == codeTable)
             verifyRemoveCodeRow(context, key, value);
+         else if (table == codeByHashTable)
+            verifyRemoveCodeByHashRow(context, key, value);
       }
 
       uint32_t clearResult(NativeFunctions& self)

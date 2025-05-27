@@ -18,6 +18,8 @@ function(add suffix)
     service(memo-service "${suffix}" memo-service.cpp)
     service(clock-service "${suffix}" clock-service.cpp)
     service(subjective-service "${suffix}" subjective-service.cpp)
+    service(RemoveCode "${suffix}" RemoveCode.cpp)
+    service(AbortService "${suffix}" AbortService.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" MockCpuLimit.cpp)
