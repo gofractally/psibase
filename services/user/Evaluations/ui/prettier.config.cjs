@@ -1,4 +1,4 @@
 module.exports = {
   tabWidth: 4,
-  plugins: ["prettier-plugin-tailwindcss"],
+  plugins: [require.resolve("prettier-plugin-tailwindcss")],
 }
