@@ -81,9 +81,17 @@ mod service {
         async fn evaluation_finishes(
             &self,
             fractal: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
             EventQuery::new("history.fractals.evaluation_finished")
                 .condition(format!("fractal_account = '{}'", fractal))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
                 .query()
         }
 
