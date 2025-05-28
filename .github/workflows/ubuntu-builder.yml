@@ -2,18 +2,23 @@ name: Ubuntu builds
 
 on:
   workflow_call:
+    secrets:
+      publish-package-login:
+        required: false
 
 jobs:
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
     runs-on: ubuntu-latest
+    env:
+      can-publish: ${{ !! secrets.publish-package-login }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:39474caca7611dd4cb884ea952e4a36ec3deac53"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:9fa50bbacdb05058a0a068964054041a5e8f4eb7"
             ubuntu-version: "2204"
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:39474caca7611dd4cb884ea952e4a36ec3deac53"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:9fa50bbacdb05058a0a068964054041a5e8f4eb7"
             ubuntu-version: "2404"
     steps:
       - name: Timestamp
@@ -33,6 +38,11 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
+      - name: Publish packages
+        if: fromJSON(env.can-publish) && matrix.ubuntu-version == '2404'
+        env:
+          PUBLISH_LOGIN: ${{ secrets.publish-package-login }}
+        run: bash ${GITHUB_WORKSPACE}/.github/scripts/publish.sh
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v4
         with:
