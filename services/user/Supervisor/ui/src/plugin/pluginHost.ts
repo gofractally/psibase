@@ -228,7 +228,7 @@ export class PluginHost implements HostInterface {
         return `${siblingUrl(null, app)}`;
     }
     
-    private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
+    private setActiveUserPrompt(subpath: string | undefined, upAuthoritativePayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
         let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
         
         // In Supervisor localStorage space, store id, subdomain, and subpath
@@ -259,9 +259,9 @@ export class PluginHost implements HostInterface {
         }
 
         // In app localStorage space, save id and payload
-        const parsedUpPayload = JSON.parse(upPayloadJsonStr);
-        parsedUpPayload.id = up_id;
-        parsedUpPayload.user = currentUser;
+        const authoritativeUpPayload = JSON.parse(upAuthoritativePayloadJsonStr);
+        authoritativeUpPayload.id = up_id;
+        authoritativeUpPayload.user = currentUser;
 
         this.supervisor.call(this.self, {
             service: "clientdata",
@@ -270,19 +270,19 @@ export class PluginHost implements HostInterface {
             method: "set",
             params: [
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(parsedUpPayload))]} as QualifiedFunctionCallArgs);
+            JSON.stringify(authoritativeUpPayload))]} as QualifiedFunctionCallArgs);
         return up_id
     }
 
     
     // Client interface
-    promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
+    promptUser(subpath: string | undefined, authoritativePayloadJsonStr: string | undefined): Result<void, PluginError> {
         if (!!subpath && subpath?.length > 0 && subpath.includes("?")) {
             console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");
             subpath = subpath.substring(0, subpath.indexOf("?"));
         }
 
-        const aup_id = this.setActiveUserPrompt(subpath, payloadJsonStr || JSON.stringify({}));
+        const aup_id = this.setActiveUserPrompt(subpath, authoritativePayloadJsonStr || JSON.stringify({}));
 
         if (typeof aup_id === "string") {
             const oauthUrl = siblingUrl(null, "supervisor", "/oauth.html", true);

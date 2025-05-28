@@ -16,12 +16,11 @@ pub fn verify_auth_method(method: &str) -> Result<(), Error> {
 
     if !res.is_some() {
         // if access not granted, redirect calling app to this app's /permissions endpoint
-        let payload = r#"{"caller":"{caller}","callee":"{callee}","user":"{user}","method":"setExampleThing","prompt":"{appname} is requesting full access to setExampleThing method."}"#
+        let authoritative_payload = r#"{"caller":"{caller}","callee":"{appname}","user":"{user}","method":"{method}","prompt":"{appname} is requesting access to {method}."}"#
             .replace("{caller}", &caller)
-            .replace("{callee}", &callee)
-            .replace("{user}", &user)
+            .replace("{method}", "setExampleThing")
             .replace("{appname}", "{{project-name}}");
-        prompt_user(Some("permissions.html"), Some(&payload))
+        prompt_user(Some("permissions.html"), Some(&authoritative_payload))
     } else {
         Ok(())
     }
