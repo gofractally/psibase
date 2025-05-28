@@ -23,12 +23,12 @@ use std::collections::HashMap;
 /// ```rust
 /// let group_result = vec![4, 3, 1, 6, 5];
 /// let group_members = vec![
-///     AccountNumber::new(1), // Alice
-///     AccountNumber::new(2), // Bob
-///     AccountNumber::new(3), // Charlie
-///     AccountNumber::new(4), // David
-///     AccountNumber::new(5), // Edward
-///     AccountNumber::new(6), // Fred
+///     "Alice"
+///     "Bob"
+///     "Charlie"
+///     "David"
+///     "Edward"
+///     "Fred"
 /// ];
 /// let result = parse_rank_to_accounts(group_result, group_members);
 /// // Result: [David, Charlie, Alice, Fred, Edward]
