@@ -23,7 +23,6 @@ export const App = () => {
     let permReqPayload;
     try {
       permReqPayload = await ActivePermsOauthRequest.get();
-      console.log("initApp::permReqPayload", permReqPayload);
     } catch (e) {
       setError("Permissions request error: " + e);
       setIsLoading(false);
@@ -59,18 +58,13 @@ export const App = () => {
       );
     }
   };
-  const approve = async () => {
+  const accept = async () => {
     try {
-      console.log("approve::validPermRequest", validPermRequest);
       await supervisor.functionCall({
         service: thisServiceName,
         intf: "admin",
         method: "savePerm",
-        params: [
-          validPermRequest?.user,
-          validPermRequest?.caller,
-          validPermRequest?.method,
-        ],
+        params: [validPermRequest?.caller, validPermRequest?.method],
       });
       await ActivePermsOauthRequest.delete();
     } catch (e) {
@@ -89,11 +83,7 @@ export const App = () => {
         service: thisServiceName,
         intf: "admin",
         method: "delPerm",
-        params: [
-          validPermRequest?.user,
-          validPermRequest?.caller,
-          validPermRequest?.callee,
-        ],
+        params: [validPermRequest?.caller, validPermRequest?.callee],
       });
       await ActivePermsOauthRequest.delete();
     } catch (e) {
@@ -123,7 +113,7 @@ export const App = () => {
       <Nav title="Grant access?" />
       <p>{validPermRequest.prompt}</p>
       {!!error && <div>ERROR: {error}</div>}
-      <Button onClick={approve}>Accept</Button>
+      <Button onClick={accept}>Accept</Button>
       <Button onClick={deny}>Deny</Button>
     </div>
   );

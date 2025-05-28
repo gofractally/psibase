@@ -9,7 +9,7 @@ pub fn verify_auth_method(method: &str) -> Result<(), Error> {
     let callee = client::my_service_account();
 
     let Some(user) = get_current_user().map_err(|e| Error::from(e))? else {
-        return Err(Error::from(ErrorType::UserDNEError()));
+        return Err(Error::from(ErrorType::UserDNE()));
     };
 
     let res = Keyvalue::get(&format!("{user}-{caller}->{method}"));

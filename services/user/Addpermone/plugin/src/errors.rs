@@ -3,5 +3,5 @@ use psibase::plugin_error;
 plugin_error! {
     pub ErrorType
     QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
-    UserDNEError() => "No logged-in user",
+    UserDNE() => "No logged-in user",
 }

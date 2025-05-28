@@ -67,8 +67,8 @@ impl Queries for AddpermonePlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val =
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        let examplething_val = examplething_val
+            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
     }

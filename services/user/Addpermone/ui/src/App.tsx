@@ -9,6 +9,7 @@ import { Nav } from "@components/nav";
 import { useCreateConnectionToken } from "@hooks";
 
 import { getSupervisor, isRedirectErrorObject } from "@psibase/common-lib";
+
 const supervisor = getSupervisor();
 
 export const App = () => {
@@ -54,8 +55,8 @@ export const App = () => {
         } catch (e) {
             if (isRedirectErrorObject(e)) {
                 console.log("isRedirect; redirecting to", e.message);
-                 window.location.href = e.message;
-                 return;
+                window.location.href = e.message;
+                return;
             } else if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);
                 setUploadStatus(`Error: ${e.message}`);
