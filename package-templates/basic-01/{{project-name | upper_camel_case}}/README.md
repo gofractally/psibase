@@ -30,3 +30,7 @@ To run the app,
 
 The UI is served at the `{{ project-name }}` subdomain of your local psinode network.
 A graphiql interface is also served at the `/graphiql` endpoint.
+
+## Permissions management example
+
+Apps can implement privileged methods, e.g., require an authed user. `setExampleThing()` demonstrates a mechanism for apps to call it (a privileged method) and--with minimal additional implementation--allow the user to approve access from a particular calling app. Permissions obviously can be handled many different ways; here we only demonstrate one method-specific permission. `prompt_user()` is a way to query a user to grant a permission (something like some oauth flows) with an authoritative source of critical permission parameters, e.g., logged-in user, caller, callee, etc.
