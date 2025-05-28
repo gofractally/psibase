@@ -25,7 +25,7 @@ export const useWatchStart = (status: EvaluationStatus | undefined) => {
                     fractal!.fractal!.account,
                     fractal!.evaluations.find(
                         (evaluation) =>
-                            evaluation.evalType == EvalType.Repuation,
+                            evaluation.evalType == EvalType.Reputation,
                     )!.evaluationId,
                     status.groupNumber!,
                 ),

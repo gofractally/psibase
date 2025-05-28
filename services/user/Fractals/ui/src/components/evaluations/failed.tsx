@@ -11,7 +11,7 @@ export const Failed = () => {
 
     const fractal = useCurrentFractal();
 
-    const { evaluation } = useEvaluationInstance(EvalType.Repuation);
+    const { evaluation } = useEvaluationInstance(EvalType.Reputation);
 
     const { hasPassed, label } = useFormatRelative(evaluation?.finishBy);
 
@@ -32,7 +32,7 @@ export const Failed = () => {
                         <Button
                             onClick={() => {
                                 closeEvaluation({
-                                    evalType: EvalType.Repuation,
+                                    evalType: EvalType.Reputation,
                                     fractal: fractal!,
                                 });
                             }}

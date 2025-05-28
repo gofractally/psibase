@@ -27,6 +27,7 @@ const QueryKey = {
         ["membership", fractal, user] as const,
     evaluation: (evaluationId: OptionalNumber) =>
         ["evaluation", evaluationId] as const,
+    completedEvaluations: () => ["completedEvaluations"] as const,
     usersAndGroups: (evaluationId: OptionalNumber) =>
         ["usersAndGroups", evaluationId] as const,
     groupUsers: (evaluationId: OptionalNumber, groupNumber: OptionalNumber) =>

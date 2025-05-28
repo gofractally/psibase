@@ -10,7 +10,7 @@ import { useCurrentUser } from "./use-current-user";
 
 export const useEvaluationStatus = (
     now: number,
-    type: EvalType = EvalType.Repuation,
+    type: EvalType = EvalType.Reputation,
 ): EvaluationStatus | undefined => {
     const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
 
@@ -53,14 +53,14 @@ export const useEvaluationStatus = (
         now,
     );
 
-    console.log("expected data", {
-        evaluation,
-        currentUser,
-        currentStatus,
-        usersAndGroups,
-        currentUserCanActOnBehalfOfFractal,
-        pingUsersAndGroups,
-    });
+    // console.log("expected data", {
+    //     evaluation,
+    //     currentUser,
+    //     currentStatus,
+    //     usersAndGroups,
+    //     currentUserCanActOnBehalfOfFractal,
+    //     pingUsersAndGroups,
+    // });
 
     const pingOnStatuses: EvaluationStatus["type"][] = [
         "waitingStart",

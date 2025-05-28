@@ -54,7 +54,7 @@ export const Proposed = () => {
                 const finishBy = submission + submissionSeconds;
 
                 await setSchedule({
-                    evalType: zEvalType.enum.Repuation,
+                    evalType: zEvalType.enum.Reputation,
                     registration,
                     deliberation,
                     submission,
@@ -76,7 +76,7 @@ export const Proposed = () => {
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
-            <div className="flex justify-between">
+            <div className="flex h-9 items-center justify-between">
                 <h1 className="text-lg font-semibold">Proposed</h1>
                 <Dialog
                     onOpenChange={(e) => {

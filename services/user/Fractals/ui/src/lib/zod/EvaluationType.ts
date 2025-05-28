@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export enum EvalType {
-    Repuation = 1,
+    Reputation = 1,
     Favor = 2,
 }
 
