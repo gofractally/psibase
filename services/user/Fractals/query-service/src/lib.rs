@@ -67,11 +67,14 @@ mod service {
             }
 
             let raw = GroupFinishRaw::deserialize(deserializer)?;
+            let mut users_result = raw.users.clone();
+            fractals::helpers::parse_rank_to_accounts(raw.result, &mut users_result);
+
             Ok(GroupFinish {
                 evaluation_id: raw.evaluation_id,
                 group_number: raw.group_number,
-                users: raw.users.clone(),
-                result: fractals::helpers::parse_rank_to_accounts(raw.result, raw.users),
+                users: raw.users,
+                result: users_result,
             })
         }
     }

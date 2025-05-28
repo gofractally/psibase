@@ -49,18 +49,17 @@ impl Api for FractallyPlugin {
         match get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
             None => Ok(None),
             Some(rank_numbers) => {
-                let users: Vec<AccountNumber> =
+                let mut users: Vec<AccountNumber> =
                     get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
                         .iter()
                         .map(|account| AccountNumber::from_str(account).unwrap())
                         .collect();
 
-                let res: Vec<String> = helpers::parse_rank_to_accounts(rank_numbers, users)
-                    .into_iter()
-                    .map(|user| user.to_string())
-                    .collect();
+                helpers::parse_rank_to_accounts(rank_numbers, &mut users);
 
-                Ok(Some(res))
+                Ok(Some(
+                    users.into_iter().map(|user| user.to_string()).collect(),
+                ))
             }
         }
     }

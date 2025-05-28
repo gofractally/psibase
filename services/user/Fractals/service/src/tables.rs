@@ -424,7 +424,6 @@ pub mod tables {
                 submission,
                 finish_by,
             );
-
         }
 
         pub fn schedule_next_evaluation(&mut self) {
@@ -496,13 +495,14 @@ pub mod tables {
 
         pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
             let group_members = self.users(Some(group_number)).unwrap();
+            let mut group_users: Vec<AccountNumber> = group_members
+                .into_iter()
+                .map(|member| member.user)
+                .collect();
 
-            let fractal_group_result = parse_rank_to_accounts(
-                vanilla_group_result,
-                group_members.into_iter().map(|user| user.user).collect(),
-            );
+            parse_rank_to_accounts(vanilla_group_result, &mut group_users);
 
-            for (index, account) in fractal_group_result.into_iter().enumerate() {
+            for (index, account) in group_users.into_iter().enumerate() {
                 let level = (6 as usize) - index;
                 Score::get(self.fractal, self.eval_type.into(), account)
                     .set_pending_score(level as f32);
