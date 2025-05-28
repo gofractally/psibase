@@ -11,4 +11,9 @@ void RemoveCode::removeCode(psibase::Checksum256 codeHash,
    kvRemove(CodeByHashRow::db, codeByHashKey(codeHash, vmType, vmVersion));
 }
 
+void RemoveCode::setCodeRow(psibase::CodeRow row)
+{
+   kvPut(CodeRow::db, row.key(), row);
+}
+
 PSIBASE_DISPATCH(RemoveCode)

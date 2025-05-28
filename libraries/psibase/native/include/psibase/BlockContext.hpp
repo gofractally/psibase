@@ -21,8 +21,10 @@ namespace psibase
       bool              needGenesisAction = false;
       bool              started           = false;
       bool              active            = false;
-      //
-      std::map<AccountNumber, bool> modifiedAuthAccounts;
+      // Both of these are supersets of the actual values,
+      // as they are not reverted when a transaction fails.
+      std::set<AccountNumber>     modifiedAuthAccounts;
+      std::set<CodeByHashKeyType> removedCode;
 
       loggers::common_logger trxLogger;
 
@@ -72,9 +74,8 @@ namespace psibase
 
       // The action has the same database access rules as queries
       void execAsyncAction(Action&& action);
-      auto execAsyncExport(std::string_view  fn,
-                           Action&&          action,
-                           TransactionTrace& trace) -> ActionTrace&;
+      auto execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+          -> ActionTrace&;
 
       void execAllInBlock();
 

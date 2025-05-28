@@ -119,7 +119,7 @@ namespace psibase
             db.kvPut(CodeRow::db, account.key(), account);
             if (service.flags & CodeRow::isAuthService)
             {
-               self.blockContext.modifiedAuthAccounts.insert({service.service, true});
+               self.blockContext.modifiedAuthAccounts.insert(service.service);
             }
             setCode(db, service.service, service.vmType, service.vmVersion,
                     {service.code.data(), service.code.size()});

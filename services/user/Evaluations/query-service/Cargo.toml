@@ -11,5 +11,5 @@ psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
 serde = "1.0"
 serde_json = "1.0"
 evaluations = { path = "../service", version = "0.16.0" }
-async-graphql = { version = "7.0.10" }
+async-graphql = "=7.0.17"
 serde-aux = "4.7.0"
