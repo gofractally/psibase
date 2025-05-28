@@ -2,6 +2,7 @@ use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::host::common::client::{self, prompt_user};
 use crate::bindings::host::common::types::Error;
+use crate::errors::ErrorType;
 
 pub fn verify_auth_method(method: &str) -> Result<(), Error> {
     let caller = client::get_sender_app().app.unwrap();
