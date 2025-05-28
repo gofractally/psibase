@@ -1,10 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 mod perms;
-mod perms;
 
-use bindings::clientdata::plugin::keyvalue as Keyvalue;
-use bindings::exports::{{project-name | snake_case}}::plugin::admin::Guest as Admin;
+use bindings::accounts::plugin::api::get_current_user;
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::{{project-name | snake_case}}::plugin::admin::Guest as Admin;
 use bindings::exports::{{project-name | snake_case}}::plugin::api::Guest as Api;
@@ -14,7 +12,6 @@ use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use perms::verify_auth_method;
-use perms::verify_auth_method;
 use psibase::fracpack::Pack;
 
 mod errors;
@@ -23,34 +20,31 @@ use errors::ErrorType;
 struct {{project-name | upper_camel_case}}Plugin;
 
 impl Api for {{project-name | upper_camel_case}}Plugin {
-    fn set_example_thing(thing: String) {
+    fn set_example_thing(thing: String) -> Result<(), Error> {
         verify_auth_method("setExampleThing").map_err(|e| Error::from(e))?;
 
         let packed_example_thing_args =
             {{project-name}}::action_structs::setExampleThing { thing }.packed();
         add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+
+        Ok(())
     }
 }
 
 impl Admin for {{project-name | upper_camel_case}}Plugin {
-    fn save_perm(caller: String, method: String) {
+    fn save_perm(caller: String, method: String) -> Result<(), Error> {
         let any_value = "1".as_bytes();
-        Keyvalue::set(&format!("{caller}->{method}"), any_value).unwrap();
-    }
-
-    fn del_perm(caller: String, method: String) {
-        Keyvalue::delete(&format!("{caller}->{method}"));
-    }
-}
-
-impl Admin for {{project-name | upper_camel_case}}Plugin {
-    fn save_perm(user: String, caller: String, method: String) {
-        let any_value = "1".as_bytes();
+        let user = get_current_user().map_err(|e| Error::from(e))?.unwrap();
         Keyvalue::set(&format!("{user}-{caller}->{method}"), any_value).unwrap();
+
+        Ok(())
     }
 
-    fn del_perm(user: String, caller: String, method: String) {
+    fn del_perm(caller: String, method: String) -> Result<(), Error> {
+        let user = get_current_user().map_err(|e| Error::from(e))?.unwrap();
         Keyvalue::delete(&format!("{user}-{caller}->{method}"));
+
+        Ok(())
     }
 }
 

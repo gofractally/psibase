@@ -24,7 +24,6 @@ export const App = () => {
         let permReqPayload;
         try {
             permReqPayload = await ActivePermsOauthRequest.get();
-            console.log("initApp::permReqPayload", permReqPayload);
         } catch (e) {
             setError("Permissions request error: " + e);
             setIsLoading(false);
@@ -62,7 +61,6 @@ export const App = () => {
     };
     const approve = async () => {
         try {
-            console.log("approve::validPermRequest", validPermRequest);
             await supervisor.functionCall({
                 service: thisServiceName,
                 intf: "admin",

@@ -7,7 +7,9 @@ pub fn verify_auth_method(method: &str) -> Result<(), Error> {
     let caller = client::get_sender_app().app.unwrap();
     let callee = client::my_service_account();
 
-    let user = get_current_user()?.unwrap();
+    let Some(user) = get_current_user().map_err(|e| Error::from(e))? else {
+        return Err(Error::from(ErrorType::UserDNEError()));
+    };
 
     let res = Keyvalue::get(&format!("{user}-{caller}->{method}"));
 
