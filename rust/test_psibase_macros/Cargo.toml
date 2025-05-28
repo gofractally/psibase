@@ -18,7 +18,7 @@ services = ["basicwquery", "mincallrecvr", "addcheckinit"]
 [dependencies]
 psibase = { path = "../psibase" }
 psibase_macros = { path = "../psibase_macros" }
-async-graphql = "7.0.7"
+async-graphql.workspace = true
 serde = { version = "1.0.209", features = ["derive"] }
 serde_json = "1.0.132"
 basicwquery = { path = "services/basic-w-query" }
