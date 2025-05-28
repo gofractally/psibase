@@ -33,10 +33,31 @@ mod service {
         result: Vec<u8>,
     }
 
+    #[derive(Deserialize, SimpleObject)]
+    struct EvaluationStart {
+        owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        groups: Vec<Vec<AccountNumber>>,
+    }
+
     struct Query;
 
     #[Object]
     impl Query {
+        async fn evaluation_starts(
+            &self,
+            evaluation_owner: AccountNumber,
+            evaluation_id: u32,
+        ) -> async_graphql::Result<Connection<u64, EvaluationStart>> {
+            EventQuery::new("history.evaluations.evaluation_start")
+                .condition(format!(
+                    "owner = '{}' AND evaluation_id = {}",
+                    evaluation_owner, evaluation_id
+                ))
+                .query()
+        }
+
         async fn get_group_key(
             &self,
             evaluation_owner: AccountNumber,

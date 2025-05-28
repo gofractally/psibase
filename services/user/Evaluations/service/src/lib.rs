@@ -34,6 +34,14 @@ pub mod service {
     ) {
     }
 
+    #[event(history)]
+    pub fn evaluation_start(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        groups: Vec<Vec<AccountNumber>>,
+    ) {
+    }
+
     /// Creates and schedules a new evaluation with specified phases and parameters.
     ///
     /// # Arguments
@@ -104,6 +112,22 @@ pub mod service {
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
         evaluation.create_groups();
+
+        let groups: Vec<Vec<AccountNumber>> = evaluation
+            .get_groups()
+            .into_iter()
+            .map(|group| {
+                group
+                    .get_users()
+                    .into_iter()
+                    .map(|user| user.user)
+                    .collect()
+            })
+            .collect();
+
+        Wrapper::emit()
+            .history()
+            .evaluation_start(owner, evaluation_id, groups);
     }
 
     /// Sets the public key for the user to receive the symmetric key.
