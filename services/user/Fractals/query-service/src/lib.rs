@@ -25,6 +25,23 @@ mod service {
         evaluation_id: u32,
     }
 
+    #[derive(Deserialize, SimpleObject)]
+    struct ScheduledEvaluation {
+        fractal_account: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        registration: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        deliberation: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        submission: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        finish_by: u32,
+    }
+
+
+
     #[derive(SimpleObject)]
     struct GroupFinish {
         evaluation_id: u32,
@@ -81,6 +98,24 @@ mod service {
                 .after(after)
                 .query()
         }
+
+        async fn scheduled_evaluations(
+            &self,
+            fractal: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, ScheduledEvaluation>> {
+            EventQuery::new("history.fractals.scheduled_evaluation")
+                .condition(format!("fractal_account = '{}'", fractal))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
 
         async fn group_finishes(
             &self,

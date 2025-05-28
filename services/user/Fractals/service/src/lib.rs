@@ -71,8 +71,10 @@ pub mod service {
         interval_seconds: u32,
         force_delete: bool,
     ) {
+        let fractal_account = get_sender();
+        check_some(Fractal::get(fractal_account), "fractal does not exist");
         let mut evaluation = EvaluationInstance::get_or_create(
-            get_sender(),
+            fractal_account,
             evaluation_type.into(),
             interval_seconds,
         );
@@ -148,6 +150,17 @@ pub mod service {
 
     #[event(history)]
     pub fn evaluation_finished(fractal_account: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn scheduled_evaluation(
+        fractal_account: AccountNumber,
+        evaluation_id: u32,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+    ) {
+    }
 }
 
 #[cfg(test)]

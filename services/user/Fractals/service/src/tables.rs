@@ -15,6 +15,7 @@ pub mod tables {
 
     use crate::helpers::parse_rank_to_accounts;
     use crate::scoring::calculate_ema;
+    use crate::Wrapper;
 
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -414,6 +415,16 @@ pub mod tables {
             self.evaluation_id = Some(eval_id);
             self.interval = interval_seconds;
             self.save();
+
+            crate::Wrapper::emit().history().scheduled_evaluation(
+                self.fractal,
+                eval_id,
+                registration,
+                deliberation,
+                submission,
+                finish_by,
+            );
+
         }
 
         pub fn schedule_next_evaluation(&mut self) {
