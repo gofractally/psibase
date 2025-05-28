@@ -33,7 +33,7 @@ mod service {
     pub struct BalanceInstance {
         pub account: AccountNumber,
         pub token_id: u32,
-        pub balance: Quantity,
+        pub balance: Asset,
     }
 
     impl TokenDetail {
@@ -63,19 +63,44 @@ mod service {
             ))
         }
 
-
         async fn user_balances(&self, user: AccountNumber) -> Vec<BalanceInstance> {
-            let token: Vec<Balance> = BalanceTable::with_service(tokens::SERVICE).get_index_pk().range(
-                (user, 0)..=(user, u32::MAX)
-            ).collect();
+            let token_balances: Vec<Balance> = BalanceTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .range((user, 0)..=(user, u32::MAX))
+                .collect();
 
-            token.into_iter().map(|token| BalanceInstance {
-                account: token.account,
-                balance: token.balance,
-                token_id: token.token_id
-            }).collect()
+            let tokens: Vec<Token> = token_balances
+                .iter()
+                .map(|balance| {
+                    TokenTable::with_service(tokens::SERVICE)
+                        .get_index_pk()
+                        .get(&balance.token_id)
+                        .expect("faled to find token")
+                })
+                .collect();
+
+            token_balances
+                .into_iter()
+                .map(|token_balance| {
+                    let precision = tokens
+                        .iter()
+                        .find_map(|token| {
+                            if token.id == token_balance.token_id {
+                                Some(token.precision)
+                            } else {
+                                None
+                            }
+                        })
+                        .expect("failed to find precision");
+
+                    BalanceInstance {
+                        account: token_balance.account,
+                        balance: token_balance.balance.to_asset(precision.into()),
+                        token_id: token_balance.token_id,
+                    }
+                })
+                .collect()
         }
-
 
         /// This query gets paginated historical updates of the Example Thing.
         async fn historical_updates(

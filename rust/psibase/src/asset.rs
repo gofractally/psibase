@@ -1,8 +1,27 @@
 use std::str::FromStr;
 
+// use async_graphql::{InputObject, SimpleObject};
+// use fracpack::{Pack, ToSchema, Unpack};
+// use serde::{Deserialize, Serialize};
+
 use crate::{serialize_as_str, ConversionError};
 use crate::{Precision, Quantity};
 
+// #[derive(
+//     Debug,
+//     Copy,
+//     Clone,
+//     Pack,
+//     Unpack,
+//     ToSchema,
+//     PartialEq,
+//     SimpleObject,
+//     InputObject,
+//     Deserialize,
+//     Serialize,
+// )]
+// #[fracpack(fracpack_mod = "fracpack")]
+// #[graphql(input_name = "AssetInput")]
 pub struct Asset {
     quantity: Quantity,
     precision: Precision,

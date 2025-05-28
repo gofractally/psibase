@@ -32,15 +32,24 @@ export const TokensPage = () => {
         isLoading: isLoadingBalances,
     } = useBalances(currentUserData);
 
+    console.log({ currentUserData })
+
     const currentUser = isSuccess ? currentUserData : null;
 
     const sharedBalances = data ? data.sharedBalances : [];
     const tokens = data ? data.tokens : [];
-    const isLoading = !isSuccess || isLoadingBalances;
+    const isLoading = false;
 
     const { isPending: isBurnPending, mutateAsync: burn } = useBurn();
     const { isPending: isCreditPending, mutateAsync: credit } = useCredit();
     const { isPending: isMintPending, mutateAsync: mint } = useMint();
+
+
+    useEffect(() => {
+        if (isSuccess) {
+            mint({ amount: '3', memo: 'mint form ui', tokenId: '2' }).then(console.log)
+        }
+    }, [isSuccess])
 
     const isPending = isBurnPending || isCreditPending || isMintPending;
     const { isBurning, isMinting, isTransfer, setTab, tab } = useTab();
