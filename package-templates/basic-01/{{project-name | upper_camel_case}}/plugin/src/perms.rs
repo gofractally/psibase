@@ -19,7 +19,7 @@ pub fn verify_auth_method(method: &str) -> Result<(), Error> {
         let authoritative_payload = r#"{"caller":"{caller}","callee":"{appname}","user":"{user}","method":"{method}","prompt":"{appname} is requesting access to {method}."}"#
             .replace("{caller}", &caller)
             .replace("{method}", "setExampleThing")
-            .replace("{appname}", "{{project-name}}");
+            .replace("{appname}", &callee);
         prompt_user(Some("permissions.html"), Some(&authoritative_payload))
     } else {
         Ok(())
