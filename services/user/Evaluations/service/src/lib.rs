@@ -34,6 +34,14 @@ pub mod service {
     ) {
     }
 
+    #[event(history)]
+    pub fn evaluation_start(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        groups: Vec<Vec<AccountNumber>>,
+    ) {
+    }
+
     /// Creates and schedules a new evaluation with specified phases and parameters.
     ///
     /// # Arguments
@@ -104,6 +112,22 @@ pub mod service {
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
         evaluation.create_groups();
+
+        let groups: Vec<Vec<AccountNumber>> = evaluation
+            .get_groups()
+            .into_iter()
+            .map(|group| {
+                group
+                    .get_users()
+                    .into_iter()
+                    .map(|user| user.user)
+                    .collect()
+            })
+            .collect();
+
+        Wrapper::emit()
+            .history()
+            .evaluation_start(owner, evaluation_id, groups);
     }
 
     /// Sets the public key for the user to receive the symmetric key.
@@ -153,6 +177,10 @@ pub mod service {
     #[action]
     fn close(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
+        check(
+            get_sender() == evaluation.owner,
+            "only owner can close an evaluation",
+        );
         evaluation.assert_status(EvaluationStatus::Closed);
 
         evaluation.get_groups().iter().for_each(|group| {
@@ -178,7 +206,7 @@ pub mod service {
             let phase = evaluation.get_current_phase();
             check(
                 phase == EvaluationStatus::Pending || phase == EvaluationStatus::Closed,
-                "evaluation is not deletable unless pending or closed",
+                "evaluation is not deletable unless pending, closed or force is true",
             );
         }
         evaluation.delete();

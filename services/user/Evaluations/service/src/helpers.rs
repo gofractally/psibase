@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 #[derive(PartialEq, Eq)]
 pub enum EvaluationStatus {
@@ -7,6 +8,18 @@ pub enum EvaluationStatus {
     Deliberation,
     Submission,
     Closed,
+}
+
+impl fmt::Display for EvaluationStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EvaluationStatus::Pending => write!(f, "Pending"),
+            EvaluationStatus::Registration => write!(f, "Registration"),
+            EvaluationStatus::Deliberation => write!(f, "Deliberation"),
+            EvaluationStatus::Submission => write!(f, "Submission"),
+            EvaluationStatus::Closed => write!(f, "Closed"),
+        }
+    }
 }
 
 #[derive(Eq, PartialEq)]

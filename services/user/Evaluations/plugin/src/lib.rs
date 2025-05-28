@@ -267,6 +267,20 @@ impl User for EvaluationsPlugin {
 
         Ok(user_submission.1)
     }
+
+    fn get_group_users(
+        evaluation_owner: String,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Result<Vec<String>, Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let users = graphql::fetch_group_users(evaluation_owner, evaluation_id, group_number)?
+            .get_group_users
+            .nodes;
+
+        Ok(users.into_iter().map(|user| user.user).collect())
+    }
 }
 
 // TODO: These rules will be moved to the fractals plugin, as they are not general evaluation constraints
