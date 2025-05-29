@@ -49,7 +49,7 @@ impl PartialOrd for DecNum<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct Prerelease<'a> {
     value: &'a str,
 }
@@ -134,6 +134,16 @@ impl<'a> Version<'a> {
             patch,
             pre,
         })
+    }
+    pub fn is_compat(&self, other: &Self) -> bool {
+        VersionMatch {
+            op: VersionOp::Compat,
+            maj: Some(other.maj),
+            min: Some(other.min),
+            patch: Some(other.patch),
+            pre: other.pre,
+        }
+        .matches(self)
     }
 }
 
@@ -229,6 +239,9 @@ impl VersionMatch<'_> {
                                 return false;
                             }
                             if let Some(patch) = self.patch {
+                                if v.patch != patch && min == (DecNum { value: "0" }) {
+                                    return false;
+                                }
                                 if v.patch < patch {
                                     return false;
                                 }

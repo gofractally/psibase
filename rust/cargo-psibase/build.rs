@@ -40,7 +40,11 @@ fn main() {
             .args(["--target-dir", &target_dir])
             .args(["--manifest-path", &(package_dir + "/Cargo.toml")])
             .args(["--release"])
-            .args(["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"])
+            .args([
+                "--",
+                "-C",
+                "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
+            ])
             .status()
             .unwrap()
             .success()
@@ -54,6 +58,7 @@ fn main() {
         OptimizationOptions::new_opt_level_2()
             .shrink_level(wasm_opt::ShrinkLevel::Level1)
             .enable_feature(wasm_opt::Feature::BulkMemory)
+            .enable_feature(wasm_opt::Feature::TruncSat)
             .enable_feature(wasm_opt::Feature::SignExt)
             .enable_feature(wasm_opt::Feature::Simd)
             .debug_info(debug_build)

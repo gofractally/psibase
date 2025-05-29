@@ -961,6 +961,18 @@ impl<'a> CompiledSchema<'a> {
         }
         result
     }
+    pub fn extend(&mut self, ty: &'a AnyType) {
+        let mut custom_indexes = Vec::new();
+        self.add(self.schema, &mut custom_indexes, ty);
+        while !self.queue.is_empty() {
+            for (id, ty) in std::mem::take(&mut self.queue) {
+                self.complete(self.schema, &mut custom_indexes, id, ty);
+            }
+        }
+        for idx in custom_indexes {
+            self.resolve_custom(idx);
+        }
+    }
     fn add(&mut self, schema: &'a Schema, custom: &mut Vec<usize>, ty: &'a AnyType) -> usize {
         let p: *const AnyType = &*ty;
         if let Some(id) = self.type_map.get(&p) {
@@ -1122,7 +1134,10 @@ impl<'a> CompiledSchema<'a> {
         }
     }
     fn get_by_id(&self, id: usize) -> &CompiledType {
-        &self.types[id]
+        match &self.types[id] {
+            CompiledType::Alias(next) => &self.types[*next],
+            ty => ty,
+        }
     }
 
     /// Looks up a CompiledType
@@ -1219,6 +1234,20 @@ impl<'a> CompiledSchema<'a> {
             &mut result,
         )?;
         Ok(result)
+    }
+
+    /// If ty is a fixed-size, single element struct, return its element type.
+    /// Otherwise return ty.
+    pub fn unwrap_struct(&'a self, ty: &'a CompiledType) -> &'a CompiledType {
+        use CompiledType::*;
+        match ty {
+            Struct {
+                is_variable_size: false,
+                children,
+                ..
+            } if children.len() == 1 => self.get_by_id(children[0].1),
+            _ => ty,
+        }
     }
 }
 
@@ -1713,7 +1742,6 @@ enum EmbeddedPack<'a> {
     Offset {
         ty: &'a CompiledType,
         val: &'a serde_json::Value,
-        fixed_pos: usize,
     },
     NoHeap {
         schema: &'a CompiledSchema<'a>,
@@ -1727,7 +1755,8 @@ impl<'a> EmbeddedPack<'a> {
     fn pack(self, dest: &mut Vec<u8>) -> Result<Option<Repack<'a>>, serde_json::Error> {
         use EmbeddedPack::*;
         match self {
-            Offset { ty, val, fixed_pos } => {
+            Offset { ty, val } => {
+                let fixed_pos = dest.len();
                 dest.extend_from_slice(&0u32.to_le_bytes());
                 Ok(Some(Repack { ty, val, fixed_pos }))
             }
@@ -1747,16 +1776,11 @@ fn json2frac_pointer<'a>(
     schema: &'a CompiledSchema,
     ty: &'a CompiledType,
     val: &'a serde_json::Value,
-    dest: &mut Vec<u8>,
 ) -> Result<EmbeddedPack<'a>, serde_json::Error> {
     if ty.is_empty_container(schema, val) {
         Ok(EmbeddedPack::NoHeap { schema, ty, val })
     } else {
-        Ok(EmbeddedPack::Offset {
-            ty,
-            val,
-            fixed_pos: dest.len(),
-        })
+        Ok(EmbeddedPack::Offset { ty, val })
     }
 }
 
@@ -1764,13 +1788,12 @@ fn json2frac_fixed<'a>(
     schema: &'a CompiledSchema<'a>,
     ty: &'a CompiledType,
     val: Option<&'a serde_json::Value>,
-    dest: &mut Vec<u8>,
 ) -> Result<EmbeddedPack<'a>, serde_json::Error> {
     match ty {
         CompiledType::Option(ty) => {
             if let Some(val) = val {
                 if !val.is_null() {
-                    return json2frac_pointer(schema, schema.get_by_id(*ty), val, dest);
+                    return json2frac_pointer(schema, schema.get_by_id(*ty), val);
                 }
             }
             Ok(EmbeddedPack::EmptyOption)
@@ -1780,7 +1803,7 @@ fn json2frac_fixed<'a>(
                 return Err(serde_json::Error::custom("Missing field"));
             };
             if ty.is_variable_size() {
-                json2frac_pointer(schema, ty, val, dest)
+                json2frac_pointer(schema, ty, val)
             } else {
                 Ok(EmbeddedPack::NoHeap { schema, ty, val })
             }
@@ -1874,8 +1897,7 @@ fn json2frac(
             let mut items = Vec::with_capacity(children.len());
             for (name, child) in children {
                 items.push(
-                    json2frac_fixed(schema, schema.get_by_id(*child), map.get(name), dest)?
-                        .pack(dest)?,
+                    json2frac_fixed(schema, schema.get_by_id(*child), map.get(name))?.pack(dest)?,
                 );
             }
             for item in items {
@@ -1892,7 +1914,7 @@ fn json2frac(
             let mut items = ObjectWriter::with_capacity(children.len());
             for (name, child) in children {
                 items.push(
-                    json2frac_fixed(schema, schema.get_by_id(*child), map.get(name), dest)?,
+                    json2frac_fixed(schema, schema.get_by_id(*child), map.get(name))?,
                     dest,
                 )?;
             }
@@ -1916,7 +1938,7 @@ fn json2frac(
             }
             let mut items = Vec::with_capacity(arr.len());
             for item in arr {
-                items.push(json2frac_fixed(schema, ty, Some(item), dest)?.pack(dest)?);
+                items.push(json2frac_fixed(schema, ty, Some(item))?.pack(dest)?);
             }
             for item in items {
                 json2frac_variable(schema, item, dest)?;
@@ -1934,7 +1956,7 @@ fn json2frac(
             len.pack(dest);
             let mut items = Vec::with_capacity(arr.len());
             for item in arr {
-                items.push(json2frac_fixed(schema, ty, Some(item), dest)?.pack(dest)?);
+                items.push(json2frac_fixed(schema, ty, Some(item))?.pack(dest)?);
             }
             for item in items {
                 json2frac_variable(schema, item, dest)?;
@@ -1942,7 +1964,7 @@ fn json2frac(
             Ok(())
         }
         Option(_) => {
-            let item = json2frac_fixed(schema, ty, Some(val), dest)?.pack(dest)?;
+            let item = json2frac_fixed(schema, ty, Some(val))?.pack(dest)?;
             json2frac_variable(schema, item, dest)
         }
         Variant(alternatives) => {
@@ -1982,7 +2004,7 @@ fn json2frac(
             let mut items = ObjectWriter::with_capacity(children.len());
             for (ty, val) in children.iter().zip(arr) {
                 items.push(
-                    json2frac_fixed(schema, schema.get_by_id(*ty), Some(val), dest)?,
+                    json2frac_fixed(schema, schema.get_by_id(*ty), Some(val))?,
                     dest,
                 )?;
             }
@@ -2081,7 +2103,7 @@ fn json2frac(
             schema.custom.json2frac(*id, schema, repr, val, dest)
         }
 
-        _ => unimplemented!(),
+        _ => unimplemented!("{:?}", ty),
     }
 }
 

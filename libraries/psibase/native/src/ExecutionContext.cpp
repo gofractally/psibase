@@ -68,7 +68,6 @@ namespace psibase
          codeObj->vmVersion = vmVersion;
          codeObj->code.assign(code.pos, code.end);
       }
-      ++codeObj->numRefs;
       database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
    }  // setCode
 
@@ -183,12 +182,8 @@ namespace psibase
                            const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
                            AccountNumber       service)
-          : NativeFunctions{transactionContext.blockContext.db,
-                            transactionContext,
-                            transactionContext.allowDbRead,
-                            transactionContext.allowDbWrite,
-                            transactionContext.allowDbReadSubjective,
-                            transactionContext.allowDbWriteSubjective},
+          : NativeFunctions{transactionContext.blockContext.db, transactionContext,
+                            transactionContext.dbMode},
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
@@ -360,7 +355,7 @@ namespace psibase
    {
       // Prevents a poison block
       if (callerFlags & CodeRow::isSubjective &&
-          !actionContext.transactionContext.allowDbReadSubjective)
+          !actionContext.transactionContext.dbMode.isSubjective)
       {
          check(impl->code.flags & CodeRow::isSubjective,
                "subjective services may not call non-subjective ones");

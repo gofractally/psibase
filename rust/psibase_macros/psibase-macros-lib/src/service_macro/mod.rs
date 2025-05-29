@@ -228,7 +228,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
-                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::FunctionType> {
+                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::FunctionType> {
                     let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
                     #action_schema_init
                     actions
@@ -526,7 +526,7 @@ fn process_mod(
             if !event_fns.contains_key(&id) {
                 items.push( parse_quote! {
                     impl #psibase_mod::ToEventsSchema for #event_name {
-                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
+                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::AnyType> {
                             Default::default()
                         }
                     }
@@ -614,7 +614,7 @@ fn process_mod(
             items.push(parse_quote! {
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
-                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
+                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::AnyType> {
                         let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
                         #event_schema_init
                         events

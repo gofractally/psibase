@@ -78,6 +78,11 @@ namespace psibase
       return true;
    }
 
+   inline constexpr bool psio_custom_schema(MethodNumber*)
+   {
+      return true;
+   }
+
    inline namespace literals
    {
       inline constexpr psibase::MethodNumber operator""_m(const char* s, unsigned long)

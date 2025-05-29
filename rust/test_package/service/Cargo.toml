@@ -11,7 +11,7 @@ publish = false
 [package.metadata.psibase]
 server = "r-tpack"
 postinstall = [
-    { sender = "tpack", service = "tpack", method = "init", rawData = "0000" },
+    { sender = "tpack", service = "tpack", method = "init" },
 ]
 
 [package.metadata.psibase.dependencies]

@@ -152,7 +152,7 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, true, false};
+      TransactionContext tc{*this, trx, trace, DbMode::transaction()};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since Transact relies on startBlock
@@ -191,7 +191,7 @@ namespace psibase
             continue;
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -243,7 +243,7 @@ namespace psibase
          action.method  = a.method;
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -295,7 +295,7 @@ namespace psibase
          action.method  = a.method();
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -358,47 +358,89 @@ namespace psibase
    void updateAuthServices(Database&   db,
                            StatusRow&  status,
                            Block&      current,
-                           const auto& modifiedAuthAccounts)
+                           const auto& modifiedAuthAccounts,
+                           const auto& removedCode)
    {
       auto& currentAuthServices = status.consensus.next ? status.consensus.next->consensus.services
                                                         : status.consensus.current.services;
 
       std::vector<BlockHeaderAuthAccount> modifiedAuthServices;
-      for (const auto& account : currentAuthServices)
+      std::vector<BlockHeaderCode>        authCode;
+      // Used for set-union of modified and current accounts
+      auto currentIter = currentAuthServices.begin();
+      auto currentEnd  = currentAuthServices.end();
+      // Tracking of CodeByHashRows
+      auto origCodeKeys    = getCodeKeys(currentAuthServices);
+      auto visitedCodeKeys = std::map<CodeByHashKeyType, bool>{};
+      auto hasCode         = [&](const BlockHeaderAuthAccount& account, bool existing = true)
       {
-         if (modifiedAuthAccounts.find(account.codeNum) == modifiedAuthAccounts.end())
+         auto key             = codeByHashKey(account.codeHash, account.vmType, account.vmVersion);
+         auto [pos, inserted] = visitedCodeKeys.insert({key, false});
+         if (inserted)
          {
-            modifiedAuthServices.push_back(account);
+            existing = existing || std::ranges::binary_search(origCodeKeys, key);
+            if (existing && removedCode.find(key) == removedCode.end())
+            {
+               pos->second = true;
+            }
+            if (!pos->second)
+            {
+               if (auto code = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key))
+               {
+                  if (!existing)
+                  {
+                     authCode.push_back({.vmType    = code->vmType,
+                                         .vmVersion = code->vmVersion,
+                                         .code      = std::move(code->code)});
+                  }
+                  pos->second = true;
+               }
+            }
+         }
+         return pos->second;
+      };
+      for (const auto& account : modifiedAuthAccounts)
+      {
+         // Copy elements of currentAuthServices that were not touched
+         const BlockHeaderAuthAccount* existing = nullptr;
+         while (currentIter != currentEnd)
+         {
+            if (currentIter->codeNum < account)
+            {
+               if (hasCode(*currentIter))
+                  modifiedAuthServices.push_back(*currentIter);
+               ++currentIter;
+            }
+            else
+            {
+               if (currentIter->codeNum == account)
+               {
+                  existing = &*currentIter;
+                  ++currentIter;
+               }
+               break;
+            }
+         }
+         // look up the account
+         if (auto row = db.kvGet<CodeRow>(CodeRow::db, codeKey(account)))
+         {
+            if (row->flags & CodeRow::isAuthService)
+            {
+               BlockHeaderAuthAccount item{.codeNum   = row->codeNum,
+                                           .codeHash  = row->codeHash,
+                                           .vmType    = row->vmType,
+                                           .vmVersion = row->vmVersion};
+               if (hasCode(item, existing && *existing == item))
+                  modifiedAuthServices.push_back(item);
+            }
          }
       }
-      for (const auto& [name, exists] : modifiedAuthAccounts)
-      {
-         if (exists)
-         {
-            auto row = db.kvGet<CodeRow>(CodeRow::db, codeKey(name));
-            assert(!!row);
-            modifiedAuthServices.push_back({.codeNum   = row->codeNum,
-                                            .codeHash  = row->codeHash,
-                                            .vmType    = row->vmType,
-                                            .vmVersion = row->vmVersion});
-         }
-      }
-      std::ranges::sort(modifiedAuthServices,
-                        [](const auto& lhs, const auto& rhs) { return lhs.codeNum < rhs.codeNum; });
+      // Copy any trailing elements
+      std::copy_if(currentIter, currentEnd, std::back_inserter(modifiedAuthServices), hasCode);
+      // Check for changes and update the consensus field
       if (modifiedAuthServices != currentAuthServices)
       {
-         current.header.authCode.emplace();
-         auto               origKeys    = getCodeKeys(currentAuthServices);
-         auto               currentKeys = getCodeKeys(modifiedAuthServices);
-         decltype(origKeys) addedKeys;
-         std::ranges::set_difference(currentKeys, origKeys, std::back_inserter(addedKeys));
-         for (const auto& key : addedKeys)
-         {
-            auto code = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key);
-            check(!!code, "Missing code for auth service");
-            current.header.authCode->push_back(
-                {.vmType = code->vmType, .vmVersion = code->vmVersion, .code = code->code});
-         }
+         current.header.authCode = std::move(authCode);
          if (!status.consensus.next)
             status.consensus.next =
                 PendingConsensus{{status.consensus.current.data, std::move(modifiedAuthServices)},
@@ -420,7 +462,7 @@ namespace psibase
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       check(status.has_value(), "missing status record");
 
-      updateAuthServices(db, *status, current, modifiedAuthAccounts);
+      updateAuthServices(db, *status, current, modifiedAuthAccounts, removedCode);
 
       if (status->consensus.next && status->consensus.next->blockNum == status->current.blockNum)
       {
@@ -518,7 +560,7 @@ namespace psibase
       try
       {
          checkActive();
-         TransactionContext t{*this, trx, trace, false, false, false};
+         TransactionContext t{*this, trx, trace, DbMode::verify()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.execVerifyProof(i);
@@ -550,7 +592,7 @@ namespace psibase
       try
       {
          checkActive();
-         TransactionContext t{*this, trx, trace, true, false, false};
+         TransactionContext t{*this, trx, trace, DbMode::firstAuth()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.checkFirstAuth();
@@ -579,48 +621,22 @@ namespace psibase
       current.transactions.push_back(std::move(trx));
    }
 
-   void BlockContext::execNonTrxAction(Action&& action, ActionTrace& atrace)
-   {
-      SignedTransaction  trx;
-      TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-
-      auto session = db.startWrite(writer);
-      tc.execNonTrxAction(0, action, atrace);
-      session.commit();
-   }
-
-   auto BlockContext::execExport(std::string_view  fn,
-                                 Action&&          action,
-                                 TransactionTrace& trace) -> ActionTrace&
-   {
-      SignedTransaction  trx;
-      auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-
-      auto session = db.startWrite(writer);
-      tc.execExport(fn, action, atrace);
-      session.commit();
-      return atrace;
-   }
-
    void BlockContext::execAsyncAction(Action&& action)
    {
       SignedTransaction  trx;
       TransactionTrace   trace;
       auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true};
+      TransactionContext tc{*this, trx, trace, DbMode::rpc()};
 
       tc.execNonTrxAction(0, action, atrace);
    }
 
-   auto BlockContext::execAsyncExport(std::string_view  fn,
-                                      Action&&          action,
-                                      TransactionTrace& trace) -> ActionTrace&
+   auto BlockContext::execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+       -> ActionTrace&
    {
       SignedTransaction  trx;
       auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true};
+      TransactionContext tc{*this, trx, trace, DbMode::rpc()};
 
       tc.execExport(fn, action, atrace);
       return atrace;
@@ -665,7 +681,7 @@ namespace psibase
 
          std::vector<std::vector<char>> result;
          {
-            TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
+            TransactionContext t{*this, trx, trace, DbMode::transaction()};
             if (initialWatchdogLimit)
                t.setWatchdog(*initialWatchdogLimit);
             t.execTransaction();

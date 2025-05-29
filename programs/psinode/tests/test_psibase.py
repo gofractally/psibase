@@ -13,16 +13,19 @@ import hashlib
 import unittest
 import os
 from io import TextIOWrapper
+import subprocess
 
 class TestPackage:
-    def __init__(self, name, version, accounts=None, depends=None):
+    def __init__(self, name, version, accounts=None, depends=None, description=None):
         if accounts is None:
             accounts = []
         if depends is None:
             depends = []
+        if description is None:
+            description = "Test package"
         self.name = name
         self.version = version
-        self.description = "Test package"
+        self.description = description
         self.accounts = accounts
         self._depends = depends
         self.files = dict()
@@ -84,7 +87,47 @@ def make_package_repository(directory, packages):
     with open(os.path.join(directory, 'index.json'), 'w') as file:
         file.write(json.dumps(index))
 
+class Foo:
+    def __init__(self):
+        self.foo10 = TestPackage('foo', '1.0.0', description='The original foo').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        self.foo11 = TestPackage('foo', '1.1.0', description='Minor version update').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
+        self.foo20 = TestPackage('foo', '2.0.0', description='Major version update').depends('Sites').service('foo', data={'file1.txt': 'version 2'})
+
+        # These just need to be valid and distinct
+        self.original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
+        self.updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
+        self.deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
+        self.added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
+
+        self.foo10.service('bar1', wasm=self.original_wasm, flags=['allowWriteNative'])
+        self.foo10.service('bar2', wasm=self.deleted_wasm, flags=['allowSudo'], server='bar1')
+        self.foo11.service('bar1', wasm=self.updated_wasm)
+        self.foo11.service('bar2', data={'file4.txt': 'cancel server'})
+        self.foo11.service('bar3', wasm=self.added_wasm)
+
 class TestPsibase(unittest.TestCase):
+    @testutil.psinode_test
+    def test_push(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+        def make_input(account):
+            return json.dumps(
+                [{"sender":"root",
+                  "service":"accounts",
+                  "method":"newAccount",
+                  "data":{"name":account,"authService":"auth-any","requireNew":False}}])
+        a.run_psibase(['push'] + a.node_args(), input=make_input('a1'), text=True)
+        a.run_psibase(['push', '-'] + a.node_args(), input=make_input('a2'), text=True)
+        with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8') as f:
+            f.write(make_input('a3'))
+            f.flush()
+            a.run_psibase(['push', f.name] + a.node_args())
+
+        a.wait(new_block())
+        for account in ['a1', 'a2', 'a3']:
+            res = a.graphql('accounts', 'query { getAccount(account: "%s") { authService } }' % account)
+            self.assertEqual(res['getAccount']['authService'], 'auth-any')
+
     @testutil.psinode_test
     def test_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
@@ -94,38 +137,202 @@ class TestPsibase(unittest.TestCase):
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
     @testutil.psinode_test
-    def test_upgrade(self, cluster):
+    def test_install_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
-        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
-        foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
-
-        # These just need to be valid and distinct
-        original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
-        updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
-        deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
-        added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
-
-        foo10.service('bar1', wasm=original_wasm, flags=['allowWriteNative'])
-        foo10.service('bar2', wasm=deleted_wasm, flags=['allowSudo'], server='bar1')
-        foo11.service('bar1', wasm=updated_wasm)
-        foo11.service('bar2', data={'file4.txt': 'cancel server'})
-        foo11.service('bar3', wasm=added_wasm)
+        foo = Foo()
 
         with tempfile.TemporaryDirectory() as dir:
-            make_package_repository(dir, [foo10])
+            make_package_repository(dir, [foo.foo10])
             a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
-            make_package_repository(dir, [foo10, foo11])
+            make_package_repository(dir, [foo.foo10, foo.foo11])
             a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
             self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
+
+    def do_test_upgrade(self, cluster, command, v2=False):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10])
+            a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
+            a.wait(new_block())
+            self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
+            self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            a.run_psibase(command + a.node_args() + ['foo', '--package-source', dir])
+            a.wait(new_block())
+            if v2:
+                self.assertResponse(a.get('/file1.txt', 'foo'), 'version 2')
+            else:
+                self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
+                self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
+                self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
+                self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
+
+    @testutil.psinode_test
+    def test_upgrade(self, cluster):
+        self.do_test_upgrade(cluster, ["upgrade", "foo"])
+
+    @testutil.psinode_test
+    def test_upgrade_all(self, cluster):
+        self.do_test_upgrade(cluster, ["upgrade"])
+
+    @testutil.psinode_test
+    def test_upgrade_latest(self, cluster):
+        self.do_test_upgrade(cluster, ["upgrade", "--latest"], True)
+
+    @testutil.psinode_test
+    def test_info(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        info = a.run_psibase(['info', 'Explorer'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+        self.assertIn('status: not installed', info)
+        self.assertIn('Explorer', info)
+
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def get_info(package):
+                return a.run_psibase(['info'] + a.node_args() + [package, '--package-source', dir], stdout=subprocess.PIPE, encoding='utf-8').stdout
+            info = get_info('foo')
+            self.assertIn('status: not installed', info)
+            self.assertIn('description: Major version update', info)
+            self.assertIn('name: foo-2.0.0', info)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.wait(new_block())
+
+            for name in ['foo', 'foo-1', 'foo-1.0', 'foo-1.0.0']:
+                info = get_info('foo')
+                self.assertIn('status: upgrade to 2.0.0 available', info)
+                self.assertIn('description: The original foo', info)
+                self.assertIn('name: foo-1.0.0', info)
+            for name in ["foo-2", "foo-2.0", "foo-2.0.0"]:
+                info = get_info(name)
+                self.assertIn('status: version 1.0.0 installed', info)
+                self.assertIn('description: Major version update', info)
+                self.assertIn('name: foo-2.0.0', info)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.wait(new_block())
+
+            info = get_info('foo')
+            self.assertIn('status: installed', info)
+            self.assertIn('description: Major version update', info)
+            self.assertIn('name: foo-2.0.0', info)
+            info = get_info('foo-1.0')
+            self.assertIn('status: version 2.0.0 installed', info)
+            self.assertIn('description: The original foo', info)
+            self.assertIn('name: foo-1.0.0', info)
+
+    @testutil.psinode_test
+    def test_list(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        # A non-existent account should be an error
+        for source in ['neminis', 'http://neminis.a/']:
+            status = a.run_psibase(['list', '--package-source', source] + a.node_args(), encoding='utf-8', stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, check=False)
+            self.assertNotEqual(status.returncode, 0)
+            self.assertIn("account 'neminis' does not exist", status.stderr)
+
+        # An existing account is okay even if it wasn't intended as a package repo
+        for source in ['transact', 'http://transact.a']:
+            l = a.run_psibase(['list', '--available', '--package-source', 'transact'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            self.assertEqual(l, "")
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def get_list(*options):
+                return a.run_psibase(['list', '--package-source', dir] + list(options) + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            for args in [(), ('--all',), ('--all', '--installed'), ('--installed', '--available', '--updates')]:
+                l = get_list(*args)
+                self.assertIn('Minimal', l)
+                self.assertIn('Explorer', l)
+                self.assertIn('Sites', l)
+                self.assertIn('foo 2.0.0', l)
+
+            l = get_list('--installed')
+            self.assertIn('Explorer', l)
+            self.assertNotIn('foo', l)
+
+            l = get_list('--available')
+            self.assertNotIn('Explorer', l)
+            self.assertIn('foo 2.0.0', l)
+
+            l = get_list('--updates')
+            self.assertEqual(l, "")
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.wait(new_block())
+
+            l = get_list('--installed')
+            self.assertIn('Explorer', l)
+            self.assertIn('foo 1.0.0', l)
+
+            l = get_list('--available')
+            self.assertEqual(l, "")
+
+            l = get_list('--updates')
+            self.assertIn('foo 1.0.0->2.0.0', l)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.wait(new_block())
+
+            l = get_list('--updates')
+            self.assertEqual(l, "")
+
+    @testutil.psinode_test
+    def test_search(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def search(*options):
+                return a.run_psibase(['search', '--package-source', dir] + list(options) + a.node_args(), stdout=subprocess.PIPE, text=True).stdout
+
+            def check_repo():
+                self.assertEqual(search('foo'), 'foo 2.0.0\n')
+                self.assertEqual(search('The original'), 'foo 1.0.0\n')
+                self.assertEqual(search('Min.*up'), 'foo 1.1.0\n')
+                self.assertEqual(search('bar'), '')
+                self.assertEqual(search('foo', 'original'), 'foo 1.0.0\n')
+            check_repo()
+            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+            check_repo()
+            self.assertIn('Transact ', search('^transact$'))
+
+    @testutil.psinode_test
+    def test_configure_sources(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
+        with tempfile.TemporaryDirectory() as dir:
+            path = os.path.join(dir, foo10.write(dir)["file"])
+            a.run_psibase(["publish", "-S", "root"] + a.node_args() + [path])
+            a.push_action("root", "packages", "setSources", {"sources": [{"account":"root"}]})
+            a.wait(new_block())
+            a.run_psibase(['install'] + a.node_args() + ['foo'])
+            a.wait(new_block())
+            self.assertResponse(a.get('/file1.txt', 'foo'), 'data')
 
     @testutil.psinode_test
     def test_sign(self, cluster):

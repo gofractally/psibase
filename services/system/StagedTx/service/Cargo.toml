@@ -11,12 +11,10 @@ publish = false
 flags = ["allowSudo"]
 server = "r-staged-tx"
 plugin = "plugin"
-postinstall = [
-    { sender = "staged-tx", service = "staged-tx", method = "init", rawData = "0000" },
-]
+postinstall = [{ sender = "staged-tx", service = "staged-tx", method = "init" }]
 
 [dependencies]
-async-graphql = { version = "7.0.10" }
+async-graphql = "=7.0.17"
 psibase = { path = "../../../../rust/psibase/" }
 serde = { version = "1.0.213", features = ["derive"] }
 serde_json = { version = "1.0.100" }

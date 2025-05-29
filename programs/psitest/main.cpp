@@ -78,6 +78,7 @@ inline constexpr int32_t polyfill_root_dir_fd = 3;
 
 /** WASI Types */
 using wasi_errno_t                                = uint16_t;
+inline constexpr wasi_errno_t wasi_errno_success  = 0;
 inline constexpr wasi_errno_t wasi_errno_again    = 6;
 inline constexpr wasi_errno_t wasi_errno_badf     = 8;
 inline constexpr wasi_errno_t wasi_errno_fault    = 21;
@@ -382,8 +383,8 @@ struct test_chain
 
       // These are not the correct values if we want the chain to actually
       // sync correctly, but it's sufficient for the tester to test services.
-      auto term      = status->current.term;
-      auto commitNum = status->current.blockNum;
+      auto term      = status ? status->current.term : 0;
+      auto commitNum = status ? status->current.blockNum : 0;
 
       blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();
@@ -453,17 +454,14 @@ struct test_chain
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
          nativeFunctionsTrace->actionTraces.resize(1);
          nativeFunctionsTransactionContext = std::make_unique<psibase::TransactionContext>(
-             *blockContext, dummyTransaction, *nativeFunctionsTrace, true, false, true);
+             *blockContext, dummyTransaction, *nativeFunctionsTrace, psibase::DbMode::rpc());
          nativeFunctionsActionContext = std::make_unique<psibase::ActionContext>(
              psibase::ActionContext{*nativeFunctionsTransactionContext, dummyAction,
                                     nativeFunctionsTrace->actionTraces[0]});
          nativeFunctions = std::make_unique<psibase::NativeFunctions>(
              psibase::NativeFunctions{blockContext->db,
                                       *nativeFunctionsTransactionContext,
-                                      true,
-                                      false,
-                                      true,
-                                      false,
+                                      psibase::DbMode::rpc(),
                                       {},
                                       &*nativeFunctionsActionContext});
       }
@@ -1152,6 +1150,26 @@ struct callbacks
       return 0;
    }
 
+   uint32_t wasi_fd_tell(wasi_fd_t fd, wasm_ptr<wasi_filesize_t> newoffset)
+   {
+      // Validate file descriptor
+      auto* file = get_file(fd);
+      if (!file)
+         return wasi_errno_badf;
+
+      // Get the current file position using ftell
+      auto position = ftell(file->f);
+      if (position < 0)
+      {
+         return wasi_errno_io;
+      }
+
+      // Store the position in the provided wasm_ptr<wasi_filesize_t>
+      *newoffset = position;
+
+      return wasi_errno_success;
+   }
+
    int32_t testerExecute(span<const char> command) { return system(span_str(command).c_str()); }
 
    test_chain& assert_chain(uint32_t chain, bool require_context = true)
@@ -1266,7 +1284,12 @@ struct callbacks
       trace.actionTraces.emplace_back();
       try
       {
-         chain.readBlockContext()->execNonTrxAction(std::move(act), trace.actionTraces.back());
+         auto* bc = chain.readBlockContext();
+
+         psibase::SignedTransaction  trx;
+         psibase::TransactionContext tc{*bc, trx, trace, psibase::DbMode::verify()};
+
+         tc.execNonTrxAction(0, act, trace.actionTraces.back());
       }
       catch (const std::exception& e)
       {
@@ -1367,7 +1390,7 @@ struct callbacks
       bc.start();
       psibase::check(!bc.needGenesisAction, "Node is not connected to any psibase network.");
       psibase::SignedTransaction  trx;
-      psibase::TransactionContext tc{bc, trx, trace, true, false, true};
+      psibase::TransactionContext tc{bc, trx, trace, psibase::DbMode::rpc()};
 
       std::int32_t fd;
 
@@ -1699,6 +1722,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::wasi_fd_read>("wasi_snapshot_preview1", "fd_read");
    rhf_t::add<&callbacks::wasi_fd_readdir>("wasi_snapshot_preview1", "fd_readdir");
    rhf_t::add<&callbacks::wasi_fd_seek>("wasi_snapshot_preview1", "fd_seek");
+   rhf_t::add<&callbacks::wasi_fd_tell>("wasi_snapshot_preview1", "fd_tell");
    rhf_t::add<&callbacks::wasi_fd_write>("wasi_snapshot_preview1", "fd_write");
    rhf_t::add<&callbacks::wasi_path_filestat_get>("wasi_snapshot_preview1", "path_filestat_get");
    rhf_t::add<&callbacks::wasi_path_open>("wasi_snapshot_preview1", "path_open");
