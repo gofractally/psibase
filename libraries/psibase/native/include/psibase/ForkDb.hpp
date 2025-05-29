@@ -1161,7 +1161,9 @@ namespace psibase
          return std::move(*claim);
       }
       // TODO: this can run concurrently.
-      void validateTransactionSignatures(const Block& b, const ConstRevisionPtr& revision)
+      void validateTransactionSignatures(BlockContext&           bc,
+                                         const Block&            b,
+                                         const ConstRevisionPtr& revision)
       {
          BlockContext verifyBc(*systemContext, revision);
          verifyBc.start(b.header.time);
@@ -1169,10 +1171,11 @@ namespace psibase
          {
             check(trx.proofs.size() == trx.transaction->claims().size(),
                   "proofs and claims must have same size");
+            auto verifyTokens = bc.callPreverify(trx);
             for (std::size_t i = 0; i < trx.proofs.size(); ++i)
             {
                TransactionTrace trace;
-               verifyBc.verifyProof(trx, trace, i, std::nullopt, nullptr);
+               verifyBc.verifyProof(trx, trace, i, std::nullopt, nullptr, verifyTokens[i]);
             }
          }
       }
@@ -1189,7 +1192,7 @@ namespace psibase
             {
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
                ctx.start(Block(blockPtr->block()));
-               validateTransactionSignatures(ctx.current, prev->revision);
+               validateTransactionSignatures(ctx, ctx.current, prev->revision);
                ctx.callStartBlock();
                ctx.execAllInBlock();
                auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
