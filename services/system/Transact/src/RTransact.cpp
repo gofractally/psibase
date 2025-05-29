@@ -171,8 +171,8 @@ std::optional<std::vector<std::optional<RunToken>>> RTransact::preverify(
          }
          return result;
       }
-      return {};
    }
+   return {};
 }
 
 namespace
