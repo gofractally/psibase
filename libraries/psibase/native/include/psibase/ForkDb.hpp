@@ -1161,7 +1161,9 @@ namespace psibase
          return std::move(*claim);
       }
       // TODO: this can run concurrently.
-      void validateTransactionSignatures(const Block& b, const ConstRevisionPtr& revision)
+      void validateTransactionSignatures(BlockContext&           bc,
+                                         const Block&            b,
+                                         const ConstRevisionPtr& revision)
       {
          BlockContext verifyBc(*systemContext, revision);
          verifyBc.start(b.header.time);
@@ -1169,10 +1171,14 @@ namespace psibase
          {
             check(trx.proofs.size() == trx.transaction->claims().size(),
                   "proofs and claims must have same size");
-            for (std::size_t i = 0; i < trx.proofs.size(); ++i)
+            if (!trx.proofs.empty())
             {
-               TransactionTrace trace;
-               verifyBc.verifyProof(trx, trace, i, std::nullopt, nullptr);
+               auto verifyTokens = bc.callPreverify(trx);
+               for (std::size_t i = 0; i < trx.proofs.size(); ++i)
+               {
+                  TransactionTrace trace;
+                  verifyBc.verifyProof(trx, trace, i, std::nullopt, nullptr, verifyTokens[i]);
+               }
             }
          }
       }
@@ -1189,7 +1195,7 @@ namespace psibase
             {
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
                ctx.start(Block(blockPtr->block()));
-               validateTransactionSignatures(ctx.current, prev->revision);
+               validateTransactionSignatures(ctx, ctx.current, prev->revision);
                ctx.callStartBlock();
                ctx.execAllInBlock();
                auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
@@ -1952,28 +1958,17 @@ namespace psibase
             {
                check(trx.proofs.size() == trx.transaction->claims().size(),
                      "proofs and claims must have same size");
-               // All proofs execute as of the state at block begin. This will allow
-               // consistent parallel execution of all proofs within a block during
-               // replay. Proofs don't have direct database access, but they do rely
-               // on the set of services stored within the database. They may call
-               // other services; e.g. to call crypto functions.
-               //
-               // TODO: move proof execution to background threads
-               // TODO: track CPU usage of proofs and pass it somehow to the main
-               //       execution for charging
-               // TODO: If by the time the transaction executes it's on a different
-               //       block than the proofs were verified on, then either the proofs
-               //       need to be rerun, or the hashes of the services which ran
-               //       during the proofs need to be compared against the current
-               //       service hashes. This will prevent a poison block.
-               // TODO: If the first proof and the first auth pass, but the transaction
-               //       fails (including other proof failures), then charge the first
-               //       authorizer
+
                BlockContext proofBC{*systemContext, revisionAtBlockStart};
                proofBC.start(bc->current.header.time);
-               for (size_t i = 0; i < trx.proofs.size(); ++i)
+
+               if (!trx.proofs.empty())
                {
-                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, bc);
+                  auto verifyTokens = bc->callPreverify(trx);
+                  for (size_t i = 0; i < trx.proofs.size(); ++i)
+                  {
+                     proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, bc, verifyTokens[i]);
+                  }
                }
 
                // TODO: in another thread: check first auth and first proof. After
@@ -2038,6 +2033,7 @@ namespace psibase
       }
 
       void onChangeNextTransaction(auto&& fn) { dbCallbacks.nextTransaction = fn; }
+      void onChangeRunQueue(auto&& fn) { dbCallbacks.runQueue = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
