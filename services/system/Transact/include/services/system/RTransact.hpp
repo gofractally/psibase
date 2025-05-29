@@ -85,7 +85,8 @@ namespace SystemService
    {
       std::uint64_t        endSequence;
       psibase::Checksum256 verifyId;
-      PSIO_REFLECT(ReverifySignaturesRecord, endSequence, verifyId)
+      bool                 running;
+      PSIO_REFLECT(ReverifySignaturesRecord, endSequence, verifyId, running)
    };
    using ReverifySignaturesTable =
        psibase::Table<ReverifySignaturesRecord, psibase::SingletonKey{}>;

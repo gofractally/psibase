@@ -78,25 +78,31 @@ namespace
    // verifyId identifies the set of verify services.
    //
    // must be run inside a subjective-tx.
-   std::uint64_t flushTransactions(ReverifySignaturesTable& reverify, const Checksum256& verifyId)
+   void flushTransactions(ReverifySignaturesTable&  reverify,
+                          ReverifySignaturesRecord& row,
+                          const Checksum256&        verifyId)
    {
       auto available     = RTransact{}.open<AvailableSequenceTable>();
       auto nextAvailable = available.get({}).value_or(AvailableSequenceRecord{0}).nextSequence;
-      reverify.put({.endSequence = nextAvailable, .verifyId = verifyId});
+      bool running       = row.running;
+      row                = {.endSequence = nextAvailable, .verifyId = verifyId, .running = true};
+      reverify.put(row);
 
-      transactor<RTransact> rtransact{RTransact::service, RTransact::service};
-      RunRow                row{
-                         .id      = 0,
-                         .mode    = RunMode::rpc,
-                         .maxTime = MicroSeconds::max(),
-                         .action  = rtransact.requeue(),
-                         .continuation = {.service = RTransact::service, .method = MethodNumber{"onRequeue"}},
-      };
-      if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
-         row.id = prev->id + 1;
+      if (!running)
+      {
+         transactor<RTransact> rtransact{RTransact::service, RTransact::service};
+         RunRow                row{
+                            .id      = 0,
+                            .mode    = RunMode::rpc,
+                            .maxTime = MicroSeconds::max(),
+                            .action  = rtransact.requeue(),
+                            .continuation = {.service = RTransact::service, .method = MethodNumber{"onRequeue"}},
+         };
+         if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
+            row.id = prev->id + 1;
 
-      kvPut(RunRow::db, row.key(), row);
-      return nextAvailable;
+         kvPut(RunRow::db, row.key(), row);
+      }
    }
 
    void validateTransaction(const SignedTransaction& trx)
@@ -120,10 +126,10 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
 
    PSIBASE_SUBJECTIVE_TX
    {
-      auto invalidated = reverify.get({}).value_or(ReverifySignaturesRecord{0});
+      auto invalidated = reverify.get({}).value_or(ReverifySignaturesRecord{});
       if (invalidated.verifyId != verifyId)
       {
-         invalidated.endSequence = flushTransactions(reverify, verifyId);
+         flushTransactions(reverify, invalidated, verifyId);
       }
       nextSequence = std::max(nextSequence, invalidated.endSequence);
       auto table   = Subjective{}.open<PendingTransactionTable>();
@@ -343,7 +349,7 @@ namespace
          auto row = reverify.get({}).value_or(ReverifySignaturesRecord{});
          if (verifyId.verifyId != row.verifyId)
          {
-            flushTransactions(reverify, verifyId.verifyId);
+            flushTransactions(reverify, row, verifyId.verifyId);
          }
       }
    }
@@ -892,27 +898,43 @@ namespace
 
 void RTransact::requeue()
 {
-   auto reverify = RTransact{}.open<ReverifySignaturesTable>();
-   auto txdata   = RTransact{}.open<TransactionDataTable>();
-   // TODO: Split this into smaller transactions to reduce interference
-   PSIBASE_SUBJECTIVE_TX
+   auto          reverify          = RTransact{}.open<ReverifySignaturesTable>();
+   auto          txdata            = RTransact{}.open<TransactionDataTable>();
+   auto          pending           = RTransact{}.open<PendingTransactionTable>();
+   auto          pendingBySequence = pending.getIndex<1>();
+   std::uint64_t nextSequence      = 0;
+   std::uint64_t endSequence;
+   while (true)
    {
-      std::uint64_t nextSequence = 0;
-      auto          endSequence = reverify.get({}).value_or(ReverifySignaturesRecord{}).endSequence;
-
-      auto table = RTransact{}.open<PendingTransactionTable>();
-      auto index = table.getIndex<1>();
-      for (auto iter = index.lower_bound(nextSequence), end = index.end(); iter != end; ++iter)
+      PSIBASE_SUBJECTIVE_TX
       {
-         auto item = *iter;
-         auto data = txdata.get(item.id);
-         check(!!data, "Missing transaction data");
+         auto row    = reverify.get({}).value_or(ReverifySignaturesRecord{});
+         endSequence = row.endSequence;
+         if (nextSequence >= endSequence)
+         {
+            row.running = false;
+            reverify.put(row);
+         }
+      }
+      if (nextSequence >= endSequence)
+         break;
+      while (true)
+      {
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto iter = pendingBySequence.lower_bound(nextSequence);
+            auto item = *iter;
+            if (item.sequence < endSequence)
+            {
+               auto data = txdata.get(item.id);
+               check(!!data, "Missing transaction data");
 
-         scheduleVerify(item.id, data->trx);
+               scheduleVerify(item.id, data->trx);
 
-         table.remove(item);
-
-         nextSequence = item.sequence + 1;
+               pending.remove(item);
+            }
+            nextSequence = item.sequence + 1;
+         }
          if (nextSequence >= endSequence)
             break;
       }
