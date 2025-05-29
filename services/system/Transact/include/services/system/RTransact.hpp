@@ -7,6 +7,7 @@
 #include <psibase/trace.hpp>
 
 #include <cstdint>
+#include <functional>
 
 namespace SystemService
 {
@@ -78,16 +79,17 @@ namespace SystemService
    {
       std::int32_t socket;
       bool         json = true;
-      PSIO_REFLECT(TraceClientInfo, socket, json)
+      uint8_t      waitFor;
+
+      PSIO_REFLECT(TraceClientInfo, socket, json, waitFor)
    };
 
    struct TraceClientRow
    {
       psibase::Checksum256         id;
-      uint8_t                      waitFor;
       std::vector<TraceClientInfo> clients;
    };
-   PSIO_REFLECT(TraceClientRow, id, waitFor, clients)
+   PSIO_REFLECT(TraceClientRow, id, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
    PSIO_REFLECT_TYPENAME(TraceClientTable)
@@ -114,7 +116,7 @@ namespace SystemService
       psibase::BlockNum         blockNum;
       psibase::TransactionTrace trace;
 
-      bool successful() const { return !trace.error.has_value(); }
+      [[nodiscard]] bool successful() const { return !trace.error.has_value(); }
 
       using ByBlockNum = psibase::CompositeKey<&BlockTxRecord::blockNum, &BlockTxRecord::id>;
       auto byBlockNum() const { return ByBlockNum{}(*this); }
@@ -131,7 +133,7 @@ namespace SystemService
       static constexpr uint8_t final_flag   = 1;
       static constexpr uint8_t applied_flag = 2;
 
-      uint8_t flag() const
+      [[nodiscard]] uint8_t flag() const
       {
          if (wait_for == "final")
             return final_flag;
@@ -168,16 +170,20 @@ namespace SystemService
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
 
      private:
-      auto claimClientReply(const psibase::Checksum256& id)
-          -> std::tuple<TraceClientRow, bool, bool>;
+      using ClientFilter = std::function<bool(const TraceClientInfo&)>;
+      auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
+          -> std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
 
-      std::pair<std::vector<psibase::BlockNum>, psibase::BlockTime> finalizeBlocks(
-          const psibase::BlockHeader& current);
+      auto finalizeBlocks(const psibase::BlockHeader& current)
+          -> std::pair<std::vector<psibase::BlockNum>, psibase::BlockTime>;
 
       void stopTracking(const std::vector<psibase::Checksum256>& txids);
       void sendReplies(const std::vector<psibase::Checksum256>& txids);
-      void sendReply(const psibase::Checksum256&                 id,
-                     psio::view<const psibase::TransactionTrace> trace);
+
+      void sendReply(
+          const psibase::Checksum256&                 id,
+          psio::view<const psibase::TransactionTrace> trace,
+          const ClientFilter& clientFilter = [](const TraceClientInfo&) { return true; });
    };
    PSIO_REFLECT(RTransact,
                 method(next),
