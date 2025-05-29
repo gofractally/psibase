@@ -64,8 +64,7 @@ namespace SystemService
       psibase::TimePointSec     expiration;
       std::vector<VerifyStatus> verifies;
       psibase::Checksum256      verifyId;
-      bool                      hasError;
-      PSIO_REFLECT(UnverifiedTransactionRecord, id, expiration, verifies, verifyId, hasError)
+      PSIO_REFLECT(UnverifiedTransactionRecord, id, expiration, verifies, verifyId)
    };
 
    using UnverifiedTransactionTable =
@@ -188,8 +187,8 @@ namespace SystemService
       void requeue();
       void onRequeue(std::uint64_t id, psio::view<const psibase::TransactionTrace> trace);
       void onBlock();
-      auto serveSys(const psibase::HttpRequest& request,
-                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
+      auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> socket)
+          -> std::optional<psibase::HttpReply>;
 
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
    };

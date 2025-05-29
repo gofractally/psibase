@@ -636,7 +636,6 @@ namespace
              .id         = id,
              .expiration = trx.transaction->tapos().expiration(),
              .verifies   = std::move(remaining),
-             .hasError   = false,
          };
          unverifiedTransactions.put(row);
       }
@@ -654,8 +653,6 @@ namespace
          auto unverified = RTransact{}.open<UnverifiedTransactionTable>();
          if (auto row = unverified.get(id))
          {
-            // TODO: report an error. Maybe we should defer sending
-            // the error until all verification has reported back...
             return false;
          }
          scheduleVerify(id, trx);
