@@ -1952,6 +1952,9 @@ namespace psibase
             {
                check(trx.proofs.size() == trx.transaction->claims().size(),
                      "proofs and claims must have same size");
+
+               auto verifyTokens = bc->callPreverify(trx);
+
                // All proofs execute as of the state at block begin. This will allow
                // consistent parallel execution of all proofs within a block during
                // replay. Proofs don't have direct database access, but they do rely
@@ -1973,7 +1976,7 @@ namespace psibase
                proofBC.start(bc->current.header.time);
                for (size_t i = 0; i < trx.proofs.size(); ++i)
                {
-                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, bc);
+                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, bc, verifyTokens[i]);
                }
 
                // TODO: in another thread: check first auth and first proof. After
