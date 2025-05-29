@@ -38,7 +38,6 @@ mod service {
         owner: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
-        groups: Vec<Vec<AccountNumber>>,
     }
 
 
