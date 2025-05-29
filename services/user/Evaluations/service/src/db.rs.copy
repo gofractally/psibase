@@ -39,7 +39,6 @@ pub mod tables {
     pub struct User {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
-
         pub user: AccountNumber,
         pub group_number: Option<u32>,
         pub attestation: Option<Vec<u8>>,
@@ -252,8 +251,6 @@ pub mod impls {
             }
         }
 
-        // Public interface:
-
         pub fn add(
             allowable_group_sizes: Vec<u8>,
             registration_starts: u32,
@@ -263,7 +260,7 @@ pub mod impls {
             num_options: u8,
             use_hooks: bool,
         ) -> Self {
-            let eval = Self::new(
+            let evaluation = Self::new(
                 allowable_group_sizes,
                 registration_starts,
                 deliberation_starts,
@@ -272,81 +269,49 @@ pub mod impls {
                 num_options,
                 use_hooks,
             );
-            eval.save();
-            eval
+            evaluation.save();
+            evaluation
         }
 
         pub fn get_groups(&self) -> Vec<Group> {
             let table = GroupTable::new();
-            let result = table
+            table
                 .get_index_pk()
                 .range(&(self.owner, self.id, 0)..=&(self.owner, self.id, u32::MAX))
-                .collect();
-            result
+                .collect()
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
-            let table = GroupTable::new();
-            let result = table
+            GroupTable::new()
                 .get_index_pk()
-                .get(&&(self.owner, self.id, group_number));
-            result
+                .get(&&(self.owner, self.id, group_number))
         }
 
         pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
-            let table = EvaluationTable::new();
-            let result = table.get_index_pk().get(&&(owner, evaluation_id));
-            psibase::check_some(
-                result,
-                &format!("evaluation {} {} not found", owner, evaluation_id),
-            )
+            EvaluationTable::new()
+                .get_index_pk()
+                .get(&&(owner, evaluation_id))
+                .unwrap_or_else(|| panic!("Evaluation not found"))
         }
 
         pub fn delete(&self) {
-            let users_table = UserTable::new();
-
-            let users: Vec<User> = users_table
-                .get_index_pk()
-                .range(
-                    &(self.owner, self.id, AccountNumber::new(0))
-                        ..=&(self.owner, self.id, AccountNumber::new(u64::MAX)),
-                )
-                .collect();
-
-            for user in users {
-                users_table.remove(&user);
-            }
-
-            let groups_table = GroupTable::new();
-            let groups: Vec<Group> = groups_table
-                .get_index_pk()
-                .range(&(self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
-                .collect();
-
-            for group in groups {
-                groups_table.remove(&group);
-            }
-
-            EvaluationTable::new().remove(&self);
+            let table = EvaluationTable::new();
+            table.remove(&self);
         }
 
         pub fn get_current_phase(&self) -> EvaluationStatus {
-            let current_time_seconds = get_current_time_seconds();
-            self.calculate_scheduled_phase(current_time_seconds)
+            self.calculate_scheduled_phase(get_current_time_seconds())
         }
 
         pub fn assert_status(&self, expected_status: EvaluationStatus) {
-            let current_phase = self.get_current_phase();
-            let phase_name = match current_phase {
-                EvaluationStatus::Pending => "Pending",
-                EvaluationStatus::Registration => "Registration",
-                EvaluationStatus::Deliberation => "Deliberation",
-                EvaluationStatus::Submission => "Submission",
-                EvaluationStatus::Closed => "Closed",
-            };
+            let current_status = self.get_current_phase();
             psibase::check(
-                current_phase == expected_status,
-                format!("evaluation must be in {phase_name} phase").as_str(),
+                current_status == expected_status,
+                format!(
+                    "Evaluation is in {:?} phase, expected {:?}",
+                    current_status, expected_status
+                )
+                .as_str(),
             );
         }
 
@@ -355,61 +320,52 @@ pub mod impls {
         }
 
         pub fn register_user(&self, new_user: AccountNumber) {
-            psibase::check_none(self.get_user(new_user), "user already registered");
-
+            self.assert_status(EvaluationStatus::Registration);
             User::add(self.owner, self.id, new_user);
-
             self.notify_register(new_user);
         }
 
         pub fn unregister_user(&self, user: AccountNumber) {
-            let user = self.get_user(user).expect("user not found");
-            user.delete();
-
-            self.notify_unregister(user.user);
+            self.assert_status(EvaluationStatus::Registration);
+            if let Some(user) = User::get(self.owner, self.id, user) {
+                user.delete();
+                self.notify_unregister(user.user);
+            }
         }
 
         pub fn create_groups(&self) {
-            psibase::check(
-                self.get_groups().len() == 0,
-                "groups have already been created",
-            );
-
-            let mut users = self.get_users();
-
-            // `self.id` is public, so anyone can predict the grouping
-            let mut rng = StdRng::seed_from_u64(self.id as u64);
+            self.assert_status(EvaluationStatus::Deliberation);
+            let users = self.get_users();
+            let mut rng = StdRng::from_entropy();
+            let mut users = users;
             users.shuffle(&mut rng);
 
-            let allowable_group_sizes = self
-                .allowable_group_sizes
-                .iter()
-                .map(|&size| size as u32)
-                .collect();
+            let mut group_sizes = self.allowable_group_sizes.clone();
+            group_sizes.shuffle(&mut rng);
 
-            let population = users.len() as u32;
-            let chunk_sizes = psibase::check_some(
-                Subgroups::call().gmp(population, allowable_group_sizes),
-                "unable to group users",
-            );
+            let mut current_group = 0;
+            let mut current_group_size = 0;
+            let mut current_group_number = 0;
 
-            for (index, &chunk_size) in chunk_sizes.iter().enumerate() {
-                let group_number = (index as u32) + 1;
-                Group::add(self.owner, self.id, group_number);
-
-                for _ in 0..chunk_size {
-                    if let Some(mut user) = users.pop() {
-                        user.set_group_number(group_number);
-                    }
+            for user in users {
+                if current_group_size == 0 {
+                    current_group_size = group_sizes[current_group];
+                    current_group = (current_group + 1) % group_sizes.len();
+                    current_group_number += 1;
                 }
+
+                let mut user = user;
+                user.set_group_number(current_group_number);
+                current_group_size -= 1;
             }
         }
     }
 
     impl Group {
         pub fn get(owner: AccountNumber, evaluation_id: u32, number: u32) -> Option<Self> {
-            let table = GroupTable::new();
-            table.get_index_pk().get(&&(owner, evaluation_id, number))
+            GroupTable::new()
+                .get_index_pk()
+                .get(&&(owner, evaluation_id, number))
         }
 
         pub fn save(&self) {
@@ -418,21 +374,8 @@ pub mod impls {
         }
 
         pub fn delete(&self) {
-            let users_table = UserTable::new();
-
-            let users: Vec<User> = users_table
-                .get_index_pk()
-                .range(
-                    &(self.owner, self.evaluation_id, AccountNumber::new(0))
-                        ..=&(self.owner, self.evaluation_id, AccountNumber::new(u64::MAX)),
-                )
-                .collect();
-
-            for user in users {
-                users_table.remove(&user);
-            }
-
-            GroupTable::new().remove(&self);
+            let table = GroupTable::new();
+            table.remove(&self);
         }
 
         fn new(owner: AccountNumber, evaluation_id: u32, number: u32) -> Self {
@@ -445,59 +388,60 @@ pub mod impls {
         }
 
         pub fn add(owner: AccountNumber, evaluation_id: u32, number: u32) {
-            let group = Group::new(owner, evaluation_id, number);
-            psibase::check_none(
-                GroupTable::new().get_index_pk().get(&&group.pk()),
-                "group already exists",
-            );
-
+            let group = Self::new(owner, evaluation_id, number);
             group.save();
         }
 
         pub fn get_users(&self) -> Vec<User> {
-            let (owner, id, group_num) = self.pk();
-            UserTable::new()
-                .get_index_by_group()
+            let table = UserTable::new();
+            table
+                .get_index_pk()
                 .range(
-                    &(owner, id, Some(group_num), AccountNumber::new(0))
-                        ..=&(owner, id, Some(group_num), AccountNumber::new(u64::MAX)),
+                    &(self.owner, self.evaluation_id, AccountNumber::new(0))
+                        ..=&(self.owner, self.evaluation_id, AccountNumber::new(u64::MAX)),
                 )
+                .filter(|user| user.group_number == Some(self.number))
                 .collect()
         }
 
         pub fn get_result(&self) -> Option<Vec<u8>> {
             let users = self.get_users();
-            let attestations = users.into_iter().map(|user| user.attestation).collect();
-            match calculate_results(attestations) {
-                GroupResult::ConsensusSuccess(result) => Some(result),
-                _ => None,
+            if users.is_empty() {
+                return None;
+            }
+
+            let mut results = Vec::new();
+            for user in users {
+                if let Some(proposal) = user.proposal {
+                    results.push(proposal);
+                }
+            }
+
+            if results.is_empty() {
+                None
+            } else {
+                Some(calculate_results(results, self.evaluation_id))
             }
         }
 
         pub fn declare_result(&self, result: Vec<u8>) {
-            let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
+            let evaluation = Evaluation::get(self.owner, self.evaluation_id);
+            evaluation.assert_status(EvaluationStatus::Submission);
 
-            if parent_eval.use_hooks {
-                EvalHooks::call_from(crate::Wrapper::SERVICE).evalGroupFin(
-                    self.evaluation_id,
-                    self.number,
-                    result.clone(),
-                );
+            let users = self.get_users();
+            for user in users {
+                if user.attestation.is_none() {
+                    panic!("Not all users have attested");
+                }
             }
 
-            let users = self.get_users().into_iter().map(|user| user.user).collect();
-
-            crate::Wrapper::emit().history().group_finished(
-                self.owner,
-                self.evaluation_id,
-                self.number,
-                users,
-                result,
-            );
+            let table = GroupTable::new();
+            let mut group = self.clone();
+            group.key_submitter = Some(psibase::get_sender());
+            table.put(&group).unwrap();
         }
 
         pub fn set_key_submitter(&mut self, submitter: AccountNumber) {
-            psibase::check_none(self.key_submitter, "group key has already been submitted");
             self.key_submitter = Some(submitter);
             self.save();
         }

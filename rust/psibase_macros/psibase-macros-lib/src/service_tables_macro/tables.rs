@@ -205,7 +205,7 @@ pub fn process_service_tables(
                 const DB: #psibase_mod::DbId = #psibase_mod::DbId::#db;
 
                 fn get_primary_key(&self) -> Self::PrimaryKey<'_> {
-                    &self.#pk_call_ident
+                    self.#pk_call_ident
                 }
 
                 fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {

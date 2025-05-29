@@ -24,8 +24,8 @@ pub mod tables {
     }
     impl SavedMessage {
         #[secondary_key(1)]
-        fn by_receiver(&self) -> AccountNumber {
-            self.receiver
+        fn by_receiver(&self) -> &AccountNumber {
+            &self.receiver
         }
     }
 }
