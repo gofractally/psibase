@@ -1,4 +1,3 @@
-use psibase::{service::*, AccountNumber, DbId, MethodNumber, TimePointUSec};
 use sha2::{Digest, Sha256};
 
 mod db;
@@ -47,14 +46,17 @@ pub mod service {
     fn check_init() {
         let table: InitTable = InitTable::new();
         check(
-            table.get_index_pk().get(&()).is_some(),
+            table.get_index_pk().get(&&()).is_some(),
             "service not initialized",
         );
     }
 
-    #[service_init]
+    /// Initialize the staged-tx service
+    #[action]
     fn init() {
-        // Initialize event indexes
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+
         let updated = MethodNumber::from("updated");
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
@@ -199,7 +201,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     #[action]
     fn get_staged_tx(id: u32) -> StagedTx {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
+        let staged_tx = StagedTxTable::new().get_index_pk().get(&&id);
         check(staged_tx.is_some(), "Unknown staged tx");
         staged_tx.unwrap()
     }

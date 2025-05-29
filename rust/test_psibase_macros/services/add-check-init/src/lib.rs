@@ -4,13 +4,12 @@ mod service_tables {
     use serde::{Deserialize, Serialize};
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {
-        #[primary_key]
-        pub pk: (),
-    }
+    pub struct InitRow {}
+
     impl InitRow {
-        fn pk(&self) -> &() {
-            &self.pk
+        #[primary_key]
+        fn pk(&self) -> () {
+            ()
         }
     }
 }
@@ -25,13 +24,13 @@ pub mod service {
     #[action]
     fn init() {
         let table = InitTable::new();
-        table.put(&InitRow { pk: () }).unwrap();
+        table.put(&InitRow {}).unwrap();
     }
 
     #[action]
     fn init2() {
         let table = InitTable::new();
-        table.put(&InitRow { pk: () }).unwrap();
+        table.put(&InitRow {}).unwrap();
     }
 
     #[pre_action(exclude(init, init2, check_inited))]

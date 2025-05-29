@@ -4,10 +4,17 @@ pub mod tables {
     use psibase::{AccountNumber, Fracpack, TimePointSec, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    pub struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
     #[table(name = "SavedMessageTable", index = 1)]
     #[derive(Debug, Serialize, Deserialize, ToSchema, Fracpack, SimpleObject)]
     pub struct SavedMessage {
-        #[primary_key]
         pub msg_id: u64,
         pub receiver: AccountNumber,
         pub sender: AccountNumber,
@@ -16,6 +23,11 @@ pub mod tables {
         pub datetime: TimePointSec,
     }
     impl SavedMessage {
+        #[primary_key]
+        fn pk(&self) -> u64 {
+            self.msg_id
+        }
+
         #[secondary_key(1)]
         fn by_receiver(&self) -> AccountNumber {
             self.receiver

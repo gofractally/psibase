@@ -27,8 +27,8 @@ mod service {
         pub datetime: TimePointSec,
     }
     impl SavedMessage {
-        fn by_msg_id(&self) -> &u64 {
-            &self.msg_id
+        fn by_msg_id(&self) -> u64 {
+            self.msg_id
         }
         fn by_receiver(&self) -> AccountNumber {
             self.receiver
@@ -42,8 +42,8 @@ mod service {
     }
 
     impl InitRow {
-        fn pk(&self) -> &() {
-            &self.pk
+        fn pk(&self) -> () {
+            self.pk
         }
     }
     #[allow(dead_code)]
@@ -327,8 +327,8 @@ mod service {
         type PrimaryKey = ();
         const SECONDARY_KEYS: u8 = 0u8;
         const DB: psibase::DbId = psibase::DbId::Service;
-        fn get_primary_key(&self) -> &Self::PrimaryKey {
-            self.pk()
+        fn get_primary_key(&self) -> RawKey {
+            self.pk().to_key()
         }
         fn get_secondary_keys(&self) -> Vec<psibase::RawKey> {
             (alloc::vec::Vec::new())
@@ -357,8 +357,8 @@ mod service {
         type PrimaryKey = u64;
         const SECONDARY_KEYS: u8 = 1u8;
         const DB: psibase::DbId = psibase::DbId::Service;
-        fn get_primary_key(&self) -> &Self::PrimaryKey {
-            self.by_msg_id()
+        fn get_primary_key(&self) -> RawKey {
+            self.by_msg_id().to_key()
         }
         fn get_secondary_keys(&self) -> Vec<psibase::RawKey> {
             (<[_]>::into_vec(

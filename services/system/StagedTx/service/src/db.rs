@@ -11,15 +11,10 @@ pub mod tables {
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    pub struct InitRow {
-        #[primary_key]
-        pk: (),
-    }
-
+    pub struct InitRow {}
     impl InitRow {
-        fn pk(&self) -> &() {
-            &self.pk
-        }
+        #[primary_key]
+        fn pk(&self) {}
     }
 
     /// A table that contains all of the transactions currently staged.
@@ -69,7 +64,9 @@ pub mod tables {
     }
     impl LastUsed {
         #[primary_key]
-        fn pk(&self) {}
+        fn pk(&self) -> () {
+            ()
+        }
     }
 
     /// A table that contains all of the responses to staged transactions.

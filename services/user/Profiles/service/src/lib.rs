@@ -40,6 +40,6 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getProfile(account: AccountNumber) -> Option<Profile> {
         let table = ProfileTable::new();
-        table.get_index_pk().get(&account)
+        table.get_index_pk().get(&&account)
     }
 }
