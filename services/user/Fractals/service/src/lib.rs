@@ -90,9 +90,6 @@ pub mod service {
     }
 
     fn check_is_eval() {
-        // keep action names less than 12 chars
-        // go psibase::service:: get the name
-
         check(
             get_sender() == AccountNumber::from("evaluations"),
             "sender must be evaluations",
@@ -100,7 +97,7 @@ pub mod service {
     }
 
     #[action]
-    fn on_eval_register(evaluation_id: u32, account: AccountNumber) {
+    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
         let member = psibase::check_some(
@@ -116,7 +113,7 @@ pub mod service {
     }
 
     #[action]
-    fn on_eval_unregister(evaluation_id: u32, account: AccountNumber) {}
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
 
     #[action]
     fn on_attestation(
@@ -136,7 +133,7 @@ pub mod service {
     }
 
     #[action]
-    fn on_eval_group_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
+    fn on_grp_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
         check_is_eval();
         EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .award_group_scores(group_number, group_result);

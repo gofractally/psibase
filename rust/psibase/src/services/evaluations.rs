@@ -12,17 +12,17 @@ pub mod Hooks {
     use crate::AccountNumber;
 
     #[action]
-    fn on_eval_register(evaluation_id: u32, account: AccountNumber) {
+    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
         unimplemented!()
     }
 
     #[action]
-    fn on_eval_unregister(evaluation_id: u32, account: AccountNumber) {
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
         unimplemented!()
     }
 
     #[action]
-    fn on_eval_group_fin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
+    fn on_grp_fin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
         unimplemented!()
     }
 }

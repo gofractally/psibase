@@ -242,13 +242,13 @@ pub mod impls {
 
         fn notify_register(&self, registrant: AccountNumber) {
             if self.use_hooks {
-                EvalHooks::call_to(self.owner).on_eval_register(self.id, registrant);
+                EvalHooks::call_to(self.owner).on_ev_reg(self.id, registrant);
             }
         }
 
         fn notify_unregister(&self, registrant: AccountNumber) {
             if self.use_hooks {
-                EvalHooks::call_to(self.owner).on_eval_unregister(self.id, registrant);
+                EvalHooks::call_to(self.owner).on_ev_unreg(self.id, registrant);
             }
         }
 
@@ -473,7 +473,7 @@ pub mod impls {
             let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
 
             if parent_eval.use_hooks {
-                EvalHooks::call_to(self.owner).on_eval_group_fin(
+                EvalHooks::call_to(self.owner).on_grp_fin(
                     self.evaluation_id,
                     self.number,
                     result.clone(),
