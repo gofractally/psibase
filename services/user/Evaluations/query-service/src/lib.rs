@@ -43,7 +43,7 @@ mod service {
 
 
     #[derive(Deserialize, SimpleObject)]
-    struct CreatedGroup {
+    struct NewGroup {
         owner: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
@@ -77,8 +77,8 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, CreatedGroup>> {
-            EventQuery::new("history.evaluations.created")
+        ) -> async_graphql::Result<Connection<u64, NewGroup>> {
+            EventQuery::new("history.evaluations.new_group")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {}",
                     evaluation_owner, evaluation_id

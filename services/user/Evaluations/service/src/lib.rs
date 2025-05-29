@@ -38,7 +38,7 @@ pub mod service {
     pub fn evaluation_start(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
-    pub fn created(
+    pub fn new_group(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,
@@ -126,7 +126,7 @@ pub mod service {
 
             Wrapper::emit()
                 .history()
-                .created(owner, evaluation_id, group.number, users);
+                .new_group(owner, evaluation_id, group.number, users);
         });
 
         Wrapper::emit()
