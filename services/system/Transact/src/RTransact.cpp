@@ -205,14 +205,19 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
 
    if (waitForFinal)
    {
-      auto currentBlock = to<Transact>().currentBlock();
-      auto blockTxs     = WriteOnly{}.open<BlockTxsTable>();
-      PSIBASE_SUBJECTIVE_TX
+      if (!trace.error().has_value())
       {
-         blockTxs.put(BlockTxRecord{
+         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessRecord{
              .id       = id,
-             .blockNum = currentBlock.blockNum,
+             .blockNum = to<Transact>().currentBlock().blockNum,
              .trace    = trace.unpack(),
+         });
+      }
+      else
+      {
+         WriteOnly{}.open<TxFailedTable>().put(TxFailedRecord{
+             .id    = id,
+             .trace = trace.unpack(),
          });
       }
       return;
@@ -325,33 +330,30 @@ void RTransact::sendReply(const psibase::Checksum256&        id,
 void RTransact::sendReplies(const std::vector<psibase::Checksum256>& txids)
 {
    stopTracking(txids);
-   auto blockTxsTable = WriteOnly{}.open<BlockTxsTable>();
+   auto successfulTxs = WriteOnly{}.open<TxSuccessTable>();
+   auto failedTxs     = WriteOnly{}.open<TxFailedTable>();
 
    for (auto id : txids)
    {
       std::optional<std::vector<char>> trace;
 
-      PSIBASE_SUBJECTIVE_TX
+      if (auto tx = successfulTxs.get(id))
       {
-         if (auto blockTx = blockTxsTable.get(id))
-         {
-            trace = psio::to_frac(blockTx->trace);
-            blockTxsTable.erase(id);
-         }
+         trace = psio::to_frac(tx->trace);
+         successfulTxs.erase(id);
       }
-
-      if (trace)
+      else if (auto tx = failedTxs.get(id))
       {
-         auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
-         sendReply(id, traceView);
+         trace = psio::to_frac(tx->trace);
+         failedTxs.erase(id);
       }
       else
       {
-         auto error_trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
-         auto error_trace_view =
-             psio::view<const TransactionTrace>{psio::prevalidated{error_trace}};
-         sendReply(id, error_trace_view);
+         trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
       }
+
+      auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
+      sendReply(id, traceView);
    }
 #ifdef __wasm32__
    printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
@@ -407,26 +409,23 @@ void RTransact::onBlock()
 
    std::vector<psibase::Checksum256> txids;
 
-   auto blockTxsTable  = WriteOnly{}.open<BlockTxsTable>();
-   auto pendingTxTable = Subjective{}.open<PendingTransactionTable>();
-   auto dataTable      = Subjective{}.open<TransactionDataTable>();
-   auto clientTable    = Subjective{}.open<TraceClientTable>();
+   auto successfulTxTable = WriteOnly{}.open<TxSuccessTable>();
+   auto pendingTxTable    = Subjective{}.open<PendingTransactionTable>();
+   auto dataTable         = Subjective{}.open<TransactionDataTable>();
+   auto clientTable       = Subjective{}.open<TraceClientTable>();
+
+   // Get all successful and irreversible transactions
+   auto successTxIdx = successfulTxTable.getIndex<1>();
+   for (BlockNum blockNum : irreversible)
+   {
+      for (const auto& tx : successTxIdx.subindex<psibase::Checksum256>(blockNum))
+      {
+         txids.push_back(tx.id);
+      }
+   }
 
    PSIBASE_SUBJECTIVE_TX
    {
-      // Get all successful and irreversible transactions
-      auto blockTxsIdx = blockTxsTable.getIndex<1>();
-      for (BlockNum blockNum : irreversible)
-      {
-         for (const auto& tx : blockTxsIdx.subindex<psibase::Checksum256>(blockNum))
-         {
-            if (tx.successful())
-            {
-               txids.push_back(tx.id);
-            }
-         }
-      }
-
       // Get all expired transactions
       for (auto pendingTx : pendingTxTable.getIndex<3>())
       {
@@ -441,7 +440,7 @@ void RTransact::onBlock()
          {  // Stop tracking an expired tx if no client is waiting for a reply.
             pendingTxTable.erase(pendingTx.id);
             dataTable.erase(pendingTx.id);
-            blockTxsTable.erase(pendingTx.id);
+            successfulTxTable.erase(pendingTx.id);
          }
       }
    }

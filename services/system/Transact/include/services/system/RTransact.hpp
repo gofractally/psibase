@@ -110,21 +110,28 @@ namespace SystemService
    };
    PSIO_REFLECT(LoginReply, access_token, token_type)
 
-   struct BlockTxRecord
+   struct TxSuccessRecord
    {
       psibase::Checksum256      id;
-      psibase::BlockNum         blockNum;
+      psibase::BlockNum         blockNum;  // The block in which the tx was applied
       psibase::TransactionTrace trace;
 
-      [[nodiscard]] bool successful() const { return !trace.error.has_value(); }
-
-      using ByBlockNum = psibase::CompositeKey<&BlockTxRecord::blockNum, &BlockTxRecord::id>;
+      using ByBlockNum = psibase::CompositeKey<&TxSuccessRecord::blockNum, &TxSuccessRecord::id>;
       auto byBlockNum() const { return ByBlockNum{}(*this); }
    };
-   PSIO_REFLECT(BlockTxRecord, id, blockNum, trace)
-   using BlockTxsTable =
-       psibase::Table<BlockTxRecord, &BlockTxRecord::id, BlockTxRecord::ByBlockNum{}>;
-   PSIO_REFLECT_TYPENAME(BlockTxsTable)
+   PSIO_REFLECT(TxSuccessRecord, id, blockNum, trace)
+   using TxSuccessTable =
+       psibase::Table<TxSuccessRecord, &TxSuccessRecord::id, TxSuccessRecord::ByBlockNum{}>;
+   PSIO_REFLECT_TYPENAME(TxSuccessTable)
+
+   struct TxFailedRecord
+   {
+      psibase::Checksum256      id;
+      psibase::TransactionTrace trace;
+   };
+   PSIO_REFLECT(TxFailedRecord, id, trace)
+   using TxFailedTable = psibase::Table<TxFailedRecord, &TxFailedRecord::id>;
+   PSIO_REFLECT_TYPENAME(TxFailedTable)
 
    struct WaitFor
    {
@@ -156,8 +163,11 @@ namespace SystemService
                                                                 AvailableSequenceTable,
                                                                 TraceClientTable,
                                                                 JWTKeyTable>;
-      using WriteOnly =
-          psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable, BlockTxsTable>;
+      using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
+                                                               ReversibleBlocksTable,
+                                                               TxSuccessTable,
+                                                               TxFailedTable>;
+
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
