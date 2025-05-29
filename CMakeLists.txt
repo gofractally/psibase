@@ -388,7 +388,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH services/user/Fractals
-    DEPENDS ${Fractally_js_DEP}
+    DEPENDS ${Fractals_js_DEP}
 )
 
 
