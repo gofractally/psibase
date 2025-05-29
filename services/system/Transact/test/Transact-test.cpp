@@ -308,4 +308,36 @@ TEST_CASE("Test push_transaction")
       auto trace = reply.get<TransactionTrace>();
       CHECK(Result<void>(std::move(trace)).failed("service account has no code"));
    }
+   SECTION("Duplicate push 2 keys error")
+   {
+      constexpr auto verifysig = VerifySig::service;
+
+      auto alice    = t.addAccount("alice", aliceKeys.first);
+      auto accounts = transactor<Accounts>{alice, Accounts::service};
+      auto act      = accounts.setAuthServ(AuthAny::service);
+      auto trx      = signTransaction(t.makeTransaction({std::move(act)}, 5),
+                                      {{verifysig, aliceKeys}, {verifysig, bobKeys}});
+
+      // make the signatures invalid
+      for (auto& proof : trx.proofs)
+         proof.clear();
+
+      t.setAutoRun(false);
+
+      std::vector<AsyncHttpReply> replies;
+      std::size_t                 remaining = 8;
+      do
+      {
+         replies.push_back(t.asyncPost(Transact::service, "/push_transaction", FracPackBody{trx}));
+      } while (t.runQueueItem() && --remaining != 0);
+
+      t.runAll();
+
+      for (auto& reply : replies)
+      {
+         auto trace = reply.poll<TransactionTrace>();
+         REQUIRE(trace.has_value());
+         CHECK(trace->error.has_value());
+      }
+   }
 }
