@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1.0"
-async-graphql = "7.0.10"
+async-graphql.workspace = true
 async-trait = "0.1.77"
 brotli = "7.0.0"
 chrono = "0.4"
