@@ -336,13 +336,14 @@ pub mod impls {
 
         pub fn assert_status(&self, expected_status: EvaluationStatus) {
             let current_phase = self.get_current_phase();
-            psibase::check(
-                current_phase == expected_status,
-                format!(
+            if current_phase != expected_status {
+                psibase::abort_message(
+                    format!(
                     "invalid evaluation phase, expected: {expected_status} actual: {current_phase}"
                 )
-                .as_str(),
-            );
+                    .as_str(),
+                );
+            }
         }
 
         pub fn get_user(&self, user: AccountNumber) -> Option<User> {
