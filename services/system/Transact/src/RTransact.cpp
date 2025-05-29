@@ -206,7 +206,7 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    if (waitForFinal)
    {
       auto currentBlock = to<Transact>().currentBlock();
-      auto blockTxs     = Subjective{}.open<BlockTxsTable>();
+      auto blockTxs     = WriteOnly{}.open<BlockTxsTable>();
       PSIBASE_SUBJECTIVE_TX
       {
          blockTxs.put(BlockTxRecord{
@@ -325,7 +325,7 @@ void RTransact::sendReply(const psibase::Checksum256&        id,
 void RTransact::sendReplies(const std::vector<psibase::Checksum256>& txids)
 {
    stopTracking(txids);
-   auto blockTxsTable = Subjective{}.open<BlockTxsTable>();
+   auto blockTxsTable = WriteOnly{}.open<BlockTxsTable>();
 
    for (auto id : txids)
    {
@@ -407,7 +407,7 @@ void RTransact::onBlock()
 
    std::vector<psibase::Checksum256> txids;
 
-   auto blockTxsTable  = Subjective{}.open<BlockTxsTable>();
+   auto blockTxsTable  = WriteOnly{}.open<BlockTxsTable>();
    auto pendingTxTable = Subjective{}.open<PendingTransactionTable>();
    auto dataTable      = Subjective{}.open<TransactionDataTable>();
    auto clientTable    = Subjective{}.open<TraceClientTable>();
