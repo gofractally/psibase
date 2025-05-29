@@ -35,10 +35,9 @@ use std::collections::HashMap;
 /// ```
 pub fn parse_rank_to_accounts(
     group_result: Vec<u8>,
-    group_members: Vec<AccountNumber>,
+    mut group_members: Vec<AccountNumber>,
 ) -> Vec<AccountNumber> {
     let mut rank_amount_to_account_dictionary: HashMap<u8, AccountNumber> = HashMap::new();
-    let mut group_members = group_members.clone();
 
     // Sort accounts by their u64 value in ascending order
     group_members.sort_by(|a, b| a.value.cmp(&b.value));

@@ -41,6 +41,17 @@ mod service {
         groups: Vec<Vec<AccountNumber>>,
     }
 
+
+    #[derive(Deserialize, SimpleObject)]
+    struct CreatedGroup {
+        owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        group_number: u32,
+        users: Vec<AccountNumber>,
+    }
+
     struct Query;
 
     #[Object]
@@ -55,6 +66,27 @@ mod service {
                     "owner = '{}' AND evaluation_id = {}",
                     evaluation_owner, evaluation_id
                 ))
+                .query()
+        }
+
+        async fn get_groups_created(
+            &self,
+            evaluation_owner: AccountNumber,
+            evaluation_id: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, CreatedGroup>> {
+            EventQuery::new("history.evaluations.created")
+                .condition(format!(
+                    "owner = '{}' AND evaluation_id = {}",
+                    evaluation_owner, evaluation_id
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
                 .query()
         }
 
@@ -82,11 +114,11 @@ mod service {
                 format!("owner = '{}'", evaluation_owner),
                 format!("evaluation_id = {}", evaluation_id),
             ];
-        
+
             if let Some(group_num) = group_number {
                 conditions.push(format!("group_number = {}", group_num));
             }
-        
+
             EventQuery::new("history.evaluations.group_finished")
                 .condition(conditions.join(" AND "))
                 .query()

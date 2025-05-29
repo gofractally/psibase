@@ -35,10 +35,14 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn evaluation_start(
+    pub fn evaluation_start(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn created(
         owner: AccountNumber,
         evaluation_id: u32,
-        groups: Vec<Vec<AccountNumber>>,
+        group_number: u32,
+        users: Vec<AccountNumber>,
     ) {
     }
 
@@ -113,21 +117,21 @@ pub mod service {
 
         evaluation.create_groups();
 
-        let groups: Vec<Vec<AccountNumber>> = evaluation
-            .get_groups()
-            .into_iter()
-            .map(|group| {
-                group
-                    .get_users()
-                    .into_iter()
-                    .map(|user| user.user)
-                    .collect()
-            })
-            .collect();
+        evaluation.get_groups().into_iter().for_each(|group| {
+            let users: Vec<AccountNumber> = group
+                .get_users()
+                .into_iter()
+                .map(|user| user.user)
+                .collect();
+
+            Wrapper::emit()
+                .history()
+                .created(owner, evaluation_id, group.number, users);
+        });
 
         Wrapper::emit()
             .history()
-            .evaluation_start(owner, evaluation_id, groups);
+            .evaluation_start(owner, evaluation_id);
     }
 
     /// Sets the public key for the user to receive the symmetric key.
