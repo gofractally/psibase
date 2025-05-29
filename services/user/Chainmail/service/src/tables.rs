@@ -4,6 +4,13 @@ pub mod tables {
     use psibase::{AccountNumber, Fracpack, TimePointSec, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    pub struct InitRow {
+        #[primary_key]
+        pub pk: (),
+    }
+
     #[table(name = "SavedMessageTable", index = 1)]
     #[derive(Debug, Serialize, Deserialize, ToSchema, Fracpack, SimpleObject)]
     pub struct SavedMessage {

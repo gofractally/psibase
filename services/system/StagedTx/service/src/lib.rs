@@ -1,4 +1,3 @@
-use psibase::{service::*, AccountNumber, DbId, MethodNumber, TimePointUSec};
 use sha2::{Digest, Sha256};
 
 mod db;
@@ -52,9 +51,12 @@ pub mod service {
         );
     }
 
-    #[service_init]
+    /// Initialize the staged-tx service
+    #[action]
     fn init() {
-        // Initialize event indexes
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+
         let updated = MethodNumber::from("updated");
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter

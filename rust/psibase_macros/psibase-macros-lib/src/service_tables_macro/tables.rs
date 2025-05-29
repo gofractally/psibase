@@ -200,11 +200,11 @@ pub fn process_service_tables(
 
         let table_record_impl = quote! {
             impl #psibase_mod::TableRecord for #table_record_struct_name {
-                type PrimaryKey = #pk_ty;
+                type PrimaryKey<'a> = &'a #pk_ty where Self: 'a;
                 const SECONDARY_KEYS: u8 = #sks_len;
                 const DB: #psibase_mod::DbId = #psibase_mod::DbId::#db;
 
-                fn get_primary_key(&self) -> &Self::PrimaryKey {
+                fn get_primary_key(&self) -> Self::PrimaryKey<'_> {
                     &self.#pk_call_ident
                 }
 

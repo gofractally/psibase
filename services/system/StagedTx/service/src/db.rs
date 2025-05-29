@@ -13,13 +13,7 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
     pub struct InitRow {
         #[primary_key]
-        pk: (),
-    }
-
-    impl InitRow {
-        fn pk(&self) -> &() {
-            &self.pk
-        }
+        pub pk: (),
     }
 
     /// A table that contains all of the transactions currently staged.
