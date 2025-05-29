@@ -3,6 +3,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+#include <psibase/Actor.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
@@ -40,7 +41,7 @@ namespace psibase
          auto result = psio::gql_query(queryRoot, query, {});
          return HttpReply{
              .contentType = "application/json",
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+             .body        = std::move(result),
          };
       };
 
@@ -54,8 +55,8 @@ namespace psibase
       {
          auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return HttpReply{
-             .contentType = "text",                                          // TODO
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+             .contentType = "text/graphql",
+             .body        = std::move(result),
          };
       }
       else if (request.method == "POST")
@@ -352,6 +353,26 @@ namespace psibase
       }
       return result;
    }  // makeConnection
+
+   // Overload for makeConnection, with full Connection type deduction from the index.
+   template <typename T, typename Key, typename Proj = std::identity>
+   auto makeConnection(const TableIndex<T, Key>&         index,
+                       const std::optional<Key>&         gt,
+                       const std::optional<Key>&         ge,
+                       const std::optional<Key>&         lt,
+                       const std::optional<Key>&         le,
+                       std::optional<uint32_t>           first,
+                       std::optional<uint32_t>           last,
+                       const std::optional<std::string>& before,
+                       const std::optional<std::string>& after,
+                       Proj&&                            proj = {})
+   {
+      constexpr auto connName = psio::reflect<T>::name + "Connection";
+      constexpr auto edgeName = psio::reflect<T>::name + "Edge";
+      using Connection        = psibase::Connection<T, connName, edgeName>;
+      return makeConnection<Connection>(index, gt, ge, lt, le, first, last, before, after,
+                                        std::forward<Proj>(proj));
+   }
 
    /// Similar to makeConnection, except that it allows pagination through a virtual table index.
    ///
