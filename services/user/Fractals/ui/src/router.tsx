@@ -12,6 +12,7 @@ import { Layout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/protected-route";
 
 import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
+import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
 import { Browse } from "./pages/global/browse";
 
 export const router = createBrowserRouter([
@@ -84,6 +85,16 @@ export const router = createBrowserRouter([
                     <ProtectedRoute>
                         <AppExists>
                             <Completed />
+                        </AppExists>
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: ":fractalName/evaluations/completed/:evaluationId",
+                element: (
+                    <ProtectedRoute>
+                        <AppExists>
+                            <EvaluationResult />
                         </AppExists>
                     </ProtectedRoute>
                 ),

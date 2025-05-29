@@ -28,6 +28,8 @@ const QueryKey = {
     evaluation: (evaluationId: OptionalNumber) =>
         ["evaluation", evaluationId] as const,
     completedEvaluations: () => ["completedEvaluations"] as const,
+    evaluationResults: (evaluationId: OptionalNumber) =>
+        ["evaluationResults", evaluationId] as const,
     usersAndGroups: (evaluationId: OptionalNumber) =>
         ["usersAndGroups", evaluationId] as const,
     groupUsers: (evaluationId: OptionalNumber, groupNumber: OptionalNumber) =>

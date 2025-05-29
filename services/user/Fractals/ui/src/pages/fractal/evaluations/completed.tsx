@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 
 import {
     Table,
@@ -15,7 +16,7 @@ import { useCompletedEvaluation } from "@/hooks/fractals/use-completed-evaluatio
 
 export const Completed = () => {
     const { data: evaluations } = useCompletedEvaluation();
-
+    const navigate = useNavigate();
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <div className="flex h-9 items-center">
@@ -36,7 +37,10 @@ export const Completed = () => {
                         <TableBody>
                             {evaluations?.map((evaluation) => (
                                 <TableRow
-                                    key={`evaluation-${evaluation.evaluationId}`}
+                                    onClick={() => {
+                                        navigate(`${evaluation.evaluationId}`);
+                                    }}
+                                    className="cursor-pointer"
                                 >
                                     <TableCell>
                                         {dayjs(evaluation.deliberation).format(
