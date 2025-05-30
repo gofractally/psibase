@@ -179,12 +179,8 @@ pub mod service {
     /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
-    fn close(owner: AccountNumber, evaluation_id: u32) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
-        check(
-            get_sender() == evaluation.owner,
-            "only owner can close an evaluation",
-        );
+    fn close(evaluation_id: u32) {
+        let evaluation = Evaluation::get(get_sender(), evaluation_id);
         evaluation.assert_status(EvaluationStatus::Closed);
 
         evaluation.get_groups().iter().for_each(|group| {

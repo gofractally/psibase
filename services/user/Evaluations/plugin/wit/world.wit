@@ -40,7 +40,7 @@ interface admin {
     /// Parameters:
     /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
-    close: func(evaluation-owner: account, evaluation-id: u32) -> result<_, error>;
+    close: func(evaluation-id: u32) -> result<_, error>;
 
     /// Deletes evaluation during pending or closed phase
     ///

@@ -4,11 +4,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-
 const Params = z.object({
-    owner: zAccount,
-    evaluationId: z.number()
-})
+    evaluationId: z.number(),
+});
 
 export const useCloseEvaluation = () => {
     const navigate = useNavigate();
@@ -18,7 +16,7 @@ export const useCloseEvaluation = () => {
                 method: "close",
                 service: "evaluations",
                 intf: "admin",
-                params: [params.owner, params.evaluationId],
+                params: [params.evaluationId],
             }));
             navigate(`/`);
         },
