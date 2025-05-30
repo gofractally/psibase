@@ -492,7 +492,7 @@ pub mod impls {
 
             let users = self.get_users().into_iter().map(|user| user.user).collect();
 
-            crate::Wrapper::emit().history().group_finished(
+            crate::Wrapper::emit().history().group_fin(
                 self.owner,
                 self.evaluation_id,
                 self.number,

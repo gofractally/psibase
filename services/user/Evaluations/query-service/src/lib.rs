@@ -118,7 +118,7 @@ mod service {
                 conditions.push(format!("group_number = {}", group_num));
             }
 
-            EventQuery::new("history.evaluations.group_finished")
+            EventQuery::new("history.evaluations.group_fin")
                 .condition(conditions.join(" AND "))
                 .query()
         }

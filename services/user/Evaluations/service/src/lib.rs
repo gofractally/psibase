@@ -25,7 +25,7 @@ pub mod service {
     pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
-    pub fn group_finished(
+    pub fn group_fin(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,
