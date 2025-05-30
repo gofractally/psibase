@@ -461,6 +461,7 @@ void RTransact::onBlock()
    std::vector<psibase::Checksum256> txids;
 
    auto successfulTxTable = WriteOnly{}.open<TxSuccessTable>();
+   auto failedTxTable     = Subjective{}.open<TxFailedTable>();
    auto pendingTxTable    = Subjective{}.open<PendingTransactionTable>();
    auto dataTable         = Subjective{}.open<TransactionDataTable>();
    auto clientTable       = Subjective{}.open<TraceClientTable>();
@@ -491,7 +492,9 @@ void RTransact::onBlock()
          {  // Stop tracking an expired tx if no client is waiting for a reply.
             pendingTxTable.erase(pendingTx.id);
             dataTable.erase(pendingTx.id);
+
             successfulTxTable.erase(pendingTx.id);
+            failedTxTable.erase(pendingTx.id);
          }
       }
    }
