@@ -11,11 +11,12 @@ import { generate, GenerateOptions } from "@bytecodealliance/jco/component";
 // Raw imports
 import hostShimCode from "./host-api.js?raw";
 import privilegedShimCode from "./privileged-api.js?raw";
-import cliShimCode from "@bytecodealliance/preview2-shim/lib/browser/cli.js?raw"
-import clocksShimCode from "@bytecodealliance/preview2-shim/lib/browser/clocks.js?raw";
-import filesystemShimCode from "@bytecodealliance/preview2-shim/lib/browser/filesystem.js?raw";
-import ioShimCode from "@bytecodealliance/preview2-shim/lib/browser/io.js?raw";
-import randomShimCode from "@bytecodealliance/preview2-shim/lib/browser/random.js?raw";
+
+const cliShimCode = require.resolve("@bytecodealliance/preview2-shim/lib/browser/cli.js");
+const clocksShimCode = require.resolve("@bytecodealliance/preview2-shim/lib/browser/clocks.js");
+const filesystemShimCode = require.resolve("@bytecodealliance/preview2-shim/lib/browser/filesystem.js");
+const ioShimCode = require.resolve("@bytecodealliance/preview2-shim/lib/browser/io.js");
+const randomShimCode = require.resolve("@bytecodealliance/preview2-shim/lib/browser/random.js");
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
