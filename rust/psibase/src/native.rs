@@ -316,14 +316,6 @@ pub fn abort_subjective() {
 /// the subjective database is accessible. It is necessary to use
 /// this scope for any reads or writes to the subjective database.
 ///
-/// ```rust
-/// use psibase::subjective_tx;
-///
-/// subjective_tx! {
-///     // your code here
-/// }
-/// ```
-///
 /// The statement will be executed one or more times until
 /// it is successfully committed.
 ///
