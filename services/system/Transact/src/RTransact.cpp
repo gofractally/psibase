@@ -279,6 +279,7 @@ namespace
       }
    }
 
+   // This function should only be called for a transaction id that has clients waiting for it.
    void sendReply(const psibase::Checksum256&                 id,
                   psio::view<const psibase::TransactionTrace> trace,
                   const ClientFilter&                         clientFilter = noFilter)
@@ -286,7 +287,7 @@ namespace
       TransactionTraceRef pruned     = PruneTrace{true}(trace);
       auto [jsonClients, binClients] = claimClientReply(id, clientFilter);
 
-      if (jsonClients.empty() && binClients.empty())
+      if (jsonClients.empty() && binClients.empty())  // failsafe
          return;
 
       ActionViewBuilder<HttpServer> http{getReceiver(), HttpServer::service};
