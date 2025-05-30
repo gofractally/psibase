@@ -7,7 +7,6 @@ use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
-use psibase::AccountNumber;
 
 pub mod consensus;
 mod errors;
@@ -18,7 +17,10 @@ pub mod types;
 
 use errors::ErrorType;
 use evaluations::action_structs as Actions;
-use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
+use helpers::{
+    check_app_origin, current_user, get_decrypted_proposals, get_symmetric_key,
+    parse_account_number,
+};
 use std::collections::HashSet;
 
 struct EvaluationsPlugin;
@@ -47,8 +49,7 @@ impl Admin for EvaluationsPlugin {
     }
 
     fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
 
         let packed_args = Actions::start {
             owner: evaluation_owner,
@@ -59,8 +60,7 @@ impl Admin for EvaluationsPlugin {
     }
 
     fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
         let packed_args = Actions::close {
             owner: evaluation_owner,
             evaluation_id,
@@ -84,14 +84,12 @@ impl Admin for EvaluationsPlugin {
         evaluation_id: u32,
         registrant: String,
     ) -> Result<(), Error> {
-        let registrant =
-            AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let registrant = parse_account_number(&registrant)?;
 
-        let owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
 
         let packed_args = Actions::register {
-            owner,
+            owner: evaluation_owner,
             evaluation_id,
             registrant,
         }
@@ -104,10 +102,8 @@ impl Admin for EvaluationsPlugin {
         evaluation_id: u32,
         registrant: String,
     ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let registrant =
-            AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+        let registrant = parse_account_number(&registrant)?;
 
         let packed_args = Actions::unregister {
             owner: evaluation_owner,
@@ -121,6 +117,10 @@ impl Admin for EvaluationsPlugin {
 
 impl User for EvaluationsPlugin {
     fn register(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+
+        check_app_origin(evaluation_owner)?;
+
         let key = key_table::AsymKey::new();
         let public_key_vectored = key.public_key()?.serialize().to_vec();
 
@@ -133,11 +133,9 @@ impl User for EvaluationsPlugin {
         key.save()?;
 
         let registrant = current_user().expect("not authenticated");
-        let owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
 
         let packed_args = Actions::register {
-            owner,
+            owner: evaluation_owner,
             evaluation_id,
             registrant,
         }
@@ -146,8 +144,8 @@ impl User for EvaluationsPlugin {
     }
 
     fn unregister(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+        check_app_origin(evaluation_owner)?;
 
         let registrant = current_user().expect("not authenticated");
 
@@ -166,8 +164,9 @@ impl User for EvaluationsPlugin {
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+        check_app_origin(evaluation_owner)?;
+
         let current_user = current_user()?;
 
         let symmetric_key =
@@ -202,9 +201,9 @@ impl User for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
         let current_user = current_user()?;
+        check_app_origin(evaluation_owner)?;
 
         let eval_data = graphql::fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
         // TODO: Don't fetch_and_decode again inside get_decrypted_proposals, just call e.g. `decrypt(proposals)`
@@ -254,8 +253,9 @@ impl User for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<Option<Vec<u8>>, Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+
+        check_app_origin(evaluation_owner)?;
         let current_user = current_user()?;
         let submissions =
             get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
@@ -273,8 +273,7 @@ impl User for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<Vec<String>, Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
         let users = graphql::fetch_group_users(evaluation_owner, evaluation_id, group_number)?
             .get_group_users
             .nodes;

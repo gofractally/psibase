@@ -1,9 +1,13 @@
+use std::str::FromStr;
+
 use crate::bindings;
 use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::errors::ErrorType;
 use crate::key_table;
 use crate::types;
+use bindings::host::common::client as Client;
 use ecies::{decrypt, encrypt};
+use psibase::services::chainmail::action_structs::send;
 use psibase::{fracpack::Pack, AccountNumber};
 
 use crate::bindings::host::common::types::Error;
@@ -19,6 +23,20 @@ pub fn current_user() -> Result<AccountNumber, Error> {
     let account_number =
         AccountNumber::from_exact(&current_user).map_err(|_| ErrorType::InvalidAccountNumber)?;
     Ok(account_number)
+}
+
+fn get_sender_app() -> Result<AccountNumber, ErrorType> {
+    let sender_string = Client::get_sender_app().app.ok_or(ErrorType::NoSender)?;
+    AccountNumber::from_str(&sender_string).map_err(|_| ErrorType::InvalidAccountNumber)
+}
+
+pub fn check_app_origin(owner: AccountNumber) -> Result<(), ErrorType> {
+    let sender = get_sender_app()?;
+
+    if sender != owner && sender != psibase::services::evaluations::SERVICE {
+        return Err(ErrorType::InvalidSender(sender.to_string()).into());
+    }
+    Ok(())
 }
 
 pub fn create_new_symmetric_key(
