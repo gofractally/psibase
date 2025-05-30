@@ -166,11 +166,20 @@ pub mod impls {
             self.save();
         }
 
-        pub fn attest(&mut self, attestation: Vec<u8>) {
+        pub fn attest(&mut self, attestation: Vec<u8>, use_hook: bool) {
             psibase::check(
                 self.attestation.is_none(),
                 format!("user {} has already submitted", self.user).as_str(),
             );
+
+            if use_hook {
+                EvalHooks::call_to(self.owner).on_attest(
+                    self.evaluation_id,
+                    self.group_number.unwrap(),
+                    self.user,
+                    attestation.clone(),
+                );
+            }
 
             self.attestation = Some(attestation);
             self.save();

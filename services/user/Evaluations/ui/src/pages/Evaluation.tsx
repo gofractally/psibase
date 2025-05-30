@@ -104,8 +104,7 @@ export const EvaluationPage = () => {
             !isStartEvaluationSuccess
         ) {
             startEvaluation({
-                owner: zAccount.parse(owner),
-                id: evaluation!.id,
+                evaluationId: evaluation!.id,
             });
         }
     }, [

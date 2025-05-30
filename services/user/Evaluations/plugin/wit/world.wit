@@ -23,13 +23,12 @@ interface admin {
     /// Starts a specific evaluation.
     ///
     /// Requires:
-    /// * Callable by anyone
+    /// * Must be called by the evaluation owner.
     /// * Must be in deliberation phase (ideally at the beginning)
     /// 
     /// Parameters:
-    /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
-    start: func(evaluation-owner: account, evaluation-id: u32) -> result<_, error>;
+    start: func(evaluation-id: u32) -> result<_, error>;
 
     /// Closes a specific evaluation
     ///
@@ -38,7 +37,6 @@ interface admin {
     /// * Must be in closed phase
     ///
     /// Parameters:
-    /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
     close: func(evaluation-id: u32) -> result<_, error>;
 
@@ -56,10 +54,9 @@ interface admin {
     /// * Must be in registration phase 
     ///
     /// Parameters:
-    /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
     /// * `registrant`: The account to be registered.
-    register-other: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+    register-other: func(evaluation-id: u32, registrant: account) -> result<_, error>;
 
     /// Unregisters an account from a specific evaluation.
     /// 
@@ -67,10 +64,9 @@ interface admin {
     /// * Must be in registration phase 
     ///
     /// Parameters:
-    /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
     /// * `registrant`: The account to be unregistered.
-    unregister-other: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+    unregister-other: func(evaluation-id: u32, registrant: account) -> result<_, error>;
 }
 
 interface user {

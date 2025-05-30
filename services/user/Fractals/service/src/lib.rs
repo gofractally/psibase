@@ -26,10 +26,8 @@ pub mod service {
 
         evaluation.set_pending_scores(0.0);
 
-        psibase::services::evaluations::Wrapper::call().start(
-            get_service(),
-            check_some(evaluation.evaluation_id, "no set evaluation id"),
-        );
+        psibase::services::evaluations::Wrapper::call()
+            .start(check_some(evaluation.evaluation_id, "no set evaluation id"));
     }
 
     #[action]
@@ -118,12 +116,7 @@ pub mod service {
     }
 
     #[action]
-    fn on_attestation(
-        evaluation_id: u32,
-        group_number: u32,
-        user: AccountNumber,
-        attestation: Vec<u8>,
-    ) {
+    fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
         check_is_eval();
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))

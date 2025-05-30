@@ -424,7 +424,6 @@ pub mod tables {
                 submission,
                 finish_by,
             );
-
         }
 
         pub fn schedule_next_evaluation(&mut self) {
@@ -445,7 +444,7 @@ pub mod tables {
                 interval,
             );
 
-            psibase::services::evaluations::Wrapper::call().close(get_service(), old_evaluation_id);
+            psibase::services::evaluations::Wrapper::call().close(old_evaluation_id);
         }
 
         pub fn set_evaluation_schedule(

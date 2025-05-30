@@ -48,14 +48,8 @@ impl Admin for EvaluationsPlugin {
         add_action_to_transaction(Actions::create::ACTION_NAME, &packed_args)
     }
 
-    fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = parse_account_number(&evaluation_owner)?;
-
-        let packed_args = Actions::start {
-            owner: evaluation_owner,
-            evaluation_id,
-        }
-        .packed();
+    fn start(evaluation_id: u32) -> Result<(), Error> {
+        let packed_args = Actions::start { evaluation_id }.packed();
         add_action_to_transaction(Actions::start::ACTION_NAME, &packed_args)
     }
 
@@ -74,17 +68,11 @@ impl Admin for EvaluationsPlugin {
         add_action_to_transaction(Actions::delete::ACTION_NAME, &packed_args)
     }
 
-    fn register_other(
-        evaluation_owner: String,
-        evaluation_id: u32,
-        registrant: String,
-    ) -> Result<(), Error> {
+    fn register_other(evaluation_id: u32, registrant: String) -> Result<(), Error> {
         let registrant = parse_account_number(&registrant)?;
 
-        let evaluation_owner = parse_account_number(&evaluation_owner)?;
-
         let packed_args = Actions::register {
-            owner: evaluation_owner,
+            owner: current_user()?,
             evaluation_id,
             registrant,
         }
@@ -92,16 +80,11 @@ impl Admin for EvaluationsPlugin {
         add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
     }
 
-    fn unregister_other(
-        evaluation_owner: String,
-        evaluation_id: u32,
-        registrant: String,
-    ) -> Result<(), Error> {
-        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+    fn unregister_other(evaluation_id: u32, registrant: String) -> Result<(), Error> {
         let registrant = parse_account_number(&registrant)?;
 
         let packed_args = Actions::unregister {
-            owner: evaluation_owner,
+            owner: current_user()?,
             evaluation_id,
             registrant,
         }

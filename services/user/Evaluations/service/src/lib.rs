@@ -107,10 +107,10 @@ pub mod service {
     /// Therefore it is recommended that evaluations are only used in a context where there is a whitelist of allowed registrants ahead of time.
     ///
     /// # Arguments
-    /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to start.
     #[action]
-    fn start(owner: AccountNumber, evaluation_id: u32) {
+    fn start(evaluation_id: u32) {
+        let owner = get_sender();
         let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
@@ -176,7 +176,6 @@ pub mod service {
     /// Closes an evaluation and deletes its groups.
     ///
     /// # Arguments
-    /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
     fn close(evaluation_id: u32) {
@@ -258,7 +257,7 @@ pub mod service {
         evaluation.assert_status(EvaluationStatus::Submission);
 
         let mut user = evaluation.get_user(sender).expect("user not found");
-        user.attest(attestation);
+        user.attest(attestation, evaluation.use_hooks);
 
         let group = evaluation
             .get_group(user.group_number.unwrap())
