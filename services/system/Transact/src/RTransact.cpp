@@ -326,20 +326,23 @@ namespace
          if (auto tx = successfulTxs.get(id))
          {
             trace = psio::to_frac(tx->trace);
-            successfulTxs.erase(id);
          }
-
-         PSIBASE_SUBJECTIVE_TX
+         else
          {
-            if (auto tx = failedTxs.get(id))
+            PSIBASE_SUBJECTIVE_TX
             {
-               if (!trace)
+               if (auto tx = failedTxs.get(id))
                {
                   trace = psio::to_frac(tx->trace);
                }
-
-               failedTxs.erase(id);
             }
+         }
+
+         // Erase any traces
+         successfulTxs.erase(id);
+         PSIBASE_SUBJECTIVE_TX
+         {
+            failedTxs.erase(id);
          }
 
          if (!trace)
