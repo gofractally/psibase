@@ -328,20 +328,23 @@ namespace
             trace = psio::to_frac(tx->trace);
             successfulTxs.erase(id);
          }
-         else
+
+         PSIBASE_SUBJECTIVE_TX
          {
-            PSIBASE_SUBJECTIVE_TX
+            if (auto tx = failedTxs.get(id))
             {
-               if (auto tx = failedTxs.get(id))
+               if (!trace)
                {
                   trace = psio::to_frac(tx->trace);
-                  failedTxs.erase(id);
                }
-               else
-               {
-                  trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
-               }
+
+               failedTxs.erase(id);
             }
+         }
+
+         if (!trace)
+         {
+            trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
          }
 
          auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
