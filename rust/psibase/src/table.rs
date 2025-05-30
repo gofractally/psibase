@@ -20,13 +20,11 @@ custom_error! {
 }
 
 pub trait TableRecord: Pack + UnpackOwned {
-    type PrimaryKey<'a>: ToKey
-    where
-        Self: 'a;
+    type PrimaryKey: ToKey;
     const SECONDARY_KEYS: u8;
     const DB: DbId = DbId::Service;
 
-    fn get_primary_key(&self) -> Self::PrimaryKey<'_>;
+    fn get_primary_key(&self) -> RawKey;
 
     /// Return the list of secondary keys.
     ///
@@ -64,24 +62,22 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 
     /// Returns the Primary Key Index
-    fn get_index_pk(&self) -> TableIndex<Record::PrimaryKey<'_>, Record> {
-        self.get_index::<Record::PrimaryKey<'_>>(0)
+    fn get_index_pk(&self) -> TableIndex<Record::PrimaryKey, Record> {
+        self.get_index::<Record::PrimaryKey>(0)
     }
 
     /// Put a value in the table
     fn put(&self, value: &Record) -> Result<(), Error> {
-        let pk = value.get_primary_key();
-        let pk_bytes = self.serialize_key(0, &pk);
-        self.handle_secondary_keys_put(&pk_bytes.to_key(), value)?;
-        kv_put(self.db_id(), &pk_bytes, value);
+        let pk = self.serialize_key(0, &value.get_primary_key());
+        self.handle_secondary_keys_put(&pk.to_key(), value)?;
+        kv_put(self.db_id(), &pk, value);
         Ok(())
     }
 
     /// Removes a value from the table
     fn remove(&self, value: &Record) {
-        let pk = value.get_primary_key();
-        let pk_bytes = self.serialize_key(0, &pk);
-        kv_remove(self.db_id(), &pk_bytes);
+        let pk = self.serialize_key(0, &value.get_primary_key());
+        kv_remove(self.db_id(), &pk);
         self.handle_secondary_keys_removal(value);
     }
 

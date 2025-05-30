@@ -23,7 +23,7 @@ mod service {
     #[action]
     fn init() {
         let table = InitTable::new();
-        table.put(&InitRow { pk: () }).unwrap();
+        table.put(&InitRow {}).unwrap();
 
         SitesSvc::call().enableSpa(true);
 

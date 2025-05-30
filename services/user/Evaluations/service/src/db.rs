@@ -14,8 +14,8 @@ pub mod tables {
 
     impl ConfigRow {
         #[primary_key]
-        fn pk(&self) -> &AccountNumber {
-            &self.owner
+        fn pk(&self) -> AccountNumber {
+            self.owner
         }
     }
 
@@ -65,8 +65,8 @@ pub mod tables {
 
     impl User {
         #[primary_key]
-        pub fn pk(&self) -> &(AccountNumber, u32, AccountNumber) {
-            &(self.owner, self.evaluation_id, self.user)
+        pub fn pk(&self) -> (AccountNumber, u32, AccountNumber) {
+            (self.owner, self.evaluation_id, self.user)
         }
 
         #[secondary_key(1)]
@@ -77,15 +77,15 @@ pub mod tables {
 
     impl Evaluation {
         #[primary_key]
-        pub fn pk(&self) -> &(AccountNumber, u32) {
-            &(self.owner, self.id)
+        pub fn pk(&self) -> (AccountNumber, u32) {
+            (self.owner, self.id)
         }
     }
 
     impl Group {
         #[primary_key]
-        pub fn pk(&self) -> &(AccountNumber, u32, u32) {
-            &(self.owner, self.evaluation_id, self.number)
+        pub fn pk(&self) -> (AccountNumber, u32, u32) {
+            (self.owner, self.evaluation_id, self.number)
         }
     }
 }
@@ -103,7 +103,7 @@ pub mod impls {
     impl ConfigRow {
         pub fn next_id(owner: AccountNumber) -> u32 {
             let table = ConfigTable::new();
-            let mut config = table.get_index_pk().get(&&owner).unwrap_or(Self {
+            let mut config = table.get_index_pk().get(&owner).unwrap_or(Self {
                 owner,
                 last_used_id: 0,
             });
@@ -120,7 +120,7 @@ pub mod impls {
 
         pub fn get(user: AccountNumber) -> Option<Self> {
             let table = UserSettingsTable::new();
-            table.get_index_pk().get(&&user)
+            table.get_index_pk().get(&user)
         }
 
         pub fn save(&self) {
@@ -150,7 +150,7 @@ pub mod impls {
         pub fn get(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Option<Self> {
             UserTable::new()
                 .get_index_pk()
-                .get(&&(owner, evaluation_id, user))
+                .get(&(owner, evaluation_id, user))
         }
 
         fn save(&self) {
@@ -229,8 +229,8 @@ pub mod impls {
             table
                 .get_index_pk()
                 .range(
-                    &(self.owner, self.id, AccountNumber::new(0))
-                        ..=&(self.owner, self.id, AccountNumber::new(u64::MAX)),
+                    (self.owner, self.id, AccountNumber::new(0))
+                        ..=(self.owner, self.id, AccountNumber::new(u64::MAX)),
                 )
                 .collect()
         }
@@ -280,7 +280,7 @@ pub mod impls {
             let table = GroupTable::new();
             let result = table
                 .get_index_pk()
-                .range(&(self.owner, self.id, 0)..=&(self.owner, self.id, u32::MAX))
+                .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
                 .collect();
             result
         }
@@ -289,13 +289,13 @@ pub mod impls {
             let table = GroupTable::new();
             let result = table
                 .get_index_pk()
-                .get(&&(self.owner, self.id, group_number));
+                .get(&(self.owner, self.id, group_number));
             result
         }
 
         pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
             let table = EvaluationTable::new();
-            let result = table.get_index_pk().get(&&(owner, evaluation_id));
+            let result = table.get_index_pk().get(&(owner, evaluation_id));
             psibase::check_some(
                 result,
                 &format!("evaluation {} {} not found", owner, evaluation_id),
@@ -308,8 +308,8 @@ pub mod impls {
             let users: Vec<User> = users_table
                 .get_index_pk()
                 .range(
-                    &(self.owner, self.id, AccountNumber::new(0))
-                        ..=&(self.owner, self.id, AccountNumber::new(u64::MAX)),
+                    (self.owner, self.id, AccountNumber::new(0))
+                        ..=(self.owner, self.id, AccountNumber::new(u64::MAX)),
                 )
                 .collect();
 
@@ -320,7 +320,7 @@ pub mod impls {
             let groups_table = GroupTable::new();
             let groups: Vec<Group> = groups_table
                 .get_index_pk()
-                .range(&(self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
+                .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
                 .collect();
 
             for group in groups {
@@ -409,7 +409,7 @@ pub mod impls {
     impl Group {
         pub fn get(owner: AccountNumber, evaluation_id: u32, number: u32) -> Option<Self> {
             let table = GroupTable::new();
-            table.get_index_pk().get(&&(owner, evaluation_id, number))
+            table.get_index_pk().get(&(owner, evaluation_id, number))
         }
 
         pub fn save(&self) {
@@ -423,8 +423,8 @@ pub mod impls {
             let users: Vec<User> = users_table
                 .get_index_pk()
                 .range(
-                    &(self.owner, self.evaluation_id, AccountNumber::new(0))
-                        ..=&(self.owner, self.evaluation_id, AccountNumber::new(u64::MAX)),
+                    (self.owner, self.evaluation_id, AccountNumber::new(0))
+                        ..=(self.owner, self.evaluation_id, AccountNumber::new(u64::MAX)),
                 )
                 .collect();
 
@@ -447,7 +447,7 @@ pub mod impls {
         pub fn add(owner: AccountNumber, evaluation_id: u32, number: u32) {
             let group = Group::new(owner, evaluation_id, number);
             psibase::check_none(
-                GroupTable::new().get_index_pk().get(&&group.pk()),
+                GroupTable::new().get_index_pk().get(&group.pk()),
                 "group already exists",
             );
 
@@ -459,8 +459,8 @@ pub mod impls {
             UserTable::new()
                 .get_index_by_group()
                 .range(
-                    &(owner, id, Some(group_num), AccountNumber::new(0))
-                        ..=&(owner, id, Some(group_num), AccountNumber::new(u64::MAX)),
+                    (owner, id, Some(group_num), AccountNumber::new(0))
+                        ..=(owner, id, Some(group_num), AccountNumber::new(u64::MAX)),
                 )
                 .collect()
         }
