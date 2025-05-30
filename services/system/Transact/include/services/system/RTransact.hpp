@@ -162,11 +162,11 @@ namespace SystemService
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
                                                                 TraceClientTable,
-                                                                JWTKeyTable>;
+                                                                JWTKeyTable,
+                                                                TxFailedTable>;
       using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
                                                                ReversibleBlocksTable,
-                                                               TxSuccessTable,
-                                                               TxFailedTable>;
+                                                               TxSuccessTable>;
 
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P

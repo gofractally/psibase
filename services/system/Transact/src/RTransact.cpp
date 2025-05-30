@@ -215,10 +215,13 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
       }
       else
       {
-         WriteOnly{}.open<TxFailedTable>().put(TxFailedRecord{
-             .id    = id,
-             .trace = trace.unpack(),
-         });
+         PSIBASE_SUBJECTIVE_TX
+         {
+            Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+                .id    = id,
+                .trace = trace.unpack(),
+            });
+         }
       }
       return;
    }
@@ -331,25 +334,28 @@ void RTransact::sendReplies(const std::vector<psibase::Checksum256>& txids)
 {
    stopTracking(txids);
    auto successfulTxs = WriteOnly{}.open<TxSuccessTable>();
-   auto failedTxs     = WriteOnly{}.open<TxFailedTable>();
+   auto failedTxs     = Subjective{}.open<TxFailedTable>();
 
    for (auto id : txids)
    {
       std::optional<std::vector<char>> trace;
 
-      if (auto tx = successfulTxs.get(id))
+      PSIBASE_SUBJECTIVE_TX
       {
-         trace = psio::to_frac(tx->trace);
-         successfulTxs.erase(id);
-      }
-      else if (auto tx = failedTxs.get(id))
-      {
-         trace = psio::to_frac(tx->trace);
-         failedTxs.erase(id);
-      }
-      else
-      {
-         trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+         if (auto tx = successfulTxs.get(id))
+         {
+            trace = psio::to_frac(tx->trace);
+            successfulTxs.erase(id);
+         }
+         else if (auto tx = failedTxs.get(id))
+         {
+            trace = psio::to_frac(tx->trace);
+            failedTxs.erase(id);
+         }
+         else
+         {
+            trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+         }
       }
 
       auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
