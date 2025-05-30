@@ -91,7 +91,7 @@ pub mod service {
 
     fn check_is_eval() {
         check(
-            get_sender() == AccountNumber::from("evaluations"),
+            get_sender() == psibase::services::evaluations::SERVICE,
             "sender must be evaluations",
         );
     }
@@ -113,7 +113,9 @@ pub mod service {
     }
 
     #[action]
-    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
+        check_is_eval();
+    }
 
     #[action]
     fn on_attestation(
@@ -122,6 +124,7 @@ pub mod service {
         user: AccountNumber,
         attestation: Vec<u8>,
     ) {
+        check_is_eval();
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))
             .unwrap()
