@@ -7,7 +7,6 @@
 #include <psibase/trace.hpp>
 
 #include <cstdint>
-#include <functional>
 
 namespace SystemService
 {
@@ -164,9 +163,8 @@ namespace SystemService
                                                                 TraceClientTable,
                                                                 JWTKeyTable,
                                                                 TxFailedTable>;
-      using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
-                                                               ReversibleBlocksTable,
-                                                               TxSuccessTable>;
+      using WriteOnly               = psibase::
+          WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable, TxSuccessTable>;
 
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
@@ -178,22 +176,6 @@ namespace SystemService
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
-
-     private:
-      using ClientFilter = std::function<bool(const TraceClientInfo&)>;
-      auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-          -> std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-
-      auto finalizeBlocks(const psibase::BlockHeader& current)
-          -> std::pair<std::vector<psibase::BlockNum>, psibase::BlockTime>;
-
-      void stopTracking(const std::vector<psibase::Checksum256>& txids);
-      void sendReplies(const std::vector<psibase::Checksum256>& txids);
-
-      void sendReply(
-          const psibase::Checksum256&                 id,
-          psio::view<const psibase::TransactionTrace> trace,
-          const ClientFilter& clientFilter = [](const TraceClientInfo&) { return true; });
    };
    PSIO_REFLECT(RTransact,
                 method(next),
