@@ -321,7 +321,6 @@ namespace
 
    void sendReplies(const std::vector<psibase::Checksum256>& txids)
    {
-      stopTracking(txids);
       auto successfulTxs = RTransact::WriteOnly{}.open<TxSuccessTable>();
       auto failedTxs     = RTransact::Subjective{}.open<TxFailedTable>();
 
@@ -359,6 +358,9 @@ namespace
          auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
          sendReply(id, traceView);
       }
+
+      stopTracking(txids);
+
 #ifdef __wasm32__
       printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
 #endif
