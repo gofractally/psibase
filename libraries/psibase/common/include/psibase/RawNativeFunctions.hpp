@@ -630,7 +630,8 @@ namespace psibase
    };
 
    /// The `PSIBASE_SUBJECTIVE_TX` macro creates a scope in which
-   /// the subjective database is accessible.
+   /// the subjective database is accessible. It is necessary to use
+   /// this scope for any reads or writes to the subjective database.
    ///
    /// ```
    /// PSIBASE_SUBJECTIVE_TX stmt

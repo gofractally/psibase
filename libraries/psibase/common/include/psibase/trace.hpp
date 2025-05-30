@@ -22,7 +22,7 @@ namespace psibase
    // TODO: need event definitions in ABI
    struct EventTrace
    {
-      std::string       name;  // TODO: eosio::name?
+      std::string       name;
       std::vector<char> data;
    };
    PSIO_REFLECT(EventTrace, name, data)

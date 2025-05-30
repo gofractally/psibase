@@ -6,7 +6,17 @@
 
 `POST /push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. See [Pack transaction](../development/front-ends/reference/http-requests.md#pack-transaction) for an RPC request which packs transactions. The `Content-Type` of the request body should be `application/octet-stream`.
 
-If the transaction succeeds, or if the transaction fails but a trace is available, then psinode returns a 200 reply with a JSON body (below). If the transaction fails and a trace is not available, then it returns a 500 error with an appropriate message. The trace can be returned either as JSON (`application/json`) or fracpack (`application/octet-stream`). The `Accept` header can be used to choose a representation.
+#### Http response timing
+
+The `/push_transaction` endpoint accepts a `wait_for` query parameter with two options:
+
+- `final` (default): Returns a 200 response only after the transaction is included in an irreversible block. For failed transactions with traces, waits until expiration. This ensures finality but increases response time.
+
+- `applied`: Returns immediately after transaction execution, regardless of whether it succeeds or fails. The transaction may still be forked out or included in a block later. Returns a 500 error if a failed transaction has no trace available.
+
+#### Http response encoding
+
+The trace can be returned either as JSON (`application/json`) or fracpack (`application/octet-stream`). The `Accept` header can be used to choose a representation.
 
 ```json
 {
@@ -15,8 +25,6 @@ If the transaction succeeds, or if the transaction fails but a trace is availabl
     // TODO: events?
 }
 ```
-
-If a transaction succeeds, the transaction may or may not make it into a block. If it makes it into a block, it may get forked back out.
 
 > ➕ TODO: add lifetime tracking and reporting to psinode.
 
