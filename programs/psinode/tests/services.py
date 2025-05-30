@@ -14,27 +14,29 @@ class Tokens(Service):
 
 class Transact(Service):
     service = 'transact'
-    def push_transaction(self, trx):
-        packed = self.api.pack_signed_transaction(trx)
+    def push_transaction(self, trx, keys=[]):
+        packed = self.api.pack_signed_transaction(trx, keys)
         with self.post('/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:
             response.raise_for_status()
             trace = response.json()
             if trace['error'] is not None:
                 raise TransactionError(trace)
             return trace
-    def push_action(self, sender, service, method, data, timeout=10, flags=0):
+    def push_action(self, sender, service, method, data, timeout=10, flags=0, keys=[]):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]))
+        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]), keys)
 
 class Accounts(Service):
     service = 'accounts'
-    def new_account(self, name, auth_service='auth-any', require_new=True, *, sender='root'):
-        self.push_action(sender, 'newAccount', {"name": name, "authService": auth_service,"requireNew": require_new})
     def set_auth_service(self, account, auth_service):
         self.push_action(account, 'setAuthServ', {'authService': auth_service})
 
 class AuthSig(Service):
     service = 'auth-sig'
+    def new_account(self, account, key, *, sender='root'):
+        if isinstance(key, PrivateKey):
+            key = key.spki_der()
+        self.push_action(sender, 'newAccount', {"name": account, "key": key})
     def set_key(self, account, key, set_auth=True):
         if isinstance(key, PrivateKey):
             key = key.spki_der()
