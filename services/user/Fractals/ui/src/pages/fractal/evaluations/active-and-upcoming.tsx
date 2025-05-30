@@ -19,7 +19,6 @@ import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 
 export const ActiveAndUpcoming = () => {
     const { data: fractal } = useFractal();
-
     const { evaluation, evaluationInstance } = useEvaluationInstance();
 
     const navigate = useNavigate();

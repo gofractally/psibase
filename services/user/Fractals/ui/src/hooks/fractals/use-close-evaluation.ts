@@ -10,16 +10,13 @@ import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
-import { useEvaluationInstance } from "./use-evaluation-instance";
-
 const zParams = z.object({
     fractal: zAccount,
     evalType: zEvalType,
 });
 
-export const useCloseEvaluation = () => {
-    const { evaluationInstance } = useEvaluationInstance();
-    return useMutation<undefined, Error, z.infer<typeof zParams>>({
+export const useCloseEvaluation = () =>
+    useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             const { fractal, evalType } = zParams.parse(params);
 
@@ -30,20 +27,15 @@ export const useCloseEvaluation = () => {
                 intf: "api",
             }));
         },
-        onSuccess: () => {
+        onSuccess: (_, params) => {
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.fractal(params.fractal),
+            });
+
             setTimeout(() => {
                 queryClient.invalidateQueries({
-                    queryKey: QueryKey.evaluation(
-                        evaluationInstance!.evaluationId,
-                    ),
-                });
-
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.usersAndGroups(
-                        evaluationInstance!.evaluationId,
-                    ),
+                    queryKey: QueryKey.fractal(params.fractal),
                 });
             }, AwaitTime);
         },
     });
-};

@@ -8,6 +8,7 @@ import { Deliberation } from "./evaluations/deliberation";
 import { Failed } from "./evaluations/failed";
 import { Register } from "./evaluations/register";
 import { Start } from "./evaluations/start";
+import { Submission } from "./evaluations/submission";
 import { WaitingRegistration } from "./evaluations/waiting-registration";
 
 export const CurrentEvaluationCard = () => {
@@ -42,6 +43,7 @@ export const CurrentEvaluationCard = () => {
                     <Deliberation status={status} />
                 </div>
             )}
+            {status?.type == "submission" && <Submission status={status} />}
             {status?.type == "finished" && (
                 <div>Evaluation finished! ✅ Awaiting to be closed</div>
             )}

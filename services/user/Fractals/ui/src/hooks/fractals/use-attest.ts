@@ -22,14 +22,19 @@ export const useAttest = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            const toastId = toast.loading("Sending attest...");
-            void (await getSupervisor().functionCall({
-                method: "attest",
-                service: fractalsService,
-                intf: "api",
-                params: [params.evaluationId, params.groupNumber],
-            }));
-            toast.dismiss(toastId);
+            await toast.promise(
+                getSupervisor().functionCall({
+                    method: "attest",
+                    service: fractalsService,
+                    intf: "api",
+                    params: [params.evaluationId, params.groupNumber],
+                }),
+                {
+                    loading: "Sending attest...",
+                    success: "Attested",
+                    error: (error) => error.message,
+                },
+            );
 
             // HACK
             // for optimistic update purposes
