@@ -248,10 +248,15 @@ namespace
             if (r.blockNum > commitNum)
                break;
             irreversibleTime = r.time;
+
+            if (r.blockNum <= commitNum)
+            {
+               irreversible.push_back(r.blockNum);
+            }
+
             if (r.blockNum < commitNum)
             {
                reversible.remove(r);
-               irreversible.push_back(r.blockNum);
             }
          }
 
