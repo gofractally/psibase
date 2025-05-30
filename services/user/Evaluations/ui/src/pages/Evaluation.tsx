@@ -260,8 +260,7 @@ export const EvaluationPage = () => {
                             disabled={isStartEvaluationPending}
                             onClick={() => {
                                 startEvaluation({
-                                    owner: zAccount.parse(owner),
-                                    id: evaluation!.id,
+                                    evaluationId: evaluation!.id,
                                 });
                             }}
                         >
