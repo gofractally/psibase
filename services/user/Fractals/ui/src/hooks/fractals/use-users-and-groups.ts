@@ -13,6 +13,8 @@ import { Account } from "@/lib/zod/Account";
 
 import { assertUser } from "../use-current-user";
 
+let attestedEvaluationId: number | undefined;
+
 export const useUsersAndGroups = (
     interval = 10000,
     evaluationId: number | undefined | null,
@@ -22,7 +24,24 @@ export const useUsersAndGroups = (
         enabled: !!evaluationId,
         refetchInterval: interval,
         queryFn: async () => {
-            return getUsersAndGroups(fractalsService, evaluationId!);
+            const res = await getUsersAndGroups(fractalsService, evaluationId!);
+
+            if (evaluationId === attestedEvaluationId) {
+                const pretendAttestation = [1, 2, 3];
+                return {
+                    ...res,
+                    users: updateArray(
+                        res.users,
+                        (user) => user.user === assertUser(),
+                        (user) => ({
+                            ...user,
+                            attestation: pretendAttestation,
+                        }),
+                    ),
+                };
+            } else {
+                return res;
+            }
         },
     });
 
@@ -62,6 +81,7 @@ export const updateAttestation = (
 ) => {
     const currentUser = assertUser();
 
+    attestedEvaluationId = evaluationId;
     queryClient.setQueryData(
         QueryKey.usersAndGroups(evaluationId),
         (data: unknown) => {
