@@ -132,27 +132,6 @@ namespace SystemService
    using TxFailedTable = psibase::Table<TxFailedRecord, &TxFailedRecord::id>;
    PSIO_REFLECT_TYPENAME(TxFailedTable)
 
-   struct WaitFor
-   {
-      std::string wait_for;
-
-      static constexpr uint8_t final_flag   = 1;
-      static constexpr uint8_t applied_flag = 2;
-
-      [[nodiscard]] uint8_t flag() const
-      {
-         if (wait_for == "final")
-            return final_flag;
-         else if (wait_for == "applied")
-            return applied_flag;
-         else if (wait_for.empty())
-            return final_flag;
-         else
-            psibase::abortMessage("Invalid wait_for parameter");
-      }
-   };
-   PSIO_REFLECT(WaitFor, wait_for)
-
    class RTransact : psibase::Service
    {
      public:
