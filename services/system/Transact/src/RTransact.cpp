@@ -323,21 +323,24 @@ namespace
       {
          std::optional<std::vector<char>> trace;
 
-         PSIBASE_SUBJECTIVE_TX
+         if (auto tx = successfulTxs.get(id))
          {
-            if (auto tx = successfulTxs.get(id))
+            trace = psio::to_frac(tx->trace);
+            successfulTxs.erase(id);
+         }
+         else
+         {
+            PSIBASE_SUBJECTIVE_TX
             {
-               trace = psio::to_frac(tx->trace);
-               successfulTxs.erase(id);
-            }
-            else if (auto tx = failedTxs.get(id))
-            {
-               trace = psio::to_frac(tx->trace);
-               failedTxs.erase(id);
-            }
-            else
-            {
-               trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+               if (auto tx = failedTxs.get(id))
+               {
+                  trace = psio::to_frac(tx->trace);
+                  failedTxs.erase(id);
+               }
+               else
+               {
+                  trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+               }
             }
          }
 
@@ -365,13 +368,16 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
 
    bool waitForApplied = false;
    bool waitForFinal   = false;
+   auto row            = std::optional<TraceClientRow>{};
    PSIBASE_SUBJECTIVE_TX
    {
-      if (auto row = clients.get(id))
-      {
-         waitForApplied = std::ranges::any_of(row->clients, isApplied);
-         waitForFinal   = std::ranges::any_of(row->clients, isFinal);
-      }
+      row = clients.get(id);
+   }
+
+   if (row)
+   {
+      waitForApplied = std::ranges::any_of(row->clients, isApplied);
+      waitForFinal   = std::ranges::any_of(row->clients, isFinal);
    }
 
    if (waitForFinal)
