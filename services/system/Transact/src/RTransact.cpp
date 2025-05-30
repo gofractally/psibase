@@ -425,7 +425,6 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
             });
          }
       }
-      return;
    }
 
    if (waitForApplied)
