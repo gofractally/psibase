@@ -155,7 +155,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
-            EventQuery::new("history.evaluations.group_finished")
+            EventQuery::new("history.evaluations.group_fin")
                 .condition(format!(
                     "owner = 'fractals' AND evaluation_id = {}",
                     evaluation_id

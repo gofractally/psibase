@@ -563,10 +563,10 @@ pub mod tables {
         }
 
         pub fn save_pending_score(&mut self) {
-            if self.pending.is_some() {
-                self.value = calculate_ema(self.pending.unwrap(), self.value, 0.2);
+            self.pending.take().map(|pending_score| {
+                self.value = calculate_ema(pending_score, self.value, 0.2);
                 self.save();
-            }
+            });
         }
 
         pub fn save(&self) {
