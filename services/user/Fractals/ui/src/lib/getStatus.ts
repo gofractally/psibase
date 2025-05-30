@@ -167,10 +167,7 @@ export const getStatus = (
 
             const res: SubmissionPhase = {
                 type: "submission",
-                mustSubmit:
-                    !userHasSubmitted &&
-                    !isGroupResult &&
-                    timeStatus === "SUBMISSION",
+                mustSubmit: !userHasSubmitted && !isGroupResult,
                 groupNumber: user.groupNumber!,
                 evaluationId: evaluation.id,
                 submissionDeadline: evaluation.finishBy,
