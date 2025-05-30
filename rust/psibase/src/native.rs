@@ -319,8 +319,8 @@ pub fn abort_subjective() {
 /// The statement will be executed one or more times until
 /// it is successfully committed.
 ///
-/// Unstructured control flow that exits the statement, including break,
-/// return, and exceptions, will discard any changes made to the
+/// Unstructured control flow that exits the statement, (e.g. break,
+/// return, panic), will discard any changes made to the
 /// subjective database.
 #[macro_export]
 macro_rules! subjective_tx {
