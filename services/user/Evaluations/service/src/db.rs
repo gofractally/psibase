@@ -499,8 +499,6 @@ pub mod impls {
                 users,
                 result,
             );
-
-            self.delete();
         }
 
         pub fn set_key_submitter(&mut self, submitter: AccountNumber) {

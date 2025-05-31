@@ -1,11 +1,12 @@
 mod db;
 mod helpers;
 
-#[psibase::service(tables = "db::tables")]
+#[psibase::service(tables = "db::tables", recursive = true)]
 #[allow(non_snake_case)]
 pub mod service {
     pub use crate::db::tables::*;
     use crate::helpers::{self, EvaluationStatus};
+    use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
     use psibase::*;
 
     #[event(history)]
@@ -159,11 +160,12 @@ pub mod service {
 
         let sender = get_sender();
 
-        let group_number = evaluation
-            .get_user(sender)
-            .expect("user not found")
-            .group_number
-            .expect("user not grouped");
+        let group_number = check_some(
+            evaluation
+                .get_user(sender)
+                .and_then(|user| user.group_number),
+            "user not found or not grouped",
+        );
 
         let mut group = evaluation.get_group(group_number).expect("group not found");
         group.set_key_submitter(sender);
@@ -176,11 +178,26 @@ pub mod service {
     /// Closes an evaluation and deletes its groups.
     ///
     /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
-    fn close(evaluation_id: u32) {
-        let evaluation = Evaluation::get(get_sender(), evaluation_id);
-        evaluation.assert_status(EvaluationStatus::Closed);
+    fn close(owner: AccountNumber, evaluation_id: u32) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
+
+        let is_closed = evaluation.get_current_phase() == EvaluationStatus::Closed;
+        let is_all_with_results = evaluation
+            .get_groups()
+            .iter()
+            .all(|group| group.get_result().is_some());
+
+        check(
+            is_closed || is_all_with_results,
+            "evaluation is still in progress",
+        );
+
+        if evaluation.use_hooks {
+            EvalHooks::call_to(evaluation.owner).on_eval_fin(evaluation_id);
+        }
 
         evaluation.get_groups().iter().for_each(|group| {
             group.delete();
@@ -263,10 +280,9 @@ pub mod service {
             .get_group(user.group_number.unwrap())
             .expect("group not found");
 
-        let result = group.get_result();
-        if result.is_some() {
-            group.declare_result(result.unwrap());
-        }
+        group
+            .get_result()
+            .map(|result| group.declare_result(result));
     }
 
     /// Registers a user for an evaluation during the registration phase.

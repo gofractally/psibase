@@ -30,6 +30,11 @@ pub mod Hooks {
     fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
         unimplemented!()
     }
+
+    #[action]
+    fn on_eval_fin(evaluation_id: u32) {
+        unimplemented!()
+    }
 }
 
 #[crate::service(name = "evaluations", dispatch = false, psibase_mod = "crate")]

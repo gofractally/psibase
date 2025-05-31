@@ -75,6 +75,7 @@ const zSubmissionPhase = z.object({
     mustSubmit: z.boolean(),
     groupNumber: z.number().optional(),
     evaluationId: z.number(),
+    canCloseEarly: z.boolean(),
     submissionDeadline: zUnix,
     results: zResult.array(),
 });
@@ -157,6 +158,8 @@ export const getStatus = (
         }
 
         const user = users.find((user) => user.user === currentUser);
+        const canCloseEarly = results.length == groups.length;
+
         if (user) {
             const isGroupResult = results.some(
                 (result) => result.groupNumber === user.groupNumber,
@@ -171,6 +174,7 @@ export const getStatus = (
                 groupNumber: user.groupNumber!,
                 evaluationId: evaluation.id,
                 submissionDeadline: evaluation.finishBy,
+                canCloseEarly,
                 results,
             };
             return zSubmissionPhase.parse(res);
@@ -178,6 +182,7 @@ export const getStatus = (
             const res: SubmissionPhase = {
                 type: "submission",
                 mustSubmit: false,
+                canCloseEarly,
                 submissionDeadline: evaluation.finishBy,
                 evaluationId: evaluation.id,
                 results,

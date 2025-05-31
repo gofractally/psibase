@@ -10,9 +10,8 @@ interface api {
 
     join: func(fractal: string) -> result<_, error>;
     
-    close-eval: func(fractal: string, evaluation-type: u32) -> result<_, error>;
- 
-    
+    close-eval: func(evaluation-id: u32) -> result<_, error>;
+     
     register: func(evaluation-id: u32) -> result<_, error>;
     unregister: func(evaluation-id: u32) -> result<_, error>;
     attest: func(evaluation-id: u32, group-number: u32) -> result<_, error>;

@@ -434,8 +434,6 @@ pub mod tables {
                 "expected existing evaluation to set the next one",
             );
 
-            let old_evaluation_id = self.evaluation_id.unwrap().clone();
-
             self.create_evaluation(
                 evaluation.registration_starts + interval,
                 evaluation.deliberation_starts + interval,
@@ -443,8 +441,6 @@ pub mod tables {
                 evaluation.finish_by + interval,
                 interval,
             );
-
-            psibase::services::evaluations::Wrapper::call().close(old_evaluation_id);
         }
 
         pub fn set_evaluation_schedule(

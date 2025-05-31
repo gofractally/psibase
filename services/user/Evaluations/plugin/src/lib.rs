@@ -53,8 +53,14 @@ impl Admin for EvaluationsPlugin {
         add_action_to_transaction(Actions::start::ACTION_NAME, &packed_args)
     }
 
-    fn close(evaluation_id: u32) -> Result<(), Error> {
-        let packed_args = Actions::close { evaluation_id }.packed();
+    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
+
+        let packed_args = Actions::close {
+            evaluation_id,
+            owner: evaluation_owner,
+        }
+        .packed();
         add_action_to_transaction(Actions::close::ACTION_NAME, &packed_args)
     }
 

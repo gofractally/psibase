@@ -31,19 +31,6 @@ pub mod service {
     }
 
     #[action]
-    fn close_eval(fractal: AccountNumber, evaluation_type: u32) {
-        let mut evaluation = EvaluationInstance::get_assert(fractal, evaluation_type.into());
-
-        evaluation.save_pending_scores();
-
-        Wrapper::emit()
-            .history()
-            .evaluation_finished(fractal, evaluation.evaluation_id.unwrap());
-
-        evaluation.schedule_next_evaluation();
-    }
-
-    #[action]
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
@@ -95,6 +82,21 @@ pub mod service {
     }
 
     #[action]
+    fn on_eval_fin(evaluation_id: u32) {
+        check_is_eval();
+
+        let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
+
+        evaluation.save_pending_scores();
+
+        Wrapper::emit()
+            .history()
+            .evaluation_finished(evaluation.fractal, evaluation.evaluation_id.unwrap());
+
+        evaluation.schedule_next_evaluation();
+    }
+
+    #[action]
     fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
@@ -111,9 +113,7 @@ pub mod service {
     }
 
     #[action]
-    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
-        check_is_eval();
-    }
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
 
     #[action]
     fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {

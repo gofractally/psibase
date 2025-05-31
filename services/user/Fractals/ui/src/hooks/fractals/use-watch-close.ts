@@ -23,8 +23,7 @@ export const useWatchClose = (status: EvaluationStatus | undefined) => {
         !isSuccess
     ) {
         closeEvaluation({
-            evalType: instanceData.evaluationInstance.evalType,
-            fractal: instanceData.evaluationInstance.fractal,
+            evaluationId: instanceData.evaluationInstance.evaluationId,
         });
     }
 

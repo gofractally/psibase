@@ -7,35 +7,46 @@ import { supervisor } from "@/supervisor";
 import { fractalsService } from "@/lib/constants";
 import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
-import { zEvalType } from "@/lib/zod/EvaluationType";
+
+import { useCurrentFractal } from "../use-current-fractal";
 
 const zParams = z.object({
-    fractal: zAccount,
-    evalType: zEvalType,
+    evaluationId: z.number(),
 });
 
-export const useCloseEvaluation = () =>
-    useMutation<undefined, Error, z.infer<typeof zParams>>({
-        mutationFn: async (params) => {
-            const { fractal, evalType } = zParams.parse(params);
+export const useCloseEvaluation = () => {
+    const fractal = useCurrentFractal();
 
-            void (await supervisor.functionCall({
-                method: "closeEval",
-                params: [fractal, evalType],
-                service: fractalsService,
-                intf: "api",
-            }));
+    return useMutation<undefined, Error, z.infer<typeof zParams>>({
+        mutationFn: async (params) => {
+            const { evaluationId } = zParams.parse(params);
+
+            try {
+                void (await supervisor.functionCall({
+                    method: "closeEval",
+                    params: [evaluationId],
+                    service: fractalsService,
+                    intf: "api",
+                }));
+            } catch (e) {
+                const error = e as Error;
+                // Here we assume that not finding the evaluation means
+                // someone else beat us to it, so we will treat this as success
+                if (!error.message.includes("not found")) {
+                    throw e;
+                }
+            }
         },
-        onSuccess: (_, params) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({
-                queryKey: QueryKey.fractal(params.fractal),
+                queryKey: QueryKey.fractal(fractal),
             });
 
             setTimeout(() => {
                 queryClient.invalidateQueries({
-                    queryKey: QueryKey.fractal(params.fractal),
+                    queryKey: QueryKey.fractal(fractal),
                 });
             }, AwaitTime);
         },
     });
+};

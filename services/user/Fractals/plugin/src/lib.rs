@@ -15,9 +15,11 @@ mod helpers;
 use errors::ErrorType;
 use psibase::AccountNumber;
 
+use bindings::evaluations::plugin::admin::close;
 use bindings::evaluations::plugin::user::{
     attest, get_group_users, get_proposal, propose, register, unregister,
 };
+
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 struct ProposeLatch;
 
@@ -145,16 +147,8 @@ impl Api for FractallyPlugin {
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
 
-    fn close_eval(fractal: String, evaluation_type: u32) -> Result<(), Error> {
-        let packed_args = fractals::action_structs::close_eval {
-            fractal: AccountNumber::from(fractal.as_str()),
-            evaluation_type,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::close_eval::ACTION_NAME,
-            &packed_args,
-        )
+    fn close_eval(evaluation_id: u32) -> Result<(), Error> {
+        close(&"fractals".to_string(), evaluation_id)
     }
 
     fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {

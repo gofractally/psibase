@@ -53,24 +53,21 @@ export const useEvaluationStatus = (
         now,
     );
 
-    // console.log("expected data", {
-    //     evaluation,
-    //     currentUser,
-    //     currentStatus,
-    //     usersAndGroups,
-    //     currentUserCanActOnBehalfOfFractal,
-    //     pingUsersAndGroups,
-    // });
-
     const pingOnStatuses: EvaluationStatus["type"][] = [
         "waitingStart",
         "finished",
     ];
+    const canCloseEarly =
+        currentStatus.type == "submission" && currentStatus.canCloseEarly;
 
-    if (pingOnStatuses.includes(currentStatus.type) && !pingUsersAndGroups) {
+    if (
+        (pingOnStatuses.includes(currentStatus.type) || canCloseEarly) &&
+        !pingUsersAndGroups
+    ) {
         setPingUsersAndGroups(true);
     } else if (
         !pingOnStatuses.includes(currentStatus.type) &&
+        !canCloseEarly &&
         pingUsersAndGroups
     ) {
         setPingUsersAndGroups(false);
