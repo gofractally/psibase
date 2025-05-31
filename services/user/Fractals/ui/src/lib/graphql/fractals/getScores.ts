@@ -1,0 +1,40 @@
+import { z } from "zod";
+
+import { OptionalAccount } from "@/lib/queryKeys";
+import { Account, zAccount } from "@/lib/zod/Account";
+import { zEvalType } from "@/lib/zod/EvaluationType";
+
+import { graphql } from "../../graphql";
+
+export const zScore = z.object({
+    account: zAccount,
+    evalType: zEvalType,
+    pending: z.number().nullable(),
+    value: z.number(),
+});
+
+export type Score = z.infer<typeof zScore>;
+
+export const getScores = async (
+    fractalAccount: Account,
+    account?: OptionalAccount,
+) => {
+    const member = await graphql(
+        `
+    {
+        scores(fractal: "${fractalAccount}"${account ? `, member: "${account}"` : ""}) {
+                account
+                evalType
+                pending
+                value
+        } 
+    }`,
+    );
+
+    console.log({ member });
+    return z
+        .object({
+            scores: zScore.array(),
+        })
+        .parse(member).scores;
+};

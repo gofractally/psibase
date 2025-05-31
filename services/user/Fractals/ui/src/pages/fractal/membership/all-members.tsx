@@ -11,17 +11,37 @@ import {
 } from "@/components/ui/table";
 
 import { useMembers } from "@/hooks/fractals/use-members";
+import { useScores } from "@/hooks/fractals/use-scores";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 import { cn } from "@/lib/utils";
+import { EvalType } from "@/lib/zod/EvaluationType";
+
+const formatScore = (num: number): string => {
+    // Would it be neat to make the score a flat integer out of 100?
+    return Math.floor((num / 6) * 100).toString();
+};
 
 export const AllMembers = () => {
-    const { data: members, error } = useMembers(useCurrentFractal());
+    const currentFractal = useCurrentFractal();
 
-    const sortedMembers = members?.slice();
-    // .sort((a, b) => b.reputation - a.reputation);
+    const { data: members } = useMembers(currentFractal);
+    const { data: scores } = useScores();
 
-    console.log({ members, error });
+    const sortedMembers = (members || [])
+        .map((member) => {
+            const score = scores?.find(
+                (score) =>
+                    score.account == member.account &&
+                    score.evalType == EvalType.Reputation,
+            );
+            return {
+                ...member,
+                score: score ? score.value : 0,
+            };
+        })
+        .sort((a, b) => b.score - a.score);
+
     return (
         <div className="w-full max-w-screen-xl p-4">
             <Table>
@@ -43,7 +63,7 @@ export const AllMembers = () => {
                             <TableCell className="font-medium">
                                 {member.account}
                             </TableCell>
-                            <TableCell>{`member.reputation`}</TableCell>
+                            <TableCell>{formatScore(member.score)}</TableCell>
                             <TableCell>
                                 {getMemberLabel(member.memberStatus)}
                             </TableCell>

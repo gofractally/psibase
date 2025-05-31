@@ -1,7 +1,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use std::str::FromStr;
+    use std::{str::FromStr, u64};
 
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
@@ -39,8 +39,6 @@ mod service {
         #[serde(deserialize_with = "deserialize_number_from_string")]
         finish_by: u32,
     }
-
-
 
     #[derive(SimpleObject)]
     struct GroupFinish {
@@ -90,7 +88,6 @@ mod service {
 
     #[Object]
     impl Query {
-
         async fn get_groups_created(
             &self,
             evaluation_owner: AccountNumber,
@@ -146,7 +143,6 @@ mod service {
                 .query()
         }
 
-
         async fn group_finishes(
             &self,
             evaluation_id: u32,
@@ -181,13 +177,21 @@ mod service {
                 .collect()
         }
 
-        async fn scores(&self, fractal: String, member: String) -> Vec<Score> {
-            let fractal = AccountNumber::from_str(&fractal).expect("invalid account name");
-            let member = AccountNumber::from_str(&member).expect("invalid account name");
-
+        async fn scores(
+            &self,
+            fractal: AccountNumber,
+            member: Option<AccountNumber>,
+        ) -> Vec<Score> {
             ScoreTable::with_service(fractals::SERVICE)
                 .get_index_pk()
-                .range((fractal, 0, member)..=(fractal, u32::MAX, member))
+                .range(
+                    (fractal, 0, member.unwrap_or(AccountNumber::new(0)))
+                        ..=(
+                            fractal,
+                            u32::MAX,
+                            member.unwrap_or(AccountNumber::new(u64::MAX)),
+                        ),
+                )
                 .collect()
         }
 
