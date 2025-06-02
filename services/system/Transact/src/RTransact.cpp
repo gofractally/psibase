@@ -241,40 +241,38 @@ namespace
 
    auto finalizeBlocks(const psibase::BlockHeader& current) -> std::optional<FinalizedBlocks>
    {
+      auto commitNum  = current.commitNum;
+      auto reversible = RTransact::WriteOnly{}.open<ReversibleBlocksTable>();
+      reversible.put({.blockNum = current.blockNum, .time = current.time});
+
+      BlockTime irreversibleTime = {};
+
+      std::optional<FinalizedBlocks> result;
+      for (auto r : reversible.getIndex<0>())
       {
-         auto commitNum  = current.commitNum;
-         auto reversible = RTransact::WriteOnly{}.open<ReversibleBlocksTable>();
-         reversible.put({.blockNum = current.blockNum, .time = current.time});
+         if (r.blockNum > commitNum)
+            break;
 
-         BlockTime irreversibleTime = {};
-
-         std::optional<FinalizedBlocks> result;
-         for (auto r : reversible.getIndex<0>())
+         if (!result)
          {
-            if (r.blockNum > commitNum)
-               break;
-
-            if (!result)
-            {
-               result = FinalizedBlocks{.first = r.blockNum, .count = 1, .time = r.time};
-            }
-            else
-            {
-               result->count++;
-               result->time = r.time;
-            }
-
-            if (r.blockNum < commitNum)
-            {
-               // A block is irreversible if r.blockNum <= commitNum. The reason that the last
-               // irreversible block is not removed here is so there will always be at least one
-               // irreversible block to provide irreversibleTime.
-               reversible.remove(r);
-            }
+            result = FinalizedBlocks{.first = r.blockNum, .count = 1, .time = r.time};
+         }
+         else
+         {
+            result->count++;
+            result->time = r.time;
          }
 
-         return result;
+         if (r.blockNum < commitNum)
+         {
+            // A block is irreversible if r.blockNum <= commitNum. The reason that the last
+            // irreversible block is not removed here is so there will always be at least one
+            // irreversible block to provide irreversibleTime.
+            reversible.remove(r);
+         }
       }
+
+      return result;
    }
 
    void stopTracking(const std::vector<psibase::Checksum256>& txids)
