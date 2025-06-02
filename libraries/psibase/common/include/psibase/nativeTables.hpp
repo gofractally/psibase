@@ -122,9 +122,8 @@ namespace psibase
 
    using CodeByHashKeyType =
        std::tuple<std::uint16_t, std::uint8_t, Checksum256, std::uint8_t, std::uint8_t>;
-   auto codeByHashKey(const Checksum256& codeHash,
-                      uint8_t            vmType,
-                      uint8_t            vmVersion) -> CodeByHashKeyType;
+   auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
+       -> CodeByHashKeyType;
 
    /// where code is actually stored, duplicate services are reused
    struct CodeByHashRow
@@ -380,8 +379,10 @@ namespace psibase
    // will be run with the trace.
    //
    // The state used to run the action is the head block state
-   // whenever execution begins. The continuation is run in the
-   // same context as the action.
+   // whenever execution begins. The continuation is run with
+   // the same state as the action. It is unspecified whether
+   // changes to the chain state made by the action are seen
+   // by the continuation.
    //
    // Execution can be terminated at any time. It is the
    // continuation's resposibility to remove the row. Native
