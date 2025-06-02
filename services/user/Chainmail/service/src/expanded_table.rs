@@ -34,22 +34,16 @@ mod service {
             self.receiver
         }
     }
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {
-        #[primary_key]
-        pk: (),
-    }
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    struct InitRow {}
 
     impl InitRow {
-        fn pk(&self) -> () {
-            self.pk
-        }
+        fn pk(&self) {}
     }
     #[allow(dead_code)]
     fn init() {
         let table = InitTable::new();
-        table.put(&InitRow { pk: () }).unwrap();
+        table.put(&InitRow {}).unwrap();
         SitesSvc::call().enableSpa(true);
         EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);

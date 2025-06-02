@@ -5,12 +5,9 @@ mod service_tables {
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct InitRow {}
-
     impl InitRow {
         #[primary_key]
-        fn pk(&self) -> () {
-            ()
-        }
+        fn pk(&self) {}
     }
 }
 

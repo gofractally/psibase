@@ -64,9 +64,7 @@ pub mod tables {
     }
     impl LastUsed {
         #[primary_key]
-        fn pk(&self) -> () {
-            ()
-        }
+        fn pk(&self) {}
     }
 
     /// A table that contains all of the responses to staged transactions.
