@@ -512,22 +512,32 @@ void RTransact::onBlock()
          if (pendingTx.expiration > finalized->time)
             break;
 
-         if (auto client = clientTable.get(pendingTx.id))
+         txids.push_back(pendingTx.id);
+      }
+   }
+
+   // Ensure all txids have a client waiting for a reply
+   std::vector<psibase::Checksum256> needsReply;
+   for (auto id : txids)
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto client = clientTable.get(id))
          {
-            txids.push_back(pendingTx.id);
+            needsReply.push_back(id);
          }
          else
-         {  // Stop tracking an expired tx if no client is waiting for a reply.
-            pendingTxTable.erase(pendingTx.id);
-            dataTable.erase(pendingTx.id);
+         {  // Stop tracking a finalized tx if no client is waiting for a reply.
+            pendingTxTable.erase(id);
+            dataTable.erase(id);
 
-            successfulTxTable.erase(pendingTx.id);
-            failedTxTable.erase(pendingTx.id);
+            successfulTxTable.erase(id);
+            failedTxTable.erase(id);
          }
       }
    }
 
-   sendReplies(txids);
+   sendReplies(needsReply);
 }
 
 namespace
