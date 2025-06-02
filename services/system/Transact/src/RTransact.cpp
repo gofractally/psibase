@@ -232,8 +232,14 @@ namespace
       }
    }
 
-   auto finalizeBlocks(const psibase::BlockHeader& current)
-       -> std::pair<std::vector<psibase::BlockNum>, psibase::BlockTime>
+   struct FinalizedBlocks
+   {
+      psibase::BlockNum  first;  // First finalized block
+      size_t             count;  // Number of finalized blocks
+      psibase::BlockTime time;   // Time of the last finalized block
+   };
+
+   auto finalizeBlocks(const psibase::BlockHeader& current) -> std::optional<FinalizedBlocks>
    {
       {
          auto commitNum  = current.commitNum;
@@ -242,16 +248,20 @@ namespace
 
          BlockTime irreversibleTime = {};
 
-         std::vector<psibase::BlockNum> irreversible;
+         std::optional<FinalizedBlocks> result;
          for (auto r : reversible.getIndex<0>())
          {
             if (r.blockNum > commitNum)
                break;
-            irreversibleTime = r.time;
 
-            if (r.blockNum <= commitNum)
+            if (!result)
             {
-               irreversible.push_back(r.blockNum);
+               result = FinalizedBlocks{.first = r.blockNum, .count = 1, .time = r.time};
+            }
+            else
+            {
+               result->count++;
+               result->time = r.time;
             }
 
             if (r.blockNum < commitNum)
@@ -260,7 +270,7 @@ namespace
             }
          }
 
-         return {irreversible, irreversibleTime};
+         return result;
       }
    }
 
@@ -453,7 +463,9 @@ void RTransact::onBlock()
    if (!stat)
       return;
 
-   auto [irreversible, irreversibleTime] = finalizeBlocks(stat->current);
+   auto finalized = finalizeBlocks(stat->current);
+   if (!finalized)
+      return;
 
    // Reasons to send a reply:
    // 1. The transaction was successful and is irreversible
@@ -478,7 +490,7 @@ void RTransact::onBlock()
 
    // Get all successful and irreversible transactions
    auto successTxIdx = successfulTxTable.getIndex<1>();
-   for (BlockNum blockNum : irreversible)
+   for (BlockNum blockNum : std::views::iota(finalized->first) | std::views::take(finalized->count))
    {
       for (const auto& tx : successTxIdx.subindex<psibase::Checksum256>(blockNum))
       {
@@ -491,7 +503,7 @@ void RTransact::onBlock()
       // Get all expired transactions
       for (auto pendingTx : pendingTxTable.getIndex<3>())
       {
-         if (pendingTx.expiration > irreversibleTime)
+         if (pendingTx.expiration > finalized->time)
             break;
 
          if (auto client = clientTable.get(pendingTx.id))
