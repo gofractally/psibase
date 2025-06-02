@@ -266,6 +266,9 @@ namespace
 
             if (r.blockNum < commitNum)
             {
+               // A block is irreversible if r.blockNum <= commitNum. The reason that the last
+               // irreversible block is not removed here is so there will always be at least one
+               // irreversible block to provide irreversibleTime.
                reversible.remove(r);
             }
          }
@@ -344,6 +347,9 @@ namespace
             successfulTxs.remove(*tx);
             PSIBASE_SUBJECTIVE_TX
             {
+               // It is possible for a tx to have both failed and successful associated traces.
+               // We want to prefer the successful result, so here we remove the failed trace
+               //   (if it exists).
                failedTxs.erase(id);
             }
          }
