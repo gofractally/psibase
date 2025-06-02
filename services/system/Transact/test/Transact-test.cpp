@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN
 
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/testerApi.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
@@ -365,6 +366,13 @@ TEST_CASE("Test push_transaction")
       auto strx =
           SignedTransaction{psio::shared_view_ptr<Transaction>{trx}, {psio::to_frac(flags)}};
 
+      SECTION("run in transact mode")
+      {
+         auto trace = psibase::tester::runAction(
+             t.nativeHandle(), RunMode::speculative, true,
+             makeVerify(strx, sha256(strx.transaction.data(), strx.transaction.size()), 0));
+         CHECK(trace.error.value_or("") == "");
+      }
       SECTION("keep flags")
       {
          CHECK(httpPush(strx).failed(""));
