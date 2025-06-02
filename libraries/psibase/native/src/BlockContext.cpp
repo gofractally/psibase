@@ -742,10 +742,10 @@ namespace psibase
                                   const Checksum256&                       token)
    {
       auto id = sha256(trx.transaction.data(), trx.transaction.size());
+      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
       try
       {
          checkActive();
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
          auto act = makeVerify(trx, id, i);
          if (token != Checksum256{})
          {
