@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
@@ -30,14 +30,14 @@ package-name = "BrotliCodec"
 services = ["brotli-codec"]
 
 [package.metadata.psibase.dependencies]
-Supervisor = "0.16.0"
-Sites = "0.16.0"
-HttpServer = "0.16.0"
+Supervisor = "0.17.0"
+Sites = "0.17.0"
+HttpServer = "0.17.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-brotli-codec = { path = "service", version = "0.16.0" }
-plugin = { path = "plugin", version = "0.16.0" }
+brotli-codec = { path = "service", version = "0.17.0" }
+plugin = { path = "plugin", version = "0.17.0" }
 serde = { version = "1.0", features = ["derive"] }

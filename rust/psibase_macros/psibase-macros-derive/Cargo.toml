@@ -1,6 +1,6 @@
 [package]
 name = "psibase-macros-derive"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 license = "MIT"
 description = "Macros to support psibase development"
@@ -14,8 +14,8 @@ proc-macro = true
 darling = "0.14"
 proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"
-psibase_names = { version = "0.16.0", path = "../../psibase_names" }
+psibase_names = { version = "0.17.0", path = "../../psibase_names" }
 quote = "1.0.15"
 syn = { version = "1.0.86", features = ["full", "visit-mut"] }
 toml = "0.8.19"
-psibase-macros-lib = { path = "../psibase-macros-lib", version = "0.16.0" }
+psibase-macros-lib = { path = "../psibase-macros-lib", version = "0.17.0" }

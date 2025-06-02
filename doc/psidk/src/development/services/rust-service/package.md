@@ -40,7 +40,7 @@ package-name = "example"
 services = ["service1"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.16.0"
+HttpServer = "0.17.0"
 ```
 
 ./service/Cargo.toml
