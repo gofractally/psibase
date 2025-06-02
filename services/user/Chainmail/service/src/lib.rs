@@ -50,7 +50,7 @@ mod service {
     #[action]
     fn archive(msg_id: u64) {
         let saved_messages_table = SavedMessageTable::new();
-        if let Some(rec) = saved_messages_table.get_index_pk().get(&&msg_id) {
+        if let Some(rec) = saved_messages_table.get_index_pk().get(&msg_id) {
             unsave(
                 msg_id,
                 rec.sender,

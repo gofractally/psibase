@@ -46,7 +46,7 @@ pub mod service {
     fn check_init() {
         let table: InitTable = InitTable::new();
         check(
-            table.get_index_pk().get(&&()).is_some(),
+            table.get_index_pk().get(&()).is_some(),
             "service not initialized",
         );
     }
@@ -201,7 +201,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     #[action]
     fn get_staged_tx(id: u32) -> StagedTx {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&&id);
+        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
         check(staged_tx.is_some(), "Unknown staged tx");
         staged_tx.unwrap()
     }
