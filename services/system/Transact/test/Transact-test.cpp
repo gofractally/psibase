@@ -340,4 +340,53 @@ TEST_CASE("Test push_transaction")
          CHECK(trace->error.has_value());
       }
    }
+   SECTION("verify flags")
+   {
+      // TODO: Should we allow any flags in verify mode? A few
+      // would make sense, but we would need to add a flags
+      // field to BlockHeaderAuthAccount.
+      //
+      // - allowSudo
+      // - canSetTimeLimit
+      auto alice = t.addAccount("alice");
+      auto flags =
+          GENERATE(values({CodeRow::allowSudo, CodeRow::allowWriteNative, CodeRow::isSubjective,
+                           CodeRow::canSetTimeLimit, (CodeRow::isSubjective | CodeRow::allowSocket),
+                           (CodeRow::isSubjective | CodeRow::allowNativeSubjective)}));
+      INFO("flags: " << std::hex << flags);
+      auto verifyFlags = t.addService(AccountNumber{"verify-flags"}, "VerifyFlagsService.wasm",
+                                      flags | CodeRow::isAuthService);
+      t.startBlock();
+      static_assert(std::same_as<decltype(flags), std::uint64_t>);
+
+      Action nop{.sender = alice, .service = AccountNumber{"nop"}};
+      auto   trx = t.makeTransaction({nop}, 5);
+      trx.claims.push_back({.service = verifyFlags});
+      auto strx =
+          SignedTransaction{psio::shared_view_ptr<Transaction>{trx}, {psio::to_frac(flags)}};
+
+      SECTION("keep flags")
+      {
+         CHECK(httpPush(strx).failed(""));
+      }
+      SECTION("cancel flags")
+      {
+         t.setAutoRun(false);
+         auto reply = t.asyncPost(Transact::service, "/push_transaction", FracPackBody{strx});
+         while (t.runQueueItem())
+         {
+         }
+
+         REQUIRE(t.from(SetCode::service)
+                     .to<SetCode>()
+                     .setFlags(verifyFlags, CodeRow::isAuthService)
+                     .succeeded());
+         t.startBlock();
+
+         t.runAll();
+
+         auto trace = reply.get<TransactionTrace>();
+         CHECK(trace.error.value_or("") != "");
+      }
+   }
 }

@@ -237,7 +237,7 @@ namespace SystemService
          account.emplace();
          account->codeNum = service;
       }
-      incrementVerifySeq(account->flags | flags);
+      incrementVerifySeq(account->flags ^ flags);
 
       account->flags = flags;
       if (account->codeHash != Checksum256{} || account->flags)
