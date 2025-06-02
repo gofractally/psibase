@@ -28,15 +28,13 @@ class Transact(Service):
 
 class Accounts(Service):
     service = 'accounts'
+    def new_account(self, name, auth_service='auth-any', require_new=True, *, sender='root'):
+        self.push_action(sender, 'newAccount', {"name": name, "authService": auth_service,"requireNew": require_new})
     def set_auth_service(self, account, auth_service):
         self.push_action(account, 'setAuthServ', {'authService': auth_service})
 
 class AuthSig(Service):
     service = 'auth-sig'
-    def new_account(self, account, key, *, sender='root'):
-        if isinstance(key, PrivateKey):
-            key = key.spki_der()
-        self.push_action(sender, 'newAccount', {"name": account, "key": key})
     def set_key(self, account, key, set_auth=True):
         if isinstance(key, PrivateKey):
             key = key.spki_der()
