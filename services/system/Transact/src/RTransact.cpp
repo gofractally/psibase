@@ -208,8 +208,6 @@ namespace
             if (auto row_opt = clients.get(id))
             {
                auto& row = *row_opt;
-               if (std::ranges::none_of(row.clients, clientFilter))
-                  abortMessage("No clients matching filter to claim a reply for this tx");
 
                auto filtered = row.clients | std::views::filter(clientFilter);
                for (const auto& client : filtered)
