@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Action, Checksum256, Fracpack, TimePointUSec, ToKey, ToSchema};
+    use psibase::{AccountNumber, Action, Checksum256, Fracpack, TimePointUSec, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]

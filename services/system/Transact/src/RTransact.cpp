@@ -4,8 +4,10 @@
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 
+#include <functional>
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
+#include <ranges>
 
 using namespace psibase;
 using namespace SystemService;
@@ -354,67 +356,233 @@ namespace
       }
    }
 
-   struct TrxReply
+   using ClientFilter = std::function<bool(const TraceClientInfo&)>;
+   bool noFilter(const TraceClientInfo&)
    {
-      std::optional<TraceClientRow> row;
-      bool                          json = false;
-      bool                          bin  = false;
-      void                          send(psio::view<const TransactionTrace> pruned);
-      explicit                      operator bool() const { return row.has_value(); }
+      return true;
+   }
+
+   // Returns a tuple containing:
+   // 1. Vector of sockets waiting for a JSON response
+   // 2. Vector of sockets waiting for a binary response
+   //
+   // Removes any clients from TraceClientTable for whom replies have been claimed.
+   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
+       -> std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>
+   {
+      {
+         auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
+         std::vector<std::int32_t> json_clients, bin_clients;
+
+         auto socketClaimed = [&](const auto& client)
+         {
+            return std::ranges::contains(json_clients, client.socket) ||
+                   std::ranges::contains(bin_clients, client.socket);
+         };
+
+         PSIBASE_SUBJECTIVE_TX
+         {
+            if (auto row_opt = clients.get(id))
+            {
+               auto& row = *row_opt;
+
+               auto filtered = row.clients | std::views::filter(clientFilter);
+               for (const auto& client : filtered)
+               {
+                  to<HttpServer>().claimReply(client.socket);
+                  auto& clientList = client.json ? json_clients : bin_clients;
+                  clientList.push_back(client.socket);
+               }
+
+               std::erase_if(row.clients, socketClaimed);
+
+               if (row.clients.empty())
+                  clients.remove(row);
+               else
+                  clients.put(row);
+            }
+         }
+
+         return {std::move(json_clients), std::move(bin_clients)};
+      }
+   }
+
+   struct FinalizedBlocks
+   {
+      psibase::BlockNum  first;  // First finalized block
+      size_t             count;  // Number of finalized blocks
+      psibase::BlockTime time;   // Time of the last finalized block
    };
 
-   TrxReply claimTrxReply(const Checksum256& id)
+   auto finalizeBlocks(const psibase::BlockHeader& current) -> std::optional<FinalizedBlocks>
    {
-      auto     clients = RTransact{}.open<TraceClientTable>();
-      TrxReply result{clients.get(id)};
-      if (result.row)
+      auto commitNum  = current.commitNum;
+      auto reversible = RTransact::WriteOnly{}.open<ReversibleBlocksTable>();
+      reversible.put({.blockNum = current.blockNum, .time = current.time});
+
+      BlockTime irreversibleTime = {};
+
+      std::optional<FinalizedBlocks> result;
+      for (auto r : reversible.getIndex<0>())
       {
-         clients.remove(*result.row);
-         for (auto client : result.row->clients)
+         if (r.blockNum > commitNum)
+            break;
+
+         if (!result)
          {
-            if (client.json)
-               result.json = true;
-            else
-               result.bin = true;
-            to<HttpServer>().claimReply(client.socket);
+            result = FinalizedBlocks{.first = r.blockNum, .count = 1, .time = r.time};
+         }
+         else
+         {
+            result->count++;
+            result->time = r.time;
+         }
+
+         if (r.blockNum < commitNum)
+         {
+            // A block is irreversible if r.blockNum <= commitNum. The reason that the last
+            // irreversible block is not removed here is so there will always be at least one
+            // irreversible block to provide irreversibleTime.
+            reversible.remove(r);
          }
       }
+
       return result;
    }
 
-   void TrxReply::send(psio::view<const TransactionTrace> trace)
+   void stopTracking(const std::vector<psibase::Checksum256>& txids)
    {
-      TransactionTraceRef pruned = PruneTrace{true}(trace);
+      auto pendingTxTable = RTransact::Subjective{}.open<PendingTransactionTable>();
+      auto dataTable      = RTransact::Subjective{}.open<TransactionDataTable>();
 
-      if (json)
+      PSIBASE_SUBJECTIVE_TX
+      {
+         for (auto id : txids)
+         {
+            pendingTxTable.erase(id);
+            dataTable.erase(id);
+         }
+      }
+   }
+
+   // This function should only be called for a transaction id that has clients waiting for it.
+   void sendReply(const psibase::Checksum256&                 id,
+                  psio::view<const psibase::TransactionTrace> trace,
+                  const ClientFilter&                         clientFilter = noFilter)
+   {
+      TransactionTraceRef pruned     = PruneTrace{true}(trace);
+      auto [jsonClients, binClients] = claimClientReply(id, clientFilter);
+
+      if (jsonClients.empty() && binClients.empty())  // failsafe
+         return;
+
+      ActionViewBuilder<HttpServer> http{getReceiver(), HttpServer::service};
+
+      if (!jsonClients.empty())
       {
          JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json",
                                                    .body{pruned}};
-         ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
          auto                                action = http.sendReply(0, reply);
 
-         for (auto client : row->clients)
-            if (client.json)
-            {
-               psio::get<0>(action->rawData().value()) = client.socket;
-               call(action.data(), action.size());
-            }
+         for (auto socket : jsonClients)
+         {
+            psio::get<0>(action->rawData().value()) = socket;
+            call(action.data(), action.size());
+         }
       }
-      if (bin)
+
+      if (!binClients.empty())
       {
          FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
                                                        .body{pruned}};
-         ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
          auto                                    action = http.sendReply(0, reply);
 
-         for (auto client : row->clients)
-            if (!client.json)
-            {
-               psio::get<0>(action->rawData().value()) = client.socket;
-               call(action.data(), action.size());
-            }
+         for (auto socket : binClients)
+         {
+            psio::get<0>(action->rawData().value()) = socket;
+            call(action.data(), action.size());
+         }
       }
    }
+
+   void sendReplies(const std::vector<psibase::Checksum256>& txids)
+   {
+      auto successfulTxs = RTransact::WriteOnly{}.open<TxSuccessTable>();
+      auto failedTxs     = RTransact::Subjective{}.open<TxFailedTable>();
+
+      for (auto id : txids)
+      {
+         std::optional<std::vector<char>> trace;
+
+         if (auto tx = successfulTxs.get(id))
+         {
+            trace = psio::to_frac(tx->trace);
+            successfulTxs.remove(*tx);
+            PSIBASE_SUBJECTIVE_TX
+            {
+               // It is possible for a tx to have both failed and successful associated traces.
+               // We want to prefer the successful result, so here we remove the failed trace
+               //   (if it exists).
+               failedTxs.erase(id);
+            }
+         }
+         else
+         {
+            PSIBASE_SUBJECTIVE_TX
+            {
+               if (auto tx = failedTxs.get(id))
+               {
+                  trace = psio::to_frac(tx->trace);
+                  failedTxs.remove(*tx);
+               }
+            }
+         }
+
+         if (!trace)
+         {
+            trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+         }
+
+         auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
+         sendReply(id, traceView);
+      }
+
+      stopTracking(txids);
+
+#ifdef __wasm32__
+      printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
+#endif
+   }
+
+   struct WaitFor
+   {
+      std::string wait_for;
+
+      static constexpr uint8_t final_flag   = 1;
+      static constexpr uint8_t applied_flag = 2;
+
+      [[nodiscard]] uint8_t flag() const
+      {
+         if (wait_for == "final")
+            return final_flag;
+         else if (wait_for == "applied")
+            return applied_flag;
+         else if (wait_for.empty())
+            return final_flag;
+         else
+            psibase::abortMessage("Invalid wait_for parameter");
+      }
+
+      static bool isApplied(const TraceClientInfo& client)
+      {
+         return client.waitFor == WaitFor::applied_flag;
+      }
+      static bool isFinal(const TraceClientInfo& client)
+      {
+         return client.waitFor == WaitFor::final_flag;
+      }
+   };
+   PSIO_REFLECT(WaitFor, wait_for)
 
 }  // namespace
 
@@ -423,21 +591,53 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    check(getSender() == AccountNumber{}, "Wrong sender");
    printf("trace size: %zu\n", find_view_span(trace).size());
 
-   TrxReply reply;
+   auto clients = Subjective{}.open<TraceClientTable>();
+
+   bool waitForApplied = false;
+   bool waitForFinal   = false;
+   auto row            = std::optional<TraceClientRow>{};
    PSIBASE_SUBJECTIVE_TX
    {
-      reply = claimTrxReply(id);
+      row = clients.get(id);
    }
-   reply.send(trace);
-#ifdef __wasm32__
-   printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
-#endif
+
+   if (row)
+   {
+      waitForApplied = std::ranges::any_of(row->clients, WaitFor::isApplied);
+      waitForFinal   = std::ranges::any_of(row->clients, WaitFor::isFinal);
+   }
+
+   if (waitForFinal)
+   {
+      if (!trace.error().has_value())
+      {
+         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessRecord{
+             .id       = id,
+             .blockNum = to<Transact>().currentBlock().blockNum,
+             .trace    = trace.unpack(),
+         });
+      }
+      else
+      {
+         PSIBASE_SUBJECTIVE_TX
+         {
+            Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+                .id    = id,
+                .trace = trace.unpack(),
+            });
+         }
+      }
+   }
+
+   if (waitForApplied)
+   {
+      sendReply(id, trace, WaitFor::isApplied);
+   }
 }
 
 void RTransact::onBlock()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   // Update reversible table and find the time of the last commit
    auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    if (!stat)
       return;
@@ -447,59 +647,75 @@ void RTransact::onBlock()
       checkReverify(stat->head->blockId);
    }
 
-   auto commitNum  = stat->current.commitNum;
-   auto reversible = WriteOnly{}.open<ReversibleBlocksTable>();
-   reversible.put({.blockNum = stat->current.blockNum, .time = stat->current.time});
-   BlockTime irreversibleTime = {};
-   for (auto r : reversible.getIndex<0>())
+   auto finalized = finalizeBlocks(stat->current);
+   if (!finalized)
+      return;
+
+   // Reasons to send a reply:
+   // 1. The transaction was successful and is irreversible
+   // 2. The transaction is expired
+
+   // On failed transactions: We cannot send a response until the transaction
+   // has expired (Implicit consensus that the tx will not be included).
+
+   // In all cases where a reply is sent, we can stop subjectively tracking information about that tx
+   //
+   // To determine the trace for the reply, the txid can be used to look up the trace in subjective tables.
+   //   If there is no record of that tx in the table, then it must be an expired pending transaction so
+   //   it gets the standard "transaction expired" trace.
+
+   std::vector<psibase::Checksum256> txids;
+
+   auto successfulTxTable = WriteOnly{}.open<TxSuccessTable>();
+   auto failedTxTable     = Subjective{}.open<TxFailedTable>();
+   auto pendingTxTable    = Subjective{}.open<PendingTransactionTable>();
+   auto dataTable         = Subjective{}.open<TransactionDataTable>();
+   auto clientTable       = Subjective{}.open<TraceClientTable>();
+
+   // Get all successful and irreversible transactions
+   auto successTxIdx = successfulTxTable.getIndex<1>();
+   for (BlockNum blockNum : std::views::iota(finalized->first) | std::views::take(finalized->count))
    {
-      if (r.blockNum > commitNum)
-         break;
-      irreversibleTime = r.time;
-      if (r.blockNum < commitNum)
-         reversible.remove(r);
+      for (const auto& tx : successTxIdx.subindex<psibase::Checksum256>(blockNum))
+      {
+         txids.push_back(tx.id);
+      }
    }
-   // Remove expired transactions and find associated requests
-   std::vector<TraceClientRow> ids;
+
    PSIBASE_SUBJECTIVE_TX
    {
-      auto table       = Subjective{}.open<PendingTransactionTable>();
-      auto dataTable   = Subjective{}.open<TransactionDataTable>();
-      auto clientTable = Subjective{}.open<TraceClientTable>();
-      auto index       = table.getIndex<3>();
-      for (auto item : index)
+      // Get all expired transactions
+      for (auto pendingTx : pendingTxTable.getIndex<3>())
       {
-         if (item.expiration > irreversibleTime)
+         if (pendingTx.expiration > finalized->time)
             break;
-         if (auto client = clientTable.get(item.id))
-         {
-            ids.push_back(*client);
-            clientTable.remove(*client);
-         }
-         dataTable.erase(item.id);
-         table.remove(item);
+
+         txids.push_back(pendingTx.id);
       }
    }
-   // Send responses to everyone waiting for a transaction that expired
-   if (!ids.empty())
+
+   // Ensure all txids have a client waiting for a reply
+   std::vector<psibase::Checksum256> needsReply;
+   for (auto id : txids)
    {
-      TransactionTrace trace{.error = "Transaction expired"};
-      HttpReply        json{.contentType = "application/json"};
+      PSIBASE_SUBJECTIVE_TX
       {
-         psio::vector_stream stream{json.body};
-         to_json(trace, stream);
-      }
-      HttpReply bin{.contentType = "application/octet-stream"};
-      {
-         psio::vector_stream stream{bin.body};
-         to_frac(trace, stream);
-      }
-      for (auto row : ids)
-      {
-         for (auto client : row.clients)
-            to<HttpServer>().sendReply(client.socket, client.json ? json : bin);
+         if (auto client = clientTable.get(id))
+         {
+            needsReply.push_back(id);
+         }
+         else
+         {  // Stop tracking a finalized tx if no client is waiting for a reply.
+            pendingTxTable.erase(id);
+            dataTable.erase(id);
+
+            successfulTxTable.erase(id);
+            failedTxTable.erase(id);
+         }
       }
    }
+
+   sendReplies(needsReply);
 }
 
 void RTransact::onVerify(std::uint64_t                      id,
@@ -507,11 +723,11 @@ void RTransact::onVerify(std::uint64_t                      id,
                          std::optional<RunToken>            token)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   auto     pendingVerifies        = open<PendingVerifyTable>();
-   auto     unverifiedTransactions = open<UnverifiedTransactionTable>();
-   auto     reverify               = open<ReverifySignaturesTable>();
-   auto     runVerifyId = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
-   TrxReply errorReply;
+   auto pendingVerifies        = open<PendingVerifyTable>();
+   auto unverifiedTransactions = open<UnverifiedTransactionTable>();
+   auto reverify               = open<ReverifySignaturesTable>();
+   auto runVerifyId            = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
+   auto errorTxId              = std::optional<Checksum256>{};
    PSIBASE_SUBJECTIVE_TX
    {
       kvRemove(RunRow::db, runKey(id));
@@ -569,7 +785,7 @@ void RTransact::onVerify(std::uint64_t                      id,
             {
                unverifiedTransactions.remove(*tx);
                open<TransactionDataTable>().erase(tx->id);
-               errorReply = claimTrxReply(tx->id);
+               errorTxId = tx->id;
             }
             else
             {
@@ -580,9 +796,9 @@ void RTransact::onVerify(std::uint64_t                      id,
          }
       }
    }
-   if (errorReply)
+   if (errorTxId)
    {
-      errorReply.send(trace);
+      sendReply(*errorTxId, trace, WaitFor::isApplied);
    }
 }
 
@@ -990,26 +1206,29 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
 {
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
-   if (request.method == "POST" && request.target == "/push_transaction")
+   auto target = request.path();
+   if (request.method == "POST" && target == "/push_transaction")
    {
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
-      auto trx = psio::from_frac<SignedTransaction>(request.body);
-      auto id  = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+
+      auto query = request.query<WaitFor>();
+      auto trx   = psio::from_frac<SignedTransaction>(request.body);
+      auto id    = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       validateTransaction(trx);
       bool json = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {
          auto clients = Subjective{}.open<TraceClientTable>();
          auto row     = clients.get(id).value_or(TraceClientRow{.id = id});
-         row.clients.push_back({*socket, json});
+         row.clients.push_back({*socket, json, query.flag()});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
       }
       if (pushTransaction(id, trx))
          forwardTransaction(trx);
    }
-   else if (request.method == "POST" && request.target == "/login")
+   else if (request.method == "POST" && target == "/login")
    {
       auto trx = parseBody<SignedTransaction>(request);
       check(trx.transaction->actions().size() == 1 &&

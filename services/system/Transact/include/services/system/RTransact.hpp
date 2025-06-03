@@ -127,7 +127,9 @@ namespace SystemService
    {
       std::int32_t socket;
       bool         json = true;
-      PSIO_REFLECT(TraceClientInfo, socket, json)
+      uint8_t      waitFor;
+
+      PSIO_REFLECT(TraceClientInfo, socket, json, waitFor)
    };
 
    struct TraceClientRow
@@ -156,6 +158,29 @@ namespace SystemService
    };
    PSIO_REFLECT(LoginReply, access_token, token_type)
 
+   struct TxSuccessRecord
+   {
+      psibase::Checksum256      id;
+      psibase::BlockNum         blockNum;  // The block in which the tx was applied
+      psibase::TransactionTrace trace;
+
+      using ByBlockNum = psibase::CompositeKey<&TxSuccessRecord::blockNum, &TxSuccessRecord::id>;
+      auto byBlockNum() const { return ByBlockNum{}(*this); }
+   };
+   PSIO_REFLECT(TxSuccessRecord, id, blockNum, trace)
+   using TxSuccessTable =
+       psibase::Table<TxSuccessRecord, &TxSuccessRecord::id, TxSuccessRecord::ByBlockNum{}>;
+   PSIO_REFLECT_TYPENAME(TxSuccessTable)
+
+   struct TxFailedRecord
+   {
+      psibase::Checksum256      id;
+      psibase::TransactionTrace trace;
+   };
+   PSIO_REFLECT(TxFailedRecord, id, trace)
+   using TxFailedTable = psibase::Table<TxFailedRecord, &TxFailedRecord::id>;
+   PSIO_REFLECT_TYPENAME(TxFailedTable)
+
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification
    // are dispatched asynchronously. When they complete, the transaction
@@ -169,11 +194,15 @@ namespace SystemService
                                                                 AvailableSequenceTable,
                                                                 TraceClientTable,
                                                                 JWTKeyTable,
+                                                                TxFailedTable,
                                                                 UnverifiedTransactionTable,
                                                                 PendingVerifyTable,
                                                                 ReverifySignaturesTable>;
-      using WriteOnly =
-          psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable, VerifyIdTable>;
+      using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
+                                                               ReversibleBlocksTable,
+                                                               TxSuccessTable,
+                                                               VerifyIdTable>;
+
       std::optional<psibase::SignedTransaction>                    next();
       std::optional<std::vector<std::optional<psibase::RunToken>>> preverify(
           psio::view<const psibase::SignedTransaction> trx);

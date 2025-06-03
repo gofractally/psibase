@@ -169,7 +169,7 @@ class Chain {
     }
 
     public async pushArrayBufferTransaction(buffer: ArrayBufferLike) {
-        let url = siblingUrl(null, "transact", "/push_transaction");
+        let url = siblingUrl(null, "transact", "/push_transaction?wait_for=applied");
         let res = await throwIfError(
             await fetch(url, {
                 method: "POST",

@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "query", "plugin"]
 
 [workspace.package]
-version = "0.16.0"
+version = "0.17.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -31,6 +31,6 @@ lto = true
 crate-type = ["rlib"]
 
 [dependencies]
-registry = { path = "service", version = "0.16.0" }
-r-registry = { path = "query", version = "0.16.0" }
-plugin = { path = "plugin", version = "0.16.0" }
+registry = { path = "service", version = "0.17.0" }
+r-registry = { path = "query", version = "0.17.0" }
+plugin = { path = "plugin", version = "0.17.0" }

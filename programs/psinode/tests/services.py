@@ -16,7 +16,7 @@ class Transact(Service):
     service = 'transact'
     def push_transaction(self, trx, keys=[]):
         packed = self.api.pack_signed_transaction(trx, keys)
-        with self.post('/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:
+        with self.post('/push_transaction?wait_for=applied', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:
             response.raise_for_status()
             trace = response.json()
             if trace['error'] is not None:

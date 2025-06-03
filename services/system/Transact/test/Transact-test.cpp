@@ -139,8 +139,8 @@ TEST_CASE("Test push_transaction")
 
    auto httpPush = [&](const SignedTransaction& trx)
    {
-      return Result<void>(t.post<TransactionTrace>(Transact::service, "/push_transaction",
-                                                   FracPackBody{std::move(trx)}));
+      return Result<void>(t.post<TransactionTrace>(
+          Transact::service, "/push_transaction?wait_for=applied", FracPackBody{std::move(trx)}));
    };
 
    SECTION("No signature")
@@ -173,7 +173,8 @@ TEST_CASE("Test push_transaction")
       SECTION("Missing")
       {
          trx.proofs.pop_back();
-         auto reply = t.post(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+         auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied",
+                             FracPackBody{std::move(trx)});
          CHECK(reply.status == HttpStatus::internalServerError);
          CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
                AuthSig::AuthSig::service);
@@ -181,7 +182,8 @@ TEST_CASE("Test push_transaction")
       SECTION("Extra")
       {
          trx.proofs.push_back({});
-         auto reply = t.post(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+         auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied",
+                             FracPackBody{std::move(trx)});
          CHECK(reply.status == HttpStatus::internalServerError);
          CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
                AuthSig::AuthSig::service);
@@ -208,8 +210,8 @@ TEST_CASE("Test push_transaction")
       constexpr auto verifysig = VerifySig::service;
 
       t.setAutoRun(false);
-      auto reply =
-          t.asyncPost(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+      auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                               FracPackBody{std::move(trx)});
       // Verify signatures
       while (t.runQueueItem())
       {
@@ -267,8 +269,8 @@ TEST_CASE("Test push_transaction")
       t.startBlock();
 
       t.setAutoRun(false);
-      auto reply =
-          t.asyncPost(Transact::service, "/push_transaction", FracPackBody{std::move(trx)});
+      auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                               FracPackBody{std::move(trx)});
 
       // Count items in queue
       std::size_t                       queueSize = 0;
@@ -329,7 +331,8 @@ TEST_CASE("Test push_transaction")
       std::size_t                 remaining = 8;
       do
       {
-         replies.push_back(t.asyncPost(Transact::service, "/push_transaction", FracPackBody{trx}));
+         replies.push_back(t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                                       FracPackBody{trx}));
       } while (t.runQueueItem() && --remaining != 0);
 
       t.runAll();
@@ -380,7 +383,8 @@ TEST_CASE("Test push_transaction")
       SECTION("cancel flags")
       {
          t.setAutoRun(false);
-         auto reply = t.asyncPost(Transact::service, "/push_transaction", FracPackBody{strx});
+         auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                                  FracPackBody{strx});
          while (t.runQueueItem())
          {
          }

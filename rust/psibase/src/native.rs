@@ -312,6 +312,16 @@ pub fn abort_subjective() {
     unsafe { native_raw::abortSubjective() }
 }
 
+/// The `subjective_tx` macro creates a scope in which
+/// the subjective database is accessible. It is necessary to use
+/// this scope for any reads or writes to the subjective database.
+///
+/// The statement will be executed one or more times until
+/// it is successfully committed.
+///
+/// Unstructured control flow that exits the statement, (e.g. break,
+/// return, panic), will discard any changes made to the
+/// subjective database.
 #[macro_export]
 macro_rules! subjective_tx {
     {$($stmt:tt)*} => {
