@@ -263,7 +263,7 @@ class API:
                 packed = bytes.fromhex(trx)
             else:
                 packed = trx
-        with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
+        with self.post('/push_transaction?wait_for=applied', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
             if trace['error'] is not None:
