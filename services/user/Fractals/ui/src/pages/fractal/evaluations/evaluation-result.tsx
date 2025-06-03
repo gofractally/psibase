@@ -1,5 +1,4 @@
 import { CircleSlash2 } from "lucide-react";
-import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyBlock } from "@/components/empty-block";
 
 import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
+import { cn } from "@/lib/utils";
 
-// const sortedData = [
+// const data = [
 //     {
 //         groupNumber: 1,
 //         users: ["sparky", "val"],
@@ -25,16 +25,17 @@ import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
 //         users: ["dan", "brandon", "james", "john", "mike", "steven"],
 //         result: ["james", "john", "mike", "brandon"],
 //     },
+//     {
+//         groupNumber: 4,
+//         users: ["neo", "trinity", "morpheus"],
+//         result: undefined,
+//     },
 // ];
 
 export const EvaluationResult = () => {
     const { evaluationId } = useParams<{ evaluationId: string }>();
 
     const { data } = useEvaluationResults(Number(evaluationId));
-
-    const sortedData = useMemo(() => {
-        return [...(data || [])].sort((a, b) => a.groupNumber - b.groupNumber);
-    }, [data]);
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -44,11 +45,11 @@ export const EvaluationResult = () => {
                 </h1>
             </div>
             <div className="mt-3">
-                {sortedData.length === 0 ? (
+                {data?.length === 0 ? (
                     <EmptyBlock title="No results found" />
                 ) : (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        {sortedData.map((group) => {
+                        {data?.map((group) => {
                             const members = new Set(group.users);
                             const results = new Set(group.result);
                             const missing = members.difference(results);
@@ -68,7 +69,7 @@ export const EvaluationResult = () => {
                                     </CardHeader>
                                     <CardContent className="p-4">
                                         <ol className="space-y-3">
-                                            {group.result.map(
+                                            {group.result?.map(
                                                 (member, index) => (
                                                     <li
                                                         key={`group-${group.groupNumber}-member-${member}`}
@@ -85,7 +86,13 @@ export const EvaluationResult = () => {
                                             )}
                                         </ol>
                                         {missing.size > 0 && (
-                                            <div className="mt-4 space-y-2">
+                                            <div
+                                                className={cn(
+                                                    "space-y-2",
+                                                    missing.size !==
+                                                        members.size && "mt-4",
+                                                )}
+                                            >
                                                 <h4 className="text-center text-sm font-medium">
                                                     Not ranked
                                                 </h4>

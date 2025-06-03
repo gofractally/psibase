@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { fractalsService } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -9,10 +10,21 @@ export const zGroupFinishes = z.object({
     result: z.array(zAccount),
 });
 
+export const zGroupsCreated = z.object({
+    groupNumber: z.number(),
+    users: z.array(zAccount),
+});
+
 export type EvaluationResults = z.infer<typeof zGroupFinishes>;
 
 export const getEvaluationResults = async (evaluationId: number) => {
     const gql = `{
+        getGroupsCreated(evaluationOwner: ${fractalsService}, evaluationId: ${evaluationId}) {
+            nodes {
+                groupNumber
+                users
+            }
+        }
         groupFinishes(evaluationId: ${evaluationId}) {
             nodes {
                 groupNumber
@@ -26,11 +38,21 @@ export const getEvaluationResults = async (evaluationId: number) => {
 
     const response = z
         .object({
+            getGroupsCreated: z.object({
+                nodes: z.array(zGroupsCreated),
+            }),
             groupFinishes: z.object({
                 nodes: z.array(zGroupFinishes),
             }),
         })
         .parse(results);
 
-    return response.groupFinishes.nodes;
+    return response.getGroupsCreated.nodes
+        .map((group) => ({
+            ...group,
+            result: response.groupFinishes.nodes.find(
+                (group) => group.groupNumber === group.groupNumber,
+            )?.result,
+        }))
+        .sort((a, b) => a.groupNumber - b.groupNumber);
 };
