@@ -24,7 +24,7 @@ pub trait TableRecord: Pack + UnpackOwned {
     const SECONDARY_KEYS: u8;
     const DB: DbId = DbId::Service;
 
-    fn get_primary_key(&self) -> Self::PrimaryKey;
+    fn get_primary_key(&self) -> RawKey;
 
     /// Return the list of secondary keys.
     ///

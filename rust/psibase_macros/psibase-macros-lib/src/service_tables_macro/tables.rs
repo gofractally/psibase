@@ -204,8 +204,9 @@ pub fn process_service_tables(
                 const SECONDARY_KEYS: u8 = #sks_len;
                 const DB: #psibase_mod::DbId = #psibase_mod::DbId::#db;
 
-                fn get_primary_key(&self) -> Self::PrimaryKey {
-                    self.#pk_call_ident
+                fn get_primary_key(&self) -> #psibase_mod::RawKey {
+                    use #psibase_mod::ToKey;
+                    #psibase_mod::RawKey::new(self.#pk_call_ident.to_key())
                 }
 
                 fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {

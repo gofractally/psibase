@@ -96,6 +96,7 @@ namespace psibase
          TypedAction<Args> action{sender, receiver, method, {Args(args...)}};
          psio::size_stream ss;
          psio::to_frac(action, ss);
+         check(ss.size <= std::numeric_limits<uint32_t>::max(), "packImpl: size overflow");
          psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(
              psio::size_tag{static_cast<uint32_t>(ss.size)});
          psio::fast_buf_stream stream(result.data(), result.size());
