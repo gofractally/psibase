@@ -13,12 +13,6 @@ mod service {
     use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
-    }
-
-    #[derive(Deserialize, SimpleObject)]
     struct EvaluationFinish {
         fractal_account: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -163,14 +157,13 @@ mod service {
                 .query()
         }
 
-        async fn fractal(&self, fractal: String) -> Option<Fractal> {
+        async fn fractal(&self, fractal: AccountNumber) -> Option<Fractal> {
             FractalTable::with_service(fractals::SERVICE)
                 .get_index_pk()
-                .get(&AccountNumber::from(fractal.as_str()))
+                .get(&fractal)
         }
 
-        async fn evaluations(&self, fractal: String) -> Vec<EvaluationInstance> {
-            let fractal = AccountNumber::from_str(&fractal).expect("invalid account name");
+        async fn evaluations(&self, fractal: AccountNumber) -> Vec<EvaluationInstance> {
             EvaluationInstanceTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .range((fractal, 0)..=(fractal, u32::MAX))
@@ -211,13 +204,13 @@ mod service {
                 .await
         }
 
-        async fn fractals_list(&self, fractals: Vec<String>) -> Vec<Option<Fractal>> {
+        async fn fractals_list(&self, fractals: Vec<AccountNumber>) -> Vec<Option<Fractal>> {
             fractals
                 .into_iter()
                 .map(|account| {
                     FractalTable::with_service(fractals::SERVICE)
                         .get_index_pk()
-                        .get(&AccountNumber::from(account.as_str()))
+                        .get(&account)
                 })
                 .collect()
         }
