@@ -210,6 +210,7 @@ pub fn process_service_tables(
                 }
 
                 fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {
+                    use #psibase_mod::ToKey;
                     vec![#sks]
                 }
             }
