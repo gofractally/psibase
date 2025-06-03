@@ -30,7 +30,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.16.0"
+version = "0.17.0"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
