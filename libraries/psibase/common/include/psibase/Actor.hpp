@@ -1,5 +1,5 @@
 #pragma once
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>

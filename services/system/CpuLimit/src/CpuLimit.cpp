@@ -1,7 +1,7 @@
 #include <services/system/CpuLimit.hpp>
 
 #include <time.h>
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 
 #include <services/system/Accounts.hpp>
