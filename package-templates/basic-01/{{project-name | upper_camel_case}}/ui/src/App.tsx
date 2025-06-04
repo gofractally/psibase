@@ -8,7 +8,8 @@ import { Nav } from "@components/nav";
 
 import { useCreateConnectionToken } from "@hooks";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { getSupervisor, isRedirectErrorObject } from "@psibase/common-lib";
+
 const supervisor = getSupervisor();
 
 export const App = () => {
@@ -52,7 +53,11 @@ export const App = () => {
             }
             setChangesMade(false);
         } catch (e) {
-            if (e instanceof Error) {
+            if (isRedirectErrorObject(e)) {
+                console.log("isRedirect; redirecting to", e.message);
+                window.location.href = e.message;
+                return;
+            } else if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);
                 setUploadStatus(`Error: ${e.message}`);
             } else {
@@ -69,6 +74,7 @@ export const App = () => {
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <Nav title="Example Thing Page" />
+            <div className="text-red-500">{uploadStatus}</div>
             <form className="mx-auto grid max-w-screen-md grid-cols-6">
                 <div className="col-span-6 mt-6 grid grid-cols-6">
                     <Label htmlFor="exampleThing" className="col-span-2">

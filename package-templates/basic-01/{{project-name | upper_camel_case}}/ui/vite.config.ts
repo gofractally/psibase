@@ -19,7 +19,7 @@ export default defineConfig(({ command }) => ({
                 projectDir: serviceDir,
                 additionalManualChunks: {},
             }),
-        ...createPsibaseConfig({
+        createPsibaseConfig({
             service: serviceName,
             serviceDir,
             isServing: command === "serve",
@@ -29,4 +29,12 @@ export default defineConfig(({ command }) => ({
         topLevelAwait(),
         tsconfigPaths(),
     ],
+    build: {
+        rollupOptions: {
+            input: {
+                main: path.resolve(__dirname, "index.html"),
+                perms: path.resolve(__dirname, "permissions.html"),
+            },
+        },
+    },
 }));
