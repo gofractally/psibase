@@ -185,16 +185,21 @@ pub mod service {
         let evaluation = Evaluation::get(owner, evaluation_id);
 
         let is_closed = evaluation.get_current_phase() == EvaluationStatus::Closed;
-        let is_all_with_results = evaluation
-            .get_groups()
-            .iter()
-            .all(|group| group.get_result().is_some());
+        let has_all_results = || {
+            evaluation
+                .get_groups()
+                .iter()
+                .all(|group| group.get_result().is_some())
+        };
 
         check(
-            is_closed || is_all_with_results,
+            is_closed || has_all_results(),
             "evaluation is still in progress",
         );
 
+        // The ordering is important here, we want to make sure the hook is ran BEFORE
+        // we delete all groups + evaluation so that any users of this service
+        // have an oppurtunity to read any table data before it's dropped.
         if evaluation.use_hooks {
             EvalHooks::call_to(evaluation.owner).on_eval_fin(evaluation_id);
         }
