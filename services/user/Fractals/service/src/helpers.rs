@@ -37,26 +37,10 @@ pub fn parse_rank_to_accounts(
     group_result: Vec<u8>,
     mut group_members: Vec<AccountNumber>,
 ) -> Vec<AccountNumber> {
-    let mut rank_amount_to_account_dictionary: HashMap<u8, AccountNumber> = HashMap::new();
-
-    // Sort accounts by their u64 value in ascending order
     group_members.sort_by(|a, b| a.value.cmp(&b.value));
 
-    // Map each index to an account
-    group_members
-        .into_iter()
-        .enumerate()
-        .for_each(|(index, account)| {
-            rank_amount_to_account_dictionary.insert(index as u8, account);
-        });
-
-    // Map rank numbers to accounts
     group_result
         .into_iter()
-        .map(|rank_number| {
-            rank_amount_to_account_dictionary
-                .remove(&rank_number)
-                .expect("Rank number not found in dictionary")
-        })
+        .map(|rank_number| group_members[rank_number as usize])
         .collect()
 }
