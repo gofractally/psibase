@@ -135,9 +135,10 @@ namespace SystemService
    struct TraceClientRow
    {
       psibase::Checksum256         id;
+      psibase::TimePointSec        expiration;
       std::vector<TraceClientInfo> clients;
    };
-   PSIO_REFLECT(TraceClientRow, id, clients)
+   PSIO_REFLECT(TraceClientRow, id, expiration, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
    PSIO_REFLECT_TYPENAME(TraceClientTable)
@@ -175,10 +176,14 @@ namespace SystemService
    struct TxFailedRecord
    {
       psibase::Checksum256      id;
+      psibase::TimePointSec     expiration;
       psibase::TransactionTrace trace;
+
+      using ByExpiration = psibase::CompositeKey<&TxFailedRecord::expiration, &TxFailedRecord::id>;
    };
-   PSIO_REFLECT(TxFailedRecord, id, trace)
-   using TxFailedTable = psibase::Table<TxFailedRecord, &TxFailedRecord::id>;
+   PSIO_REFLECT(TxFailedRecord, id, expiration, trace)
+   using TxFailedTable =
+       psibase::Table<TxFailedRecord, &TxFailedRecord::id, TxFailedRecord::ByExpiration{}>;
    PSIO_REFLECT_TYPENAME(TxFailedTable)
 
    // Transactions enter this service through the push_transaction endpoint

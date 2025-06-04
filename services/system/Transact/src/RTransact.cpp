@@ -367,8 +367,9 @@ namespace
    // 2. Vector of sockets waiting for a binary response
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
+   using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
    auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-       -> std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>
+       -> ClaimedSockets
    {
       {
          auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
@@ -465,13 +466,10 @@ namespace
       }
    }
 
-   // This function should only be called for a transaction id that has clients waiting for it.
-   void sendReply(const psibase::Checksum256&                 id,
-                  psio::view<const psibase::TransactionTrace> trace,
-                  const ClientFilter&                         clientFilter = noFilter)
+   void sendReply(const ClaimedSockets& clients, psio::view<const psibase::TransactionTrace> trace)
    {
-      TransactionTraceRef pruned     = PruneTrace{true}(trace);
-      auto [jsonClients, binClients] = claimClientReply(id, clientFilter);
+      TransactionTraceRef pruned            = PruneTrace{true}(trace);
+      const auto& [jsonClients, binClients] = clients;
 
       if (jsonClients.empty() && binClients.empty())  // failsafe
          return;
@@ -503,6 +501,14 @@ namespace
             call(action.data(), action.size());
          }
       }
+   }
+
+   // This function should only be called for a transaction id that has clients waiting for it.
+   void sendReply(const psibase::Checksum256&                 id,
+                  psio::view<const psibase::TransactionTrace> trace,
+                  const ClientFilter&                         clientFilter = noFilter)
+   {
+      sendReply(claimClientReply(id, clientFilter), trace);
    }
 
    void sendReplies(const std::vector<psibase::Checksum256>& txids)
@@ -552,6 +558,42 @@ namespace
 #ifdef __wasm32__
       printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
 #endif
+   }
+
+   // Send failure traces for expired transactions. This is intended
+   // to handle transactions that were not put in the queue. It should
+   // be run after sending any successful traces, to avoid false positives.
+   void sendFailureTraces(TxFailedTable& failed, BlockTime finalizedTime)
+   {
+      auto byExpiration = failed.getIndex<1>();
+
+      while (true)
+      {
+         std::optional<std::vector<char>>                                 trace;
+         std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>> claimed;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            if (auto iter = byExpiration.begin(); iter != byExpiration.end())
+            {
+               auto failedTx = *iter;
+               if (failedTx.expiration <= finalizedTime)
+               {
+                  failed.remove(failedTx);
+                  trace   = psio::to_frac(failedTx.trace);
+                  claimed = claimClientReply(failedTx.id, noFilter);
+               }
+            }
+         }
+         if (trace)
+         {
+            auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
+            sendReply(claimed, traceView);
+         }
+         else
+         {
+            break;
+         }
+      }
    }
 
    struct WaitFor
@@ -622,8 +664,9 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
          PSIBASE_SUBJECTIVE_TX
          {
             Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
-                .id    = id,
-                .trace = trace.unpack(),
+                .id         = id,
+                .expiration = row->expiration,
+                .trace      = trace.unpack(),
             });
          }
       }
@@ -716,6 +759,7 @@ void RTransact::onBlock()
    }
 
    sendReplies(needsReply);
+   sendFailureTraces(failedTxTable, finalized->time);
 }
 
 void RTransact::onVerify(std::uint64_t                      id,
@@ -726,6 +770,7 @@ void RTransact::onVerify(std::uint64_t                      id,
    auto pendingVerifies        = open<PendingVerifyTable>();
    auto unverifiedTransactions = open<UnverifiedTransactionTable>();
    auto reverify               = open<ReverifySignaturesTable>();
+   auto clients                = open<TraceClientTable>();
    auto runVerifyId            = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
    auto errorTxId              = std::optional<Checksum256>{};
    PSIBASE_SUBJECTIVE_TX
@@ -785,7 +830,19 @@ void RTransact::onVerify(std::uint64_t                      id,
             {
                unverifiedTransactions.remove(*tx);
                open<TransactionDataTable>().erase(tx->id);
-               errorTxId = tx->id;
+               if (auto client = clients.get(tx->id))
+               {
+                  if (std::ranges::any_of(client->clients, WaitFor::isFinal))
+                  {
+                     Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+                         .id         = tx->id,
+                         .expiration = tx->expiration,
+                         .trace      = trace.unpack(),
+                     });
+                  }
+                  if (std::ranges::any_of(client->clients, WaitFor::isApplied))
+                     errorTxId = tx->id;
+               }
             }
             else
             {
@@ -1220,7 +1277,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       PSIBASE_SUBJECTIVE_TX
       {
          auto clients = Subjective{}.open<TraceClientTable>();
-         auto row     = clients.get(id).value_or(TraceClientRow{.id = id});
+         auto row     = clients.get(id).value_or(
+             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
          row.clients.push_back({*socket, json, query.flag()});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);

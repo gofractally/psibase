@@ -170,6 +170,19 @@ TEST_CASE("Test push_transaction")
          CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
                AuthSig::AuthSig::service);
       }
+      SECTION("Invalid final")
+      {
+         trx.proofs[0].clear();
+         auto expiration = trx.transaction->tapos().expiration().unpack();
+         auto reply      = t.asyncPost(Transact::service, "/push_transaction?wait_for=final",
+                                       FracPackBody{std::move(trx)});
+         // skip to the transaction expiration
+         t.startBlock(expiration);
+         t.finishBlock();
+         CHECK(Result<void>(reply.get<TransactionTrace>()).failed("signature invalid"));
+         CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
+               AuthSig::AuthSig::service);
+      }
       SECTION("Missing")
       {
          trx.proofs.pop_back();
