@@ -23,22 +23,21 @@ use std::collections::HashMap;
 /// ```rust
 /// let group_result = vec![4, 3, 1, 6, 5];
 /// let group_members = vec![
-///     AccountNumber::new(1), // Alice
-///     AccountNumber::new(2), // Bob
-///     AccountNumber::new(3), // Charlie
-///     AccountNumber::new(4), // David
-///     AccountNumber::new(5), // Edward
-///     AccountNumber::new(6), // Fred
+///     "Alice"
+///     "Bob"
+///     "Charlie"
+///     "David"
+///     "Edward"
+///     "Fred"
 /// ];
 /// let result = parse_rank_to_accounts(group_result, group_members);
 /// // Result: [David, Charlie, Alice, Fred, Edward]
 /// ```
 pub fn parse_rank_to_accounts(
     group_result: Vec<u8>,
-    group_members: Vec<AccountNumber>,
+    mut group_members: Vec<AccountNumber>,
 ) -> Vec<AccountNumber> {
     let mut rank_amount_to_account_dictionary: HashMap<u8, AccountNumber> = HashMap::new();
-    let mut group_members = group_members.clone();
 
     // Sort accounts by their u64 value in ascending order
     group_members.sort_by(|a, b| a.value.cmp(&b.value));
