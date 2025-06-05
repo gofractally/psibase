@@ -159,7 +159,7 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
         if data is None:
-            self.private = ec.generate_private_key(ec.SECP256R1)
+            self.private = ec.generate_private_key(ec.SECP256R1())
         else:
             try:
                 self.private = load_pem_private_key(data)
