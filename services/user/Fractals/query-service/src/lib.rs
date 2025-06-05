@@ -84,7 +84,6 @@ mod service {
     impl Query {
         async fn get_groups_created(
             &self,
-            evaluation_owner: AccountNumber,
             evaluation_id: u32,
             first: Option<i32>,
             last: Option<i32>,
@@ -93,8 +92,8 @@ mod service {
         ) -> async_graphql::Result<Connection<u64, NewGroup>> {
             EventQuery::new("history.evaluations.new_group")
                 .condition(format!(
-                    "owner = '{}' AND evaluation_id = {}",
-                    evaluation_owner, evaluation_id
+                    "owner = 'fractals' AND evaluation_id = {}",
+                    evaluation_id
                 ))
                 .first(first)
                 .last(last)

@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -19,7 +18,7 @@ export type EvaluationResults = z.infer<typeof zGroupFinishes>;
 
 export const getEvaluationResults = async (evaluationId: number) => {
     const gql = `{
-        getGroupsCreated(evaluationOwner: ${fractalsService}, evaluationId: ${evaluationId}) {
+        getGroupsCreated(evaluationId: ${evaluationId}) {
             nodes {
                 groupNumber
                 users
