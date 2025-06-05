@@ -94,7 +94,6 @@ if(DEFINED WASI_SDK_PREFIX)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
         CpuLimit Events Explorer Invite Nft
-        CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
