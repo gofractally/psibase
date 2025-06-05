@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
+#include <psibase/nativeTables.hpp>
+#include <psibase/trace.hpp>
 
 namespace psibase
 {
@@ -31,18 +33,20 @@ namespace psibase::tester::raw
    TESTER_NATIVE(getFork) void getFork(std::uint32_t chain, const psibase::Checksum256& id);
    TESTER_NATIVE(destroyChain) void destroyChain(std::uint32_t chain);
    TESTER_NATIVE(finishBlock) void finishBlock(std::uint32_t chain_index);
-   TESTER_NATIVE(verify)
-   std::uint32_t verify(std::uint32_t chain_index,
-                        const char*   args_packed,
-                        std::uint32_t args_packed_size);
+   TESTER_NATIVE(runAction)
+   std::uint32_t runAction(std::uint32_t chain_index,
+                           RunMode       mode,
+                           bool          head,
+                           const char*   args_packed,
+                           std::uint32_t args_packed_size);
    TESTER_NATIVE(pushTransaction)
    std::uint32_t pushTransaction(std::uint32_t chain_index,
                                  const char*   args_packed,
                                  std::uint32_t args_packed_size);
    TESTER_NATIVE(httpRequest)
-   std::uint32_t httpRequest(std::uint32_t chain_index,
-                             const char*   args_packed,
-                             std::uint32_t args_packed_size);
+   std::int32_t httpRequest(std::uint32_t chain_index,
+                            const char*   args_packed,
+                            std::uint32_t args_packed_size);
    TESTER_NATIVE(socketRecv) std::uint32_t socketRecv(std::int32_t fd, std::size_t* size);
    TESTER_NATIVE(shutdownChain) void shutdownChain(uint32_t chain);
    TESTER_NATIVE(startBlock) void startBlock(std::uint32_t chain_index, std::int64_t time_us);
@@ -99,3 +103,9 @@ namespace psibase::tester::raw
 #undef TESTER_NATIVE
 
 }  // namespace psibase::tester::raw
+
+namespace psibase::tester
+{
+   TransactionTrace pushTransaction(std::uint32_t chain, const SignedTransaction& signedTrx);
+   TransactionTrace runAction(std::uint32_t chain, RunMode mode, bool head, const Action& act);
+}  // namespace psibase::tester
