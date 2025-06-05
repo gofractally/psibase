@@ -1,7 +1,7 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/Service.hpp>
+#include <psibase/api.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase

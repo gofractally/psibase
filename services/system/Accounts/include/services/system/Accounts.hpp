@@ -1,5 +1,4 @@
 #pragma once
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
