@@ -51,7 +51,7 @@ interface admin {
     /// Registers an account for a specific evaluation.
     /// 
     /// Requires:
-    /// * Must be called by registrant OR the evaluation owner
+    /// * Must be called by evaluation owner
     /// * Must be in registration phase 
     ///
     /// Parameters:
@@ -62,6 +62,7 @@ interface admin {
     /// Unregisters an account from a specific evaluation.
     /// 
     /// Requires:
+    /// * Must be called by evaluation owner
     /// * Must be in registration phase 
     ///
     /// Parameters:
