@@ -16,12 +16,12 @@ export const App = () => {
     const [previewImgUrl, setPreviewImgUrl] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
 
-    const init = async () => {
-        await supervisor.onLoaded();
-        await getNetworkName();
-    };
-
     useEffect(() => {
+        const init = async () => {
+            await supervisor.onLoaded();
+            await getNetworkName();
+        };
+
         init();
     }, []);
 

@@ -1,8 +1,8 @@
 import js from "@eslint/js";
-import globals from "globals";
-import reactHooks from "eslint-plugin-react-hooks";
-import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
+import * as reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
+import tseslint from "typescript-eslint";
 
 export default tseslint.config(
     { ignores: ["dist", "node_modules"] },
@@ -13,9 +13,7 @@ export default tseslint.config(
             ecmaVersion: 2020,
             globals: globals.browser,
         },
-        plugins: {
-            "react-hooks": reactHooks,
-        },
     },
+    reactHooks.configs["recommended-latest"],
     eslintConfigPrettier,
 );
