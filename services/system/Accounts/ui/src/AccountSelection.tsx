@@ -1,4 +1,3 @@
-import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +27,6 @@ import {
 import debounce from "debounce";
 import { Button } from "./components/ui/button";
 
-import { Check, UserX, LoaderCircle } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -52,6 +50,7 @@ import {
   InviteExpiredCard,
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
+import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
 
 dayjs.extend(relativeTime);
 
@@ -217,6 +216,29 @@ export const AccountSelection = () => {
     return <InviteExpiredCard token={token} />;
   }
 
+  const onAcceptOrLogin = () => {
+    if (isInvite) {
+      if (!inviteToken) {
+        throw new Error(`Expected invite token loaded`);
+      }
+      acceptInvite({
+        token: z.string().parse(token),
+        accountName: z.string().parse(selectedAccount?.account),
+        app: inviteToken.app,
+        origin: inviteToken.appDomain,
+      });
+    } else {
+      if (!connectionToken) {
+        throw new Error(`Expected connection token for a login`);
+      }
+      login({
+        app: connectionToken.app,
+        origin: connectionToken.origin,
+        accountName: selectedAccount!.account,
+      });
+    }
+  };
+
   return (
     <>
       <Dialog open={isModalOpen} onOpenChange={(open) => setIsModalOpen(open)}>
@@ -244,63 +266,11 @@ export const AccountSelection = () => {
                       <FormItem>
                         <div className="w-full flex justify-between ">
                           <FormLabel>Username</FormLabel>
-                          {isDirty && isCreatingAccount && (
-                            <FormLabel className="text-muted-foreground">
-                              {accountStatus === "Available" ? (
-                                <div className="flex gap-1">
-                                  <div className="text-sm">Available</div>
-                                  <Check size={15} className="my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Taken" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Taken</div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Invalid" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Invalid</div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Loading</div>
-                                  <LoaderCircle
-                                    size={15}
-                                    className="animate animate-spin my-auto"
-                                  />{" "}
-                                </div>
-                              )}
-                            </FormLabel>
-                          )}
-                          {isDirty && !isCreatingAccount && (
-                            <FormLabel className="text-muted-foreground">
-                              {accountStatus === "Available" ? (
-                                <div className="flex gap-1">
-                                  <div className="text-sm">
-                                    Account does not exist
-                                  </div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Invalid" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Invalid</div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Loading" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Loading</div>
-                                  <LoaderCircle
-                                    size={15}
-                                    className="animate animate-spin my-auto"
-                                  />{" "}
-                                </div>
-                              ) : undefined}
-                            </FormLabel>
+                          {isDirty && (
+                            <AccountAvailabilityStatus
+                              accountStatus={accountStatus}
+                              isCreatingAccount={isCreatingAccount}
+                            />
                           )}
                         </div>
                         <FormControl>
@@ -356,30 +326,7 @@ export const AccountSelection = () => {
               <div className="my-3">
                 <Button
                   disabled={!selectedAccount || isTxInProgress}
-                  onClick={() => {
-                    if (isInvite) {
-                      if (!inviteToken) {
-                        throw new Error(`Expected invite token loaded`);
-                      }
-                      acceptInvite({
-                        token: z.string().parse(token),
-                        accountName: z.string().parse(selectedAccount?.account),
-                        app: inviteToken.app,
-                        origin: inviteToken.appDomain,
-                      });
-                    } else {
-                      if (!connectionToken) {
-                        throw new Error(
-                          `Expected connection token for a login`
-                        );
-                      }
-                      login({
-                        app: connectionToken.app,
-                        origin: connectionToken.origin,
-                        accountName: selectedAccount!.account,
-                      });
-                    }
-                  }}
+                  onClick={onAcceptOrLogin}
                   className="w-full"
                 >
                   {isSubmitting
