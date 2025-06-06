@@ -101,7 +101,6 @@ impl Api for FractallyPlugin {
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
-        force_delete: bool,
     ) -> Result<(), Error> {
         let _latch = ProposeLatch::new(&fractal);
 
@@ -112,7 +111,6 @@ impl Api for FractallyPlugin {
             interval_seconds,
             registration,
             submission,
-            force_delete,
         }
         .packed();
 

@@ -54,7 +54,6 @@ pub mod service {
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
-        force_delete: bool,
     ) {
         let fractal_account = get_sender();
         check_some(Fractal::get(fractal_account), "fractal does not exist");
@@ -70,7 +69,7 @@ pub mod service {
             submission,
             finish_by,
             interval_seconds,
-            force_delete,
+            false,
         );
     }
 
