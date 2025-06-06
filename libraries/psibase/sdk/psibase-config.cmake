@@ -54,7 +54,7 @@ function(add_libs suffix)
     )
 
     add_library(psibase-service-base${suffix} INTERFACE)
-    target_include_directories(psibase-service-base${suffix} INTERFACE ${root}/include)
+    target_include_directories(psibase-service-base${suffix} INTERFACE ${root}/include/wasm32-psibase ${root}/include)
     target_link_libraries(psibase-service-base${suffix} INTERFACE
         -L${root}/lib
         psibase${suffix}
