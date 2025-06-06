@@ -41,7 +41,7 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        Member::add(fractal, sender, MemberStatus::Citizen).save();
+        Member::add(fractal, sender, MemberStatus::Citizen);
 
         Wrapper::emit().history().joined_fractal(fractal, sender);
     }

@@ -55,7 +55,7 @@ pub mod tables {
             check_some(Self::get(fractal), "fractal does not exist")
         }
 
-        pub fn save(&self) {
+        fn save(&self) {
             let table = FractalTable::new();
             table.put(&self).expect("failed to save");
         }
@@ -145,7 +145,7 @@ pub mod tables {
             check_some(Self::get(fractal, account), "member does not exist")
         }
 
-        pub fn save(&self) {
+        fn save(&self) {
             let table = MemberTable::new();
             table.put(&self).expect("failed to save");
         }
@@ -354,7 +354,7 @@ pub mod tables {
             );
         }
 
-        pub fn save(&self) {
+        fn save(&self) {
             let table = EvaluationInstanceTable::new();
             table.put(&self).expect("failed to save");
         }
@@ -388,7 +388,7 @@ pub mod tables {
             for (index, account) in fractal_group_result.into_iter().enumerate() {
                 let level = (6 as usize) - index;
                 Score::get(self.fractal, self.eval_type.into(), account)
-                    .set_pending_score(level as u32);
+                    .set_pending_score((level as u32) * 10000);
             }
         }
 
@@ -453,7 +453,7 @@ pub mod tables {
             });
         }
 
-        pub fn save(&self) {
+        fn save(&self) {
             let table = ScoreTable::new();
             table.put(&self).expect("failed to save score");
         }
