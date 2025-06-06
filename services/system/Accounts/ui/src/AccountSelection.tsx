@@ -3,9 +3,6 @@ import { AlarmClockMinus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
-
 import { z } from "zod";
 
 import {
@@ -53,6 +50,11 @@ import { useGetAllAccounts } from "@/hooks/useGetAllAccounts";
 import { useLoginDirect } from "@/hooks/useLoginDirect";
 import { useAcceptInvite } from "@/hooks/useAcceptInvite";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
+import { useImportAccount } from "./hooks/useImportAccount";
+
+import { AccountsList } from "./AccountsList";
+import { useCreateAccount } from "./hooks/useCreateAccount";
+import { useRejectInvite } from "./hooks/useRejectInvite";
 
 dayjs.extend(relativeTime);
 
@@ -60,43 +62,6 @@ const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const capitaliseFirstLetter = (str: string) =>
   str[0].toUpperCase() + str.slice(1);
-
-const Account = ({
-  name,
-  isSelected,
-  onSelected,
-}: {
-  onSelected: () => void;
-  name?: string;
-  isSelected: boolean;
-}) => {
-  return (
-    <button
-      onClick={() => {
-        onSelected();
-      }}
-      className={cn(
-        "w-full flex justify-around p-4 rounded-md border bg-muted/50",
-        {
-          "bg-accent border ": isSelected,
-        }
-      )}
-    >
-      <div className="flex gap-3">
-        {!name ? (
-          <Skeleton className="h-12 w-12 rounded-full" />
-        ) : (
-          <Avatar>
-            <AvatarFallback>{name.toUpperCase().slice(0, 2)}</AvatarFallback>
-          </Avatar>
-        )}
-        <div className={cn("text-lg flex flex-col justify-center")}>
-          {!name ? <Skeleton className="h-4 w-[100px]" /> : name}
-        </div>
-      </div>
-    </button>
-  );
-};
 
 const formSchema = z.object({
   username: z.string().min(1).max(50),
@@ -106,6 +71,13 @@ export const AccountSelection = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: "",
+    },
+  });
+
   const key = searchParams.get("key");
 
   const navigate = useNavigate();
@@ -114,30 +86,6 @@ export const AccountSelection = () => {
   if (key) {
     navigate(`/key?key=${key}`);
   }
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      username: "",
-    },
-  });
-
-  const { mutateAsync: importAccount } = useMutation<void, string, string>({
-    mutationFn: async (accountName) => {
-      await supervisor.functionCall({
-        method: "importAccount",
-        params: [accountName],
-        service: "accounts",
-        intf: "admin",
-      });
-    },
-    onSuccess: async () => {
-      fetchAccounts();
-      setTimeout(() => {
-        fetchAccounts();
-      }, 2000);
-    },
-  });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -169,11 +117,9 @@ export const AccountSelection = () => {
 
   const [debouncedAccount, setDebouncedAccount] = useState<string>();
 
-  const {
-    data: accounts,
-    isLoading: isFetching,
-    refetch: fetchAccounts,
-  } = useGetAllAccounts();
+  const { data: accounts, isLoading: isFetching } = useGetAllAccounts();
+
+  const { mutateAsync: importAccount } = useImportAccount();
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
 
@@ -243,94 +189,24 @@ export const AccountSelection = () => {
     isLoadingInvite || isLoadingConnectionToken || isLoadingToken;
 
   const { mutateAsync: createAccount, isSuccess: isInviteClaimed } =
-    useMutation<void, string, string>({
-      mutationFn: async (account) => {
-        if (!inviteToken) throw new Error(`Must have invite`);
-
-        void (await supervisor.functionCall({
-          method: "logout",
-          params: [],
-          service: "accounts",
-          intf: "activeApp",
-        }));
-
-        void (await supervisor.functionCall({
-          method: "acceptWithNewAccount",
-          params: [account, token],
-          service: "invite",
-          intf: "invitee",
-        }));
-
-        await wait(2000);
-
-        await importAccount(account);
-
-        void (await supervisor.functionCall({
-          method: "loginDirect",
-          params: [
-            {
-              app: inviteToken.app,
-              origin: inviteToken.appDomain,
-            },
-            account,
-          ],
-          service: "accounts",
-          intf: "admin",
-        }));
-      },
-    });
+    useCreateAccount(token);
 
   const appName = isInvite
     ? inviteToken
       ? capitaliseFirstLetter(inviteToken.app)
       : ""
     : connectionToken
-    ? capitaliseFirstLetter(connectionToken.app)
-    : "";
+      ? capitaliseFirstLetter(connectionToken.app)
+      : "";
 
   const isExpired = inviteToken
     ? inviteToken.expiry.valueOf() < new Date().valueOf()
     : false;
 
-  const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
-    onSuccess: () => {
-      refetchToken();
-      setTimeout(() => {
-        refetchToken();
-      }, 3000);
-    },
-    mutationFn: async () => {
-      if (!inviteToken) {
-        throw new Error(`No invite available`);
-      }
-
-      const rejectParams = {
-        method: "reject",
-        params: [token],
-        service: "invite",
-        intf: "invitee",
-      };
-      if (selectedAccount) {
-        void (await supervisor.functionCall({
-          method: "login",
-          params: [selectedAccount.account],
-          service: "accounts",
-          intf: "activeApp",
-        }));
-
-        void (await supervisor.functionCall(rejectParams));
-      } else {
-        void (await supervisor.functionCall({
-          method: "logout",
-          params: [],
-          service: "accounts",
-          intf: "activeApp",
-        }));
-
-        void (await supervisor.functionCall(rejectParams));
-      }
-    },
-  });
+  const { mutateAsync: rejectInvite, isPending: isRejecting } = useRejectInvite(
+    selectedAccount,
+    token
+  );
 
   const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
 
@@ -524,8 +400,8 @@ export const AccountSelection = () => {
                 {isInitialLoading
                   ? "Loading..."
                   : isInvite
-                  ? `Select an account to accept invite to `
-                  : `Select an account to login to  `}
+                    ? `Select an account to accept invite to `
+                    : `Select an account to login to  `}
               </div>
             </div>
             {isNoAccounts ? (
@@ -544,28 +420,12 @@ export const AccountSelection = () => {
             )}
 
             <div className="flex flex-col gap-3 ">
-              <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
-                {isAccountsLoading
-                  ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
-                      (_, index) => (
-                        <Account
-                          onSelected={() => {}}
-                          isSelected={false}
-                          key={index}
-                        />
-                      )
-                    )
-                  : accountsToRender.map((account) => (
-                      <Account
-                        onSelected={() => {
-                          onAccountSelection(account.id);
-                        }}
-                        isSelected={selectedAccountId == account.id}
-                        key={account.id}
-                        name={account.account}
-                      />
-                    ))}
-              </div>
+              <AccountsList
+                isAcocuntsLoading={isAccountsLoading}
+                accountsToRender={accountsToRender}
+                selectedAccountId={selectedAccountId}
+                onAccountSelection={onAccountSelection}
+              />
               {isInvite && !isInviteClaimed && (
                 <button
                   onClick={() => {
@@ -611,8 +471,8 @@ export const AccountSelection = () => {
                   {isSubmitting
                     ? "Loading..."
                     : isInvite
-                    ? "Accept invite"
-                    : "Login"}
+                      ? "Accept invite"
+                      : "Login"}
                 </Button>
               </div>
             )}
