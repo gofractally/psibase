@@ -1,6 +1,6 @@
 #include <psibase/KvMerkle.hpp>
 
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 
 namespace
 {

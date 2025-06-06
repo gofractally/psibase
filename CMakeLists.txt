@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16.3)
-cmake_policy(VERSION 3.16.3...3.25.1)
+cmake_policy(VERSION 3.16.3...3.31.6)
 project(psibase)
 include(ExternalProject)
 
@@ -279,7 +279,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.16.0")
+set(PSIBASE_VERSION "0.17.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi

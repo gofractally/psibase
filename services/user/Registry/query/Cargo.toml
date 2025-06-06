@@ -7,10 +7,10 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase", version = "0.16.0" }
+psibase = { path = "../../../../rust/psibase", version = "0.17.0" }
 serde = "1.0"
-registry = { path = "../service", version = "0.16.0" }
-async-graphql = "7.0.7"
+registry = { path = "../service", version = "0.17.0" }
+async-graphql = "=7.0.17"
 
 [dev-dependencies]
-registry-pkg = { path = "..", version = "0.16.0" }
+registry-pkg = { path = "..", version = "0.17.0" }

@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "addcheckinit"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -190,9 +190,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ba6d24703c5adc5ba9116901b92ee4e4c0643c01a56c4fd303f3818638d7449"
+checksum = "036618f842229ba0b89652ffe425f96c7c16a49f7e3cb23b56fca7f61fd74980"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -211,7 +211,6 @@ dependencies = [
  "mime",
  "multer",
  "num-traits",
- "once_cell",
  "pin-project-lite",
  "regex",
  "serde",
@@ -224,9 +223,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a94c2d176893486bd37cd1b6defadd999f7357bf5804e92f510c08bcf16c538f"
+checksum = "fd45deb3dbe5da5cdb8d6a670a7736d735ba65b455328440f236dfb113727a3d"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -241,9 +240,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79272bdbf26af97866e149f05b2b546edb5c00e51b5f916289931ed233e208ad"
+checksum = "60b7607e59424a35dadbc085b0d513aa54ec28160ee640cf79ec3b634eba66d3"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -253,9 +252,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef5ec94176a12a8cbe985cd73f2e54dc9c702c88c766bdef12f1f3a67cedbee1"
+checksum = "34ecdaff7c9cffa3614a9f9999bf9ee4c3078fe3ce4d6a6e161736b56febf2de"
 dependencies = [
  "bytes",
  "indexmap 2.2.6",
@@ -349,7 +348,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "basicwquery"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "mincallrecvr",
@@ -435,7 +434,7 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "burst-transfer"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -491,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1052,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "example"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1122,7 +1121,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1249,7 +1248,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -2028,7 +2027,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "clap",
  "pulldown-cmark 0.9.6",
@@ -2093,7 +2092,7 @@ dependencies = [
 
 [[package]]
 name = "mincallrecvr"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2649,7 +2648,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2703,7 +2702,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2717,7 +2716,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -2729,21 +2728,21 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "seahash",
 ]
 
 [[package]]
 name = "psimacrotest"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "addcheckinit",
  "async-graphql",
@@ -2796,7 +2795,7 @@ dependencies = [
 
 [[package]]
 name = "r-tpack"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3435,7 +3434,7 @@ dependencies = [
 
 [[package]]
 name = "subjective"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase",
  "psibase_macros",
@@ -3590,7 +3589,7 @@ dependencies = [
 
 [[package]]
 name = "test-contract"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3599,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -3612,7 +3611,7 @@ dependencies = [
 
 [[package]]
 name = "test_package"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "r-tpack",
  "tpack",
@@ -3792,7 +3791,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tpack"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3801,7 +3800,7 @@ dependencies = [
 
 [[package]]
 name = "tpack-plugin"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt",

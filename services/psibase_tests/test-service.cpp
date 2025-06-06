@@ -1,8 +1,8 @@
 #include "test-service.hpp"
 
 #include <stdio.h>
+#include <psibase/api.hpp>
 #include <psibase/block.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_json.hpp>
 

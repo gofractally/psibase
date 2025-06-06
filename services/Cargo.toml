@@ -36,9 +36,12 @@ strip = true
 lto = true
 
 [workspace.package]
-version = "0.16.0"
+version = "0.17.0"
 edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
 publish = false
+
+[workspace.dependencies]
+async-graphql = "=7.0.17"

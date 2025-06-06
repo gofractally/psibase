@@ -3,7 +3,7 @@
 #include <botan/ec_group.h>
 #include <botan/pubkey.h>
 #include <botan/x509_key.h>
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serviceEntry.hpp>
 

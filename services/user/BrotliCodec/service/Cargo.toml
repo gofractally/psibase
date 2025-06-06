@@ -14,8 +14,8 @@ plugin = "plugin"
 brotli = { version = "7.0.0" }
 base64 = { version = "0.22" }
 anyhow = { version = "1.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
 serde = { version = "1.0.213", features = ["derive"] }
 
 [dev-dependencies]
-brotli-codec-pkg = { path = "..", version = "0.16.0" }
+brotli-codec-pkg = { path = "..", version = "0.17.0" }

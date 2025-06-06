@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ba6d24703c5adc5ba9116901b92ee4e4c0643c01a56c4fd303f3818638d7449"
+checksum = "036618f842229ba0b89652ffe425f96c7c16a49f7e3cb23b56fca7f61fd74980"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -178,7 +178,6 @@ dependencies = [
  "mime",
  "multer",
  "num-traits",
- "once_cell",
  "pin-project-lite",
  "regex",
  "serde",
@@ -191,9 +190,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a94c2d176893486bd37cd1b6defadd999f7357bf5804e92f510c08bcf16c538f"
+checksum = "fd45deb3dbe5da5cdb8d6a670a7736d735ba65b455328440f236dfb113727a3d"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -208,9 +207,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79272bdbf26af97866e149f05b2b546edb5c00e51b5f916289931ed233e208ad"
+checksum = "60b7607e59424a35dadbc085b0d513aa54ec28160ee640cf79ec3b634eba66d3"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -220,9 +219,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "7.0.11"
+version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef5ec94176a12a8cbe985cd73f2e54dc9c702c88c766bdef12f1f3a67cedbee1"
+checksum = "34ecdaff7c9cffa3614a9f9999bf9ee4c3078fe3ce4d6a6e161736b56febf2de"
 dependencies = [
  "bytes",
  "indexmap",
@@ -352,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "branding"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "branding-pkg",
@@ -364,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "branding-pkg"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "branding",
  "plugin",
@@ -804,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1672,7 +1671,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "branding",
  "branding-pkg",
@@ -1732,7 +1731,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1786,7 +1785,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1800,7 +1799,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1812,14 +1811,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "seahash",
 ]

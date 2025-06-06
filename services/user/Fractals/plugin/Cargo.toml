@@ -6,8 +6,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-fractals = { path = "../service/", version = "0.16.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
+fractals = { path = "../service/", version = "0.17.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
@@ -30,4 +30,4 @@ world = "impl"
 
 
 [dev-dependencies]
-fractals-pkg = { path = "..", version = "0.16.0" }
+fractals-pkg = { path = "..", version = "0.17.0" }

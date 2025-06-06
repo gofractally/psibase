@@ -3,9 +3,9 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
+#include <psibase/api.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -383,8 +383,8 @@ struct test_chain
 
       // These are not the correct values if we want the chain to actually
       // sync correctly, but it's sufficient for the tester to test services.
-      auto term      = status->current.term;
-      auto commitNum = status->current.blockNum;
+      auto term      = status ? status->current.term : 0;
+      auto commitNum = status ? status->current.blockNum : 0;
 
       blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();

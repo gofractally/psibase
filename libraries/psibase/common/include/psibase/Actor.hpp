@@ -1,5 +1,5 @@
 #pragma once
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
@@ -96,8 +96,10 @@ namespace psibase
          TypedAction<Args> action{sender, receiver, method, {Args(args...)}};
          psio::size_stream ss;
          psio::to_frac(action, ss);
-         psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(psio::size_tag{ss.size});
-         psio::fast_buf_stream                                stream(result.data(), result.size());
+         check(ss.size <= std::numeric_limits<uint32_t>::max(), "packImpl: size overflow");
+         psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(
+             psio::size_tag{static_cast<uint32_t>(ss.size)});
+         psio::fast_buf_stream stream(result.data(), result.size());
          psio::to_frac(action, stream);
          return result;
       }

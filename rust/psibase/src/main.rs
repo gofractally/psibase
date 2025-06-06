@@ -11,14 +11,14 @@ use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, tra
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
     get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
-    get_tapos_for_head, login_action, new_account_action, push_transaction, push_transactions,
-    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
-    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, Checksum256,
-    DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta,
-    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
-    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
-    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
-    TransactionTrace, Version,
+    get_tapos_for_head, login_action, new_account_action, push_transaction,
+    push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
+    AnyPublicKey, AutoAbort, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
+    FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp,
+    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
+    SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec,
+    TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1090,7 +1090,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     for (label, transactions, _) in groups {
         progress.set_message(label);
         for trx in transactions {
-            push_transaction(
+            push_transaction_optimistic(
                 &args.node_args.api,
                 client.clone(),
                 trx.packed(),

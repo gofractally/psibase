@@ -12,12 +12,12 @@ package-name = "addcheckinit"
 server = "addcheckinit"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.16.0"
+HttpServer = "0.17.0"
 
 [dependencies]
 psibase = { path = "../../../psibase" }
 psibase_macros = { path = "../../../psibase_macros" }
-async-graphql = "7.0.7"
+async-graphql.workspace = true
 serde = { version = "1.0.209", features = ["derive"] }
 
 [dev-dependencies]

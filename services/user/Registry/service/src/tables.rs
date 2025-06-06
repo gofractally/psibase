@@ -2,7 +2,7 @@
 pub mod tables {
     use async_graphql::*;
     use psibase::services::accounts::Wrapper as AccountsSvc;
-    use psibase::{check, AccountNumber, Fracpack, ToKey, ToSchema};
+    use psibase::{check, AccountNumber, Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
     use url::Url;
 
