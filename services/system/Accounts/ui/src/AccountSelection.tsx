@@ -51,6 +51,7 @@ import {
   InviteRejectedCard,
   InviteExpiredCard,
 } from "./TokenErrorUIs";
+import { ActiveSearch } from "./ActiveSearch";
 
 dayjs.extend(relativeTime);
 
@@ -137,13 +138,7 @@ export const AccountSelection = () => {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  const [activeSearch, setActiveSearch] = useState("");
-
-  const accountsToRender = activeSearch
-    ? (accounts || []).filter((account) =>
-        account.account.toLowerCase().includes(activeSearch.toLowerCase())
-      )
-    : accounts || [];
+  const [accountsToRender, setAccountsToRender] = useState<any[]>([]);
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -334,21 +329,10 @@ export const AccountSelection = () => {
                     : `Select an account to login to  `}
               </div>
             </div>
-            {isNoAccounts ? (
-              <div className="text-primary">No accounts available</div>
-            ) : (
-              <div className="relative ml-auto flex-1 md:grow-0 mb-3">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={activeSearch}
-                  type="search"
-                  onChange={(e) => setActiveSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full rounded-lg bg-background pl-8 "
-                />
-              </div>
-            )}
-
+            <ActiveSearch
+              accounts={accounts}
+              setAccountsToRender={setAccountsToRender}
+            />
             <div className="flex flex-col gap-3 ">
               <AccountsList
                 isAcocuntsLoading={isAccountsLoading}
