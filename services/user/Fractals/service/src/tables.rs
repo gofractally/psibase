@@ -103,10 +103,6 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
-
-        pub reward_balance: u64,
-        pub reward_start_time: psibase::TimePointSec,
-        pub reward_wait: u32,
     }
 
     impl Member {
@@ -127,101 +123,7 @@ pub mod tables {
                 fractal,
                 created_at: now,
                 member_status: status as StatusU8,
-                reward_balance: 0,
-                reward_start_time: now,
-                reward_wait: 0,
             }
-        }
-
-        fn deposit(&mut self, amount: u64) {
-            psibase::check(amount > 0, "amount must be greater than 0");
-
-            let current_time = TransactSvc::call().currentBlock().time.seconds();
-
-            let elapsed = if current_time.seconds >= self.reward_start_time.seconds {
-                (current_time.seconds - self.reward_start_time.seconds) as u64
-            } else {
-                0
-            };
-
-            let original_balance = self.reward_balance;
-            let new_balance = original_balance.saturating_add(amount);
-
-            let reward_wait_period = Fractal::get_assert(self.fractal).reward_wait_period;
-
-            let remaining_waiting =
-                reward_wait_period as u64 - elapsed.min(reward_wait_period as u64);
-
-            let weight_original = if new_balance == 0 {
-                0.0
-            } else {
-                original_balance as f64 / new_balance as f64
-            };
-            let weight_new = if new_balance == 0 {
-                0.0
-            } else {
-                amount as f64 / new_balance as f64
-            };
-
-            let new_period = if original_balance == 0 {
-                reward_wait_period as f64
-            } else {
-                (weight_original * remaining_waiting as f64)
-                    + (weight_new * reward_wait_period as f64)
-            };
-
-            self.reward_wait = new_period.ceil().min(u32::MAX as f64) as u32;
-            self.reward_balance = new_balance;
-            self.save();
-        }
-
-        fn withdrawable_amount(&self) -> u64 {
-            let current_time = TransactSvc::call().currentBlock().time.seconds();
-            if current_time.seconds < self.reward_start_time.seconds {
-                return 0;
-            }
-
-            let elasped = if current_time.seconds >= self.reward_start_time.seconds {
-                (current_time.seconds - self.reward_start_time.seconds) as u32
-            } else {
-                0
-            };
-
-            if elasped >= self.reward_wait {
-                self.reward_balance
-            } else {
-                let percent_waited = (elasped as f64) / (self.reward_wait as f64);
-                let withdrawable_amount = percent_waited * (self.reward_balance as f64).floor();
-                withdrawable_amount as u64
-            }
-        }
-
-        fn withdraw(mut self) {
-            let current_time = TransactSvc::call().currentBlock().time.seconds();
-
-            let withdrawable = self.withdrawable_amount();
-            if withdrawable == 0 {
-                abort_message("nothing to withdraw");
-            }
-
-            self.reward_balance = self.reward_balance.saturating_sub(withdrawable);
-            self.reward_start_time = current_time;
-
-            let reward_wait_period = Fractal::get_assert(self.fractal).reward_wait_period;
-
-            self.reward_wait = if self.reward_balance == 0 {
-                reward_wait_period
-            } else {
-                let original_balance = self.reward_balance + withdrawable;
-                let new_period = if original_balance == 0 {
-                    reward_wait_period as f64
-                } else {
-                    (self.reward_wait as f64 * self.reward_balance as f64) / original_balance as f64
-                };
-                new_period.ceil() as u32
-            };
-
-            self.save();
         }
 
         pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
