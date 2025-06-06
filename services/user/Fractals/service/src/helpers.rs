@@ -1,5 +1,4 @@
 use psibase::AccountNumber;
-use std::collections::HashMap;
 
 /// Translates a vector of rank numbers into a sorted list of accounts based on their `AccountNumber` values.
 ///

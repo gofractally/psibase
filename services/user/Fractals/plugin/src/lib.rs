@@ -4,7 +4,6 @@ mod bindings;
 use std::str::FromStr;
 
 use bindings::exports::fractals::plugin::api::Guest as Api;
-use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -12,7 +11,6 @@ use psibase::fracpack::Pack;
 
 mod errors;
 mod helpers;
-use errors::ErrorType;
 use psibase::AccountNumber;
 
 use bindings::evaluations::plugin::admin::close;

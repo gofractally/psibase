@@ -5,7 +5,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        abort_message, check_some, get_service, AccountNumber, Fracpack, Pack, Table, TimePointSec,
+        abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
         ToKey, ToSchema,
     };
 
@@ -15,7 +15,6 @@ pub mod tables {
 
     use crate::helpers::parse_rank_to_accounts;
     use crate::scoring::calculate_ema;
-    use crate::Wrapper;
 
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
