@@ -1,7 +1,6 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use std::{str::FromStr, u64};
 
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{

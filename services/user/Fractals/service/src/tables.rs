@@ -39,7 +39,6 @@ pub mod tables {
                 created_at: now,
                 mission,
                 name,
-                reward_wait_period: 86400 * 7 * 1,
             }
         }
 
