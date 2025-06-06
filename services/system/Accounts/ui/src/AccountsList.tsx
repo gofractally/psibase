@@ -46,24 +46,26 @@ export const AccountsList = ({
   onAccountSelection,
 }: {
   isAcocuntsLoading: boolean;
-  accountsToRender: Account[];
+  accountsToRender: any[];
   selectedAccountId: string;
   onAccountSelection: (accountId: string) => void;
-}) => (
-  <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
-    {isAcocuntsLoading
-      ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((_, index) => (
-          <Account onSelected={() => {}} isSelected={false} key={index} />
-        ))
-      : accountsToRender.map((account) => (
-          <Account
-            onSelected={() => {
-              onAccountSelection(account.id);
-            }}
-            isSelected={selectedAccountId == account.id}
-            key={account.id}
-            name={account.account}
-          />
-        ))}
-  </div>
-);
+}) => {
+  return (
+    <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
+      {isAcocuntsLoading
+        ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((_, index) => (
+            <Account onSelected={() => {}} isSelected={false} key={index} />
+          ))
+        : accountsToRender.map((account) => (
+            <Account
+              onSelected={() => {
+                onAccountSelection(account.id);
+              }}
+              isSelected={selectedAccountId == account.id}
+              key={account.id}
+              name={account.account}
+            />
+          ))}
+    </div>
+  );
+};

@@ -139,6 +139,10 @@ export const AccountSelection = () => {
 
   const [accountsToRender, setAccountsToRender] = useState<any[]>([]);
 
+  useEffect(() => {
+    setAccountsToRender(accounts || []);
+  }, [accounts]);
+
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
   );

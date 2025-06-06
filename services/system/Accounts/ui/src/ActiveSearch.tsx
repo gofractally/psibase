@@ -9,15 +9,9 @@ export const ActiveSearch = ({
   accounts: any[];
   setAccountsToRender: (accounts: any[]) => void;
 }) => {
-  console.log(
-    "Rendering ActiveSearch; setAccountsToRender:",
-    setAccountsToRender
-  );
-
   const [activeSearch, setActiveSearch] = useState("");
   const isNoAccounts = accounts ? accounts.length == 0 : false;
   const handleSetActiveSearch = (activeSearch: string) => {
-    console.log("accounts:", accounts);
     setActiveSearch(activeSearch);
     setAccountsToRender(
       activeSearch
