@@ -4,7 +4,7 @@
 #include <psibase/serveGraphQL.hpp>
 #include <services/system/Transact.hpp>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace psibase;
 using namespace std::literals::string_literals;

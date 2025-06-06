@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <catch2/catch_message.hpp>
+
 namespace psibase::tester::raw
 {
    std::optional<std::uint32_t> selectedChain;

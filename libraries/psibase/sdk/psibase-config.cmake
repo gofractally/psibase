@@ -20,9 +20,7 @@ target_link_options(wasm-base-debug INTERFACE $<$<CONFIG:Mixed>:${debug-link-fla
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${root}/include)
 
-add_library(catch2 INTERFACE)
-target_include_directories(catch2 INTERFACE ${root}/include)
-target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
+find_package(Catch2 REQUIRED)
 
 function(add_libs suffix)
 
@@ -104,7 +102,7 @@ function(add_libs suffix)
     target_link_libraries(Psibase::test${suffix} INTERFACE
         -L${root}/lib
         psibase${suffix}
-        catch2
+        Catch2::Catch2
         boost
         -lz
         -lsecp256k1
