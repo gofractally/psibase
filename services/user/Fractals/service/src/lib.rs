@@ -24,7 +24,7 @@ pub mod service {
     fn start_eval(fractal: AccountNumber, evaluation_type: u8) {
         let evaluation = EvaluationInstance::get_assert(fractal, evaluation_type.into());
 
-        evaluation.set_pending_scores(0.0);
+        evaluation.set_pending_scores(0);
 
         psibase::services::evaluations::Wrapper::call()
             .start(check_some(evaluation.evaluation_id, "no set evaluation id"));

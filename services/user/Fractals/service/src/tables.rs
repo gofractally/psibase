@@ -14,7 +14,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     use crate::helpers::parse_rank_to_accounts;
-    use crate::scoring::calculate_ema;
+    use crate::scoring::{calculate_ema_u32, Fraction};
 
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -371,7 +371,7 @@ pub mod tables {
                 .collect()
         }
 
-        pub fn set_pending_scores(&self, pending_score: f32) {
+        pub fn set_pending_scores(&self, pending_score: u32) {
             self.scores().into_iter().for_each(|mut account| {
                 account.set_pending_score(pending_score);
             });
@@ -388,7 +388,7 @@ pub mod tables {
             for (index, account) in fractal_group_result.into_iter().enumerate() {
                 let level = (6 as usize) - index;
                 Score::get(self.fractal, self.eval_type.into(), account)
-                    .set_pending_score(level as f32);
+                    .set_pending_score(level as u32);
             }
         }
 
@@ -405,8 +405,8 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub eval_type: EvalTypeU8,
-        pub value: f32,
-        pub pending: Option<f32>,
+        pub value: u32,
+        pub pending: Option<u32>,
     }
 
     impl Score {
@@ -430,7 +430,7 @@ pub mod tables {
                 account,
                 eval_type: eval_type.into(),
                 fractal,
-                value: 0.0,
+                value: 0,
                 pending: None,
             }
         }
@@ -441,14 +441,14 @@ pub mod tables {
             new_instance
         }
 
-        pub fn set_pending_score(&mut self, incoming_score: f32) {
+        pub fn set_pending_score(&mut self, incoming_score: u32) {
             self.pending = Some(incoming_score);
             self.save();
         }
 
         pub fn save_pending_score(&mut self) {
             self.pending.take().map(|pending_score| {
-                self.value = calculate_ema(pending_score, self.value, 0.2);
+                self.value = calculate_ema_u32(pending_score, self.value, Fraction::new(1, 6));
                 self.save();
             });
         }
