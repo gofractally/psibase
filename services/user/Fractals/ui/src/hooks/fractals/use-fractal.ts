@@ -34,7 +34,6 @@ export const setDefaultFractal = (
                 createdAt: new Date().toISOString(),
                 mission,
                 name,
-                rewardWaitPeriod: 86400,
             },
             evaluations: [],
         };

@@ -12,9 +12,6 @@ export const zMember = z
         account: zAccount,
         createdAt: zDateTime,
         memberStatus: z.nativeEnum(MemberStatus),
-        rewardBalance: z.number(),
-        rewardStartTime: zDateTime,
-        rewardWait: z.number(),
     })
     .or(z.null());
 
@@ -32,9 +29,7 @@ export const getMembership = async (
             account
             createdAt
             memberStatus
-            rewardBalance
-            rewardStartTime
-            rewardWait
+
         } 
     }`,
     );

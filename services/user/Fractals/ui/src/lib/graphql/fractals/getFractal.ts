@@ -12,7 +12,6 @@ export const zFractal = z
         createdAt: zDateTime,
         name: z.string(),
         mission: z.string(),
-        rewardWaitPeriod: z.number().or(z.null()),
     })
     .or(z.null());
 
@@ -41,7 +40,6 @@ export const getFractal = async (owner: Account) => {
             createdAt
             name
             mission
-            rewardWaitPeriod
         }
         evaluations(fractal: "${owner}") {
             fractal

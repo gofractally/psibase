@@ -365,8 +365,8 @@ pub mod tables {
             table
                 .get_index_pk()
                 .range(
-                    (self.fractal, self.eval_type, AccountNumber::from(0))
-                        ..=(self.fractal, self.eval_type, AccountNumber::from(u64::MAX)),
+                    (self.fractal, AccountNumber::from(0), self.eval_type)
+                        ..=(self.fractal, AccountNumber::from(u64::MAX), self.eval_type),
                 )
                 .collect()
         }
@@ -411,8 +411,8 @@ pub mod tables {
 
     impl Score {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, EvalTypeU8, AccountNumber) {
-            (self.fractal, self.eval_type, self.account)
+        fn pk(&self) -> (AccountNumber, AccountNumber, EvalTypeU8) {
+            (self.fractal, self.account, self.eval_type)
         }
 
         pub fn get(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
@@ -420,7 +420,7 @@ pub mod tables {
             check_some(
                 table
                     .get_index_pk()
-                    .get(&(fractal, eval_type.into(), account)),
+                    .get(&(fractal, account, eval_type.into())),
                 "failed to find score",
             )
         }

@@ -167,22 +167,46 @@ mod service {
                 .collect()
         }
 
+
+        async fn scores_by_member(
+            &self,
+            fractal: AccountNumber,
+            member: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Score>> {
+            TableQuery::subindex::<u8>(
+                ScoreTable::with_service(fractals::SERVICE).get_index_pk(),
+                &(fractal, member),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
         async fn scores(
             &self,
             fractal: AccountNumber,
-            member: Option<AccountNumber>,
-        ) -> Vec<Score> {
-            ScoreTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .range(
-                    (fractal, 0, member.unwrap_or(AccountNumber::new(0)))
-                        ..=(
-                            fractal,
-                            u8::MAX,
-                            member.unwrap_or(AccountNumber::new(u64::MAX)),
-                        ),
-                )
-                .collect()
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Score>> {
+            TableQuery::subindex::<(AccountNumber, u8)>(
+                ScoreTable::with_service(fractals::SERVICE).get_index_pk(),
+                &(fractal),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn fractals(
