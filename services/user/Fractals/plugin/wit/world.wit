@@ -5,7 +5,7 @@ interface api {
     use host:common/types.{error};
 
 
-    set-schedule: func(evaluation-type: u32, fractal: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32, force-delete: bool) -> result<_, error>;
+    set-schedule: func(evaluation-type: u8, fractal: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32, force-delete: bool) -> result<_, error>;
     create-fractal: func(account: string, name: string, mission: string) -> result<_, error>;
 
     join: func(fractal: string) -> result<_, error>;
@@ -21,7 +21,7 @@ interface api {
 
     get-proposal: func(evaluation-id: u32, group-number: u32) -> result<option<list<string>>, error>;
 
-    start: func(fractal: string, evaluation-type: u32) -> result<_, error>;
+    start: func(fractal: string, evaluation-type: u8) -> result<_, error>;
 
 }
 

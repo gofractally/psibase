@@ -21,7 +21,7 @@ pub mod service {
     }
 
     #[action]
-    fn start_eval(fractal: AccountNumber, evaluation_type: u32) {
+    fn start_eval(fractal: AccountNumber, evaluation_type: u8) {
         let evaluation = EvaluationInstance::get_assert(fractal, evaluation_type.into());
 
         evaluation.set_pending_scores(0.0);
@@ -48,7 +48,7 @@ pub mod service {
 
     #[action]
     fn set_schedule(
-        evaluation_type: u32,
+        evaluation_type: u8,
         registration: u32,
         deliberation: u32,
         submission: u32,

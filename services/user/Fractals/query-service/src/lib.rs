@@ -165,7 +165,7 @@ mod service {
         async fn evaluations(&self, fractal: AccountNumber) -> Vec<EvaluationInstance> {
             EvaluationInstanceTable::with_service(fractals::SERVICE)
                 .get_index_pk()
-                .range((fractal, 0)..=(fractal, u32::MAX))
+                .range((fractal, 0)..=(fractal, u8::MAX))
                 .collect()
         }
 
@@ -180,7 +180,7 @@ mod service {
                     (fractal, 0, member.unwrap_or(AccountNumber::new(0)))
                         ..=(
                             fractal,
-                            u32::MAX,
+                            u8::MAX,
                             member.unwrap_or(AccountNumber::new(u64::MAX)),
                         ),
                 )

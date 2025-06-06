@@ -96,7 +96,7 @@ impl Api for FractallyPlugin {
     }
 
     fn set_schedule(
-        evaluation_type: u32,
+        evaluation_type: u8,
         fractal: String,
         registration: u32,
         deliberation: u32,
@@ -124,7 +124,7 @@ impl Api for FractallyPlugin {
         )
     }
 
-    fn start(fractal: String, evaluation_type: u32) -> Result<(), Error> {
+    fn start(fractal: String, evaluation_type: u8) -> Result<(), Error> {
         let _latch = ProposeLatch::new(&fractal);
 
         let packed_args = fractals::action_structs::start_eval {

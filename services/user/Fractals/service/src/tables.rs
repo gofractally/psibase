@@ -259,10 +259,10 @@ pub mod tables {
         Favor = 2,
     }
 
-    pub type EvalTypeU32 = u32;
+    pub type EvalTypeU8 = u8;
 
-    impl From<EvalTypeU32> for EvalType {
-        fn from(eval_type: EvalTypeU32) -> Self {
+    impl From<EvalTypeU8> for EvalType {
+        fn from(eval_type: EvalTypeU8) -> Self {
             match eval_type {
                 1 => EvalType::Repuation,
                 2 => EvalType::Favor,
@@ -271,9 +271,9 @@ pub mod tables {
         }
     }
 
-    impl From<EvalType> for u32 {
-        fn from(eval_type: EvalType) -> u32 {
-            eval_type as u32
+    impl From<EvalType> for u8 {
+        fn from(eval_type: EvalType) -> u8 {
+            eval_type as u8
         }
     }
 
@@ -281,14 +281,14 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct EvaluationInstance {
         pub fractal: AccountNumber,
-        pub eval_type: EvalTypeU32,
+        pub eval_type: EvalTypeU8,
         pub interval: u32,
         pub evaluation_id: Option<u32>,
     }
 
     impl EvaluationInstance {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, EvalTypeU32) {
+        fn pk(&self) -> (AccountNumber, EvalTypeU8) {
             (self.fractal, self.eval_type)
         }
 
@@ -506,14 +506,14 @@ pub mod tables {
     pub struct Score {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
-        pub eval_type: EvalTypeU32,
+        pub eval_type: EvalTypeU8,
         pub value: f32,
         pub pending: Option<f32>,
     }
 
     impl Score {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, EvalTypeU32, AccountNumber) {
+        fn pk(&self) -> (AccountNumber, EvalTypeU8, AccountNumber) {
             (self.fractal, self.eval_type, self.account)
         }
 
