@@ -7,7 +7,6 @@ use crate::key_table;
 use crate::types;
 use bindings::host::common::client as Client;
 use ecies::{decrypt, encrypt};
-use psibase::services::chainmail::action_structs::send;
 use psibase::{fracpack::Pack, AccountNumber};
 
 use crate::bindings::host::common::types::Error;

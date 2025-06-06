@@ -113,7 +113,7 @@ pub mod service {
     }
 
     #[action]
-    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
+    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
 
     #[action]
     fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
