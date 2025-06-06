@@ -1,5 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
-import { AlarmClockMinus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -29,20 +28,11 @@ import {
 import debounce from "debounce";
 import { Button } from "./components/ui/button";
 
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
 import { Check, UserX, LoaderCircle } from "lucide-react";
-import { TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supervisor } from "@/main";
 import { useDecodeInviteToken } from "@/hooks/useDecodeInviteToken";
 import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
 import { useDecodeToken } from "@/hooks/useDecodeToken";
@@ -55,10 +45,14 @@ import { useImportAccount } from "./hooks/useImportAccount";
 import { AccountsList } from "./AccountsList";
 import { useCreateAccount } from "./hooks/useCreateAccount";
 import { useRejectInvite } from "./hooks/useRejectInvite";
+import { LoadingCard } from "./LoadingCard";
+import {
+  InviteAlreadyAcceptedCard,
+  InviteRejectedCard,
+  InviteExpiredCard,
+} from "./TokenErrorUIs";
 
 dayjs.extend(relativeTime);
-
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const capitaliseFirstLetter = (str: string) =>
   str[0].toUpperCase() + str.slice(1);
@@ -69,7 +63,7 @@ const formSchema = z.object({
 
 export const AccountSelection = () => {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const token: string = z.string().parse(searchParams.get("token"));
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -176,11 +170,8 @@ export const AccountSelection = () => {
     }
   };
 
-  const {
-    data: inviteToken,
-    isLoading: isLoadingInvite,
-    refetch: refetchToken,
-  } = useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
+  const { data: inviteToken, isLoading: isLoadingInvite } =
+    useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
 
   const { data: connectionToken, isLoading: isLoadingConnectionToken } =
     useDecodeConnectionToken(token, decodedToken?.tag == "connection-token");
@@ -216,80 +207,19 @@ export const AccountSelection = () => {
   const isTxInProgress = isRejecting || isAccepting || isLoggingIn;
 
   if (isLoadingInvite) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <LoaderCircle className="w-12 h-12 animate-spin" />
-          </div>
-          <CardTitle className="text-center">Loading...</CardTitle>
-        </CardHeader>
-      </Card>
-    );
+    return <LoadingCard />;
   }
 
   if (inviteToken?.state == "accepted" && !isInviteClaimed) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <TriangleAlert className="w-12 h-12" />
-          </div>
-          <CardTitle>Invitation already accepted.</CardTitle>
-          <CardDescription>
-            This invitation has been accepted by{" "}
-            <span className="text-primary font-semibold">
-              {inviteToken.actor}
-            </span>
-            .
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <InviteAlreadyAcceptedCard token={token} />;
   }
 
   if (inviteToken?.state == "rejected") {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <TriangleAlert className="w-12 h-12" />
-          </div>
-          <CardTitle>Invitation rejected.</CardTitle>
-          <CardDescription>
-            This invitation has been rejected
-            {inviteToken?.actor && inviteToken.actor !== "invite-sys"
-              ? ` by ${inviteToken.actor}.`
-              : "."}
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <InviteRejectedCard token={token} />;
   }
 
-  const expiryMessage =
-    inviteToken &&
-    `This invitation expired ${dayjs().to(inviteToken.expiry)} (${dayjs(
-      inviteToken.expiry
-    ).format("YYYY/MM/DD HH:mm")}).`;
-
   if (isExpired) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <AlarmClockMinus className="w-12 h-12" />
-          </div>
-          <CardTitle>Expired invitation</CardTitle>
-          <CardDescription>{expiryMessage}</CardDescription>
-          <CardDescription>
-            Please ask the sender{" "}
-            <span className="text-primary">{inviteToken?.inviter}</span> for a
-            new one.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <InviteExpiredCard token={token} />;
   }
 
   return (
