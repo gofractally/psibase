@@ -293,8 +293,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        pub fn by_evaluation(&self) -> (Option<u32>, EvalTypeU32, AccountNumber) {
-            (self.evaluation_id, self.eval_type, self.fractal)
+        pub fn by_evaluation(&self) -> Option<u32> {
+            self.evaluation_id
         }
 
         pub fn get(fractal: AccountNumber, eval_type: EvalType) -> Option<Self> {
@@ -328,21 +328,11 @@ pub mod tables {
         }
 
         pub fn get_by_evaluation_id(eval_id: u32) -> Self {
-            // TODO: Fix this
-
             let table = EvaluationInstanceTable::new();
-            let vec: Vec<EvaluationInstance> = table
-                .get_index_by_evaluation()
-                .range(
-                    (Some(eval_id), 0, AccountNumber::new(0))
-                        ..=(Some(eval_id), u32::MAX, AccountNumber::new(u64::MAX)),
-                )
-                .collect();
 
             check_some(
-                vec.into_iter()
-                    .find(|evaluation| evaluation.evaluation_id.is_some_and(|id| eval_id == id)),
-                "failed finding evaluation by id",
+                table.get_index_by_evaluation().get(&Some(eval_id)),
+                "failed finding by eval id",
             )
         }
 
