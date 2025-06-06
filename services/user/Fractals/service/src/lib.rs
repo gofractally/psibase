@@ -43,7 +43,7 @@ pub mod service {
 
         Member::add(fractal, sender, MemberStatus::Citizen).save();
 
-        Wrapper::emit().history().joined_fractal(sender, fractal);
+        Wrapper::emit().history().joined_fractal(fractal, sender);
     }
 
     #[action]
