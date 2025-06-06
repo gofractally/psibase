@@ -23,8 +23,6 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
-
-        pub reward_wait_period: u32,
     }
 
     impl Fractal {
