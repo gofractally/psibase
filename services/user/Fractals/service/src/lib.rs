@@ -26,8 +26,7 @@ pub mod service {
 
         evaluation.set_pending_scores(0);
 
-        psibase::services::evaluations::Wrapper::call()
-            .start(check_some(evaluation.evaluation_id, "no set evaluation id"));
+        psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
     }
 
     #[action]
@@ -55,21 +54,13 @@ pub mod service {
         finish_by: u32,
         interval_seconds: u32,
     ) {
-        let fractal_account = get_sender();
-        check_some(Fractal::get(fractal_account), "fractal does not exist");
-        let mut evaluation = EvaluationInstance::get_or_create(
-            fractal_account,
+        Fractal::get_assert(get_sender()).set_schedule(
             evaluation_type.into(),
-            interval_seconds,
-        );
-
-        evaluation.set_evaluation_schedule(
             registration,
             deliberation,
             submission,
             finish_by,
             interval_seconds,
-            false,
         );
     }
 
@@ -90,7 +81,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .evaluation_finished(evaluation.fractal, evaluation.evaluation_id.unwrap());
+            .evaluation_finished(evaluation.fractal, evaluation.evaluation_id);
 
         evaluation.schedule_next_evaluation();
     }

@@ -70,6 +70,26 @@ pub mod tables {
                 )
                 .collect()
         }
+
+        pub fn set_schedule(
+            &self,
+            eval_type: EvalType,
+            registration: u32,
+            deliberation: u32,
+            submission: u32,
+            finish_by: u32,
+            interval_seconds: u32,
+        ) {
+            EvaluationInstance::set_evaluation_schedule(
+                self.account,
+                eval_type,
+                registration,
+                deliberation,
+                submission,
+                finish_by,
+                interval_seconds,
+            )
+        }
     }
 
     #[derive(PartialEq)]
@@ -181,7 +201,7 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub eval_type: EvalTypeU8,
         pub interval: u32,
-        pub evaluation_id: Option<u32>,
+        pub evaluation_id: u32,
     }
 
     impl EvaluationInstance {
@@ -191,11 +211,11 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        pub fn by_evaluation(&self) -> Option<u32> {
+        pub fn by_evaluation(&self) -> u32 {
             self.evaluation_id
         }
 
-        pub fn get(fractal: AccountNumber, eval_type: EvalType) -> Option<Self> {
+        fn get(fractal: AccountNumber, eval_type: EvalType) -> Option<Self> {
             let table = EvaluationInstanceTable::new();
             table.get_index_pk().get(&(fractal, eval_type.into()))
         }
@@ -207,29 +227,36 @@ pub mod tables {
             )
         }
 
-        fn new(fractal: AccountNumber, eval_type: EvalType, interval: u32) -> Self {
+        fn new(
+            fractal: AccountNumber,
+            eval_type: EvalType,
+            interval: u32,
+            evaluation_id: u32,
+        ) -> Self {
             Self {
                 eval_type: eval_type.into(),
-                evaluation_id: None,
+                evaluation_id,
                 fractal,
                 interval,
             }
         }
 
-        pub fn add(fractal: AccountNumber, eval_type: EvalType, interval: u32) -> Self {
-            Self::new(fractal, eval_type, interval)
-        }
-
-        pub fn get_or_create(fractal: AccountNumber, eval_type: EvalType, interval: u32) -> Self {
-            Self::get(fractal, eval_type.clone().into())
-                .unwrap_or_else(|| Self::add(fractal, eval_type, interval))
+        fn add(
+            fractal: AccountNumber,
+            eval_type: EvalType,
+            interval: u32,
+            evaluation_id: u32,
+        ) -> Self {
+            let instance = Self::new(fractal, eval_type, interval, evaluation_id);
+            instance.save();
+            instance
         }
 
         pub fn get_by_evaluation_id(eval_id: u32) -> Self {
             let table = EvaluationInstanceTable::new();
 
             check_some(
-                table.get_index_by_evaluation().get(&Some(eval_id)),
+                table.get_index_by_evaluation().get(&eval_id),
                 "failed finding by eval id",
             )
         }
@@ -237,15 +264,12 @@ pub mod tables {
         fn internal(&self) -> Option<Evaluation> {
             EvaluationTable::with_service(evaluations::SERVICE)
                 .get_index_pk()
-                .get(&(
-                    get_service(),
-                    psibase::check_some(self.evaluation_id, "no secheduled eval"),
-                ))
+                .get(&(get_service(), self.evaluation_id))
         }
 
         pub fn users(&self, group_number: Option<u32>) -> Option<Vec<User>> {
             let fractals_service = get_service();
-            let evaluation_id = check_some(self.evaluation_id, "no scheduled evaluation");
+            let evaluation_id = self.evaluation_id;
 
             let res = match group_number {
                 Some(group_number) => UserTable::with_service(evaluations::SERVICE)
@@ -282,14 +306,15 @@ pub mod tables {
         }
 
         fn create_evaluation(
-            &mut self,
+            fractal: AccountNumber,
+            eval_type: EvalType,
             registration: u32,
             deliberation: u32,
             submission: u32,
             finish_by: u32,
             interval_seconds: u32,
         ) {
-            let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(
+            let evaluation_id: u32 = psibase::services::evaluations::Wrapper::call().create(
                 registration,
                 deliberation,
                 submission,
@@ -300,13 +325,11 @@ pub mod tables {
                 true,
             );
 
-            self.evaluation_id = Some(eval_id);
-            self.interval = interval_seconds;
-            self.save();
+            Self::add(fractal, eval_type, interval_seconds, evaluation_id);
 
             crate::Wrapper::emit().history().scheduled_evaluation(
-                self.fractal,
-                eval_id,
+                fractal,
+                evaluation_id,
                 registration,
                 deliberation,
                 submission,
@@ -322,7 +345,9 @@ pub mod tables {
                 "expected existing evaluation to set the next one",
             );
 
-            self.create_evaluation(
+            Self::create_evaluation(
+                self.fractal,
+                self.eval_type.into(),
                 evaluation.registration_starts + interval,
                 evaluation.deliberation_starts + interval,
                 evaluation.submission_starts + interval,
@@ -332,20 +357,22 @@ pub mod tables {
         }
 
         pub fn set_evaluation_schedule(
-            &mut self,
+            fractal: AccountNumber,
+            eval_type: EvalType,
             registration: u32,
             deliberation: u32,
             submission: u32,
             finish_by: u32,
             interval_seconds: u32,
-            force_delete: bool,
         ) {
-            if self.evaluation_id.is_some() {
+            Self::get(fractal, eval_type.clone()).map(|existing| {
                 psibase::services::evaluations::Wrapper::call()
-                    .delete(self.evaluation_id.unwrap(), force_delete);
-            };
+                    .delete(existing.evaluation_id, false);
+            });
 
-            self.create_evaluation(
+            Self::create_evaluation(
+                fractal,
+                eval_type,
                 registration,
                 deliberation,
                 submission,
@@ -387,7 +414,7 @@ pub mod tables {
 
             for (index, account) in fractal_group_result.into_iter().enumerate() {
                 let level = (6 as usize) - index;
-                Score::get(self.fractal, self.eval_type.into(), account)
+                Score::get_assert(self.fractal, self.eval_type.into(), account)
                     .set_pending_score((level as u32) * 10000);
             }
         }
@@ -415,7 +442,11 @@ pub mod tables {
             (self.fractal, self.account, self.eval_type)
         }
 
-        pub fn get(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
+        pub fn get_assert(
+            fractal: AccountNumber,
+            eval_type: EvalType,
+            account: AccountNumber,
+        ) -> Self {
             let table = ScoreTable::new();
             check_some(
                 table
@@ -425,7 +456,7 @@ pub mod tables {
             )
         }
 
-        pub fn new(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
+        fn new(fractal: AccountNumber, eval_type: EvalType, account: AccountNumber) -> Self {
             Self {
                 account,
                 eval_type: eval_type.into(),
