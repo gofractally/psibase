@@ -116,7 +116,12 @@ pub mod service {
     fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
 
     #[action]
-    fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
+    fn on_attest(
+        evaluation_id: u32,
+        group_number: u32,
+        _user: AccountNumber,
+        attestation: Vec<u8>,
+    ) {
         check_is_eval();
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))
