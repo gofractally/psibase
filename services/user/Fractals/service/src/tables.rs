@@ -83,10 +83,10 @@ pub mod tables {
         Exiled = 3,
     }
 
-    pub type StatusU32 = u32;
+    pub type StatusU8 = u8;
 
-    impl From<StatusU32> for MemberStatus {
-        fn from(status: StatusU32) -> Self {
+    impl From<StatusU8> for MemberStatus {
+        fn from(status: StatusU8) -> Self {
             match status {
                 1 => MemberStatus::Visa,
                 2 => MemberStatus::Citizen,
@@ -102,7 +102,7 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
-        pub member_status: StatusU32,
+        pub member_status: StatusU8,
 
         pub reward_balance: u64,
         pub reward_start_time: psibase::TimePointSec,
@@ -126,7 +126,7 @@ pub mod tables {
                 account,
                 fractal,
                 created_at: now,
-                member_status: status as StatusU32,
+                member_status: status as StatusU8,
                 reward_balance: 0,
                 reward_start_time: now,
                 reward_wait: 0,
