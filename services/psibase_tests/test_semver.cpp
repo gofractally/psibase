@@ -1,3 +1,4 @@
+#include <catch2/catch_all.hpp>
 #include <psibase/semver.hpp>
 #include <psibase/tester.hpp>
 #include <psio/from_json.hpp>

@@ -1,3 +1,4 @@
+#include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/VerifySig.hpp>

@@ -3,7 +3,7 @@
 #include <thread>
 #include <vector>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace triedent;
 using namespace std::literals::chrono_literals;

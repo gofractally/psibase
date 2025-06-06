@@ -14,8 +14,7 @@ S& operator<<(S& stream, const std::optional<T>& obj)
       return stream << "<nullopt>";
 }
 
-#define CATCH_CONFIG_MAIN
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace triedent;
 using namespace std::literals::string_literals;

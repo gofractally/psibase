@@ -1,8 +1,9 @@
 #include <boost/asio/steady_timer.hpp>
+#include <iomanip>
+#include <iostream>
 #include <psibase/random_timer.hpp>
 
-#define CATCH_CONFIG_MAIN
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 TEST_CASE("test random timer distribution")
 {

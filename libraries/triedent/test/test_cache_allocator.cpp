@@ -2,13 +2,14 @@
 
 #include <cstring>
 #include <mutex>
+#include <random>
 #include <thread>
 #include <utility>
 #include <vector>
 
 #include "temp_directory.hpp"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace triedent;
 using namespace std::literals::chrono_literals;

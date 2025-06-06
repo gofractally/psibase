@@ -18,6 +18,7 @@ function(add suffix)
     )
 
     if(DEFINED IS_WASM)
+        find_package(Catch2 3 REQUIRED)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
         target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-wasip1)
 
@@ -135,7 +136,7 @@ function(add suffix)
             psibase${suffix}
             Spki${suffix}
             PrivateKeyInfo${suffix}
-            catch2
+            Catch2::Catch2
             boost
             -lz
             -lsecp256k1

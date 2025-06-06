@@ -1,5 +1,5 @@
 #pragma once
-#include <catch2/catch.hpp>
+#include <catch2/catch_tostring.hpp>
 #include <iostream>
 #include <psibase/Actor.hpp>
 #include <psibase/Rpc.hpp>

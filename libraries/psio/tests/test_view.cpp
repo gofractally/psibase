@@ -2,7 +2,7 @@
 
 #include <psio/shared_view_ptr.hpp>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 template <typename T, typename F>
 void test_view(const T& value, F&& f)
@@ -30,15 +30,13 @@ void test_mutate(F&& f, const T& expected)
 template <typename T>
 void test_assign(const T& original, const T& modified)
 {
-   test_mutate(
-       original, [&](auto v) { v = modified; }, modified);
+   test_mutate(original, [&](auto v) { v = modified; }, modified);
 }
 
 template <typename T>
 void test_assign(const T& modified)
 {
-   test_mutate(
-       T{}, [&](auto v) { v = modified; }, modified);
+   test_mutate(T{}, [&](auto v) { v = modified; }, modified);
 }
 
 TEST_CASE("u8 view", "[view]")

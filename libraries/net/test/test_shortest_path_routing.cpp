@@ -4,8 +4,7 @@
 #include <psibase/peer_manager.hpp>
 #include "connection_pair.hpp"
 
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace psibase;
 using namespace psibase::net;
@@ -229,7 +228,7 @@ int main(int argc, const char* const* argv)
 
    Catch::Session session;
 
-   using Catch::clara::Opt;
+   using Catch::Clara::Opt;
    auto cli = session.cli() | Opt(logConfig.stderr.filter,
                                   "filter")["--log-filter"]("The filter to apply to node loggers");
    session.cli(cli);

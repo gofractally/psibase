@@ -4,7 +4,6 @@ if(DEFINED IS_NATIVE)
     find_package(Threads REQUIRED)
     add_executable(psio-tests
         graphql.cpp
-        psio_tests.cpp
 #        reflect.cpp
 #        flat_views.cpp
         benchmark.cpp
@@ -24,7 +23,7 @@ if(DEFINED IS_NATIVE)
         test_schema.cpp
         test_key.cpp
     )
-    target_link_libraries(psio-tests psio catch2 Threads::Threads )
+    target_link_libraries(psio-tests psio Catch2::Catch2WithMain Threads::Threads )
 
     add_executable(generate_test_data generate_test_data.cpp)
     target_link_libraries(generate_test_data psio)
@@ -33,7 +32,6 @@ endif()
 if(DEFINED IS_WASM)
     add_executable(psio-tests
         graphql.cpp
-        psio_tests.cpp
 #        reflect.cpp
 #        flat_views.cpp
         benchmark.cpp

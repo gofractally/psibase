@@ -1,8 +1,7 @@
-#define CATCH_CONFIG_MAIN
-#include <psio/fracpack.hpp>
-
+#include <catch2/catch_all.hpp>
 #include <cmath>
 #include <psibase/DefaultTestChain.hpp>
+#include <psio/fracpack.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
 

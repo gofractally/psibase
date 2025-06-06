@@ -4,8 +4,7 @@
 
 #include <boost/log/attributes/function.hpp>
 
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace psibase;
 
@@ -35,7 +34,7 @@ int main(int argc, const char* const* argv)
 
    Catch::Session session;
 
-   using Catch::clara::Opt;
+   using Catch::Clara::Opt;
    auto cli =
        session.cli() |
        Opt(logConfig.stderr.filter,
