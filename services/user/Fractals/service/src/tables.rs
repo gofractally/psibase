@@ -426,7 +426,7 @@ pub mod tables {
             for (index, account) in fractal_group_result.into_iter().enumerate() {
                 let level = (6 as usize) - index;
                 Score::get_assert(self.fractal, self.eval_type.into(), account)
-                    .set_pending_score((level as u32) * 10000);
+                    .set_pending_score(level as u32);
             }
         }
 
@@ -484,7 +484,7 @@ pub mod tables {
         }
 
         pub fn set_pending_score(&mut self, incoming_score: u32) {
-            self.pending = Some(incoming_score);
+            self.pending = Some(incoming_score * 10000);
             self.save();
         }
 
