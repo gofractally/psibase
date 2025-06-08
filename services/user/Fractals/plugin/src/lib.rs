@@ -42,8 +42,6 @@ struct FractallyPlugin;
 
 impl Admin for FractallyPlugin {
     fn close_eval(evaluation_id: u32) -> Result<(), Error> {
-        check_app_origin()?;
-
         close(&"fractals".to_string(), evaluation_id)
     }
 
