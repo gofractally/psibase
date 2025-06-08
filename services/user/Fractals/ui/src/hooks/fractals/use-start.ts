@@ -19,7 +19,7 @@ export const useStart = () => {
                 method: "start",
                 params: [params.fractal, params.evaluationType],
                 service: fractalsService,
-                intf: "api",
+                intf: "admin",
             });
         },
     });

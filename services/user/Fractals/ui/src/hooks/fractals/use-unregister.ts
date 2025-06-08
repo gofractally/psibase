@@ -23,7 +23,7 @@ export const useUnregister = () =>
             void (await getSupervisor().functionCall({
                 method: "unregister",
                 service: fractalsService,
-                intf: "api",
+                intf: "user",
                 params: [params.evaluationId],
             }));
         },

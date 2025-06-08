@@ -54,7 +54,7 @@ export const useSetSchedule = () =>
                             forceDelete,
                         ],
                         service: fractalsService,
-                        intf: "api",
+                        intf: "admin",
                     }));
                 },
                 { description: "Scheduled evaluation" },

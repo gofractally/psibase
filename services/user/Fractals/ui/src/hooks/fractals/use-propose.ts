@@ -21,7 +21,7 @@ export const usePropose = () =>
             const pars = {
                 method: "propose",
                 service: fractalsService,
-                intf: "api",
+                intf: "user",
                 params: [evaluationId, groupNumber, proposal],
             };
             console.log("Proposing...", pars);

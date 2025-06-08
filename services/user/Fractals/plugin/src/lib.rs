@@ -3,7 +3,9 @@ mod bindings;
 
 use std::str::FromStr;
 
-use bindings::exports::fractals::plugin::api::Guest as Api;
+use bindings::exports::fractals::plugin::admin::Guest as Admin;
+use bindings::exports::fractals::plugin::user::Guest as User;
+
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -38,7 +40,76 @@ impl Drop for ProposeLatch {
 
 struct FractallyPlugin;
 
-impl Api for FractallyPlugin {
+impl Admin for FractallyPlugin {
+    fn close_eval(evaluation_id: u32) -> Result<(), Error> {
+        check_app_origin()?;
+
+        close(&"fractals".to_string(), evaluation_id)
+    }
+
+    fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let packed_args = fractals::action_structs::create_fractal {
+            fractal_account: account.parse().unwrap(),
+            name,
+            mission,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::create_fractal::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn start(fractal: String, evaluation_type: u8) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let _latch = ProposeLatch::new(&fractal);
+
+        let packed_args = fractals::action_structs::start_eval {
+            fractal: AccountNumber::from(fractal.as_str()),
+            evaluation_type,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::start_eval::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_schedule(
+        evaluation_type: u8,
+        fractal: String,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+        interval_seconds: u32,
+    ) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let _latch = ProposeLatch::new(&fractal);
+
+        let packed_args = fractals::action_structs::set_schedule {
+            evaluation_type,
+            deliberation,
+            finish_by,
+            interval_seconds,
+            registration,
+            submission,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_schedule::ACTION_NAME,
+            &packed_args,
+        )
+    }
+}
+
+impl User for FractallyPlugin {
     fn register(evaluation_id: u32) -> Result<(), Error> {
         check_app_origin()?;
 
@@ -107,52 +178,6 @@ impl Api for FractallyPlugin {
         propose(&"fractals".to_string(), evaluation_id, group_number, &res)
     }
 
-    fn set_schedule(
-        evaluation_type: u8,
-        fractal: String,
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-        interval_seconds: u32,
-    ) -> Result<(), Error> {
-        check_app_origin()?;
-
-        let _latch = ProposeLatch::new(&fractal);
-
-        let packed_args = fractals::action_structs::set_schedule {
-            evaluation_type,
-            deliberation,
-            finish_by,
-            interval_seconds,
-            registration,
-            submission,
-        }
-        .packed();
-
-        add_action_to_transaction(
-            fractals::action_structs::set_schedule::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
-    fn start(fractal: String, evaluation_type: u8) -> Result<(), Error> {
-        check_app_origin()?;
-
-        let _latch = ProposeLatch::new(&fractal);
-
-        let packed_args = fractals::action_structs::start_eval {
-            fractal: AccountNumber::from(fractal.as_str()),
-            evaluation_type,
-        }
-        .packed();
-
-        add_action_to_transaction(
-            fractals::action_structs::start_eval::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn join(fractal: String) -> Result<(), Error> {
         check_app_origin()?;
 
@@ -161,27 +186,6 @@ impl Api for FractallyPlugin {
         }
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
-    }
-
-    fn close_eval(evaluation_id: u32) -> Result<(), Error> {
-        check_app_origin()?;
-
-        close(&"fractals".to_string(), evaluation_id)
-    }
-
-    fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {
-        check_app_origin()?;
-
-        let packed_args = fractals::action_structs::create_fractal {
-            fractal_account: account.parse().unwrap(),
-            name,
-            mission,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::create_fractal::ACTION_NAME,
-            &packed_args,
-        )
     }
 }
 

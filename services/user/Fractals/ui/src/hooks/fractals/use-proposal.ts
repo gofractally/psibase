@@ -18,7 +18,7 @@ export const useProposal = (
                 method: "getProposal",
                 params: [evaluationId, groupNumber],
                 service: fractalsService,
-                intf: "api",
+                intf: "user",
             });
 
             return zAccount.array().parse(res);

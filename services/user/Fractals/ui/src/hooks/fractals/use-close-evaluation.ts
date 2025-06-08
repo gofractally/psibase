@@ -25,7 +25,7 @@ export const useCloseEvaluation = () => {
                     method: "closeEval",
                     params: [evaluationId],
                     service: fractalsService,
-                    intf: "api",
+                    intf: "admin",
                 }));
             } catch (e) {
                 const error = e as Error;

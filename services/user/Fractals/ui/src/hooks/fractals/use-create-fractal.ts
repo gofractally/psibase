@@ -28,7 +28,7 @@ export const useCreateFractal = () =>
                         method: "createFractal",
                         params: [zAccount.parse(account), name, mission],
                         service: fractalsService,
-                        intf: "api",
+                        intf: "admin",
                     }));
                 },
                 { description: `Created fractal ${name || account}` },

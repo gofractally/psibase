@@ -24,7 +24,7 @@ export const useJoinFractal = () =>
                 method: "join",
                 params: [fractal],
                 service: fractalsService,
-                intf: "api",
+                intf: "user",
             }));
         },
         onSuccess: (_, params) => {

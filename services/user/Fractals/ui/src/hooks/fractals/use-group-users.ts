@@ -19,7 +19,7 @@ export const useGroupUsers = (
                     method: "getGroupUsers",
                     params: [evaluationId, groupNumber],
                     service: fractalsService,
-                    intf: "api",
+                    intf: "user",
                 }),
             );
         },
