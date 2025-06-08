@@ -5,10 +5,10 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import { fractalsService } from "@/lib/constants";
-import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
+import { assertUser } from "../use-current-user";
 import { setDefaultMembership } from "./use-membership";
 
 const zParams = z.object({
@@ -30,14 +30,10 @@ export const useJoinFractal = () =>
         onSuccess: (_, params) => {
             const { fractal } = zParams.parse(params);
 
-            const currentUser = zAccount.parse(
-                queryClient.getQueryData(QueryKey.currentUser()),
-            );
+            const currentUser = assertUser();
             setDefaultMembership(fractal, currentUser);
-            setTimeout(() => {
-                queryClient.refetchQueries({
-                    queryKey: QueryKey.membership(fractal, currentUser),
-                });
-            }, AwaitTime);
+            queryClient.refetchQueries({
+                queryKey: QueryKey.membership(fractal, currentUser),
+            });
         },
     });

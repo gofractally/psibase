@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useFractalMemberships } from "@/hooks/fractals/use-fractal-memberships";
+import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -36,8 +36,12 @@ export function AppSwitcher() {
     const navigate = useNavigate();
 
     const { data: currentUser } = useCurrentUser();
-    const { data: fractals } = useFractalMemberships(currentUser);
+    const { data: memberships, error } = useMemberships(currentUser);
+    const fractals = memberships
+        ? memberships.map((membership) => membership.fractalDetails)
+        : [];
 
+    console.log({ fractals, error });
     const { data: chainId } = useChainId();
 
     const [showCreateFractalModal, setShowCreateFractalModal] = useState(false);

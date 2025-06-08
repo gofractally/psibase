@@ -5,7 +5,6 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import { fractalsService } from "@/lib/constants";
-import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 
 import { useCurrentFractal } from "../use-current-fractal";
@@ -41,12 +40,6 @@ export const useCloseEvaluation = () => {
             queryClient.invalidateQueries({
                 queryKey: QueryKey.fractal(fractal),
             });
-
-            setTimeout(() => {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.fractal(fractal),
-                });
-            }, AwaitTime);
         },
     });
 };

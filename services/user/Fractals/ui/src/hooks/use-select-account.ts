@@ -4,7 +4,6 @@ import { toast } from "sonner";
 
 import { supervisor } from "@/supervisor";
 
-import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -21,11 +20,6 @@ export const useSelectAccount = () =>
         },
         onSuccess: (_, accountName) => {
             queryClient.setQueryData(QueryKey.currentUser(), () => accountName);
-            setTimeout(() => {
-                queryClient.refetchQueries({
-                    queryKey: QueryKey.currentUser(),
-                });
-            }, AwaitTime);
         },
         onError: (error) => {
             if (error instanceof Error) {

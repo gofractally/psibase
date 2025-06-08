@@ -6,12 +6,10 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import { fractalsService } from "@/lib/constants";
-import { AwaitTime } from "@/lib/globals";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
 import { zAccountNameStatus } from "../use-account-status";
-import { cacheAddFractalMembership } from "./use-fractal-memberships";
 
 const zParams = z.object({
     account: zAccount,
@@ -36,21 +34,11 @@ export const useCreateFractal = () =>
                 { description: `Created fractal ${name || account}` },
             );
         },
-        onSuccess: (_, { account, mission, name }) => {
+        onSuccess: (_, { account }) => {
             queryClient.setQueryData(
                 QueryKey.userAccount(account),
                 () => zAccountNameStatus.Enum.Taken,
             );
-
-            setTimeout(() => {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.fractal(account),
-                });
-            }, AwaitTime);
-
-            cacheAddFractalMembership([
-                { account, createdAt: new Date().toISOString(), mission, name },
-            ]);
         },
         onError: (error) => {
             if (error instanceof Error) {

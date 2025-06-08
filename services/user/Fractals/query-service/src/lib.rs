@@ -262,27 +262,6 @@ mod service {
             .await
         }
 
-        async fn fractal_memberships(&self, member: AccountNumber) -> Vec<Fractal> {
-            let memberships: Vec<Member> = MemberTable::with_service(fractals::SERVICE)
-                .get_index_by_member()
-                .range((member, AccountNumber::from(0))..=(member, AccountNumber::from(u64::MAX)))
-                .collect();
-
-            let fractal_accounts: Vec<AccountNumber> = memberships
-                .into_iter()
-                .map(|membership| membership.fractal)
-                .collect();
-
-            fractal_accounts
-                .into_iter()
-                .filter_map(|account| {
-                    FractalTable::with_service(fractals::SERVICE)
-                        .get_index_pk()
-                        .get(&account)
-                })
-                .collect()
-        }
-
         async fn members(
             &self,
             fractal: AccountNumber,

@@ -9,6 +9,9 @@ export const zMember = z
     .object({
         fractal: zAccount,
         createdAt: zDateTime,
+        fractalDetails: z.object({
+            account: zAccount,
+        }),
     })
     .array();
 
@@ -21,6 +24,9 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
                 nodes {
                     fractal
                     createdAt
+                    fractalDetails {
+                        account
+                    }
                 }
             }
         }
@@ -30,7 +36,9 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
 
     return z
         .object({
-            memberships: zMember,
+            memberships: z.object({
+                nodes: zMember,
+            }),
         })
-        .parse(res).memberships;
+        .parse(res).memberships.nodes;
 };
