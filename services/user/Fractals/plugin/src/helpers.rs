@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use crate::bindings::host::common::client as Client;
+use crate::errors::ErrorType;
 use psibase::AccountNumber;
 
 /// Translates a vector of rank numbers into a sorted list of accounts based on their `AccountNumber` values.
@@ -56,4 +60,18 @@ pub fn parse_accounts_to_ranks(
         .into_iter()
         .map(|account| users.iter().position(|x| *x == account).unwrap() as u8)
         .collect()
+}
+
+fn get_sender_app() -> Result<AccountNumber, ErrorType> {
+    let sender_string = Client::get_sender_app().app.ok_or(ErrorType::NoSender)?;
+    AccountNumber::from_str(&sender_string).map_err(|_| ErrorType::InvalidAccountNumber)
+}
+
+pub fn check_app_origin() -> Result<(), ErrorType> {
+    let sender = get_sender_app()?;
+
+    if sender != psibase::services::fractals::SERVICE {
+        return Err(ErrorType::InvalidSender(sender.to_string()).into());
+    }
+    Ok(())
 }

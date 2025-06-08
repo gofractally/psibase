@@ -19,6 +19,8 @@ use bindings::evaluations::plugin::user::{
 };
 
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
+
+use crate::helpers::check_app_origin;
 struct ProposeLatch;
 
 impl ProposeLatch {
@@ -38,14 +40,20 @@ struct FractallyPlugin;
 
 impl Api for FractallyPlugin {
     fn register(evaluation_id: u32) -> Result<(), Error> {
+        check_app_origin()?;
+
         register(&"fractals".to_string(), evaluation_id)
     }
 
     fn unregister(evaluation_id: u32) -> Result<(), Error> {
+        check_app_origin()?;
+
         unregister(&"fractals".to_string(), evaluation_id)
     }
 
     fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<String>>, Error> {
+        check_app_origin()?;
+
         match get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
             None => Ok(None),
             Some(rank_numbers) => {
@@ -66,14 +74,20 @@ impl Api for FractallyPlugin {
     }
 
     fn attest(evaluation_id: u32, group_number: u32) -> Result<(), Error> {
+        check_app_origin()?;
+
         attest(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn get_group_users(evaluation_id: u32, group_number: u32) -> Result<Vec<String>, Error> {
+        check_app_origin()?;
+
         get_group_users(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn propose(evaluation_id: u32, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
+        check_app_origin()?;
+
         let all_users: Vec<AccountNumber> =
             get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
                 .iter()
@@ -102,6 +116,8 @@ impl Api for FractallyPlugin {
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
+        check_app_origin()?;
+
         let _latch = ProposeLatch::new(&fractal);
 
         let packed_args = fractals::action_structs::set_schedule {
@@ -121,6 +137,8 @@ impl Api for FractallyPlugin {
     }
 
     fn start(fractal: String, evaluation_type: u8) -> Result<(), Error> {
+        check_app_origin()?;
+
         let _latch = ProposeLatch::new(&fractal);
 
         let packed_args = fractals::action_structs::start_eval {
@@ -136,6 +154,8 @@ impl Api for FractallyPlugin {
     }
 
     fn join(fractal: String) -> Result<(), Error> {
+        check_app_origin()?;
+
         let packed_args = fractals::action_structs::join {
             fractal: AccountNumber::from(fractal.as_str()),
         }
@@ -144,10 +164,14 @@ impl Api for FractallyPlugin {
     }
 
     fn close_eval(evaluation_id: u32) -> Result<(), Error> {
+        check_app_origin()?;
+
         close(&"fractals".to_string(), evaluation_id)
     }
 
     fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {
+        check_app_origin()?;
+
         let packed_args = fractals::action_structs::create_fractal {
             fractal_account: account.parse().unwrap(),
             name,
