@@ -2,7 +2,7 @@
 pub mod tables {
     use std::u64;
 
-    use async_graphql::SimpleObject;
+    use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
@@ -114,11 +114,22 @@ pub mod tables {
 
     #[table(name = "MemberTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Member {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
+    }
+
+    #[ComplexObject]
+    impl Member {
+        pub async fn fractal_details(&self) -> Fractal {
+            FractalTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.fractal)
+                .unwrap()
+        }
     }
 
     impl Member {
