@@ -55,18 +55,6 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn evaluation_starts(
-            &self,
-            evaluation_owner: AccountNumber,
-            evaluation_id: u32,
-        ) -> async_graphql::Result<Connection<u64, EvaluationStart>> {
-            EventQuery::new("history.evaluations.evaluation_start")
-                .condition(format!(
-                    "owner = '{}' AND evaluation_id = {}",
-                    evaluation_owner, evaluation_id
-                ))
-                .query()
-        }
 
         async fn get_groups_created(
             &self,
