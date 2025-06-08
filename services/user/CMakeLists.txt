@@ -45,6 +45,8 @@ function(add suffix)
         Nft/include
         Packages/include
         Sites/include
+        Symbol/include
+        Tokens/include
     )
 endfunction(add)
 
