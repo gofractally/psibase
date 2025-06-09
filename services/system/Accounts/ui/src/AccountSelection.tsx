@@ -51,7 +51,6 @@ import {
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
-import { AccountType } from "./types";
 
 dayjs.extend(relativeTime);
 
@@ -112,10 +111,7 @@ export const AccountSelection = () => {
 
   const [debouncedAccount, setDebouncedAccount] = useState<string>();
 
-  const {
-    data: accounts,
-    isLoading: isFetching,
-  }: { data: AccountType[]; isLoading: boolean } = useGetAllAccounts();
+  const { data: accounts, isLoading: isFetching } = useGetAllAccounts();
 
   const { mutateAsync: importAccount } = useImportAccount();
 
@@ -129,7 +125,7 @@ export const AccountSelection = () => {
   const accountStatus = isProcessing ? "Loading" : status;
 
   const isAccountsLoading = isFetching && !accounts;
-  const [selectedAccountId, setSelectedAccountId] = useState<string>();
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
 
   useEffect(() => {
     const debouncedCb = debounce((formValue) => {
@@ -141,14 +137,20 @@ export const AccountSelection = () => {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  const [accountsToRender, setAccountsToRender]: [
-    AccountType[],
-    (accounts: AccountType[]) => void,
-  ] = useState<AccountType[]>([]);
+  const [activeSearch, setActiveSearch] = useState("");
+  const accountsToRender = activeSearch
+    ? (accounts || []).filter((account) =>
+        account.account.toLowerCase().includes(activeSearch.toLowerCase())
+      )
+    : accounts || [];
+  // const [accountsToRender, setAccountsToRender]: [
+  //   AccountType[],
+  //   (accounts: AccountType[]) => void,
+  // ] = useState<AccountType[]>([]);
 
-  useEffect(() => {
-    setAccountsToRender(accounts || []);
-  }, [accounts]);
+  // useEffect(() => {
+  //   setAccountsToRender(accounts || []);
+  // }, [accounts]);
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -311,12 +313,13 @@ export const AccountSelection = () => {
               </div>
             </div>
             <ActiveSearch
-              accounts={accounts}
-              setAccountsToRender={setAccountsToRender}
+              isNoAccounts={isNoAccounts}
+              activeSearch={activeSearch}
+              setActiveSearch={setActiveSearch}
             />
             <div className="flex flex-col gap-3 ">
               <AccountsList
-                isAcocuntsLoading={isAccountsLoading}
+                isAccountsLoading={isAccountsLoading}
                 accountsToRender={accountsToRender}
                 selectedAccountId={selectedAccountId}
                 onAccountSelection={onAccountSelection}

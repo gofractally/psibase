@@ -32,7 +32,7 @@ export const useRejectInvite = (selectedAccount: string, token: string) => {
       if (selectedAccount) {
         void (await supervisor.functionCall({
           method: "login",
-          params: [selectedAccount.account],
+          params: [selectedAccount],
           service: "accounts",
           intf: "activeApp",
         }));

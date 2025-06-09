@@ -55,7 +55,7 @@ export const InviteAlreadyAcceptedCard = ({ token }: { token: string }) => {
         <CardDescription>
           This invitation has been accepted by{" "}
           <span className="text-primary font-semibold">
-            {inviteToken.actor}
+            {inviteToken?.actor}
           </span>
           .
         </CardDescription>
@@ -80,7 +80,7 @@ export const InviteRejectedCard = ({ token }: { token: string }) => {
         <CardDescription>
           This invitation has been rejected
           {inviteToken?.actor !== "invite-sys"
-            ? ` by ${inviteToken.actor}.`
+            ? ` by ${inviteToken?.actor}.`
             : "."}
         </CardDescription>
       </CardHeader>
