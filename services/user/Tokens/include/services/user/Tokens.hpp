@@ -33,7 +33,6 @@ namespace UserService
 
       void burn(TID tokenId, Quantity amount);
 
-      void setUserConf(psibase::EnumElement flag, bool enable);
       void setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable);
 
       void credit(TID                             tokenId,
@@ -108,7 +107,6 @@ namespace UserService
       method(mint, tokenId, amount, memo),
 
       method(burn, tokenId, amount),
-      method(setUserConf, flag, enable),
       method(setTokenConf, tokenId, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, maxAmount, memo),
