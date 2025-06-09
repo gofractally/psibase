@@ -200,7 +200,7 @@ export const AccountSelection = () => {
     : false;
 
   const { mutateAsync: rejectInvite, isPending: isRejecting } = useRejectInvite(
-    selectedAccount,
+    selectedAccount?.account || "",
     token
   );
 
