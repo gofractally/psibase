@@ -162,6 +162,62 @@ namespace psibase
       T                 value;
    };
 
+   template <typename R>
+   R unpackReply(HttpReply&& response)
+   {
+      if constexpr (std::is_convertible_v<HttpReply, R>)
+      {
+         return std::move(response);
+      }
+      else
+      {
+         if (response.status != HttpStatus::ok)
+         {
+            if (response.contentType == "text/html")
+            {
+               abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
+                            std::string(response.body.begin(), response.body.end()));
+            }
+            else
+            {
+               abortMessage("Request returned " +
+                            std::to_string(static_cast<std::uint16_t>(response.status)));
+            }
+         }
+         if (response.contentType != "application/json")
+            abortMessage("Wrong Content-Type " + response.contentType);
+         response.body.push_back('\0');
+         psio::json_token_stream stream(response.body.data());
+         return psio::from_json<R>(stream);
+      }
+   }
+
+   struct AsyncHttpReply
+   {
+      std::int32_t             fd;
+      std::optional<HttpReply> poll();
+      template <typename R>
+      std::optional<R> poll()
+      {
+         if (auto reply = poll())
+         {
+            return unpackReply<R>(std::move(*reply));
+         }
+         else
+         {
+            return {};
+         }
+      }
+      template <typename R = HttpReply>
+      R get()
+      {
+         auto reply = poll();
+         if (!reply)
+            abortMessage("HTTP response not available");
+         return unpackReply<R>(std::move(*reply));
+      }
+   };
+
    /**
     * Manages a chain.
     * The test chain uses simulated time.
@@ -173,6 +229,7 @@ namespace psibase
       std::optional<psibase::StatusRow> status;
       bool                              producing        = false;
       bool                              isAutoBlockStart = true;
+      bool                              isAutoRun        = true;
       bool                              isPublicChain;
 
       explicit TestChain(uint32_t chain_id, bool clone, bool pub = true);
@@ -226,6 +283,14 @@ namespace psibase
       void setAutoBlockStart(bool enable);
 
       /**
+       * By default the TestChain will automatically process
+       * the run table and transactions provided by services.
+       * When autoRun is disabled, the chain will only run
+       * them manually.
+       */
+      void setAutoRun(bool enable);
+
+      /**
        * Start a new pending block.  If a block is currently pending, finishes it first.
        * May push additional blocks if any time is skipped.
        *
@@ -268,6 +333,24 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
+
+      /**
+       * Runs the nextTransaction callback to find the
+       * next transaction and pushes it. If there was
+       * a transaction, returns its trace.
+       */
+      std::optional<TransactionTrace> pushNextTransaction();
+      /**
+       * Reads the first RunRow and executes it. Returns true
+       * if there was anything to do.
+       */
+      bool runQueueItem();
+      /**
+       * Runs pending work to completion.
+       * - pushNextTransaction
+       * - runQueueItem
+       */
+      void runAll();
 
       /**
        * Creates a POST request with a JSON body
@@ -321,32 +404,7 @@ namespace psibase
       template <typename R>
       R http(const HttpRequest& request)
       {
-         auto response = http(request);
-         if constexpr (std::is_convertible_v<HttpReply, R>)
-         {
-            return response;
-         }
-         else
-         {
-            if (response.status != HttpStatus::ok)
-            {
-               if (response.contentType == "text/html")
-               {
-                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
-                               std::string(response.body.begin(), response.body.end()));
-               }
-               else
-               {
-                  abortMessage("Request returned " +
-                               std::to_string(static_cast<std::uint16_t>(response.status)));
-               }
-            }
-            if (response.contentType != "application/json")
-               abortMessage("Wrong Content-Type " + response.contentType);
-            response.body.push_back('\0');
-            psio::json_token_stream stream(response.body.data());
-            return psio::from_json<R>(stream);
-         }
+         return unpackReply<R>(http(request));
       }
 
       template <typename R = HttpReply, typename T>
@@ -359,6 +417,17 @@ namespace psibase
       R get(AccountNumber account, std::string_view target)
       {
          return http<R>(makeGet(account, target));
+      }
+
+      AsyncHttpReply asyncHttp(const HttpRequest& request);
+      template <typename T>
+      AsyncHttpReply asyncPost(AccountNumber account, std::string_view target, const T& data)
+      {
+         return asyncHttp(makePost(account, target, data));
+      }
+      AsyncHttpReply asyncGet(AccountNumber account, std::string_view target)
+      {
+         return asyncHttp(makeGet(account, target));
       }
 
       template <typename Action>

@@ -196,6 +196,13 @@ namespace psibase
          check(c.has_value(), "service code record is missing");
          check(c->vmType == 0, "vmType is not 0");
          check(c->vmVersion == 0, "vmVersion is not 0");
+         if (transactionContext.dbMode.verifyOnly)
+         {
+            check(code.flags & CodeRow::isAuthService,
+                  "service account " + service.str() + " cannot be used in verify mode");
+            // Ignore all other flags
+            code.flags &= CodeRow::isAuthService;
+         }
          rethrowVMExcept(
              [&]
              {
