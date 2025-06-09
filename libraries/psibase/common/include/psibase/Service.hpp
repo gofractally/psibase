@@ -1,6 +1,5 @@
 #pragma once
 
-#include <concepts>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Actor.hpp>
 #include <psibase/Table.hpp>

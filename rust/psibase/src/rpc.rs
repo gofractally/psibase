@@ -166,10 +166,20 @@ async fn push_transaction_impl(
     fmt: TraceFormat,
     console: bool,
     progress: Option<&ProgressBar>,
+    wait_for: Option<String>,
 ) -> Result<(), anyhow::Error> {
+    let wait_for = wait_for
+        .map(|wait| format!("?wait_for={}", wait))
+        .unwrap_or_default();
+
     let trace: TransactionTrace = as_json_or_fracpack(
         client
-            .post(transact::SERVICE.url(base_url)?.join("/push_transaction")?)
+            .post(
+                transact::SERVICE
+                    .url(base_url)?
+                    .join("/push_transaction")?
+                    .join(&wait_for)?,
+            )
             .header("Content-Type", "application/octet-stream")
             .header("Accept", "application/octet-stream")
             .body(packed),
@@ -192,9 +202,31 @@ pub async fn push_transaction(
     console: bool,
     progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
-    push_transaction_impl(base_url, client, packed, fmt, console, progress)
+    push_transaction_impl(base_url, client, packed, fmt, console, progress, None)
         .await
         .context("Failed to push transaction")?;
+    Ok(())
+}
+
+pub async fn push_transaction_optimistic(
+    base_url: &Url,
+    client: reqwest::Client,
+    packed: Vec<u8>,
+    fmt: TraceFormat,
+    console: bool,
+    progress: Option<&ProgressBar>,
+) -> Result<(), anyhow::Error> {
+    push_transaction_impl(
+        base_url,
+        client,
+        packed,
+        fmt,
+        console,
+        progress,
+        Some("applied".to_string()),
+    )
+    .await
+    .context("Failed to push transaction")?;
     Ok(())
 }
 

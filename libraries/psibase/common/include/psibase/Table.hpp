@@ -6,7 +6,7 @@
 #include <concepts>
 #include <cstdint>
 #include <functional>
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/to_key.hpp>
@@ -579,7 +579,7 @@ namespace psibase
       decltype(auto) invoke(CompositeKey<K...> f, const C& value);
 
       template <typename T, typename C>
-      decltype(auto) invoke(T C::*f, const C& value)
+      decltype(auto) invoke(T C::* f, const C& value)
       {
          return (value.*f);
       }

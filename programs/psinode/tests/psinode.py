@@ -159,7 +159,7 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
         if data is None:
-            self.private = ec.generate_private_key(ec.SECP256R1)
+            self.private = ec.generate_private_key(ec.SECP256R1())
         else:
             try:
                 self.private = load_pem_private_key(data)
@@ -263,7 +263,7 @@ class API:
                 packed = bytes.fromhex(trx)
             else:
                 packed = trx
-        with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
+        with self.post('/push_transaction?wait_for=applied', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
             if trace['error'] is not None:
