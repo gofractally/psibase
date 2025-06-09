@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": [
-      "ES2023"
+      "ES2023",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker"
     ],
     "module": "ESNext",
     /* Bundler mode */
@@ -21,7 +24,8 @@
       "vite/client",
       "react",
       "react-dom"
-    ]
+    ],
+    "skipLibCheck": true
   },
   "include": [
     "vite.config.ts",
