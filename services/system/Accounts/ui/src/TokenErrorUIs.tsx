@@ -10,7 +10,7 @@ import dayjs from "dayjs";
 import { useDecodeInviteToken } from "./hooks/useDecodeInviteToken";
 import { useDecodeToken } from "./hooks/useDecodeToken";
 
-export const InviteExpiredCard = (token: string) => {
+export const InviteExpiredCard = ({ token }: { token: string }) => {
   const { data: decodedToken } = useDecodeToken(token);
   const { data: inviteToken } = useDecodeInviteToken(
     token,
@@ -64,7 +64,7 @@ export const InviteAlreadyAcceptedCard = ({ token }: { token: string }) => {
   );
 };
 
-export const InviteRejectedCard = (token: string) => {
+export const InviteRejectedCard = ({ token }: { token: string }) => {
   const { data: decodedToken } = useDecodeToken(token);
   const { data: inviteToken } = useDecodeInviteToken(
     token,
@@ -79,7 +79,7 @@ export const InviteRejectedCard = (token: string) => {
         <CardTitle>Invitation rejected.</CardTitle>
         <CardDescription>
           This invitation has been rejected
-          {inviteToken?.actor && inviteToken.actor !== "invite-sys"
+          {inviteToken?.actor !== "invite-sys"
             ? ` by ${inviteToken.actor}.`
             : "."}
         </CardDescription>
