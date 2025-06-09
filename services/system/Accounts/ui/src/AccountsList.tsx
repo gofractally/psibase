@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AccountType } from "./types";
 
 export const Account = ({
   name,
@@ -40,19 +41,19 @@ export const Account = ({
 };
 
 export const AccountsList = ({
-  isAcocuntsLoading,
+  isAccountsLoading,
   accountsToRender,
   selectedAccountId,
   onAccountSelection,
 }: {
-  isAcocuntsLoading: boolean;
-  accountsToRender: any[];
+  isAccountsLoading: boolean;
+  accountsToRender: AccountType[];
   selectedAccountId: string;
   onAccountSelection: (accountId: string) => void;
 }) => {
   return (
     <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
-      {isAcocuntsLoading
+      {isAccountsLoading
         ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((_, index) => (
             <Account onSelected={() => {}} isSelected={false} key={index} />
           ))

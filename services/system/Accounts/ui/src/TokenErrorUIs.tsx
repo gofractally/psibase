@@ -39,7 +39,7 @@ export const InviteExpiredCard = (token: string) => {
   );
 };
 
-export const InviteAlreadyAcceptedCard = (token: string) => {
+export const InviteAlreadyAcceptedCard = ({ token }: { token: string }) => {
   const { data: decodedToken } = useDecodeToken(token);
   const { data: inviteToken } = useDecodeInviteToken(
     token,

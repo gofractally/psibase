@@ -51,6 +51,7 @@ import {
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
+import { AccountType } from "./types";
 
 dayjs.extend(relativeTime);
 
@@ -111,7 +112,10 @@ export const AccountSelection = () => {
 
   const [debouncedAccount, setDebouncedAccount] = useState<string>();
 
-  const { data: accounts, isLoading: isFetching } = useGetAllAccounts();
+  const {
+    data: accounts,
+    isLoading: isFetching,
+  }: { data: AccountType[]; isLoading: boolean } = useGetAllAccounts();
 
   const { mutateAsync: importAccount } = useImportAccount();
 
@@ -137,7 +141,10 @@ export const AccountSelection = () => {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  const [accountsToRender, setAccountsToRender] = useState<any[]>([]);
+  const [accountsToRender, setAccountsToRender]: [
+    AccountType[],
+    (accounts: AccountType[]) => void,
+  ] = useState<AccountType[]>([]);
 
   useEffect(() => {
     setAccountsToRender(accounts || []);

@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "./components/ui/input";
+import { AccountType } from "./types";
 
 export const ActiveSearch = ({
   accounts,
   setAccountsToRender,
 }: {
-  accounts: any[];
-  setAccountsToRender: (accounts: any[]) => void;
+  accounts: AccountType[];
+  setAccountsToRender: (accounts: AccountType[]) => void;
 }) => {
   const [activeSearch, setActiveSearch] = useState("");
   const isNoAccounts = accounts ? accounts.length == 0 : false;
