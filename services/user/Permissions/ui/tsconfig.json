@@ -61,9 +61,4 @@
         "./wasm-psibase/*.d.ts",
         "wasm-psibase"
     ],
-    "references": [
-        {
-            "path": "./tsconfig.node.json"
-        }
-    ]
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && vite build'",
+    "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -61,6 +61,6 @@
     "tailwindcss": "^3.4.10",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "4.5.2"
+    "vite": "^4.5.2"
   }
 }
