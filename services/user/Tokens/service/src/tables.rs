@@ -4,10 +4,9 @@ pub mod tables {
     use crate::flags::token_holder_flags::TokenHolderFlags;
 
     use async_graphql::SimpleObject;
-    use psibase::services::nft::action_structs::debit;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::{check, check_some, AccountNumber, Quantity};
-    use psibase::{services::nft::Wrapper, Fracpack, Table, ToKey, ToSchema};
+    use psibase::{check, check_some, get_sender, AccountNumber, Quantity};
+    use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -42,6 +41,10 @@ pub mod tables {
             check_some(Self::get(id), "failed to find token")
         }
 
+        pub fn check_owner_is_sender(&self) {
+            check(get_sender() == self.nft_holder(), "must own token NFT");
+        }
+
         pub fn add(max_supply: Quantity, precision: u8) -> Self {
             let init_table = InitTable::new();
             let mut init_row = init_table.get_index_pk().get(&()).unwrap();
@@ -50,9 +53,7 @@ pub mod tables {
             init_row.last_used_id = new_id;
             init_table.put(&init_row).expect("failed to save init_row");
 
-            let token_table = TokenTable::new();
-
-            let new_instance = Self {
+            let mut new_instance = Self {
                 id: new_id,
                 nft_id: Nfts::call().mint(),
                 current_supply: 0.into(),
@@ -61,14 +62,12 @@ pub mod tables {
                 settings_value: TokenSetting::new().value,
             };
 
-            token_table
-                .put(&new_instance)
-                .expect("failed to save token");
+            new_instance.save();
 
             new_instance
         }
 
-        pub fn owner(&self) -> AccountNumber {
+        fn nft_holder(&self) -> AccountNumber {
             Nfts::call().getNft(self.nft_id).owner
         }
 
@@ -76,16 +75,26 @@ pub mod tables {
             TokenSetting::from(self.settings_value)
         }
 
-        pub fn save_settings(&mut self, settings: TokenSetting) {
+        fn save_settings(&mut self, settings: TokenSetting) {
             self.settings_value = settings.value;
             self.save();
         }
 
-        pub fn set_recallable(&mut self, recallable: bool) {
-            check(recallable == false, "cannot re-enable recallable once set");
+        pub fn disable_recallability(&mut self) {
             let mut current_settings = self.settings();
-            current_settings.set_is_unrecallable(recallable);
+            current_settings.set_is_unrecallable(true);
+            self.save_settings(current_settings);
+        }
 
+        pub fn disable_burnability(&mut self) {
+            let mut current_settings = self.settings();
+            current_settings.set_is_unburnable(true);
+            self.save_settings(current_settings);
+        }
+
+        pub fn disable_transferability(&mut self) {
+            let mut current_settings = self.settings();
+            current_settings.set_is_untransferable(true);
             self.save_settings(current_settings);
         }
 
@@ -99,16 +108,14 @@ pub mod tables {
             psibase::check(self.current_supply <= self.max_supply, "over max supply");
             self.save();
 
-            let mut user_balance = Balance::get(receiver, self.id);
-            user_balance.add_balance(amount);
+            Balance::get_or_default(receiver, self.id).add_balance(amount);
         }
 
         pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
             self.current_supply = self.current_supply - amount;
             self.save();
 
-            let mut user_balance = Balance::get(burnee, self.id);
-            user_balance.sub_balance(amount);
+            Balance::get_or_default(burnee, self.id).sub_balance(amount);
         }
     }
 
@@ -126,7 +133,7 @@ pub mod tables {
             (self.account, self.token_id)
         }
 
-        pub fn get(account: AccountNumber, token_id: u32) -> Balance {
+        pub fn get_or_default(account: AccountNumber, token_id: u32) -> Balance {
             let table = BalanceTable::new();
             table
                 .get_index_pk()
@@ -169,7 +176,12 @@ pub mod tables {
             (self.creditor, self.debitor, self.token_id)
         }
 
-        pub fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
+        pub fn get_or_default(
+            creditor: AccountNumber,
+            debitor: AccountNumber,
+            token_id: u32,
+        ) -> Self {
+            check(creditor != debitor, "creditor cannot also be debitor");
             SharedBalanceTable::new()
                 .get_index_pk()
                 .get(&(creditor, debitor, token_id))
@@ -182,12 +194,18 @@ pub mod tables {
         }
 
         pub fn credit(&mut self, quantity: Quantity) {
-            Balance::get(self.creditor, self.token_id).sub_balance(quantity);
+            Balance::get_or_default(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
+
+            let token = Token::get_assert(self.token_id);
+            check(
+                !token.settings().is_untransferable(),
+                "token is untransferable",
+            );
 
             let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
                 .map(|holder| holder.is_auto_debit())
-                .unwrap_or(Holder::get(self.debitor).is_auto_debit());
+                .unwrap_or(Holder::get_or_default(self.debitor).is_auto_debit());
 
             if is_auto_debit {
                 self.debit(quantity);
@@ -196,12 +214,24 @@ pub mod tables {
 
         pub fn uncredit(&mut self, quantity: Quantity) {
             self.sub_balance(quantity);
-            Balance::get(self.creditor, self.token_id).add_balance(quantity);
+            Balance::get_or_default(self.creditor, self.token_id).add_balance(quantity);
         }
 
         pub fn debit(&mut self, quantity: Quantity) {
+            crate::Wrapper::emit().history().debited(
+                self.token_id,
+                self.creditor,
+                self.debitor,
+                "Autodebit".to_string(),
+            );
             self.sub_balance(quantity);
-            Balance::get(self.debitor, self.token_id).add_balance(quantity);
+            Balance::get_or_default(self.debitor, self.token_id).add_balance(quantity);
+
+            let token = Token::get_assert(self.token_id);
+            check(
+                !token.settings().is_untransferable(),
+                "token is untransferable",
+            );
         }
 
         fn add_balance(&mut self, quantity: Quantity) {
@@ -215,7 +245,7 @@ pub mod tables {
             if self.balance == 0.into() {
                 let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
                     .map(|token_holder| token_holder.is_keep_zero_balances())
-                    .unwrap_or(Holder::get(self.creditor).is_keep_zero_balances());
+                    .unwrap_or(Holder::get_or_default(self.creditor).is_keep_zero_balances());
 
                 if keep_zero_balance {
                     self.save();
@@ -250,7 +280,7 @@ pub mod tables {
             self.account
         }
 
-        pub fn get(account: AccountNumber) -> Self {
+        pub fn get_or_default(account: AccountNumber) -> Self {
             HolderTable::new()
                 .get_index_pk()
                 .get(&account)
@@ -307,6 +337,14 @@ pub mod tables {
             TokenHolderTable::new()
                 .get_index_pk()
                 .get(&(account, token_id))
+        }
+
+        pub fn get_or_default(account: AccountNumber, token_id: u32) -> Self {
+            Self::get(account, token_id).unwrap_or(Self {
+                account,
+                flags: 0,
+                token_id,
+            })
         }
 
         pub fn is_auto_debit(&self) -> bool {
