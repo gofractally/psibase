@@ -26,7 +26,6 @@ export default defineConfig(({ command }) => {
                 additionalManualChunks: {
                     // Radix UI components
                     "radix-ui": [
-                        "@radix-ui/react-alert-dialog",
                         "@radix-ui/react-avatar",
                         "@radix-ui/react-dropdown-menu",
                         "@radix-ui/react-label",

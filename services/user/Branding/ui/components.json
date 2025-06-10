@@ -10,7 +10,7 @@
         "prefix": ""
     },
     "aliases": {
-        "components": "src/components/ui",
+        "components": "src/components",
         "utils": "src/lib/utils"
     }
 }
