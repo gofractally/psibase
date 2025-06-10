@@ -1,10 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
-import { AlarmClockMinus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
 
 import { z } from "zod";
 
@@ -32,20 +27,10 @@ import {
 import debounce from "debounce";
 import { Button } from "./components/ui/button";
 
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-import { Check, UserX, LoaderCircle } from "lucide-react";
-import { TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supervisor } from "@/main";
 import { useDecodeInviteToken } from "@/hooks/useDecodeInviteToken";
 import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
 import { useDecodeToken } from "@/hooks/useDecodeToken";
@@ -53,50 +38,24 @@ import { useGetAllAccounts } from "@/hooks/useGetAllAccounts";
 import { useLoginDirect } from "@/hooks/useLoginDirect";
 import { useAcceptInvite } from "@/hooks/useAcceptInvite";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
+import { useImportAccount } from "./hooks/useImportAccount";
+
+import { AccountsList } from "./AccountsList";
+import { useCreateAccount } from "./hooks/useCreateAccount";
+import { useRejectInvite } from "./hooks/useRejectInvite";
+import { LoadingCard } from "./LoadingCard";
+import {
+  InviteAlreadyAcceptedCard,
+  InviteRejectedCard,
+  InviteExpiredCard,
+} from "./TokenErrorUIs";
+import { ActiveSearch } from "./ActiveSearch";
+import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
 
 dayjs.extend(relativeTime);
 
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const capitaliseFirstLetter = (str: string) =>
   str[0].toUpperCase() + str.slice(1);
-
-const Account = ({
-  name,
-  isSelected,
-  onSelected,
-}: {
-  onSelected: () => void;
-  name?: string;
-  isSelected: boolean;
-}) => {
-  return (
-    <button
-      onClick={() => {
-        onSelected();
-      }}
-      className={cn(
-        "w-full flex justify-around p-4 rounded-md border bg-muted/50",
-        {
-          "bg-accent border ": isSelected,
-        }
-      )}
-    >
-      <div className="flex gap-3">
-        {!name ? (
-          <Skeleton className="h-12 w-12 rounded-full" />
-        ) : (
-          <Avatar>
-            <AvatarFallback>{name.toUpperCase().slice(0, 2)}</AvatarFallback>
-          </Avatar>
-        )}
-        <div className={cn("text-lg flex flex-col justify-center")}>
-          {!name ? <Skeleton className="h-4 w-[100px]" /> : name}
-        </div>
-      </div>
-    </button>
-  );
-};
 
 const formSchema = z.object({
   username: z.string().min(1).max(50),
@@ -104,7 +63,14 @@ const formSchema = z.object({
 
 export const AccountSelection = () => {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const token: string = z.string().parse(searchParams.get("token"));
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: "",
+    },
+  });
 
   const key = searchParams.get("key");
 
@@ -114,30 +80,6 @@ export const AccountSelection = () => {
   if (key) {
     navigate(`/key?key=${key}`);
   }
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      username: "",
-    },
-  });
-
-  const { mutateAsync: importAccount } = useMutation<void, string, string>({
-    mutationFn: async (accountName) => {
-      await supervisor.functionCall({
-        method: "importAccount",
-        params: [accountName],
-        service: "accounts",
-        intf: "admin",
-      });
-    },
-    onSuccess: async () => {
-      fetchAccounts();
-      setTimeout(() => {
-        fetchAccounts();
-      }, 2000);
-    },
-  });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -169,11 +111,9 @@ export const AccountSelection = () => {
 
   const [debouncedAccount, setDebouncedAccount] = useState<string>();
 
-  const {
-    data: accounts,
-    isLoading: isFetching,
-    refetch: fetchAccounts,
-  } = useGetAllAccounts();
+  const { data: accounts, isLoading: isFetching } = useGetAllAccounts();
+
+  const { mutateAsync: importAccount } = useImportAccount();
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
 
@@ -185,7 +125,7 @@ export const AccountSelection = () => {
   const accountStatus = isProcessing ? "Loading" : status;
 
   const isAccountsLoading = isFetching && !accounts;
-  const [selectedAccountId, setSelectedAccountId] = useState<string>();
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
 
   useEffect(() => {
     const debouncedCb = debounce((formValue) => {
@@ -198,12 +138,19 @@ export const AccountSelection = () => {
   }, [form]);
 
   const [activeSearch, setActiveSearch] = useState("");
-
   const accountsToRender = activeSearch
     ? (accounts || []).filter((account) =>
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
+  // const [accountsToRender, setAccountsToRender]: [
+  //   AccountType[],
+  //   (accounts: AccountType[]) => void,
+  // ] = useState<AccountType[]>([]);
+
+  // useEffect(() => {
+  //   setAccountsToRender(accounts || []);
+  // }, [accounts]);
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -230,11 +177,8 @@ export const AccountSelection = () => {
     }
   };
 
-  const {
-    data: inviteToken,
-    isLoading: isLoadingInvite,
-    refetch: refetchToken,
-  } = useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
+  const { data: inviteToken, isLoading: isLoadingInvite } =
+    useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
 
   const { data: connectionToken, isLoading: isLoadingConnectionToken } =
     useDecodeConnectionToken(token, decodedToken?.tag == "connection-token");
@@ -243,94 +187,24 @@ export const AccountSelection = () => {
     isLoadingInvite || isLoadingConnectionToken || isLoadingToken;
 
   const { mutateAsync: createAccount, isSuccess: isInviteClaimed } =
-    useMutation<void, string, string>({
-      mutationFn: async (account) => {
-        if (!inviteToken) throw new Error(`Must have invite`);
-
-        void (await supervisor.functionCall({
-          method: "logout",
-          params: [],
-          service: "accounts",
-          intf: "activeApp",
-        }));
-
-        void (await supervisor.functionCall({
-          method: "acceptWithNewAccount",
-          params: [account, token],
-          service: "invite",
-          intf: "invitee",
-        }));
-
-        await wait(2000);
-
-        await importAccount(account);
-
-        void (await supervisor.functionCall({
-          method: "loginDirect",
-          params: [
-            {
-              app: inviteToken.app,
-              origin: inviteToken.appDomain,
-            },
-            account,
-          ],
-          service: "accounts",
-          intf: "admin",
-        }));
-      },
-    });
+    useCreateAccount(token);
 
   const appName = isInvite
     ? inviteToken
       ? capitaliseFirstLetter(inviteToken.app)
       : ""
     : connectionToken
-    ? capitaliseFirstLetter(connectionToken.app)
-    : "";
+      ? capitaliseFirstLetter(connectionToken.app)
+      : "";
 
   const isExpired = inviteToken
     ? inviteToken.expiry.valueOf() < new Date().valueOf()
     : false;
 
-  const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
-    onSuccess: () => {
-      refetchToken();
-      setTimeout(() => {
-        refetchToken();
-      }, 3000);
-    },
-    mutationFn: async () => {
-      if (!inviteToken) {
-        throw new Error(`No invite available`);
-      }
-
-      const rejectParams = {
-        method: "reject",
-        params: [token],
-        service: "invite",
-        intf: "invitee",
-      };
-      if (selectedAccount) {
-        void (await supervisor.functionCall({
-          method: "login",
-          params: [selectedAccount.account],
-          service: "accounts",
-          intf: "activeApp",
-        }));
-
-        void (await supervisor.functionCall(rejectParams));
-      } else {
-        void (await supervisor.functionCall({
-          method: "logout",
-          params: [],
-          service: "accounts",
-          intf: "activeApp",
-        }));
-
-        void (await supervisor.functionCall(rejectParams));
-      }
-    },
-  });
+  const { mutateAsync: rejectInvite, isPending: isRejecting } = useRejectInvite(
+    selectedAccount?.account || "",
+    token
+  );
 
   const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
 
@@ -340,81 +214,43 @@ export const AccountSelection = () => {
   const isTxInProgress = isRejecting || isAccepting || isLoggingIn;
 
   if (isLoadingInvite) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <LoaderCircle className="w-12 h-12 animate-spin" />
-          </div>
-          <CardTitle className="text-center">Loading...</CardTitle>
-        </CardHeader>
-      </Card>
-    );
+    return <LoadingCard />;
   }
 
   if (inviteToken?.state == "accepted" && !isInviteClaimed) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <TriangleAlert className="w-12 h-12" />
-          </div>
-          <CardTitle>Invitation already accepted.</CardTitle>
-          <CardDescription>
-            This invitation has been accepted by{" "}
-            <span className="text-primary font-semibold">
-              {inviteToken.actor}
-            </span>
-            .
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <InviteAlreadyAcceptedCard token={token} />;
   }
 
   if (inviteToken?.state == "rejected") {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <TriangleAlert className="w-12 h-12" />
-          </div>
-          <CardTitle>Invitation rejected.</CardTitle>
-          <CardDescription>
-            This invitation has been rejected
-            {inviteToken?.actor && inviteToken.actor !== "invite-sys"
-              ? ` by ${inviteToken.actor}.`
-              : "."}
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <InviteRejectedCard token={token} />;
   }
-
-  const expiryMessage =
-    inviteToken &&
-    `This invitation expired ${dayjs().to(inviteToken.expiry)} (${dayjs(
-      inviteToken.expiry
-    ).format("YYYY/MM/DD HH:mm")}).`;
 
   if (isExpired) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <AlarmClockMinus className="w-12 h-12" />
-          </div>
-          <CardTitle>Expired invitation</CardTitle>
-          <CardDescription>{expiryMessage}</CardDescription>
-          <CardDescription>
-            Please ask the sender{" "}
-            <span className="text-primary">{inviteToken?.inviter}</span> for a
-            new one.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <InviteExpiredCard token={token} />;
   }
+
+  const onAcceptOrLogin = () => {
+    if (isInvite) {
+      if (!inviteToken) {
+        throw new Error(`Expected invite token loaded`);
+      }
+      acceptInvite({
+        token: z.string().parse(token),
+        accountName: z.string().parse(selectedAccount?.account),
+        app: inviteToken.app,
+        origin: inviteToken.appDomain,
+      });
+    } else {
+      if (!connectionToken) {
+        throw new Error(`Expected connection token for a login`);
+      }
+      login({
+        app: connectionToken.app,
+        origin: connectionToken.origin,
+        accountName: selectedAccount!.account,
+      });
+    }
+  };
 
   return (
     <>
@@ -443,63 +279,11 @@ export const AccountSelection = () => {
                       <FormItem>
                         <div className="w-full flex justify-between ">
                           <FormLabel>Username</FormLabel>
-                          {isDirty && isCreatingAccount && (
-                            <FormLabel className="text-muted-foreground">
-                              {accountStatus === "Available" ? (
-                                <div className="flex gap-1">
-                                  <div className="text-sm">Available</div>
-                                  <Check size={15} className="my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Taken" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Taken</div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Invalid" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Invalid</div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Loading</div>
-                                  <LoaderCircle
-                                    size={15}
-                                    className="animate animate-spin my-auto"
-                                  />{" "}
-                                </div>
-                              )}
-                            </FormLabel>
-                          )}
-                          {isDirty && !isCreatingAccount && (
-                            <FormLabel className="text-muted-foreground">
-                              {accountStatus === "Available" ? (
-                                <div className="flex gap-1">
-                                  <div className="text-sm">
-                                    Account does not exist
-                                  </div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Invalid" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Invalid</div>
-                                  <UserX size={15} className=" my-auto" />{" "}
-                                </div>
-                              ) : accountStatus === "Loading" ? (
-                                <div className="flex gap-1">
-                                  {" "}
-                                  <div className="text-sm">Loading</div>
-                                  <LoaderCircle
-                                    size={15}
-                                    className="animate animate-spin my-auto"
-                                  />{" "}
-                                </div>
-                              ) : undefined}
-                            </FormLabel>
+                          {isDirty && (
+                            <AccountAvailabilityStatus
+                              accountStatus={accountStatus}
+                              isCreatingAccount={isCreatingAccount}
+                            />
                           )}
                         </div>
                         <FormControl>
@@ -524,48 +308,22 @@ export const AccountSelection = () => {
                 {isInitialLoading
                   ? "Loading..."
                   : isInvite
-                  ? `Select an account to accept invite to `
-                  : `Select an account to login to  `}
+                    ? `Select an account to accept invite to `
+                    : `Select an account to login to  `}
               </div>
             </div>
-            {isNoAccounts ? (
-              <div className="text-primary">No accounts available</div>
-            ) : (
-              <div className="relative ml-auto flex-1 md:grow-0 mb-3">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={activeSearch}
-                  type="search"
-                  onChange={(e) => setActiveSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full rounded-lg bg-background pl-8 "
-                />
-              </div>
-            )}
-
+            <ActiveSearch
+              isNoAccounts={isNoAccounts}
+              activeSearch={activeSearch}
+              setActiveSearch={setActiveSearch}
+            />
             <div className="flex flex-col gap-3 ">
-              <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
-                {isAccountsLoading
-                  ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
-                      (_, index) => (
-                        <Account
-                          onSelected={() => {}}
-                          isSelected={false}
-                          key={index}
-                        />
-                      )
-                    )
-                  : accountsToRender.map((account) => (
-                      <Account
-                        onSelected={() => {
-                          onAccountSelection(account.id);
-                        }}
-                        isSelected={selectedAccountId == account.id}
-                        key={account.id}
-                        name={account.account}
-                      />
-                    ))}
-              </div>
+              <AccountsList
+                isAccountsLoading={isAccountsLoading}
+                accountsToRender={accountsToRender}
+                selectedAccountId={selectedAccountId}
+                onAccountSelection={onAccountSelection}
+              />
               {isInvite && !isInviteClaimed && (
                 <button
                   onClick={() => {
@@ -582,37 +340,14 @@ export const AccountSelection = () => {
               <div className="my-3">
                 <Button
                   disabled={!selectedAccount || isTxInProgress}
-                  onClick={() => {
-                    if (isInvite) {
-                      if (!inviteToken) {
-                        throw new Error(`Expected invite token loaded`);
-                      }
-                      acceptInvite({
-                        token: z.string().parse(token),
-                        accountName: z.string().parse(selectedAccount?.account),
-                        app: inviteToken.app,
-                        origin: inviteToken.appDomain,
-                      });
-                    } else {
-                      if (!connectionToken) {
-                        throw new Error(
-                          `Expected connection token for a login`
-                        );
-                      }
-                      login({
-                        app: connectionToken.app,
-                        origin: connectionToken.origin,
-                        accountName: selectedAccount!.account,
-                      });
-                    }
-                  }}
+                  onClick={onAcceptOrLogin}
                   className="w-full"
                 >
                   {isSubmitting
                     ? "Loading..."
                     : isInvite
-                    ? "Accept invite"
-                    : "Login"}
+                      ? "Accept invite"
+                      : "Login"}
                 </Button>
               </div>
             )}
