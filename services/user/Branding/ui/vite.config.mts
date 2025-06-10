@@ -26,12 +26,11 @@ export default defineConfig(({ command }) => {
                 additionalManualChunks: {
                     // Radix UI components
                     "radix-ui": [
+                        "@radix-ui/react-alert-dialog",
+                        "@radix-ui/react-avatar",
                         "@radix-ui/react-dropdown-menu",
                         "@radix-ui/react-label",
-                        "@radix-ui/react-separator",
                         "@radix-ui/react-slot",
-                        "@radix-ui/react-tabs",
-                        "@radix-ui/react-tooltip",
                     ],
                     // Animation libraries
                     animation: ["framer-motion"],
@@ -57,7 +56,7 @@ export default defineConfig(({ command }) => {
         ],
         build: {
             minify: false,
-            sourcemap: true,
+            sourcemap: false,
         },
     };
 });

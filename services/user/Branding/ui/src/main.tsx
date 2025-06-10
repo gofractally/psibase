@@ -1,7 +1,8 @@
-import { ThemeProvider } from "@components/theme-provider";
 import { QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
+
+import { ThemeProvider } from "@/components/theme-provider";
 
 import { App } from "./App";
 import { queryClient } from "./queryClient";

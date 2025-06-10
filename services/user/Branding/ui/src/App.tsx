@@ -1,10 +1,12 @@
-import { Nav } from "@components/nav";
-import { Button } from "@shadcn/button";
-import { Input } from "@shadcn/input";
-import { Label } from "@shadcn/label";
 import { useEffect, useRef, useState } from "react";
 
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import { Nav } from "@/components/nav";
 
 const supervisor = getSupervisor();
 
