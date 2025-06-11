@@ -1,6 +1,7 @@
 /// <reference types="node" />
 
-import { Plugin, UserConfig, Alias } from "vite";
+import type { Plugin, UserConfig, Alias } from "vite";
+
 import path from "path";
 import fs from "fs";
 
