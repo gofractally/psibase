@@ -1,7 +1,7 @@
 {
     "extends": "../../../tsconfig.node.json",
-    "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
     "compilerOptions": {
+        "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
         "baseUrl": "./"
     },
     "include": ["vite.config.mts"]
