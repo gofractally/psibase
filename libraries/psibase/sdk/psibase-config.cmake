@@ -107,7 +107,6 @@ function(add_libs suffix)
         catch2
         boost
         -lz
-        -lsecp256k1
         -lc++
         -lc++abi
         -lc
