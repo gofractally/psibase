@@ -3,7 +3,9 @@ pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::{Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder};
+    use crate::tables::tables::{
+        Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
+    };
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{Quantity, *};
 
@@ -78,19 +80,22 @@ pub mod service {
     #[action]
     fn set_auto_debit(token_id: Option<u32>, enable: bool) {
         match token_id {
-            Some(id) => TokenHolder::get_or_default(get_sender(), id).set_auto_debit(enable),
-            None => Holder::get_or_default(get_sender()).set_auto_debit(enable),
+            Some(id) => TokenHolder::get_or_new(get_sender(), id).set_auto_debit(enable),
+            None => Holder::get_or_new(get_sender()).set_auto_debit(enable),
         }
     }
 
     #[action]
     fn set_keep_zero_balance(token_id: Option<u32>, enable: bool) {
         match token_id {
-            Some(id) => {
-                TokenHolder::get_or_default(get_sender(), id).set_keep_zero_balances(enable)
-            }
-            None => Holder::get_or_default(get_sender()).set_keep_zero_balances(enable),
+            Some(id) => TokenHolder::get_or_new(get_sender(), id).set_keep_zero_balances(enable),
+            None => Holder::get_or_new(get_sender()).set_keep_zero_balances(enable),
         }
+    }
+
+    #[action]
+    fn open(token_id: u32) {
+        Balance::add(get_sender(), token_id);
     }
 
     #[action]
@@ -131,8 +136,7 @@ pub mod service {
         check(amount.value > 0, "must be greater than 0");
 
         let creditor = get_sender();
-        let mut shared_balance = SharedBalance::get_or_default(creditor, debitor, token_id);
-        shared_balance.credit(amount);
+        SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
 
         Wrapper::emit()
             .history()
@@ -142,10 +146,9 @@ pub mod service {
     #[action]
     fn uncredit(token_id: u32, debitor: AccountNumber, amount: Quantity, memo: String) {
         check(amount.value > 0, "must be greater than 0");
-
         let creditor = get_sender();
-        let mut shared_balance = SharedBalance::get_or_default(creditor, debitor, token_id);
-        shared_balance.uncredit(amount);
+
+        SharedBalance::get_or_new(creditor, debitor, token_id).uncredit(amount);
 
         Wrapper::emit()
             .history()
@@ -155,10 +158,9 @@ pub mod service {
     #[action]
     fn debit(token_id: u32, creditor: AccountNumber, amount: Quantity, memo: String) {
         check(amount.value > 0, "must be greater than 0");
-
         let debitor = get_sender();
-        let mut shared_balance = SharedBalance::get_or_default(creditor, debitor, token_id);
-        shared_balance.debit(amount);
+
+        SharedBalance::get_or_new(creditor, debitor, token_id).debit(amount);
 
         Wrapper::emit()
             .history()

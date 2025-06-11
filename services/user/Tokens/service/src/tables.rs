@@ -5,7 +5,7 @@ pub mod tables {
 
     use async_graphql::SimpleObject;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::{check, check_some, get_sender, AccountNumber, Quantity};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Precision, Quantity};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -58,7 +58,7 @@ pub mod tables {
                 nft_id: Nfts::call().mint(),
                 current_supply: 0.into(),
                 max_supply,
-                precision,
+                precision: Precision::from(precision).value,
                 settings_value: TokenSetting::new().value,
             };
 
@@ -108,14 +108,14 @@ pub mod tables {
             psibase::check(self.current_supply <= self.max_supply, "over max supply");
             self.save();
 
-            Balance::get_or_default(receiver, self.id).add_balance(amount);
+            Balance::get_or_new(receiver, self.id).add_balance(amount);
         }
 
         pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
             self.current_supply = self.current_supply - amount;
             self.save();
 
-            Balance::get_or_default(burnee, self.id).sub_balance(amount);
+            Balance::get_or_new(burnee, self.id).sub_balance(amount);
         }
     }
 
@@ -133,16 +133,28 @@ pub mod tables {
             (self.account, self.token_id)
         }
 
-        pub fn get_or_default(account: AccountNumber, token_id: u32) -> Balance {
-            let table = BalanceTable::new();
-            table
-                .get_index_pk()
-                .get(&(account, token_id))
-                .unwrap_or_else(|| Balance {
-                    account,
-                    token_id,
-                    balance: 0.into(),
-                })
+        fn new(account: AccountNumber, token_id: u32) -> Self {
+            Token::get_assert(token_id);
+            Self {
+                account,
+                token_id,
+                balance: 0.into(),
+            }
+        }
+
+        pub fn get(account: AccountNumber, token_id: u32) -> Option<Self> {
+            BalanceTable::new().get_index_pk().get(&(account, token_id))
+        }
+
+        pub fn add(account: AccountNumber, token_id: u32) -> Self {
+            check_none(Self::get(account, token_id), "balance already exists");
+            let mut instance = Self::new(account, token_id);
+            instance.save();
+            instance
+        }
+
+        pub fn get_or_new(account: AccountNumber, token_id: u32) -> Self {
+            Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
         fn save(&mut self) {
@@ -176,25 +188,25 @@ pub mod tables {
             (self.creditor, self.debitor, self.token_id)
         }
 
-        pub fn get_or_default(
-            creditor: AccountNumber,
-            debitor: AccountNumber,
-            token_id: u32,
-        ) -> Self {
+        fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
+            Self {
+                token_id,
+                creditor,
+                debitor,
+                balance: 0.into(),
+            }
+        }
+
+        pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
             check(creditor != debitor, "creditor cannot also be debitor");
             SharedBalanceTable::new()
                 .get_index_pk()
                 .get(&(creditor, debitor, token_id))
-                .unwrap_or(Self {
-                    balance: 0.into(),
-                    creditor,
-                    debitor,
-                    token_id,
-                })
+                .unwrap_or(Self::new(creditor, debitor, token_id))
         }
 
         pub fn credit(&mut self, quantity: Quantity) {
-            Balance::get_or_default(self.creditor, self.token_id).sub_balance(quantity);
+            Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
 
             let token = Token::get_assert(self.token_id);
@@ -205,7 +217,7 @@ pub mod tables {
 
             let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
                 .map(|holder| holder.is_auto_debit())
-                .unwrap_or(Holder::get_or_default(self.debitor).is_auto_debit());
+                .unwrap_or(Holder::get_or_new(self.debitor).is_auto_debit());
 
             if is_auto_debit {
                 self.debit(quantity);
@@ -214,7 +226,7 @@ pub mod tables {
 
         pub fn uncredit(&mut self, quantity: Quantity) {
             self.sub_balance(quantity);
-            Balance::get_or_default(self.creditor, self.token_id).add_balance(quantity);
+            Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
         }
 
         pub fn debit(&mut self, quantity: Quantity) {
@@ -225,7 +237,7 @@ pub mod tables {
                 "Autodebit".to_string(),
             );
             self.sub_balance(quantity);
-            Balance::get_or_default(self.debitor, self.token_id).add_balance(quantity);
+            Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
 
             let token = Token::get_assert(self.token_id);
             check(
@@ -245,7 +257,7 @@ pub mod tables {
             if self.balance == 0.into() {
                 let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
                     .map(|token_holder| token_holder.is_keep_zero_balances())
-                    .unwrap_or(Holder::get_or_default(self.creditor).is_keep_zero_balances());
+                    .unwrap_or(Holder::get_or_new(self.creditor).is_keep_zero_balances());
 
                 if keep_zero_balance {
                     self.save();
@@ -280,11 +292,18 @@ pub mod tables {
             self.account
         }
 
-        pub fn get_or_default(account: AccountNumber) -> Self {
+        fn new(account: AccountNumber) -> Self {
+            Self {
+                account: account,
+                flags: 0,
+            }
+        }
+
+        pub fn get_or_new(account: AccountNumber) -> Self {
             HolderTable::new()
                 .get_index_pk()
                 .get(&account)
-                .unwrap_or(Self { account, flags: 0 })
+                .unwrap_or(Self::new(account))
         }
 
         pub fn is_auto_debit(&self) -> bool {
@@ -333,18 +352,22 @@ pub mod tables {
             (self.account, self.token_id)
         }
 
+        fn new(account: AccountNumber, token_id: u32) -> Self {
+            Self {
+                account,
+                token_id,
+                flags: 0,
+            }
+        }
+
         pub fn get(account: AccountNumber, token_id: u32) -> Option<Self> {
             TokenHolderTable::new()
                 .get_index_pk()
                 .get(&(account, token_id))
         }
 
-        pub fn get_or_default(account: AccountNumber, token_id: u32) -> Self {
-            Self::get(account, token_id).unwrap_or(Self {
-                account,
-                flags: 0,
-                token_id,
-            })
+        pub fn get_or_new(account: AccountNumber, token_id: u32) -> Self {
+            Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
         pub fn is_auto_debit(&self) -> bool {
