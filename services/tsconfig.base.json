@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "incremental": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Base Options: */
+    "esModuleInterop": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* Paths */
+    "paths": {
+      "@/*": ["./src/*"],
+      "@psibase/common-lib": [
+        "../../../user/CommonApi/common/packages/common-lib/src"
+      ],
+      "@psibase/common-lib/*": [
+        "../../../user/CommonApi/common/packages/common-lib/src/*"
+      ]
+    }
+  }
+}
