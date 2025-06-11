@@ -1,34 +1,7 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "useDefineForClassFields": true,
-        "lib": ["ESNext", "DOM", "DOM.Iterable"],
-        "allowJs": false,
-        "baseUrl": "./",
-        "paths": {
-            "@/*": ["./src/*"],
-            "/common": ["../../../user/CommonApi/common"],
-            "@psibase/common-lib": [
-                "../../../user/CommonApi/common/packages/common-lib/src"
-            ],
-            "@psibase/common-lib/*": [
-                "../../../user/CommonApi/common/packages/common-lib/src/*"
-            ]
-        },
-        "skipLibCheck": true,
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "strict": true,
-        "forceConsistentCasingInFileNames": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "allowImportingTsExtensions": true,
-        "resolveJsonModule": true,
-        "isolatedModules": true,
-        "noEmit": true,
-        "jsx": "react-jsx",
-        "incremental": true,
-        "tsBuildInfoFile": ".tsbuildinfo"
-    },
-    "include": ["src"]
+    "files": [],
+    "references": [
+        { "path": "./tsconfig.app.json" },
+        { "path": "./tsconfig.node.json" }
+    ]
 }
