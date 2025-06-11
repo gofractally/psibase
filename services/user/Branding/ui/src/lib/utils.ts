@@ -14,14 +14,14 @@ export function formatDate(input: string | number): string {
     });
 }
 
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
     cb: T,
     wait: number,
-) {
-    let h: any;
-    const callable = (...args: any) => {
+): (...args: Parameters<T>) => void {
+    let h: NodeJS.Timeout;
+    const callable = (...args: Parameters<T>) => {
         clearTimeout(h);
         h = setTimeout(() => cb(...args), wait);
     };
-    return <T>(<any>callable);
+    return callable as T;
 }
