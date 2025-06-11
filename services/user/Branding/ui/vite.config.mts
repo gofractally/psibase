@@ -1,14 +1,12 @@
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import path from "path";
 import { defineConfig } from "vite";
 import topLevelAwait from "vite-plugin-top-level-await";
 import wasm from "vite-plugin-wasm";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 import {
     createPsibaseConfig,
     createSharedViteConfig,
+    getSharedUIPlugins,
     verifyViteCache,
 } from "../../../vite.shared";
 
@@ -20,7 +18,6 @@ verifyViteCache(serviceDir);
 export default defineConfig(({ command }) => {
     return {
         plugins: [
-            react(),
             createSharedViteConfig({
                 projectDir: serviceDir,
                 additionalManualChunks: {
@@ -50,8 +47,7 @@ export default defineConfig(({ command }) => {
             }),
             wasm(),
             topLevelAwait(),
-            tsconfigPaths(),
-            tailwindcss(),
+            ...getSharedUIPlugins(),
         ],
         build: {
             minify: false,

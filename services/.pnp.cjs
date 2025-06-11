@@ -118,6 +118,7 @@ const RAW_RUNTIME_STATE =
           ["@rollup/browser", "npm:4.40.2"],\
           ["@tailwindcss/forms", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.5.10"],\
           ["@tailwindcss/typography", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.5.16"],\
+          ["@tailwindcss/vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.1.8"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.36.1"],\
           ["@trivago/prettier-plugin-sort-imports", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.2.2"],\
           ["@types/babel__template", "npm:7.4.4"],\
@@ -2904,14 +2905,12 @@ const RAW_RUNTIME_STATE =
           ["@radix-ui/react-slot", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:1.2.3"],\
           ["@tailwindcss/forms", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:0.5.10"],\
           ["@tailwindcss/typography", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:0.5.16"],\
-          ["@tailwindcss/vite", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:4.1.8"],\
           ["@tanstack/react-query", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:5.76.1"],\
           ["@types/node", "npm:22.15.18"],\
           ["@types/react", "npm:19.1.7"],\
           ["@types/react-dom", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:19.1.6"],\
           ["@types/react-router-dom", "npm:5.3.3"],\
           ["@uidotdev/usehooks", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:2.4.1"],\
-          ["@vitejs/plugin-react", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.4.1"],\
           ["@yarnpkg/cli", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:4.9.2"],\
           ["@yarnpkg/core", "npm:4.4.2"],\
           ["@yarnpkg/plugin-essentials", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:4.4.1"],\
@@ -2933,7 +2932,6 @@ const RAW_RUNTIME_STATE =
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.19"],\
           ["vite-plugin-top-level-await", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.5.0"],\
           ["vite-plugin-wasm", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.4.1"],\
-          ["vite-tsconfig-paths", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.3.2"],\
           ["zod", "npm:3.25.51"]\
         ],\
         "linkType": "SOFT"\
@@ -7077,12 +7075,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:4.1.8", {\
-        "packageLocation": "./.yarn/__virtual__/@tailwindcss-vite-virtual-5694b4a304/2/.caches/yarn/@tailwindcss-vite-npm-4.1.8-954ab0fbf4-334384b196.zip/node_modules/@tailwindcss/vite/",\
+      ["virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.1.8", {\
+        "packageLocation": "./.yarn/__virtual__/@tailwindcss-vite-virtual-38ea41f75c/2/.caches/yarn/@tailwindcss-vite-npm-4.1.8-954ab0fbf4-334384b196.zip/node_modules/@tailwindcss/vite/",\
         "packageDependencies": [\
           ["@tailwindcss/node", "npm:4.1.8"],\
           ["@tailwindcss/oxide", "npm:4.1.8"],\
-          ["@tailwindcss/vite", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:4.1.8"],\
+          ["@tailwindcss/vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.1.8"],\
           ["@types/vite", null],\
           ["tailwindcss", "npm:4.1.8"],\
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.19"]\
@@ -19134,6 +19132,7 @@ const RAW_RUNTIME_STATE =
           ["@rollup/browser", "npm:4.40.2"],\
           ["@tailwindcss/forms", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.5.10"],\
           ["@tailwindcss/typography", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.5.16"],\
+          ["@tailwindcss/vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.1.8"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.36.1"],\
           ["@trivago/prettier-plugin-sort-imports", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.2.2"],\
           ["@types/babel__template", "npm:7.4.4"],\

@@ -1,6 +1,9 @@
 /// <reference types="node" />
 
 import type { Plugin, UserConfig, Alias } from "vite";
+import react from "@vitejs/plugin-react";
+import tsconfigPaths from "vite-tsconfig-paths";
+import tailwindcss from "@tailwindcss/vite";
 
 import path from "path";
 import fs from "fs";
@@ -232,3 +235,11 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
     }),
   };
 }
+
+export const getSharedUIPlugins = (uiFramework: "react" | "svelte" = "react") => {
+  return [
+    uiFramework === "react" ? react() : null,
+    tsconfigPaths(),
+    tailwindcss(),
+  ];
+};
