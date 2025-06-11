@@ -2036,6 +2036,7 @@ __metadata:
     "@yarnpkg/plugin-typescript": "npm:^4.1.2"
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
+    eslint: "npm:^9.15.0"
     framer-motion: "npm:^11.3.29"
     lucide-react: "npm:^0.513.0"
     react: "npm:^19.1.0"
