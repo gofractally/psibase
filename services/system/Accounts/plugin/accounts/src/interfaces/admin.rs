@@ -4,6 +4,7 @@ use crate::bindings::accounts::account_tokens::api::*;
 use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Admin};
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::client::{self as Client, OriginationData};
+use crate::bindings::transact::plugin::login as TransactLoginApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
@@ -78,5 +79,11 @@ impl Admin for AccountsPlugin {
     fn get_all_accounts() -> Vec<String> {
         assert_caller_admin("get_all_accounts");
         AppsTable::new(&get_accounts_app()).get_connected_accounts()
+    }
+
+    fn get_authed_query(user: String) -> String {
+        println!("plugin:get_authed_query().top");
+        assert_caller_admin("login_authed_query");
+        TransactLoginApi::login(&get_accounts_app().app.unwrap(), &user).unwrap()
     }
 }
