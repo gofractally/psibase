@@ -51,6 +51,7 @@ import {
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
+import { supervisor } from "./main";
 
 dayjs.extend(relativeTime);
 
@@ -163,17 +164,30 @@ export const AccountSelection = () => {
   const disableModalSubmit: boolean =
     accountStatus !== (isInvite ? "Available" : "Taken");
 
-  const onAccountSelection = (accountId: string) => {
+  const onAccountSelection = async (accountId: string) => {
     setSelectedAccountId(accountId);
     if (!isInvite) {
       if (!connectionToken) {
         throw new Error(`Expected connection token`);
       }
+      console.info("onAccountSelection() called with accountId:", accountId);
       login({
         accountName: accountId,
         app: connectionToken.app,
         origin: connectionToken.origin,
       });
+      console.info(
+        "'calling get_authed_query with selectedAccount.account",
+        accountId
+      );
+      const res = await supervisor.functionCall({
+        service: "accounts",
+        intf: "admin",
+        method: "getAuthedQuery",
+        params: [accountId],
+      });
+      console.info("onAccountSelection().get_authed_query() returned:");
+      console.info(res);
     }
   };
 
@@ -229,7 +243,7 @@ export const AccountSelection = () => {
     return <InviteExpiredCard token={token} />;
   }
 
-  const onAcceptOrLogin = () => {
+  const onAcceptOrLogin = async () => {
     if (isInvite) {
       if (!inviteToken) {
         throw new Error(`Expected invite token loaded`);
@@ -241,6 +255,7 @@ export const AccountSelection = () => {
         origin: inviteToken.appDomain,
       });
     } else {
+      // Login
       if (!connectionToken) {
         throw new Error(`Expected connection token for a login`);
       }
@@ -249,6 +264,14 @@ export const AccountSelection = () => {
         origin: connectionToken.origin,
         accountName: selectedAccount!.account,
       });
+      const res = await supervisor.functionCall({
+        service: "accounts",
+        intf: "admin",
+        method: "getAuthedQuery",
+        params: [selectedAccount!.account],
+      });
+      console.info("onAcceptOrLogin().get_authed_query() returned:");
+      console.info(res);
     }
   };
 
