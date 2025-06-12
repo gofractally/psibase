@@ -32,6 +32,9 @@ interface intf {
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
     burn: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
     mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+
+
+    map-symbol: func(symbol: string) -> result<_, error>;
 }
 
 interface queries {

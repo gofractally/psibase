@@ -7,6 +7,9 @@ pub mod service {
         Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
     };
     use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::symbol::Service::Wrapper as Symbol;
+    use psibase::services::tokens::Actions as Tokens;
+
     use psibase::{Quantity, *};
 
     #[action]
@@ -75,6 +78,12 @@ pub mod service {
         let mut token = Token::get_assert(token_id);
         token.check_owner_is_sender();
         token.disable_recallability();
+    }
+
+    #[action]
+    fn map_symbol(token_id: u32, symbol_id: AccountNumber) {
+        let x = Symbol::call().getSymbol(symbol_id);
+        check(x.ownerNft == get_sender(), "must be owner");
     }
 
     #[action]

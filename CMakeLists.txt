@@ -763,6 +763,18 @@ psibase_package(
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/postinstall.json
 )
 
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    NAME Symbol
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Symbol service"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
+    SERVICE symbol
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
+        INIT
+    DEPENDS wasm
+)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Packages.psi
@@ -787,7 +799,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Evaluations Events Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Tokens Transact Homepage Workshop 
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
@@ -834,7 +846,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Evaluations Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Tokens Transact Homepage Workshop)
+    Sites SetCode Symbol StagedTx Subgroups Supervisor Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -875,6 +887,7 @@ install(
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SupervisorTests.psi
+          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
