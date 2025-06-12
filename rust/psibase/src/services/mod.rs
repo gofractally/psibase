@@ -22,6 +22,7 @@ pub mod setcode;
 pub mod sites;
 pub mod staged_tx;
 pub mod subgroups;
+pub mod symbol;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;

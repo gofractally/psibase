@@ -108,7 +108,6 @@ namespace UserService
       method(mint, tokenId, amount, memo),
 
       method(burn, tokenId, amount),
-      method(setUserConf, flag, enable),
       method(setTokenConf, tokenId, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, maxAmount, memo),

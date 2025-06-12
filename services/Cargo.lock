@@ -2796,16 +2796,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokens"
-version = "0.17.0"
-dependencies = [
- "psibase",
- "serde",
- "serde_json",
- "wit-bindgen-rt 0.26.0",
-]
-
-[[package]]
 name = "tokio"
 version = "1.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

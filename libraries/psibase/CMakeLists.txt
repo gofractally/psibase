@@ -166,7 +166,7 @@ function(add suffix)
             ../../services/user/Packages/include
             ../../services/user/Sites/include
             ../../services/user/Symbol/include
-            ../../services/user/Tokens/include
+            # ../../services/user/Tokens/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
             ../../services/system/VerifySig/include

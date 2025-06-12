@@ -14,11 +14,16 @@ mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;
 mod method_number;
+
+pub mod asset;
 pub mod native;
 pub mod native_raw;
 mod native_tables;
 mod package;
 mod plugin_error;
+
+pub mod precision;
+pub mod quantity;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
@@ -39,6 +44,7 @@ mod web_services;
 pub use account_number::*;
 pub use action_template::*;
 pub use actions::*;
+pub use asset::*;
 pub use block::*;
 pub use boot::*;
 pub use crypto::*;
@@ -54,6 +60,8 @@ pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;
 pub use package::*;
+pub use precision::*;
+pub use quantity::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;

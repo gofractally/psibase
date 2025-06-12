@@ -15,9 +15,9 @@ pub type NID = u32;
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
 pub struct NftRecord {
-    id: NID,
-    issuer: AccountNumber,
-    owner: AccountNumber,
+    pub id: NID,
+    pub issuer: AccountNumber,
+    pub owner: AccountNumber,
 }
 
 #[derive(
@@ -75,10 +75,10 @@ mod service {
         unimplemented!()
     }
 
-    #[action]
-    fn setUserConf(flag: NamedBit, enable: bool) {
-        unimplemented!()
-    }
+    // #[action]
+    // fn setUserConf(flag: NamedBit, enable: bool) {
+    //     unimplemented!()
+    // }
 
     #[action]
     fn getNft(nftId: crate::services::nft::NID) -> super::NftRecord {
