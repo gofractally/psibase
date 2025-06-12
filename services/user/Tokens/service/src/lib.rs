@@ -1,16 +1,54 @@
+use psibase::{AccountNumber, Precision, Quantity};
+
+use psibase::{Fracpack, ToSchema};
+use serde::{Deserialize, Serialize};
+
 pub mod flags;
 pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
+    use std::str::FromStr;
+
     use crate::tables::tables::{
         Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
     };
+    use crate::{InflationRecord, TokenRecord};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
     use psibase::services::tokens::Actions as Tokens;
 
     use psibase::{Quantity, *};
+
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct InfSettingsRecord {
+        pub dailyLimitPct: u64,
+        pub dailyLimitQty: u64,
+        pub yearlyLimitPct: u64,
+    }
+
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct InfStatsRecord {
+        pub avgDaily: i64,
+        pub avgYearly: i64,
+    }
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct InflationRecord {
+        pub settings: InfSettingsRecord,
+        pub stats: InfStatsRecord,
+    }
+
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct TokenRecord {
+        pub id: u32,       // TID
+        pub ownerNft: u32, // NID
+        pub inflation: InflationRecord,
+        pub config: u8,
+        pub precision: Precision,
+        pub currentSupply: Quantity,
+        pub maxSupply: Quantity,
+        pub symbolId: AccountNumber, // SID
+    }
 
     #[action]
     fn init() {
@@ -74,6 +112,36 @@ pub mod service {
     }
 
     #[action]
+    fn gettoken(token_id: u32) -> TokenRecord {
+        let token = Token::get_assert(token_id);
+
+        let inflation = InflationRecord {
+            settings: crate::InfSettingsRecord {
+                dailyLimitPct: 0,
+                dailyLimitQty: 0,
+                yearlyLimitPct: 0,
+            },
+            stats: crate::InfStatsRecord {
+                avgDaily: 0,
+                avgYearly: 0,
+            },
+        };
+
+        let x = crate::TokenRecord {
+            config: token.settings_value,
+            currentSupply: token.current_supply,
+            id: token.id,
+            inflation,
+            maxSupply: token.max_supply,
+            ownerNft: token.nft_id,
+            precision: token.precision.into(),
+            symbolId: token.symbol.unwrap_or(AccountNumber::from(0)),
+        };
+
+        x
+    }
+
+    #[action]
     fn disable_recallability(token_id: u32) {
         let mut token = Token::get_assert(token_id);
         token.check_owner_is_sender();
@@ -81,9 +149,10 @@ pub mod service {
     }
 
     #[action]
-    fn map_symbol(token_id: u32, symbol_id: AccountNumber) {
-        let x = Symbol::call().getSymbol(symbol_id);
-        check(x.ownerNft == get_sender(), "must be owner");
+    fn mapsymbol(token_id: u32, symbol_id: AccountNumber) {
+        // let x = Symbol::call().getSymbol(symbol_id);
+        let mut token = Token::get_assert(token_id);
+        token.map_symbol(symbol_id);
     }
 
     #[action]

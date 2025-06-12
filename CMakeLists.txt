@@ -244,7 +244,7 @@ add_rs_component_workspace(services/:Plugins
     permissions
     sites
     test
-    # tokens
+    tokens
     transact
     workshop
     producers

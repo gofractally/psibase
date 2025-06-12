@@ -53,15 +53,12 @@ impl Intf for TokensPlugin {
     }
 
     fn map_symbol(symbol: String) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::map_symbol {
+        let packed_args = tokens::action_structs::mapsymbol {
             token_id: 2,
             symbol_id: AccountNumber::from_str(symbol.as_str()).unwrap(),
         }
         .packed();
-        add_action_to_transaction(
-            tokens::action_structs::map_symbol::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(tokens::action_structs::mapsymbol::ACTION_NAME, &packed_args)
     }
 
     fn mint(token_id: String, amount: String, memo: String) -> Result<(), Error> {

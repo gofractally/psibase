@@ -41,14 +41,14 @@ namespace UserService
 
    struct TokenRecord
    {
-      TID                id;
-      NID                ownerNft;
-      InflationRecord    inflation;
-      psibase::Bitset<8> config;
-      Precision          precision;
-      Quantity           currentSupply;
-      Quantity           maxSupply;
-      SID                symbolId;
+      TID             id;
+      NID             ownerNft;
+      InflationRecord inflation;
+      uint8_t         config;
+      Precision       precision;
+      Quantity        currentSupply;
+      Quantity        maxSupply;
+      SID             symbolId;
 
       using Configurations =
           psibase::Enum<psibase::EnumElement{"unrecallable"}, psibase::EnumElement{"untradeable"}>;

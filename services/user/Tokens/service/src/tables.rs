@@ -29,6 +29,7 @@ pub mod tables {
         pub current_supply: Quantity,
         pub max_supply: Quantity,
         pub settings_value: u8,
+        pub symbol: Option<AccountNumber>,
     }
 
     impl Token {
@@ -43,6 +44,12 @@ pub mod tables {
 
         pub fn check_owner_is_sender(&self) {
             check(get_sender() == self.nft_holder(), "must own token NFT");
+        }
+
+        pub fn map_symbol(&mut self, symbol: AccountNumber) {
+            check_none(self.symbol, "already has symbol");
+            self.symbol = Some(symbol);
+            self.save();
         }
 
         pub fn add(max_supply: Quantity, precision: u8) -> Self {
@@ -60,6 +67,7 @@ pub mod tables {
                 max_supply,
                 precision: Precision::from(precision).value,
                 settings_value: TokenSetting::new().value,
+                symbol: None,
             };
 
             new_instance.save();
@@ -67,7 +75,7 @@ pub mod tables {
             new_instance
         }
 
-        fn nft_holder(&self) -> AccountNumber {
+        pub fn nft_holder(&self) -> AccountNumber {
             Nfts::call().getNft(self.nft_id).owner
         }
 
