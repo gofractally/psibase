@@ -2021,7 +2021,6 @@ __metadata:
     "@radix-ui/react-dropdown-menu": "npm:^2.1.15"
     "@radix-ui/react-label": "npm:^2.1.7"
     "@radix-ui/react-slot": "npm:^1.2.3"
-    "@tailwindcss/forms": "npm:^0.5.7"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -2034,7 +2033,6 @@ __metadata:
     "@yarnpkg/plugin-git": "npm:^3.1.2"
     "@yarnpkg/plugin-typescript": "npm:^4.1.2"
     class-variance-authority: "npm:^0.7.1"
-    clsx: "npm:^2.1.1"
     eslint: "npm:^9.15.0"
     framer-motion: "npm:^11.3.29"
     lucide-react: "npm:^0.513.0"
@@ -2043,9 +2041,7 @@ __metadata:
     react-router-dom: "npm:^6.23.1"
     rollup: "npm:^4.40.0"
     sonner: "npm:^2.0.5"
-    tailwind-merge: "npm:^3.3.0"
-    tailwindcss: "npm:^4.1.8"
-    tw-animate-css: "npm:^1.3.4"
+    tailwind-merge: "npm:^3.3.1"
     typescript: "npm:^5.7.3"
     vite: "npm:^5.4.1"
     vite-plugin-top-level-await: "npm:^1.4.1"
@@ -4717,7 +4713,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tailwindcss/forms@npm:^0.5.2, @tailwindcss/forms@npm:^0.5.7":
+"@tailwindcss/forms@npm:^0.5.10, @tailwindcss/forms@npm:^0.5.2, @tailwindcss/forms@npm:^0.5.7":
   version: 0.5.10
   resolution: "@tailwindcss/forms@npm:0.5.10"
   dependencies:
@@ -13952,7 +13948,7 @@ __metadata:
     "@radix-ui/react-tabs": "npm:^1.0.4"
     "@radix-ui/react-tooltip": "npm:^1.0.7"
     "@rollup/browser": "npm:^4.9.0"
-    "@tailwindcss/forms": "npm:^0.5.7"
+    "@tailwindcss/forms": "npm:^0.5.10"
     "@tailwindcss/typography": "npm:^0.5.16"
     "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^4.29.19"
@@ -13993,9 +13989,10 @@ __metadata:
     react-router-dom: "npm:^6.23.1"
     rollup: "npm:^4.40.0"
     svgo: "npm:^3.3.2"
-    tailwind-merge: "npm:^2.3.0"
-    tailwindcss: "npm:^3.4.10"
+    tailwind-merge: "npm:^3.3.1"
+    tailwindcss: "npm:^4.1.8"
     tailwindcss-animate: "npm:^1.0.7"
+    tw-animate-css: "npm:^1.3.4"
     typescript: "npm:^5.7.3"
     typescript-eslint: "npm:^8.33.1"
     vite: "npm:^5.4.1"
@@ -14899,10 +14896,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tailwind-merge@npm:^3.3.0":
-  version: 3.3.0
-  resolution: "tailwind-merge@npm:3.3.0"
-  checksum: 10c0/a50cd141100486f98541dfab3705712af5860556689b7496dc6b0284374f02d12d5471f0f40035f6bb8b1c749c422060a1f3e5f8900057d8a7786b111c8472e6
+"tailwind-merge@npm:^3.3.1":
+  version: 3.3.1
+  resolution: "tailwind-merge@npm:3.3.1"
+  checksum: 10c0/b84c6a78d4669fa12bf5ab8f0cdc4400a3ce0a7c006511af4af4be70bb664a27466dbe13ee9e3b31f50ddf6c51d380e8192ce0ec9effce23ca729d71a9f63818
   languageName: node
   linkType: hard
 

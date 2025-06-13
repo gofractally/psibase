@@ -33,7 +33,6 @@ export default defineConfig(({ command }) => {
                     // UI utilities
                     "ui-utils": [
                         "class-variance-authority",
-                        "clsx",
                         "tailwind-merge",
                         "lucide-react",
                     ],

@@ -9,6 +9,7 @@ module.exports = {
     "^@/components/ui/(.*)$",
     "^@/components(/.*)?$",
     "^(@/globals|@/hooks|@/lib|@/types|@/utils)(/.*)?$",
+    "^@shared(/.*)?$",
     "^[./]",
   ],
   importOrderSeparation: true,
