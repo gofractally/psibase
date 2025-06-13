@@ -13,7 +13,7 @@ export const useLoginDirect = () =>
     mutationFn: async (params) => {
       const { accountName, app, origin } = LoginParams.parse(params);
 
-      void (await supervisor.functionCall({
+      const queryToken = await supervisor.functionCall({
         method: "loginDirect",
         params: [
           {
@@ -24,12 +24,7 @@ export const useLoginDirect = () =>
         ],
         service: "accounts",
         intf: "admin",
-      }));
-
-      if (window.location && window.location.href) {
-        window.location.href = origin;
-      } else {
-        throw new Error(`Expected window location to redirect to`);
-      }
+      });
+      console.log("returned queryToken:", queryToken);
     },
   });

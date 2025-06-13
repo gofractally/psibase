@@ -506,6 +506,8 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CommonApi-schema.json
         SERVER common-api
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/auth-cookie.html common/auth-cookie.html
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/auth-cookie.js common/auth-cookie.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
         DATA GLOB ${THIRD_FILES}                                              common

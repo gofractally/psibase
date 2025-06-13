@@ -6,7 +6,7 @@ interface admin {
 
     /// Logs the specified user into the specified app without any user interaction.
     /// This function is only callable by the accounts app itself.
-    login-direct: func(app: app-details, user: string);
+    login-direct: func(app: app-details, user: string) -> option<string>;
 
     /// Gets app details
     decode-connection-token: func(token: string) -> option<app-details>;
@@ -20,7 +20,7 @@ interface admin {
     /// Gets a list of all accounts that are known by the accounts app on this device.
     get-all-accounts: func() -> list<string>;
 
-    get-authed-query: func(user: string) -> string;
+    logout: func();
 }
 
 world impl {

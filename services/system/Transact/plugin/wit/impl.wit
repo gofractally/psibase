@@ -34,7 +34,7 @@ world impl {
 
     export admin;
     export intf;
-    export login;
+    export auth;
 
     import hook-handlers;
     export hooks;
