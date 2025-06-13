@@ -105,6 +105,15 @@ export const AccountSelection = () => {
         origin: connectionToken!.origin,
       }));
     }
+    const res = await supervisor.functionCall({
+      service: "accounts",
+      intf: "admin",
+      method: "getAuthedQueryToken",
+      params: [values.username],
+    });
+    console.info("onSubmit().get_authed_query_token() returned:");
+    console.info(res);
+    window.location.href = connectionToken!.origin;
     setIsModalOpen(false);
   };
 
@@ -165,6 +174,8 @@ export const AccountSelection = () => {
   const disableModalSubmit: boolean =
     accountStatus !== (isInvite ? "Available" : "Taken");
 
+  // AccountsList only shows accounts already connected to apps,
+  // so all that's needed here is a "direct" login.
   const onAccountSelection = async (accountId: string) => {
     setSelectedAccountId(accountId);
     if (!isInvite) {
@@ -176,14 +187,6 @@ export const AccountSelection = () => {
         app: connectionToken.app,
         origin: connectionToken.origin,
       });
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "admin",
-        method: "getAuthedQuery",
-        params: [accountId],
-      });
-      console.info("onAccountSelection().get_authed_query() returned:");
-      console.info(res);
 
       window.location.href = connectionToken.origin;
     }
@@ -262,14 +265,6 @@ export const AccountSelection = () => {
         origin: connectionToken.origin,
         accountName: selectedAccount!.account,
       });
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "admin",
-        method: "getAuthedQuery",
-        params: [selectedAccount!.account],
-      });
-      console.info("onAcceptOrLogin().get_authed_query() returned:");
-      console.info(res);
     }
   };
 
@@ -288,6 +283,7 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                   : "Import a pre-existing account prior to accepting / denying an invite."}
               </DialogDescription>
+              {/* <ImportAccountOrAcceptInviteForm /> */}
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
