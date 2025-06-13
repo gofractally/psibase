@@ -10,10 +10,10 @@
         "prefix": ""
     },
     "aliases": {
-        "components": "shared-ui/components",
-        "hooks": "shared-ui/shadcn/hooks",
-        "lib": "shared-ui/lib",
+        "components": "@shared/components",
+        "hooks": "@shared/shadcn/hooks",
+        "lib": "@shared/lib",
         "ui": "shared-ui/shadcn/ui",
-        "utils": "shared-ui/lib/utils"
+        "utils": "@shared/lib/utils"
     }
 }

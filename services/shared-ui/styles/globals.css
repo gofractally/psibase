@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @plugin '@tailwindcss/forms';
 
+/* This ensures @tailwindcss/vite scans the shared-ui directory for tailwind classes */
+@source "..";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

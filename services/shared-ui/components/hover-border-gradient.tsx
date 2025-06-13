@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import React, { useEffect, useState } from "react";
 
 import { cn } from "@shared/lib/utils";
@@ -52,6 +52,7 @@ export function HoverBorderGradient({
             return () => clearInterval(interval);
         }
     }, [clockwise, duration, hovered]);
+
     return (
         <Tag
             onMouseEnter={() => {
@@ -59,7 +60,7 @@ export function HoverBorderGradient({
             }}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-                "relative flex h-min w-fit  flex-col flex-nowrap content-center items-center justify-center gap-10 overflow-visible rounded-full border bg-black/20 box-decoration-clone p-px transition duration-500 hover:bg-black/10 dark:bg-white/20",
+                "relative flex h-min w-fit  flex-col flex-nowrap content-center items-center justify-center gap-10 overflow-visible rounded-full border bg-black/20 decoration-clone p-px transition duration-500 hover:bg-black/10 dark:bg-white/20",
                 containerClassName,
             )}
             {...props}

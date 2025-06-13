@@ -1,7 +1,10 @@
 {
-    // This file is used by service-level shared assets and the shadcn CLI
+    // This file is used by shared components and assets at the /services directory level and by the shadcn CLI
     "extends": "./tsconfig.app.json",
     "compilerOptions": {
-        "baseUrl": "."
+        "baseUrl": ".",
+        "paths": {
+            "@shared/*": ["shared-ui/*"]
+        }
     }
 }

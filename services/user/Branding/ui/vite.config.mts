@@ -21,20 +21,11 @@ export default defineConfig(({ command }) => {
             createSharedViteConfig({
                 projectDir: serviceDir,
                 additionalManualChunks: {
-                    // Radix UI components
-                    "radix-ui": [
-                        "@radix-ui/react-avatar",
-                        "@radix-ui/react-dropdown-menu",
-                        "@radix-ui/react-label",
-                        "@radix-ui/react-slot",
-                    ],
-                    // Animation libraries
-                    animation: ["framer-motion"],
-                    // UI utilities
                     "ui-utils": [
-                        "class-variance-authority",
-                        "tailwind-merge",
                         "lucide-react",
+                        "sonner",
+                        "@dicebear/collection",
+                        "@dicebear/core",
                     ],
                 },
             }),
