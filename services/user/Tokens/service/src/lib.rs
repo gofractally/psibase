@@ -3,16 +3,12 @@ pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use std::str::FromStr;
 
     use crate::tables::tables::{
         Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
     };
-    use psibase::services::accounts::Account;
-    use psibase::services::nft::{self, Wrapper as Nfts};
-    use psibase::services::symbol;
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
-    use psibase::services::tokens::Actions as Tokens;
     use psibase::{AccountNumber, Precision, Quantity};
 
     use psibase::{Fracpack, ToSchema};
@@ -68,6 +64,15 @@ pub mod service {
         );
 
         check(native_token.id == 1, "expected native token to be ID of 1");
+
+        // Give the Owner token NFT to Symbol
+        Nfts::call_from(Wrapper::SERVICE).credit(
+            native_token.nft_id,
+            psibase::services::symbol::SERVICE,
+            "Passing system token ownership".to_string(),
+        );
+
+        Nfts::call_from(Wrapper::SERVICE).setUserConf(psibase::NamedBit::from("manualDebit"), true)
     }
 
     #[pre_action(exclude(init))]

@@ -58,7 +58,7 @@ void Symbol::init()
 
    // Configure manualDebit for self on Token and NFT
    // to<Tokens>().setUserConf("manualDebit"_m, true);
-   // to<Nft>().setUserConf("manualDebit"_m, true);
+   to<Nft>().setUserConf("manualDebit"_m, true);
 
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)

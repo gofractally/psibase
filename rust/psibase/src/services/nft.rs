@@ -75,10 +75,10 @@ mod service {
         unimplemented!()
     }
 
-    // #[action]
-    // fn setUserConf(flag: NamedBit, enable: bool) {
-    //     unimplemented!()
-    // }
+    #[action]
+    fn setUserConf(flag: NamedBit, enable: bool) {
+        unimplemented!()
+    }
 
     #[action]
     fn getNft(nftId: crate::services::nft::NID) -> super::NftRecord {
