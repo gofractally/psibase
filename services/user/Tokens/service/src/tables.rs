@@ -43,7 +43,13 @@ pub mod tables {
         }
 
         pub fn check_owner_is_sender(&self) {
-            check(get_sender() == self.nft_holder(), "must own token NFT");
+            let sender = get_sender();
+            let holder = self.nft_holder();
+
+            check(
+                sender == holder,
+                &format!("{} does not hold the NFT, {} does", sender, holder),
+            );
         }
 
         pub fn map_symbol(&mut self, symbol: AccountNumber) {
@@ -71,6 +77,16 @@ pub mod tables {
             };
 
             new_instance.save();
+
+            let creator = get_sender();
+
+            if creator != AccountNumber::from("tokens") {
+                Nfts::call().credit(
+                    new_instance.nft_id,
+                    creator,
+                    format!("NFT for token ID {}", new_instance.id),
+                );
+            }
 
             new_instance
         }

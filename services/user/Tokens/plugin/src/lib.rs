@@ -52,10 +52,10 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
     }
 
-    fn map_symbol(symbol: String) -> Result<(), Error> {
+    fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
         let packed_args = tokens::action_structs::mapsymbol {
-            token_id: 2,
-            symbol_id: AccountNumber::from_str(symbol.as_str()).unwrap(),
+            token_id,
+            symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
         }
         .packed();
         add_action_to_transaction(tokens::action_structs::mapsymbol::ACTION_NAME, &packed_args)

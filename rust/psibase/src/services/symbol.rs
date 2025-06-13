@@ -23,7 +23,7 @@ pub struct SymbolRecord {
     #[allow(non_snake_case)]
     pub symbolId: AccountNumber,
     #[allow(non_snake_case)]
-    pub ownerNft: AccountNumber,
+    pub ownerNft: u32,
     #[allow(non_snake_case)]
     pub saleDetails: SaleDetails,
 }

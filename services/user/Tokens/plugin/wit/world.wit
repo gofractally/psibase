@@ -34,7 +34,7 @@ interface intf {
     mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
 
 
-    map-symbol: func(symbol: string) -> result<_, error>;
+    map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
 }
 
 interface queries {

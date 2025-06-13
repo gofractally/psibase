@@ -1,8 +1,3 @@
-use psibase::{AccountNumber, Precision, Quantity};
-
-use psibase::{Fracpack, ToSchema};
-use serde::{Deserialize, Serialize};
-
 pub mod flags;
 pub mod tables;
 
@@ -13,12 +8,17 @@ pub mod service {
     use crate::tables::tables::{
         Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
     };
-    use crate::{InflationRecord, TokenRecord};
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::accounts::Account;
+    use psibase::services::nft::{self, Wrapper as Nfts};
+    use psibase::services::symbol;
     use psibase::services::symbol::Service::Wrapper as Symbol;
     use psibase::services::tokens::Actions as Tokens;
+    use psibase::{AccountNumber, Precision, Quantity};
 
-    use psibase::{Quantity, *};
+    use psibase::{Fracpack, ToSchema};
+    use serde::{Deserialize, Serialize};
+
+    use psibase::*;
 
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct InfSettingsRecord {
@@ -84,15 +84,9 @@ pub mod service {
         check(max_supply.value > 0, "max supply must be greator than 0");
         let new_token = Token::add(max_supply, precision);
 
-        let creator = get_sender();
-
-        if creator != get_service() {
-            Nfts::call().credit(
-                new_token.nft_id,
-                creator,
-                format!("NFT for token ID {}", new_token.id),
-            );
-        }
+        Wrapper::emit()
+            .history()
+            .created(new_token.id, get_sender(), precision, max_supply);
 
         new_token.id
     }
@@ -116,18 +110,18 @@ pub mod service {
         let token = Token::get_assert(token_id);
 
         let inflation = InflationRecord {
-            settings: crate::InfSettingsRecord {
+            settings: InfSettingsRecord {
                 dailyLimitPct: 0,
                 dailyLimitQty: 0,
                 yearlyLimitPct: 0,
             },
-            stats: crate::InfStatsRecord {
+            stats: InfStatsRecord {
                 avgDaily: 0,
                 avgYearly: 0,
             },
         };
 
-        let x = crate::TokenRecord {
+        TokenRecord {
             config: token.settings_value,
             currentSupply: token.current_supply,
             id: token.id,
@@ -136,9 +130,7 @@ pub mod service {
             ownerNft: token.nft_id,
             precision: token.precision.into(),
             symbolId: token.symbol.unwrap_or(AccountNumber::from(0)),
-        };
-
-        x
+        }
     }
 
     #[action]
@@ -149,10 +141,28 @@ pub mod service {
     }
 
     #[action]
-    fn mapsymbol(token_id: u32, symbol_id: AccountNumber) {
-        // let x = Symbol::call().getSymbol(symbol_id);
+    fn mapsymbol(token_id: u32, symbol: AccountNumber) {
         let mut token = Token::get_assert(token_id);
-        token.map_symbol(symbol_id);
+        token.check_owner_is_sender();
+        token.map_symbol(symbol);
+
+        let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
+            .getSymbol(symbol)
+            .ownerNft;
+
+        Nfts::call_from(Wrapper::SERVICE).debit(
+            symbol_owner_nft,
+            format!(
+                "Mapping symbol {} to token {}",
+                symbol.to_string(),
+                token_id
+            ),
+        );
+        Nfts::call_from(Wrapper::SERVICE).burn(symbol_owner_nft);
+
+        Wrapper::emit()
+            .history()
+            .symbol_mapped(token_id, get_sender(), symbol);
     }
 
     #[action]
@@ -256,7 +266,13 @@ pub mod service {
     }
 
     #[event(history)]
+    pub fn created(token_id: u32, sender: AccountNumber, precision: u8, max_supply: Quantity) {}
+
+    #[event(history)]
     pub fn minted(token_id: u32, amount: Quantity, memo: String) {}
+
+    #[event(history)]
+    pub fn symbol_mapped(token_id: u32, sender: AccountNumber, symbol: AccountNumber) {}
 
     #[event(history)]
     pub fn credited(token_id: u32, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
