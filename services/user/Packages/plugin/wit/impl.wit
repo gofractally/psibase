@@ -31,6 +31,12 @@ interface intf {
         old: option<meta>,
         new: option<package-info>,
     }
+    record package-source {
+        url: option<string>,
+        account: option<string>,
+    }
+
+    get-sources: func() -> result<list<package-source>, error>;
     resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op>, error>;
 
     // Like package-op, but has the contents of the new package.

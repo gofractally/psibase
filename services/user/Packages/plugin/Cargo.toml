@@ -32,4 +32,4 @@ world = "impl"
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]
-#derives = ["psibase::Pack", "psibase::Unpack"]
+derives = ["serde::Deserialize", "serde::Serialize"]

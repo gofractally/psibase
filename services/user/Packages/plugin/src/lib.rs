@@ -130,6 +130,11 @@ struct QueryRoot<T> {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SourcesQuery {
+    sources: Vec<intf::PackageSource>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledEdge {
     node: InstalledPackageInfo,
 }
@@ -335,6 +340,16 @@ fn make_transaction(actions: Vec<Action>) -> SignedTransaction {
 }
 
 impl intf::Guest for PackagesPlugin {
+    fn get_sources() -> Result<Vec<intf::PackageSource>, CommonTypes::Error> {
+        let owner = account!("root");
+        let json = Server::post_graphql_get_json(&format!(
+            "query {{ sources(account: {}) {{ url account }} }}",
+            serde_json::to_string(&owner).unwrap(),
+        ))?;
+        let result: QueryRoot<SourcesQuery> =
+            serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
+        Ok(result.data.sources)
+    }
     fn resolve(
         index: Vec<intf::PackageInfo>,
         packages: Vec<String>,
