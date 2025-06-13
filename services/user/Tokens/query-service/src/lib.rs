@@ -27,6 +27,7 @@ mod service {
         pub current_supply: Asset,
         pub max_supply: Asset,
         pub owner: AccountNumber,
+        pub symbol: Option<AccountNumber>,
     }
 
     #[derive(Deserialize, SimpleObject)]
@@ -45,14 +46,14 @@ mod service {
                 precision: token.precision,
                 current_supply: token.current_supply.to_asset(token.precision.into()),
                 max_supply: token.max_supply.to_asset(token.precision.into()),
+                symbol: token.symbol,
             }
         }
     }
 
     #[Object]
     impl Query {
-        async fn token(&self, token_id: String) -> Option<TokenDetail> {
-            let token_id: u32 = token_id.parse().unwrap();
+        async fn token(&self, token_id: u32) -> Option<TokenDetail> {
             let token = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&token_id)?;

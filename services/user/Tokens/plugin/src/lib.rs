@@ -36,11 +36,11 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
     }
 
-    fn burn(token_id: String, amount: String, memo: String, account: String) -> Result<(), Error> {
+    fn burn(token_id: u32, amount: String, memo: String, from: String) -> Result<(), Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
-        let from = AccountNumber::from_str(account.as_str()).unwrap();
+        let from = AccountNumber::from_str(from.as_str()).unwrap();
 
-        let amount = Quantity::from_str(&amount, 4.into()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
 
         let packed_args = tokens::action_structs::recall {
             amount,
@@ -61,7 +61,7 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::mapsymbol::ACTION_NAME, &packed_args)
     }
 
-    fn mint(token_id: String, amount: String, memo: String) -> Result<(), Error> {
+    fn mint(token_id: u32, amount: String, memo: String) -> Result<(), Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
         let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
@@ -77,12 +77,7 @@ impl Intf for TokensPlugin {
 }
 
 impl Transfer for TokensPlugin {
-    fn credit(
-        token_id: String,
-        debitor: String,
-        amount: String,
-        memo: String,
-    ) -> Result<(), Error> {
+    fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
         let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
@@ -100,12 +95,7 @@ impl Transfer for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
     }
 
-    fn debit(
-        token_id: String,
-        creditor: String,
-        amount: String,
-        memo: String,
-    ) -> Result<(), Error> {
+    fn debit(token_id: u32, creditor: String, amount: String, memo: String) -> Result<(), Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
         let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
@@ -123,18 +113,27 @@ impl Transfer for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
     }
 
-    fn uncredit(
-        token_id: String,
-        debitor: String,
-        amount: String,
-        memo: String,
-    ) -> Result<(), Error> {
-        Ok(())
+    fn uncredit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
+
+        let debitor = AccountNumber::from_str(debitor.as_str()).unwrap();
+
+        let packed_args = tokens::action_structs::uncredit {
+            amount,
+            memo,
+            debitor,
+            token_id: token.id,
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::uncredit::ACTION_NAME, &packed_args)
     }
 }
 
 impl Queries for TokensPlugin {
-    fn token_owner(token_id: String) -> Result<Types::TokenDetail, Error> {
+    fn token_owner(token_id: u32) -> Result<Types::TokenDetail, Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Ok(Types::TokenDetail {

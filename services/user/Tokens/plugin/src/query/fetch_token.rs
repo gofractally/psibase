@@ -25,9 +25,7 @@ pub struct Token {
     pub owner: AccountNumber,
 }
 
-pub fn fetch_token(token_number: String) -> Result<Token, ErrorType> {
-    let token_number: u32 = token_number.parse().unwrap();
-
+pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
     let query = format!(
         r#"query {{
         	token(tokenId: "{token_id}") {{

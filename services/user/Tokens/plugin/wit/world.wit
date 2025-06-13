@@ -4,12 +4,11 @@ interface types {
 
     type quantity = string;
     type precision = u8;
-    type token-id = string;
-    type token-number = u32;
+    type token-id = u32;
     type account-number = string;
 
     record token-detail {
-        id: token-number,
+        id: token-id,
         owner: string,
         precision: u8,
         symbol-id: string,
@@ -21,7 +20,7 @@ interface types {
         balance: string,
         creditor: string,
         debitor: string,
-        token-number: token-number,
+        token-number: token-id,
     }
 }
 
@@ -34,7 +33,7 @@ interface intf {
     mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
 
 
-    map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
+    map-symbol: func(token-id: u32, symbol: account-number) -> result<_, error>;
 }
 
 interface queries {
