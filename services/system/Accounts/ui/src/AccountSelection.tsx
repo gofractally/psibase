@@ -144,14 +144,15 @@ export const AccountSelection = () => {
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
-  // const [accountsToRender, setAccountsToRender]: [
-  //   AccountType[],
-  //   (accounts: AccountType[]) => void,
-  // ] = useState<AccountType[]>([]);
 
-  // useEffect(() => {
-  //   setAccountsToRender(accounts || []);
-  // }, [accounts]);
+  useEffect(() => {
+    async function preloadAuthAny() {
+      await supervisor.preLoadPlugins([
+        { service: "auth-any", plugin: "plugin" },
+      ]);
+    }
+    preloadAuthAny();
+  }, []);
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -170,16 +171,11 @@ export const AccountSelection = () => {
       if (!connectionToken) {
         throw new Error(`Expected connection token`);
       }
-      console.info("onAccountSelection() called with accountId:", accountId);
       login({
         accountName: accountId,
         app: connectionToken.app,
         origin: connectionToken.origin,
       });
-      console.info(
-        "'calling get_authed_query with selectedAccount.account",
-        accountId
-      );
       const res = await supervisor.functionCall({
         service: "accounts",
         intf: "admin",
@@ -188,6 +184,8 @@ export const AccountSelection = () => {
       });
       console.info("onAccountSelection().get_authed_query() returned:");
       console.info(res);
+
+      window.location.href = connectionToken.origin;
     }
   };
 
