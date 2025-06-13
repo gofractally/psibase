@@ -43,7 +43,7 @@ interface intf {
     // - Upload package data. These transactions should be executed
     //   by passing them to push-data. The order of execution does not
     //   matter.
-    // - Install packages. These must be executed in order with push-install
+    // - Install packages. These must be staged with propose-install
     //   after all the data transactions are completed. This will usually
     //   only have one transaction, but it's possible to have more when
     //   installing many packages at once.
@@ -53,7 +53,7 @@ interface intf {
     build-transactions: func(packages: list<package-install-op>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
 
     push-data: func(tx: list<u8>);
-    stage-install: func(tx: list<u8>) -> result<_, error>;
+    propose-install: func(tx: list<u8>) -> result<_, error>;
 }
 
 world impl {

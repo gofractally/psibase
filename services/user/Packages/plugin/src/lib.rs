@@ -456,7 +456,7 @@ impl intf::Guest for PackagesPlugin {
             }
         }
     }
-    fn stage_install(tx: Vec<u8>) -> Result<(), CommonTypes::Error> {
+    fn propose_install(tx: Vec<u8>) -> Result<(), CommonTypes::Error> {
         assert!(
             Client::get_sender_app().app.expect("sender app not set")
                 == Client::my_service_account()
