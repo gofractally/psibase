@@ -1,0 +1,35 @@
+[package]
+name = "packages"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.29.0", features = ["bitflags"] }
+anyhow = "1.0"
+getrandom = "0.3"
+psibase = { path = "../../../../rust/psibase" }
+regex = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = "0.4.38"
+sha2 = "0.10.6"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "packages:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
+"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+
+[package.metadata.component.bindings]
+#derives = ["psibase::Pack", "psibase::Unpack"]

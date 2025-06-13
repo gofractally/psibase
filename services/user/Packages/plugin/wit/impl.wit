@@ -1,0 +1,67 @@
+package packages:plugin;
+
+interface intf {
+    use host:common/types.{error};
+    record package-ref {
+        name: string,
+        version: string,
+    }
+    record package-info {
+        name: string,
+        version: string,
+        description: string,
+        depends: list<package-ref>,
+        accounts: list<string>,
+        sha256: string,
+        file: string,
+    }
+    record meta {
+        name: string,
+        version: string,
+        description: string,
+        depends: list<package-ref>,
+        accounts: list<string>,
+    }
+    enum package-preference {
+        best,
+        compatible,
+        current,
+    }
+    record package-op {
+        old: option<meta>,
+        new: option<package-info>,
+    }
+    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op>, error>;
+
+    // Like package-op, but has the contents of the new package.
+    record package-install-op {
+        old: option<meta>,
+        new: option<list<u8>>,
+    }
+
+    // Returns two lists of transactions
+    // - Upload package data. These transactions should be executed
+    //   by passing them to push-data. The order of execution does not
+    //   matter.
+    // - Install packages. These must be executed in order with push-install
+    //   after all the data transactions are completed. This will usually
+    //   only have one transaction, but it's possible to have more when
+    //   installing many packages at once.
+    //
+    // The format of the result is unspecified. The transactions returned
+    // should only be passed to push-data and stage-install.
+    build-transactions: func(packages: list<package-install-op>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
+
+    push-data: func(tx: list<u8>);
+    stage-install: func(tx: list<u8>) -> result<_, error>;
+}
+
+world impl {
+    include host:common/imports;
+    include accounts:plugin/imports;
+    include setcode:plugin/imports;
+    include sites:plugin/imports;
+    include staged-tx:plugin/imports;
+
+    export intf;
+}

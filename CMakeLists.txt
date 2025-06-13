@@ -241,6 +241,7 @@ add_rs_component_workspace(services/:Plugins
     setcode
     clientdata
     invite
+    packages
     permissions
     sites
     test
