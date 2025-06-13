@@ -2904,7 +2904,6 @@ const RAW_RUNTIME_STATE =
           ["@radix-ui/react-label", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:2.1.7"],\
           ["@radix-ui/react-slot", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:1.2.3"],\
           ["@tailwindcss/forms", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:0.5.10"],\
-          ["@tailwindcss/typography", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:0.5.16"],\
           ["@tanstack/react-query", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:5.76.1"],\
           ["@types/node", "npm:22.15.18"],\
           ["@types/react", "npm:19.1.7"],\
@@ -7043,23 +7042,6 @@ const RAW_RUNTIME_STATE =
           ["lodash.merge", "npm:4.6.2"],\
           ["postcss-selector-parser", "npm:6.0.10"],\
           ["tailwindcss", "npm:3.4.17"]\
-        ],\
-        "packagePeers": [\
-          "@types/tailwindcss",\
-          "tailwindcss"\
-        ],\
-        "linkType": "HARD"\
-      }],\
-      ["virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:0.5.16", {\
-        "packageLocation": "./.yarn/__virtual__/@tailwindcss-typography-virtual-9cbf85b590/2/.caches/yarn/@tailwindcss-typography-npm-0.5.16-675125d30f-35a7387876.zip/node_modules/@tailwindcss/typography/",\
-        "packageDependencies": [\
-          ["@tailwindcss/typography", "virtual:f6cc4be42e2dba214438b207d9297364635a0ae0c61a5ee88b6754e9b2c0a255680996f4cd252f30ca18d9370adfa73a7adfeab547b26ae0ad38463d14d5dbb6#npm:0.5.16"],\
-          ["@types/tailwindcss", null],\
-          ["lodash.castarray", "npm:4.4.0"],\
-          ["lodash.isplainobject", "npm:4.0.6"],\
-          ["lodash.merge", "npm:4.6.2"],\
-          ["postcss-selector-parser", "npm:6.0.10"],\
-          ["tailwindcss", "npm:4.1.8"]\
         ],\
         "packagePeers": [\
           "@types/tailwindcss",\

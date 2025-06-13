@@ -238,7 +238,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
 
 export const getSharedUIPlugins = (uiFramework: "react" | "svelte" = "react") => {
   return [
-    uiFramework === "react" ? react() : null,
+    uiFramework === "react" ? react() : undefined,
     tsconfigPaths(),
     tailwindcss(),
   ];
