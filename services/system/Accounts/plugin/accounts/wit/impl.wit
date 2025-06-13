@@ -20,9 +20,10 @@ interface admin {
     /// Gets a list of all accounts that are known by the accounts app on this device.
     get-all-accounts: func() -> list<string>;
 
-    get-authed-query: func(user: string) -> string;
+    get-authed-query-token: func(user: string) -> string;
 }
 
+// "internal" interface for the accounts app
 world impl {
     include host:common/imports;
     include host:privileged/imports;

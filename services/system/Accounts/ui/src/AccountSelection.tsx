@@ -105,7 +105,47 @@ export const AccountSelection = () => {
         origin: connectionToken!.origin,
       }));
     }
-    setIsModalOpen(false);
+    const res = await supervisor.functionCall({
+      service: "accounts",
+      intf: "admin",
+      method: "getAuthedQueryToken",
+      params: [values.username],
+    });
+    console.info("onSubmit().get_authed_query_token() returned:");
+    console.info(res);
+    // Attach iframe and send token
+    const iframeUrl = `${connectionToken!.origin}/common/auth-cookie.html`;
+    const iframe = document.createElement("iframe");
+    iframe.src = iframeUrl;
+    iframe.style.display = "none";
+
+    // Handler for confirmation message from iframe
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== connectionToken!.origin) return;
+      const data = event.data;
+      if (data && data.id === "set-cookie") {
+        // Clean up: remove event listener and iframe
+        window.removeEventListener("message", handleMessage);
+        iframe.remove();
+        if (data.status === "ok") {
+          // Redirect after confirmation
+          window.location.href = connectionToken!.origin;
+        } else {
+          alert("Failed to set cookie: " + (data.error || "Unknown error"));
+        }
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+
+    iframe.onload = () => {
+      // Wait for iframe to load, then postMessage
+      iframe.contentWindow?.postMessage(
+        { token: res, id: "set-cookie" },
+        `${connectionToken!.origin}`
+      );
+    };
+    document.body.appendChild(iframe);
   };
 
   const username = form.watch("username");
@@ -140,7 +180,7 @@ export const AccountSelection = () => {
 
   const [activeSearch, setActiveSearch] = useState("");
   const accountsToRender = activeSearch
-    ? (accounts || []).filter((account) =>
+    ? (accounts || []).filter((account: { account: string }) =>
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
@@ -165,6 +205,8 @@ export const AccountSelection = () => {
   const disableModalSubmit: boolean =
     accountStatus !== (isInvite ? "Available" : "Taken");
 
+  // AccountsList only shows accounts already connected to apps,
+  // so all that's needed here is a "direct" login.
   const onAccountSelection = async (accountId: string) => {
     setSelectedAccountId(accountId);
     if (!isInvite) {
@@ -176,14 +218,6 @@ export const AccountSelection = () => {
         app: connectionToken.app,
         origin: connectionToken.origin,
       });
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "admin",
-        method: "getAuthedQuery",
-        params: [accountId],
-      });
-      console.info("onAccountSelection().get_authed_query() returned:");
-      console.info(res);
 
       window.location.href = connectionToken.origin;
     }
@@ -262,20 +296,15 @@ export const AccountSelection = () => {
         origin: connectionToken.origin,
         accountName: selectedAccount!.account,
       });
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "admin",
-        method: "getAuthedQuery",
-        params: [selectedAccount!.account],
-      });
-      console.info("onAcceptOrLogin().get_authed_query() returned:");
-      console.info(res);
     }
   };
 
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={(open) => setIsModalOpen(open)}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open: boolean) => setIsModalOpen(open)}
+      >
         <div className="mt-6">
           <DialogContent>
             <DialogHeader>
@@ -288,6 +317,7 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                   : "Import a pre-existing account prior to accepting / denying an invite."}
               </DialogDescription>
+              {/* <ImportAccountOrAcceptInviteForm /> */}
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}

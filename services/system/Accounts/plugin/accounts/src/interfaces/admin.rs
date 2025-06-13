@@ -81,8 +81,8 @@ impl Admin for AccountsPlugin {
         AppsTable::new(&get_accounts_app()).get_connected_accounts()
     }
 
-    fn get_authed_query(user: String) -> String {
-        assert_caller_admin("get_authed_query");
+    fn get_authed_query_token(user: String) -> String {
+        assert_caller_admin("get_authed_query_token");
         TransactLoginApi::login(&get_accounts_app().app.unwrap(), &user).unwrap()
     }
 }
