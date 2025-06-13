@@ -10,13 +10,14 @@ export const useLogout = () => {
 
     return useMutation({
         mutationKey: ["logout"],
-        mutationFn: async () =>
-            supervisor.functionCall({
+        mutationFn: async () => {
+            await supervisor.functionCall({
                 method: "logout",
                 params: [],
                 service: "accounts",
                 intf: "activeApp",
-            }),
+            });
+        },
         onSuccess: () => {
             setExpectCurrentUser(false);
             queryClient.setQueryData(["loggedInUser"], null);

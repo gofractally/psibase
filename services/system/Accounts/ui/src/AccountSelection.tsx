@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { cn } from "@shared/lib/utils";
 
 import { z } from "zod";
@@ -51,7 +51,10 @@ import {
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
-import { supervisor } from "./main";
+import { getSupervisor } from "@psibase/common-lib";
+import { useLogout } from "./hooks/use-logout";
+
+const supervisor = getSupervisor();
 
 dayjs.extend(relativeTime);
 
@@ -89,21 +92,23 @@ export const AccountSelection = () => {
   const { isDirty, isSubmitting } = form.formState;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (isCreatingAccount) {
-      void (await createAccount(values.username));
-      void (await acceptInvite({
-        origin: inviteToken ? inviteToken.appDomain : connectionToken!.origin,
-        app: inviteToken ? inviteToken.app : connectionToken!.app,
-        accountName: values.username,
-        token: z.string().parse(token),
-      }));
-    } else {
-      void (await importAccount(values.username));
-      void (await login({
-        accountName: values.username,
-        app: connectionToken!.app,
-        origin: connectionToken!.origin,
-      }));
+    let origin = inviteToken?.appDomain || connectionToken!.origin;
+    try {
+      if (isCreatingAccount) {
+        // createAccount handles logout, acceptWithNewAccount, and importAccount
+        await createAccount(values.username);
+        // Now we need to login and set auth cookie
+      } else {
+        // Import existing account and perform login
+        await importAccount(values.username);
+        origin = connectionToken!.origin;
+      }
+      await handleLogin(values.username, origin);
+      window.location.href = origin;
+    } catch (error) {
+      console.error("❌ Error in logging in:", error);
+      await logout();
+      return;
     }
     setIsModalOpen(false);
   };
@@ -140,18 +145,19 @@ export const AccountSelection = () => {
 
   const [activeSearch, setActiveSearch] = useState("");
   const accountsToRender = activeSearch
-    ? (accounts || []).filter((account) =>
+    ? (accounts || []).filter((account: { account: string }) =>
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
-  // const [accountsToRender, setAccountsToRender]: [
-  //   AccountType[],
-  //   (accounts: AccountType[]) => void,
-  // ] = useState<AccountType[]>([]);
 
-  // useEffect(() => {
-  //   setAccountsToRender(accounts || []);
-  // }, [accounts]);
+  useEffect(() => {
+    async function preloadAuthAny() {
+      await supervisor.preLoadPlugins([
+        { service: "auth-any", plugin: "plugin" },
+      ]);
+    }
+    preloadAuthAny();
+  }, []);
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -164,30 +170,23 @@ export const AccountSelection = () => {
   const disableModalSubmit: boolean =
     accountStatus !== (isInvite ? "Available" : "Taken");
 
+  // AccountsList only shows accounts already connected to apps,
+  // so all that's needed here is a "direct" login.
   const onAccountSelection = async (accountId: string) => {
     setSelectedAccountId(accountId);
     if (!isInvite) {
       if (!connectionToken) {
         throw new Error(`Expected connection token`);
       }
-      console.info("onAccountSelection() called with accountId:", accountId);
-      login({
-        accountName: accountId,
-        app: connectionToken.app,
-        origin: connectionToken.origin,
-      });
-      console.info(
-        "'calling get_authed_query with selectedAccount.account",
-        accountId
-      );
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "admin",
-        method: "getAuthedQuery",
-        params: [accountId],
-      });
-      console.info("onAccountSelection().get_authed_query() returned:");
-      console.info(res);
+
+      try {
+        await handleLogin(accountId, connectionToken.origin);
+        window.location.href = connectionToken.origin;
+      } catch (error) {
+        console.error("❌ Error logging in:", error);
+        await logout();
+        return;
+      }
     }
   };
 
@@ -220,7 +219,16 @@ export const AccountSelection = () => {
     token
   );
 
-  const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
+  const { mutateAsync: loginDirect, isPending: isLoggingIn } = useLoginDirect();
+  const { mutateAsync: logout } = useLogout();
+
+  const handleLogin = async (accountName: string, origin: string) => {
+    await loginDirect({
+      accountName,
+      app: connectionToken!.app,
+      origin,
+    });
+  };
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } =
     useAcceptInvite();
@@ -243,6 +251,7 @@ export const AccountSelection = () => {
     return <InviteExpiredCard token={token} />;
   }
 
+  // I believe this is dead code
   const onAcceptOrLogin = async () => {
     if (isInvite) {
       if (!inviteToken) {
@@ -259,25 +268,20 @@ export const AccountSelection = () => {
       if (!connectionToken) {
         throw new Error(`Expected connection token for a login`);
       }
-      login({
+      loginDirect({
         app: connectionToken.app,
         origin: connectionToken.origin,
         accountName: selectedAccount!.account,
       });
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "admin",
-        method: "getAuthedQuery",
-        params: [selectedAccount!.account],
-      });
-      console.info("onAcceptOrLogin().get_authed_query() returned:");
-      console.info(res);
     }
   };
 
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={(open) => setIsModalOpen(open)}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open: boolean) => setIsModalOpen(open)}
+      >
         <div className="mt-6">
           <DialogContent>
             <DialogHeader>
@@ -290,6 +294,7 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                   : "Import a pre-existing account prior to accepting / denying an invite."}
               </DialogDescription>
+              {/* <ImportAccountOrAcceptInviteForm /> */}
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
