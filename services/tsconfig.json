@@ -1,0 +1,7 @@
+{
+    // This file is used by service-level shared assets and the shadcn CLI
+    "extends": "./tsconfig.app.json",
+    "compilerOptions": {
+        "baseUrl": "."
+    }
+}

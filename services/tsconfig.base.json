@@ -1,40 +1,42 @@
 {
-  "compilerOptions": {
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "incremental": true,
+    // This file is extended by ./tsconfig.node.json and ./tsconfig.app.json
+    "compilerOptions": {
+        "module": "ESNext",
+        "skipLibCheck": true,
+        "incremental": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+        /* Bundler mode */
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "moduleDetection": "force",
+        "noEmit": true,
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
+        /* Linting */
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedSideEffectImports": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
 
-    /* Base Options: */
-    "esModuleInterop": true,
-    "allowJs": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+        /* Base Options: */
+        "esModuleInterop": true,
+        "allowJs": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
 
-    /* Paths */
-    "paths": {
-      "@/*": ["./src/*"],
-      "@shared/*": ["../../../shared-ui/*"],
-      "@psibase/common-lib": [
-        "../../../user/CommonApi/common/packages/common-lib/src"
-      ],
-      "@psibase/common-lib/*": [
-        "../../../user/CommonApi/common/packages/common-lib/src/*"
-      ]
+        /* Paths */
+        "paths": {
+            "@/*": ["./src/*"],
+            "@shared/*": ["../../../shared-ui/*"],
+            "@/shared/*": ["../../../shared-ui/*"],
+            "@psibase/common-lib": [
+                "../../../user/CommonApi/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../../user/CommonApi/common/packages/common-lib/src/*"
+            ]
+        }
     }
-  }
 }

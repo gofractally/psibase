@@ -1,0 +1,19 @@
+{
+    "$schema": "https://ui.shadcn.com/schema.json",
+    "style": "default",
+    "rsc": false,
+    "tsx": true,
+    "tailwind": {
+        "css": "./shared-ui/styles/globals.css",
+        "baseColor": "slate",
+        "cssVariables": true,
+        "prefix": ""
+    },
+    "aliases": {
+        "components": "shared-ui/components",
+        "hooks": "shared-ui/shadcn/hooks",
+        "lib": "shared-ui/lib",
+        "ui": "shared-ui/shadcn/ui",
+        "utils": "shared-ui/lib/utils"
+    }
+}
