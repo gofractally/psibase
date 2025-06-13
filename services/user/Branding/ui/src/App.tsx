@@ -28,13 +28,17 @@ export const App = () => {
     }, []);
 
     const getNetworkName = async () => {
-        const queriedNetworkName = (await supervisor.functionCall({
-            service: "branding",
-            intf: "queries",
-            method: "getNetworkName",
-            params: [],
-        })) as string;
-        setNetworkName(queriedNetworkName);
+        try {
+            const queriedNetworkName = (await supervisor.functionCall({
+                service: "branding",
+                intf: "queries",
+                method: "getNetworkName",
+                params: [],
+            })) as string;
+            setNetworkName(queriedNetworkName);
+        } catch (e: unknown) {
+            console.error("Error getting network name:", e);
+        }
     };
     const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
         e,

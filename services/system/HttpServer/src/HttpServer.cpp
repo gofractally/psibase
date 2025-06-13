@@ -95,8 +95,10 @@ namespace SystemService
                                                      "Content-Security-Policy",  //
                                                      "ETag"};
 
-      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result, 
-                        const std::string& requestTarget = "")
+      void sendReplyImpl(AccountNumber      service,
+                         std::int32_t       socket,
+                         const HttpReply&   result,
+                         const std::string& requestTarget = "")
       {
          for (const auto& header : result.headers)
          {
@@ -105,11 +107,13 @@ namespace SystemService
             {
                if (requestTarget != "/common/set-cookie")
                {
-                  abortMessage("service " + service.str() + " attempted to set Set-Cookie header on unauthorized endpoint " + requestTarget);
+                  abortMessage("service " + service.str() +
+                               " attempted to set Set-Cookie header on unauthorized endpoint " +
+                               requestTarget);
                }
-               continue; // Allow Set-Cookie for the authorized endpoint
+               continue;  // Allow Set-Cookie for the authorized endpoint
             }
-            
+
             // Check standard allowed headers
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
@@ -256,7 +260,8 @@ namespace SystemService
             sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
-                           .body        = std::vector(msg.begin(), msg.end())}, req.target);
+                           .body        = std::vector(msg.begin(), msg.end())},
+                          req.target);
          }
       }
    }  // serve()
