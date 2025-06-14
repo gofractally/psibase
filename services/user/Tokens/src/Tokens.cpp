@@ -85,17 +85,6 @@ void Tokens::init()
       Tables().open<TokenHolderTable>().put(holder);
    }
 
-   // Create system token
-   auto tid = recurse().create(Precision{4}, Quantity{1'000'000'000e4});
-   check(tid == TID{1}, wrongSysTokenId);
-
-   // Make system token default untradeable
-   recurse().setTokenConf(tid, tokenConfig::untradeable, true);
-
-   // Pass system token ownership to symbol service
-   auto tNft = getToken(tid).ownerNft;
-   nftService.credit(tNft, Symbol::service, "Passing system token ownership");
-
    // Register proxy
    to<SystemService::HttpServer>().registerServer(RTokens::service);
 

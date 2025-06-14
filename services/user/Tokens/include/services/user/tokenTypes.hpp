@@ -17,10 +17,10 @@ namespace UserService
 
       uint8_t value;
 
-      Precision(uint8_t p) : value{p} { validate(p); }
-      Precision() : Precision(0) {}
+      explicit constexpr Precision(uint8_t p) : value{p} { validate(p); }
+      constexpr Precision() : Precision(0) {}
 
-      static bool validate(const uint8_t& p)
+      static constexpr bool validate(const uint8_t& p)
       {
          if (precisionMin > p || p > precisionMax)
          {
