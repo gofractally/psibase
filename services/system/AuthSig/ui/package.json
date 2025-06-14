@@ -16,7 +16,7 @@
         "react-dom": "^19.1.0",
         "react-qr-code": "^2.0.15",
         "react-router-dom": "^6.26.1",
-        "sonner": "^1.7.2",
+        "sonner": "^2.0.5",
         "usehooks-ts": "^3.1.0",
         "zod": "^3.23.8"
     },

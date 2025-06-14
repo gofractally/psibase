@@ -5,8 +5,6 @@ import { RouterProvider } from "react-router-dom";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { Toaster } from "@shared/shadcn/ui/sonner";
-
 import { ThemeProvider } from "@/components/theme-provider";
 
 import Router from "./router";
@@ -20,7 +18,6 @@ createRoot(document.getElementById("root")!).render(
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
             <QueryClientProvider client={queryClient}>
                 <RouterProvider router={Router} />
-                <Toaster />
             </QueryClientProvider>
         </ThemeProvider>
     </StrictMode>,
