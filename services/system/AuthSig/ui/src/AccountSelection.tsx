@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -14,25 +16,23 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
+import { Input } from "@shared/shadcn/ui/input";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@shared/shadcn/ui/select";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
 import { useAccountLookup } from "./hooks/useAccountLookup";
 import { useAccountSelector } from "./hooks/useAccountSelector";
 import { useConnectedAccounts } from "./hooks/useConnectedAccounts";
 import { useCreateConnectionToken } from "./hooks/useCreateConnectionToken";
 import { usePublicToPrivate } from "./hooks/usePrivateFromPublicKey";
 import { modifyUrlParams } from "./lib/modifyUrlParams";
-import { cn } from "./lib/utils";
 
 const ModalState = z.enum(["Off", "Warn", "Show"]);
 
@@ -90,7 +90,7 @@ export const AccountSelection = () => {
             <p>Copy your account to another device or browser session.</p>
             <div className="flex gap-2">
                 {isLoading ? (
-                    <Skeleton className="my-auto h-[40px] w-full rounded-sm" />
+                    <Skeleton className="rounded-xs my-auto h-[40px] w-full" />
                 ) : (
                     <Select
                         onValueChange={(account) => {
