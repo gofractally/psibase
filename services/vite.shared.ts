@@ -1,68 +1,81 @@
 /// <reference types="node" />
+import type { Alias, Plugin, UserConfig } from "vite";
 
-import { Plugin, UserConfig, Alias } from 'vite'
-import path from 'path'
-import fs from 'fs'
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import fs from "fs";
+import path from "path";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 const outDirParams = {
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: true,
-}
+};
 
 export interface SharedViteConfigOptions {
-  projectDir: string
-  manualChunks?: Record<string, string[]>
-  additionalManualChunks?: Record<string, string[]>
-  uiFramework?: string
+    projectDir: string;
+    manualChunks?: Record<string, string[]>;
+    additionalManualChunks?: Record<string, string[]>;
+    uiFramework?: string;
 }
 
-export function createSharedViteConfig(options: SharedViteConfigOptions): Plugin {
-  const { uiFramework = "react", manualChunks = {
-    vendor: ['react', 'react-dom'],
-  }, additionalManualChunks = {} } = options
+export function createSharedViteConfig(
+    options: SharedViteConfigOptions,
+): Plugin {
+    const {
+        uiFramework = "react",
+        manualChunks = {
+            vendor: ["react", "react-dom"],
+        },
+        additionalManualChunks = {},
+    } = options;
 
-  const rollupOptions = {
+    const rollupOptions = {
         cache: true,
         ...(uiFramework === "svelte" ? outDirParams : {}),
         output: {
-            entryFileNames: 'index.js',
-            assetFileNames: '[name][extname]',
+            entryFileNames: "index.js",
+            assetFileNames: "[name][extname]",
             dir: "dist",
-            ...(Object.keys(manualChunks).length > 0 ? {
-                manualChunks: {
-                  // Core UI libraries
-                  ...manualChunks,
-                  ...additionalManualChunks
-                }
-              } : {})
-        }
-      };
+            ...(Object.keys(manualChunks).length > 0
+                ? {
+                      manualChunks: {
+                          // Core UI libraries
+                          ...manualChunks,
+                          ...additionalManualChunks,
+                      },
+                  }
+                : {}),
+        },
+    };
 
-  const userConfig: UserConfig = {
-    build: {
-      // Disable sourcemaps in production for better caching
-      sourcemap: process.env.NODE_ENV === 'development',
-      minify: process.env.NODE_ENV !== 'development',
-      rollupOptions,
-      // Increase chunk size warning limit
-      chunkSizeWarningLimit: 1000
-    },
-    optimizeDeps: {
-      // Enable dependency pre-bundling
-      // TODO: this isn't right; what about manualChunks other than vendor?
-      include: uiFramework === "react" ? (manualChunks.vendor || []) : [],
-    },
-  }
-  return (uiFramework === "svelte") ? {
-        name: 'shared-vite-config',
-        ...userConfig
-    } : {
-        name: 'shared-vite-config',
-        config: () => ({
-            ...userConfig
-        })
-    }
-} 
+    const userConfig: UserConfig = {
+        build: {
+            // Disable sourcemaps in production for better caching
+            sourcemap: process.env.NODE_ENV === "development",
+            minify: process.env.NODE_ENV !== "development",
+            rollupOptions,
+            // Increase chunk size warning limit
+            chunkSizeWarningLimit: 1000,
+        },
+        optimizeDeps: {
+            // Enable dependency pre-bundling
+            // TODO: this isn't right; what about manualChunks other than vendor?
+            include: uiFramework === "react" ? manualChunks.vendor || [] : [],
+        },
+    };
+    return uiFramework === "svelte"
+        ? {
+              name: "shared-vite-config",
+              ...userConfig,
+          }
+        : {
+              name: "shared-vite-config",
+              config: () => ({
+                  ...userConfig,
+              }),
+          };
+}
 
 export function verifyViteCache(dirname: any) {
     // Ensure cache directory exists
@@ -81,7 +94,15 @@ export interface PsibaseConfigOptions {
     proxyPort?: number;
     additionalAliases?: Array<{ find: string | RegExp; replacement: string }>;
     additionalProxyBypassConditions?: Array<(req: any) => boolean>;
-    additionalProxies?: Record<string, { target: string; ws?: boolean; timeout?: number; rewrite?: (path: string) => string }>;
+    additionalProxies?: Record<
+        string,
+        {
+            target: string;
+            ws?: boolean;
+            timeout?: number;
+            rewrite?: (path: string) => string;
+        }
+    >;
 }
 
 interface ServerConfig {
@@ -111,7 +132,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         service,
         serviceDir,
         isServing = false,
-        useHttps = false,
+        useHttps = process.env.VITE_SECURE_LOCAL_DEV === "true",
         proxyPort = 8080,
         additionalAliases = [],
         additionalProxyBypassConditions = [],
@@ -125,7 +146,9 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         },
         {
             find: /^\/common(?!\/(?:fonts))(.*)$/,
-            replacement: path.resolve(`${servicesDir}/user/CommonApi/common/resources$1`),
+            replacement: path.resolve(
+                `${servicesDir}/user/CommonApi/common/resources$1`,
+            ),
         },
         {
             find: /^@psibase\/common-lib.*$/,
@@ -139,7 +162,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         buildAliases.push({
             find: /^@psibase\/common-lib.*$/,
             replacement: path.resolve(
-                `${servicesDir}/user/CommonApi/common/packages/common-lib/src`
+                `${servicesDir}/user/CommonApi/common/packages/common-lib/src`,
             ),
         });
     }
@@ -150,7 +173,7 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         proxy: {
             ...additionalProxies,
             "/": {
-                target: `${useHttps ? 'https' : 'http'}://psibase.127.0.0.1.sslip.io:${proxyPort}/`,
+                target: `${useHttps ? "https" : "http"}://psibase.127.0.0.1.sslip.io:${proxyPort}/`,
                 changeOrigin: true,
                 secure: !useHttps,
                 autoRewrite: true,
@@ -165,22 +188,32 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
                         !req.url.startsWith("/common"),
                         !req.url.startsWith("/api"),
                     ];
-                    return req.url === "/" || [...baseConditions, ...additionalProxyBypassConditions].every(condition => 
-                        typeof condition === 'function' ? condition(req) : condition
-                    ) ? req.url : undefined;
+                    return req.url === "/" ||
+                        [
+                            ...baseConditions,
+                            ...additionalProxyBypassConditions,
+                        ].every((condition) =>
+                            typeof condition === "function"
+                                ? condition(req)
+                                : condition,
+                        )
+                        ? req.url
+                        : undefined;
                 },
             },
         },
     };
 
+    const pathToCerts: string = process.env.VITE_SECURE_PATH_TO_CERTS ?? "";
+
     if (useHttps) {
         baseServerConfig.https = {
             key: fs.readFileSync(
-                `${process.env.VITE_SECURE_PATH_TO_CERTS}psibase.127.0.0.1.sslip.io+1-key.pem`,
+                `${pathToCerts}psibase.127.0.0.1.sslip.io+1-key.pem`,
                 "utf8",
             ),
             cert: fs.readFileSync(
-                `${process.env.VITE_SECURE_PATH_TO_CERTS}psibase.127.0.0.1.sslip.io+1.pem`,
+                `${pathToCerts}psibase.127.0.0.1.sslip.io+1.pem`,
                 "utf8",
             ),
         };
@@ -208,3 +241,13 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         }),
     };
 }
+
+export const getSharedUIPlugins = (
+    uiFramework: "react" | "svelte" = "react",
+) => {
+    return [
+        uiFramework === "react" ? react() : undefined,
+        tsconfigPaths(),
+        tailwindcss(),
+    ];
+};

@@ -1,11 +1,9 @@
-import { supervisor } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { getSupervisor } from "@psibase/common-lib";
+import { AccountType } from "../types";
 
-interface AccountType {
-  account: string;
-  id: string;
-}
+const supervisor = getSupervisor();
 
 export const useGetAllAccounts = () =>
   useQuery({

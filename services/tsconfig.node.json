@@ -1,0 +1,8 @@
+{
+    // This file is referenced and used by child UI projects for the vite config and build
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "target": "ES2023",
+        "lib": ["ES2023"]
+    }
+}

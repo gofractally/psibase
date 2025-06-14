@@ -45,9 +45,4 @@
         "./wasm-transpiled/*.d.ts",
         "wasm-transpiled"
     ],
-    "references": [
-        {
-            "path": "./tsconfig.node.json"
-        }
-    ]
 }

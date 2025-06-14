@@ -1,4 +1,5 @@
+const psibasePrettierConfig = require("../../../prettier.config.cjs");
+
 module.exports = {
-  tabWidth: 4,
-  plugins: ["prettier-plugin-tailwindcss"],
-}
+    ...psibasePrettierConfig,
+};
