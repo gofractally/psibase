@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Button } from "@shadcn/button";
-import { Label } from "@shadcn/label";
-import { Input } from "@shadcn/input";
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
-import { siblingUrl, getSupervisor } from "@psibase/common-lib";
-import { Nav } from "@components/nav";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import { Nav } from "@/components/nav";
 
 const supervisor = getSupervisor();
 
@@ -17,12 +18,12 @@ export const App = () => {
     const [previewImgUrl, setPreviewImgUrl] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
 
-    const init = async () => {
-        await supervisor.onLoaded();
-        await getNetworkName();
-    };
-
     useEffect(() => {
+        const init = async () => {
+            await supervisor.onLoaded();
+            await getNetworkName();
+        };
+
         init();
     }, []);
 

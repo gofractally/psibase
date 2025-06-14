@@ -1,10 +1,16 @@
-import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import wasm from "vite-plugin-wasm";
+import { defineConfig } from "vite";
 import topLevelAwait from "vite-plugin-top-level-await";
+import wasm from "vite-plugin-wasm";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+
+import {
+    createPsibaseConfig,
+    createSharedViteConfig,
+    verifyViteCache,
+} from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
@@ -19,39 +25,37 @@ export default defineConfig(({ command }) => {
                 projectDir: serviceDir,
                 additionalManualChunks: {
                     // Radix UI components
-                    'radix-ui': [
-                        '@radix-ui/react-dropdown-menu',
-                        '@radix-ui/react-label',
-                        '@radix-ui/react-separator',
-                        '@radix-ui/react-slot',
-                        '@radix-ui/react-tabs',
-                        '@radix-ui/react-tooltip'
+                    "radix-ui": [
+                        "@radix-ui/react-avatar",
+                        "@radix-ui/react-dropdown-menu",
+                        "@radix-ui/react-label",
+                        "@radix-ui/react-slot",
                     ],
                     // Animation libraries
-                    animation: ['framer-motion'],
+                    animation: ["framer-motion"],
                     // UI utilities
-                    'ui-utils': [
-                        'class-variance-authority',
-                        'clsx',
-                        'tailwind-merge',
-                        'tailwindcss-animate',
-                        'lucide-react'
+                    "ui-utils": [
+                        "class-variance-authority",
+                        "clsx",
+                        "tailwind-merge",
+                        "lucide-react",
                     ],
-                }
+                },
             }),
             createPsibaseConfig({
                 service: "branding",
                 serviceDir,
                 isServing: command === "serve",
-                useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true"
+                useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
             }),
             wasm(),
             topLevelAwait(),
             tsconfigPaths(),
+            tailwindcss(),
         ],
         build: {
             minify: false,
-            sourcemap: true,
-        }
+            sourcemap: false,
+        },
     };
 });
