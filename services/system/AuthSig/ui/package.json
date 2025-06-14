@@ -21,6 +21,7 @@
         "zod": "^3.23.8"
     },
     "devDependencies": {
+        "@tailwindcss/vite": "^4.1.8",
         "@types/node": "^22.5.0",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",
