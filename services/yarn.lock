@@ -1978,7 +1978,6 @@ __metadata:
     "@types/node": "npm:^22.5.0"
     "@types/react": "npm:^18.3.3"
     "@types/react-dom": "npm:^18.3.0"
-    "@vitejs/plugin-react": "npm:4.2.1"
     autoprefixer: "npm:^10.4.20"
     axios: "npm:^1.7.9"
     class-variance-authority: "npm:^0.7.0"
@@ -2005,7 +2004,7 @@ __metadata:
     typescript: "npm:^5.7.3"
     typescript-eslint: "npm:^8.0.1"
     usehooks-ts: "npm:^3.1.0"
-    vite: "npm:4.5.2"
+    vite: "npm:^5.4.1"
     zod: "npm:^3.23.8"
   languageName: unknown
   linkType: soft
