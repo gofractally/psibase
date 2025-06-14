@@ -1,26 +1,28 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { supervisor } from "@/supervisor";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+
 import { useExpectCurrentUser } from "./useExpectCurrentUser";
 
 export const useLogout = () => {
-  const queryClient = useQueryClient();
-  const [_, setExpectCurrentUser] = useExpectCurrentUser();
+    const queryClient = useQueryClient();
+    const [, setExpectCurrentUser] = useExpectCurrentUser();
 
-  return useMutation({
-    mutationKey: ["logout"],
-    mutationFn: async () =>
-      supervisor.functionCall({
-        method: "logout",
-        params: [],
-        service: "accounts",
-        intf: "activeApp",
-      }),
-    onSuccess: () => {
-      setExpectCurrentUser(false);
-      queryClient.setQueryData(["loggedInUser"], null);
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-      }, 2500);
-    },
-  });
+    return useMutation({
+        mutationKey: ["logout"],
+        mutationFn: async () =>
+            supervisor.functionCall({
+                method: "logout",
+                params: [],
+                service: "accounts",
+                intf: "activeApp",
+            }),
+        onSuccess: () => {
+            setExpectCurrentUser(false);
+            queryClient.setQueryData(["loggedInUser"], null);
+            setTimeout(() => {
+                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+            }, 2500);
+        },
+    });
 };

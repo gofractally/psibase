@@ -8,8 +8,17 @@ import {
     UserPlus,
 } from "lucide-react";
 
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useSelectAccount } from "@/hooks/use-select-account";
+import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useLogout } from "@/hooks/useLogout";
+import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
+
+import { cn } from "@shared/lib/utils";
+import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,16 +31,7 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-import { useChainId } from "@/hooks/use-chain-id";
-import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useSelectAccount } from "@/hooks/use-select-account";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useLogout } from "@/hooks/useLogout";
-import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
-import { cn } from "@/lib/utils";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 import { useTheme } from "./theme-provider";
 

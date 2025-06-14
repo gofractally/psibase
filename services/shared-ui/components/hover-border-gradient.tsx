@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import React, { useEffect, useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 type Direction = "TOP" | "LEFT" | "BOTTOM" | "RIGHT";
 
@@ -25,15 +25,6 @@ export function HoverBorderGradient({
     const [hovered, setHovered] = useState<boolean>(false);
     const [direction, setDirection] = useState<Direction>("TOP");
 
-    const rotateDirection = (currentDirection: Direction): Direction => {
-        const directions: Direction[] = ["TOP", "LEFT", "BOTTOM", "RIGHT"];
-        const currentIndex = directions.indexOf(currentDirection);
-        const nextIndex = clockwise
-            ? (currentIndex - 1 + directions.length) % directions.length
-            : (currentIndex + 1) % directions.length;
-        return directions[nextIndex];
-    };
-
     const movingMap: Record<Direction, string> = {
         TOP: "radial-gradient(20.7% 50% at 50% 0%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)",
         LEFT: "radial-gradient(16.6% 43.1% at 0% 50%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)",
@@ -45,13 +36,23 @@ export function HoverBorderGradient({
         "radial-gradient(75% 181.15942028985506% at 50% 50%, #3275F8 0%, rgba(255, 255, 255, 0) 100%)";
 
     useEffect(() => {
+        const rotateDirection = (currentDirection: Direction): Direction => {
+            const directions: Direction[] = ["TOP", "LEFT", "BOTTOM", "RIGHT"];
+            const currentIndex = directions.indexOf(currentDirection);
+            const nextIndex = clockwise
+                ? (currentIndex - 1 + directions.length) % directions.length
+                : (currentIndex + 1) % directions.length;
+            return directions[nextIndex];
+        };
+
         if (!hovered) {
             const interval = setInterval(() => {
                 setDirection((prevState) => rotateDirection(prevState));
             }, duration * 1000);
             return () => clearInterval(interval);
         }
-    }, [hovered]);
+    }, [clockwise, duration, hovered]);
+
     return (
         <Tag
             onMouseEnter={() => {
@@ -59,7 +60,7 @@ export function HoverBorderGradient({
             }}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-                "relative flex h-min w-fit  flex-col flex-nowrap content-center items-center justify-center gap-10 overflow-visible rounded-full border bg-black/20 box-decoration-clone p-px transition duration-500 hover:bg-black/10 dark:bg-white/20",
+                "relative flex h-min w-fit  flex-col flex-nowrap content-center items-center justify-center gap-10 overflow-visible rounded-full border bg-black/20 decoration-clone p-px transition duration-500 hover:bg-black/10 dark:bg-white/20",
                 containerClassName,
             )}
             {...props}

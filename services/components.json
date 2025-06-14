@@ -4,13 +4,16 @@
     "rsc": false,
     "tsx": true,
     "tailwind": {
-        "css": "src/styles/globals.css",
+        "css": "./shared-ui/styles/globals.css",
         "baseColor": "slate",
         "cssVariables": true,
         "prefix": ""
     },
     "aliases": {
-        "components": "src/components",
-        "utils": "src/lib/utils"
+        "components": "@shared/components",
+        "hooks": "@shared/shadcn/hooks",
+        "lib": "@shared/lib",
+        "ui": "shared-ui/shadcn/ui",
+        "utils": "@shared/lib/utils"
     }
 }
