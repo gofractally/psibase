@@ -2,13 +2,13 @@ import { useCreateConnectionToken } from "./hooks/useCreateConnectionToken";
 import { usePublicToPrivate } from "./hooks/usePrivateFromPublicKey";
 import { siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "./lib/modifyUrlParams";
-import { Button } from "./components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { useState } from "react";
 import { useAccountLookup } from "./hooks/useAccountLookup";
 import { useLocalStorage } from "usehooks-ts";
 
 import QRCode from "react-qr-code";
-import { cn } from "./lib/utils";
+import { cn } from "@shared/lib/utils";
 
 import {
   Select,
@@ -16,10 +16,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@shared/shadcn/ui/select";
 import { useConnectedAccounts } from "./hooks/useConnectedAccounts";
 import { Copy, Download } from "lucide-react";
-import { Input } from "./components/ui/input";
+import { Input } from "@shared/shadcn/ui/input";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -28,10 +28,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import { z } from "zod";
 import { useAccountSelector } from "./hooks/useAccountSelector";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const ModalState = z.enum(["Off", "Warn", "Show"]);
 
