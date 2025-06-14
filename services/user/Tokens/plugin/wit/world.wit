@@ -34,6 +34,10 @@ interface intf {
 
 
     map-symbol: func(token-id: u32, symbol: account-number) -> result<_, error>;
+
+    disable-burn: func(token-id: u32) -> result<_, error>;
+    disable-transfer: func(token-id: u32) -> result<_, error>;
+    disable-recall: func(token-id: u32) -> result<_, error>;
 }
 
 interface queries {

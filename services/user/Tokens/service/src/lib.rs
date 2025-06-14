@@ -97,17 +97,10 @@ pub mod service {
     }
 
     #[action]
-    fn disable_burnability(token_id: u32) {
+    fn set_token_settings(token_id: u32, settings: u8) {
         let mut token = Token::get_assert(token_id);
         token.check_owner_is_sender();
-        token.disable_burnability();
-    }
-
-    #[action]
-    fn disable_transferability(token_id: u32) {
-        let mut token = Token::get_assert(token_id);
-        token.check_owner_is_sender();
-        token.disable_transferability();
+        token.set_settings(settings.into());
     }
 
     #[action]
@@ -136,13 +129,6 @@ pub mod service {
             precision: token.precision.into(),
             symbolId: token.symbol.unwrap_or(AccountNumber::from(0)),
         }
-    }
-
-    #[action]
-    fn disable_recallability(token_id: u32) {
-        let mut token = Token::get_assert(token_id);
-        token.check_owner_is_sender();
-        token.disable_recallability();
     }
 
     #[action]

@@ -99,27 +99,28 @@ pub mod tables {
             TokenSetting::from(self.settings_value)
         }
 
-        fn save_settings(&mut self, settings: TokenSetting) {
+        pub fn set_settings(&mut self, settings: TokenSetting) {
+            let current_settings = self.settings();
+            if current_settings.is_unburnable() {
+                check(
+                    current_settings.is_unburnable() == settings.is_unburnable(),
+                    "cannot change unburnable",
+                );
+            }
+            if current_settings.is_unrecallable() {
+                check(
+                    current_settings.is_unrecallable() == settings.is_unrecallable(),
+                    "cannot change unrecallable",
+                )
+            }
+            if current_settings.is_untransferable() {
+                check(
+                    current_settings.is_untransferable() == settings.is_untransferable(),
+                    "cannot change untransferable",
+                )
+            }
             self.settings_value = settings.value;
             self.save();
-        }
-
-        pub fn disable_recallability(&mut self) {
-            let mut current_settings = self.settings();
-            current_settings.set_is_unrecallable(true);
-            self.save_settings(current_settings);
-        }
-
-        pub fn disable_burnability(&mut self) {
-            let mut current_settings = self.settings();
-            current_settings.set_is_unburnable(true);
-            self.save_settings(current_settings);
-        }
-
-        pub fn disable_transferability(&mut self) {
-            let mut current_settings = self.settings();
-            current_settings.set_is_untransferable(true);
-            self.save_settings(current_settings);
         }
 
         fn save(&mut self) {

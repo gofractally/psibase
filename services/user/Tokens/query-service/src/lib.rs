@@ -4,18 +4,12 @@ mod service {
 
     use std::u32;
 
-    use async_graphql::{connection::Connection, *};
-    use psibase::services::{accounts::Account, nft::Wrapper as Nfts};
+    use async_graphql::*;
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::Asset;
     use psibase::*;
     use serde::Deserialize;
     use tokens::tables::tables::{Balance, BalanceTable, Token, TokenTable};
-
-    #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
-    }
 
     struct Query;
 
