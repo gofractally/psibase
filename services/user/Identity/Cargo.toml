@@ -21,7 +21,7 @@ codegen-units = 1
 opt-level = "s"
 debug = false
 strip = true
-lto = true
+lto = false
 
 [package.metadata.psibase]
 package-name = "Identity"
