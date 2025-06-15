@@ -1964,6 +1964,7 @@ __metadata:
   resolution: "@psibase/authsig-ui@workspace:system/AuthSig/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
+    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.5.0"
     "@types/react": "npm:^19.1.0"
@@ -1989,6 +1990,7 @@ __metadata:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
     "@psibase/common-lib": "workspace:*"
+    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -12575,11 +12577,11 @@ __metadata:
   linkType: hard
 
 "react-hook-form@npm:^7.52.0, react-hook-form@npm:^7.53.0, react-hook-form@npm:^7.54.2":
-  version: 7.57.0
-  resolution: "react-hook-form@npm:7.57.0"
+  version: 7.58.0
+  resolution: "react-hook-form@npm:7.58.0"
   peerDependencies:
     react: ^16.8.0 || ^17 || ^18 || ^19
-  checksum: 10c0/6db0b44b2e88d4db541514e96557723e39381ce9f71b3787bf041635f829143dbd0ae46a1f6c16dee23afe3413fd25539484ba02bf2a35d90aaa1b7483193ea9
+  checksum: 10c0/9e87bf1dfb43157ffec1b112092e8c5b2b9d0056c2a8bdea6c15e08d510b365915101f499f2e7698e16e94541ac82b26ab8e3b05af5b0cccfc82d29cf31c1b0b
   languageName: node
   linkType: hard
 
@@ -13184,7 +13186,6 @@ __metadata:
     "@rollup/browser": "npm:^4.9.0"
     "@tailwindcss/forms": "npm:^0.5.10"
     "@tailwindcss/typography": "npm:^0.5.16"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^4.29.19"
     "@trivago/prettier-plugin-sort-imports": "npm:^5.2.2"
     "@types/babel__template": "npm:^7.4.4"
@@ -14009,8 +14010,8 @@ __metadata:
   linkType: hard
 
 "svelte@npm:^5.2.4":
-  version: 5.34.2
-  resolution: "svelte@npm:5.34.2"
+  version: 5.34.3
+  resolution: "svelte@npm:5.34.3"
   dependencies:
     "@ampproject/remapping": "npm:^2.3.0"
     "@jridgewell/sourcemap-codec": "npm:^1.5.0"
@@ -14026,7 +14027,7 @@ __metadata:
     locate-character: "npm:^3.0.0"
     magic-string: "npm:^0.30.11"
     zimmerframe: "npm:^1.1.2"
-  checksum: 10c0/ed52869799c1edfa11a7e9166d808ddf4b50df14f9f27e1316cdc8cbcd4847e473d8327b83233e406f4e9b32f23fa25ea518618a1874a4d7e259a476c8378b8b
+  checksum: 10c0/78f7befb176bc5a9cb24343d644b8cb7f2d02d78e6ed6a2410760fca3019b31ded1dd70b2bc8fc6805435dce3a36787308c1730974d0511cc3aaf0d80cd471d2
   languageName: node
   linkType: hard
 
