@@ -37,8 +37,8 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build' && yarn build:auth-cookies",
-        "build:auth-cookies": "tsc src/auth-cookie.ts --outDir dist/ --module ESNext --target ES2020 --esModuleInterop --moduleResolution Node --declaration false",
+        "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build' && yarn build:auth-cookie",
+        "build:auth-cookie": "vite build --config vite.auth-cookie.config.ts",
         "preview": "vite preview",
         "format": "prettier --write 'src/**/*.ts'"
     },
