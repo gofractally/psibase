@@ -1,0 +1,26 @@
+import { useQuery } from "@tanstack/react-query";
+
+import { supervisor } from "@/supervisor";
+
+import { fractalsService } from "@/lib/constants";
+import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import { zAccount } from "@/lib/zod/Account";
+
+export const useGroupUsers = (
+    evaluationId: OptionalNumber,
+    groupNumber: OptionalNumber,
+) =>
+    useQuery({
+        queryKey: QueryKey.groupUsers(evaluationId, groupNumber),
+        enabled: !!(evaluationId && groupNumber),
+        queryFn: async () => {
+            return zAccount.array().parse(
+                await supervisor.functionCall({
+                    method: "getGroupUsers",
+                    params: [evaluationId, groupNumber],
+                    service: fractalsService,
+                    intf: "user",
+                }),
+            );
+        },
+    });
