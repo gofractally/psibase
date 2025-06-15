@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["service", "plugin", "query-service"]
+members = ["service", "plugin"]
 
 [workspace.package]
 version = "0.17.0"
