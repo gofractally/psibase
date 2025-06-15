@@ -113,8 +113,39 @@ export const AccountSelection = () => {
     });
     console.info("onSubmit().get_authed_query_token() returned:");
     console.info(res);
-    window.location.href = connectionToken!.origin;
-    setIsModalOpen(false);
+    // Attach iframe and send token
+    const iframeUrl = `${connectionToken!.origin}/common/auth-cookie.html`;
+    const iframe = document.createElement("iframe");
+    iframe.src = iframeUrl;
+    iframe.style.display = "none";
+
+    // Handler for confirmation message from iframe
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== connectionToken!.origin) return;
+      const data = event.data;
+      if (data && data.id === "set-cookie") {
+        // Clean up: remove event listener and iframe
+        window.removeEventListener("message", handleMessage);
+        iframe.remove();
+        if (data.status === "ok") {
+          // Redirect after confirmation
+          window.location.href = connectionToken!.origin;
+        } else {
+          alert("Failed to set cookie: " + (data.error || "Unknown error"));
+        }
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+
+    iframe.onload = () => {
+      // Wait for iframe to load, then postMessage
+      iframe.contentWindow?.postMessage(
+        { token: res, id: "set-cookie" },
+        `${connectionToken!.origin}`
+      );
+    };
+    document.body.appendChild(iframe);
   };
 
   const username = form.watch("username");
@@ -149,7 +180,7 @@ export const AccountSelection = () => {
 
   const [activeSearch, setActiveSearch] = useState("");
   const accountsToRender = activeSearch
-    ? (accounts || []).filter((account) =>
+    ? (accounts || []).filter((account: { account: string }) =>
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
@@ -270,7 +301,10 @@ export const AccountSelection = () => {
 
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={(open) => setIsModalOpen(open)}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open: boolean) => setIsModalOpen(open)}
+      >
         <div className="mt-6">
           <DialogContent>
             <DialogHeader>
