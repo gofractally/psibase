@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
-wit-bindgen-rt = { version = "0.38.0", features = ["bitflags"] }
+wit-bindgen-rt = { workspace = true }
 
 [lib]
 crate-type = ["cdylib"]

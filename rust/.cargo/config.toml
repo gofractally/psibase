@@ -1,0 +1,10 @@
+[build]
+target-dir = "../.caches/target-shared-rust"
+
+# Ensure consistent build profiles across all crates
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true

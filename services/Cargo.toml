@@ -23,6 +23,8 @@ members = [
 ]
 resolver = "2"
 
+# Moved to existing workspace.dependencies section below
+
 exclude = [
     "user/CommonApi/common/packages/component-parser",
     "user/XAdmin/ui/wasm",
@@ -46,3 +48,18 @@ publish = false
 
 [workspace.dependencies]
 async-graphql = "=7.0.17"
+# Standardize external dependencies to enable build artifact sharing
+wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+
+# Tier 2 consolidation - high-priority shared dependencies
+chrono = "0.4"
+base64 = "0.22"
+sha2 = "0.10"
+url = "2.5"
+rand = "0.9"
+pem = "3.0"
+regex = "1.0"
+brotli = "7.0.0"

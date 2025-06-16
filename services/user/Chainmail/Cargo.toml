@@ -10,6 +10,14 @@ repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
 publish = false
 
+[workspace.dependencies]
+# Standardize external dependencies to enable build artifact sharing
+wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+async-graphql = "7.0.17"
+anyhow = "1.0"
+
 [package]
 name = "chainmail_package"
 description = "Message-sending application"
