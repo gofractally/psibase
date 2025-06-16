@@ -342,6 +342,12 @@ fn make_transaction(actions: Vec<Action>) -> SignedTransaction {
 }
 
 impl Queries for PackagesPlugin {
+    fn get_installed_packages() -> Result<Vec<types::Meta>, CommonTypes::Error> {
+        Ok(get_installed_packages()?
+            .into_iter()
+            .map(|p| p.meta().into())
+            .collect())
+    }
     fn get_sources() -> Result<Vec<types::PackageSource>, CommonTypes::Error> {
         let owner = account!("root");
         let json = Server::post_graphql_get_json(&format!(
