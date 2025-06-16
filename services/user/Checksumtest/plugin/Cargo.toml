@@ -1,0 +1,27 @@
+[package]
+name = "plugin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+checksumtest = { path = "../service/", version = "0.17.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "checksumtest:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }

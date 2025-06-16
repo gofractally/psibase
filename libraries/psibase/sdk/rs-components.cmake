@@ -1,17 +1,33 @@
 # A function that can be used to add a new target that builds a wasm component from rust
 set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
+
+# Helper function to determine the correct shared cache directory
+function(get_shared_cache_dir OUTPUT_VAR SOURCE_PATH)
+    # Check if this is a nested workspace by looking for Cargo.toml with [workspace] section
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_PATH}/Cargo.toml")
+        file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_PATH}/Cargo.toml" CARGO_CONTENT)
+        if(CARGO_CONTENT MATCHES "\\[workspace\\]")
+            # This is a nested workspace, use the nested shared cache
+            set(${OUTPUT_VAR} "/root/psibase/.caches/target-shared-nested" PARENT_SCOPE)
+        else()
+            # This is a standalone package, use the main shared cache
+            set(${OUTPUT_VAR} "/root/psibase/.caches/target-shared" PARENT_SCOPE)
+        endif()
+    else()
+        # Default to main workspace cache
+        set(${OUTPUT_VAR} "/root/psibase/.caches/target-shared" PARENT_SCOPE)
+    endif()
+endfunction()
+
 function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
-    cmake_parse_arguments(ARG "" "SHARED_TARGET_DIR" "" ${ARGN})
+    cmake_parse_arguments(ARG "" "" "" ${ARGN})
 
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
 
-    if(ARG_SHARED_TARGET_DIR AND NOT ARG_SHARED_TARGET_DIR STREQUAL "false")
-        set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugins)
-    else()
-        set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugins/${TARGET_NAME})
-    endif()
+    # Get the appropriate shared cache directory
+    get_shared_cache_dir(TARGET_DIR ${PATH})
 
     ExternalProject_Add(${TARGET_NAME}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
@@ -19,8 +35,8 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND cargo component build -r
             --target ${TARGET_ARCH}
-            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
-            --target-dir    ${TARGET_DIR}
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml
+            --target-dir ${TARGET_DIR}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TARGET_DIR}/${TARGET_ARCH}/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
@@ -53,7 +69,8 @@ function(add_rs_component_workspace TARGET_TUPLE)
         list(APPEND OUTPUT_FILES ${FILENAME})
     endforeach()
 
-    set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugin_workspaces/${TARGET_NAME})
+    # Get the appropriate shared cache directory
+    get_shared_cache_dir(TARGET_DIR ${PATH})
     set(TARGET_ARCH wasm32-wasip1)
 
     set(COPY_COMMANDS "")
@@ -71,8 +88,8 @@ function(add_rs_component_workspace TARGET_TUPLE)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND cargo component build -r
             --target ${TARGET_ARCH}
-            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
-            --target-dir    ${TARGET_DIR}
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml
+            --target-dir ${TARGET_DIR}
         ${COPY_COMMANDS}
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
