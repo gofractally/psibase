@@ -1,0 +1,56 @@
+package packages:plugin;
+
+interface types {
+    record package-ref {
+        name: string,
+        version: string,
+    }
+    record package-info {
+        name: string,
+        version: string,
+        description: string,
+        depends: list<package-ref>,
+        accounts: list<string>,
+        sha256: string,
+        file: string,
+    }
+    record meta {
+        name: string,
+        version: string,
+        description: string,
+        depends: list<package-ref>,
+        accounts: list<string>,
+    }
+    record package-source {
+        url: option<string>,
+        account: option<string>,
+    }
+
+    enum package-preference {
+        best,
+        compatible,
+        current,
+    }
+
+    // Indicates that a package should be installed, removed, or replaced.
+    record package-op-info {
+        old: option<meta>,
+        new: option<package-info>,
+    }
+
+    // Like package-op-info, but has the contents of the new package.
+    record package-op-full {
+        old: option<meta>,
+        new: option<list<u8>>,
+    }
+}
+
+interface queries {
+    use host:common/types.{error};
+    use types.{package-source};
+    get-sources: func() -> result<list<package-source>, error>;
+}
+
+world imports {
+    import queries;
+}

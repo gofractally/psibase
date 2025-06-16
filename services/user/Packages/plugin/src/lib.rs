@@ -14,7 +14,9 @@ use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use staged_tx::plugin::proposer as StagedTx;
 
-use exports::packages::plugin::intf;
+use crate::packages::plugin::types;
+use exports::packages::plugin::private_api::Guest as PrivateApi;
+use exports::packages::plugin::queries::Guest as Queries;
 
 use psibase::fracpack::{Pack, Unpack};
 use psibase::{
@@ -31,8 +33,8 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::io::{Cursor, Read, Seek};
 
-impl From<intf::PackageRef> for psibase::PackageRef {
-    fn from(value: intf::PackageRef) -> psibase::PackageRef {
+impl From<types::PackageRef> for psibase::PackageRef {
+    fn from(value: types::PackageRef) -> psibase::PackageRef {
         psibase::PackageRef {
             name: value.name,
             version: value.version,
@@ -40,17 +42,17 @@ impl From<intf::PackageRef> for psibase::PackageRef {
     }
 }
 
-impl From<psibase::PackageRef> for intf::PackageRef {
-    fn from(value: psibase::PackageRef) -> intf::PackageRef {
-        intf::PackageRef {
+impl From<psibase::PackageRef> for types::PackageRef {
+    fn from(value: psibase::PackageRef) -> types::PackageRef {
+        types::PackageRef {
             name: value.name,
             version: value.version,
         }
     }
 }
 
-impl From<intf::PackageInfo> for psibase::PackageInfo {
-    fn from(value: intf::PackageInfo) -> Self {
+impl From<types::PackageInfo> for psibase::PackageInfo {
+    fn from(value: types::PackageInfo) -> Self {
         psibase::PackageInfo {
             name: value.name,
             version: value.version,
@@ -67,9 +69,9 @@ impl From<intf::PackageInfo> for psibase::PackageInfo {
     }
 }
 
-impl From<psibase::PackageInfo> for intf::PackageInfo {
+impl From<psibase::PackageInfo> for types::PackageInfo {
     fn from(value: psibase::PackageInfo) -> Self {
-        intf::PackageInfo {
+        types::PackageInfo {
             name: value.name,
             version: value.version,
             description: value.description,
@@ -81,19 +83,19 @@ impl From<psibase::PackageInfo> for intf::PackageInfo {
     }
 }
 
-impl From<intf::PackagePreference> for psibase::PackagePreference {
-    fn from(value: intf::PackagePreference) -> Self {
+impl From<types::PackagePreference> for psibase::PackagePreference {
+    fn from(value: types::PackagePreference) -> Self {
         match value {
-            intf::PackagePreference::Best => psibase::PackagePreference::Latest,
-            intf::PackagePreference::Compatible => psibase::PackagePreference::Compatible,
-            intf::PackagePreference::Current => psibase::PackagePreference::Current,
+            types::PackagePreference::Best => psibase::PackagePreference::Latest,
+            types::PackagePreference::Compatible => psibase::PackagePreference::Compatible,
+            types::PackagePreference::Current => psibase::PackagePreference::Current,
         }
     }
 }
 
-impl From<psibase::Meta> for intf::Meta {
+impl From<psibase::Meta> for types::Meta {
     fn from(value: psibase::Meta) -> Self {
-        intf::Meta {
+        types::Meta {
             name: value.name,
             version: value.version,
             description: value.description,
@@ -103,18 +105,18 @@ impl From<psibase::Meta> for intf::Meta {
     }
 }
 
-impl From<psibase::PackageOp> for intf::PackageOp {
+impl From<psibase::PackageOp> for types::PackageOpInfo {
     fn from(value: psibase::PackageOp) -> Self {
         match value {
-            psibase::PackageOp::Install(new) => intf::PackageOp {
+            psibase::PackageOp::Install(new) => types::PackageOpInfo {
                 old: None,
                 new: Some(new.into()),
             },
-            psibase::PackageOp::Replace(old, new) => intf::PackageOp {
+            psibase::PackageOp::Replace(old, new) => types::PackageOpInfo {
                 old: Some(old.into()),
                 new: Some(new.into()),
             },
-            psibase::PackageOp::Remove(old) => intf::PackageOp {
+            psibase::PackageOp::Remove(old) => types::PackageOpInfo {
                 old: Some(old.into()),
                 new: None,
             },
@@ -131,7 +133,7 @@ struct QueryRoot<T> {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SourcesQuery {
-    sources: Vec<intf::PackageSource>,
+    sources: Vec<types::PackageSource>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -231,7 +233,7 @@ struct NewAccountsQuery {
 }
 
 fn get_package_accounts(
-    ops: &[intf::PackageInstallOp],
+    ops: &[types::PackageOpFull],
 ) -> Result<Vec<AccountNumber>, CommonTypes::Error> {
     let mut result = Vec::new();
     for op in ops {
@@ -262,7 +264,7 @@ fn apply_packages<
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
     G: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
 >(
-    ops: Vec<intf::PackageInstallOp>,
+    ops: Vec<types::PackageOpFull>,
     mut uploader: StagedUpload,
     out: &mut TransactionBuilder<F>,
     files: &mut TransactionBuilder<G>,
@@ -339,8 +341,8 @@ fn make_transaction(actions: Vec<Action>) -> SignedTransaction {
     }
 }
 
-impl intf::Guest for PackagesPlugin {
-    fn get_sources() -> Result<Vec<intf::PackageSource>, CommonTypes::Error> {
+impl Queries for PackagesPlugin {
+    fn get_sources() -> Result<Vec<types::PackageSource>, CommonTypes::Error> {
         let owner = account!("root");
         let json = Server::post_graphql_get_json(&format!(
             "query {{ sources(account: {}) {{ url account }} }}",
@@ -350,12 +352,15 @@ impl intf::Guest for PackagesPlugin {
             serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
         Ok(result.data.sources)
     }
+}
+
+impl PrivateApi for PackagesPlugin {
     fn resolve(
-        index: Vec<intf::PackageInfo>,
+        index: Vec<types::PackageInfo>,
         packages: Vec<String>,
-        request_pref: intf::PackagePreference,
-        non_request_pref: intf::PackagePreference,
-    ) -> Result<Vec<intf::PackageOp>, CommonTypes::Error> {
+        request_pref: types::PackagePreference,
+        non_request_pref: types::PackagePreference,
+    ) -> Result<Vec<types::PackageOpInfo>, CommonTypes::Error> {
         let index = index.into_iter().map(|p| p.into()).collect();
         let essential = get_essential_packages(&index, &EssentialServices::new());
         Ok(solve_dependencies(
@@ -373,7 +378,7 @@ impl intf::Guest for PackagesPlugin {
         .collect())
     }
     fn build_transactions(
-        packages: Vec<intf::PackageInstallOp>,
+        packages: Vec<types::PackageOpFull>,
         compression_level: u8,
     ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), CommonTypes::Error> {
         let id = getrandom::u64().unwrap();

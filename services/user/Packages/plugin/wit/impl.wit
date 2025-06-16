@@ -1,49 +1,12 @@
 package packages:plugin;
 
-interface intf {
+interface private-api {
     use host:common/types.{error};
-    record package-ref {
-        name: string,
-        version: string,
-    }
-    record package-info {
-        name: string,
-        version: string,
-        description: string,
-        depends: list<package-ref>,
-        accounts: list<string>,
-        sha256: string,
-        file: string,
-    }
-    record meta {
-        name: string,
-        version: string,
-        description: string,
-        depends: list<package-ref>,
-        accounts: list<string>,
-    }
-    enum package-preference {
-        best,
-        compatible,
-        current,
-    }
-    record package-op {
-        old: option<meta>,
-        new: option<package-info>,
-    }
-    record package-source {
-        url: option<string>,
-        account: option<string>,
-    }
+    use types.{meta, package-info, package-source, package-op-info, package-op-full, package-preference};
 
-    get-sources: func() -> result<list<package-source>, error>;
-    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op>, error>;
-
-    // Like package-op, but has the contents of the new package.
-    record package-install-op {
-        old: option<meta>,
-        new: option<list<u8>>,
-    }
+    // Takes a list of available packages and packages to install or update
+    // and returns a list of operations to apply.
+    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
 
     // Returns two lists of transactions
     // - Upload package data. These transactions should be executed
@@ -56,7 +19,7 @@ interface intf {
     //
     // The format of the result is unspecified. The transactions returned
     // should only be passed to push-data and stage-install.
-    build-transactions: func(packages: list<package-install-op>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
+    build-transactions: func(packages: list<package-op-full>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
 
     push-data: func(tx: list<u8>);
     propose-install: func(tx: list<u8>) -> result<_, error>;
@@ -69,5 +32,6 @@ world impl {
     include sites:plugin/imports;
     include staged-tx:plugin/imports;
 
-    export intf;
+    export queries;
+    export private-api;
 }

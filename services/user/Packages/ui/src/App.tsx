@@ -65,7 +65,7 @@ async function readPackageIndexGQL(url: string, account: string): Promise<Packag
 async function getPackageIndex(): Promise<PackageRepo[]> {
     let sources = await supervisor.functionCall({
         service: "packages",
-        intf: "intf",
+        intf: "queries",
         method: "getSources",
         params: [],
     });
@@ -114,21 +114,21 @@ async function installPackages(packages: string[], request_pref: string, non_req
     const index = flattenPackageIndex(await getPackageIndex());
     const resolved = (await supervisor.functionCall({
         service: "packages",
-        intf: "intf",
+        intf: "privateApi",
         method: "resolve",
         params: [index, packages, request_pref, non_request_pref],
     })) as PackageOp[];
     const ops = await loadPackages(resolved);
     const [data, install] = (await supervisor.functionCall({
         service: "packages",
-        intf: "intf",
+        intf: "privateApi",
         method: "buildTransactions",
         params: [ops, 4],
     })) as [ArrayBuffer[], ArrayBuffer[]];
     for (const tx of data) {
         await supervisor.functionCall({
             service: "packages",
-            intf: "intf",
+            intf: "privateApi",
             method: "pushData",
             params: [tx],
         });
@@ -136,7 +136,7 @@ async function installPackages(packages: string[], request_pref: string, non_req
     for (const tx of install) {
         await supervisor.functionCall({
             service: "packages",
-            intf: "intf",
+            intf: "privateApi",
             method: "proposeInstall",
             params: [tx],
         });
