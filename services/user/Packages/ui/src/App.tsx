@@ -76,7 +76,9 @@ async function getPackageIndex(): Promise<PackageRepo[]> {
     for (const source of sources) {
         if (source.account) {
             const url = source.url || siblingUrl(null, null, '/');
-            const index = await readPackageIndexGQL(url, source.account);
+            const packagesUrl = new URL(url);
+            packagesUrl.hostname = `packages.${packagesUrl.hostname}`;
+            const index = await readPackageIndexGQL(packagesUrl.toString(), source.account);
             let baseUrl = new URL(url);
             baseUrl.hostname = `${source.account}.${baseUrl.hostname}`;
             result.push({baseUrl: baseUrl.toString(), index})
