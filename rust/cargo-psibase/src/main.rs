@@ -514,6 +514,7 @@ async fn build_plugin(
 
 async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
     let mut command = tokio::process::Command::new(get_cargo())
+        .env("CARGO_PSIBASE_TEST", "")
         .arg("rustc")
         .args(&["-p", package])
         .arg("--release")
@@ -710,7 +711,7 @@ async fn test(
 }
 
 async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Error> {
-    let files = build(args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
+    let files = build(args, &[root], vec![("CARGO_PSIBASE_TEST", "")], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
     if files.is_empty() {
         Err(anyhow!("Nothing found to deploy"))?
     }

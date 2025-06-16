@@ -358,7 +358,7 @@ pub async fn build_package(
         let mut paths = build(
             args,
             &[id.as_str()],
-            vec![],
+            vec![("CARGO_PSIBASE_TEST", "")],
             &["--lib", "--crate-type=cdylib", "-p", &service],
             Some(SERVICE_POLYFILL),
         )

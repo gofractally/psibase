@@ -860,6 +860,7 @@ name = "evaluations"
 version = "0.17.0"
 dependencies = [
  "async-graphql",
+ "evaluations-pkg",
  "psibase",
  "psibase_macros",
  "rand 0.9.1",
