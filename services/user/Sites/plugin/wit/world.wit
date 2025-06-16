@@ -26,6 +26,8 @@ interface api {
     /// file (after compression if applied).
     upload: func(file: file, compression-quality: u8) -> result<_, error>;
 
+    upload-encoded: func(file: file, content-encoding: string) -> result<_, error>;
+
     /// Upload multiple files to Sites.
     /// 
     /// These files will be accessible at the subdomain of the caller, 

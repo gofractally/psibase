@@ -16,6 +16,7 @@ members = [
     "user/Kdf/plugin",
     "user/Sites/plugin",
     "user/Supervisor/plugin",
+    "user/Packages/plugin",
     "user/Permissions/plugin",
     "user/Tokens/plugin",
     "user/Workshop/plugin",
