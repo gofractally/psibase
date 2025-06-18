@@ -178,6 +178,20 @@ pub mod service {
     }
 
     #[action]
+    fn get_balance(user: AccountNumber, token_id: u32) -> Balance {
+        Balance::get_or_new(user, token_id)
+    }
+
+    #[action]
+    fn get_shared_balance(
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        token_id: u32,
+    ) -> SharedBalance {
+        SharedBalance::get_or_new(creditor, debitor, token_id)
+    }
+
+    #[action]
     fn recall(token_id: u32, from: AccountNumber, amount: Quantity, memo: String) {
         check(amount.value > 0, "must be greater than 0");
         let sender = get_sender();
