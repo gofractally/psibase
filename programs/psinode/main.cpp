@@ -410,10 +410,13 @@ void load_subjective_services(Database& db)
          auto account = AccountNumber{filename.stem().string()};
          if (account != AccountNumber{})
          {
-            PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Loading " << entry.path();
+            PSIBASE_LOG(psibase::loggers::generic::get(), info)
+                << "Loading subjective service " << account.str();
             std::ifstream             in(entry.path(), std::ios_base::binary);
             std::vector<std::uint8_t> code(std::filesystem::file_size(entry.path()));
             in.read(reinterpret_cast<char*>(code.data()), code.size());
+            if (!in)
+               throw std::runtime_error{"Failed to read " + entry.path().string()};
 
             auto    codeHash = sha256(code.data(), code.size());
             CodeRow codeRow{
