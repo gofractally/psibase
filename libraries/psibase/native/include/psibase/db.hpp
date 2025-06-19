@@ -96,6 +96,9 @@ namespace psibase
       // the storage is shared.
       SharedDatabase clone() const;
 
+      // Returns true if the database is completely empty.
+      bool empty() const;
+
       ConstRevisionPtr getHead();
       ConstRevisionPtr emptyRevision();
       WriterPtr        createWriter();
@@ -223,9 +226,8 @@ namespace psibase
       std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
 
       template <typename K, typename V>
-      auto kvPut(DbId     db,
-                 const K& key,
-                 const V& value) -> std::enable_if_t<!psio::is_std_optional<V>(), void>
+      auto kvPut(DbId db, const K& key, const V& value)
+          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
          kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
       }

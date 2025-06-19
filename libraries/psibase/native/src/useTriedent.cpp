@@ -267,6 +267,11 @@ namespace psibase
       return result;
    }
 
+   bool SharedDatabase::empty() const
+   {
+      return impl->getTopRoot() == nullptr;
+   }
+
    ConstRevisionPtr SharedDatabase::getHead()
    {
       return impl->getHead();

@@ -151,8 +151,13 @@ namespace SystemService
       // Callbacks used to track successful/expired transactions
       void onTrx(const psibase::Checksum256& id, psio::view<const psibase::TransactionTrace> trace);
       void onBlock();
-      auto serveSys(const psibase::HttpRequest& request,
-                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
+      auto serveSys(const psibase::HttpRequest&           request,
+                    std::optional<std::int32_t>           socket,
+                    std::optional<psibase::AccountNumber> user)
+          -> std::optional<psibase::HttpReply>;
+      // Returns a login token for the sender. A service can use
+      // this to allow a custom authentication scheme.
+      std::string login(std::string rootHost);
 
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
    };
@@ -161,7 +166,8 @@ namespace SystemService
                 method(recv, transaction),
                 method(onTrx, id, trace),
                 method(onBlock),
-                method(serveSys, request, socket),
+                method(serveSys, request, socket, user),
+                method(login, rootHost),
                 method(getUser, request))
    PSIBASE_REFLECT_TABLES(RTransact, RTransact::Subjective, RTransact::WriteOnly)
 }  // namespace SystemService
