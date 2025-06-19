@@ -10,6 +10,7 @@
 #include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/db.hpp>
+#include <psio/finally.hpp>
 #include <psio/from_bin.hpp>
 
 namespace bmi = boost::multi_index;
@@ -187,12 +188,13 @@ namespace psibase
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
-         auto ca = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
-         check(ca.has_value(), "unknown service account: " + service.str());
-         check(ca->codeHash != Checksum256{}, "service account has no code");
-         code   = std::move(*ca);
+         database.checkoutSubjective();
+         psio::finally _{[&] { database.abortSubjective(); }};
+         auto [ca, db] = getCode(service);
+
+         code   = std::move(ca);
          auto c = database.kvGet<CodeByHashRow>(
-             CodeByHashRow::db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+             db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
          check(c.has_value(), "service code record is missing");
          check(c->vmType == 0, "vmType is not 0");
          check(c->vmVersion == 0, "vmVersion is not 0");
@@ -233,6 +235,41 @@ namespace psibase
       }
 
       eosio::vm::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
+
+      std::pair<CodeRow, DbId> getCode(AccountNumber service)
+      {
+         if (dbMode.isSubjective)
+         {
+            // Check subjective first, then objective
+            {
+               auto ca = database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
+               if (ca.has_value() && ca->codeHash != Checksum256{})
+                  return {std::move(*ca), DbId::nativeSubjective};
+            }
+            auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
+            check(ca.has_value(), "unknown service account: " + service.str());
+            check(ca->codeHash != Checksum256{}, "service account has no code");
+            return {std::move(*ca), DbId::native};
+         }
+         else
+         {
+            // Use objective service unless it has the isSubjective flag
+            auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
+            check(ca.has_value(), "unknown service account: " + service.str());
+            check(ca->codeHash != Checksum256{}, "service account has no code");
+            if (ca->flags & CodeRow::isSubjective)
+            {
+               auto subjectiveCode =
+                   database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
+               if (subjectiveCode.has_value() && subjectiveCode->codeHash != Checksum256{})
+               {
+                  subjectiveCode->flags |= CodeRow::isSubjective;
+                  return {std::move(*subjectiveCode), DbId::nativeSubjective};
+               }
+            }
+            return {std::move(*ca), DbId::native};
+         }
+      }
 
       void init()
       {
