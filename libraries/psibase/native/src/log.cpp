@@ -652,7 +652,6 @@ namespace psibase::loggers
                                 {
                                    if (key == "format")
                                    {
-                                      std::string tmp;
                                       obj.format = parse_formatter(stream.get_string());
                                    }
                                    else if (key == "filter")
