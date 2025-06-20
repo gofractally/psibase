@@ -3,9 +3,12 @@ pub mod tables {
     use crate::flags::token_flags::TokenSetting;
     use crate::flags::token_holder_flags::TokenHolderFlags;
 
-    use async_graphql::SimpleObject;
+    use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Precision, Quantity};
+    use psibase::{
+        check, check_none, check_some, get_sender, AccountNumber, Asset, Precision, Quantity,
+        ToServiceSchema,
+    };
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -21,12 +24,15 @@ pub mod tables {
 
     #[table(name = "TokenTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Token {
         #[primary_key]
         pub id: u32,
         pub nft_id: u32,
         pub precision: u8,
+        #[graphql(skip)]
         pub current_supply: Quantity,
+        #[graphql(skip)]
         pub max_supply: Quantity,
         pub settings_value: u8,
         pub symbol: Option<AccountNumber>,
@@ -144,11 +150,30 @@ pub mod tables {
         }
     }
 
+    #[ComplexObject]
+    impl Token {
+        pub async fn owner(&self) -> AccountNumber {
+            self.nft_holder()
+        }
+
+        #[graphql(name = "currentSupply")]
+        pub async fn current_supply(&self) -> Asset {
+            self.current_supply.to_asset(self.precision.into())
+        }
+
+        #[graphql(name = "maxSupply")]
+        pub async fn max_supply(&self) -> Asset {
+            self.max_supply.to_asset(self.precision.into())
+        }
+    }
+
     #[table(name = "BalanceTable", index = 2)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[graphql(complex)]
     pub struct Balance {
         pub account: AccountNumber,
         pub token_id: u32,
+        #[graphql(skip)]
         pub balance: Quantity,
     }
 
@@ -198,8 +223,16 @@ pub mod tables {
         }
     }
 
+    #[ComplexObject]
+    impl Balance {
+        pub async fn owner(&self) -> Asset {
+            Asset::new(40000.into(), 4.into())
+        }
+    }
+
     #[table(name = "SharedBalanceTable", index = 3)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
     pub struct SharedBalance {
         pub creditor: AccountNumber,
         pub debitor: AccountNumber,
@@ -207,10 +240,42 @@ pub mod tables {
         pub balance: Quantity,
     }
 
+    #[ComplexObject]
+    impl SharedBalance {
+        pub async fn token(&self) -> Token {
+            TokenTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.token_id)
+                .unwrap()
+        }
+
+        pub async fn balance_asset(&self) -> Asset {
+            Asset::new(
+                self.balance,
+                TokenTable::with_service(crate::Wrapper::SERVICE)
+                    .get_index_pk()
+                    .get(&self.token_id)
+                    .unwrap()
+                    .precision
+                    .into(),
+            )
+        }
+    }
+
     impl SharedBalance {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, u32) {
+        fn pk(&self) -> (u32, AccountNumber, AccountNumber) {
+            (self.token_id, self.creditor, self.debitor)
+        }
+
+        #[secondary_key(1)]
+        fn by_creditor(&self) -> (AccountNumber, AccountNumber, u32) {
             (self.creditor, self.debitor, self.token_id)
+        }
+
+        #[secondary_key(2)]
+        fn by_debitor(&self) -> (AccountNumber, AccountNumber, u32) {
+            (self.debitor, self.creditor, self.token_id)
         }
 
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
@@ -229,7 +294,7 @@ pub mod tables {
             );
             SharedBalanceTable::new()
                 .get_index_pk()
-                .get(&(creditor, debitor, token_id))
+                .get(&(token_id, creditor, debitor))
                 .unwrap_or(Self::new(creditor, debitor, token_id))
         }
 

@@ -74,47 +74,6 @@ impl Intf for TokensPlugin {
         .packed();
         add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
-
-    fn disable_transfer(token_id: u32) -> Result<(), Error> {
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let packed_args = tokens::action_structs::set_token_settings {
-            token_id,
-            settings: 2,
-        }
-        .packed();
-
-        add_action_to_transaction(
-            tokens::action_structs::set_token_settings::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
-    fn disable_recall(token_id: u32) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::set_token_settings {
-            token_id,
-            settings: 2,
-        }
-        .packed();
-
-        add_action_to_transaction(
-            tokens::action_structs::set_token_settings::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
-    fn disable_burn(token_id: u32) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::set_token_settings {
-            token_id,
-            settings: 2,
-        }
-        .packed();
-
-        add_action_to_transaction(
-            tokens::action_structs::set_token_settings::ACTION_NAME,
-            &packed_args,
-        )
-    }
 }
 
 impl Transfer for TokensPlugin {

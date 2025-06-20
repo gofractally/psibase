@@ -4,12 +4,13 @@ mod service {
 
     use std::u32;
 
-    use async_graphql::*;
-    use psibase::services::nft::Wrapper as Nfts;
+    use async_graphql::{connection::Connection, *};
     use psibase::Asset;
     use psibase::*;
     use serde::Deserialize;
-    use tokens::tables::tables::{Balance, BalanceTable, Token, TokenTable};
+    use tokens::tables::tables::{
+        Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
+    };
 
     struct Query;
 
@@ -47,15 +48,50 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn token(&self, token_id: u32) -> Option<TokenDetail> {
-            let token = TokenTable::with_service(tokens::SERVICE)
+        async fn token(&self, token_id: u32) -> Option<Token> {
+            TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
-                .get(&token_id)?;
+                .get(&token_id)
+        }
 
-            Some(TokenDetail::from_token(
-                token,
-                Nfts::call().getNft(token_id).owner,
-            ))
+        async fn user_credits(
+            &self,
+            user: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+            TableQuery::subindex::<(AccountNumber, u32)>(
+                SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_creditor(),
+                &(user),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
+        async fn user_debits(
+            &self,
+            user: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+            TableQuery::subindex::<(AccountNumber, u32)>(
+                SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_debitor(),
+                &(user),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn user_balances(&self, user: AccountNumber) -> Vec<BalanceInstance> {
