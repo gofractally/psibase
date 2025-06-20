@@ -59,6 +59,13 @@ void Symbol::init()
    // Configure manualDebit for self on Token and NFT
    to<Nft>().setUserConf("manualDebit"_m, true);
 
+   // Create system token
+   constexpr auto precision = Precision{4};
+   auto           tid       = to<Tokens>().create(precision, Quantity{1'000'000'000e4});
+   check(tid == Tokens::sysToken, wrongSysTokenId);
+   auto tNft = to<Tokens>().getToken(tid).ownerNft;
+   to<Nft>().debit(tNft, "Taking ownership of system token");
+
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)
    {
@@ -69,7 +76,6 @@ void Symbol::init()
       return s;
    };
 
-   auto precision   = to<Tokens>().getToken(Tokens::sysToken).precision;
    auto getQuantity = [precision](Quantity_t q)
    { return (Quantity_t)(q * std::pow(10, precision.value)); };
    auto symLengthTable = Tables().open<SymbolLengthTable>();

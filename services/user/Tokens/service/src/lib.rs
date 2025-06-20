@@ -56,22 +56,6 @@ pub mod service {
         let init_instance = InitRow { last_used_id: 0 };
         table.put(&init_instance).unwrap();
 
-        let precision: u8 = 4;
-
-        let native_token = Token::add(
-            Quantity::from_str("1000000", precision.into()).unwrap(),
-            precision,
-        );
-
-        check(native_token.id == 1, "expected native token to be ID of 1");
-
-        // Give the Owner token NFT to Symbol
-        Nfts::call_from(Wrapper::SERVICE).credit(
-            native_token.nft_id,
-            psibase::services::symbol::SERVICE,
-            "Passing system token ownership".to_string(),
-        );
-
         Nfts::call_from(Wrapper::SERVICE).setUserConf(psibase::NamedBit::from("manualDebit"), true)
     }
 
