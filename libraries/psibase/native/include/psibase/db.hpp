@@ -96,9 +96,6 @@ namespace psibase
       // the storage is shared.
       SharedDatabase clone() const;
 
-      // Returns true if the database is completely empty.
-      bool empty() const;
-
       ConstRevisionPtr getHead();
       ConstRevisionPtr emptyRevision();
       WriterPtr        createWriter();

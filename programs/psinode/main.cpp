@@ -1370,16 +1370,19 @@ void run(const std::string&              db_path,
    }
 
    // If this is a new database, initialize subjective services
-   if (system->sharedDatabase.empty())
    {
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;
       auto               session = db.startWrite(system->sharedDatabase.createWriter());
       db.checkoutSubjective();
-      load_subjective_services(db);
-      if (!db.commitSubjective(*system->sockets, autoClose))
+      auto key = psio::convert_to_key(codePrefix());
+      if (!db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
       {
-         throw std::runtime_error("Failed to initialize database");
+         load_subjective_services(db);
+         if (!db.commitSubjective(*system->sockets, autoClose))
+         {
+            throw std::runtime_error("Failed to initialize database");
+         }
       }
    }
 
