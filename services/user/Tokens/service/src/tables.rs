@@ -156,14 +156,24 @@ pub mod tables {
             self.nft_holder()
         }
 
-        #[graphql(name = "currentSupply")]
         pub async fn current_supply(&self) -> Asset {
             self.current_supply.to_asset(self.precision.into())
         }
 
-        #[graphql(name = "maxSupply")]
         pub async fn max_supply(&self) -> Asset {
             self.max_supply.to_asset(self.precision.into())
+        }
+
+        pub async fn is_unburnable(&self) -> bool {
+            self.settings().is_unburnable()
+        }
+
+        pub async fn is_unrecallable(&self) -> bool {
+            self.settings().is_unrecallable()
+        }
+
+        pub async fn is_unburnable(&self) -> bool {
+            self.settings().is_unburnable()
         }
     }
 
