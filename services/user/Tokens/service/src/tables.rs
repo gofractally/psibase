@@ -292,6 +292,10 @@ pub mod tables {
         }
 
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
+            check(
+                creditor != debitor,
+                format!("{} cannot be the creditor and debitor", creditor).as_str(),
+            );
             Self {
                 token_id,
                 creditor,
@@ -301,10 +305,6 @@ pub mod tables {
         }
 
         pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
-            check(
-                creditor != debitor,
-                format!("{} cannot be the creditor and debitor", creditor).as_str(),
-            );
             SharedBalanceTable::new()
                 .get_index_pk()
                 .get(&(token_id, creditor, debitor))
