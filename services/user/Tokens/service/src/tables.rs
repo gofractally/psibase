@@ -40,8 +40,7 @@ pub mod tables {
 
     impl Token {
         pub fn get(id: u32) -> Option<Self> {
-            let token_table = TokenTable::new();
-            token_table.get_index_pk().get(&id)
+            TokenTable::new().get_index_pk().get(&id)
         }
 
         pub fn get_assert(id: u32) -> Self {
@@ -172,8 +171,8 @@ pub mod tables {
             self.settings().is_unrecallable()
         }
 
-        pub async fn is_unburnable(&self) -> bool {
-            self.settings().is_unburnable()
+        pub async fn is_untransferable(&self) -> bool {
+            self.settings().is_untransferable()
         }
     }
 
@@ -235,8 +234,11 @@ pub mod tables {
 
     #[ComplexObject]
     impl Balance {
-        pub async fn owner(&self) -> Asset {
-            Asset::new(40000.into(), 4.into())
+        pub async fn balance(&self) -> Asset {
+            Asset::new(
+                self.balance,
+                Token::get_assert(self.token_id).precision.into(),
+            )
         }
     }
 
@@ -247,6 +249,7 @@ pub mod tables {
         pub creditor: AccountNumber,
         pub debitor: AccountNumber,
         pub token_id: u32,
+        #[graphql(skip)]
         pub balance: Quantity,
     }
 
@@ -259,7 +262,7 @@ pub mod tables {
                 .unwrap()
         }
 
-        pub async fn balance_asset(&self) -> Asset {
+        pub async fn balance(&self) -> Asset {
             Asset::new(
                 self.balance,
                 TokenTable::with_service(crate::Wrapper::SERVICE)
