@@ -5,8 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 const StartParams = z.object({
-    owner: zAccount,
-    id: z.number(),
+    evaluationId: z.number(),
 });
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -14,18 +13,24 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const useStartEvaluation = () =>
     useMutation({
         mutationFn: async (params: z.infer<typeof StartParams>) => {
-            const { id, owner } = StartParams.parse(params);
+            const { evaluationId } = StartParams.parse(params);
             void (await getSupervisor().functionCall({
                 method: "start",
                 service: "evaluations",
                 intf: "admin",
-                params: [owner, id],
+                params: [evaluationId],
             }));
             await wait(3000);
             await Promise.all([
-                queryClient.refetchQueries({ queryKey: ["evaluation", id] }),
-                queryClient.refetchQueries({ queryKey: ["users", id] }),
-                queryClient.refetchQueries({ queryKey: ["groups", id] }),
+                queryClient.refetchQueries({
+                    queryKey: ["evaluation", evaluationId],
+                }),
+                queryClient.refetchQueries({
+                    queryKey: ["users", evaluationId],
+                }),
+                queryClient.refetchQueries({
+                    queryKey: ["groups", evaluationId],
+                }),
             ]);
         },
     });

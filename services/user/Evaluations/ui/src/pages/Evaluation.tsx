@@ -104,8 +104,7 @@ export const EvaluationPage = () => {
             !isStartEvaluationSuccess
         ) {
             startEvaluation({
-                owner: zAccount.parse(owner),
-                id: evaluation!.id,
+                evaluationId: evaluation!.id,
             });
         }
     }, [
@@ -261,8 +260,7 @@ export const EvaluationPage = () => {
                             disabled={isStartEvaluationPending}
                             onClick={() => {
                                 startEvaluation({
-                                    owner: zAccount.parse(owner),
-                                    id: evaluation!.id,
+                                    evaluationId: evaluation!.id,
                                 });
                             }}
                         >
@@ -296,7 +294,6 @@ export const EvaluationPage = () => {
                                 disabled={isCloseEvaluationPending}
                                 onClick={() => {
                                     closeEvaluation({
-                                        owner: evaluation!.owner,
                                         evaluationId: evaluation.id,
                                     });
                                 }}
@@ -331,7 +328,9 @@ export const EvaluationPage = () => {
                                 Group {group.groupNumber}
                             </div>
                             <div className="flex flex-col gap-1 text-center">
-                                {group.result.map(num => <div key={num}>{num}</div>)}
+                                {group.result.map((num) => (
+                                    <div key={num}>{num}</div>
+                                ))}
                             </div>
 
                             <div>Members: {group.users.join(", ")}</div>
