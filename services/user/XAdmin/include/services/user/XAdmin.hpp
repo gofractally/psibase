@@ -30,11 +30,13 @@ namespace UserService
    using ContentTable = psibase::Table<ContentRow, &ContentRow::path>;
    PSIO_REFLECT_TYPENAME(ContentTable)
 
+   /// Service for node administration
    struct XAdmin : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-admin"};
       using Subjective =
           psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable, ContentTable>;
+      /// Returns true if the account is a node admin
       bool isAdmin(psibase::AccountNumber account);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
