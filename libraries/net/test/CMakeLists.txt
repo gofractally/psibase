@@ -5,24 +5,24 @@ link_directories( ${ICU_LIBRARY_DIR} )
 
 add_executable(test_random_timer test_random_timer.cpp)
 target_include_directories(test_random_timer PUBLIC ../include)
-target_link_libraries(test_random_timer PUBLIC catch2 Threads::Threads Boost::headers)
+target_link_libraries(test_random_timer PUBLIC Catch2::Catch2WithMain Threads::Threads Boost::headers)
 
 add_test(NAME test_random_timer COMMAND test_random_timer)
 
 add_executable(test_mock_timer test_mock_timer.cpp mock_timer.cpp)
 target_include_directories(test_mock_timer PUBLIC ../include)
-target_link_libraries(test_mock_timer PUBLIC catch2 Threads::Threads Boost::headers)
+target_link_libraries(test_mock_timer PUBLIC Catch2::Catch2WithMain Threads::Threads Boost::headers)
 
 add_test(NAME test_mock_timer COMMAND test_mock_timer)
 
 add_executable(test_shortest_path_routing test_shortest_path_routing.cpp connection_pair.cpp)
 target_include_directories(test_shortest_path_routing PUBLIC ../include)
-target_link_libraries(test_shortest_path_routing PUBLIC catch2 psibase Threads::Threads Boost::headers)
+target_link_libraries(test_shortest_path_routing PUBLIC Catch2::Catch2 psibase Threads::Threads Boost::headers)
 add_test(NAME test_shortest_path_routing COMMAND test_shortest_path_routing --log-filter "Severity >= debug")
 
 add_executable(test_consensus test_consensus.cpp test_cft_consensus.cpp test_bft_consensus.cpp test_signatures.cpp mock_timer.cpp test_util.cpp main.cpp)
 target_include_directories(test_consensus PUBLIC ../include)
-target_link_libraries(test_consensus PUBLIC catch2 psibase services_system)
+target_link_libraries(test_consensus PUBLIC Catch2::Catch2 psibase services_system)
 
 add_test(
     NAME test_consensus
@@ -44,11 +44,11 @@ add_test(
 
 add_executable(bft_fuzz bft_fuzz.cpp test_util.cpp fuzz.cpp)
 target_include_directories(bft_fuzz PUBLIC ../include)
-target_link_libraries(bft_fuzz PUBLIC catch2 psibase services_system)
+target_link_libraries(bft_fuzz PUBLIC Catch2::Catch2WithMain psibase services_system)
 
 add_executable(joint_bft_fuzz joint_bft_fuzz.cpp test_util.cpp fuzz.cpp)
 target_include_directories(joint_bft_fuzz PUBLIC ../include)
-target_link_libraries(joint_bft_fuzz PUBLIC catch2 psibase services_system)
+target_link_libraries(joint_bft_fuzz PUBLIC Catch2::Catch2WithMain psibase services_system)
 
 set(PSIBASE_FUZZER "None" CACHE STRING "The fuzzer framework to use. Possible values: AFL None")
 
@@ -65,8 +65,8 @@ endif()
 
 #add_executable(test_direct_routing test_direct_routing.cpp mock_timer.cpp)
 #target_include_directories(test_direct_routing PUBLIC ../include)
-#target_link_libraries(test_direct_routing PUBLIC psio catch2)
+#target_link_libraries(test_direct_routing PUBLIC psio Catch2::Catch2WithMain)
 
 #add_executable(test_integrated test_integrated.cpp mock_timer.cpp)
 #target_include_directories(test_integrated PUBLIC ../include)
-#target_link_libraries(test_integrated PUBLIC psio catch2 psibase)
+#target_link_libraries(test_integrated PUBLIC psio Catch2::Catch2WithMain psibase)

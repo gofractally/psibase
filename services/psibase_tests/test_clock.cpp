@@ -3,7 +3,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/serveGraphQL.hpp>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 using namespace psibase;
 
