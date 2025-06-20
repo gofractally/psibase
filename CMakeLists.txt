@@ -92,6 +92,44 @@ if(DEFINED WASI_SDK_PREFIX)
         COMPONENT libpsibase
     )
 
+    ExternalProject_Add(wasm-catch2
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2
+        BINARY_DIR catch2
+        TEST_EXCLUDE_FROM_MAIN 1
+        EXCLUDE_FROM_ALL 1
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/catch2
+        INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
+        CMAKE_ARGS
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DBUILD_TESTING=OFF
+            -DCATCH_INSTALL_DOCS=OFF
+            -DCATCH_INSTALL_EXTRAS=OFF
+            -DCATCH_CONFIG_NO_POSIX_SIGNALS=ON
+            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+            -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/wasm/toolchain.cmake
+            -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}
+            -DWASM_CLANG_PREFIX=${WASM_CLANG_PREFIX}
+            -DWASM_CLANG_SUFFIX=${WASM_CLANG_SUFFIX}
+            -DCMAKE_SYSROOT=${WASI_SDK_PREFIX}/share/wasi-sysroot
+    )
+    install(
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libCatch2.a
+              ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libCatch2Main.a
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
+        COMPONENT libpsibase
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/cmake/Catch2
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib/cmake
+        COMPONENT libpsibase
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/include/catch2
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
+        COMPONENT libpsibase
+    )
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
+
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
         CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
@@ -107,7 +145,7 @@ if(DEFINED WASI_SDK_PREFIX)
 
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
-        DEPENDS ${wasm-deps} wasm-botan psitest
+        DEPENDS ${wasm-deps} wasm-botan wasm-catch2 psitest
         BINARY_DIR wasm
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1

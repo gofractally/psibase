@@ -14,7 +14,7 @@ function(add_user_test_impl suffix name)
     target_include_directories(${TARGET} PUBLIC
       ../include
      ${CMAKE_CURRENT_LIST_DIR})
-    target_link_libraries(${TARGET} services_system${suffix} services_user${suffix} psitestlib${suffix})
+    target_link_libraries(${TARGET} services_system${suffix} services_user${suffix} psitestlib${suffix} catch2)
     set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 

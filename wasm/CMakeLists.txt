@@ -188,26 +188,6 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     )
 endif()
 
-if(NOT EXISTS ${DEP_PREFIX}/lib/libsecp256k1.a)
-    message("building secp256k1")
-    execute_process(
-        WORKING_DIRECTORY ${DEP_PREFIX}
-        COMMAND bash -c "\
-               rm -rf secp256k1                                                         \
-            && cp -r ${ROOT_SOURCE_DIR}/external/secp256k1 secp256k1                    \
-            && cd secp256k1                                                             \
-            && ./autogen.sh                                                             \
-            && export CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"           \
-            && export AR=${CMAKE_AR}                                                    \
-            && export RANLIB=${CMAKE_RANLIB}                                            \
-            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1 -DUSE_FORCE_WIDEMUL_INT64\"   \
-            && ./configure --prefix=${DEP_PREFIX} --host=wasm32                         \
-            && make -j                                                                  \
-            && make -j install                                                          \
-        "
-    )
-endif()
-
 # For generating the schema
 include(../libraries/psibase/sdk/pack_service.cmake)
 
@@ -218,4 +198,4 @@ add_subdirectory(../libraries libraries)
 add_subdirectory(../services services)
 add_subdirectory(../programs programs)
 
-install(FILES ${DEP_PREFIX}/lib/libcrypto.a ${DEP_PREFIX}/lib/libz.a ${DEP_PREFIX}/lib/libsecp256k1.a TYPE LIB COMPONENT libpsibase)
+install(FILES ${DEP_PREFIX}/lib/libcrypto.a ${DEP_PREFIX}/lib/libz.a TYPE LIB COMPONENT libpsibase)
