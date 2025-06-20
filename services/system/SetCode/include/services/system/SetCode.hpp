@@ -38,6 +38,14 @@ namespace SystemService
    using StagedCodeTable = psibase::Table<StagedCodeRow, StagedCodeRow::Key{}>;
    PSIO_REFLECT_TYPENAME(StagedCodeTable)
 
+   struct VerifySequenceRow
+   {
+      std::uint64_t seq;
+      PSIO_REFLECT(VerifySequenceRow, seq)
+   };
+   using VerifySequenceTable = psibase::Table<VerifySequenceRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(VerifySequenceTable)
+
    /// All compiled code is uploaded to the chain through this service
    struct SetCode : psibase::Service
    {
@@ -47,7 +55,8 @@ namespace SystemService
       /// Flags this service must run with
       static constexpr uint64_t serviceFlags = psibase::CodeRow::allowWriteNative;
 
-      using Tables = psibase::ServiceTables<CodeRefCountTable, StagedCodeTable>;
+      using Tables =
+          psibase::ServiceTables<CodeRefCountTable, StagedCodeTable, VerifySequenceTable>;
 
       void init();
 
@@ -97,6 +106,10 @@ namespace SystemService
 
       /// Sets the flags that a particular service must be run with
       void setFlags(psibase::AccountNumber service, uint64_t flags);
+
+      /// Returns a sequence number that is incremented whenever
+      /// the verify services change.
+      std::uint64_t verifySeq();
    };
    PSIO_REFLECT(SetCode,
                 method(init),
@@ -104,7 +117,8 @@ namespace SystemService
                 method(stageCode, service, id, vmType, vmVersion, code),
                 method(unstageCode, service, id),
                 method(setCodeStaged, from, id, vmType, vmVersion, codeHash),
-                method(setFlags, service, flags))
+                method(setFlags, service, flags),
+                method(verifySeq))
 
    PSIBASE_REFLECT_TABLES(SetCode, SetCode::Tables)
 }  // namespace SystemService
