@@ -1,7 +1,20 @@
 use super::BitFlags;
 
-pub const AUTO_DEBIT: u8 = 1u8 << 0;
-pub const KEEP_ZERO_BALANCES: u8 = 1u8 << 1;
+#[repr(u8)]
+#[derive(PartialEq)]
+pub enum TokenHolderSettingIndex {
+    Autodebit = 0,
+    KeepZeroBalances = 1,
+}
+
+impl From<u8> for TokenHolderSettingIndex {
+    fn from(value: u8) -> Self {
+        if value > 1 {
+            panic!("index out of bounds")
+        }
+        TokenHolderSettingIndex::from(value)
+    }
+}
 
 pub struct TokenHolderFlags {
     pub value: u8,
@@ -23,19 +36,15 @@ impl TokenHolderFlags {
     }
 
     pub fn is_auto_debit(&self) -> bool {
-        self.is_set(AUTO_DEBIT)
-    }
-
-    pub fn set_is_auto_debit(&mut self, enabled: bool) {
-        self.set(AUTO_DEBIT, enabled);
+        self.is_set(1u8 << TokenHolderSettingIndex::Autodebit as u8)
     }
 
     pub fn is_keep_zero_balances(&self) -> bool {
-        self.is_set(KEEP_ZERO_BALANCES)
+        self.is_set(1u8 << TokenHolderSettingIndex::KeepZeroBalances as u8)
     }
 
-    pub fn set_is_keep_zero_balances(&mut self, enabled: bool) {
-        self.set(KEEP_ZERO_BALANCES, enabled);
+    pub fn set_index(&mut self, index: TokenHolderSettingIndex, enabled: bool) {
+        self.set(index as u8, enabled);
     }
 }
 

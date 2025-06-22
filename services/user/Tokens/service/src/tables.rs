@@ -6,8 +6,8 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Asset, Precision, Quantity,
-        ToServiceSchema,
+        check, check_none, check_some, get_sender, quantity, AccountNumber, Asset, Precision,
+        Quantity, ToServiceSchema,
     };
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -47,13 +47,12 @@ pub mod tables {
             check_some(Self::get(id), "failed to find token")
         }
 
-        pub fn check_owner_is_sender(&self) {
-            let sender = get_sender();
+        pub fn check_is_owner(&self, account: AccountNumber) {
             let holder = self.nft_holder();
 
             check(
-                sender == holder,
-                &format!("{} does not hold the NFT, {} does", sender, holder),
+                account == holder,
+                &format!("{} does not hold the issuer NFT, {} does", account, holder),
             );
         }
 
@@ -104,26 +103,9 @@ pub mod tables {
             TokenSetting::from(self.settings_value)
         }
 
-        pub fn set_settings(&mut self, settings: TokenSetting) {
-            let current_settings = self.settings();
-            if current_settings.is_unburnable() {
-                check(
-                    current_settings.is_unburnable() == settings.is_unburnable(),
-                    "cannot change unburnable",
-                );
-            }
-            if current_settings.is_unrecallable() {
-                check(
-                    current_settings.is_unrecallable() == settings.is_unrecallable(),
-                    "cannot change unrecallable",
-                )
-            }
-            if current_settings.is_untransferable() {
-                check(
-                    current_settings.is_untransferable() == settings.is_untransferable(),
-                    "cannot change untransferable",
-                )
-            }
+        pub fn set_settings(&mut self, index: u8, enabled: bool) {
+            let mut settings = self.settings();
+            settings.set_index(index.into(), enabled);
             self.settings_value = settings.value;
             self.save();
         }
@@ -340,6 +322,7 @@ pub mod tables {
                 self.token_id,
                 self.creditor,
                 self.debitor,
+                quantity,
                 "Autodebit".to_string(),
             );
             self.sub_balance(quantity);
@@ -416,20 +399,13 @@ pub mod tables {
             self.settings().is_auto_debit()
         }
 
-        pub fn set_auto_debit(&mut self, enabled: bool) {
-            let mut settings = self.settings();
-            settings.set_is_auto_debit(enabled);
-            self.flags = settings.value;
-            self.save();
-        }
-
         pub fn is_keep_zero_balances(&self) -> bool {
             self.settings().is_keep_zero_balances()
         }
 
-        pub fn set_keep_zero_balances(&mut self, enabled: bool) {
+        pub fn set_settings(&mut self, index: u8, enabled: bool) {
             let mut settings = self.settings();
-            settings.set_is_keep_zero_balances(enabled);
+            settings.set_index(index.into(), enabled);
             self.flags = settings.value;
             self.save();
         }
@@ -480,26 +456,19 @@ pub mod tables {
             self.settings().is_auto_debit()
         }
 
-        pub fn set_auto_debit(&mut self, enabled: bool) {
-            let mut settings = self.settings();
-            settings.set_is_auto_debit(enabled);
-            self.flags = settings.value;
-            self.save();
-        }
-
         pub fn is_keep_zero_balances(&self) -> bool {
             self.settings().is_keep_zero_balances()
         }
 
-        pub fn set_keep_zero_balances(&mut self, enabled: bool) {
-            let mut settings = self.settings();
-            settings.set_is_keep_zero_balances(enabled);
-            self.flags = settings.value;
-            self.save();
-        }
-
         fn settings(&self) -> TokenHolderFlags {
             TokenHolderFlags::from(self.flags)
+        }
+
+        pub fn set_settings(&mut self, index: u8, enabled: bool) {
+            let mut settings = self.settings();
+            settings.set_index(index.into(), enabled);
+            self.flags = settings.value;
+            self.save();
         }
 
         fn save(&mut self) {

@@ -81,13 +81,6 @@ pub mod service {
     }
 
     #[action]
-    fn set_token_settings(token_id: u32, settings: u8) {
-        let mut token = Token::get_assert(token_id);
-        token.check_owner_is_sender();
-        token.set_settings(settings.into());
-    }
-
-    #[action]
     fn gettoken(token_id: u32) -> TokenRecord {
         let token = Token::get_assert(token_id);
 
@@ -118,7 +111,8 @@ pub mod service {
     #[action]
     fn mapsymbol(token_id: u32, symbol: AccountNumber) {
         let mut token = Token::get_assert(token_id);
-        token.check_owner_is_sender();
+        let sender = get_sender();
+        token.check_is_owner(sender);
         token.map_symbol(symbol);
 
         let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
@@ -137,23 +131,24 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .symbol_mapped(token_id, get_sender(), symbol);
+            .symbol_mapped(token_id, sender, symbol);
     }
 
     #[action]
-    fn set_auto_debit(token_id: Option<u32>, enable: bool) {
-        match token_id {
-            Some(id) => TokenHolder::get_or_new(get_sender(), id).set_auto_debit(enable),
-            None => Holder::get_or_new(get_sender()).set_auto_debit(enable),
-        }
+    fn set_user_global_config(index: u8, enabled: bool) {
+        Holder::get_or_new(get_sender()).set_settings(index, enabled);
     }
 
     #[action]
-    fn set_keep_zero_balance(token_id: Option<u32>, enable: bool) {
-        match token_id {
-            Some(id) => TokenHolder::get_or_new(get_sender(), id).set_keep_zero_balances(enable),
-            None => Holder::get_or_new(get_sender()).set_keep_zero_balances(enable),
-        }
+    fn set_user_token_config(token_id: u32, index: u8, enabled: bool) {
+        TokenHolder::get_or_new(get_sender(), token_id).set_settings(index, enabled);
+    }
+
+    #[action]
+    fn set_token_config(token_id: u32, index: u8, enabled: bool) {
+        let mut token = Token::get_assert(token_id);
+        token.check_is_owner(get_sender());
+        token.set_settings(index, enabled);
     }
 
     #[action]
@@ -182,14 +177,10 @@ pub mod service {
         let mut token = Token::get_assert(token_id);
         let token_settings = token.settings();
 
-        let is_remote_recall = sender != from;
-        if is_remote_recall {
-            check(!token_settings.is_unrecallable(), "token is not recallable");
-            token.check_owner_is_sender();
-        } else {
-            check(!token_settings.is_unburnable(), "token is not burnable");
-        }
+        check(sender != from, "cannot recall from self, use burn instead");
+        check(!token_settings.is_unrecallable(), "token is not recallable");
 
+        token.check_is_owner(sender);
         token.burn(amount, from);
 
         Wrapper::emit()
@@ -198,12 +189,29 @@ pub mod service {
     }
 
     #[action]
+    fn burn(token_id: u32, amount: Quantity, memo: String) {
+        check(amount.value > 0, "must be greater than 0");
+        let sender = get_sender();
+        let mut token = Token::get_assert(token_id);
+        let token_settings = token.settings();
+
+        check(!token_settings.is_unburnable(), "token is not burnable");
+
+        token.burn(amount, sender);
+
+        Wrapper::emit()
+            .history()
+            .burn(token_id, sender, amount, memo);
+    }
+
+    #[action]
     fn mint(token_id: u32, amount: Quantity, memo: String) {
         check(amount.value > 0, "must be greater than 0");
 
         let mut token = Token::get_assert(token_id);
-        token.check_owner_is_sender();
-        token.mint(amount, get_sender());
+        let sender = get_sender();
+        token.check_is_owner(sender);
+        token.mint(amount, sender);
 
         Wrapper::emit().history().minted(token_id, amount, memo);
     }
@@ -217,7 +225,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .credited(token_id, creditor, debitor, memo);
+            .credited(token_id, creditor, debitor, amount, memo);
     }
 
     #[action]
@@ -229,7 +237,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .uncredited(token_id, creditor, debitor, memo);
+            .uncredited(token_id, creditor, debitor, amount, memo);
     }
 
     #[action]
@@ -241,7 +249,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .debited(token_id, creditor, debitor, memo);
+            .debited(token_id, creditor, debitor, amount, memo);
     }
 
     #[event(history)]
@@ -255,6 +263,9 @@ pub mod service {
     }
 
     #[event(history)]
+    pub fn burn(token_id: u32, sender: AccountNumber, amount: Quantity, memo: String) {}
+
+    #[event(history)]
     pub fn created(token_id: u32, sender: AccountNumber, precision: u8, max_supply: Quantity) {}
 
     #[event(history)]
@@ -264,19 +275,34 @@ pub mod service {
     pub fn symbol_mapped(token_id: u32, sender: AccountNumber, symbol: AccountNumber) {}
 
     #[event(history)]
-    pub fn credited(token_id: u32, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
+    pub fn credited(
+        token_id: u32,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: String,
+    ) {
+    }
 
     #[event(history)]
     pub fn uncredited(
         token_id: u32,
         creditor: AccountNumber,
         debitor: AccountNumber,
+        amount: Quantity,
         memo: String,
     ) {
     }
 
     #[event(history)]
-    pub fn debited(token_id: u32, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
+    pub fn debited(
+        token_id: u32,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: String,
+    ) {
+    }
 }
 
 #[cfg(test)]

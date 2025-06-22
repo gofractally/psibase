@@ -355,7 +355,7 @@ SCENARIO("Buying and selling symbols")
       // Map system symbol to system token
       auto sysSymbolNft = alice.to<Symbol>().getSymbol(sysSymbol).returnVal().ownerNft;
       alice.to<Nft>().credit(sysSymbolNft, Tokens::service, memo);
-      alice.to<Tokens>().mapSymbol(sysToken, sysSymbol);
+      alice.to<Tokens>().map_symbol(sysToken, sysSymbol);
 
       WHEN("Alice creates a symbol")
       {
@@ -396,7 +396,7 @@ SCENARIO("Buying and selling symbols")
             alice.to<Tokens>().mint(newToken, userBalance, memo);
             auto newTokenId = alice.to<Tokens>().getToken(newToken).returnVal().id;
 
-            alice.to<Tokens>().mapSymbol(newTokenId, symbol);
+            alice.to<Tokens>().map_symbol(newTokenId, symbol);
             THEN("The symbol cannot be sold")
             {
                CHECK(alice.to<Symbol>()

@@ -56,7 +56,7 @@ namespace UserService
                   Quantity                        amount,
                   psio::view<const psibase::Memo> memo);
 
-      void mapSymbol(TID tokenId, SID symbolId);
+      void map_symbol(TID tokenId, SID symbolId);
 
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
@@ -120,7 +120,7 @@ namespace UserService
       method(getSharedBal, tokenId, creditor, debitor),
       method(getUserConf, account, flag),
       method(getTokenConf, tokenId, flag),
-      method(mapSymbol, symbolId, tokenId),
+      method(map_symbol, symbolId, tokenId),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
