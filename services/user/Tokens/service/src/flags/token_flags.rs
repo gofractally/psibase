@@ -38,15 +38,15 @@ impl TokenSetting {
     }
 
     pub fn is_unburnable(&self) -> bool {
-        self.is_set(1u8 << TokenSettingIndex::Unburnable as u8)
+        self.is_set(TokenSettingIndex::Unburnable as u8)
     }
 
     pub fn is_untransferable(&self) -> bool {
-        self.is_set(1u8 << TokenSettingIndex::Untransferable as u8)
+        self.is_set(TokenSettingIndex::Untransferable as u8)
     }
 
     pub fn is_unrecallable(&self) -> bool {
-        self.is_set(1u8 << TokenSettingIndex::Unrecallable as u8)
+        self.is_set(TokenSettingIndex::Unrecallable as u8)
     }
 
     pub fn set_index(&mut self, index: TokenSettingIndex, enabled: bool) {

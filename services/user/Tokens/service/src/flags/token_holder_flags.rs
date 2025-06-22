@@ -36,11 +36,11 @@ impl TokenHolderFlags {
     }
 
     pub fn is_auto_debit(&self) -> bool {
-        self.is_set(1u8 << TokenHolderSettingIndex::Autodebit as u8)
+        self.is_set(TokenHolderSettingIndex::Autodebit as u8)
     }
 
     pub fn is_keep_zero_balances(&self) -> bool {
-        self.is_set(1u8 << TokenHolderSettingIndex::KeepZeroBalances as u8)
+        self.is_set(TokenHolderSettingIndex::KeepZeroBalances as u8)
     }
 
     pub fn set_index(&mut self, index: TokenHolderSettingIndex, enabled: bool) {
