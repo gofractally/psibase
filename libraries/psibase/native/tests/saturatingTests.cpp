@@ -42,4 +42,43 @@ static_assert(saturatingCast<std::chrono::duration<std::uint8_t, std::ratio<1, 1
                   std::chrono::duration<std::int8_t>(-1))
                   .count() == 0);
 
+static_assert(saturatingMultiply<int>(-1, std::numeric_limits<int>::min()) ==
+              std::numeric_limits<int>::max());
+static_assert(saturatingMultiply<int>(std::numeric_limits<int>::min(), -1) ==
+              std::numeric_limits<int>::max());
+static_assert(saturatingMultiply<int>(std::numeric_limits<int>::min() / 2,
+                                      std::numeric_limits<int>::min() / 2) ==
+              std::numeric_limits<int>::max());
+static_assert(saturatingMultiply<int>(-std::numeric_limits<int>::max() + 1, -1) ==
+              std::numeric_limits<int>::max() - 1);
+static_assert(saturatingMultiply<int>(-1, -std::numeric_limits<int>::max() + 1) ==
+              std::numeric_limits<int>::max() - 1);
+static_assert(saturatingMultiply<int>(std::numeric_limits<int>::min(), 1) ==
+              std::numeric_limits<int>::min());
+static_assert(saturatingMultiply<int>(1, std::numeric_limits<int>::min()) ==
+              std::numeric_limits<int>::min());
+static_assert(saturatingMultiply<int>(-(std::numeric_limits<int>::min() / 2), -2) ==
+              std::numeric_limits<int>::min());
+static_assert(saturatingMultiply<int>(-2, -(std::numeric_limits<int>::min() / 2)) ==
+              std::numeric_limits<int>::min());
+static_assert(saturatingMultiply<int>(-(std::numeric_limits<int>::min() / 2), -3) ==
+              std::numeric_limits<int>::min());
+static_assert(saturatingMultiply<int>(-3, -(std::numeric_limits<int>::min() / 2)) ==
+              std::numeric_limits<int>::min());
+static_assert(saturatingMultiply<int>(std::numeric_limits<int>::min() + 1, 1) ==
+              std::numeric_limits<int>::min() + 1);
+static_assert(saturatingMultiply<int>(1, std::numeric_limits<int>::min() + 1) ==
+              std::numeric_limits<int>::min() + 1);
+static_assert(saturatingMultiply<int>(-(std::numeric_limits<int>::min() + 1), -1) ==
+              std::numeric_limits<int>::min() + 1);
+static_assert(saturatingMultiply<int>(-1, -(std::numeric_limits<int>::min() + 1)) ==
+              std::numeric_limits<int>::min() + 1);
+static_assert(saturatingMultiply<int>(std::numeric_limits<int>::max(),
+                                      std::numeric_limits<int>::max()) ==
+              std::numeric_limits<int>::max());
+static_assert(saturatingMultiply<int>(std::numeric_limits<int>::max() - 1, 1) ==
+              std::numeric_limits<int>::max() - 1);
+static_assert(saturatingMultiply<int>(1, std::numeric_limits<int>::max() - 1) ==
+              std::numeric_limits<int>::max() - 1);
+
 int main() {}

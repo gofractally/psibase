@@ -61,6 +61,13 @@ namespace psibase
             }
             return lhs * rhs;
          }
+         if (lhs < 0)
+         {
+            if (std::numeric_limits<T>::max() / lhs > rhs)
+               return std::numeric_limits<T>::max();
+            else
+               return static_cast<T>(lhs * rhs);
+         }
       }
       if (std::numeric_limits<T>::max() / lhs < rhs)
          return std::numeric_limits<T>::max();
