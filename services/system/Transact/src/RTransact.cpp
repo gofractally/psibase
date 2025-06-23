@@ -936,9 +936,6 @@ namespace
          }
          scheduleVerify(id, trx);
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
-
-         // Tell native that we have a transaction
-         setTransactionReady();
       }
       return true;
    }
