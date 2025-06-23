@@ -25,6 +25,10 @@ class Transact(Service):
     def push_action(self, sender, service, method, data, timeout=10, flags=0):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
         return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]))
+    def get_jwt_key(self, token):
+        with self.get('/jwt_key', headers={"Authorization": "Bearer " + token}) as reply:
+            reply.raise_for_status()
+            return reply.content
 
 class Accounts(Service):
     service = 'accounts'
@@ -68,6 +72,10 @@ class XAdmin(Service):
         with self.get('/admin_accounts') as reply:
             reply.raise_for_status()
             return reply.json()
+    def admin_login(self):
+        with self.get('/admin_login') as reply:
+            reply.raise_for_status()
+            return reply.json()["access_token"]
     def get_config(self):
         with self.get('/native/admin/config') as reply:
             reply.raise_for_status()
