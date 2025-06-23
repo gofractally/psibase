@@ -685,6 +685,10 @@ namespace psibase::http
                   {
                      return send(not_found(req.target(), true));
                   }
+                  if (!check_admin_auth(authz::mode_type::read_write))
+                  {
+                     return;
+                  }
                }
             }
 

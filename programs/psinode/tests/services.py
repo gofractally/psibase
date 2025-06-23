@@ -61,3 +61,17 @@ class StagedTx(Service):
             id_ = id_or_tx['id']
             txid = id_or_tx['txid']
         self.push_action(account, 'accept', {"id": id_,  "txid": txid}, keys=keys)
+
+class XAdmin(Service):
+    service = 'x-admin'
+    def get_admin_accounts(self):
+        with self.get('/admin_accounts') as reply:
+            reply.raise_for_status()
+            return reply.json()
+    def get_config(self):
+        with self.get('/native/admin/config') as reply:
+            reply.raise_for_status()
+            return reply.json()
+    def set_config(self, json):
+        with self.put('/native/admin/config', json=json) as reply:
+            reply.raise_for_status()
