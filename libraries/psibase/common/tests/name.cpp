@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <iostream>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>

@@ -39,13 +39,13 @@ export const Settings = () => {
         </div>
       </div>
     );
-  }  else
+  } else
     return (
       <div className="mx-auto w-full grid p-4 grid-cols-1 lg:grid-cols-2 gap-8 max-w-screen-xl">
         {isSuccess && (
           <MetaDataForm
             key={currentApp}
-            existingValues={metadata ? metadata.appMetadata : undefined}
+            existingValues={metadata?.appMetadata}
             onSubmit={async (x) => {
               await updateMetadata({
                 metadata: {

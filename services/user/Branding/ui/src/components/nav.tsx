@@ -1,6 +1,8 @@
-import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
-import { SettingsDropdown } from "@/components/settings-dropdown";
 import { siblingUrl } from "@psibase/common-lib";
+
+import { SettingsDropdown } from "@/components/settings-dropdown";
+
+import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
 
 function HoverBorderGradientDemo() {
     return (

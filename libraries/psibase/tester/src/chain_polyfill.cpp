@@ -1,4 +1,4 @@
-#include <psibase/RawNativeFunctions.hpp>
+#include <psibase/api.hpp>
 #include <psibase/testerApi.hpp>
 
 using namespace psibase;

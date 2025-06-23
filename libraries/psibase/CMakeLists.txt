@@ -19,8 +19,9 @@ function(add suffix)
     )
 
     if(DEFINED IS_WASM)
+        find_package(Catch2 3 REQUIRED)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
-        target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-wasip1)
+        target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-psibase)
 
         add_library(simple-malloc-objects${suffix} OBJECT service/src/simple_malloc.cpp)
         target_link_libraries(simple-malloc-objects${suffix} PUBLIC wasm-base${suffix})
@@ -136,10 +137,9 @@ function(add suffix)
             psibase${suffix}
             Spki${suffix}
             PrivateKeyInfo${suffix}
-            catch2
+            Catch2::Catch2
             boost
             -lz
-            -lsecp256k1
             -lc++
             -lc++abi
             -L${CMAKE_CURRENT_BINARY_DIR}
@@ -181,7 +181,7 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS filesystem log)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 Boost::filesystem Boost::log debug_eos_vm -ldl)
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent Boost::filesystem Boost::log debug_eos_vm -ldl)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
@@ -219,7 +219,7 @@ endif()
 if(IS_WASM)
     install(DIRECTORY common/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY tester/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
-    install(DIRECTORY wasm32-wasip1 TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.h")
+    install(DIRECTORY wasm32-psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.h")
     install(PROGRAMS sdk/psidk-cmake-args TYPE BIN COMPONENT libpsibase)
     install(FILES sdk/psibase-config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psibase COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements.a ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements-debug.a TYPE LIB COMPONENT libpsibase)

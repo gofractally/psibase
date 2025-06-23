@@ -3,9 +3,9 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
-#include <psibase/RawNativeFunctions.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
+#include <psibase/api.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>

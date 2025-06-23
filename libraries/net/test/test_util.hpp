@@ -13,7 +13,7 @@
 #include <filesystem>
 #include <random>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 template <>
 struct Catch::StringMaker<psibase::Checksum256>
@@ -315,8 +315,8 @@ psibase::Transaction setProducers(const psibase::ConsensusData& producers);
 std::vector<psibase::AccountNumber> makeAccounts(
     const std::vector<std::string_view>& producer_names);
 
-auto makeBoot(const psibase::ConsensusData& producers,
-              bool enableEcdsa = false) -> std::vector<psibase::SignedTransaction>;
+auto makeBoot(const psibase::ConsensusData& producers, bool enableEcdsa = false)
+    -> std::vector<psibase::SignedTransaction>;
 
 template <typename Node>
 void boot(Node& node, const psibase::ConsensusData& producers, bool enableEcdsa = false)

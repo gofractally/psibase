@@ -45,9 +45,4 @@
         "src",
         "../../CommonApi/common/resources/useGraphQLQuery.d.ts"
     ],
-    "references": [
-        {
-            "path": "./tsconfig.node.json"
-        }
-    ]
 }

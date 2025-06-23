@@ -2,14 +2,14 @@
 #include <psibase/testerApi.hpp>
 
 #include <psibase/serviceEntry.hpp>
-
-#include <secp256k1.h>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
 
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <catch2/catch_message.hpp>
 
 namespace psibase::tester::raw
 {
