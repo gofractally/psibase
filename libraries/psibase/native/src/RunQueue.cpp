@@ -136,7 +136,10 @@ namespace psibase
 
       ~Impl()
       {
-         numThreads = 0;
+         {
+            std::lock_guard l(queue->mutex);
+            numThreads = 0;
+         }
          adjustThreads();
       }
       // Starts or stops threads to match numThreads
