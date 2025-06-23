@@ -25,3 +25,4 @@ pub mod subgroups;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;
+pub mod x_admin;
