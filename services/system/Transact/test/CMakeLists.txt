@@ -1,5 +1,6 @@
 function(add suffix)
     add_system_service("${suffix}" GetUser GetUser.cpp)
+    add_system_service("${suffix}" VerifyFlagsService VerifyFlagsService.cpp)
 endfunction(add)
 
 if(DEFINED IS_WASM)

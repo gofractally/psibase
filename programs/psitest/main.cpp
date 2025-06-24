@@ -244,6 +244,12 @@ struct test_chain_ref
    test_chain_ref& operator=(const test_chain_ref&);
 };
 
+struct NullSocket : psibase::Socket
+{
+   void                send(std::span<const char> data) {}
+   psibase::SocketInfo info() const { return psibase::ProducerMulticastSocketInfo{}; }
+};
+
 struct test_chain
 {
    ::state&                                 state;
@@ -287,6 +293,8 @@ struct test_chain
                                  std::make_shared<psibase::Sockets>(this->db)});
       state.shared_memory_cache.init(*sys);
       head = this->db.getHead();
+
+      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
    }
 
    test_chain(::state&                         state,
@@ -1272,11 +1280,16 @@ struct callbacks
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
 
-   uint32_t testerVerify(uint32_t chain_index, span<const char> args_packed)
+   uint32_t testerRunAction(uint32_t         chain_index,
+                            std::uint32_t    mode,
+                            bool             head,
+                            span<const char> args_packed)
    {
       auto&              chain = assert_chain(chain_index);
       psio::input_stream s     = {args_packed.data(), args_packed.size()};
       auto               act   = psio::from_frac<psibase::Action>(args_packed);
+
+      auto dbMode = psibase::DbMode::from(static_cast<psibase::RunMode>(mode));
 
       BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
       BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
@@ -1284,12 +1297,25 @@ struct callbacks
       trace.actionTraces.emplace_back();
       try
       {
-         auto* bc = chain.readBlockContext();
+         if (head)
+         {
+            psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
+            bc.start();
 
-         psibase::SignedTransaction  trx;
-         psibase::TransactionContext tc{*bc, trx, trace, psibase::DbMode::verify()};
+            psibase::SignedTransaction  trx;
+            psibase::TransactionContext tc{bc, trx, trace, dbMode};
 
-         tc.execNonTrxAction(0, act, trace.actionTraces.back());
+            tc.execNonTrxAction(0, act, trace.actionTraces.back());
+         }
+         else
+         {
+            auto* bc = chain.readBlockContext();
+
+            psibase::SignedTransaction  trx;
+            psibase::TransactionContext tc{*bc, trx, trace, dbMode};
+
+            tc.execNonTrxAction(0, act, trace.actionTraces.back());
+         }
       }
       catch (const std::exception& e)
       {
@@ -1322,12 +1348,6 @@ struct callbacks
          proofBC.start(chain.blockContext->current.header.time);
          psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
                         "Genesis block may not have proofs");
-
-         psibase::check(signedTrx.proofs.size() == signedTrx.transaction->claims().size(),
-                        "proofs and claims must have same size");
-
-         for (size_t i = 0; i < signedTrx.proofs.size(); ++i)
-            proofBC.verifyProof(signedTrx, trace, i, std::nullopt, &*chain.blockContext);
 
          if (!proofBC.needGenesisAction)
          {
@@ -1446,6 +1466,18 @@ struct callbacks
       if (!socket->response.empty())
       {
          socket->logResponse();
+      }
+      else if (!tc.ownedSockets.owns(*chain.sys->sockets, *socket))
+      {
+         trace.error  = atrace.error;
+         auto  error  = trace.error;
+         auto& logger = chain.logger;
+         BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+         if (error)
+            PSIBASE_LOG(logger, warning)
+                << psibase::proxyServiceNum.str() << "::serve failed: " << *error;
+         else
+            PSIBASE_LOG(logger, info) << psibase::proxyServiceNum.str() << "::serve succeeded";
       }
 
       return fd;
@@ -1699,7 +1731,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::commitSubjective>("psibase", "commitSubjective");
    rhf_t::add<&callbacks::abortSubjective>("psibase", "abortSubjective");
    rhf_t::add<&callbacks::commitState>("psibase", "commitState");
-   rhf_t::add<&callbacks::testerVerify>("psibase", "verify");
+   rhf_t::add<&callbacks::testerRunAction>("psibase", "runAction");
    rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
    rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
    rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");

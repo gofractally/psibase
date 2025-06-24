@@ -1,6 +1,7 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
+#include <psibase/RunQueue.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
@@ -1436,6 +1437,10 @@ void run(const std::string&              db_path,
    // is destroyed.
    auto http_config = std::make_shared<http::http_config>();
 
+   // The runQueue needs to out-live the chainContext, so
+   // that notify is safe.
+   RunQueue runQueue{sharedState};
+
    boost::asio::io_context chainContext;
 
    auto server_work = boost::asio::make_work_guard(chainContext);
@@ -1466,6 +1471,13 @@ void run(const std::string&              db_path,
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
+
+   // The callback is *not* posted to chainContext. It can run concurrently.
+   node.chain().onChangeRunQueue([&] { runQueue.notify(); });
+
+   // This needs to be initialized after all chain state,
+   // because the thread pool can begin executing wasm immediately.
+   WasmThreadPool tpool{runQueue, 4};
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
