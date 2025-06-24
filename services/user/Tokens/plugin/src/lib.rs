@@ -36,7 +36,21 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
     }
 
-    fn burn(token_id: u32, amount: String, memo: String, from: String) -> Result<(), Error> {
+    fn burn(token_id: u32, amount: String, memo: String) -> Result<(), Error> {
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision.into()).unwrap();
+
+        let packed_args = tokens::action_structs::burn {
+            amount,
+            memo,
+            token_id: token.id,
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::burn::ACTION_NAME, &packed_args)
+    }
+
+    fn recall(token_id: u32, amount: String, memo: String, from: String) -> Result<(), Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
         let from = AccountNumber::from_str(from.as_str()).unwrap();
 
