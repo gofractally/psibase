@@ -414,3 +414,18 @@ TEST_CASE("Test push_transaction")
       }
    }
 }
+
+TEST_CASE("Test firstAuth")
+{
+   DefaultTestChain t;
+   t.setAutoBlockStart(false);
+   t.startBlock();
+   auto alice = t.addAccount("alice");
+   auto trx   = t.signTransaction(
+       t.makeTransaction({Action{.sender = alice, .service = AccountNumber{"nop"}}}));
+   auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied", FracPackBody{trx});
+   if (static_cast<int>(reply.status) < 400)
+   {
+      CHECK(TraceResult{unpackReply<TransactionTrace>(std::move(reply))}.failed(""));
+   }
+}

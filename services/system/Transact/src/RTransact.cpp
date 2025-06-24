@@ -107,10 +107,11 @@ namespace
       }
    }
 
-   void validateTransaction(const SignedTransaction& trx)
+   void validateTransaction(const Checksum256& id, const SignedTransaction& trx)
    {
       check(trx.transaction->claims().size() == trx.proofs.size(),
             "proofs and claims must have same size");
+      to<Transact>().checkFirstAuth(id, *trx.transaction);
    }
 
 }  // namespace
@@ -1214,8 +1215,8 @@ void RTransact::requeue()
 void RTransact::recv(const SignedTransaction& trx)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
-   validateTransaction(trx);
    auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+   validateTransaction(id, trx);
    if (pushTransaction(id, trx))
       forwardTransaction(trx);
 }
@@ -1269,7 +1270,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       auto query = request.query<WaitFor>();
       auto trx   = psio::from_frac<SignedTransaction>(request.body);
       auto id    = psibase::sha256(trx.transaction.data(), trx.transaction.size());
-      validateTransaction(trx);
+      validateTransaction(id, trx);
       bool json = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {
