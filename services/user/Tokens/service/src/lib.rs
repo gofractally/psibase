@@ -109,7 +109,7 @@ pub mod service {
     }
 
     #[action]
-    fn mapsymbol(token_id: u32, symbol: AccountNumber) {
+    fn map_symbol(token_id: u32, symbol: AccountNumber) {
         let mut token = Token::get_assert(token_id);
         let sender = get_sender();
         token.check_is_owner(sender);
