@@ -1,13 +1,13 @@
 #include <services/user/Events.hpp>
 #include <services/user/REvents.hpp>
 
+#include <iomanip>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/user/Packages.hpp>
 #include "TestService.hpp"
 
-#define CATCH_CONFIG_MAIN
-
+#include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
 using namespace psibase;

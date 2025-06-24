@@ -66,6 +66,9 @@ void Symbol::init()
    auto tNft = to<Tokens>().getToken(tid).ownerNft;
    to<Nft>().debit(tNft, "Taking ownership of system token");
 
+   // Make system token default untradeable
+   // to<Tokens>().setTokenConf(tid, "untradeable"_m, true);
+
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)
    {

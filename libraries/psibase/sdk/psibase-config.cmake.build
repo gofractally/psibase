@@ -20,9 +20,8 @@ target_link_options(wasm-base-debug INTERFACE $<$<CONFIG:Mixed>:${debug-link-fla
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE @ROOT_BINARY_DIR@/wasm/boost)
 
-add_library(catch2 INTERFACE)
-target_include_directories(catch2 INTERFACE @ROOT_BINARY_DIR@/wasm/catch2/include)
-target_compile_options(catch2 INTERFACE -DCATCH_CONFIG_NO_POSIX_SIGNALS -DCATCH_CONFIG_DISABLE_EXCEPTIONS)
+set(Catch2_ROOT @ROOT_BINARY_DIR@/wasm/deps)
+find_package(Catch2 REQUIRED)
 
 function(add_libs suffix)
 
@@ -48,7 +47,7 @@ function(add_libs suffix)
     add_library(psibase${suffix} INTERFACE)
     target_include_directories(psibase${suffix} INTERFACE
         @ROOT_SOURCE_DIR@/libraries/psibase/common/include
-        @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-wasip1
+        @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-psibase
         @ROOT_SOURCE_DIR@/services/system/Accounts/include
         @ROOT_SOURCE_DIR@/services/system/AuthAny/include
         @ROOT_SOURCE_DIR@/services/system/AuthSig/include
@@ -125,10 +124,9 @@ function(add_libs suffix)
         -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
         -L@ROOT_BINARY_DIR@/wasm/deps/lib
         psibase${suffix}
-        catch2
+        Catch2::Catch2
         boost
         -lz
-        -lsecp256k1
         -lc++
         -lc++abi
         -lc

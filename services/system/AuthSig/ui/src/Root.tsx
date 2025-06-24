@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { Nav } from "./components/nav";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@shared/shadcn/ui/sonner";
 
 function Root() {
   return (
