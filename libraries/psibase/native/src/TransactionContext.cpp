@@ -52,7 +52,7 @@ namespace psibase
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
-   static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit);
+   static void execProcessTransaction(TransactionContext& self);
 
    void TransactionContext::execTransaction()
    {
@@ -76,7 +76,7 @@ namespace psibase
       }
       else
       {
-         execProcessTransaction(*this, false);
+         execProcessTransaction(*this);
       }
 
       // If the transaction adjusted numExecutionMemories too big for this node, then attempt
@@ -84,19 +84,6 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
-   }
-
-   void TransactionContext::checkFirstAuth()
-   {
-      auto& db         = blockContext.db;
-      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
-      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
-                                                          WasmConfigRow::key(proofWasmConfigTable));
-      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
-      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
-
-      check(!blockContext.needGenesisAction, "checkFirstAuth does not handle genesis");
-      execProcessTransaction(*this, true);
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action)
@@ -142,10 +129,10 @@ namespace psibase
    }
 
    // TODO: eliminate extra copies
-   static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit)
+   static void execProcessTransaction(TransactionContext& self)
    {
       ProcessTransactionArgs args{.transaction           = self.signedTransaction.transaction,
-                                  .checkFirstAuthAndExit = checkFirstAuthAndExit};
+                                  .checkFirstAuthAndExit = false};
 
       Action action{
           .sender  = AccountNumber(),

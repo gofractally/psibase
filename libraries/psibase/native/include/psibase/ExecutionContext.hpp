@@ -58,7 +58,6 @@ namespace psibase
       static constexpr DbMode verify() { return {false, false, true, true}; }
       static constexpr DbMode callback() { return {true, true, false, false}; }
       static constexpr DbMode rpc() { return {true, false, false, false}; }
-      static constexpr DbMode firstAuth() { return {false, true, true, false}; }
       static constexpr DbMode from(RunMode mode)
       {
          switch (mode)
