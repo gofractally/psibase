@@ -51,7 +51,9 @@ import {
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
-import { supervisor } from "./main";
+import { getSupervisor } from "@psibase/common-lib";
+
+const supervisor = getSupervisor();
 
 dayjs.extend(relativeTime);
 
@@ -89,112 +91,76 @@ export const AccountSelection = () => {
   const { isDirty, isSubmitting } = form.formState;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log("🔄 onSubmit called with values:", values);
-    console.log("🔄 isCreatingAccount:", isCreatingAccount);
-    console.log("🔄 connectionToken:", connectionToken);
-    console.log("🔄 inviteToken:", inviteToken);
-
     try {
       if (isCreatingAccount) {
-        console.log("📝 Creating account for invite...");
         void (await createAccount(values.username));
-        console.log("✅ Account created, accepting invite...");
         void (await acceptInvite({
           origin: inviteToken ? inviteToken.appDomain : connectionToken!.origin,
           app: inviteToken ? inviteToken.app : connectionToken!.app,
           accountName: values.username,
           token: z.string().parse(token),
         }));
-        console.log("✅ Invite accepted");
       } else {
-        console.log("📥 Importing account...");
         void (await importAccount(values.username));
-        console.log("✅ Account imported, logging in...");
         void (await login({
           accountName: values.username,
           app: connectionToken!.app,
           origin: connectionToken!.origin,
         }));
-        console.log("✅ Login completed");
       }
 
-      console.log("🎫 Getting auth token...");
-      const res = await supervisor.functionCall({
+      const authedQueryToken = await supervisor.functionCall({
         service: "accounts",
         intf: "admin",
         method: "getAuthedQueryToken",
         params: [values.username],
       });
-      console.log("✅ get_authed_query_token() returned:", res);
 
       // Attach iframe and send token
       const iframeUrl = `${connectionToken!.origin}/common/auth-cookie.html`;
-      console.log("🖼️ Creating iframe with URL:", iframeUrl);
       const iframe = document.createElement("iframe");
       iframe.src = iframeUrl;
       iframe.style.display = "none";
 
       // Handler for confirmation message from iframe
       function handleMessage(event: MessageEvent) {
-        console.log(
-          "📨 Received message from iframe:",
-          event.data,
-          "from origin:",
-          event.origin
-        );
-        if (event.origin !== connectionToken!.origin) {
-          console.log(
-            "❌ Ignoring message from wrong origin. Expected:",
-            connectionToken!.origin
-          );
-          return;
-        }
         const data = event.data;
         if (data && data.id === "set-cookie") {
-          console.log("🍪 Processing set-cookie response:", data);
           // Clean up: remove event listener and iframe
           window.removeEventListener("message", handleMessage);
           iframe.remove();
           if (data.status === "ok") {
-            console.log(
-              "✅ Cookie set successfully! Redirecting to:",
-              connectionToken!.origin
-            );
             // Redirect after confirmation
             window.location.href = connectionToken!.origin;
           } else {
             console.error("❌ Failed to set cookie:", data.error);
-            alert("Failed to set cookie: " + (data.error || "Unknown error"));
+            logout();
+            return;
           }
-        } else if (data && data.status === "ready") {
-          console.log("🖼️ Iframe reported ready");
-        } else {
-          console.log("📨 Received other message:", data);
         }
       }
 
       window.addEventListener("message", handleMessage);
 
       iframe.onload = () => {
-        console.log("🖼️ Iframe loaded, sending token...");
         // Wait for iframe to load, then postMessage
         iframe.contentWindow?.postMessage(
-          { token: res, id: "set-cookie" },
+          { token: authedQueryToken, id: "set-cookie" },
           `${connectionToken!.origin}`
         );
-        console.log("📤 Token sent to iframe");
       };
 
       iframe.onerror = (error) => {
         console.error("❌ Iframe failed to load:", error);
-        alert("Iframe failed to load: " + error);
+        logout();
+        return;
       };
 
       document.body.appendChild(iframe);
-      console.log("🖼️ Iframe appended to body");
     } catch (error) {
-      console.error("❌ Error in onSubmit:", error);
-      alert("An error occurred during login: " + error);
+      console.error("❌ Error in logging in:", error);
+      await logout();
+      return;
     }
   };
 
@@ -258,7 +224,6 @@ export const AccountSelection = () => {
   // AccountsList only shows accounts already connected to apps,
   // so all that's needed here is a "direct" login.
   const onAccountSelection = async (accountId: string) => {
-    console.log("🔄 onAccountSelection called with accountId:", accountId);
     setSelectedAccountId(accountId);
     if (!isInvite) {
       if (!connectionToken) {
@@ -266,67 +231,40 @@ export const AccountSelection = () => {
       }
 
       try {
-        console.log("🔐 Direct login for existing account...");
         login({
           accountName: accountId,
           app: connectionToken.app,
           origin: connectionToken.origin,
         });
 
-        console.log("🎫 Getting auth token for existing account...");
-        const res = await supervisor.functionCall({
+        const authedQueryToken = await supervisor.functionCall({
           service: "accounts",
           intf: "admin",
           method: "getAuthedQueryToken",
           params: [accountId],
         });
-        console.log("✅ get_authed_query_token() returned:", res);
 
         // Create iframe and set cookie (same as onSubmit)
         const iframeUrl = `${connectionToken.origin}/common/auth-cookie.html`;
-        console.log(
-          "🖼️ Creating iframe for existing account with URL:",
-          iframeUrl
-        );
         const iframe = document.createElement("iframe");
         iframe.src = iframeUrl;
         iframe.style.display = "none";
 
         // Handler for confirmation message from iframe
         function handleMessage(event: MessageEvent) {
-          console.log(
-            "📨 onAccountSelection received message:",
-            event.data,
-            "from:",
-            event.origin
-          );
-          if (event.origin !== connectionToken?.origin) {
-            console.log(
-              "❌ Ignoring message from wrong origin. Expected:",
-              connectionToken?.origin
-            );
-            return;
-          }
           const data = event.data;
           if (data && data.id === "set-cookie") {
-            console.log(
-              "🍪 Processing set-cookie response for existing account:",
-              data
-            );
             window.removeEventListener("message", handleMessage);
             iframe.remove();
             if (data.status === "ok") {
-              console.log(
-                "✅ Cookie set for existing account! Redirecting to:",
-                connectionToken?.origin
-              );
-              window.location.href = connectionToken?.origin;
+              window.location.href = connectionToken!.origin;
             } else {
               console.error(
                 "❌ Failed to set cookie for existing account:",
                 data.error
               );
-              alert("Failed to set cookie: " + (data.error || "Unknown error"));
+              logout();
+              return;
             }
           }
         }
@@ -334,14 +272,10 @@ export const AccountSelection = () => {
         window.addEventListener("message", handleMessage);
 
         iframe.onload = () => {
-          console.log(
-            "🖼️ Iframe loaded for existing account, sending token..."
-          );
           iframe.contentWindow?.postMessage(
-            { token: res, id: "set-cookie" },
-            connectionToken?.origin
+            { token: authedQueryToken, id: "set-cookie" },
+            connectionToken!.origin
           );
-          console.log("📤 Token sent to iframe for existing account");
         };
 
         iframe.onerror = (error) => {
@@ -349,13 +283,15 @@ export const AccountSelection = () => {
             "❌ Iframe failed to load for existing account:",
             error
           );
+          logout();
+          return;
         };
 
         document.body.appendChild(iframe);
-        console.log("🖼️ Iframe appended for existing account");
       } catch (error) {
-        console.error("❌ Error in onAccountSelection:", error);
-        alert("An error occurred during login: " + error);
+        console.error("❌ Error logging in:", error);
+        await logout();
+        return;
       }
     }
   };
@@ -390,6 +326,7 @@ export const AccountSelection = () => {
   );
 
   const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
+  const { mutateAsync: logout } = useLogout();
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } =
     useAcceptInvite();

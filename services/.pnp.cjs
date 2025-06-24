@@ -19729,15 +19729,6 @@ const RAW_RUNTIME_STATE =
           ["tinyglobby", "npm:0.2.14"]\
         ],\
         "linkType": "HARD"\
-      }],\
-      ["npm:0.2.14", {\
-        "packageLocation": "../.caches/yarn/tinyglobby-npm-0.2.14-d4e4bcf80e-f789ed6c92.zip/node_modules/tinyglobby/",\
-        "packageDependencies": [\
-          ["fdir", "virtual:13dba315b30721812929c770ddde019c62f0f5aaf3d322e194cc0bf6cf728a558519bedd52ec8aab338ba88d51755f53d336e981f79120c140fd5c81616eeabd#npm:6.4.4"],\
-          ["picomatch", "npm:4.0.2"],\
-          ["tinyglobby", "npm:0.2.14"]\
-        ],\
-        "linkType": "HARD"\
       }]\
     ]],\
     ["tinylogic", [\

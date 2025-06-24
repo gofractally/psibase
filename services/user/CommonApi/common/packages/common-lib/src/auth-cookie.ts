@@ -56,7 +56,9 @@ window.addEventListener("message", async (/** @type {MessageEvent} */ event) => 
     let success = false;
     let error = undefined;
     try {
-        document.cookie = cookie;
+        const existingCookies = document.cookie.split(";").map(c => c.trim());
+        existingCookies.push(cookie);
+        document.cookie = existingCookies.join("; ");
         // Check if cookie was set
         success = document.cookie.includes(`accessToken=${encodeURIComponent(accessToken)}`);
         console.log("🍪 Cookie set success:", success);
