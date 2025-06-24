@@ -1971,29 +1971,6 @@ namespace psibase
                   }
                }
 
-               // TODO: in another thread: check first auth and first proof. After
-               //       they pass, schedule the remaining proofs. After they pass,
-               //       schedule the transaction for execution in the main thread.
-               //
-               // The first auth check is a prefiltering measure and is mostly redundant
-               // with main execution. Unlike the proofs, the first auth check is allowed
-               // to run with any state on any fork. This is OK since the main execution
-               // checks all auths including the first; the worst that could happen is
-               // the transaction being rejected because it passes on one fork but not
-               // another, potentially charging the user for the failed transaction. The
-               // first auth check, when not part of the main execution, runs in read-only
-               // mode. Transact lets the account's auth service know it's in a
-               // read-only mode so it doesn't fail the transaction trying to update its
-               // tables.
-               //
-               // Replay doesn't run the first auth check separately. This separate
-               // execution is a subjective measure; it's possible, but not advisable,
-               // for a modified node to skip it during production. This won't hurt
-               // consensus since replay never uses read-only mode for auth checks.
-               auto saveTrace = trace;
-               proofBC.checkFirstAuth(trx, trace, std::nullopt, bc);
-               trace = std::move(saveTrace);
-
                // TODO: RPC: don't forward failed transactions to P2P; this gives users
                //       feedback.
                // TODO: P2P: do forward failed transactions; this enables producers to
