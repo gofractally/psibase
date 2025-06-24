@@ -57,6 +57,7 @@ interface api {
     get-current-user: func() -> result<option<string>, error>;
 }
 
+// public interface for other apps to access the functionality of the accounts app
 world imports {
     import api;
     import active-app;

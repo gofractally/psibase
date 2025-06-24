@@ -51,6 +51,9 @@ import {
 } from "./TokenErrorUIs";
 import { ActiveSearch } from "./ActiveSearch";
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
+import { getSupervisor } from "@psibase/common-lib";
+
+const supervisor = getSupervisor();
 
 dayjs.extend(relativeTime);
 
@@ -88,23 +91,77 @@ export const AccountSelection = () => {
   const { isDirty, isSubmitting } = form.formState;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (isCreatingAccount) {
-      void (await createAccount(values.username));
-      void (await acceptInvite({
-        origin: inviteToken ? inviteToken.appDomain : connectionToken!.origin,
-        app: inviteToken ? inviteToken.app : connectionToken!.app,
-        accountName: values.username,
-        token: z.string().parse(token),
-      }));
-    } else {
-      void (await importAccount(values.username));
-      void (await login({
-        accountName: values.username,
-        app: connectionToken!.app,
-        origin: connectionToken!.origin,
-      }));
+    try {
+      if (isCreatingAccount) {
+        void (await createAccount(values.username));
+        void (await acceptInvite({
+          origin: inviteToken ? inviteToken.appDomain : connectionToken!.origin,
+          app: inviteToken ? inviteToken.app : connectionToken!.app,
+          accountName: values.username,
+          token: z.string().parse(token),
+        }));
+      } else {
+        void (await importAccount(values.username));
+        void (await login({
+          accountName: values.username,
+          app: connectionToken!.app,
+          origin: connectionToken!.origin,
+        }));
+      }
+
+      const authedQueryToken = await supervisor.functionCall({
+        service: "accounts",
+        intf: "admin",
+        method: "getAuthedQueryToken",
+        params: [values.username],
+      });
+
+      // Attach iframe and send token
+      const iframeUrl = `${connectionToken!.origin}/common/auth-cookie.html`;
+      const iframe = document.createElement("iframe");
+      iframe.src = iframeUrl;
+      iframe.style.display = "none";
+
+      // Handler for confirmation message from iframe
+      function handleMessage(event: MessageEvent) {
+        const data = event.data;
+        if (data && data.id === "set-cookie") {
+          // Clean up: remove event listener and iframe
+          window.removeEventListener("message", handleMessage);
+          iframe.remove();
+          if (data.status === "ok") {
+            // Redirect after confirmation
+            window.location.href = connectionToken!.origin;
+          } else {
+            console.error("❌ Failed to set cookie:", data.error);
+            logout();
+            return;
+          }
+        }
+      }
+
+      window.addEventListener("message", handleMessage);
+
+      iframe.onload = () => {
+        // Wait for iframe to load, then postMessage
+        iframe.contentWindow?.postMessage(
+          { token: authedQueryToken, id: "set-cookie" },
+          `${connectionToken!.origin}`
+        );
+      };
+
+      iframe.onerror = (error) => {
+        console.error("❌ Iframe failed to load:", error);
+        logout();
+        return;
+      };
+
+      document.body.appendChild(iframe);
+    } catch (error) {
+      console.error("❌ Error in logging in:", error);
+      await logout();
+      return;
     }
-    setIsModalOpen(false);
   };
 
   const username = form.watch("username");
@@ -139,18 +196,19 @@ export const AccountSelection = () => {
 
   const [activeSearch, setActiveSearch] = useState("");
   const accountsToRender = activeSearch
-    ? (accounts || []).filter((account) =>
+    ? (accounts || []).filter((account: { account: string }) =>
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
-  // const [accountsToRender, setAccountsToRender]: [
-  //   AccountType[],
-  //   (accounts: AccountType[]) => void,
-  // ] = useState<AccountType[]>([]);
 
-  // useEffect(() => {
-  //   setAccountsToRender(accounts || []);
-  // }, [accounts]);
+  useEffect(() => {
+    async function preloadAuthAny() {
+      await supervisor.preLoadPlugins([
+        { service: "auth-any", plugin: "plugin" },
+      ]);
+    }
+    preloadAuthAny();
+  }, []);
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -163,17 +221,78 @@ export const AccountSelection = () => {
   const disableModalSubmit: boolean =
     accountStatus !== (isInvite ? "Available" : "Taken");
 
-  const onAccountSelection = (accountId: string) => {
+  // AccountsList only shows accounts already connected to apps,
+  // so all that's needed here is a "direct" login.
+  const onAccountSelection = async (accountId: string) => {
     setSelectedAccountId(accountId);
     if (!isInvite) {
       if (!connectionToken) {
         throw new Error(`Expected connection token`);
       }
-      login({
-        accountName: accountId,
-        app: connectionToken.app,
-        origin: connectionToken.origin,
-      });
+
+      try {
+        login({
+          accountName: accountId,
+          app: connectionToken.app,
+          origin: connectionToken.origin,
+        });
+
+        const authedQueryToken = await supervisor.functionCall({
+          service: "accounts",
+          intf: "admin",
+          method: "getAuthedQueryToken",
+          params: [accountId],
+        });
+
+        // Create iframe and set cookie (same as onSubmit)
+        const iframeUrl = `${connectionToken.origin}/common/auth-cookie.html`;
+        const iframe = document.createElement("iframe");
+        iframe.src = iframeUrl;
+        iframe.style.display = "none";
+
+        // Handler for confirmation message from iframe
+        function handleMessage(event: MessageEvent) {
+          const data = event.data;
+          if (data && data.id === "set-cookie") {
+            window.removeEventListener("message", handleMessage);
+            iframe.remove();
+            if (data.status === "ok") {
+              window.location.href = connectionToken!.origin;
+            } else {
+              console.error(
+                "❌ Failed to set cookie for existing account:",
+                data.error
+              );
+              logout();
+              return;
+            }
+          }
+        }
+
+        window.addEventListener("message", handleMessage);
+
+        iframe.onload = () => {
+          iframe.contentWindow?.postMessage(
+            { token: authedQueryToken, id: "set-cookie" },
+            connectionToken!.origin
+          );
+        };
+
+        iframe.onerror = (error) => {
+          console.error(
+            "❌ Iframe failed to load for existing account:",
+            error
+          );
+          logout();
+          return;
+        };
+
+        document.body.appendChild(iframe);
+      } catch (error) {
+        console.error("❌ Error logging in:", error);
+        await logout();
+        return;
+      }
     }
   };
 
@@ -207,6 +326,7 @@ export const AccountSelection = () => {
   );
 
   const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
+  const { mutateAsync: logout } = useLogout();
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } =
     useAcceptInvite();
@@ -229,7 +349,7 @@ export const AccountSelection = () => {
     return <InviteExpiredCard token={token} />;
   }
 
-  const onAcceptOrLogin = () => {
+  const onAcceptOrLogin = async () => {
     if (isInvite) {
       if (!inviteToken) {
         throw new Error(`Expected invite token loaded`);
@@ -241,6 +361,7 @@ export const AccountSelection = () => {
         origin: inviteToken.appDomain,
       });
     } else {
+      // Login
       if (!connectionToken) {
         throw new Error(`Expected connection token for a login`);
       }
@@ -254,7 +375,10 @@ export const AccountSelection = () => {
 
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={(open) => setIsModalOpen(open)}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open: boolean) => setIsModalOpen(open)}
+      >
         <div className="mt-6">
           <DialogContent>
             <DialogHeader>
@@ -267,6 +391,7 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                   : "Import a pre-existing account prior to accepting / denying an invite."}
               </DialogDescription>
+              {/* <ImportAccountOrAcceptInviteForm /> */}
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
