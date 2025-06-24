@@ -38,7 +38,6 @@ pub mod service {
     pub struct TokenRecord {
         pub id: u32,       // TID
         pub ownerNft: u32, // NID
-        pub inflation: InflationRecord,
         pub config: u8,
         pub precision: Precision,
         pub currentSupply: Quantity,
@@ -84,23 +83,10 @@ pub mod service {
     fn gettoken(token_id: u32) -> TokenRecord {
         let token = Token::get_assert(token_id);
 
-        let inflation = InflationRecord {
-            settings: InfSettingsRecord {
-                dailyLimitPct: 0,
-                dailyLimitQty: 0,
-                yearlyLimitPct: 0,
-            },
-            stats: InfStatsRecord {
-                avgDaily: 0,
-                avgYearly: 0,
-            },
-        };
-
         TokenRecord {
             config: token.settings_value,
             currentSupply: token.current_supply,
             id: token.id,
-            inflation,
             maxSupply: token.max_supply,
             ownerNft: token.nft_id,
             precision: token.precision.into(),
