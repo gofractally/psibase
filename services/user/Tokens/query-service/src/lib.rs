@@ -5,8 +5,9 @@ mod service {
     use std::u32;
 
     use async_graphql::{connection::Connection, *};
-    use psibase::Asset;
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::*;
+    use psibase::{AccountNumber, Asset};
     use serde::Deserialize;
     use tokens::tables::tables::{
         Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
@@ -67,6 +68,21 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn user_tokens(&self, user: AccountNumber) -> Vec<Token> {
+            let tokens: Vec<Token> = TokenTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .range(0..=(u32::MAX))
+                .collect();
+
+            tokens
+                .into_iter()
+                .filter(|token| {
+                    let nft = Nfts::call_from(Wrapper::SERVICE).getNft(token.nft_id);
+                    nft.owner == user
+                })
+                .collect()
         }
 
         async fn user_balances(&self, user: AccountNumber) -> Vec<BalanceInstance> {
