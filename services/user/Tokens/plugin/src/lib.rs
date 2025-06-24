@@ -91,6 +91,41 @@ impl Intf for TokensPlugin {
         .packed();
         add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
+
+    fn set_user_global_config(index: u8, enabled: bool) -> Result<(), Error> {
+        let packed_args =
+            tokens::action_structs::set_user_global_config { enabled, index }.packed();
+        add_action_to_transaction(
+            tokens::action_structs::set_user_global_config::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_user_token_config(token_id: u32, index: u8, enabled: bool) -> Result<(), Error> {
+        let packed_args = tokens::action_structs::set_user_token_config {
+            enabled,
+            index,
+            token_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            tokens::action_structs::set_user_token_config::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_token_config(token_id: u32, index: u8, enabled: bool) -> Result<(), Error> {
+        let packed_args = tokens::action_structs::set_token_config {
+            enabled,
+            index,
+            token_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            tokens::action_structs::set_token_config::ACTION_NAME,
+            &packed_args,
+        )
+    }
 }
 
 impl Transfer for TokensPlugin {
