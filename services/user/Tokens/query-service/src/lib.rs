@@ -63,6 +63,26 @@ mod service {
             .await
         }
 
+        async fn user_balances(
+            &self,
+            user: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Balance>> {
+            TableQuery::subindex::<u32>(
+                BalanceTable::with_service(tokens::SERVICE).get_index_pk(),
+                &(user),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
         async fn user_tokens(&self, user: AccountNumber) -> Vec<Token> {
             let tokens: Vec<Token> = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -75,13 +95,6 @@ mod service {
                     let nft = Nfts::call_from(Wrapper::SERVICE).getNft(token.nft_id);
                     nft.owner == user
                 })
-                .collect()
-        }
-
-        async fn user_balances(&self, user: AccountNumber) -> Vec<Balance> {
-            BalanceTable::with_service(tokens::SERVICE)
-                .get_index_pk()
-                .range((user, 0)..=(user, u32::MAX))
                 .collect()
         }
     }
