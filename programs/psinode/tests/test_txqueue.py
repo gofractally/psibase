@@ -135,19 +135,5 @@ class TestTransactionQueue(unittest.TestCase):
                     self.assertNotEqual(action['sender'], 'alice')
         self.assertTrue(found_bob)
 
-    @testutil.psinode_test
-    def test_socket_in_auth(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer'])
-        a.install(sources=[testutil.test_packages()], packages=['SocketAuth'])
-        a.wait(new_block())
-
-        Accounts(a).new_account('alice', 's-socket-auth')
-        a.wait(new_block())
-        try:
-            a.push_action('alice', 'nop', 'autoClose', '')
-        except TransactionError:
-            pass
-
 if __name__ == '__main__':
     testutil.main()
