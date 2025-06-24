@@ -17,24 +17,6 @@ pub mod service {
     use psibase::*;
 
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
-    pub struct InfSettingsRecord {
-        pub dailyLimitPct: u64,
-        pub dailyLimitQty: u64,
-        pub yearlyLimitPct: u64,
-    }
-
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
-    pub struct InfStatsRecord {
-        pub avgDaily: i64,
-        pub avgYearly: i64,
-    }
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
-    pub struct InflationRecord {
-        pub settings: InfSettingsRecord,
-        pub stats: InfStatsRecord,
-    }
-
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct TokenRecord {
         pub id: u32,       // TID
         pub ownerNft: u32, // NID
