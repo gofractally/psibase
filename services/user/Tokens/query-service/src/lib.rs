@@ -15,13 +15,6 @@ mod service {
 
     struct Query;
 
-    #[derive(Deserialize, SimpleObject)]
-    pub struct BalanceInstance {
-        pub account: AccountNumber,
-        pub token_id: u32,
-        pub balance: Asset,
-    }
-
     #[Object]
     impl Query {
         async fn token(&self, token_id: u32) -> Option<Token> {
@@ -85,42 +78,10 @@ mod service {
                 .collect()
         }
 
-        async fn user_balances(&self, user: AccountNumber) -> Vec<BalanceInstance> {
-            let token_balances: Vec<Balance> = BalanceTable::with_service(tokens::SERVICE)
+        async fn user_balances(&self, user: AccountNumber) -> Vec<Balance> {
+            BalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .range((user, 0)..=(user, u32::MAX))
-                .collect();
-
-            let tokens: Vec<Token> = token_balances
-                .iter()
-                .map(|balance| {
-                    TokenTable::with_service(tokens::SERVICE)
-                        .get_index_pk()
-                        .get(&balance.token_id)
-                        .expect("faled to find token")
-                })
-                .collect();
-
-            token_balances
-                .into_iter()
-                .map(|token_balance| {
-                    let precision = tokens
-                        .iter()
-                        .find_map(|token| {
-                            if token.id == token_balance.token_id {
-                                Some(token.precision)
-                            } else {
-                                None
-                            }
-                        })
-                        .expect("failed to find precision");
-
-                    BalanceInstance {
-                        account: token_balance.account,
-                        balance: token_balance.balance.to_asset(precision.into()),
-                        token_id: token_balance.token_id,
-                    }
-                })
                 .collect()
         }
     }
