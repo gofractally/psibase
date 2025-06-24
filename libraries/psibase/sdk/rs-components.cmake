@@ -8,14 +8,14 @@ function(get_shared_cache_dir OUTPUT_VAR SOURCE_PATH)
         file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_PATH}/Cargo.toml" CARGO_CONTENT)
         if(CARGO_CONTENT MATCHES "\\[workspace\\]")
             # This is a nested workspace, use the nested shared cache
-            set(${OUTPUT_VAR} "/root/psibase/.caches/target-shared-nested" PARENT_SCOPE)
+            set(${OUTPUT_VAR} "${CMAKE_SOURCE_DIR}/.caches/target-shared-nested" PARENT_SCOPE)
         else()
             # This is a standalone package, use the main shared cache
-            set(${OUTPUT_VAR} "/root/psibase/.caches/target-shared" PARENT_SCOPE)
+            set(${OUTPUT_VAR} "${CMAKE_SOURCE_DIR}/.caches/target-shared" PARENT_SCOPE)
         endif()
     else()
         # Default to main workspace cache
-        set(${OUTPUT_VAR} "/root/psibase/.caches/target-shared" PARENT_SCOPE)
+        set(${OUTPUT_VAR} "${CMAKE_SOURCE_DIR}/.caches/target-shared" PARENT_SCOPE)
     endif()
 endfunction()
 

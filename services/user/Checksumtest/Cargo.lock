@@ -403,7 +403,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "checksumtest"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "checksumtest-pkg",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "checksumtest-pkg"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "checksumtest",
  "plugin",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1630,13 +1630,13 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "checksumtest",
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.30.0",
+ "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -1698,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1752,7 +1752,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1766,7 +1766,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1778,14 +1778,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "seahash",
 ]
@@ -1801,7 +1801,7 @@ dependencies = [
 
 [[package]]
 name = "r-checksumtest"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-graphql",
  "checksumtest",
@@ -2714,7 +2714,7 @@ version = "0.14.2+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
 dependencies = [
- "wit-bindgen-rt 0.39.0",
+ "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -3060,15 +3060,6 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
-dependencies = [
- "bitflags 2.9.1",
 ]
 
 [[package]]
