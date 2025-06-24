@@ -14,36 +14,11 @@ mod service {
 
     struct Query;
 
-    #[derive(SimpleObject)]
-    struct TokenDetail {
-        pub id: u32,
-        pub nft_id: u32,
-        pub precision: u8,
-        pub current_supply: Asset,
-        pub max_supply: Asset,
-        pub owner: AccountNumber,
-        pub symbol: Option<AccountNumber>,
-    }
-
     #[derive(Deserialize, SimpleObject)]
     pub struct BalanceInstance {
         pub account: AccountNumber,
         pub token_id: u32,
         pub balance: Asset,
-    }
-
-    impl TokenDetail {
-        fn from_token(token: Token, owner: AccountNumber) -> TokenDetail {
-            TokenDetail {
-                owner,
-                id: token.id,
-                nft_id: token.nft_id,
-                precision: token.precision,
-                current_supply: token.current_supply.to_asset(token.precision.into()),
-                max_supply: token.max_supply.to_asset(token.precision.into()),
-                symbol: token.symbol,
-            }
-        }
     }
 
     #[Object]

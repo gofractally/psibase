@@ -27,10 +27,6 @@ namespace UserService
       TID create(Precision precision, Quantity maxSupply);
 
       void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
-
-      //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
-      //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
-
       void burn(TID tokenId, Quantity amount);
 
       void setUserConf(psibase::EnumElement flag, bool enable);

@@ -80,7 +80,8 @@ pub mod service {
     }
 
     #[action]
-    fn gettoken(token_id: u32) -> TokenRecord {
+    #[allow(non_snake_case)]
+    fn getToken(token_id: u32) -> TokenRecord {
         let token = Token::get_assert(token_id);
 
         TokenRecord {

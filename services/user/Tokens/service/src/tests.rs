@@ -134,7 +134,7 @@ mod tests {
             .mint(2, 67655.into(), "memo".to_string())
             .get()?;
 
-        let token_detail = Wrapper::push_from(&chain, alice).gettoken(token_id).get()?;
+        let token_detail = Wrapper::push_from(&chain, alice).getToken(token_id).get()?;
 
         assert!(
             token_detail.currentSupply == token_detail.maxSupply,
@@ -150,7 +150,7 @@ mod tests {
 
         let supply_delta = token_detail.currentSupply
             - Wrapper::push_from(&chain, alice)
-                .gettoken(token_id)
+                .getToken(token_id)
                 .get()?
                 .currentSupply;
         assert_eq!(supply_delta, 3.into());
