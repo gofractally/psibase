@@ -12,17 +12,27 @@ pub mod Hooks {
     use crate::AccountNumber;
 
     #[action]
-    fn evalRegister(evaluation_id: u32, account: AccountNumber) {
+    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
         unimplemented!()
     }
 
     #[action]
-    fn evalUnregister(evaluation_id: u32, account: AccountNumber) {
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
         unimplemented!()
     }
 
     #[action]
-    fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
+    fn on_grp_fin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_eval_fin(evaluation_id: u32) {
         unimplemented!()
     }
 }
@@ -61,10 +71,9 @@ pub mod Service {
     /// Starts an evaluation, sorting registrants into groups and enabling proposal submission.
     ///
     /// # Arguments
-    /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to start.
     #[action]
-    fn start(owner: AccountNumber, evaluation_id: u32) {
+    fn start(evaluation_id: u32) {
         unimplemented!()
     }
 
@@ -92,10 +101,9 @@ pub mod Service {
     /// Closes an evaluation and deletes its groups.
     ///
     /// # Arguments
-    /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
-    fn close(owner: AccountNumber, evaluation_id: u32) {
+    fn close(evaluation_id: u32) {
         unimplemented!()
     }
 

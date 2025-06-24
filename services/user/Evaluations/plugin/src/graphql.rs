@@ -75,3 +75,23 @@ pub fn fetch_key_history(
 
     KeyHistoryResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
 }
+
+pub fn fetch_group_users(
+    owner: psibase::AccountNumber,
+    evaluation_id: u32,
+    group_number: u32,
+) -> Result<UserConnection, CommonServer::Error> {
+    let query = format!(
+        r#"query {{
+            getGroupUsers(owner: "{owner}", evaluationId: {evaluation_id}, groupNumber: {group_number}) {{
+                nodes {{
+                    user
+                }}
+            }}
+        }}"#,
+        owner = owner,
+        evaluation_id = evaluation_id,
+        group_number = group_number
+    );
+    UserConnection::try_from(CommonServer::post_graphql_get_json(&query)?)
+}
