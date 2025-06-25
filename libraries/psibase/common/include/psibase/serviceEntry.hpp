@@ -22,4 +22,11 @@ namespace psibase
       std::vector<char> proof;
       PSIO_REFLECT(VerifyArgs, transactionHash, claim, proof)
    };
+
+   Action makeVerify(const Checksum256&    transactionHash,
+                     const Claim&          claim,
+                     std::span<const char> proof);
+   Action makeVerify(const SignedTransaction& trx,
+                     const Checksum256&       transactionHash,
+                     std::size_t              idx);
 }  // namespace psibase

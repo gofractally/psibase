@@ -221,10 +221,11 @@ namespace psibase
                                              const Action& action,
                                              ActionTrace&  atrace)
    {
-      auto& db         = blockContext.db;
-      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
-      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
-          WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
+      auto& db             = blockContext.db;
+      config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
+      auto wasmConfigTable = dbMode.verifyOnly ? proofWasmConfigTable : transactionWasmConfigTable;
+      impl->wasmConfig =
+          db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db, WasmConfigRow::key(wasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
       remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
 
@@ -344,7 +345,7 @@ namespace psibase
       return impl->watchdog.elapsed();
    }
 
-   void TransactionContext::setWatchdog(std::chrono::steady_clock::duration watchdogLimit)
+   void TransactionContext::setWatchdog(CpuClock::duration watchdogLimit)
    {
       impl->watchdog.setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog

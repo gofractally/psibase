@@ -1,11 +1,12 @@
 mod db;
 mod helpers;
 
-#[psibase::service(tables = "db::tables")]
+#[psibase::service(tables = "db::tables", recursive = true)]
 #[allow(non_snake_case)]
 pub mod service {
     pub use crate::db::tables::*;
     use crate::helpers::{self, EvaluationStatus};
+    use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
     use psibase::*;
 
     #[event(history)]
@@ -25,12 +26,24 @@ pub mod service {
     pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
-    pub fn group_finished(
+    pub fn group_fin(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,
         users: Vec<AccountNumber>,
         result: Vec<u8>,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn evaluation_start(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn new_group(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        users: Vec<AccountNumber>,
     ) {
     }
 
@@ -95,15 +108,31 @@ pub mod service {
     /// Therefore it is recommended that evaluations are only used in a context where there is a whitelist of allowed registrants ahead of time.
     ///
     /// # Arguments
-    /// * `owner` - The account number of the evaluation owner.
     /// * `evaluation_id` - The ID of the evaluation to start.
     #[action]
-    fn start(owner: AccountNumber, evaluation_id: u32) {
+    fn start(evaluation_id: u32) {
+        let owner = get_sender();
         let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
         evaluation.create_groups();
+
+        evaluation.get_groups().into_iter().for_each(|group| {
+            let users: Vec<AccountNumber> = group
+                .get_users()
+                .into_iter()
+                .map(|user| user.user)
+                .collect();
+
+            Wrapper::emit()
+                .history()
+                .new_group(owner, evaluation_id, group.number, users);
+        });
+
+        Wrapper::emit()
+            .history()
+            .evaluation_start(owner, evaluation_id);
     }
 
     /// Sets the public key for the user to receive the symmetric key.
@@ -131,11 +160,12 @@ pub mod service {
 
         let sender = get_sender();
 
-        let group_number = evaluation
-            .get_user(sender)
-            .expect("user not found")
-            .group_number
-            .expect("user not grouped");
+        let group_number = check_some(
+            evaluation
+                .get_user(sender)
+                .and_then(|user| user.group_number),
+            "user not found or not grouped",
+        );
 
         let mut group = evaluation.get_group(group_number).expect("group not found");
         group.set_key_submitter(sender);
@@ -153,7 +183,26 @@ pub mod service {
     #[action]
     fn close(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
-        evaluation.assert_status(EvaluationStatus::Closed);
+
+        let is_closed = evaluation.get_current_phase() == EvaluationStatus::Closed;
+        let has_all_results = || {
+            evaluation
+                .get_groups()
+                .iter()
+                .all(|group| group.get_result().is_some())
+        };
+
+        check(
+            is_closed || has_all_results(),
+            "evaluation is still in progress",
+        );
+
+        // The ordering is important here, we want to make sure the hook is ran BEFORE
+        // we delete all groups + evaluation so that any users of this service
+        // have an oppurtunity to read any table data before it's dropped.
+        if evaluation.use_hooks {
+            EvalHooks::call_to(evaluation.owner).on_eval_fin(evaluation_id);
+        }
 
         evaluation.get_groups().iter().for_each(|group| {
             group.delete();
@@ -178,7 +227,7 @@ pub mod service {
             let phase = evaluation.get_current_phase();
             check(
                 phase == EvaluationStatus::Pending || phase == EvaluationStatus::Closed,
-                "evaluation is not deletable unless pending or closed",
+                "evaluation is not deletable unless pending, closed or force is true",
             );
         }
         evaluation.delete();
@@ -230,16 +279,15 @@ pub mod service {
         evaluation.assert_status(EvaluationStatus::Submission);
 
         let mut user = evaluation.get_user(sender).expect("user not found");
-        user.attest(attestation);
+        user.attest(attestation, evaluation.use_hooks);
 
         let group = evaluation
             .get_group(user.group_number.unwrap())
             .expect("group not found");
 
-        let result = group.get_result();
-        if result.is_some() {
-            group.declare_result(result.unwrap());
-        }
+        group
+            .get_result()
+            .map(|result| group.declare_result(result));
     }
 
     /// Registers a user for an evaluation during the registration phase.

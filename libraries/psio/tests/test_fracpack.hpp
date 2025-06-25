@@ -14,7 +14,7 @@
 #include <boost/core/demangle.hpp>
 #include <type_traits>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 template <typename T>
 struct Catch::StringMaker<std::optional<T>>
@@ -148,7 +148,7 @@ bool bitwise_equal(const psio::nested<T>& lhs, const psio::nested<T>& rhs)
 }
 
 template <typename T>
-struct BitwiseEqual : Catch::MatcherBase<T>
+struct BitwiseEqual : Catch::Matchers::MatcherBase<T>
 {
    explicit BitwiseEqual(const T& v) : value(v) {}
    bool        match(const T& other) const { return bitwise_equal(value, other); }

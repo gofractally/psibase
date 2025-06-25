@@ -26,6 +26,9 @@ namespace psibase
       std::set<AccountNumber>     modifiedAuthAccounts;
       std::set<CodeByHashKeyType> removedCode;
 
+      // Initialized on first use
+      std::optional<Checksum256> verifyContextId;
+
       loggers::common_logger trxLogger;
 
       BlockContext(SystemContext&                  systemContext,
@@ -47,6 +50,8 @@ namespace psibase
       void      callOnBlock();
       void      callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
       std::optional<SignedTransaction>         callNextTransaction();
+      std::vector<Checksum256>                 callPreverify(const SignedTransaction& trx);
+      void                                     callRun(psio::view<const RunRow> row);
       Checksum256                              makeEventMerkleRoot();
       Checksum256                              makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(
@@ -58,7 +63,8 @@ namespace psibase
                        TransactionTrace&                        trace,
                        size_t                                   i,
                        std::optional<std::chrono::microseconds> watchdogLimit,
-                       BlockContext*                            errorContext);
+                       BlockContext*                            errorContext,
+                       const Checksum256&                       token = {});
 
       void checkFirstAuth(const SignedTransaction&                 trx,
                           TransactionTrace&                        trace,
@@ -84,6 +90,8 @@ namespace psibase
           std::optional<std::chrono::microseconds> initialWatchdogLimit,
           bool                                     enableUndo,
           bool                                     commit);
+
+      Checksum256 getVerifyContextId();
 
       psibase::BlockTime getHeadBlockTime();
    };  // BlockContext

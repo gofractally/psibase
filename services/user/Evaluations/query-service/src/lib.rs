@@ -33,10 +33,50 @@ mod service {
         result: Vec<u8>,
     }
 
+    #[derive(Deserialize, SimpleObject)]
+    struct EvaluationStart {
+        owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+    }
+
+
+    #[derive(Deserialize, SimpleObject)]
+    struct NewGroup {
+        owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        group_number: u32,
+        users: Vec<AccountNumber>,
+    }
+
     struct Query;
 
     #[Object]
     impl Query {
+
+        async fn get_groups_created(
+            &self,
+            evaluation_owner: AccountNumber,
+            evaluation_id: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, NewGroup>> {
+            EventQuery::new("history.evaluations.new_group")
+                .condition(format!(
+                    "owner = '{}' AND evaluation_id = {}",
+                    evaluation_owner, evaluation_id
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
         async fn get_group_key(
             &self,
             evaluation_owner: AccountNumber,
@@ -61,12 +101,12 @@ mod service {
                 format!("owner = '{}'", evaluation_owner),
                 format!("evaluation_id = {}", evaluation_id),
             ];
-        
+
             if let Some(group_num) = group_number {
                 conditions.push(format!("group_number = {}", group_num));
             }
-        
-            EventQuery::new("history.evaluations.group_finished")
+
+            EventQuery::new("history.evaluations.group_fin")
                 .condition(conditions.join(" AND "))
                 .query()
         }

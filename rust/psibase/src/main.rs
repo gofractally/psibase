@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
-use futures::future::join_all;
+use futures::future::{join_all, try_join_all};
 use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -1518,28 +1518,33 @@ async fn do_install<T: Read + Seek>(
         let progress = ProgressBar::new(total_size as u64).with_style(
             ProgressStyle::with_template("{wide_bar} {bytes}/{total_bytes}\n{msg}")?,
         );
-        for (label, transactions, _carry) in upload_transactions {
-            progress.set_message(label);
+        let mut running = Vec::new();
+        progress.set_message("Uploading files");
+        for (_label, transactions, _carry) in &upload_transactions {
             for trx in transactions {
-                let len = trx.transaction.len() as u64;
-                let result = push_transaction(
-                    &node_args.api,
-                    client.clone(),
-                    trx.packed(),
-                    tx_args.trace,
-                    tx_args.console,
-                    Some(&progress),
-                )
-                .await;
-
-                if let Err(err) = result {
-                    progress.abandon();
-                    return Err(err);
-                }
-                progress.inc(len);
+                running.push(async {
+                    let len = trx.transaction.len() as u64;
+                    push_transaction(
+                        &node_args.api,
+                        client.clone(),
+                        trx.packed(),
+                        tx_args.trace,
+                        tx_args.console,
+                        Some(&progress),
+                    )
+                    .await?;
+                    progress.inc(len);
+                    Ok(())
+                })
             }
         }
-        progress.finish_and_clear();
+        let result: Result<_, anyhow::Error> = try_join_all(running).await;
+        if result.is_ok() {
+            progress.finish_and_clear();
+        } else {
+            progress.abandon();
+        }
+        result?;
     }
 
     if trx_builder.num_transactions() == 1 {

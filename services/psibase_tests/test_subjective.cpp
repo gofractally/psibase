@@ -1,3 +1,4 @@
+#include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>

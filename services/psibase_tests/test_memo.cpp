@@ -1,5 +1,6 @@
 #include <psibase/Memo.hpp>
 
+#include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 
 using namespace psibase;
