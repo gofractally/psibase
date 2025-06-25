@@ -137,7 +137,7 @@ mod tests {
         let token_detail = Wrapper::push_from(&chain, alice).getToken(token_id).get()?;
 
         assert!(
-            token_detail.currentSupply == token_detail.maxSupply,
+            token_detail.current_supply == token_detail.max_supply,
             "expected the current supply to be the max supply",
         );
 
@@ -148,11 +148,11 @@ mod tests {
             .recall(token_id, bob, 3.into(), format!(""))
             .get()?;
 
-        let supply_delta = token_detail.currentSupply
+        let supply_delta = token_detail.current_supply
             - Wrapper::push_from(&chain, alice)
                 .getToken(token_id)
                 .get()?
-                .currentSupply;
+                .current_supply;
         assert_eq!(supply_delta, 3.into());
 
         // Alice can burn some of Bobs balance

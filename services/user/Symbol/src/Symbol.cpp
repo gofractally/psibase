@@ -63,7 +63,7 @@ void Symbol::init()
    constexpr auto precision = Precision{4};
    auto           tid       = to<Tokens>().create(precision, Quantity{1'000'000'000e4});
    check(tid == Tokens::sysToken, wrongSysTokenId);
-   auto tNft = to<Tokens>().getToken(tid).ownerNft;
+   auto tNft = to<Tokens>().getToken(tid).owner_nft;
    to<Nft>().debit(tNft, "Taking ownership of system token");
 
    // Make system token default untradeable

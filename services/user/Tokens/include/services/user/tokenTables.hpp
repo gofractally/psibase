@@ -14,12 +14,12 @@ namespace UserService
    struct TokenRecord
    {
       TID       id;
-      NID       ownerNft;
+      NID       owner_nft;
       uint8_t   config;
       Precision precision;
-      Quantity  currentSupply;
-      Quantity  maxSupply;
-      SID       symbolId;
+      Quantity  current_supply;
+      Quantity  max_supply;
+      SID       symbol_id;
 
       using Configurations =
           psibase::Enum<psibase::EnumElement{"unrecallable"}, psibase::EnumElement{"untradeable"}>;
@@ -37,7 +37,7 @@ namespace UserService
 
       auto operator<=>(const TokenRecord&) const = default;
    };
-   PSIO_REFLECT(TokenRecord, id, ownerNft, config, precision, currentSupply, maxSupply, symbolId);
+   PSIO_REFLECT(TokenRecord, id, owner_nft, config, precision, current_supply, max_supply, symbol_id);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    PSIO_REFLECT_TYPENAME(TokenTable)
 
