@@ -2,8 +2,6 @@
 #[allow(non_snake_case)]
 mod service {
 
-    use std::u32;
-
     use async_graphql::{connection::Connection, *};
     use psibase::services::nft::Wrapper as Nfts;
 
@@ -14,12 +12,42 @@ mod service {
 
     struct Query;
 
+    enum TokenType {
+        Number(u32),
+        Symbol(AccountNumber),
+    }
+
+    fn identify_token_type(token_id: String) -> TokenType {
+        use TokenType::{Number, Symbol};
+
+        let first_char = token_id.chars().next().unwrap();
+
+        if first_char.is_ascii_digit() {
+            Number(token_id.parse::<u32>().unwrap())
+        } else {
+            Symbol(AccountNumber::from(token_id.as_str()))
+        }
+    }
+
+    fn token_id_to_number(token_id: String) -> u32 {
+        match identify_token_type(token_id) {
+            TokenType::Number(num) => num,
+            TokenType::Symbol(account) => {
+                TokenTable::with_service(tokens::SERVICE)
+                    .get_index_by_symbol()
+                    .get(&Some(account))
+                    .unwrap()
+                    .id
+            }
+        }
+    }
+
     #[Object]
     impl Query {
-        async fn token(&self, token_id: u32) -> Option<Token> {
+        async fn token(&self, token_id: String) -> Option<Token> {
             TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
-                .get(&token_id)
+                .get(&token_id_to_number(token_id))
         }
 
         async fn user_credits(

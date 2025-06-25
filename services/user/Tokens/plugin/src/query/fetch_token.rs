@@ -1,4 +1,4 @@
-use crate::bindings::host::common::{server, types as CommonTypes};
+use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
 use psibase::{AccountNumber, Asset};
 
@@ -29,7 +29,7 @@ pub struct Token {
 pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
     let query = format!(
         r#"query {{
-        	token(tokenId: {token_id}) {{
+        	token(tokenId: "{token_id}") {{
         		precision
         		id
         		nftId
