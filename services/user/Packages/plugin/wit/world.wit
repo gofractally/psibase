@@ -66,7 +66,7 @@ interface queries {
     use host:common/types.{error};
     use types.{meta, package-source};
     get-installed-packages: func() -> result<list<meta>, error>;
-    get-sources: func() -> result<list<package-source>, error>;
+    get-sources: func(owner: string) -> result<list<package-source>, error>;
 }
 
 world imports {

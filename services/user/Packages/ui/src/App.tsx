@@ -62,12 +62,12 @@ async function readPackageIndexGQL(url: string, account: string): Promise<Packag
     return result;
 }
 
-async function getPackageIndex(): Promise<PackageRepo[]> {
+async function getPackageIndex(owner: string): Promise<PackageRepo[]> {
     let sources = await supervisor.functionCall({
         service: "packages",
         intf: "queries",
         method: "getSources",
-        params: [],
+        params: [owner],
     });
     if (sources.length == 0) {
         sources = [{url:siblingUrl(null, 'x-admin', '/packages')}];
@@ -110,8 +110,8 @@ async function loadPackages(ops: PackageOp[]): Promise<PackageInstallOp[]> {
     }));
 }
 
-async function installPackages(packages: string[], request_pref: string, non_request_pref: string) {
-    const index = flattenPackageIndex(await getPackageIndex());
+async function installPackages(owner: string, packages: string[], request_pref: string, non_request_pref: string) {
+    const index = flattenPackageIndex(await getPackageIndex(owner));
     const resolved = (await supervisor.functionCall({
         service: "packages",
         intf: "privateApi",
@@ -123,7 +123,7 @@ async function installPackages(packages: string[], request_pref: string, non_req
         service: "packages",
         intf: "privateApi",
         method: "buildTransactions",
-        params: [ops, 4],
+        params: [owner, ops, 4],
     })) as [ArrayBuffer[], ArrayBuffer[]];
     for (const tx of data) {
         await supervisor.functionCall({
@@ -152,7 +152,7 @@ export const App = () => {
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
     const init = async () => {
-        await getPackageIndex();
+        await getPackageIndex("root");
     };
 
     useEffect(() => {
@@ -164,7 +164,7 @@ export const App = () => {
     ) => {
         e.preventDefault();
         try {
-            await installPackages([packageName], "best", "current");
+            await installPackages("root", [packageName], "best", "current");
             setUploadStatus("");
             setChangesMade(false);
         } catch (e) {

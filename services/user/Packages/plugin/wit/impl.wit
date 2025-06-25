@@ -19,7 +19,7 @@ interface private-api {
     //
     // The format of the result is unspecified. The transactions returned
     // should only be passed to push-data and stage-install.
-    build-transactions: func(packages: list<package-op-full>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
+    build-transactions: func(owner: string, packages: list<package-op-full>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
 
     push-data: func(tx: list<u8>);
     propose-install: func(tx: list<u8>) -> result<_, error>;

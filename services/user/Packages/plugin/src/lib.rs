@@ -20,7 +20,7 @@ use exports::packages::plugin::queries::Guest as Queries;
 
 use psibase::fracpack::{Pack, Unpack};
 use psibase::{
-    account, get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
+    get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
     EssentialServices, InstalledPackageInfo, PackageDisposition, PackageManifest, PackagedService,
     SchemaMap, SignedTransaction, StagedUpload, Tapos, Transaction, TransactionBuilder,
 };
@@ -348,8 +348,8 @@ impl Queries for PackagesPlugin {
             .map(|p| p.meta().into())
             .collect())
     }
-    fn get_sources() -> Result<Vec<types::PackageSource>, CommonTypes::Error> {
-        let owner = account!("root");
+    fn get_sources(owner: String) -> Result<Vec<types::PackageSource>, CommonTypes::Error> {
+        let owner: AccountNumber = owner.parse().unwrap();
         let json = Server::post_graphql_get_json(&format!(
             "query {{ sources(account: {}) {{ url account }} }}",
             serde_json::to_string(&owner).unwrap(),
@@ -384,6 +384,7 @@ impl PrivateApi for PackagesPlugin {
         .collect())
     }
     fn build_transactions(
+        owner: String,
         packages: Vec<types::PackageOpFull>,
         compression_level: u8,
     ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), CommonTypes::Error> {
@@ -391,7 +392,7 @@ impl PrivateApi for PackagesPlugin {
 
         let index_cell = Cell::new(0);
 
-        let sender = account!("root");
+        let sender: AccountNumber = owner.parse().unwrap();
 
         let build_transaction =
             |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
