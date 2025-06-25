@@ -8,6 +8,13 @@ interface api {
     /// `code`: The compiled code as a byte array
     set-service-code: func(account: string, code: list<u8>);
 
+    /// Upload compiled service code to the server in a staging area shared
+    /// between the logged in user and the destination account. The service
+    /// will not become active until it is accepted by `account`.
+    /// Parameters:
+    /// `account`: The account to which to upload the code
+    /// `id`: A unique value
+    /// `code`: The compiled code as a byte array
     stage-service-code: func(account: string, id: u64, code: list<u8>);
 }
 
