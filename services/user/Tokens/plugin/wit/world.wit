@@ -4,7 +4,7 @@ interface types {
 
     type quantity = string;
     type precision = u8;
-    type token-id = u32;
+    type token-id = string;
     type token-number = u32;
     type account-number = string;
 

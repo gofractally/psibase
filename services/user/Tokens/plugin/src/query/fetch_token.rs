@@ -23,6 +23,7 @@ pub struct Token {
     pub current_supply: Asset,
     pub max_supply: Asset,
     pub owner: AccountNumber,
+    pub symbol: Option<AccountNumber>,
 }
 
 pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
@@ -34,6 +35,7 @@ pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
         		nftId
         		currentSupply
         		maxSupply
+                symbol
                 owner
         	}}
         }}"#,

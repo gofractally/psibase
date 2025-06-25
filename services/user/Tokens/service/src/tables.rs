@@ -39,6 +39,11 @@ pub mod tables {
     }
 
     impl Token {
+        #[secondary_key(1)]
+        fn by_symbol(&self) -> Option<AccountNumber> {
+            self.symbol
+        }
+
         pub fn get(id: u32) -> Option<Self> {
             TokenTable::new().get_index_pk().get(&id)
         }
