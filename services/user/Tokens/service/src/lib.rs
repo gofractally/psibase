@@ -18,13 +18,13 @@ pub mod service {
 
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct TokenRecord {
-        pub id: u32,        // TID
-        pub owner_nft: u32, // NID
-        pub config: u8,
+        pub id: u32,     // TID
+        pub nft_id: u32, // NID
+        pub settings_value: u8,
         pub precision: Precision,
         pub current_supply: Quantity,
         pub max_supply: Quantity,
-        pub symbol_id: AccountNumber, // SID
+        pub symbol: AccountNumber, // SID
     }
 
     #[action]
@@ -67,13 +67,13 @@ pub mod service {
         let token = Token::get_assert(token_id);
 
         TokenRecord {
-            config: token.settings_value,
+            settings_value: token.settings_value,
             current_supply: token.current_supply,
             id: token.id,
             max_supply: token.max_supply,
-            owner_nft: token.nft_id,
+            nft_id: token.nft_id,
             precision: token.precision.into(),
-            symbol_id: token.symbol.unwrap_or(AccountNumber::from(0)),
+            symbol: token.symbol.unwrap_or(AccountNumber::from(0)),
         }
     }
 
