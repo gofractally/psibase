@@ -5,6 +5,7 @@ interface types {
         name: string,
         version: string,
     }
+    /// Package metadata including where to fetch the package
     record package-info {
         name: string,
         version: string,
@@ -14,6 +15,7 @@ interface types {
         sha256: string,
         file: string,
     }
+    /// Package metadata
     record meta {
         name: string,
         version: string,
@@ -21,14 +23,29 @@ interface types {
         depends: list<package-ref>,
         accounts: list<string>,
     }
+    /// The location of a package repository.
+    ///
+    /// - If only `url` is provided, it means to use a static
+    ///   package repository at that location
+    /// - If only `account` is provided, it means to use an
+    ///   account on this chain
+    /// - If `account` and `url` are both provided, it means to
+    ///   use an account on a foreign chain
     record package-source {
         url: option<string>,
         account: option<string>,
     }
 
+    /// Specifies the default behavior for existing packages.
+    /// Package dependencies and explicitly requested versions
+    /// take precedence.
     enum package-preference {
+        /// Prefer the highest version regardless of compatibility
+        /// with the existing version
         best,
+        /// Prefer semver compatible versions
         compatible,
+        /// Prefer leaving the package unchanged
         current,
     }
 
