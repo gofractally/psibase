@@ -3,6 +3,7 @@ pub mod tables {
     use crate::flags::token_flags::TokenSetting;
     use crate::flags::token_holder_flags::TokenHolderFlags;
 
+    use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{
@@ -14,7 +15,7 @@ pub mod tables {
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct InitRow {
-        pub last_used_id: u32,
+        pub last_used_id: TID,
     }
     impl InitRow {
         #[primary_key]
@@ -26,7 +27,7 @@ pub mod tables {
     #[graphql(complex)]
     pub struct Token {
         #[primary_key]
-        pub id: u32,
+        pub id: TID,
         pub nft_id: u32,
         pub precision: u8,
         #[graphql(skip)]
@@ -43,12 +44,16 @@ pub mod tables {
             self.symbol
         }
 
-        pub fn get(id: u32) -> Option<Self> {
+        pub fn get(id: TID) -> Option<Self> {
             TokenTable::new().get_index_pk().get(&id)
         }
 
-        pub fn get_assert(id: u32) -> Self {
+        pub fn get_assert(id: TID) -> Self {
             check_some(Self::get(id), "failed to find token")
+        }
+
+        pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
+            TokenTable::new().get_index_by_symbol().get(&Some(symbol))
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -167,18 +172,18 @@ pub mod tables {
     #[graphql(complex)]
     pub struct Balance {
         pub account: AccountNumber,
-        pub token_id: u32,
+        pub token_id: TID,
         #[graphql(skip)]
         pub balance: Quantity,
     }
 
     impl Balance {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, u32) {
+        fn pk(&self) -> (AccountNumber, TID) {
             (self.account, self.token_id)
         }
 
-        fn new(account: AccountNumber, token_id: u32) -> Self {
+        fn new(account: AccountNumber, token_id: TID) -> Self {
             Token::get_assert(token_id);
             Self {
                 account,
@@ -187,18 +192,18 @@ pub mod tables {
             }
         }
 
-        pub fn get(account: AccountNumber, token_id: u32) -> Option<Self> {
+        pub fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
             BalanceTable::new().get_index_pk().get(&(account, token_id))
         }
 
-        pub fn add(account: AccountNumber, token_id: u32) -> Self {
+        pub fn add(account: AccountNumber, token_id: TID) -> Self {
             check_none(Self::get(account, token_id), "balance already exists");
             let mut instance = Self::new(account, token_id);
             instance.save();
             instance
         }
 
-        pub fn get_or_new(account: AccountNumber, token_id: u32) -> Self {
+        pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
@@ -234,7 +239,7 @@ pub mod tables {
     pub struct SharedBalance {
         pub creditor: AccountNumber,
         pub debitor: AccountNumber,
-        pub token_id: u32,
+        pub token_id: TID,
         #[graphql(skip)]
         pub balance: Quantity,
     }
@@ -263,21 +268,21 @@ pub mod tables {
 
     impl SharedBalance {
         #[primary_key]
-        fn pk(&self) -> (u32, AccountNumber, AccountNumber) {
+        fn pk(&self) -> (TID, AccountNumber, AccountNumber) {
             (self.token_id, self.creditor, self.debitor)
         }
 
         #[secondary_key(1)]
-        fn by_creditor(&self) -> (AccountNumber, AccountNumber, u32) {
+        fn by_creditor(&self) -> (AccountNumber, AccountNumber, TID) {
             (self.creditor, self.debitor, self.token_id)
         }
 
         #[secondary_key(2)]
-        fn by_debitor(&self) -> (AccountNumber, AccountNumber, u32) {
+        fn by_debitor(&self) -> (AccountNumber, AccountNumber, TID) {
             (self.debitor, self.creditor, self.token_id)
         }
 
-        fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
+        fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             check(
                 creditor != debitor,
                 format!("{} cannot be the creditor and debitor", creditor).as_str(),
@@ -290,7 +295,7 @@ pub mod tables {
             }
         }
 
-        pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: u32) -> Self {
+        pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             SharedBalanceTable::new()
                 .get_index_pk()
                 .get(&(token_id, creditor, debitor))
@@ -428,17 +433,17 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct TokenHolder {
         pub account: AccountNumber,
-        pub token_id: u32,
+        pub token_id: TID,
         pub flags: u8,
     }
 
     impl TokenHolder {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, u32) {
+        fn pk(&self) -> (AccountNumber, TID) {
             (self.account, self.token_id)
         }
 
-        fn new(account: AccountNumber, token_id: u32) -> Self {
+        fn new(account: AccountNumber, token_id: TID) -> Self {
             Self {
                 account,
                 token_id,
@@ -446,13 +451,13 @@ pub mod tables {
             }
         }
 
-        pub fn get(account: AccountNumber, token_id: u32) -> Option<Self> {
+        pub fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
             TokenHolderTable::new()
                 .get_index_pk()
                 .get(&(account, token_id))
         }
 
-        pub fn get_or_new(account: AccountNumber, token_id: u32) -> Self {
+        pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 

@@ -53,7 +53,7 @@ fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, Error> {
 }
 
 impl Intf for TokensPlugin {
-    fn create(precision: u8, max_supply: String) -> Result<(), Error> {
+    fn create(precision: u8, max_supply: Wit::Quantity) -> Result<(), Error> {
         let max_supply = Quantity::from_str(&max_supply, precision.into()).unwrap();
 
         let packed_args = tokens::action_structs::create {
@@ -65,7 +65,7 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
     }
 
-    fn burn(token_id: Wit::TokenId, amount: String, memo: String) -> Result<(), Error> {
+    fn burn(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
         let token = query::fetch_token::fetch_token(token_id)?;
@@ -83,9 +83,9 @@ impl Intf for TokensPlugin {
 
     fn recall(
         token_id: Wit::TokenId,
-        amount: String,
+        amount: Wit::Quantity,
         memo: String,
-        from: String,
+        from: Wit::AccountNumber,
     ) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
@@ -104,7 +104,7 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
     }
 
-    fn map_symbol(token_id: Wit::TokenId, symbol: String) -> Result<(), Error> {
+    fn map_symbol(token_id: Wit::TokenId, symbol: Wit::AccountNumber) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
         let packed_args = tokens::action_structs::map_symbol {
@@ -118,7 +118,7 @@ impl Intf for TokensPlugin {
         )
     }
 
-    fn mint(token_id: Wit::TokenId, amount: String, memo: String) -> Result<(), Error> {
+    fn mint(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
         let token = query::fetch_token::fetch_token(token_id)?;
@@ -181,8 +181,8 @@ impl Intf for TokensPlugin {
 impl Transfer for TokensPlugin {
     fn credit(
         token_id: Wit::TokenId,
-        debitor: String,
-        amount: String,
+        debitor: Wit::AccountNumber,
+        amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
@@ -206,8 +206,8 @@ impl Transfer for TokensPlugin {
 
     fn debit(
         token_id: Wit::TokenId,
-        creditor: String,
-        amount: String,
+        creditor: Wit::AccountNumber,
+        amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
@@ -231,8 +231,8 @@ impl Transfer for TokensPlugin {
 
     fn uncredit(
         token_id: Wit::TokenId,
-        debitor: String,
-        amount: String,
+        debitor: Wit::AccountNumber,
+        amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
