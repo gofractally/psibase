@@ -1950,7 +1950,6 @@ __metadata:
     react-dom: "npm:^19.1.0"
     react-qr-code: "npm:^2.0.15"
     react-router-dom: "npm:^6.26.1"
-    sonner: "npm:^2.0.5"
     typescript: "npm:^5.7.3"
     usehooks-ts: "npm:^3.1.0"
     vite: "npm:^5.4.1"
