@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Form,
     FormControl,
@@ -7,8 +7,8 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
 import { Quantity } from "@/apps/tokens/lib/quantity";
 import { supervisor } from "@/supervisor";
 import { zodResolver } from "@hookform/resolvers/zod";

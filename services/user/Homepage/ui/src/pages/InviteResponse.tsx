@@ -1,4 +1,3 @@
-import { useSearchParams } from "react-router-dom";
 import ConfettiExplosion from "react-confetti-explosion";
 
 import {
@@ -6,14 +5,10 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-} from "@/components/ui/card";
+} from "@shared/shadcn/ui/card";
 import { CircleCheck } from "lucide-react";
 
 export const InviteResponse = () => {
-    const [searchParams] = useSearchParams();
-
-    const token = searchParams.get("token");
-
     return (
         <Card className="mx-auto mt-4 w-[350px]">
             <ConfettiExplosion />

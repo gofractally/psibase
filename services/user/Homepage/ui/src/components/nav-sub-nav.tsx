@@ -6,10 +6,10 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 
 import { useNavLocation } from "@/hooks/use-nav-location";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 export function NavSubNav() {
     const { currentApp, currentChild } = useNavLocation();

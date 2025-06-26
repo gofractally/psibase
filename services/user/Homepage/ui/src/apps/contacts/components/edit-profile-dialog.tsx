@@ -1,11 +1,11 @@
 import { Trash, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { DialogDescription } from "@/components/ui/dialog";
-import { DialogTitle } from "@/components/ui/dialog";
-import { DialogContent } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Button } from "@shared/shadcn/ui/button";
+import { DialogDescription } from "@shared/shadcn/ui/dialog";
+import { DialogTitle } from "@shared/shadcn/ui/dialog";
+import { DialogContent } from "@shared/shadcn/ui/dialog";
+import { Input } from "@shared/shadcn/ui/input";
 
 import { FormProfile } from "@/components/form-profile";
 
@@ -67,7 +67,7 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
         }
     };
 
-    const { avatarSrc, type, forceRefresh } = useAvatar(currentUser);
+    const { avatarSrc, type } = useAvatar(currentUser);
     const removeImage = async () => {
         await removeAvatar();
     };

@@ -1,7 +1,7 @@
 import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
-import { Avatar } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar } from "@shared/shadcn/ui/avatar";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
 import { formatDistanceToNow } from "@/apps/chainmail/utils";
 

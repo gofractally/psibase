@@ -3,8 +3,6 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const u8Schema = z.number().int().min(0).max(255);
-
 const zAvatar = z.object({
     contentType: z.string(),
     content: z.any(),
