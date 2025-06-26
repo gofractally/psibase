@@ -24,7 +24,6 @@ export default defineConfig(({ command }) => {
                 additionalManualChunks: {
                     "ui-utils": [
                         "lucide-react",
-                        "sonner",
                         "@dicebear/collection",
                         "@dicebear/core",
                     ],

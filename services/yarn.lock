@@ -1982,7 +1982,6 @@ __metadata:
     react-dom: "npm:^19.1.0"
     react-router-dom: "npm:^6.23.1"
     rollup: "npm:^4.40.0"
-    sonner: "npm:^2.0.5"
     typescript: "npm:^5.7.3"
     vite: "npm:^5.4.1"
     vite-plugin-top-level-await: "npm:^1.4.1"
@@ -13500,7 +13499,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sonner@npm:2.0.5, sonner@npm:^2.0.5":
+"sonner@npm:2.0.5":
   version: 2.0.5
   resolution: "sonner@npm:2.0.5"
   peerDependencies:
