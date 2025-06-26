@@ -2,7 +2,7 @@
 
 use crate::{
     AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Hex,
-    JointConsensus, Pack, ToSchema, Unpack,
+    JointConsensus, MethodNumber, MicroSeconds, Pack, ToSchema, Unpack,
 };
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +22,8 @@ pub const CONSENSUS_CHANGE_TABLE: NativeTable = 10;
 pub const SNAPSHOT_TABLE: NativeTable = 11;
 pub const SCHEDULED_SNAPSHOT_TABLE: NativeTable = 12;
 pub const LOG_TRUNCATE_TABLE: NativeTable = 13;
+pub const SOCKET_TABLE: NativeTable = 14;
+pub const RUN_TABLE: NativeTable = 15;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -260,6 +262,8 @@ impl ScheduledSnapshotRow {
 }
 
 // If this row is present it indicates the height the block log starts at.
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct LogTruncateRow {
     pub start: BlockNum,
 }
@@ -268,5 +272,74 @@ impl LogTruncateRow {
     pub const DB: DbId = DbId::NativeSubjective;
     pub fn key(&self) -> (NativeTable, NativeIndex) {
         (LOG_TRUNCATE_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct ProducerMultiCastSocketInfo {}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct HttpSocketInfo {}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub enum SocketInfo {
+    ProducerMultiCastSocketInfo(ProducerMultiCastSocketInfo),
+    HttpSocketInfo(HttpSocketInfo),
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct SocketRow {
+    fd: i32,
+    info: SocketInfo,
+}
+
+impl SocketRow {
+    // Well-known fds
+    pub const PRODUCER_MULTICAST: i32 = 0;
+
+    pub const DB: DbId = DbId::NativeSubjective;
+    pub fn key(&self) -> (NativeTable, NativeIndex, i32) {
+        (SOCKET_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.fd)
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct RunMode(u8);
+
+impl RunMode {
+    pub const VERIFY: RunMode = RunMode(0);
+    pub const SPECULATIVE: RunMode = RunMode(1);
+    pub const RPC: RunMode = RunMode(2);
+    pub const CALLBACK: RunMode = RunMode(3);
+}
+
+pub type RunToken = Vec<u8>;
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct BoundMethod {
+    service: AccountNumber,
+    method: MethodNumber,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct RunRow {
+    id: u64,
+    mode: RunMode,
+    maxTime: MicroSeconds,
+    action: Action,
+    continuation: BoundMethod,
+}
+
+impl RunRow {
+    pub const DB: DbId = DbId::NativeSubjective;
+    pub fn key(&self) -> (NativeTable, NativeIndex, u64) {
+        (RUN_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.id)
     }
 }
