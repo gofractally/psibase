@@ -150,4 +150,18 @@ namespace psibase
    {
       return socketKey(fd);
    }
+
+   auto runPrefix() -> KeyPrefixType
+   {
+      return std::tuple{runTable, nativeTablePrimaryIndex};
+   }
+   auto runKey(std::uint64_t id) -> RunKeyType
+   {
+      return std::tuple{runTable, nativeTablePrimaryIndex, id};
+   }
+   auto RunRow::key() const -> RunKeyType
+   {
+      return runKey(id);
+   }
+
 }  // namespace psibase

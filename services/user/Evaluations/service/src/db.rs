@@ -166,11 +166,20 @@ pub mod impls {
             self.save();
         }
 
-        pub fn attest(&mut self, attestation: Vec<u8>) {
+        pub fn attest(&mut self, attestation: Vec<u8>, use_hook: bool) {
             psibase::check(
                 self.attestation.is_none(),
                 format!("user {} has already submitted", self.user).as_str(),
             );
+
+            if use_hook {
+                EvalHooks::call_to(self.owner).on_attest(
+                    self.evaluation_id,
+                    self.group_number.unwrap(),
+                    self.user,
+                    attestation.clone(),
+                );
+            }
 
             self.attestation = Some(attestation);
             self.save();
@@ -242,13 +251,13 @@ pub mod impls {
 
         fn notify_register(&self, registrant: AccountNumber) {
             if self.use_hooks {
-                EvalHooks::call_from(crate::Wrapper::SERVICE).evalRegister(self.id, registrant);
+                EvalHooks::call_to(self.owner).on_ev_reg(self.id, registrant);
             }
         }
 
         fn notify_unregister(&self, registrant: AccountNumber) {
             if self.use_hooks {
-                EvalHooks::call_from(crate::Wrapper::SERVICE).evalUnregister(self.id, registrant);
+                EvalHooks::call_to(self.owner).on_ev_unreg(self.id, registrant);
             }
         }
 
@@ -278,11 +287,10 @@ pub mod impls {
 
         pub fn get_groups(&self) -> Vec<Group> {
             let table = GroupTable::new();
-            let result = table
+            table
                 .get_index_pk()
                 .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
-                .collect();
-            result
+                .collect()
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
@@ -337,17 +345,14 @@ pub mod impls {
 
         pub fn assert_status(&self, expected_status: EvaluationStatus) {
             let current_phase = self.get_current_phase();
-            let phase_name = match current_phase {
-                EvaluationStatus::Pending => "Pending",
-                EvaluationStatus::Registration => "Registration",
-                EvaluationStatus::Deliberation => "Deliberation",
-                EvaluationStatus::Submission => "Submission",
-                EvaluationStatus::Closed => "Closed",
-            };
-            psibase::check(
-                current_phase == expected_status,
-                format!("evaluation must be in {phase_name} phase").as_str(),
-            );
+            if current_phase != expected_status {
+                psibase::abort_message(
+                    format!(
+                    "invalid evaluation phase, expected: {expected_status} actual: {current_phase}"
+                )
+                    .as_str(),
+                );
+            }
         }
 
         pub fn get_user(&self, user: AccountNumber) -> Option<User> {
@@ -478,7 +483,7 @@ pub mod impls {
             let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
 
             if parent_eval.use_hooks {
-                EvalHooks::call_from(crate::Wrapper::SERVICE).evalGroupFin(
+                EvalHooks::call_to(self.owner).on_grp_fin(
                     self.evaluation_id,
                     self.number,
                     result.clone(),
@@ -487,7 +492,7 @@ pub mod impls {
 
             let users = self.get_users().into_iter().map(|user| user.user).collect();
 
-            crate::Wrapper::emit().history().group_finished(
+            crate::Wrapper::emit().history().group_fin(
                 self.owner,
                 self.evaluation_id,
                 self.number,

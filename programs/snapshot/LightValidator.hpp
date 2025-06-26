@@ -292,9 +292,8 @@ namespace psibase
          psibase::Action     act{.service = claim.service,
                                  .method  = MethodNumber{"verifySys"},
                                  .rawData = psio::to_frac(args)};
-         auto                packed = psio::to_frac(act);
-         auto size  = tester::raw::verify(authServices.id, packed.data(), packed.size());
-         auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
+         auto trace = tester::runAction(authServices.id, RunMode::verify, false, act);
+
          if (trace.error && !trace.error->empty())
          {
             abortMessage("Signature verification failed: " + *trace.error);

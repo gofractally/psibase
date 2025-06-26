@@ -5,8 +5,8 @@ import unittest
 from predicates import *
 import time
 from threading import Thread
-from psinode import Action, Transaction, TransactionError
-from services import Accounts, Tokens, Transact
+from psinode import Action, Transaction, TransactionError, PrivateKey
+from services import Accounts, AuthSig, Tokens, Transact
 
 class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
@@ -55,6 +55,33 @@ class TestTransactionQueue(unittest.TestCase):
         a.wait(new_block())
         new_balance = tokens.balance('alice', token=1)
         self.assertEqual(old_balance - 10000, new_balance)
+
+    @testutil.psinode_test
+    def test_signed(self, cluster):
+        prods = cluster.complete(*testutil.generate_names(3))
+        testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'TokenUsers'])
+        (a, b, c) = prods
+
+        tokens = Tokens(a)
+        old_balance = tokens.balance('alice', token=1)
+
+        key = PrivateKey()
+        AuthSig(a).set_key('alice', key)
+        a.wait(new_block())
+
+        txqueue = Transact(c)
+        txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"}, keys=[key])
+        pred = new_block()
+        a.wait(pred)
+        a_balance = Tokens(a).balance('alice', token=1)
+        b.wait(pred)
+        b_balance = Tokens(b).balance('alice', token=1)
+        c.wait(pred)
+        c_balance = Tokens(c).balance('alice', token=1)
+        expected_balance = old_balance - 10000
+        self.assertEqual(a_balance, expected_balance)
+        self.assertEqual(b_balance, expected_balance)
+        self.assertEqual(c_balance, expected_balance)
 
     @testutil.psinode_test
     def test_restart_node(self, cluster):
@@ -107,20 +134,6 @@ class TestTransactionQueue(unittest.TestCase):
                         found_bob = True
                     self.assertNotEqual(action['sender'], 'alice')
         self.assertTrue(found_bob)
-
-    @testutil.psinode_test
-    def test_socket_in_auth(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer'])
-        a.install(sources=[testutil.test_packages()], packages=['SocketAuth'])
-        a.wait(new_block())
-
-        Accounts(a).new_account('alice', 's-socket-auth')
-        a.wait(new_block())
-        try:
-            a.push_action('alice', 'nop', 'autoClose', '')
-        except TransactionError:
-            pass
 
 if __name__ == '__main__':
     testutil.main()

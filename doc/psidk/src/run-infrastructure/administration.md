@@ -436,9 +436,9 @@ Examples:
 
 `/native/admin/log` is a websocket endpoint that provides access to server logs as they are generated. Each message from the server contains one log record. Messages sent to the server should be JSON objects representing the desired logger configuration for the connection.
 
-| Field  | Type             | Description                                                                                                                                          |
-|--------|------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
-| filter | String           | The [filter](./configuration/logging.md#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
-| format | String or Object | The [format](./configuration/logging.md#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
+| Field  | Type   | Description                                                                                                                                          |
+|--------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| filter | String | The [filter](./configuration/logging.md#log-filters) for this websocket. If no filter is provided, the default is to send all possible log messages. |
+| format | String | The [format](./configuration/logging.md#log-formatters) for log messages. If no format is provided, the default is JSON.                             |
 
 The server begins sending log messages after it receives the first logger configuration from the client. The client can change the configuration at any time.  The configuration change is asynchronous, so the server will continue to send messages using the old configuration for a short period after client sends the update but before the server processes it.

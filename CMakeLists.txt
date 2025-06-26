@@ -137,7 +137,7 @@ if(DEFINED WASI_SDK_PREFIX)
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
         Tokens Transact VerifySig XAdmin
         PSubjectiveService CounterService AsyncQueryService
-        SubjectiveCounterService KeepSocketService SocketListService SocketAuth)
+        SubjectiveCounterService KeepSocketService SocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -279,6 +279,7 @@ add_rs_component_workspace(services/:Plugins
     setcode
     clientdata
     invite
+    packages
     permissions
     sites
     test
@@ -421,6 +422,12 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH services/user/Evaluations
     DEPENDS ${Evaluations_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Fractals.psi
+    PATH services/user/Fractals
+    DEPENDS ${Fractals_js_DEP}
 )
 
 
@@ -846,11 +853,13 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Packages-schema.json
         SERVER r-packages
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Packages/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_packages} /plugin.wasm
     SERVICE r-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
-    DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
+    DEPENDS wasm ${Packages_js_DEP} ${Plugins_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -859,7 +868,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Evaluations Events Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs Evaluations Events Fractals Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -869,7 +878,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs Events Explorer Fractals HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -906,7 +915,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Evaluations Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs Events Evaluations Fractals Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -922,13 +931,14 @@ install(
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
-          ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/DevDefault.psi
           ${SERVICE_DIR}/ProdDefault.psi
+          ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
+          ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
@@ -1040,19 +1050,7 @@ psibase_package(
     DEPENDS wasm
 )
 
-psibase_package(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketAuth.psi
-    NAME SocketAuth
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Try to break sockets"
-    SERVICE s-socket-auth
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketAuth.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SocketAuth-schema.json
-        FLAGS allowSocket isSubjective
-    DEPENDS wasm
-)
-
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList SocketAuth)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList)
 
 ExternalProject_Add(
     rust

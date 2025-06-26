@@ -14,17 +14,17 @@ class Tokens(Service):
 
 class Transact(Service):
     service = 'transact'
-    def push_transaction(self, trx):
-        packed = self.api.pack_signed_transaction(trx)
+    def push_transaction(self, trx, keys=[]):
+        packed = self.api.pack_signed_transaction(trx, keys)
         with self.post('/push_transaction?wait_for=applied', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:
             response.raise_for_status()
             trace = response.json()
             if trace['error'] is not None:
                 raise TransactionError(trace)
             return trace
-    def push_action(self, sender, service, method, data, timeout=10, flags=0):
+    def push_action(self, sender, service, method, data, timeout=10, flags=0, keys=[]):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]))
+        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]), keys)
     def get_jwt_key(self, token):
         with self.get('/jwt_key', headers={"Authorization": "Bearer " + token}) as reply:
             reply.raise_for_status()
