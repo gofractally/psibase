@@ -12,12 +12,15 @@ pub enum TokenSettingIndex {
 
 impl From<u8> for TokenSettingIndex {
     fn from(value: u8) -> Self {
-        if value > 2 {
-            panic!("index out of bounds")
+        match value {
+            0 => TokenSettingIndex::Unburnable,
+            1 => TokenSettingIndex::Untransferable,
+            2 => TokenSettingIndex::Unrecallable,
+            _ => panic!("value out of bounds"),
         }
-        TokenSettingIndex::from(value)
     }
 }
+
 pub struct TokenSetting {
     pub value: u8,
 }

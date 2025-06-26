@@ -9,10 +9,11 @@ pub enum TokenHolderSettingIndex {
 
 impl From<u8> for TokenHolderSettingIndex {
     fn from(value: u8) -> Self {
-        if value > 1 {
-            panic!("index out of bounds")
+        match value {
+            0 => TokenHolderSettingIndex::Autodebit,
+            1 => TokenHolderSettingIndex::KeepZeroBalances,
+            _ => panic!("value out of bounds"),
         }
-        TokenHolderSettingIndex::from(value)
     }
 }
 

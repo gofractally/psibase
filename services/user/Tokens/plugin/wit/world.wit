@@ -36,9 +36,9 @@ interface intf {
 
     map-symbol: func(token-id: token-id, symbol: account-number) -> result<_, error>;
 
-    set-user-global-config: func(index: u8, enabled: bool) -> result<_, error>;
-    set-user-token-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
-    set-token-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
+    set-user-global-config: func(index: string, enabled: bool) -> result<_, error>;
+    set-user-token-config: func(token-id: token-id, index: string, enabled: bool) -> result<_, error>;
+    set-token-config: func(token-id: token-id, index: string, enabled: bool) -> result<_, error>;
 
 }
 
