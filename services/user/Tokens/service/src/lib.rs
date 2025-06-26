@@ -175,7 +175,6 @@ pub mod service {
 
     #[action]
     fn burn(token_id: TID, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
         let sender = get_sender();
         let mut token = Token::get_assert(token_id);
         let token_settings = token.settings();
@@ -191,8 +190,6 @@ pub mod service {
 
     #[action]
     fn mint(token_id: TID, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
-
         let mut token = Token::get_assert(token_id);
         let sender = get_sender();
         token.check_is_owner(sender);
@@ -203,8 +200,6 @@ pub mod service {
 
     #[action]
     fn credit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
-
         let creditor = get_sender();
         SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
 
@@ -215,7 +210,6 @@ pub mod service {
 
     #[action]
     fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
         let creditor = get_sender();
 
         SharedBalance::get_or_new(creditor, debitor, token_id).uncredit(amount);
@@ -227,14 +221,7 @@ pub mod service {
 
     #[action]
     fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
-        let debitor = get_sender();
-
-        SharedBalance::get_or_new(creditor, debitor, token_id).debit(amount);
-
-        Wrapper::emit()
-            .history()
-            .debited(token_id, creditor, debitor, amount, memo);
+        SharedBalance::get_or_new(creditor, get_sender(), token_id).debit(amount, memo);
     }
 
     #[event(history)]

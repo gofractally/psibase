@@ -131,6 +131,8 @@ pub mod tables {
         }
 
         pub fn mint(&mut self, amount: Quantity, receiver: AccountNumber) {
+            check(amount.value > 0, "mint quantity must be greater than 0");
+
             self.current_supply = self.current_supply + amount;
             psibase::check(self.current_supply <= self.max_supply, "over max supply");
             self.save();
@@ -139,6 +141,7 @@ pub mod tables {
         }
 
         pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
+            check(amount.value > 0, "burn quantity must be greater than 0");
             self.current_supply = self.current_supply - amount;
             self.save();
 
@@ -309,6 +312,8 @@ pub mod tables {
         }
 
         pub fn credit(&mut self, quantity: Quantity) {
+            check(quantity.value > 0, "credit quantity must be greater than 0");
+
             Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
 
@@ -323,31 +328,29 @@ pub mod tables {
                 .unwrap_or(Holder::get_or_new(self.debitor).is_auto_debit());
 
             if is_auto_debit {
-                self.debit(quantity);
+                self.debit(quantity, "Autodebit".to_string());
             }
         }
 
         pub fn uncredit(&mut self, quantity: Quantity) {
+            check(quantity.value > 0, "uncredit quantity be greater than 0");
+
             self.sub_balance(quantity);
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
         }
 
-        pub fn debit(&mut self, quantity: Quantity) {
+        pub fn debit(&mut self, quantity: Quantity, memo: String) {
+            check(quantity.value > 0, "debit quantity be greater than 0");
+
             crate::Wrapper::emit().history().debited(
                 self.token_id,
                 self.creditor,
                 self.debitor,
                 quantity,
-                "Autodebit".to_string(),
+                memo,
             );
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
-
-            let token = Token::get_assert(self.token_id);
-            check(
-                !token.settings().is_untransferable(),
-                "token is untransferable",
-            );
         }
 
         fn add_balance(&mut self, quantity: Quantity) {
