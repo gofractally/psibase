@@ -15,15 +15,18 @@ impl Asset {
             precision,
         }
     }
+}
 
-    pub fn format(&self) -> String {
+impl std::fmt::Display for Asset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.precision.value == 0 {
-            return self.quantity.value.to_string();
+            return write!(f, "{}", self.quantity.value.to_string());
         }
         let integer_part = self.quantity.value / 10u64.pow(self.precision.value as u32);
         let fractional_part = self.quantity.value % 10u64.pow(self.precision.value as u32);
 
-        format!(
+        write!(
+            f,
             "{}.{:0width$}",
             integer_part,
             fractional_part,
@@ -51,12 +54,6 @@ impl FromStr for Asset {
     }
 }
 
-impl std::fmt::Display for Asset {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.format())
-    }
-}
-
 serialize_as_str!(Asset, "asset");
 
 #[cfg(test)]
@@ -69,72 +66,78 @@ mod tests {
 
     #[test]
     fn test_precision_0() {
-        assert_eq!(create_asset(40000, 0).format(), "40000");
-        assert_eq!(create_asset(1, 0).format(), "1");
-        assert_eq!(create_asset(0, 0).format(), "0");
+        assert_eq!(create_asset(40000, 0).to_string(), "40000");
+        assert_eq!(create_asset(1, 0).to_string(), "1");
+        assert_eq!(create_asset(0, 0).to_string(), "0");
     }
 
     #[test]
     fn test_precision_1() {
-        assert_eq!(create_asset(4000, 1).format(), "400.0");
-        assert_eq!(create_asset(1, 1).format(), "0.1");
-        assert_eq!(create_asset(0, 1).format(), "0.0");
+        assert_eq!(create_asset(4000, 1).to_string(), "400.0");
+        assert_eq!(create_asset(1, 1).to_string(), "0.1");
+        assert_eq!(create_asset(0, 1).to_string(), "0.0");
     }
 
     #[test]
     fn test_precision_2() {
-        assert_eq!(create_asset(40000, 2).format(), "400.00");
-        assert_eq!(create_asset(1, 2).format(), "0.01");
-        assert_eq!(create_asset(0, 2).format(), "0.00");
+        assert_eq!(create_asset(40000, 2).to_string(), "400.00");
+        assert_eq!(create_asset(1, 2).to_string(), "0.01");
+        assert_eq!(create_asset(0, 2).to_string(), "0.00");
     }
 
     #[test]
     fn test_precision_3() {
-        assert_eq!(create_asset(400000, 3).format(), "400.000");
-        assert_eq!(create_asset(1, 3).format(), "0.001");
-        assert_eq!(create_asset(123, 3).format(), "0.123");
+        assert_eq!(create_asset(400000, 3).to_string(), "400.000");
+        assert_eq!(create_asset(1, 3).to_string(), "0.001");
+        assert_eq!(create_asset(123, 3).to_string(), "0.123");
     }
 
     #[test]
     fn test_precision_4() {
-        assert_eq!(create_asset(40000, 4).format(), "4.0000");
-        assert_eq!(create_asset(1, 4).format(), "0.0001");
-        assert_eq!(create_asset(12345, 4).format(), "1.2345");
+        assert_eq!(create_asset(40000, 4).to_string(), "4.0000");
+        assert_eq!(create_asset(1, 4).to_string(), "0.0001");
+        assert_eq!(create_asset(12345, 4).to_string(), "1.2345");
     }
 
     #[test]
     fn test_precision_5() {
-        assert_eq!(create_asset(400000, 5).format(), "4.00000");
-        assert_eq!(create_asset(1, 5).format(), "0.00001");
-        assert_eq!(create_asset(54321, 5).format(), "0.54321");
+        assert_eq!(create_asset(400000, 5).to_string(), "4.00000");
+        assert_eq!(create_asset(1, 5).to_string(), "0.00001");
+        assert_eq!(create_asset(54321, 5).to_string(), "0.54321");
     }
 
     #[test]
     fn test_precision_6() {
-        assert_eq!(create_asset(4000000, 6).format(), "4.000000");
-        assert_eq!(create_asset(1, 6).format(), "0.000001");
-        assert_eq!(create_asset(123456, 6).format(), "0.123456");
+        assert_eq!(create_asset(4000000, 6).to_string(), "4.000000");
+        assert_eq!(create_asset(1, 6).to_string(), "0.000001");
+        assert_eq!(create_asset(123456, 6).to_string(), "0.123456");
     }
 
     #[test]
     fn test_precision_18() {
         assert_eq!(
-            create_asset(4000000000000000000, 18).format(),
+            create_asset(4000000000000000000, 18).to_string(),
             "4.000000000000000000"
         );
-        assert_eq!(create_asset(1, 18).format(), "0.000000000000000001");
+        assert_eq!(create_asset(1, 18).to_string(), "0.000000000000000001");
         assert_eq!(
-            create_asset(123456789123456789, 18).format(),
+            create_asset(123456789123456789, 18).to_string(),
             "0.123456789123456789"
         );
     }
 
     #[test]
     fn test_large_quantity() {
-        assert_eq!(create_asset(u64::MAX, 0).format(), "18446744073709551615");
-        assert_eq!(create_asset(u64::MAX, 18).format(), "18.446744073709551615");
         assert_eq!(
-            create_asset(1000000000000000000, 18).format(),
+            create_asset(u64::MAX, 0).to_string(),
+            "18446744073709551615"
+        );
+        assert_eq!(
+            create_asset(u64::MAX, 18).to_string(),
+            "18.446744073709551615"
+        );
+        assert_eq!(
+            create_asset(1000000000000000000, 18).to_string(),
             "1.000000000000000000"
         );
     }
@@ -147,8 +150,8 @@ mod tests {
 
     #[test]
     fn test_zero_high_precision() {
-        assert_eq!(create_asset(0, 18).format(), "0.000000000000000000");
-        assert_eq!(create_asset(0, 10).format(), "0.0000000000");
-        assert_eq!(create_asset(0, 5).format(), "0.00000");
+        assert_eq!(create_asset(0, 18).to_string(), "0.000000000000000000");
+        assert_eq!(create_asset(0, 10).to_string(), "0.0000000000");
+        assert_eq!(create_asset(0, 5).to_string(), "0.00000");
     }
 }
