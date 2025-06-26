@@ -45,11 +45,9 @@ pub mod service {
 
     #[action]
     fn init() {
-        // check_none(Token::get(1), "init already ran");
-        if Token::get(1).is_some() {
-            return;
-        }
         let table = InitTable::new();
+        check_none(table.get_index_pk().get(&()), "service already initiated");
+
         let init_instance = InitRow { last_used_id: 0 };
         table.put(&init_instance).unwrap();
 
@@ -59,10 +57,7 @@ pub mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not initiated",
-        );
+        check_some(table.get_index_pk().get(&()), "service not initiated");
     }
 
     #[action]

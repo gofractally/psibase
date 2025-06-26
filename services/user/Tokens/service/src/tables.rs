@@ -7,7 +7,8 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Asset, Precision, Quantity,
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Asset, Precision,
+        Quantity,
     };
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -40,8 +41,8 @@ pub mod tables {
 
     impl Token {
         #[secondary_key(1)]
-        fn by_symbol(&self) -> Option<AccountNumber> {
-            self.symbol
+        fn by_symbol(&self) -> (Option<AccountNumber>, TID) {
+            (self.symbol, self.id)
         }
 
         pub fn get(id: TID) -> Option<Self> {
@@ -53,7 +54,12 @@ pub mod tables {
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
-            TokenTable::new().get_index_by_symbol().get(&Some(symbol))
+            let mut tokens: Vec<Token> = TokenTable::new()
+                .get_index_by_symbol()
+                .range((Some(symbol), 0 as u32)..=(Some(symbol), u32::MAX))
+                .collect();
+
+            tokens.pop()
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -93,7 +99,7 @@ pub mod tables {
 
             let creator = get_sender();
 
-            if creator != AccountNumber::from("tokens") {
+            if creator != crate::Wrapper::SERVICE {
                 Nfts::call().credit(
                     new_instance.nft_id,
                     creator,

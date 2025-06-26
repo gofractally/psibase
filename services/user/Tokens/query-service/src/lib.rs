@@ -33,10 +33,8 @@ mod service {
         match identify_token_type(token_id) {
             TokenType::Number(num) => num,
             TokenType::Symbol(account) => {
-                TokenTable::with_service(tokens::SERVICE)
-                    .get_index_by_symbol()
-                    .get(&Some(account))
-                    .unwrap()
+                Token::get_by_symbol(account)
+                    .expect("token by symbol not found")
                     .id
             }
         }
