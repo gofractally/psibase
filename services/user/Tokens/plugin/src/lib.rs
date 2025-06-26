@@ -226,7 +226,7 @@ impl Transfer for TokensPlugin {
         }
         .packed();
 
-        add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(tokens::action_structs::debit::ACTION_NAME, &packed_args)
     }
 
     fn uncredit(
