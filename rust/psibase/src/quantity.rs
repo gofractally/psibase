@@ -46,11 +46,7 @@ impl Quantity {
     }
 
     pub fn from_str(amount: &str, precision: Precision) -> Result<Self, ConversionError> {
-        if !amount
-            .chars()
-            .filter(|&c| c != '.')
-            .all(|c| c.is_ascii_digit())
-        {
+        if !amount.chars().all(|c| c == '.' || c.is_ascii_digit()) {
             return Err(ConversionError::InvalidNumber);
         }
         let value = match amount.split_once('.') {
