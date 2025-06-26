@@ -8,7 +8,7 @@ import { Button } from "@shared/shadcn/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { supervisor } from "./main";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { siblingUrl } from "@psibase/common-lib";
 import { useDecodeB64 } from "./hooks/useB64";
 

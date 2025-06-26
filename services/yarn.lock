@@ -1928,7 +1928,6 @@ __metadata:
     react-dom: "npm:^19.1.0"
     react-hook-form: "npm:^7.58.1"
     react-router-dom: "npm:^6.26.1"
-    sonner: "npm:^2.0.5"
     typescript: "npm:^5.7.3"
     vite: "npm:^5.4.1"
     zod: "npm:^3.23.8"
