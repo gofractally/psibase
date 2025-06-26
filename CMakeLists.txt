@@ -137,7 +137,7 @@ if(DEFINED WASI_SDK_PREFIX)
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
         Tokens Transact VerifySig
         PSubjectiveService CounterService AsyncQueryService
-        SubjectiveCounterService KeepSocketService SocketListService SocketAuth)
+        SubjectiveCounterService KeepSocketService SocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1046,19 +1046,7 @@ psibase_package(
     DEPENDS wasm
 )
 
-psibase_package(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketAuth.psi
-    NAME SocketAuth
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Try to break sockets"
-    SERVICE s-socket-auth
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketAuth.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SocketAuth-schema.json
-        FLAGS allowSocket isSubjective
-    DEPENDS wasm
-)
-
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList SocketAuth)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList)
 
 ExternalProject_Add(
     rust

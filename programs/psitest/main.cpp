@@ -1349,22 +1349,6 @@ struct callbacks
          psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
                         "Genesis block may not have proofs");
 
-         if (!proofBC.needGenesisAction)
-         {
-            // checkFirstAuth isn't necessary here, but including it catches
-            // the case where an auth service modifies its tables while
-            // running in read-only mode.
-            //
-            // We run the check within blockContext to make it easier for
-            // tests to chain transactions which modify auth. There's a
-            // cost to this since numExecutionMemories may bounce back
-            // and forth.
-            auto saveTrace = trace;
-            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt,
-                                               &*chain.blockContext);
-            trace = std::move(saveTrace);
-         }
-
          chain.blockContext->pushTransaction(std::move(signedTrx), trace, std::nullopt);
       }
       catch (const std::exception& e)

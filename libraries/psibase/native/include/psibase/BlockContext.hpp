@@ -66,11 +66,6 @@ namespace psibase
                        BlockContext*                            errorContext,
                        const Checksum256&                       token = {});
 
-      void checkFirstAuth(const SignedTransaction&                 trx,
-                          TransactionTrace&                        trace,
-                          std::optional<std::chrono::microseconds> watchdogLimit,
-                          BlockContext*                            errorContext);
-
       void pushTransaction(SignedTransaction&&                      trx,
                            TransactionTrace&                        trace,
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,

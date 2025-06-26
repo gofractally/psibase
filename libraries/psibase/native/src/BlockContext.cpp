@@ -783,32 +783,6 @@ namespace psibase
       }
    }
 
-   void BlockContext::checkFirstAuth(const SignedTransaction&                 trx,
-                                     TransactionTrace&                        trace,
-                                     std::optional<std::chrono::microseconds> watchdogLimit,
-                                     BlockContext*                            errorContext)
-   {
-      try
-      {
-         checkActive();
-         TransactionContext t{*this, trx, trace, DbMode::firstAuth()};
-         if (watchdogLimit)
-            t.setWatchdog(*watchdogLimit);
-         t.checkFirstAuth();
-      }
-      catch (const std::exception& e)
-      {
-         auto id     = sha256(trx.transaction.data(), trx.transaction.size());
-         trace.error = e.what();
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
-         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-         PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
-         if (errorContext)
-            errorContext->callOnTransaction(id, trace);
-         throw;
-      }
-   }
-
    void BlockContext::pushTransaction(SignedTransaction&&                      trx,
                                       TransactionTrace&                        trace,
                                       std::optional<std::chrono::microseconds> initialWatchdogLimit,

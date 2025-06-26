@@ -47,7 +47,6 @@ namespace psibase
       void execVerifyProof(size_t i);
 
       void execVerifyProof(const Checksum256& id, Claim claim, std::vector<char> proof);
-      void checkFirstAuth();
       void execTransaction();
 
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
