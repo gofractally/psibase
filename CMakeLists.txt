@@ -279,6 +279,7 @@ add_rs_component_workspace(services/:Plugins
     setcode
     clientdata
     invite
+    packages
     permissions
     sites
     test
@@ -851,11 +852,13 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Packages-schema.json
         SERVER r-packages
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Packages/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_packages} /plugin.wasm
     SERVICE r-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
-    DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
+    DEPENDS wasm ${Packages_js_DEP} ${Plugins_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
 )
 
 psibase_package(

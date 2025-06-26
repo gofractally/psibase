@@ -66,6 +66,23 @@ impl Sites for SitesPlugin {
         Ok(())
     }
 
+    fn upload_encoded(file: File, content_encoding: String) -> Result<(), Error> {
+        let packed = SitesService::action_structs::storeSys {
+            path: file.path.clone(),
+            contentType: file.content_type,
+            contentEncoding: Some(content_encoding),
+            content: Hex::from(file.content),
+        }
+        .packed();
+
+        if packed.len() >= TX_SIZE_LIMIT {
+            return Err(ErrorType::FileTooLarge(&file.path).into());
+        }
+
+        Transact::add_action_to_transaction("storeSys", &packed)?;
+        Ok(())
+    }
+
     fn upload_tree(files: Vec<File>, compression_quality: u8) -> Result<u16, Error> {
         validate_compression_quality(compression_quality)?;
 

@@ -37,6 +37,7 @@ set(UI_PROJECTS
     user/Explorer/ui:Explorer_js
     user/Homepage/ui:Homepage_js
     user/Identity/ui:Identity_js
+    user/Packages/ui:Packages_js
     user/Permissions/ui:Permissions_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js

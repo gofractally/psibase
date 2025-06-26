@@ -20,6 +20,7 @@
             "user/Fractals/ui",
             "user/Homepage/ui",
             "user/Identity/ui",
+            "user/Packages/ui",
             "user/Permissions/ui",
             "user/Workshop/ui",
             "user/XAdmin/ui"

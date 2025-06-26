@@ -338,6 +338,9 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn name(&self) -> &str {
         &self.meta.name
     }
+    pub fn version(&self) -> &str {
+        &self.meta.version
+    }
     pub fn meta(&self) -> &Meta {
         &self.meta
     }
@@ -705,6 +708,15 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
+    pub fn get_all_schemas(&self, schemas: &mut SchemaMap) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if let Some(schema) = info.schema.clone() {
+                schemas.insert(*account, schema);
+            }
+        }
+        Ok(())
+    }
+
     #[cfg(not(target_family = "wasm"))]
     pub async fn load_schemas(
         &mut self,
@@ -712,11 +724,7 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         schemas: &mut SchemaMap,
     ) -> Result<(), anyhow::Error> {
-        for (account, _, info) in &self.services {
-            if let Some(schema) = info.schema.clone() {
-                schemas.insert(*account, schema);
-            }
-        }
+        self.get_all_schemas(schemas)?;
         let mut required = HashSet::new();
         self.get_required_schemas(&mut required)?;
         for account in required {
