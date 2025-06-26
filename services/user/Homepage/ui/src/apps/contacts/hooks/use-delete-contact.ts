@@ -5,7 +5,7 @@ import { supervisor } from "@/supervisor";
 import { removeUserFromCache } from "./use-contacts";
 import { queryClient } from "@/main";
 import QueryKey from "@/lib/queryKeys";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useDeleteContact = () =>
     useMutation({

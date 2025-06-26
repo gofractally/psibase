@@ -1,5 +1,5 @@
 import { Trash, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogDescription } from "@shared/shadcn/ui/dialog";

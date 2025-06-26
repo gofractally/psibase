@@ -1,7 +1,7 @@
 import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { Avatar } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";

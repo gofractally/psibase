@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 
 import {

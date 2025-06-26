@@ -2217,7 +2217,6 @@ __metadata:
     react-dom: "npm:^19.1.0"
     react-hook-form: "npm:^7.58.1"
     react-router-dom: "npm:^6.26.1"
-    sonner: "npm:^2.0.5"
     typescript: "npm:^5.7.3"
     usehooks-ts: "npm:^3.1.1"
     vaul: "npm:^1.1.2"
@@ -13091,7 +13090,7 @@ __metadata:
     react-resizable-panels: "npm:^3.0.3"
     react-router-dom: "npm:^6.23.1"
     rollup: "npm:^4.40.0"
-    sonner: "npm:^2.0.5"
+    sonner: "npm:2.0.5"
     svgo: "npm:^3.3.2"
     tailwind-merge: "npm:^3.3.1"
     tailwindcss: "npm:^4.1.8"
@@ -13503,6 +13502,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"sonner@npm:2.0.5, sonner@npm:^2.0.5":
+  version: 2.0.5
+  resolution: "sonner@npm:2.0.5"
+  peerDependencies:
+    react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+    react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+  checksum: 10c0/38ec98e2f5d7e086825307f737a90bdc8639182d184e002719c2368bf3a9259c340f41afda731716d2b78c40e5e3aa9165058375be42f6a93bda0876b9b433ba
+  languageName: node
+  linkType: hard
+
 "sonner@npm:^1.7.1, sonner@npm:^1.7.2":
   version: 1.7.4
   resolution: "sonner@npm:1.7.4"
@@ -13510,16 +13519,6 @@ __metadata:
     react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
     react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
   checksum: 10c0/2856a43c1afaacec5ca74c7f6bb8eb439edf1fdadb045bd201590f809e6e9b711eabcf7d1e8f3448cf414e1333d97e3e16372a989011a3190f20952947b1f60a
-  languageName: node
-  linkType: hard
-
-"sonner@npm:^2.0.5":
-  version: 2.0.5
-  resolution: "sonner@npm:2.0.5"
-  peerDependencies:
-    react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
-    react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
-  checksum: 10c0/38ec98e2f5d7e086825307f737a90bdc8639182d184e002719c2368bf3a9259c340f41afda731716d2b78c40e5e3aa9165058375be42f6a93bda0876b9b433ba
   languageName: node
   linkType: hard
 

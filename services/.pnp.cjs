@@ -3149,7 +3149,6 @@ const RAW_RUNTIME_STATE =
           ["react-dom", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:19.1.0"],\
           ["react-hook-form", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:7.58.1"],\
           ["react-router-dom", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:6.30.1"],\
-          ["sonner", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:2.0.5"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
           ["usehooks-ts", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:3.1.1"],\
           ["vaul", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:1.1.2"],\
@@ -19447,23 +19446,6 @@ const RAW_RUNTIME_STATE =
           ["sonner", "npm:2.0.5"]\
         ],\
         "linkType": "SOFT"\
-      }],\
-      ["virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:2.0.5", {\
-        "packageLocation": "./.yarn/__virtual__/sonner-virtual-1dadf56930/2/.caches/yarn/sonner-npm-2.0.5-6f95dab664-38ec98e2f5.zip/node_modules/sonner/",\
-        "packageDependencies": [\
-          ["@types/react", "npm:18.3.23"],\
-          ["@types/react-dom", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:18.3.7"],\
-          ["react", "npm:19.1.0"],\
-          ["react-dom", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:19.1.0"],\
-          ["sonner", "virtual:2e0c754fe710178cfae96f33c0ca159083799c2d6ee58b6330de2d31eb34917664a11990c89c5fc8236b878000293667ba020d09b9068a7d968baa76efe08165#npm:2.0.5"]\
-        ],\
-        "packagePeers": [\
-          "@types/react-dom",\
-          "@types/react",\
-          "react-dom",\
-          "react"\
-        ],\
-        "linkType": "HARD"\
       }],\
       ["virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:1.7.4", {\
         "packageLocation": "./.yarn/__virtual__/sonner-virtual-49fe0093d2/2/.caches/yarn/sonner-npm-1.7.4-91a76927df-2856a43c1a.zip/node_modules/sonner/",\

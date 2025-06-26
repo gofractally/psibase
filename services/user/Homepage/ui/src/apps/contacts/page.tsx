@@ -1,6 +1,6 @@
 import { Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { useMediaQuery } from "usehooks-ts";
 
 import { Button } from "@shared/shadcn/ui/button";
