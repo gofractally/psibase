@@ -74,6 +74,28 @@ class TestCrash(unittest.TestCase):
             time.sleep(1)
 
     @testutil.psinode_test
+    def test_restart_after_disconnect(self, cluster):
+        prods = cluster.complete(*testutil.generate_names(4))
+        testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer'])
+
+        (a, b, c, d) = prods
+        # Stop d, so we have no fault tolerance
+        d.shutdown()
+
+        c.disconnect(b)
+        c.connect(b)
+        c.disconnect(a)
+        c.connect(a)
+
+        # stop and restart c
+        c.shutdown();
+        c.start()
+
+        a.connect(c)
+
+        a.wait(new_block())
+
+    @testutil.psinode_test
     def test_shutdown_all_bft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
         a = testutil.boot_with_producers(prods, 'bft', packages=['Minimal', 'Explorer'])
