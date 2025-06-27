@@ -3,7 +3,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import { CreateAppForm } from "./create-app-form";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 import { useNavigate } from "react-router-dom";

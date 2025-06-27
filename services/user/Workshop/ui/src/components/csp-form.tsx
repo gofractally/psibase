@@ -1,5 +1,5 @@
-import { Label } from "./ui/label";
-import { Button } from "./ui/button";
+import { Label } from "@shared/shadcn/ui/label";
+import { Button } from "@shared/shadcn/ui/button";
 
 import {
   Dialog,
@@ -8,11 +8,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import { z } from "zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Input } from "./ui/input";
+import { Input } from "@shared/shadcn/ui/input";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 

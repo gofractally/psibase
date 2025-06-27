@@ -897,24 +897,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/android-arm64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/android-arm64@npm:0.18.20"
-  conditions: os=android & cpu=arm64
-  languageName: node
-  linkType: hard
-
 "@esbuild/android-arm64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/android-arm64@npm:0.21.5"
   conditions: os=android & cpu=arm64
-  languageName: node
-  linkType: hard
-
-"@esbuild/android-arm@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/android-arm@npm:0.18.20"
-  conditions: os=android & cpu=arm
   languageName: node
   linkType: hard
 
@@ -925,24 +911,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/android-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/android-x64@npm:0.18.20"
-  conditions: os=android & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@esbuild/android-x64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/android-x64@npm:0.21.5"
   conditions: os=android & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@esbuild/darwin-arm64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/darwin-arm64@npm:0.18.20"
-  conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
@@ -953,24 +925,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/darwin-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/darwin-x64@npm:0.18.20"
-  conditions: os=darwin & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@esbuild/darwin-x64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/darwin-x64@npm:0.21.5"
   conditions: os=darwin & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@esbuild/freebsd-arm64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/freebsd-arm64@npm:0.18.20"
-  conditions: os=freebsd & cpu=arm64
   languageName: node
   linkType: hard
 
@@ -981,24 +939,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/freebsd-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/freebsd-x64@npm:0.18.20"
-  conditions: os=freebsd & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@esbuild/freebsd-x64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/freebsd-x64@npm:0.21.5"
   conditions: os=freebsd & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@esbuild/linux-arm64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-arm64@npm:0.18.20"
-  conditions: os=linux & cpu=arm64
   languageName: node
   linkType: hard
 
@@ -1009,24 +953,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/linux-arm@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-arm@npm:0.18.20"
-  conditions: os=linux & cpu=arm
-  languageName: node
-  linkType: hard
-
 "@esbuild/linux-arm@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/linux-arm@npm:0.21.5"
   conditions: os=linux & cpu=arm
-  languageName: node
-  linkType: hard
-
-"@esbuild/linux-ia32@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-ia32@npm:0.18.20"
-  conditions: os=linux & cpu=ia32
   languageName: node
   linkType: hard
 
@@ -1037,24 +967,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/linux-loong64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-loong64@npm:0.18.20"
-  conditions: os=linux & cpu=loong64
-  languageName: node
-  linkType: hard
-
 "@esbuild/linux-loong64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/linux-loong64@npm:0.21.5"
   conditions: os=linux & cpu=loong64
-  languageName: node
-  linkType: hard
-
-"@esbuild/linux-mips64el@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-mips64el@npm:0.18.20"
-  conditions: os=linux & cpu=mips64el
   languageName: node
   linkType: hard
 
@@ -1065,24 +981,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/linux-ppc64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-ppc64@npm:0.18.20"
-  conditions: os=linux & cpu=ppc64
-  languageName: node
-  linkType: hard
-
 "@esbuild/linux-ppc64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/linux-ppc64@npm:0.21.5"
   conditions: os=linux & cpu=ppc64
-  languageName: node
-  linkType: hard
-
-"@esbuild/linux-riscv64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-riscv64@npm:0.18.20"
-  conditions: os=linux & cpu=riscv64
   languageName: node
   linkType: hard
 
@@ -1093,24 +995,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/linux-s390x@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-s390x@npm:0.18.20"
-  conditions: os=linux & cpu=s390x
-  languageName: node
-  linkType: hard
-
 "@esbuild/linux-s390x@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/linux-s390x@npm:0.21.5"
   conditions: os=linux & cpu=s390x
-  languageName: node
-  linkType: hard
-
-"@esbuild/linux-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/linux-x64@npm:0.18.20"
-  conditions: os=linux & cpu=x64
   languageName: node
   linkType: hard
 
@@ -1121,24 +1009,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/netbsd-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/netbsd-x64@npm:0.18.20"
-  conditions: os=netbsd & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@esbuild/netbsd-x64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/netbsd-x64@npm:0.21.5"
   conditions: os=netbsd & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@esbuild/openbsd-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/openbsd-x64@npm:0.18.20"
-  conditions: os=openbsd & cpu=x64
   languageName: node
   linkType: hard
 
@@ -1149,24 +1023,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/sunos-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/sunos-x64@npm:0.18.20"
-  conditions: os=sunos & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@esbuild/sunos-x64@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/sunos-x64@npm:0.21.5"
   conditions: os=sunos & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@esbuild/win32-arm64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/win32-arm64@npm:0.18.20"
-  conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
@@ -1177,24 +1037,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@esbuild/win32-ia32@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/win32-ia32@npm:0.18.20"
-  conditions: os=win32 & cpu=ia32
-  languageName: node
-  linkType: hard
-
 "@esbuild/win32-ia32@npm:0.21.5":
   version: 0.21.5
   resolution: "@esbuild/win32-ia32@npm:0.21.5"
   conditions: os=win32 & cpu=ia32
-  languageName: node
-  linkType: hard
-
-"@esbuild/win32-x64@npm:0.18.20":
-  version: 0.18.20
-  resolution: "@esbuild/win32-x64@npm:0.18.20"
-  conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
 
@@ -1408,7 +1254,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hookform/resolvers@npm:^3.6.0, @hookform/resolvers@npm:^3.9.0":
+"@hookform/resolvers@npm:^3.6.0":
   version: 3.10.0
   resolution: "@hookform/resolvers@npm:3.10.0"
   peerDependencies:
@@ -2368,54 +2214,28 @@ __metadata:
   dependencies:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
-    "@eslint/js": "npm:^9.9.0"
-    "@hookform/resolvers": "npm:^3.9.0"
+    "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
-    "@radix-ui/react-avatar": "npm:^1.1.3"
-    "@radix-ui/react-collapsible": "npm:^1.1.3"
-    "@radix-ui/react-dialog": "npm:^1.1.6"
-    "@radix-ui/react-dropdown-menu": "npm:^2.1.6"
-    "@radix-ui/react-label": "npm:^2.1.2"
-    "@radix-ui/react-scroll-area": "npm:^1.2.3"
-    "@radix-ui/react-separator": "npm:^1.1.2"
-    "@radix-ui/react-slot": "npm:^1.1.2"
-    "@radix-ui/react-switch": "npm:^1.1.3"
-    "@radix-ui/react-tooltip": "npm:^1.1.8"
+    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/humanize-duration": "npm:^3.27.4"
-    "@types/node": "npm:^22.5.0"
-    "@types/react": "npm:^18.2.0"
-    "@types/react-dom": "npm:^18.2.0"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    "@types/react-router-dom": "npm:5.3.3"
     "@uidotdev/usehooks": "npm:^2.4.1"
-    "@vitejs/plugin-react": "npm:^4.3.1"
-    autoprefixer: "npm:^10.4.20"
-    axios: "npm:^1.7.8"
-    class-variance-authority: "npm:^0.7.1"
-    clsx: "npm:^2.1.1"
     dayjs: "npm:^1.11.13"
-    debounce: "npm:^2.1.0"
-    eslint: "npm:^9.9.0"
-    eslint-plugin-react-hooks: "npm:^5.1.0-rc.0"
-    eslint-plugin-react-refresh: "npm:^0.4.9"
-    framer-motion: "npm:^11.3.29"
-    globals: "npm:^15.9.0"
+    eslint: "npm:^9.15.0"
     humanize-duration: "npm:^3.32.1"
-    lucide-react: "npm:^0.474.0"
-    next-themes: "npm:^0.4.4"
-    postcss: "npm:^8.4.41"
-    react: "npm:^18.2.0"
-    react-dom: "npm:^18.2.0"
-    react-hook-form: "npm:^7.53.0"
+    lucide-react: "npm:^0.475.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    react-hook-form: "npm:^7.58.1"
     react-router-dom: "npm:^6.26.1"
     slugify: "npm:^1.6.6"
-    sonner: "npm:^1.7.2"
-    tailwind-merge: "npm:^2.5.2"
-    tailwindcss: "npm:^3.4.10"
-    tailwindcss-animate: "npm:^1.0.7"
     typescript: "npm:^5.7.3"
-    typescript-eslint: "npm:^8.0.1"
-    vite: "npm:^4.5.2"
-    zod: "npm:^3.23.8"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.24.2"
   languageName: unknown
   linkType: soft
 
@@ -2571,7 +2391,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-avatar@npm:^1.0.4, @radix-ui/react-avatar@npm:^1.1.10, @radix-ui/react-avatar@npm:^1.1.3, @radix-ui/react-avatar@npm:^1.1.9":
+"@radix-ui/react-avatar@npm:^1.0.4, @radix-ui/react-avatar@npm:^1.1.10, @radix-ui/react-avatar@npm:^1.1.9":
   version: 1.1.10
   resolution: "@radix-ui/react-avatar@npm:1.1.10"
   dependencies:
@@ -2620,7 +2440,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-collapsible@npm:1.1.11, @radix-ui/react-collapsible@npm:^1.1.10, @radix-ui/react-collapsible@npm:^1.1.11, @radix-ui/react-collapsible@npm:^1.1.3":
+"@radix-ui/react-collapsible@npm:1.1.11, @radix-ui/react-collapsible@npm:^1.1.10, @radix-ui/react-collapsible@npm:^1.1.11":
   version: 1.1.11
   resolution: "@radix-ui/react-collapsible@npm:1.1.11"
   dependencies:
@@ -2762,7 +2582,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-dropdown-menu@npm:^2.0.6, @radix-ui/react-dropdown-menu@npm:^2.1.14, @radix-ui/react-dropdown-menu@npm:^2.1.15, @radix-ui/react-dropdown-menu@npm:^2.1.6":
+"@radix-ui/react-dropdown-menu@npm:^2.0.6, @radix-ui/react-dropdown-menu@npm:^2.1.14, @radix-ui/react-dropdown-menu@npm:^2.1.15":
   version: 2.1.15
   resolution: "@radix-ui/react-dropdown-menu@npm:2.1.15"
   dependencies:
@@ -2836,7 +2656,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-label@npm:^2.0.2, @radix-ui/react-label@npm:^2.1.0, @radix-ui/react-label@npm:^2.1.2, @radix-ui/react-label@npm:^2.1.6, @radix-ui/react-label@npm:^2.1.7":
+"@radix-ui/react-label@npm:^2.0.2, @radix-ui/react-label@npm:^2.1.0, @radix-ui/react-label@npm:^2.1.6, @radix-ui/react-label@npm:^2.1.7":
   version: 2.1.7
   resolution: "@radix-ui/react-label@npm:2.1.7"
   dependencies:
@@ -3152,7 +2972,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-separator@npm:^1.0.3, @radix-ui/react-separator@npm:^1.1.2, @radix-ui/react-separator@npm:^1.1.6, @radix-ui/react-separator@npm:^1.1.7":
+"@radix-ui/react-separator@npm:^1.0.3, @radix-ui/react-separator@npm:^1.1.6, @radix-ui/react-separator@npm:^1.1.7":
   version: 1.1.7
   resolution: "@radix-ui/react-separator@npm:1.1.7"
   dependencies:
@@ -3186,7 +3006,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-switch@npm:^1.0.3, @radix-ui/react-switch@npm:^1.1.3, @radix-ui/react-switch@npm:^1.1.4, @radix-ui/react-switch@npm:^1.2.4":
+"@radix-ui/react-switch@npm:^1.0.3, @radix-ui/react-switch@npm:^1.1.4, @radix-ui/react-switch@npm:^1.2.4, @radix-ui/react-switch@npm:^1.2.5":
   version: 1.2.5
   resolution: "@radix-ui/react-switch@npm:1.2.5"
   dependencies:
@@ -3313,7 +3133,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-tooltip@npm:^1.0.7, @radix-ui/react-tooltip@npm:^1.1.8, @radix-ui/react-tooltip@npm:^1.2.6, @radix-ui/react-tooltip@npm:^1.2.7":
+"@radix-ui/react-tooltip@npm:^1.0.7, @radix-ui/react-tooltip@npm:^1.2.6, @radix-ui/react-tooltip@npm:^1.2.7":
   version: 1.2.7
   resolution: "@radix-ui/react-tooltip@npm:1.2.7"
   dependencies:
@@ -5146,7 +4966,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react-dom@npm:^18.0.6, @types/react-dom@npm:^18.2.0, @types/react-dom@npm:^18.2.17, @types/react-dom@npm:^18.2.22, @types/react-dom@npm:^18.2.7, @types/react-dom@npm:^18.3.0":
+"@types/react-dom@npm:^18.0.6, @types/react-dom@npm:^18.2.17, @types/react-dom@npm:^18.2.22, @types/react-dom@npm:^18.2.7, @types/react-dom@npm:^18.3.0":
   version: 18.3.7
   resolution: "@types/react-dom@npm:18.3.7"
   peerDependencies:
@@ -5194,7 +5014,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/react@npm:^18.0.17, @types/react@npm:^18.2.0, @types/react@npm:^18.2.15, @types/react@npm:^18.2.43, @types/react@npm:^18.2.66, @types/react@npm:^18.3.3":
+"@types/react@npm:^18.0.17, @types/react@npm:^18.2.15, @types/react@npm:^18.2.43, @types/react@npm:^18.2.66, @types/react@npm:^18.3.3":
   version: 18.3.23
   resolution: "@types/react@npm:18.3.23"
   dependencies:
@@ -8308,83 +8128,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"esbuild@npm:^0.18.10":
-  version: 0.18.20
-  resolution: "esbuild@npm:0.18.20"
-  dependencies:
-    "@esbuild/android-arm": "npm:0.18.20"
-    "@esbuild/android-arm64": "npm:0.18.20"
-    "@esbuild/android-x64": "npm:0.18.20"
-    "@esbuild/darwin-arm64": "npm:0.18.20"
-    "@esbuild/darwin-x64": "npm:0.18.20"
-    "@esbuild/freebsd-arm64": "npm:0.18.20"
-    "@esbuild/freebsd-x64": "npm:0.18.20"
-    "@esbuild/linux-arm": "npm:0.18.20"
-    "@esbuild/linux-arm64": "npm:0.18.20"
-    "@esbuild/linux-ia32": "npm:0.18.20"
-    "@esbuild/linux-loong64": "npm:0.18.20"
-    "@esbuild/linux-mips64el": "npm:0.18.20"
-    "@esbuild/linux-ppc64": "npm:0.18.20"
-    "@esbuild/linux-riscv64": "npm:0.18.20"
-    "@esbuild/linux-s390x": "npm:0.18.20"
-    "@esbuild/linux-x64": "npm:0.18.20"
-    "@esbuild/netbsd-x64": "npm:0.18.20"
-    "@esbuild/openbsd-x64": "npm:0.18.20"
-    "@esbuild/sunos-x64": "npm:0.18.20"
-    "@esbuild/win32-arm64": "npm:0.18.20"
-    "@esbuild/win32-ia32": "npm:0.18.20"
-    "@esbuild/win32-x64": "npm:0.18.20"
-  dependenciesMeta:
-    "@esbuild/android-arm":
-      optional: true
-    "@esbuild/android-arm64":
-      optional: true
-    "@esbuild/android-x64":
-      optional: true
-    "@esbuild/darwin-arm64":
-      optional: true
-    "@esbuild/darwin-x64":
-      optional: true
-    "@esbuild/freebsd-arm64":
-      optional: true
-    "@esbuild/freebsd-x64":
-      optional: true
-    "@esbuild/linux-arm":
-      optional: true
-    "@esbuild/linux-arm64":
-      optional: true
-    "@esbuild/linux-ia32":
-      optional: true
-    "@esbuild/linux-loong64":
-      optional: true
-    "@esbuild/linux-mips64el":
-      optional: true
-    "@esbuild/linux-ppc64":
-      optional: true
-    "@esbuild/linux-riscv64":
-      optional: true
-    "@esbuild/linux-s390x":
-      optional: true
-    "@esbuild/linux-x64":
-      optional: true
-    "@esbuild/netbsd-x64":
-      optional: true
-    "@esbuild/openbsd-x64":
-      optional: true
-    "@esbuild/sunos-x64":
-      optional: true
-    "@esbuild/win32-arm64":
-      optional: true
-    "@esbuild/win32-ia32":
-      optional: true
-    "@esbuild/win32-x64":
-      optional: true
-  bin:
-    esbuild: bin/esbuild
-  checksum: 10c0/473b1d92842f50a303cf948a11ebd5f69581cd254d599dd9d62f9989858e0533f64e83b723b5e1398a5b488c0f5fd088795b4235f65ecaf4f007d4b79f04bc88
-  languageName: node
-  linkType: hard
-
 "esbuild@npm:^0.21.3":
   version: 0.21.5
   resolution: "esbuild@npm:0.21.5"
@@ -8609,7 +8352,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-plugin-react-refresh@npm:^0.4.5, eslint-plugin-react-refresh@npm:^0.4.6, eslint-plugin-react-refresh@npm:^0.4.9":
+"eslint-plugin-react-refresh@npm:^0.4.5, eslint-plugin-react-refresh@npm:^0.4.6":
   version: 0.4.20
   resolution: "eslint-plugin-react-refresh@npm:0.4.20"
   peerDependencies:
@@ -12122,7 +11865,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:^8.4.16, postcss@npm:^8.4.27, postcss@npm:^8.4.38, postcss@npm:^8.4.39, postcss@npm:^8.4.41, postcss@npm:^8.4.43, postcss@npm:^8.4.47":
+"postcss@npm:^8.4.16, postcss@npm:^8.4.38, postcss@npm:^8.4.39, postcss@npm:^8.4.41, postcss@npm:^8.4.43, postcss@npm:^8.4.47":
   version: 8.5.6
   resolution: "postcss@npm:8.5.6"
   dependencies:
@@ -12406,7 +12149,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-hook-form@npm:^7.52.0, react-hook-form@npm:^7.53.0, react-hook-form@npm:^7.58.1":
+"react-hook-form@npm:^7.52.0, react-hook-form@npm:^7.58.1":
   version: 7.58.1
   resolution: "react-hook-form@npm:7.58.1"
   peerDependencies:
@@ -12874,20 +12617,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rollup@npm:^3.27.1":
-  version: 3.29.5
-  resolution: "rollup@npm:3.29.5"
-  dependencies:
-    fsevents: "npm:~2.3.2"
-  dependenciesMeta:
-    fsevents:
-      optional: true
-  bin:
-    rollup: dist/bin/rollup
-  checksum: 10c0/a1fa26f21f0d6cf93b6d05ea284ad5854905b585f28a14c27d439b0f9b859cba13ea25f376303d86770e59b4686bedc52b4706e57442514f0414c6fd3c5b8e71
-  languageName: node
-  linkType: hard
-
 "rollup@npm:^4.20.0, rollup@npm:^4.40.0":
   version: 4.44.1
   resolution: "rollup@npm:4.44.1"
@@ -12982,6 +12711,7 @@ __metadata:
     "@radix-ui/react-select": "npm:^2.2.5"
     "@radix-ui/react-separator": "npm:^1.1.7"
     "@radix-ui/react-slot": "npm:^1.2.3"
+    "@radix-ui/react-switch": "npm:^1.2.5"
     "@radix-ui/react-tabs": "npm:^1.1.12"
     "@radix-ui/react-tooltip": "npm:^1.2.7"
     "@rollup/browser": "npm:^4.9.0"
@@ -14663,46 +14393,6 @@ __metadata:
     vite:
       optional: true
   checksum: 10c0/f390ac1d1c3992fc5ac50f9274c1090f8b55ab34a89ea88893db9a6924a3b26c9f64bc1163615150ad100749db73b6b2cf1d57f6cd60df6e762ceb5b8ad30024
-  languageName: node
-  linkType: hard
-
-"vite@npm:^4.5.2":
-  version: 4.5.14
-  resolution: "vite@npm:4.5.14"
-  dependencies:
-    esbuild: "npm:^0.18.10"
-    fsevents: "npm:~2.3.2"
-    postcss: "npm:^8.4.27"
-    rollup: "npm:^3.27.1"
-  peerDependencies:
-    "@types/node": ">= 14"
-    less: "*"
-    lightningcss: ^1.21.0
-    sass: "*"
-    stylus: "*"
-    sugarss: "*"
-    terser: ^5.4.0
-  dependenciesMeta:
-    fsevents:
-      optional: true
-  peerDependenciesMeta:
-    "@types/node":
-      optional: true
-    less:
-      optional: true
-    lightningcss:
-      optional: true
-    sass:
-      optional: true
-    stylus:
-      optional: true
-    sugarss:
-      optional: true
-    terser:
-      optional: true
-  bin:
-    vite: bin/vite.js
-  checksum: 10c0/58fdbb7e14650f78ebe290bb67f873900b914cee906c7367ad1c9786fb323ec60c3f085447341953b5e411a17703f86ed33723b31f98778d94f0ead06370b306
   languageName: node
   linkType: hard
 

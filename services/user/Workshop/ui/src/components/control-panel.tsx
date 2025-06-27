@@ -11,14 +11,14 @@ import { useSetCacheMode } from "@/hooks/useSetCacheMode";
 import { usePublishApp } from "@/hooks/usePublishApp";
 import { queryClient } from "@/queryClient";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { CheckCard } from "./Check-Card";
 import { ServiceUpload } from "./service-upload";
 import { SiteConfigResponse, useSiteConfig } from "@/hooks/useSiteConfig";
 import { CspForm } from "./csp-form";
 import { useSetCsp } from "@/hooks/useSetCsp";
-import { Label } from "./ui/label";
-import { Button } from "./ui/button";
+import { Label } from "@shared/shadcn/ui/label";
+import { Button } from "@shared/shadcn/ui/button";
 import { useDeleteCsp } from "@/hooks/useDeleteCsp";
 
 const setStatus = (
