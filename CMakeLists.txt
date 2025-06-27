@@ -135,7 +135,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
-        Tokens Transact VerifySig
+        Tokens Transact VerifySig XAdmin
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService SocketListService)
     set(WASM_BYPRODUCTS)
@@ -293,10 +293,11 @@ function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
-    DEPENDS XAdmin_js
+    DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/

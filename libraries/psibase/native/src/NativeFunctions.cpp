@@ -296,6 +296,16 @@ namespace psibase
          }
       }
 
+      void verifySubjectiveCodeRow(psio::input_stream key, psio::input_stream value)
+      {
+         check(psio::fracpack_validate_strict<CodeRow>(value), "CodeRow has invalid format");
+         auto code         = psio::view<const CodeRow>(psio::prevalidated{value});
+         auto expected_key = psio::convert_to_key(codeKey(code.codeNum()));
+         check(key.remaining() == expected_key.size() &&
+                   !std::memcmp(key.pos, expected_key.data(), key.remaining()),
+               "CodeRow has incorrect key");
+      }
+
       void verifySubjectiveRunTableRow(Database&          db,
                                        psio::input_stream key,
                                        psio::input_stream value)
@@ -356,6 +366,10 @@ namespace psibase
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == notifyTable)
             verifySubjectiveNotifyTableRow(db, key, value);
+         else if (table == codeTable)
+            verifySubjectiveCodeRow(key, value);
+         else if (table == codeByHashTable)
+            verifyCodeByHashRow(key, value);
          else if (table == runTable)
             verifySubjectiveRunTableRow(db, key, value);
          else

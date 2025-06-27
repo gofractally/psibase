@@ -12,3 +12,4 @@
 #include <services/user/Invite.hpp>
 #include <services/user/InviteTables.hpp>
 #include <services/user/Sites.hpp>
+#include <services/user/XAdmin.hpp>

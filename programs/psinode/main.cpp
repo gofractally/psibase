@@ -396,6 +396,47 @@ std::filesystem::path config_template_path()
    return installPrefix() / "share" / "psibase" / "config.in";
 }
 
+std::filesystem::path database_template_path()
+{
+   return installPrefix() / "share" / "psibase" / "services";
+}
+
+void load_subjective_services(Database& db)
+{
+   for (const auto& entry : std::filesystem::directory_iterator{database_template_path()})
+   {
+      auto filename = entry.path().filename();
+      if (filename.extension().string() == ".wasm")
+      {
+         auto account = AccountNumber{filename.stem().string()};
+         if (account != AccountNumber{})
+         {
+            PSIBASE_LOG(psibase::loggers::generic::get(), info)
+                << "Loading subjective service " << account.str();
+            std::ifstream             in(entry.path(), std::ios_base::binary);
+            std::vector<std::uint8_t> code(std::filesystem::file_size(entry.path()));
+            in.read(reinterpret_cast<char*>(code.data()), code.size());
+            if (!in)
+               throw std::runtime_error{"Failed to read " + entry.path().string()};
+
+            auto    codeHash = sha256(code.data(), code.size());
+            CodeRow codeRow{
+                .codeNum = account,
+                .flags   = CodeRow::allowWriteSubjective | CodeRow::allowSocket |
+                         CodeRow::allowNativeSubjective,
+                .codeHash = codeHash,
+            };
+            db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+            CodeByHashRow codeByHashRow{
+                .codeHash = codeHash,
+                .code     = std::move(code),
+            };
+            db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+         }
+      }
+   }
+}
+
 void load_service(const native_service& config,
                   http::services_t&     services,
                   const std::string&    root_host)
@@ -1329,6 +1370,23 @@ void run(const std::string&              db_path,
       }
    }
 
+   // If this is a new database, initialize subjective services
+   {
+      Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
+      SocketAutoCloseSet autoClose;
+      auto               session = db.startWrite(system->sharedDatabase.createWriter());
+      db.checkoutSubjective();
+      auto key = psio::convert_to_key(codePrefix());
+      if (!db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
+      {
+         load_subjective_services(db);
+         if (!db.commitSubjective(*system->sockets, autoClose))
+         {
+            throw std::runtime_error("Failed to initialize database");
+         }
+      }
+   }
+
    // Manages the session and and unlinks all keys from prover on destruction
    struct PKCS11SessionManager
    {
@@ -1587,7 +1645,8 @@ void run(const std::string&              db_path,
                                  boost::asio::use_service<http::server_service>(
                                      static_cast<boost::asio::execution_context&>(chainContext))
                                      .async_close(restart,
-                                                  [&chainContext, &server_work]() {
+                                                  [&chainContext, &server_work]()
+                                                  {
                                                      boost::asio::post(chainContext,
                                                                        [&server_work]()
                                                                        { server_work.reset(); });

@@ -3,6 +3,7 @@
 #include <services/system/RTransact.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
+#include <services/user/XAdmin.hpp>
 
 #include <functional>
 #include <psibase/dispatch.hpp>
@@ -11,6 +12,7 @@
 
 using namespace psibase;
 using namespace SystemService;
+using UserService::XAdmin;
 
 namespace
 {
@@ -1221,6 +1223,16 @@ void RTransact::recv(const SignedTransaction& trx)
       forwardTransaction(trx);
 }
 
+std::string RTransact::login(std::string rootHost)
+{
+   auto sender = getSender();
+   auto exp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now() +
+                                                                 std::chrono::days(30));
+   return encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
+                                                .aud = std::move(rootHost),
+                                                .exp = exp.time_since_epoch().count()});
+}
+
 std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
@@ -1256,8 +1268,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    return {};
 }
 
-std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request,
-                                             std::optional<std::int32_t> socket)
+std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  request,
+                                             std::optional<std::int32_t>  socket,
+                                             std::optional<AccountNumber> user)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
@@ -1330,6 +1343,12 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
          to_json(LoginReply{token}, stream);
          return reply;
       }
+   }
+   else if (target == "/jwt_key" && request.method == "GET")
+   {
+      check(user.has_value(), "Unauthorized");
+      check(to<XAdmin>().isAdmin(*user), "Forbidden");
+      return HttpReply{.contentType = "application/octet-stream", .body = getJWTKey()};
    }
 
    return {};
