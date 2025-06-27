@@ -1265,7 +1265,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
                "The maximum time for HTTP clients to send or receive a message");
    }
    file.set("", "service-threads", std::to_string(config.service_threads),
-            "The number of threads that run actions posted by services");
+            "The number of threads that run async actions posted by services");
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -2225,8 +2225,8 @@ int main(int argc, char* argv[])
        "Transaction leeway, in µs.");
    opt("http-timeout", po::value(&http_timeout)->default_value({}, "")->value_name("seconds"),
        "The maximum time for HTTP clients to send or receive a message");
-   opt("service-threads", po::value(&service_threads)->default_value(1)->value_name("num"),
-       "The number of threads that run actions posted by services");
+   opt("service-threads", po::value(&service_threads)->default_value(1, "")->value_name("num"),
+       "The number of threads that run async actions posted by services");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
