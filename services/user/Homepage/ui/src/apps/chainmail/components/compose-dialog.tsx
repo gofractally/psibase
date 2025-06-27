@@ -101,7 +101,7 @@ export function ComposeDialog({
         }
     }, [message]);
 
-    const id = useRef<string>();
+    const id = useRef<string>("");
 
     const createDraft = () => {
         if (!id.current || !user) return;
