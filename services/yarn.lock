@@ -200,7 +200,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/core@npm:^7.21.3, @babel/core@npm:^7.23.5, @babel/core@npm:^7.27.4":
+"@babel/core@npm:^7.21.3, @babel/core@npm:^7.27.4":
   version: 7.27.7
   resolution: "@babel/core@npm:7.27.7"
   dependencies:
@@ -321,7 +321,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-react-jsx-self@npm:^7.23.3, @babel/plugin-transform-react-jsx-self@npm:^7.27.1":
+"@babel/plugin-transform-react-jsx-self@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/plugin-transform-react-jsx-self@npm:7.27.1"
   dependencies:
@@ -332,7 +332,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-react-jsx-source@npm:^7.23.3, @babel/plugin-transform-react-jsx-source@npm:^7.27.1":
+"@babel/plugin-transform-react-jsx-source@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/plugin-transform-react-jsx-source@npm:7.27.1"
   dependencies:
@@ -2326,55 +2326,23 @@ __metadata:
   dependencies:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
-    "@eslint/js": "npm:^9.9.0"
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
-    "@radix-ui/react-avatar": "npm:^1.1.3"
-    "@radix-ui/react-collapsible": "npm:^1.1.3"
-    "@radix-ui/react-dialog": "npm:^1.1.6"
-    "@radix-ui/react-dropdown-menu": "npm:^2.1.6"
-    "@radix-ui/react-label": "npm:^2.1.2"
-    "@radix-ui/react-scroll-area": "npm:^1.2.3"
-    "@radix-ui/react-select": "npm:^2.1.6"
-    "@radix-ui/react-separator": "npm:^1.1.2"
-    "@radix-ui/react-slot": "npm:^1.1.2"
-    "@radix-ui/react-switch": "npm:^1.1.3"
-    "@radix-ui/react-tooltip": "npm:^1.1.8"
+    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
-    "@types/humanize-duration": "npm:^3.27.4"
-    "@types/node": "npm:^22.5.0"
-    "@types/react": "npm:^18.3.3"
-    "@types/react-dom": "npm:^18.3.0"
-    "@uidotdev/usehooks": "npm:^2.4.1"
-    "@vitejs/plugin-react": "npm:4.2.1"
-    autoprefixer: "npm:^10.4.20"
-    axios: "npm:^1.7.8"
-    class-variance-authority: "npm:^0.7.1"
-    clsx: "npm:^2.1.1"
-    dayjs: "npm:^1.11.13"
-    debounce: "npm:^2.1.0"
-    eslint: "npm:^9.9.0"
-    eslint-plugin-react-hooks: "npm:^5.1.0-rc.0"
-    eslint-plugin-react-refresh: "npm:^0.4.9"
-    framer-motion: "npm:^11.3.29"
-    globals: "npm:^15.9.0"
-    humanize-duration: "npm:^3.32.1"
-    lucide-react: "npm:^0.474.0"
-    next-themes: "npm:^0.4.4"
-    postcss: "npm:^8.4.41"
-    react: "npm:^18.3.1"
-    react-dom: "npm:^18.3.1"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    "@types/react-router-dom": "npm:5.3.3"
+    eslint: "npm:^9.15.0"
+    lucide-react: "npm:^0.475.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
     react-hook-form: "npm:^7.58.1"
     react-router-dom: "npm:^6.26.1"
-    slugify: "npm:^1.6.6"
-    sonner: "npm:^1.7.2"
-    tailwind-merge: "npm:^2.5.2"
-    tailwindcss: "npm:^3.4.10"
-    tailwindcss-animate: "npm:^1.0.7"
     typescript: "npm:^5.7.3"
-    typescript-eslint: "npm:^8.0.1"
-    vite: "npm:4.5.2"
-    zod: "npm:^3.23.8"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.24.2"
   languageName: unknown
   linkType: soft
 
@@ -3151,7 +3119,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-select@npm:^2.0.0, @radix-ui/react-select@npm:^2.1.6, @radix-ui/react-select@npm:^2.2.4, @radix-ui/react-select@npm:^2.2.5":
+"@radix-ui/react-select@npm:^2.0.0, @radix-ui/react-select@npm:^2.2.4, @radix-ui/react-select@npm:^2.2.5":
   version: 2.2.5
   resolution: "@radix-ui/react-select@npm:2.2.5"
   dependencies:
@@ -5556,21 +5524,6 @@ __metadata:
   version: 1.3.0
   resolution: "@ungap/structured-clone@npm:1.3.0"
   checksum: 10c0/0fc3097c2540ada1fc340ee56d58d96b5b536a2a0dab6e3ec17d4bfc8c4c86db345f61a375a8185f9da96f01c69678f836a2b57eeaa9e4b8eeafd26428e57b0a
-  languageName: node
-  linkType: hard
-
-"@vitejs/plugin-react@npm:4.2.1":
-  version: 4.2.1
-  resolution: "@vitejs/plugin-react@npm:4.2.1"
-  dependencies:
-    "@babel/core": "npm:^7.23.5"
-    "@babel/plugin-transform-react-jsx-self": "npm:^7.23.3"
-    "@babel/plugin-transform-react-jsx-source": "npm:^7.23.3"
-    "@types/babel__core": "npm:^7.20.5"
-    react-refresh: "npm:^0.14.0"
-  peerDependencies:
-    vite: ^4.2.0 || ^5.0.0
-  checksum: 10c0/de1eec44d703f32e5b58e776328ca20793657fe991835d15b290230b19a2a08be5d31501d424279ae13ecfed28044c117b69d746891c8d9b92c69e8a8907e989
   languageName: node
   linkType: hard
 
@@ -12528,13 +12481,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-refresh@npm:^0.14.0":
-  version: 0.14.2
-  resolution: "react-refresh@npm:0.14.2"
-  checksum: 10c0/875b72ef56b147a131e33f2abd6ec059d1989854b3ff438898e4f9310bfcc73acff709445b7ba843318a953cb9424bcc2c05af2b3d80011cee28f25aef3e2ebb
-  languageName: node
-  linkType: hard
-
 "react-refresh@npm:^0.17.0":
   version: 0.17.0
   resolution: "react-refresh@npm:0.17.0"
@@ -14723,46 +14669,6 @@ __metadata:
     vite:
       optional: true
   checksum: 10c0/f390ac1d1c3992fc5ac50f9274c1090f8b55ab34a89ea88893db9a6924a3b26c9f64bc1163615150ad100749db73b6b2cf1d57f6cd60df6e762ceb5b8ad30024
-  languageName: node
-  linkType: hard
-
-"vite@npm:4.5.2":
-  version: 4.5.2
-  resolution: "vite@npm:4.5.2"
-  dependencies:
-    esbuild: "npm:^0.18.10"
-    fsevents: "npm:~2.3.2"
-    postcss: "npm:^8.4.27"
-    rollup: "npm:^3.27.1"
-  peerDependencies:
-    "@types/node": ">= 14"
-    less: "*"
-    lightningcss: ^1.21.0
-    sass: "*"
-    stylus: "*"
-    sugarss: "*"
-    terser: ^5.4.0
-  dependenciesMeta:
-    fsevents:
-      optional: true
-  peerDependenciesMeta:
-    "@types/node":
-      optional: true
-    less:
-      optional: true
-    lightningcss:
-      optional: true
-    sass:
-      optional: true
-    stylus:
-      optional: true
-    sugarss:
-      optional: true
-    terser:
-      optional: true
-  bin:
-    vite: bin/vite.js
-  checksum: 10c0/68969ccf72ad2078aec7d9e023fce6de03746a4761f9308924212fff7bd42487145b270166cec66cddacfd7b1315ec5aa39ead174fbd7fcd463637a96ff4c9d1
   languageName: node
   linkType: hard
 
