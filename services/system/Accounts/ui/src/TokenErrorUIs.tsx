@@ -3,7 +3,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./components/ui/card";
+} from "@shared/shadcn/ui/card";
 import { AlarmClockMinus, TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 

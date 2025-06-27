@@ -5,7 +5,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 import { configuredApps } from "@/configuredApps";
 import { NavLink } from "react-router-dom";
 

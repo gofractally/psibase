@@ -1,9 +1,9 @@
-import { AvatarImage } from "@/components/ui/avatar";
-import { Avatar } from "@/components/ui/avatar";
+import { AvatarImage } from "@shared/shadcn/ui/avatar";
+import { Avatar } from "@shared/shadcn/ui/avatar";
 
 import { useAvatar } from "@/hooks/use-avatar";
 import { useProfile } from "@/hooks/use-profile";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 import { LocalContact } from "../types";
 import { formatNames } from "../utils/formatNames";

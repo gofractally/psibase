@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { Input } from "./components/ui/input";
+import { Input } from "@shared/shadcn/ui/input";
 
 export const ActiveSearch = ({
   isNoAccounts,

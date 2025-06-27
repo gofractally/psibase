@@ -7,10 +7,9 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@shared/shadcn/ui/alert-dialog";
 
 import { useAvatar } from "@/hooks/use-avatar";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
@@ -38,9 +37,6 @@ export const TransferModal = ({
     tokenId,
     amount,
 }: Props) => {
-    const { data } = useChainId();
-    const chainId = data || "";
-
     const { data: currentUserData } = useCurrentUser();
 
     const { data: balances } = useBalances(currentUserData);

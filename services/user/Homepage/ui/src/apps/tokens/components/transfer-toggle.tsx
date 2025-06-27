@@ -1,10 +1,10 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 import { Tab, TabType } from "@/apps/tokens/hooks/useTab";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 

@@ -5,8 +5,8 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
 import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
 import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { FC } from "react";
