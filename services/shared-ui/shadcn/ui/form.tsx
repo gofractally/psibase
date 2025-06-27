@@ -153,6 +153,22 @@ function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
+function FormRootError({ className, ...props }: React.ComponentProps<"p">) {
+  const { errors } = useFormState();
+  const rootError = errors.root;
+  if (!rootError) {
+    return null;
+  }
+  return (
+    <p
+      className={cn("text-sm font-medium text-destructive", className)}
+      {...props}
+    >
+      {rootError.message}
+    </p>
+  );
+}
+
 export {
   useFormField,
   Form,
@@ -162,4 +178,5 @@ export {
   FormDescription,
   FormMessage,
   FormField,
+  FormRootError,
 }

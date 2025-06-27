@@ -1,17 +1,8 @@
 {
-  "compilerOptions": {
-    "composite": true,
-    "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "types": [
-      "node"
-    ]
-  },
-  "include": [
-    "vite.config.ts",
-    "../../../vite.shared.ts"
-  ]
+    "extends": "../../../tsconfig.node.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
+        "baseUrl": "./"
+    },
+    "include": ["vite.config.mts"]
 }

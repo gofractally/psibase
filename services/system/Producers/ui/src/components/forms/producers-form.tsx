@@ -1,10 +1,10 @@
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Label } from "@shared/shadcn/ui/label";
+import { Button } from "@shared/shadcn/ui/button";
 import { z, ZodError } from "zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@shared/shadcn/ui/input";
+import { Textarea } from "@shared/shadcn/ui/textarea";
 import { Trash2 } from "lucide-react";
 import {
   Select,
@@ -12,7 +12,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@shared/shadcn/ui/select";
 import { Params } from "@/hooks/useSetProducers";
 import { siblingUrl } from "@psibase/common-lib";
 

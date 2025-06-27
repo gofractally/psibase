@@ -10,11 +10,11 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 import { Settings, LogOut, Sun, Moon, UserPlus, LogIn } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { useTheme } from "./theme-provider";
 import { useLogout } from "@/hooks/useLogout";
 import { useCurrentUser } from "@/hooks/useCurrentUser";

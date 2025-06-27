@@ -2,7 +2,7 @@ import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { FileInput } from "./file-input";
 import { useUploadTree } from "@/hooks/useUploadTree";
 import { Account, Path } from "@/lib/zodTypes";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 interface Props {
   pathPrefix?: string;

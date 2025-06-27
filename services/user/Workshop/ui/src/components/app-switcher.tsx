@@ -6,14 +6,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 import { useChainId } from "@/hooks/use-chain-id";
 import { createIdenticon } from "@/lib/createIdenticon";
@@ -27,7 +27,7 @@ import {
 } from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { queryClient } from "@/queryClient";
-import { Button } from "./ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 const buildImageSrc = (mimeType: string, icon: string) =>
   `data:${mimeType};base64,${icon}`;

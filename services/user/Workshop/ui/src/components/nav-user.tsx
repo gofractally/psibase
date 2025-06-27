@@ -8,7 +8,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { Avatar,  AvatarImage } from "@/components/ui/avatar";
+import { Avatar,  AvatarImage } from "@shared/shadcn/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,14 +21,14 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
@@ -37,9 +37,9 @@ import { useTheme } from "./theme-provider";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { Skeleton } from "./ui/skeleton";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
