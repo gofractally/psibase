@@ -339,7 +339,7 @@ name = "auth-invite"
 version = "0.17.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.33.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -353,7 +353,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.26.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1521,7 +1521,7 @@ dependencies = [
  "serde_json",
  "spki",
  "urlencoding",
- "wit-bindgen-rt 0.26.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2516,7 +2516,7 @@ name = "setcode"
 version = "0.17.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.38.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2561,7 +2561,7 @@ version = "0.17.0"
 dependencies = [
  "brotli",
  "psibase",
- "wit-bindgen-rt 0.32.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2757,7 +2757,7 @@ dependencies = [
 name = "test"
 version = "0.17.0"
 dependencies = [
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2817,7 +2817,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.26.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2941,7 +2941,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "wit-bindgen-rt 0.29.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -3451,45 +3451,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29c7526379ace8709ee9ab9f2bb50f112d95581063a59ef3097d9c10153886c9"
-dependencies = [
- "bitflags 2.8.0",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7a37bd9274cb2d4754b915d624447ec0dce9105d174361841c0826efc79ceb9"
-dependencies = [
- "bitflags 2.8.0",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b18e27825442721d23ed98591a80f55220cfe0bf883d92b1ead6c9be237bb34"
-dependencies = [
- "bitflags 2.8.0",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
-dependencies = [
- "bitflags 2.8.0",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ca6f307148acf7199e492fd3781cc7b79f8f3eda003c0ac3aa8079449601ccb"
 dependencies = [
  "bitflags 2.8.0",
 ]
@@ -3514,15 +3478,6 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.38.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed6f8d372a2d4a1227f2556e051cc24b2a5f15768d53451c84ff91e2527139e3"
-dependencies = [
- "bitflags 2.8.0",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
 version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
@@ -3537,7 +3492,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.38.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
