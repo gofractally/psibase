@@ -5,8 +5,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Button } from "./ui/button";
+} from "@shared/shadcn/ui/card";
+import { Button } from "@shared/shadcn/ui/button";
 
 interface Props {
   error: Error;

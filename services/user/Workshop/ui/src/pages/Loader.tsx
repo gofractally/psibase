@@ -1,6 +1,6 @@
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
-import { Button } from "../components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useBranding } from "@/hooks/useBranding";
 import { useEffect, useState } from "react";
@@ -11,7 +11,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "../components/ui/card";
+} from "@shared/shadcn/ui/card";
 import { Terminal } from "lucide-react";
 import { LoginButton } from "../components/login-button";
 import { CreateAppModal } from "../components/create-app-modal";

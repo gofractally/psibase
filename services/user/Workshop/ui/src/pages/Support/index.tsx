@@ -1,6 +1,6 @@
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useMessages } from "@/hooks/useMessages";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 import dayjs from "dayjs";
 import relative from "dayjs/plugin/relativeTime";
 import { useNavigate } from "react-router-dom";
