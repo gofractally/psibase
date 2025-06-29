@@ -35,7 +35,7 @@ pub mod service {
                 id: token.id,
                 nft_id: token.nft_id,
                 settings_value: token.settings_value,
-                precision: token.precision.into(),
+                precision: token.precision.try_into().unwrap(),
                 current_supply: token.current_supply,
                 max_supply: token.max_supply,
                 symbol: token.symbol.unwrap_or(AccountNumber::from(0)),

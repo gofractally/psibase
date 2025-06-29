@@ -7,8 +7,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Decimal, Precision,
-        Quantity,
+        check, check_none, check_some, get_sender, AccountNumber, Decimal, Precision, Quantity,
     };
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -90,7 +89,7 @@ pub mod tables {
                 nft_id: Nfts::call().mint(),
                 current_supply: 0.into(),
                 max_supply,
-                precision: Precision::from(precision).value,
+                precision: Precision::try_from(precision).unwrap().value,
                 settings_value: TokenSetting::new().value,
                 symbol: None,
             };
@@ -156,11 +155,11 @@ pub mod tables {
         }
 
         pub async fn current_supply(&self) -> Decimal {
-            Decimal::new(self.current_supply, self.precision.into())
+            Decimal::new(self.current_supply, self.precision.try_into().unwrap())
         }
 
         pub async fn max_supply(&self) -> Decimal {
-            Decimal::new(self.max_supply, self.precision.into())
+            Decimal::new(self.max_supply, self.precision.try_into().unwrap())
         }
 
         pub async fn is_unburnable(&self) -> bool {
@@ -237,7 +236,10 @@ pub mod tables {
         pub async fn balance(&self) -> Decimal {
             Decimal::new(
                 self.balance,
-                Token::get_assert(self.token_id).precision.into(),
+                Token::get_assert(self.token_id)
+                    .precision
+                    .try_into()
+                    .unwrap(),
             )
         }
     }
@@ -270,7 +272,8 @@ pub mod tables {
                     .get(&self.token_id)
                     .unwrap()
                     .precision
-                    .into(),
+                    .try_into()
+                    .unwrap(),
             )
         }
     }

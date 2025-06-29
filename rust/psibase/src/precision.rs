@@ -2,6 +2,8 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
+use crate::ConversionError;
+
 #[derive(
     PartialEq,
     Debug,
@@ -21,9 +23,14 @@ pub struct Precision {
     pub value: u8,
 }
 
-impl From<u8> for Precision {
-    fn from(value: u8) -> Self {
-        assert!(value <= 8, "max precision is 8");
-        Self { value }
+impl TryFrom<u8> for Precision {
+    type Error = ConversionError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value <= 8 {
+            Ok(Self { value })
+        } else {
+            Err(ConversionError::PrecisionOverflow)
+        }
     }
 }

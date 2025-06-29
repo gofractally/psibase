@@ -46,7 +46,7 @@ impl FromStr for Decimal {
             Some((_, fraction_part)) => fraction_part.len() as u8,
             None => 0,
         };
-        let precision: Precision = precision.into();
+        let precision: Precision = precision.try_into()?;
 
         let quantity = Quantity::from_str(s, precision)?;
 
@@ -58,10 +58,11 @@ serialize_as_str!(Decimal, "decimal");
 
 #[cfg(test)]
 mod tests {
+
     use super::Decimal;
 
     fn create_asset(quantity: u64, precision: u8) -> Decimal {
-        Decimal::new(quantity.into(), precision.into())
+        Decimal::new(quantity.into(), precision.try_into().unwrap())
     }
 
     #[test]
@@ -134,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "max precision is 8")]
+    #[should_panic]
     fn test_precision_18() {
         assert_eq!(
             create_asset(4000000000000000000, 18).to_string(),
@@ -164,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "max precision is 8")]
+    #[should_panic]
     fn test_invalid_precision() {
         create_asset(1000, 19);
     }
