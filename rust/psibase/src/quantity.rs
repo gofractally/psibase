@@ -1,4 +1,5 @@
 use async_graphql::{InputObject, SimpleObject};
+use custom_error::custom_error;
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -6,12 +7,11 @@ use std::ops::{Add, Div, Mul, Sub};
 
 use crate::{precision::Precision, Asset};
 
-#[derive(Debug, PartialEq)]
-pub enum ConversionError {
-    InvalidNumber,
-    PrecisionOverflow,
-    Overflow,
-    ParseError,
+custom_error! { pub ConversionError
+    InvalidNumber = "Invalid Number",
+    PrecisionOverflow = "Precision overflow",
+    Overflow = "Overflow",
+    ParseError = "Parse error",
 }
 
 #[derive(
