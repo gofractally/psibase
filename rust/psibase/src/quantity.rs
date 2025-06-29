@@ -10,7 +10,6 @@ custom_error! { pub ConversionError
     InvalidNumber = "Invalid Number",
     PrecisionOverflow = "Precision overflow",
     Overflow = "Overflow",
-    ParseError = "Parse error",
 }
 
 #[derive(
@@ -53,7 +52,7 @@ impl Quantity {
             Some((integer_part, fraction_part)) => {
                 let integer_value: u64 = integer_part
                     .parse()
-                    .map_err(|_| ConversionError::ParseError)?;
+                    .map_err(|_| ConversionError::InvalidNumber)?;
 
                 let integer_value = integer_value
                     .checked_mul(10u64.pow(precision.value as u32))
@@ -68,7 +67,7 @@ impl Quantity {
 
                 let fraction_value: u64 = fraction_part
                     .parse()
-                    .map_err(|_| ConversionError::ParseError)?;
+                    .map_err(|_| ConversionError::InvalidNumber)?;
 
                 let fraction_value = fraction_value
                     .checked_mul(10u64.pow(remaining_pow as u32))
@@ -77,7 +76,7 @@ impl Quantity {
                 integer_value + fraction_value
             }
             None => {
-                let num_value: u64 = amount.parse().map_err(|_| ConversionError::ParseError)?;
+                let num_value: u64 = amount.parse().map_err(|_| ConversionError::InvalidNumber)?;
                 num_value
                     .checked_mul(10u64.pow(precision.value as u32))
                     .ok_or(ConversionError::Overflow)?
