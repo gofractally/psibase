@@ -64,7 +64,7 @@ pub mod Service {
     use crate::{AccountNumber, Quantity};
 
     #[action]
-    fn create(new_symbol: AccountNumber, max_debit: Quantity) -> u32 {
+    fn create(new_symbol: AccountNumber, max_debit: Quantity) {
         unimplemented!()
     }
 
