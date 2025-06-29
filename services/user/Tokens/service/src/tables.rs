@@ -7,7 +7,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Asset, Precision,
+        check, check_none, check_some, get_sender, AccountNumber, Decimal, Precision,
         Quantity,
     };
     use psibase::{Fracpack, Table, ToSchema};
@@ -155,12 +155,12 @@ pub mod tables {
             self.nft_holder()
         }
 
-        pub async fn current_supply(&self) -> Asset {
-            self.current_supply.to_asset(self.precision.into())
+        pub async fn current_supply(&self) -> Decimal {
+            Decimal::new(self.current_supply, self.precision.into())
         }
 
-        pub async fn max_supply(&self) -> Asset {
-            self.max_supply.to_asset(self.precision.into())
+        pub async fn max_supply(&self) -> Decimal {
+            Decimal::new(self.max_supply, self.precision.into())
         }
 
         pub async fn is_unburnable(&self) -> bool {
@@ -234,8 +234,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl Balance {
-        pub async fn balance(&self) -> Asset {
-            Asset::new(
+        pub async fn balance(&self) -> Decimal {
+            Decimal::new(
                 self.balance,
                 Token::get_assert(self.token_id).precision.into(),
             )
@@ -262,8 +262,8 @@ pub mod tables {
                 .unwrap()
         }
 
-        pub async fn balance(&self) -> Asset {
-            Asset::new(
+        pub async fn balance(&self) -> Decimal {
+            Decimal::new(
                 self.balance,
                 TokenTable::with_service(crate::Wrapper::SERVICE)
                     .get_index_pk()

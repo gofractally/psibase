@@ -4,7 +4,7 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::{precision::Precision, Asset};
+use crate::precision::Precision;
 
 custom_error! { pub ConversionError
     InvalidNumber = "Invalid Number",
@@ -84,10 +84,6 @@ impl Quantity {
         };
 
         Ok(Self { value })
-    }
-
-    pub fn to_asset(self, precision: Precision) -> Asset {
-        Asset::new(self, precision)
     }
 }
 

@@ -3,12 +3,12 @@ use std::str::FromStr;
 use crate::{serialize_as_str, ConversionError};
 use crate::{Precision, Quantity};
 
-pub struct Asset {
+pub struct Decimal {
     quantity: Quantity,
     precision: Precision,
 }
 
-impl Asset {
+impl Decimal {
     pub fn new(quantity: Quantity, precision: Precision) -> Self {
         Self {
             quantity,
@@ -17,7 +17,7 @@ impl Asset {
     }
 }
 
-impl std::fmt::Display for Asset {
+impl std::fmt::Display for Decimal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.precision.value == 0 {
             return write!(f, "{}", self.quantity.value.to_string());
@@ -35,7 +35,7 @@ impl std::fmt::Display for Asset {
     }
 }
 
-impl FromStr for Asset {
+impl FromStr for Decimal {
     type Err = ConversionError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.chars().filter(|&c| c != '.').all(|c| c.is_ascii_digit()) {
@@ -50,18 +50,18 @@ impl FromStr for Asset {
 
         let quantity = Quantity::from_str(s, precision)?;
 
-        Ok(Asset::new(quantity, precision))
+        Ok(Decimal::new(quantity, precision))
     }
 }
 
-serialize_as_str!(Asset, "asset");
+serialize_as_str!(Decimal, "decimal");
 
 #[cfg(test)]
 mod tests {
-    use super::Asset;
+    use super::Decimal;
 
-    fn create_asset(quantity: u64, precision: u8) -> Asset {
-        Asset::new(quantity.into(), precision.into())
+    fn create_asset(quantity: u64, precision: u8) -> Decimal {
+        Decimal::new(quantity.into(), precision.into())
     }
 
     #[test]

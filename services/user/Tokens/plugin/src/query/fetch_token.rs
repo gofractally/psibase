@@ -1,6 +1,6 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
-use psibase::{AccountNumber, Asset};
+use psibase::{AccountNumber, Decimal};
 
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +20,8 @@ pub struct Token {
     pub precision: u8,
     pub id: u32,
     pub nft_id: u32,
-    pub current_supply: Asset,
-    pub max_supply: Asset,
+    pub current_supply: Decimal,
+    pub max_supply: Decimal,
     pub owner: AccountNumber,
     pub symbol: Option<AccountNumber>,
 }
