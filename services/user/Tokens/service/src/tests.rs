@@ -2,9 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::format;
-
-    use crate::{action_structs::get_balance, Wrapper};
+    use crate::Wrapper;
     use psibase::*;
 
     fn credit(

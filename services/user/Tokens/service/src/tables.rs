@@ -7,7 +7,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Asset, Precision,
+        check, check_none, check_some, get_sender, AccountNumber, Asset, Precision,
         Quantity,
     };
     use psibase::{Fracpack, Table, ToSchema};
