@@ -2,7 +2,9 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-use crate::{AccountNumber, Quantity};
+use crate::{services::nft::NID, AccountNumber, Quantity};
+
+type SID = AccountNumber;
 
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
@@ -21,9 +23,9 @@ pub struct SaleDetails {
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolRecord {
     #[allow(non_snake_case)]
-    pub symbolId: AccountNumber,
+    pub symbolId: SID,
     #[allow(non_snake_case)]
-    pub ownerNft: u32,
+    pub ownerNft: NID,
     #[allow(non_snake_case)]
     pub saleDetails: SaleDetails,
 }
