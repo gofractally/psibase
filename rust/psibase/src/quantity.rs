@@ -26,6 +26,7 @@ custom_error! { pub ConversionError
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialOrd,
     PartialEq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -92,12 +93,6 @@ impl Quantity {
     }
 }
 
-#[derive(Debug)]
-pub enum MathError {
-    Overflow,
-    PrecisionMismatch,
-}
-
 impl Add for Quantity {
     type Output = Quantity;
 
@@ -111,11 +106,5 @@ impl Sub for Quantity {
 
     fn sub(self, rhs: Self) -> Self::Output {
         self.value.checked_sub(rhs.value).unwrap().into()
-    }
-}
-
-impl PartialOrd for Quantity {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.value.partial_cmp(&other.value)
     }
 }
