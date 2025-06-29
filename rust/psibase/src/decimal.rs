@@ -90,6 +90,7 @@ mod tests {
         assert_eq!(create_asset(400000, 3).to_string(), "400.000");
         assert_eq!(create_asset(1, 3).to_string(), "0.001");
         assert_eq!(create_asset(123, 3).to_string(), "0.123");
+        assert_eq!(create_asset(0, 3).to_string(), "0.000");
     }
 
     #[test]
@@ -97,6 +98,7 @@ mod tests {
         assert_eq!(create_asset(40000, 4).to_string(), "4.0000");
         assert_eq!(create_asset(1, 4).to_string(), "0.0001");
         assert_eq!(create_asset(12345, 4).to_string(), "1.2345");
+        assert_eq!(create_asset(0, 4).to_string(), "0.0000");
     }
 
     #[test]
@@ -104,6 +106,7 @@ mod tests {
         assert_eq!(create_asset(400000, 5).to_string(), "4.00000");
         assert_eq!(create_asset(1, 5).to_string(), "0.00001");
         assert_eq!(create_asset(54321, 5).to_string(), "0.54321");
+        assert_eq!(create_asset(0, 5).to_string(), "0.00000");
     }
 
     #[test]
@@ -111,9 +114,27 @@ mod tests {
         assert_eq!(create_asset(4000000, 6).to_string(), "4.000000");
         assert_eq!(create_asset(1, 6).to_string(), "0.000001");
         assert_eq!(create_asset(123456, 6).to_string(), "0.123456");
+        assert_eq!(create_asset(0, 6).to_string(), "0.000000");
     }
 
     #[test]
+    fn test_precision_7() {
+        assert_eq!(create_asset(4000000, 6).to_string(), "4.000000");
+        assert_eq!(create_asset(1, 6).to_string(), "0.000001");
+        assert_eq!(create_asset(123456, 6).to_string(), "0.123456");
+        assert_eq!(create_asset(0, 7).to_string(), "0.0000000");
+    }
+
+    #[test]
+    fn test_precision_8() {
+        assert_eq!(create_asset(4000000, 6).to_string(), "4.000000");
+        assert_eq!(create_asset(1, 6).to_string(), "0.000001");
+        assert_eq!(create_asset(123456, 6).to_string(), "0.123456");
+        assert_eq!(create_asset(0, 8).to_string(), "0.00000000");
+    }
+
+    #[test]
+    #[should_panic(expected = "max precision is 8")]
     fn test_precision_18() {
         assert_eq!(
             create_asset(4000000000000000000, 18).to_string(),
@@ -133,25 +154,18 @@ mod tests {
             "18446744073709551615"
         );
         assert_eq!(
-            create_asset(u64::MAX, 18).to_string(),
-            "18.446744073709551615"
+            create_asset(u64::MAX, 8).to_string(),
+            "184467440737.09551615"
         );
         assert_eq!(
-            create_asset(1000000000000000000, 18).to_string(),
-            "1.000000000000000000"
+            create_asset(1000000000000000000, 2).to_string(),
+            "10000000000000000.00"
         );
     }
 
     #[test]
-    #[should_panic(expected = "max precision is 18")]
+    #[should_panic(expected = "max precision is 8")]
     fn test_invalid_precision() {
         create_asset(1000, 19);
-    }
-
-    #[test]
-    fn test_zero_high_precision() {
-        assert_eq!(create_asset(0, 18).to_string(), "0.000000000000000000");
-        assert_eq!(create_asset(0, 10).to_string(), "0.0000000000");
-        assert_eq!(create_asset(0, 5).to_string(), "0.00000");
     }
 }
