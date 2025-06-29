@@ -27,7 +27,7 @@ namespace UserService
       TID create(Precision precision, Quantity maxSupply);
 
       void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
-      void burn(TID tokenId, Quantity amount);
+      void burn(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
 
       void setUserConf(psibase::EnumElement flag, bool enable);
       void setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable);
@@ -81,7 +81,7 @@ namespace UserService
          {
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, MemoView memo) {}
-            void burned(TID tokenId, Account burner, Quantity amount) {}
+            void burned(TID tokenId, Account burner, Quantity amount, MemoView memo) {}
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             void symbolMapped(TID tokenId, Account account, SID symbolId) {}
