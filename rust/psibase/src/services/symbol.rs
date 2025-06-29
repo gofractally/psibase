@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,6 @@ type SID = AccountNumber;
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SaleDetails {
-    #[allow(non_snake_case)]
     pub salePrice: Quantity,
 
     pub seller: AccountNumber,
@@ -22,16 +22,13 @@ pub struct SaleDetails {
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolRecord {
-    #[allow(non_snake_case)]
     pub symbolId: SID,
-    #[allow(non_snake_case)]
     pub ownerNft: NID,
-    #[allow(non_snake_case)]
     pub saleDetails: SaleDetails,
 }
 
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
-#[allow(non_snake_case, unused_variables)]
+#[allow(unused_variables)]
 pub mod Service {
     use crate::services::symbol::SymbolRecord;
     use crate::{AccountNumber, Quantity};
