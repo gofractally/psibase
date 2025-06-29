@@ -134,8 +134,8 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTokens RTransact SetCode Symbol
-        Tokens Transact VerifySig
+        RHttpServer RSetCode RTransact SetCode Symbol
+        Transact VerifySig
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService SocketListService SocketAuth)
     set(WASM_BYPRODUCTS)
