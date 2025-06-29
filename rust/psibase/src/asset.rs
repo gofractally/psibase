@@ -42,7 +42,7 @@ impl FromStr for Asset {
             return Err(ConversionError::InvalidNumber);
         }
 
-        let precision: u8 = match s.trim().split_once('.') {
+        let precision: u8 = match s.split_once('.') {
             Some((_, fraction_part)) => fraction_part.len() as u8,
             None => 0,
         };
