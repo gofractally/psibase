@@ -1,24 +1,11 @@
-use async_graphql::{InputObject, SimpleObject};
+use std::str::FromStr;
+
 use fracpack::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
 
-use crate::ConversionError;
+use crate::{serialize_as_str, ConversionError};
 
-#[derive(
-    PartialEq,
-    Debug,
-    Copy,
-    Clone,
-    Pack,
-    Unpack,
-    Serialize,
-    Deserialize,
-    ToSchema,
-    SimpleObject,
-    InputObject,
-)]
+#[derive(PartialEq, Debug, Copy, Clone, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "PrecisionInput")]
 pub struct Precision {
     pub value: u8,
 }
@@ -34,3 +21,23 @@ impl TryFrom<u8> for Precision {
         }
     }
 }
+
+impl FromStr for Precision {
+    type Err = ConversionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            value: s
+                .parse::<u8>()
+                .map_err(|_| ConversionError::InvalidNumber)?,
+        })
+    }
+}
+
+impl std::fmt::Display for Precision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+serialize_as_str!(Precision, "precision");

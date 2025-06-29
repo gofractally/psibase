@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{services::nft::NID, AccountNumber, Quantity};
 
-type SID = AccountNumber;
+pub type SID = AccountNumber;
 
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,

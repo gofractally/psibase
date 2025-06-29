@@ -1,6 +1,6 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
-use psibase::{AccountNumber, Decimal};
+use psibase::{AccountNumber, Decimal, Precision};
 
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ pub struct Data {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Token {
-    pub precision: u8,
+    pub precision: Precision,
     pub id: u32,
     pub nft_id: u32,
     pub current_supply: Decimal,

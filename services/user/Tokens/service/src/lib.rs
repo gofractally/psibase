@@ -7,8 +7,8 @@ pub mod service {
     use crate::tables::tables::{
         Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
     };
-    use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::symbol::Service::Wrapper as Symbol;
+    use psibase::services::nft::{Wrapper as Nfts, NID};
+    use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
     use psibase::{AccountNumber, Precision, Quantity};
 
     use psibase::{Fracpack, ToSchema};
@@ -21,12 +21,12 @@ pub mod service {
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct TokenRecord {
         pub id: TID,
-        pub nft_id: u32,
+        pub nft_id: NID,
         pub settings_value: u8,
         pub precision: Precision,
         pub current_supply: Quantity,
         pub max_supply: Quantity,
-        pub symbol: AccountNumber, // SID
+        pub symbol: SID,
     }
 
     impl From<Token> for TokenRecord {

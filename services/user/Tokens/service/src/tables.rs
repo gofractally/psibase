@@ -29,6 +29,7 @@ pub mod tables {
         #[primary_key]
         pub id: TID,
         pub nft_id: u32,
+        #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
         pub current_supply: Quantity,
@@ -152,6 +153,10 @@ pub mod tables {
     impl Token {
         pub async fn owner(&self) -> AccountNumber {
             self.nft_holder()
+        }
+
+        pub async fn precision(&self) -> Precision {
+            self.precision.try_into().unwrap()
         }
 
         pub async fn current_supply(&self) -> Decimal {

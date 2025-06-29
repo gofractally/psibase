@@ -70,7 +70,7 @@ impl Intf for TokensPlugin {
 
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        let amount = Quantity::from_str(&amount, token.precision.try_into().unwrap()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
         let packed_args = tokens::action_structs::burn {
             amount,
@@ -90,13 +90,12 @@ impl Intf for TokensPlugin {
         let token_id = token_id_to_number(token_id)?;
 
         let token = query::fetch_token::fetch_token(token_id)?;
-        let from = AccountNumber::from_str(from.as_str()).unwrap();
 
-        let amount = Quantity::from_str(&amount, token.precision.try_into().unwrap()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
         let packed_args = tokens::action_structs::recall {
             amount,
-            from,
+            from: from.as_str().into(),
             memo,
             token_id: token.id,
         }
@@ -123,7 +122,7 @@ impl Intf for TokensPlugin {
 
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        let amount = Quantity::from_str(&amount, token.precision.try_into().unwrap()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
         let packed_args = tokens::action_structs::mint {
             amount,
@@ -189,14 +188,12 @@ impl Transfer for TokensPlugin {
 
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        let amount = Quantity::from_str(&amount, token.precision.try_into().unwrap()).unwrap();
-
-        let debitor = AccountNumber::from_str(debitor.as_str()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
         let packed_args = tokens::action_structs::credit {
             amount,
             memo,
-            debitor,
+            debitor: debitor.as_str().into(),
             token_id: token.id,
         }
         .packed();
@@ -214,13 +211,11 @@ impl Transfer for TokensPlugin {
 
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        let amount = Quantity::from_str(&amount, token.precision.try_into().unwrap()).unwrap();
-
-        let creditor = AccountNumber::from_str(&creditor.as_str()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
         let packed_args = tokens::action_structs::debit {
             amount,
-            creditor,
+            creditor: creditor.as_str().into(),
             memo,
             token_id: token.id,
         }
@@ -238,14 +233,12 @@ impl Transfer for TokensPlugin {
         let token_id = token_id_to_number(token_id)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        let amount = Quantity::from_str(&amount, token.precision.try_into().unwrap()).unwrap();
-
-        let debitor = AccountNumber::from_str(debitor.as_str()).unwrap();
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
         let packed_args = tokens::action_structs::uncredit {
             amount,
             memo,
-            debitor,
+            debitor: debitor.as_str().into(),
             token_id: token.id,
         }
         .packed();
@@ -266,7 +259,7 @@ impl Queries for TokensPlugin {
                 .symbol
                 .map(|symbol| symbol.to_string())
                 .unwrap_or("".to_string()),
-            precision: token.precision,
+            precision: token.precision.value,
             current_supply: token.current_supply.to_string(),
             max_supply: token.max_supply.to_string(),
         })
