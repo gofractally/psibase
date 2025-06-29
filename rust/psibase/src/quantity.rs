@@ -2,7 +2,6 @@ use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::{precision::Precision, Asset};
@@ -106,5 +105,21 @@ impl Sub for Quantity {
 
     fn sub(self, rhs: Self) -> Self::Output {
         self.value.checked_sub(rhs.value).unwrap().into()
+    }
+}
+
+impl Mul for Quantity {
+    type Output = Quantity;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.value.checked_mul(rhs.value).unwrap().into()
+    }
+}
+
+impl Div for Quantity {
+    type Output = Quantity;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self.value.checked_div(rhs.value).unwrap().into()
     }
 }
