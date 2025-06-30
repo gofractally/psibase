@@ -6,14 +6,14 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { CreateFractalModal } from "../components/create-fractal-modal";
 import { LoginButton } from "../components/login-button";
-import { Button } from "../components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
-} from "../components/ui/card";
+} from "@shared/shadcn/ui/card";
 
 export const Loader = () => {
     const { data: currentUser } = useCurrentUser();

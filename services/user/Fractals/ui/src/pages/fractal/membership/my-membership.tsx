@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@shared/shadcn/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";

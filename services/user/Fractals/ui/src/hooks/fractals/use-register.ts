@@ -1,6 +1,6 @@
 import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
@@ -11,7 +11,7 @@ import QueryKey from "@/lib/queryKeys";
 import { assertUser } from "../use-current-user";
 import { updateParticipants } from "./use-users-and-groups";
 
-const zParams = z.object({
+export const zParams = z.object({
     evaluationId: z.number(),
 });
 

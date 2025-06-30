@@ -8,7 +8,7 @@ import { useExpectCurrentUser } from "./use-expect-current-user";
 
 export const useLogout = () => {
     const queryClient = useQueryClient();
-    const [_, setExpectCurrentUser] = useExpectCurrentUser();
+    const [, setExpectCurrentUser] = useExpectCurrentUser();
 
     return useMutation({
         mutationKey: QueryKey.logout(),

@@ -2,16 +2,16 @@ import dayjs from "dayjs";
 import { CalendarIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@shared/shadcn/ui/button";
+import { Calendar } from "@shared/shadcn/ui/calendar";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+} from "@shared/shadcn/ui/popover";
+import { ScrollArea, ScrollBar } from "@shared/shadcn/ui/scroll-area";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 import { useFieldContext } from "./app-form";
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
