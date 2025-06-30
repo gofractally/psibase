@@ -1979,6 +1979,7 @@ dependencies = [
  "indicatif",
  "jwt",
  "mime_guess",
+ "paste",
  "pem",
  "percent-encoding",
  "pkcs8",
