@@ -1345,7 +1345,7 @@ void run(const std::string&              db_path,
        SharedDatabase{
            db_path,
            {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
-           triedent::open_mode::create},
+           triedent::open_mode::resize},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
@@ -2266,7 +2266,8 @@ int main(int argc, char* argv[])
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
        "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: "
-       "this will not modify an existing database. This option is subject to change.");
+       "If this is reduced, it may cause a significant delay on startup as the database is "
+       "reorganized. This option is subject to change.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");

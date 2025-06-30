@@ -45,6 +45,11 @@ namespace triedent
       bool                  pinned() const { return _pinned; }
       access_mode           mode() const { return _mode; }
 
+      // Sets the size of the file to new_size.
+      //
+      // Not thread-safe
+      void unsafe_resize(std::size_t new_size);
+
      private:
       std::atomic<void*> _data;
       std::size_t        _size;

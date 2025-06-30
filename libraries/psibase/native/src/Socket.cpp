@@ -220,6 +220,7 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
          check(sockets[pos]->info() == socket->info(), "Replacing socket does not match");
          sockets[pos]->weak_sockets.reset();
          sockets[pos] = socket;
+         socket->id   = fd;
          existing     = true;
       }
       else

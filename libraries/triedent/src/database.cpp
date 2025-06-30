@@ -7,7 +7,8 @@ namespace triedent
    {
       void create_db_dirs(const std::filesystem::path& dir, open_mode mode)
       {
-         if (mode == open_mode::create || mode == open_mode::trunc || mode == open_mode::create_new)
+         if (mode == open_mode::create || mode == open_mode::resize || mode == open_mode::trunc ||
+             mode == open_mode::create_new)
          {
             std::filesystem::create_directories(dir / "data");
          }
