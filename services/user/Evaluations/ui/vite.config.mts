@@ -23,7 +23,7 @@ export default defineConfig(({ command }) => ({
             },
         }),
         createPsibaseConfig({
-            service: "auth-sig",
+            service: "evaluations",
             serviceDir: serviceDir,
             isServing: command === "serve",
             useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
