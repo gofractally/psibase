@@ -46,6 +46,10 @@ psinode - The psibase blockchain server
 
   Loads a PKCS #11 module from *filename*. The server will be able to sign blocks using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used. This option can appear any number of times.
 
+- `--service-threads` *num*
+
+  The number of threads that run async actions posted by services.
+
 ### P2P Network Options
 
 - `--p2p`

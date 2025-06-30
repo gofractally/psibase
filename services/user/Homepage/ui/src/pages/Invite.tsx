@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
-
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardContent,
@@ -11,7 +9,7 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from "@/components/ui/card";
+} from "@shared/shadcn/ui/card";
 import dayjs from "dayjs";
 
 import relativeTime from "dayjs/plugin/relativeTime";

@@ -1,21 +1,21 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
   FormField,
   FormItem,
   FormLabel,
   FormControl,
   FormMessage,
-} from "@/components/ui/form";
+} from "@shared/shadcn/ui/form";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@shared/shadcn/ui/select";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 import { Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";

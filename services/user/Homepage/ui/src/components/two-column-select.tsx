@@ -1,5 +1,8 @@
-import { ResizableHandle, ResizablePanelGroup } from "./ui/resizable";
-import { ResizablePanel } from "./ui/resizable";
+import {
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
+} from "@shared/shadcn/ui/resizable";
 
 export type DisplayMode = "left" | "right" | "both";
 

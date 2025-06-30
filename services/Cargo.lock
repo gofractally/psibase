@@ -1764,6 +1764,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "packages"
+version = "0.17.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "getrandom 0.3.1",
+ "psibase",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "wit-bindgen-rt 0.29.0",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

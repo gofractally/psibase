@@ -15,9 +15,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@shared/shadcn/ui/sidebar"
 import { useBranding } from "@/hooks/use-branding"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@shared/shadcn/ui/skeleton"
 import { NavMain } from "./nav-main"
 import { NavSubNav } from "./nav-sub-nav"
 import { Developers } from "./Developers"

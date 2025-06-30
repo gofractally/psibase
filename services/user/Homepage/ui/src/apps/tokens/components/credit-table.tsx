@@ -1,6 +1,6 @@
 import { useDebit } from "@/apps/tokens/hooks/tokensPlugin/useDebit";
 import { AnimateNumber } from "./AnimateNumber";
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
   Table,
   TableBody,
@@ -9,7 +9,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@shared/shadcn/ui/table";
 import { SharedBalance } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { useUncredit } from "@/apps/tokens/hooks/tokensPlugin/useUncredit";
 import { z } from "zod";

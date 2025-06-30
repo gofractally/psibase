@@ -1,4 +1,5 @@
 #include <psibase/TransactionContext.hpp>
+#include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 
@@ -261,6 +262,36 @@ namespace psibase
       }
    }
 
+   namespace
+   {
+      struct VerifyTokenData
+      {
+         bool        success;
+         RunMode     mode;
+         Action      action;
+         Checksum256 context;
+         PSIO_REFLECT(VerifyTokenData, success, mode, action, context)
+      };
+   }  // namespace
+   Checksum256 BlockContext::getVerifyContextId()
+   {
+      check(current.transactions.empty(),
+            "Internal error: a block context used to verify signatures should not have any "
+            "transactions applied.");
+      if (verifyContextId)
+         return *verifyContextId;
+      Checksum256 result{};
+      auto        status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      if (status && status->head)
+      {
+         auto& services = status->consensus.next ? status->consensus.next->consensus.services
+                                                 : status->consensus.current.services;
+         result         = sha256(services);
+      }
+      verifyContextId = result;
+      return result;
+   }
+
    std::optional<SignedTransaction> BlockContext::callNextTransaction()
    {
       auto notifyType = NotifyType::nextTransaction;
@@ -326,6 +357,158 @@ namespace psibase
          }
       }
       return {};
+   }
+
+   std::vector<Checksum256> BlockContext::callPreverify(const SignedTransaction& trx)
+   {
+      auto notifyType = NotifyType::preverifyTransaction;
+      auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
+          *writer, psio::convert_to_key(notifyKey(notifyType)));
+      if (!notifyData)
+         return {};
+      if (!psio::fracpack_validate<NotifyRow>(*notifyData))
+         return {};
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{*notifyData}).actions();
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
+
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tie(trx))};
+
+      std::vector<Checksum256> tokens;
+
+      for (auto a : actions)
+      {
+         if (a.sender() != AccountNumber{})
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid preverifyTransaction callback" << std::endl;
+            continue;
+         }
+         if (!a.rawData().empty())
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid preverifyTransaction callback" << std::endl;
+            continue;
+         }
+         action.service = a.service();
+         action.method  = a.method();
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
+         auto&              atrace = trace.actionTraces.emplace_back();
+
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+
+            std::optional<std::vector<std::optional<RunToken>>> result;
+            if (!psio::from_frac(result, atrace.rawRetval))
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(trxLogger, warning)
+                   << "failed to deserialize result of " << action.service.str()
+                   << "::" << action.method.str();
+            }
+            else
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(trxLogger, debug) << "preverifyTransaction succeeded";
+               if (result)
+               {
+                  for (const auto& token : *result)
+                  {
+                     Checksum256 value = {};
+                     if (token && token->size() == Checksum256{}.size())
+                     {
+                        std::ranges::copy(*token, value.begin());
+                     }
+                     tokens.push_back(value);
+                  }
+                  break;
+               }
+            }
+         }
+         catch (std::exception& e)
+         {
+            trace.error = e.what();
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, warning) << "preverifyTransaction failed: " << e.what();
+         }
+      }
+
+      tokens.resize(trx.proofs.size());
+      return tokens;
+   }
+
+   void BlockContext::callRun(psio::view<const RunRow> row)
+   {
+      auto action = row.action().unpack();
+
+      DbMode mode = DbMode::rpc();
+      switch (row.mode().unpack())
+      {
+         case RunMode::verify:
+            mode = DbMode::verify();
+            break;
+         case RunMode::speculative:
+            mode = DbMode::transaction();
+            break;
+         case RunMode::rpc:
+            mode = DbMode::rpc();
+            break;
+         default:
+            PSIBASE_LOG(trxLogger, warning) << "Wrong run mode should be caught earlier";
+            break;
+      }
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, mode};
+      auto&              atrace = trace.actionTraces.emplace_back();
+
+      auto session = db.startWrite(writer);
+      try
+      {
+         auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
+         tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
+         tc.execNonTrxAction(0, action, atrace);
+         PSIBASE_LOG(trxLogger, debug)
+             << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, debug) << "async " << action.service.str()
+                                       << "::" << action.method.str() << " failed: " << e.what();
+      }
+
+      try
+      {
+         auto token = sha256(
+             VerifyTokenData{!trace.error, row.mode(), action,
+                             row.mode() == RunMode::verify ? getVerifyContextId() : Checksum256{}});
+         // Run the continuation
+         Action action{
+             .sender  = {},
+             .service = row.continuation().service(),
+             .method  = row.continuation().method(),
+             .rawData = psio::to_frac(std::tuple(
+                 row.id().unpack(), trace, std::optional{std::span(token.data(), token.size())}))};
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, DbMode::rpc()};
+         auto&              atrace = trace.actionTraces.emplace_back();
+         tc.execNonTrxAction(0, action, atrace);
+         PSIBASE_LOG(trxLogger, debug) << "async continuation " << action.service.str()
+                                       << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, warning) << "async continuation " << action.service.str()
+                                         << "::" << action.method.str() << " failed: " << e.what();
+      }
    }
 
    Checksum256 BlockContext::makeEventMerkleRoot()
@@ -555,23 +738,39 @@ namespace psibase
                                   TransactionTrace&                        trace,
                                   size_t                                   i,
                                   std::optional<std::chrono::microseconds> watchdogLimit,
-                                  BlockContext*                            errorContext)
+                                  BlockContext*                            errorContext,
+                                  const Checksum256&                       token)
    {
+      auto id = sha256(trx.transaction.data(), trx.transaction.size());
+      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
       try
       {
          checkActive();
+         auto act = makeVerify(trx, id, i);
+         if (token != Checksum256{})
+         {
+            auto expectedToken =
+                sha256(VerifyTokenData{true, RunMode::verify, act, getVerifyContextId()});
+            if (expectedToken == token)
+            {
+               PSIBASE_LOG(trxLogger, debug) << "Skipped signature verification " << i
+                                             << " because a matching token was provided";
+               return;
+            }
+            PSIBASE_LOG(trxLogger, warning)
+                << "Signature verification token " << i << "is out-dated or invalid";
+         }
          TransactionContext t{*this, trx, trace, DbMode::verify()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
-         t.execVerifyProof(i);
+         auto& atrace = trace.actionTraces.emplace_back();
+         t.execNonTrxAction(0, act, atrace);
          if (!t.subjectiveData.empty())
             throw std::runtime_error("proof called a subjective service");
       }
       catch (const std::exception& e)
       {
-         auto id     = sha256(trx.transaction.data(), trx.transaction.size());
          trace.error = e.what();
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction signature verification failed";
          if (errorContext)
@@ -580,32 +779,6 @@ namespace psibase
       }
       catch (...)
       {
-         throw;
-      }
-   }
-
-   void BlockContext::checkFirstAuth(const SignedTransaction&                 trx,
-                                     TransactionTrace&                        trace,
-                                     std::optional<std::chrono::microseconds> watchdogLimit,
-                                     BlockContext*                            errorContext)
-   {
-      try
-      {
-         checkActive();
-         TransactionContext t{*this, trx, trace, DbMode::firstAuth()};
-         if (watchdogLimit)
-            t.setWatchdog(*watchdogLimit);
-         t.checkFirstAuth();
-      }
-      catch (const std::exception& e)
-      {
-         auto id     = sha256(trx.transaction.data(), trx.transaction.size());
-         trace.error = e.what();
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
-         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-         PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
-         if (errorContext)
-            errorContext->callOnTransaction(id, trace);
          throw;
       }
    }

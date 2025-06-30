@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { ConfirmationModal } from "@/components";
 

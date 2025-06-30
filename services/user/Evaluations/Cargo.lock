@@ -861,7 +861,6 @@ version = "0.17.0"
 dependencies = [
  "async-graphql",
  "psibase",
- "psibase_macros",
  "rand 0.9.1",
  "serde",
  "serde_json",

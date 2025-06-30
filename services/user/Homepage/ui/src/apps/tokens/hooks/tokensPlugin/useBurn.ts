@@ -1,4 +1,3 @@
-import { Account } from "@/lib/zod/Account";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";

@@ -14,17 +14,21 @@ class Tokens(Service):
 
 class Transact(Service):
     service = 'transact'
-    def push_transaction(self, trx):
-        packed = self.api.pack_signed_transaction(trx)
+    def push_transaction(self, trx, keys=[]):
+        packed = self.api.pack_signed_transaction(trx, keys)
         with self.post('/push_transaction?wait_for=applied', headers={'Content-Type': 'application/octet-stream'}, data=packed) as response:
             response.raise_for_status()
             trace = response.json()
             if trace['error'] is not None:
                 raise TransactionError(trace)
             return trace
-    def push_action(self, sender, service, method, data, timeout=10, flags=0):
+    def push_action(self, sender, service, method, data, timeout=10, flags=0, keys=[]):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]))
+        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]), keys)
+    def get_jwt_key(self, token):
+        with self.get('/jwt_key', headers={"Authorization": "Bearer " + token}) as reply:
+            reply.raise_for_status()
+            return reply.content
 
 class Accounts(Service):
     service = 'accounts'
@@ -61,3 +65,21 @@ class StagedTx(Service):
             id_ = id_or_tx['id']
             txid = id_or_tx['txid']
         self.push_action(account, 'accept', {"id": id_,  "txid": txid}, keys=keys)
+
+class XAdmin(Service):
+    service = 'x-admin'
+    def get_admin_accounts(self):
+        with self.get('/admin_accounts') as reply:
+            reply.raise_for_status()
+            return reply.json()
+    def admin_login(self):
+        with self.get('/admin_login') as reply:
+            reply.raise_for_status()
+            return reply.json()["access_token"]
+    def get_config(self):
+        with self.get('/native/admin/config') as reply:
+            reply.raise_for_status()
+            return reply.json()
+    def set_config(self, json):
+        with self.put('/native/admin/config', json=json) as reply:
+            reply.raise_for_status()

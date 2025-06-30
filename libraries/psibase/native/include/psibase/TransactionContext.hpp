@@ -3,6 +3,7 @@
 #include <boost/container/flat_map.hpp>
 #include <psibase/BlockContext.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/Watchdog.hpp>
 
 namespace eosio::vm
 {
@@ -46,7 +47,6 @@ namespace psibase
       void execVerifyProof(size_t i);
 
       void execVerifyProof(const Checksum256& id, Claim claim, std::vector<char> proof);
-      void checkFirstAuth();
       void execTransaction();
 
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
@@ -60,7 +60,7 @@ namespace psibase
 
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
-      void setWatchdog(std::chrono::steady_clock::duration watchdogLimit);
+      void setWatchdog(CpuClock::duration watchdogLimit);
 
       // Returns the alt stack for wasm execution.
       eosio::vm::stack_manager& getAltStack();

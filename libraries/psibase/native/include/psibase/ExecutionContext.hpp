@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/block.hpp>
+#include <psibase/nativeTables.hpp>
 
 namespace psibase
 {
@@ -52,11 +53,27 @@ namespace psibase
       bool                    isSubjective;
       bool                    isSync;
       bool                    isReadOnly;
-      static constexpr DbMode transaction() { return {false, true, false}; }
-      static constexpr DbMode verify() { return {false, false, true}; }
-      static constexpr DbMode callback() { return {true, true, false}; }
-      static constexpr DbMode rpc() { return {true, false, false}; }
-      static constexpr DbMode firstAuth() { return {false, true, true}; }
+      bool                    verifyOnly;
+      static constexpr DbMode transaction() { return {false, true, false, false}; }
+      static constexpr DbMode verify() { return {false, false, true, true}; }
+      static constexpr DbMode callback() { return {true, true, false, false}; }
+      static constexpr DbMode rpc() { return {true, false, false, false}; }
+      static constexpr DbMode from(RunMode mode)
+      {
+         switch (mode)
+         {
+            case RunMode::verify:
+               return DbMode::verify();
+            case RunMode::speculative:
+               return DbMode::transaction();
+            case RunMode::rpc:
+               return DbMode::rpc();
+            case RunMode::callback:
+               return DbMode::callback();
+            default:
+               throw std::runtime_error("Unknown RunMode");
+         }
+      }
    };
 
    struct ExecutionContextImpl;

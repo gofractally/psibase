@@ -22,6 +22,7 @@ namespace psibase
    static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
    static constexpr NativeTableNum logTruncateTable           = 13;  // subjective
    static constexpr NativeTableNum socketTable                = 14;  // subjective
+   static constexpr NativeTableNum runTable                   = 15;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -121,9 +122,8 @@ namespace psibase
 
    using CodeByHashKeyType =
        std::tuple<std::uint16_t, std::uint8_t, Checksum256, std::uint8_t, std::uint8_t>;
-   auto codeByHashKey(const Checksum256& codeHash,
-                      uint8_t            vmType,
-                      uint8_t            vmVersion) -> CodeByHashKeyType;
+   auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
+       -> CodeByHashKeyType;
 
    /// where code is actually stored, duplicate services are reused
    struct CodeByHashRow
@@ -182,6 +182,9 @@ namespace psibase
       rejectTransaction,
       // Returns a transaction to apply
       nextTransaction,
+      // Determines which signatures (if any) have
+      // already been verified.
+      preverifyTransaction,
    };
 
    using NotifyKeyType = std::tuple<std::uint16_t, std::uint8_t, NotifyType>;
@@ -304,6 +307,123 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> SocketKeyType;
       PSIO_REFLECT(SocketRow, fd, info)
+   };
+
+   enum class RunMode : std::uint8_t
+   {
+      // No database access, and only services with isAuthService
+      // are allowed.
+      verify,
+      // Access is equivalent to transactions. Changes to the
+      // chain state are allowed, but will be discarded after
+      // the continuation completes.
+      speculative,
+      // Read-only access to chain state. Read/write access
+      // to chain-independent databases.
+      rpc,
+      // Read-only access to objective state, Read/write access
+      // to subjective state. When running in an async context,
+      // changes to chain state will be discarded.
+      callback,
+   };
+
+   // A RunToken is an opaque value that can be used to
+   // prove that a particular execution succeeded. Operations
+   // that take tokens may skip execution if a token is provided.
+   //
+   // A token matches an execution if it was created by an
+   // execution with the same action, mode, and context.
+   //
+   // - If the mode is verify, the context consists of all
+   //   the verify services.
+   // - If the mode is transaction, the context consists of
+   //   all objective chain state.
+   // - If the mode is rpc or callback, every execution has
+   //   a distinct context.
+   //
+   // - If the token matches, the implementation MAY skip execution
+   // - On an active block producer, if the token does not
+   //   match, the implementation MUST NOT skip execution
+   // - If the implementation receives a non-matching
+   //   token, it SHOULD issue a warning
+   // - Services that use tokens MUST ensure that only
+   //   matching tokens are passed to native
+   // - It is implementation-defined whether tokens can
+   //   be transferred between nodes.
+   using RunToken = std::vector<char>;
+
+   //struct ContinuationArgs
+   //{
+   //   std::uint64_t id;
+   //   TransactionTrace trace;
+   //   std::optional<RunToken> token;
+   //   PSIO_REFLECT(ContinuationArgs, id, trace, token)
+   //};
+
+   struct BoundMethod
+   {
+      AccountNumber service;
+      MethodNumber  method;
+      PSIO_REFLECT(BoundMethod, service, method)
+   };
+
+   using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
+   auto runPrefix() -> KeyPrefixType;
+   auto runKey(std::uint64_t id) -> RunKeyType;
+
+   // The run table holds actions to be run concurrently.
+   // An entry may begin executing whenever it is not
+   // currently running. Rows with a lower id are preferred,
+   // but the order is not guaranteed. After the action
+   // finishes, whether successfully or not, the continuation
+   // will be run with the trace.
+   //
+   // The state used to run the action is the head block state
+   // whenever execution begins. The continuation is run with
+   // the same state as the action. It is unspecified whether
+   // changes to the chain state made by the action are seen
+   // by the continuation.
+   //
+   // Execution can be terminated at any time. It is the
+   // continuation's resposibility to remove the row. Native
+   // code does not remove or modify entries in the table.
+   // If the row is still present, it will start execution
+   // from the beginning.
+   //
+   // Note: The server itself may be terminated abruptly
+   // and this cannot be prevented. When this happens, it is
+   // impossible to resume where we left off. Changes committed
+   // by commitSubjective (including PSIBASE_SUBJECTIVE_TX)
+   // will persist.
+   //
+   // To implement async cancellation, replace the
+   // action with a no-op and the continuation with a
+   // cancel handler. N.B. Do not implement cancellation
+   // by deleting the row. Deleting it anywhere except the
+   // continuation makes it impossible to re-use the id safely.
+   //
+   // If the row is deleted (don't) or the continuation is
+   // changed after execution starts, it is unspecified which
+   // version of the continuation is run.
+   struct RunRow
+   {
+      // queue management
+      std::uint64_t id;
+      // permitted database access.
+      RunMode mode;
+      // The initial time limit for the action. If the
+      // action has sufficient permissions, it can change
+      // the limit using setMaxTransactionTime. The limit
+      // only applies to the action. The continuation is
+      // not limited and therefore should be a system service.
+      MicroSeconds maxTime;
+      // the action to run
+      Action      action;
+      BoundMethod continuation;
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> RunKeyType;
+      PSIO_REFLECT(RunRow, id, mode, maxTime, action, continuation)
    };
 
 }  // namespace psibase

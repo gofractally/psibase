@@ -1,9 +1,7 @@
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
-
-const u8Schema = z.number().int().min(0).max(255);
 
 const zAvatar = z.object({
     contentType: z.string(),

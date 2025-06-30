@@ -249,5 +249,65 @@ impl Sub<Seconds> for TimePointUSec {
     }
 }
 
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
+)]
+#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
+#[to_key(psibase_mod = "crate")]
+pub struct MicroSeconds {
+    value: i64,
+}
+
+impl MicroSeconds {
+    pub fn new(value: i64) -> MicroSeconds {
+        MicroSeconds { value }
+    }
+}
+
+impl Add for MicroSeconds {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self::new(self.value + other.value)
+    }
+}
+
+impl Sub for MicroSeconds {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self::new(self.value - other.value)
+    }
+}
+
+impl Add<MicroSeconds> for TimePointUSec {
+    type Output = Self;
+
+    fn add(self, other: MicroSeconds) -> Self::Output {
+        Self::from(self.microseconds + other.value)
+    }
+}
+
+impl Sub<MicroSeconds> for TimePointUSec {
+    type Output = Self;
+
+    fn sub(self, other: MicroSeconds) -> Self::Output {
+        Self::from(self.microseconds - other.value)
+    }
+}
+
 // TODO: string conversions
 // TODO: implement trait with the time functions helpers

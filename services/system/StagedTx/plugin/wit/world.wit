@@ -8,6 +8,7 @@ package staged-tx:plugin;
 
 interface proposer {
     use host:common/types.{error};
+    use transact:plugin/types.{action};
 
     /// This is a latch that is set for this plugin call context, and unset when the call context 
     /// is resolved.
@@ -19,6 +20,18 @@ interface proposer {
     /// `account` - The account on behalf of which the currently logged-in user is 
     ///             proposing transactions.
     set-propose-latch: func(account: option<string>) -> result<_, error>;
+
+    /// Proposes a transaction. This can only be called by the packages plugin.
+    ///
+    /// Rationale: propose requires special privileges because it can send
+    /// actions to any service. packages cannot use the normal method of
+    /// using the plugin for X to send actions to X, because X might not
+    /// exist yet.
+    ///
+    /// * `actions`: The actions to propose
+    /// * `auto-exec`: Whether the transaction should be executed as soon
+    ///                as it has enough approvals.
+    propose: func(actions: list<action>, auto-exec: bool) -> result<_, error>;
 
     /// Removes (deletes) the specified staged transaction
     ///

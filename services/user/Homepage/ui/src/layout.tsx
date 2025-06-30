@@ -7,13 +7,13 @@ import {
     BreadcrumbList,
     BreadcrumbPage,
     BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
+} from "@shared/shadcn/ui/breadcrumb";
+import { Separator } from "@shared/shadcn/ui/separator";
 import {
     SidebarInset,
     SidebarProvider,
     SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -26,7 +26,7 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from "./components/ui/card";
+} from "@shared/shadcn/ui/card";
 import { useCurrentUser } from "./hooks/use-current-user";
 import { LoginButton } from "./login-button";
 

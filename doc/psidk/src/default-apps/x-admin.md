@@ -50,6 +50,23 @@ This option controls access to the [HTTP API](../run-infrastructure/administrati
 - All services: Allows any service to access the admin API. This should only be used for trusted private chains.
 - Disabled: The admin API will not be available. Configuration changes can only be made via the command line and config file, which require a server restart. Disabling the admin API will disconnect the administrator service.
 
+## HTTP Endpoints
+
+| Method   | URL               | Description                                                                                                                                                      |
+|----------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`    | `/services/*`     | Returns the wasm for a subjective service                                                                                                                        |
+| `PUT`    | `/services/*`     | Sets the wasm for a subjective service                                                                                                                           |
+| `GET`    | `/admin_accounts` | Returns a JSON list of all on-chain accounts that are authorized to administer the node                                                                          |
+| `POST`   | `/admin_accounts` | Takes a JSON object of the form `{"account": String, "admin": bool}` and either adds or removes the account from the set of administrator accounts for the node. |
+| `GET`    | `/admin_login`    | Returns a token to authenticate as `x-admin` to other services.                                                                                                  |
+| `GET`    | `*`               | Returns static content                                                                                                                                           |
+| `PUT`    | `*`               | Uploads static content                                                                                                                                           |
+| `DELETE` | `*`               | Removes static content                                                                                                                                           |
+
+## Service
+
+{{#cpp-doc ::UserService::XAdmin}}
+
 ## Monitoring Dashboards
 
 Psinode monitoring is powered by metrics collected and fed into Prometheus. Then, Grafana is used to manage dashboards and visualize all the collected data.

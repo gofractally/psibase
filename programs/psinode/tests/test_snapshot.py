@@ -57,5 +57,11 @@ class TestSnapshot(unittest.TestCase):
         g.wait(pred)
         h.wait(pred)
 
+        # Check that the x-admin service was set up on the nodes
+        # that were created by load-snapshot
+        with e.get('/admin_accounts', service='x-admin') as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), [])
+
 if __name__ == '__main__':
     testutil.main()

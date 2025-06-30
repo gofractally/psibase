@@ -1,6 +1,6 @@
-import { Card, CardHeader } from "./components/ui/card";
+import { Card, CardHeader } from "@shared/shadcn/ui/card";
 import { LoaderCircle } from "lucide-react";
-import { CardTitle } from "./components/ui/card";
+import { CardTitle } from "@shared/shadcn/ui/card";
 
 export const LoadingCard = () => (
   <Card className="w-[350px] mx-auto mt-4">

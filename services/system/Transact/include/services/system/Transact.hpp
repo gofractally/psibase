@@ -337,6 +337,10 @@ namespace SystemService
       // TODO: rename. Requires changes throughout C++, Rust, js, and documentation.
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
+      /// Checks authorization for the sender of the first action
+      void checkFirstAuth(psibase::Checksum256                   id,
+                          psio::view<const psibase::Transaction> transaction);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -363,6 +367,7 @@ namespace SystemService
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),
+                method(checkFirstAuth, id, transaction),
                 method(getTransaction),
                 method(currentBlock),
                 method(headBlock),

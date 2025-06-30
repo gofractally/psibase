@@ -6,7 +6,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 
 import { Account } from "@/lib/zod/Account";
 

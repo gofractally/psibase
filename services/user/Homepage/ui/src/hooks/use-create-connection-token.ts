@@ -3,7 +3,7 @@ import { modifyUrlParams } from "@/lib/modifyUrlParams";
 import { z } from "zod";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useCreateConnectionToken = () =>
     useMutation<string, Error>({

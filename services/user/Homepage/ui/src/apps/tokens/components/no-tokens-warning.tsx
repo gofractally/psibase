@@ -1,5 +1,5 @@
 import { TriangleAlert } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 interface Props {
   onContinue: () => void;
 }

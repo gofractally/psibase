@@ -378,6 +378,114 @@ namespace SystemService
       return {};
    }
 
+   namespace
+   {
+      bool checkTapos(const Checksum256& id, const Tapos& tapos, bool checkFirstAuthAndExit)
+      {
+         auto statusTable  = Transact{}.open<TransactStatusTable>();
+         auto statusIdx    = statusTable.getIndex<0>();
+         auto summaryTable = Transact{}.open<BlockSummaryTable>();
+         auto summaryIdx   = summaryTable.getIndex<0>();
+
+         const auto& stat = getStatus();
+
+         check(!(tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
+         check(stat.current.time < tapos.expiration, "transaction has expired");
+         check(tapos.expiration < stat.current.time + maxTrxLifetime,
+               "transaction was submitted too early");
+
+         auto transactStatus = statusIdx.get(std::tuple{});
+
+         std::optional<BlockSummary> summary;
+         if (checkFirstAuthAndExit)
+            summary = getBlockSummary();  // startBlock() might not have run
+         else
+            summary = summaryIdx.get(std::tuple<>{});
+
+         if (transactStatus && transactStatus->bootTransactions)
+         {
+            auto& bootTransactions = *transactStatus->bootTransactions;
+            check(
+                !bootTransactions.empty(),
+                "fatal error: All boot transactions have been pushed, but finishBoot was not run.");
+            check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
+                  "transaction references non-existing block");
+            if (!checkFirstAuthAndExit)
+            {
+               check(id == bootTransactions.front(),
+                     "Wrong transaction during boot " + psio::convert_to_json(id) +
+                         " != " + psio::convert_to_json(bootTransactions.front()));
+               bootTransactions.erase(bootTransactions.begin());
+               statusTable.put(*transactStatus);
+            }
+            else
+            {
+               check(std::ranges::contains(bootTransactions, id),
+                     "Wrong transaction during boot " + psio::convert_to_json(id));
+            }
+         }
+         else if (summary)
+         {
+            if (tapos.refBlockIndex & 0x80)
+               check(((tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
+                     "transaction references non-existing block");
+            else
+               check(((tapos.refBlockIndex - 2) & 0x7f) <= stat.head->header.blockNum - 2,
+                     "transaction references non-existing block");
+
+            // printf("expected suffix: ", summary->blockSuffixes[tapos.refBlockIndex], "\n");
+            check(tapos.refBlockSuffix == summary->blockSuffixes[tapos.refBlockIndex],
+                  "transaction references non-existing block");
+         }
+         else
+         {
+            // printf("refBlockIndex: ", tapos.refBlockIndex,
+            //       " refBlockSuffix: ", tapos.refBlockSuffix, "; should be 0\n");
+            check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
+                  "transaction references non-existing block");
+         }
+         return transactStatus && transactStatus->enforceAuth;
+      }
+
+      void checkAuth(psio::view<const Action>  act,
+                     const std::vector<Claim>& claims,
+                     bool                      first,
+                     bool                      readOnly)
+      {
+         auto accountsTables = Accounts::Tables(Accounts::service);
+         auto accountTable   = accountsTables.open<AccountTable>();
+         auto accountIndex   = accountTable.getIndex<0>();
+
+         auto account = accountIndex.get(act.sender().unpack());
+         if (!account)
+            abortMessage("unknown sender \"" + act.sender().unpack().str() + "\"");
+
+         if constexpr (enable_print)
+            std::printf("call checkAuthSys on %s for sender account %s\n",
+                        account->authService.str().c_str(), act.sender().unpack().str().c_str());
+         Actor<AuthInterface> auth(Transact::service, account->authService);
+         uint32_t             flags = AuthInterface::topActionReq;
+         if (first && !readOnly)
+         {
+            flags |= AuthInterface::firstAuthFlag;
+            Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service);
+            cpuLimit.setCpuLimit(act.sender());
+         }
+         if (readOnly)
+            flags |= AuthInterface::readOnlyFlag;
+         // This can execute user defined code, so we must set the timer first
+         auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
+                           ServiceMethod{act.service(), act.method()}, std::vector<ServiceMethod>{},
+                           claims);
+      }
+   }  // namespace
+   void Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
+   {
+      check(trx.actions().size() > 0, "transaction has no actions");
+      if (checkTapos(id, trx.tapos(), true))
+         checkAuth(trx.actions().front(), trx.claims(), true, true);
+   }
+
    // Native code calls this on the Transact account
    //
    // All transactions pass through this function, so it's critical
@@ -410,109 +518,25 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
-      const auto& stat = getStatus();
-      // printf("time: ", psio::convert_to_json(stat.current.time),
-      //       " expiration: ", psio::convert_to_json(tapos.expiration), "\n");
-
-      check(!(tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
-      check(stat.current.time < tapos.expiration, "transaction has expired");
-      check(tapos.expiration < stat.current.time + maxTrxLifetime,
-            "transaction was submitted too early");
-
       auto tables        = Transact::Tables(Transact::service);
-      auto statusTable   = tables.open<TransactStatusTable>();
-      auto statusIdx     = statusTable.getIndex<0>();
       auto includedTable = tables.open<IncludedTrxTable>();
       auto includedIdx   = includedTable.getIndex<0>();
-      auto summaryTable  = tables.open<BlockSummaryTable>();
-      auto summaryIdx    = summaryTable.getIndex<0>();
 
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
       if (!args.checkFirstAuthAndExit())
          includedTable.put({tapos.expiration, id});
 
-      auto transactStatus = statusIdx.get(std::tuple{});
-
-      std::optional<BlockSummary> summary;
-      if (args.checkFirstAuthAndExit())
-         summary = getBlockSummary();  // startBlock() might not have run
-      else
-         summary = summaryIdx.get(std::tuple<>{});
-
-      if (transactStatus && transactStatus->bootTransactions)
-      {
-         auto& bootTransactions = *transactStatus->bootTransactions;
-         check(!bootTransactions.empty(),
-               "fatal error: All boot transactions have been pushed, but finishBoot was not run.");
-         check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
-               "transaction references non-existing block");
-         if (!args.checkFirstAuthAndExit())
-         {
-            check(id == bootTransactions.front(),
-                  "Wrong transaction during boot " + psio::convert_to_json(id) +
-                      " != " + psio::convert_to_json(bootTransactions.front()));
-            bootTransactions.erase(bootTransactions.begin());
-            statusTable.put(*transactStatus);
-         }
-         else
-         {
-            check(std::find(bootTransactions.begin(), bootTransactions.end(), id) !=
-                      bootTransactions.end(),
-                  "Wrong transaction during boot " + psio::convert_to_json(id));
-         }
-      }
-      else if (summary)
-      {
-         if (tapos.refBlockIndex & 0x80)
-            check(((tapos.refBlockIndex - 2) & 0x7f) <= (stat.head->header.blockNum >> 13) - 2,
-                  "transaction references non-existing block");
-         else
-            check(((tapos.refBlockIndex - 2) & 0x7f) <= stat.head->header.blockNum - 2,
-                  "transaction references non-existing block");
-
-         // printf("expected suffix: ", summary->blockSuffixes[tapos.refBlockIndex], "\n");
-         check(tapos.refBlockSuffix == summary->blockSuffixes[tapos.refBlockIndex],
-               "transaction references non-existing block");
-      }
-      else
-      {
-         // printf("refBlockIndex: ", tapos.refBlockIndex,
-         //       " refBlockSuffix: ", tapos.refBlockSuffix, "; should be 0\n");
-         check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
-               "transaction references non-existing block");
-      }
+      bool enforceAuth = checkTapos(id, tapos, args.checkFirstAuthAndExit());
 
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
 
-      auto accountsTables = Accounts::Tables(Accounts::service);
-      auto accountTable   = accountsTables.open<AccountTable>();
-      auto accountIndex   = accountTable.getIndex<0>();
-
       for (auto act : trx.actions())
       {
-         if (transactStatus && transactStatus->enforceAuth)
+         if (enforceAuth)
          {
-            auto account = accountIndex.get(act.sender().unpack());
-            if (!account)
-               abortMessage("unknown sender \"" + act.sender().unpack().str() + "\"");
-
-            if constexpr (enable_print)
-               std::printf("call checkAuthSys on %s for sender account %s\n",
-                           account->authService.str().c_str(), act.sender().unpack().str().c_str());
-            Actor<AuthInterface> auth(Transact::service, account->authService);
-            uint32_t             flags = AuthInterface::topActionReq;
-            if (get_view_data(act) == get_view_data(trx.actions()[0]))
-            {
-               flags |= AuthInterface::firstAuthFlag;
-               cpuLimit.setCpuLimit(act.sender());
-            }
-            if (args.checkFirstAuthAndExit())
-               flags |= AuthInterface::readOnlyFlag;
-            // This can execute user defined code, so we must set the timer first
-            auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
-                              ServiceMethod{act.service(), act.method()},
-                              std::vector<ServiceMethod>{}, claims);
+            checkAuth(act, claims, get_view_data(act) == get_view_data(trx.actions()[0]),
+                      args.checkFirstAuthAndExit());
          }
          if (args.checkFirstAuthAndExit())
             break;
@@ -540,7 +564,7 @@ namespace SystemService
       }
 
       check(!trx.actions().empty(), "transaction must have at least one action");
-      if (transactStatus && transactStatus->enforceAuth)
+      if (enforceAuth)
       {
          std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
          accounts.billCpu(trx.actions()[0].sender(), cpuUsage);

@@ -11,7 +11,7 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -19,13 +19,13 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 import { useAvatar } from "@/hooks/use-avatar";
 import { useCurrentUser } from "@/hooks/use-current-user";

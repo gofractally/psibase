@@ -79,11 +79,13 @@ namespace psibase
 
    enum class HttpStatus : std::uint16_t
    {
-      ok                  = 200,
-      notModified         = 304,
-      notFound            = 404,
-      notAcceptable       = 406,
-      internalServerError = 500,
+      ok                   = 200,
+      notModified          = 304,
+      notFound             = 404,
+      methodNotAllowed     = 405,
+      notAcceptable        = 406,
+      unsupportedMediaType = 415,
+      internalServerError  = 500,
    };
 
    void from_json(HttpStatus& status, auto& stream)

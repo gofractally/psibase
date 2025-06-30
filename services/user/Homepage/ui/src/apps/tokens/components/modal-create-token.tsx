@@ -3,7 +3,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import React from "react";
 
 export const ModalCreateToken = ({

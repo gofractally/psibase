@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import {
   Drawer,
   DrawerClose,
@@ -16,10 +16,10 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+} from "@shared/shadcn/ui/drawer";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+import { cn } from "@shared/lib/utils";
 import * as React from "react";
 import { useMediaQuery } from "usehooks-ts";
 

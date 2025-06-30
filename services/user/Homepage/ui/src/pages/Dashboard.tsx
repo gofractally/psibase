@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Book, Coins, History, Mail, MoveRight, Terminal } from "lucide-react";
+import { Book, Coins, Mail, MoveRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
