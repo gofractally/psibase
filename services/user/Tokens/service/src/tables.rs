@@ -83,7 +83,7 @@ pub mod tables {
             let new_id = init_row.last_used_id.checked_add(1).unwrap();
 
             init_row.last_used_id = new_id;
-            init_table.put(&init_row).expect("failed to save init_row");
+            init_table.put(&init_row).unwrap();
 
             let mut new_instance = Self {
                 id: new_id,
