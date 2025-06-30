@@ -191,7 +191,7 @@ pub mod service {
 
     #[action]
     fn mint(token_id: TID, amount: Quantity, memo: String) {
-        Token::get_assert(token_id).mint(amount, get_sender());
+        Token::get_assert(token_id).mint(amount);
 
         Wrapper::emit().history().minted(token_id, amount, memo);
     }

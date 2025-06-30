@@ -130,15 +130,16 @@ pub mod tables {
             table.put(&self).unwrap();
         }
 
-        pub fn mint(&mut self, amount: Quantity, receiver: AccountNumber) {
-            self.check_is_owner(receiver);
+        pub fn mint(&mut self, amount: Quantity) {
+            let sender = get_sender();
+            self.check_is_owner(sender);
             check(amount.value > 0, "mint quantity must be greater than 0");
 
             self.current_supply = self.current_supply + amount;
             psibase::check(self.current_supply <= self.max_supply, "over max supply");
             self.save();
 
-            Balance::get_or_new(receiver, self.id).add_balance(amount);
+            Balance::get_or_new(sender, self.id).add_balance(amount);
         }
 
         pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
