@@ -1,4 +1,4 @@
-import { Input } from "@shadcn/input";
+import { Input } from "@shared/shadcn/ui/input";
 import { z } from "zod";
 import { useState, useMemo } from "react";
 import {
@@ -7,17 +7,15 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@shadcn/select";
+} from "@shared/shadcn/ui/select";
 import { useFieldContext } from "./app-form";
 
 const zDuration = z.enum(["Minutes", "Hours", "Days"]);
 
 export const DurationSelect = ({
     label,
-    description,
 }: {
     label: string;
-    description: string;
 }) => {
     const [unit, setUnit] = useState<z.infer<typeof zDuration>>(
         zDuration.Values.Minutes,

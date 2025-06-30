@@ -1,6 +1,6 @@
-import { Button } from "@shadcn/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { useFieldContext } from "./app-form";
-import { Input } from "@shadcn/input";
+import { Input } from "@shared/shadcn/ui/input";
 
 export const NumbersField = ({ label }: { label: string }) => {
     const field = useFieldContext<number[]>();
@@ -14,7 +14,6 @@ export const NumbersField = ({ label }: { label: string }) => {
                     className="w-8"
                     value={value.toString()}
                     defaultValue={value.toString()}
-                    onButtonClick={() => field.removeValue(index)}
                     onChange={(e) => {
                         console.log(e.target.value, "was received?");
                         field.replaceValue(index, Number(e.target.value));

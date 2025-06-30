@@ -1,10 +1,11 @@
-import { useCreateEvaluation } from "@hooks/app/use-create-evaluation";
+import { humanize } from "@/lib/humanize";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
-import { useAppForm } from "./app-form";
-import { humanize } from "@lib/humanize";
-import { NumbersField } from "./numbers-field";
 
+import { useCreateEvaluation } from "@/hooks/app/use-create-evaluation";
+
+import { useAppForm } from "./app-form";
+import { NumbersField } from "./numbers-field";
 
 dayjs.extend(duration);
 
@@ -44,9 +45,15 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     allowableGroupSizes,
                     numOptions,
                     useHooks: false,
-                }
+                };
 
-                console.log({ registrationUnix, deliberation, submission, finishBy, pars })
+                console.log({
+                    registrationUnix,
+                    deliberation,
+                    submission,
+                    finishBy,
+                    pars,
+                });
                 try {
                     await createEvaluation(pars);
                 } catch (error) {
@@ -73,15 +80,13 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
             >
                 <form.AppField
                     name="registration"
-
                     children={(field) => (
                         <field.DateTimeField
                             label="Registration starts from"
                             description={
                                 dayjs(field.state.value).isBefore(now)
                                     ? "Now"
-                                    : 
-                                      humanize(
+                                    : humanize(
                                           dayjs(field.state.value).diff(now),
                                       )
                             }
@@ -93,11 +98,6 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     children={(field) => (
                         <field.DurationField
                             label="Registration duration"
-                            description={humanize(
-                                dayjs(field.state.value).diff(
-                                    dayjs(form.getFieldValue("registration")),
-                                ),
-                            )}
                         />
                     )}
                 />
@@ -106,11 +106,6 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     children={(field) => (
                         <field.DurationField
                             label="Deliberation duration"
-                            description={humanize(
-                                dayjs(field.state.value).diff(
-                                    dayjs(form.getFieldValue("deliberationSeconds")),
-                                ),
-                            )}
                         />
                     )}
                 />
@@ -119,17 +114,12 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     children={(field) => (
                         <field.DurationField
                             label="Submission duration"
-                            description={humanize(
-                                dayjs(field.state.value).diff(
-                                    dayjs(form.getFieldValue("submissionSeconds")),
-                                ),
-                            )}
                         />
                     )}
                 />
                 <form.AppField
                     name="allowableGroupSizes"
-                    children={(field) => (
+                    children={() => (
                         <NumbersField label="Allowable Group Sizes" />
                     )}
                 />

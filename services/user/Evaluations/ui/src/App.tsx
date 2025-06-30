@@ -1,9 +1,8 @@
-import { Button } from "@shadcn/button";
-
-import { Dialog, DialogContent } from "@shadcn/dialog";
-import { NewEval } from "@components/new-eval";
-
+import { Button } from "@shared/shadcn/ui/button";
+import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
 import { useState } from "react";
+
+import { NewEval } from "@/components/new-eval";
 
 export const App = () => {
     const [isOpen, setIsOpen] = useState(false);
