@@ -506,46 +506,46 @@ namespace psibase
       template <compatible_key<K> K2 = K>
       std::optional<T> get(K2&& k) const
       {
-         KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    buffer = psio::composite_key(key_base, k);
-         int     res    = raw::kvGet(db, buffer.data(), buffer.size());
-         if (res < 0)
-         {
-            return {};
-         }
-         buffer.resize(res);
-         raw::getResult(buffer.data(), buffer.size(), 0);
-         if (is_secondary)
-         {
-            res = raw::kvGet(db, buffer.data(), buffer.size());
-            buffer.resize(res);
-            raw::getResult(buffer.data(), buffer.size(), 0);
-         }
-         return psio::from_frac<T>(psio::prevalidated{buffer});
+         return getImpl<std::optional<T>, false>(std::forward<K2>(k));
       }
 
       template <compatible_key<K> K2 = K>
-      psio::shared_view_ptr<T> getView(K2&& k)
+      psio::shared_view_ptr<T> getView(K2&& k) const
+      {
+         return getImpl<psio::shared_view_ptr<T>, true>(std::forward<K2>(k));
+      }
+
+     private:
+      template <typename R, bool View, typename K2>
+      R getImpl(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    buffer = psio::composite_key(key_base, k);
          int     res    = raw::kvGet(db, buffer.data(), buffer.size());
          if (res < 0)
          {
-            return nullptr;
+            return R{};
          }
          if (is_secondary)
          {
             buffer.resize(res);
             raw::getResult(buffer.data(), buffer.size(), 0);
             res = raw::kvGet(db, buffer.data(), buffer.size());
+            check(res >= 0, "primary key not found");
          }
-         psio::shared_view_ptr<T> v{psio::size_tag{static_cast<std::uint32_t>(res)}};
-         raw::getResult(v.data(), v.size(), 0);
-         return v;
+         if constexpr (View)
+         {
+            psio::shared_view_ptr<T> v{psio::size_tag{static_cast<std::uint32_t>(res)}};
+            raw::getResult(v.data(), v.size(), 0);
+            return v;
+         }
+         else
+         {
+            buffer.resize(res);
+            raw::getResult(buffer.data(), buffer.size(), 0);
+            return psio::from_frac<T>(psio::prevalidated{buffer});
+         }
       }
-
-     private:
       DbId              db;
       std::vector<char> prefix;
       bool              is_secondary;
@@ -823,41 +823,11 @@ namespace psibase
       }
 
       /// Remove object from table
-      void remove(const T& oldValue)
-      {
-         std::vector<char> key_buffer = prefix;
-         key_buffer.push_back(0);
-         auto erase_key = [&](std::uint8_t& idx, auto wrapped)
-         {
-            auto key          = detail::invoke(decltype(wrapped)::value, oldValue);
-            key_buffer.back() = idx;
-            psio::convert_to_key(key, key_buffer);
-            raw::kvRemove(db, key_buffer.data(), key_buffer.size());
-            key_buffer.resize(prefix.size() + 1);
-            ++idx;
-         };
-         std::uint8_t idx = 0;
-         erase_key(idx, wrap<Primary>());
-         (erase_key(idx, wrap<Secondary>()), ...);
-      }
+      void remove(const T& oldValue) { removeImpl(oldValue); }
 
-      void remove(psio::view<const T> oldValue)
-      {
-         std::vector<char> key_buffer = prefix;
-         key_buffer.push_back(0);
-         auto erase_key = [&](std::uint8_t& idx, auto wrapped)
-         {
-            auto key          = detail::invoke(decltype(wrapped)::value, oldValue);
-            key_buffer.back() = idx;
-            psio::convert_to_key(key, key_buffer);
-            raw::kvRemove(db, key_buffer.data(), key_buffer.size());
-            key_buffer.resize(prefix.size() + 1);
-            ++idx;
-         };
-         std::uint8_t idx = 0;
-         erase_key(idx, wrap<Primary>());
-         (erase_key(idx, wrap<Secondary>()), ...);
-      }
+      /// Remove object from table
+      void remove(psio::view<const T> oldValue) { removeImpl(oldValue); }
+      /// Remove object from table
       void remove(psio::view<T> oldValue) { remove(static_cast<psio::view<const T>>(oldValue)); }
 
       // TODO: get index by name
@@ -897,6 +867,23 @@ namespace psibase
       }
 
      private:
+      void removeImpl(const auto& oldValue)
+      {
+         std::vector<char> key_buffer = prefix;
+         key_buffer.push_back(0);
+         auto erase_key = [&](std::uint8_t& idx, auto wrapped)
+         {
+            auto key          = detail::invoke(decltype(wrapped)::value, oldValue);
+            key_buffer.back() = idx;
+            psio::convert_to_key(key, key_buffer);
+            raw::kvRemove(db, key_buffer.data(), key_buffer.size());
+            key_buffer.resize(prefix.size() + 1);
+            ++idx;
+         };
+         std::uint8_t idx = 0;
+         erase_key(idx, wrap<Primary>());
+         (erase_key(idx, wrap<Secondary>()), ...);
+      }
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
