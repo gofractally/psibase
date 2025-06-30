@@ -31,7 +31,7 @@ mod tests {
 
     fn get_balance(chain: &psibase::Chain, account: AccountNumber, token_id: u32) -> Quantity {
         Wrapper::push(&chain)
-            .get_balance(account, token_id)
+            .getBalance(token_id, account)
             .get()
             .unwrap()
             .balance
@@ -66,7 +66,7 @@ mod tests {
         token_id: u32,
     ) -> Quantity {
         Wrapper::push(&chain)
-            .get_shared_balance(creditor, debitor, token_id)
+            .getSharedBal(creditor, debitor, token_id)
             .get()
             .unwrap()
             .balance

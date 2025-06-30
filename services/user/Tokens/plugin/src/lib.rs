@@ -133,30 +133,25 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
 
-    fn set_user_global_config(index: u8, enabled: bool) -> Result<(), Error> {
-        let packed_args =
-            tokens::action_structs::set_user_global_config { enabled, index }.packed();
+    fn set_user_config(index: u8, enabled: bool) -> Result<(), Error> {
+        let packed_args = tokens::action_structs::setUserConf { enabled, index }.packed();
         add_action_to_transaction(
-            tokens::action_structs::set_user_global_config::ACTION_NAME,
+            tokens::action_structs::setUserConf::ACTION_NAME,
             &packed_args,
         )
     }
 
-    fn set_user_token_config(
-        token_id: Wit::TokenId,
-        index: u8,
-        enabled: bool,
-    ) -> Result<(), Error> {
+    fn set_token_holder(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
-        let packed_args = tokens::action_structs::set_user_token_config {
+        let packed_args = tokens::action_structs::setTokHoldr {
             enabled,
             index,
             token_id,
         }
         .packed();
         add_action_to_transaction(
-            tokens::action_structs::set_user_token_config::ACTION_NAME,
+            tokens::action_structs::setTokHoldr::ACTION_NAME,
             &packed_args,
         )
     }
@@ -164,14 +159,14 @@ impl Intf for TokensPlugin {
     fn set_token_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
-        let packed_args = tokens::action_structs::set_token_config {
+        let packed_args = tokens::action_structs::setTokenConf {
             enabled,
             index,
             token_id,
         }
         .packed();
         add_action_to_transaction(
-            tokens::action_structs::set_token_config::ACTION_NAME,
+            tokens::action_structs::setTokenConf::ACTION_NAME,
             &packed_args,
         )
     }

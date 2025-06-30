@@ -212,27 +212,27 @@ mod service {
     }
 
     #[action]
-    fn get_user_global_config(account: AccountNumber) -> Holder {
+    fn getUserConf(account: AccountNumber) -> Holder {
         unimplemented!()
     }
 
     #[action]
-    fn set_user_global_config(index: u8, enabled: bool) {
+    fn setUserConf(index: u8, enabled: bool) {
         unimplemented!()
     }
 
     #[action]
-    fn get_user_token_config(account: AccountNumber, token_id: TID) -> TokenHolder {
+    fn getTokHoldr(account: AccountNumber, token_id: TID) -> TokenHolder {
         unimplemented!()
     }
 
     #[action]
-    fn set_user_token_config(token_id: TID, index: u8, enabled: bool) {
+    fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
     #[action]
-    fn set_token_config(token_id: TID, index: u8, enabled: bool) {
+    fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
@@ -242,12 +242,12 @@ mod service {
     }
 
     #[action]
-    fn get_balance(user: AccountNumber, token_id: TID) -> Balance {
+    fn getBalance(token_id: TID, user: AccountNumber) -> Balance {
         unimplemented!()
     }
 
     #[action]
-    fn get_shared_balance(
+    fn getSharedBal(
         creditor: AccountNumber,
         debitor: AccountNumber,
         token_id: TID,
