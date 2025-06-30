@@ -78,11 +78,6 @@ pub mod service {
     }
 
     #[action]
-    fn get_token_by_symbol(symbol: AccountNumber) -> Option<TokenRecord> {
-        Token::get_by_symbol(symbol).map(|token| token.into())
-    }
-
-    #[action]
     fn map_symbol(token_id: TID, symbol: AccountNumber) {
         let mut token = Token::get_assert(token_id);
         let sender = get_sender();
