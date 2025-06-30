@@ -75,19 +75,22 @@ namespace psibase::net
    concept has_validate_message =
        requires(Derived& d, const Msg& msg) { d.consensus().validate_message(msg); };
 
+   using RouterId = std::uint64_t;
+
    struct RouteUpdateMessage
    {
       static constexpr unsigned type = 4;
       producer_id               producer;
       SequenceNumber            seqno;
       RouteMetric               metric;
+      std::optional<RouterId>   router;
       std::string               to_string() const
       {
          return "route update: " + producer.str() + " seqno=" + std::to_string(seqno.value) +
                 " metric=" + std::to_string(metric.value);
       }
    };
-   PSIO_REFLECT(RouteUpdateMessage, producer, seqno, metric)
+   PSIO_REFLECT(RouteUpdateMessage, producer, seqno, metric, router)
 
    struct RouteSeqnoRequest
    {
@@ -135,15 +138,30 @@ namespace psibase::net
       static constexpr peer_id min_peer               = std::numeric_limits<peer_id>::min();
       static constexpr auto    minSeqnoUpdateInterval = std::chrono::seconds(1);
       static constexpr auto    seqnoCacheMaxAge       = std::chrono::seconds(30);
+      struct SourceKey
+      {
+         producer_id producer;
+         RouterId    router;
+         friend auto operator<=>(const SourceKey&, const SourceKey&) = default;
+      };
+      struct SelectedRoute
+      {
+         RouterId    router;
+         peer_id     peer;
+         friend bool operator==(const SelectedRoute&, const SelectedRoute&) = default;
+      };
       struct RouteKey
       {
          producer_id producer;
+         RouterId    router;
          peer_id     peer;
          friend auto operator<=>(const RouteKey& lhs, const RouteKey& rhs) = default;
          friend auto operator<=>(const RouteKey& lhs, const producer_id& rhs)
          {
             return lhs.producer <=> rhs;
          }
+         SelectedRoute selected() const { return SelectedRoute{router, peer}; }
+         SourceKey     sourceKey() const { return SourceKey{producer, router}; }
       };
       struct RouteData
       {
@@ -181,6 +199,13 @@ namespace psibase::net
       explicit shortest_path_routing(boost::asio::io_context& ctx) : base_type(ctx), seqnoTimer(ctx)
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
+         std::random_device rng;
+
+         // We don't reuse the nodeId, because nodeId could be
+         // kept across node restarts.
+         // routerId is linked to seqno. If we reuse a routerId, we also
+         // have to preserve seqno. We're not do that.
+         routerId = std::uniform_int_distribution<RouterId>()(rng);
       }
 
       template <typename Msg>
@@ -194,15 +219,16 @@ namespace psibase::net
       template <typename Msg>
       void multicast_producers(const Checksum256& id, const Msg& msg)
       {
-         for (const auto& [producer, peer] : selectedRoutes)
+         for (const auto& [producer, selected] : selectedRoutes)
          {
-            send_after_block(peer, id, RoutingEnvelope{producer, this->serialize_message(msg)});
+            send_after_block(selected.peer, id,
+                             RoutingEnvelope{producer, this->serialize_message(msg)});
          }
       }
       template <typename Msg>
       void multicast_producers(const Msg& msg)
       {
-         for (const auto& [producer, peer] : selectedRoutes)
+         for (const auto& [producer, selected] : selectedRoutes)
          {
             sendto(producer, msg);
          }
@@ -213,7 +239,7 @@ namespace psibase::net
          auto selected = selectedRoutes.find(producer);
          if (selected != selectedRoutes.end())
          {
-            send_after_block(selected->second, id,
+            send_after_block(selected->second.peer, id,
                              RoutingEnvelope{producer, this->serialize_message(msg)});
          }
          else
@@ -276,9 +302,9 @@ namespace psibase::net
          {
             auto next = iter;
             ++next;
-            if (iter->second == peer)
+            if (iter->second.peer == peer)
             {
-               selectRoute(iter->first, iter->second);
+               selectRoute(iter->first, peer);
             }
             iter = next;
          }
@@ -287,16 +313,16 @@ namespace psibase::net
       {
          for (const auto& [producer, nextPeer] : selectedRoutes)
          {
-            auto route = routeTable.find(RouteKey{producer, nextPeer});
+            auto route = routeTable.find(RouteKey{producer, nextPeer.router, nextPeer.peer});
             if (route != routeTable.end())
             {
-               async_send(peer,
-                          RouteUpdateMessage{producer, route->second.seqno, getMetric(*route)});
+               async_send(peer, RouteUpdateMessage{producer, route->second.seqno, getMetric(*route),
+                                                   nextPeer.router});
             }
          }
          if (auto self = consensus().producer_name(); consensus().is_producer(self))
          {
-            async_send(peer, RouteUpdateMessage{self, seqno, RouteMetric{0}});
+            async_send(peer, RouteUpdateMessage{self, seqno, RouteMetric{0}, routerId});
          }
       }
       void on_producer_change()
@@ -326,7 +352,7 @@ namespace psibase::net
          }
          for (auto iter = sourceTable.begin(), end = sourceTable.end(); iter != end;)
          {
-            if (consensus().is_producer(iter->first) && iter->first != self)
+            if (consensus().is_producer(iter->first.producer) && iter->first.producer != self)
             {
                ++iter;
             }
@@ -338,7 +364,7 @@ namespace psibase::net
          // If we became a producer, we need to establish a new route
          if (consensus().is_producer(self))
          {
-            multicast(RouteUpdateMessage{self, seqno, RouteMetric{0}});
+            multicast(RouteUpdateMessage{self, seqno, RouteMetric{0}, routerId});
          }
          // Sync our routing table with all peers
          multicast(RequestRoutesMessage{});
@@ -349,7 +375,7 @@ namespace psibase::net
          {
             return true;
          }
-         auto pos = sourceTable.find(route.first.producer);
+         auto pos = sourceTable.find(route.first.sourceKey());
          if (pos == sourceTable.end())
          {
             return true;
@@ -381,13 +407,14 @@ namespace psibase::net
       }
       void selectRoute(std::pair<const RouteKey, RouteData>& route, peer_id updatedRoute)
       {
-         auto [iter, updated] = selectedRoutes.try_emplace(route.first.producer, route.first.peer);
+         auto [iter, updated] =
+             selectedRoutes.try_emplace(route.first.producer, route.first.selected());
          if (!updated)
          {
-            if (iter->second != route.first.peer)
+            if (iter->second != route.first.selected())
             {
                updated      = true;
-               iter->second = route.first.peer;
+               iter->second = route.first.selected();
             }
          }
          if (updated || route.first.peer == updatedRoute)
@@ -397,17 +424,18 @@ namespace psibase::net
                 << (updated ? "New" : "Updated") << " route for " << route.first.producer.str()
                 << " seqno=" << route.second.seqno.value << " metric=" << metric.value;
             auto feasibility     = Feasibility{route.second.seqno, metric};
-            auto [pos, inserted] = sourceTable.try_emplace(route.first.producer, feasibility);
+            auto [pos, inserted] = sourceTable.try_emplace(route.first.sourceKey(), feasibility);
             if (!inserted && feasibility < pos->second)
             {
                pos->second = feasibility;
             }
-            multicast(RouteUpdateMessage{route.first.producer, route.second.seqno, metric});
+            multicast(RouteUpdateMessage{route.first.producer, route.second.seqno, metric,
+                                         route.first.router});
          }
       }
       void selectRoute(producer_id producer, peer_id updated)
       {
-         auto iter        = routeTable.lower_bound(RouteKey{producer, min_peer});
+         auto iter        = routeTable.lower_bound(producer);
          auto end         = routeTable.end();
          auto best_metric = RouteMetric::infinite;
          auto best_iter   = end;
@@ -428,16 +456,19 @@ namespace psibase::net
          {
             selectRoute(*best_iter, updated);
          }
-         else if (selectedRoutes.erase(producer) != 0)
+         else if (auto removedPos = selectedRoutes.find(producer);
+                  removedPos != selectedRoutes.end())
          {
+            auto router = removedPos->second.router;
+            selectedRoutes.erase(removedPos);
             PSIBASE_LOG(logger, info) << "No feasible route to " << producer.str();
-            multicast(RouteUpdateMessage{producer, {}, RouteMetric::infinite});
-            sendSeqnoRequest(producer);
+            multicast(RouteUpdateMessage{producer, {}, RouteMetric::infinite, router});
+            sendSeqnoRequest(producer, router);
          }
       }
-      void sendSeqnoRequest(producer_id producer)
+      void sendSeqnoRequest(producer_id producer, RouterId router)
       {
-         auto iter = sourceTable.find(producer);
+         auto iter = sourceTable.find(SourceKey{producer, router});
          if (iter != sourceTable.end())
          {
             multicast(RouteSeqnoRequest{producer, iter->second.seqno + 1});
@@ -456,12 +487,13 @@ namespace psibase::net
                 << "Ignoring route because " << msg.producer.str() << " is not an active producer";
             return;
          }
-         auto iter = routeTable.find(RouteKey{msg.producer, peer});
+         auto routeKey = RouteKey{msg.producer, msg.router.value_or(0), peer};
+         auto iter     = routeTable.find(routeKey);
          if (iter == routeTable.end())
          {
             if (msg.metric != RouteMetric::infinite)
             {
-               routeTable.try_emplace(RouteKey{msg.producer, peer}, msg.seqno, msg.metric);
+               routeTable.try_emplace(routeKey, msg.seqno, msg.metric);
                selectRoute(msg.producer, peer);
             }
          }
@@ -480,10 +512,11 @@ namespace psibase::net
          auto selected = selectedRoutes.find(producer);
          if (selected != selectedRoutes.end())
          {
-            auto route = routeTable.find(RouteKey{producer, selected->second});
+            auto route =
+                routeTable.find(RouteKey{producer, selected->second.router, selected->second.peer});
             if (route != routeTable.end())
             {
-               return {producer, route->second.seqno, getMetric(*route)};
+               return {producer, route->second.seqno, getMetric(*route), selected->second.router};
             }
          }
          return {producer, {}, RouteMetric::infinite};
@@ -494,7 +527,7 @@ namespace psibase::net
          auto selected = selectedRoutes.find(prod);
          if (selected != selectedRoutes.end())
          {
-            async_send(selected->second, msg);
+            async_send(selected->second.peer, msg);
             return true;
          }
          else
@@ -566,11 +599,11 @@ namespace psibase::net
                                           {
                                              if constexpr (std::is_same_v<decltype(id), bool>)
                                              {
-                                                this->async_send(selected->second, msg);
+                                                this->async_send(selected->second.peer, msg);
                                              }
                                              else
                                              {
-                                                send_after_block(selected->second, *id, msg);
+                                                send_after_block(selected->second.peer, *id, msg);
                                              }
                                           }
                                           else
@@ -595,7 +628,7 @@ namespace psibase::net
          if (now - lastSeqnoUpdate > minSeqnoUpdateInterval)
          {
             seqno = seqno + 1;
-            multicast(RouteUpdateMessage{consensus().producer_name(), seqno, 0});
+            multicast(RouteUpdateMessage{consensus().producer_name(), seqno, 0, routerId});
             lastSeqnoUpdate = now;
          }
          else
@@ -659,12 +692,13 @@ namespace psibase::net
          auto [begin, end] = routeTable.equal_range(producer);
          return std::ranges::subrange(begin, end);
       }
-      SequenceNumber                             seqno = {};
+      RouterId                                   routerId = {};
+      SequenceNumber                             seqno    = {};
       std::chrono::steady_clock::time_point      lastSeqnoUpdate;
       std::map<peer_id, NeighborData>            neighborTable;
       std::map<RouteKey, RouteData, std::less<>> routeTable;
-      std::map<producer_id, Feasibility>         sourceTable;
-      std::map<producer_id, peer_id>             selectedRoutes;
+      std::map<SourceKey, Feasibility>           sourceTable;
+      std::map<producer_id, SelectedRoute>       selectedRoutes;
 
       std::map<producer_id, CachedSeqnoRequest> recentSeqnoRequests;
       boost::asio::steady_timer                 seqnoTimer;
