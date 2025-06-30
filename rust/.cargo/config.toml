@@ -1,5 +1,5 @@
 [build]
-target-dir = "../.caches/target-shared-rust"
+target-dir = "../.caches/target-shared"
 
 # Ensure consistent build profiles across all crates
 [profile.release]
