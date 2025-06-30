@@ -1,24 +1,20 @@
-interface Props {
-    url: string;
-}
-
 import { Label, Pie, PieChart } from "recharts";
 
 import {
     Card,
     CardContent,
-    CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
-} from "@/components/ui/card";
+} from "@shared/shadcn/ui/card";
 import {
     ChartConfig,
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
-} from "@/components/ui/chart";
-import { Separator } from "@/components/ui/separator";
+    type CustomTooltipProps,
+} from "@shared/shadcn/ui/chart";
+import { Separator } from "@shared/shadcn/ui/separator";
 import { usePerformance } from "../hooks/usePerformance";
 
 const chartConfig = {
@@ -105,7 +101,9 @@ export function Component() {
                     <PieChart>
                         <ChartTooltip
                             cursor={false}
-                            content={<ChartTooltipContent hideLabel />}
+                            content={(props: CustomTooltipProps) => (
+                                <ChartTooltipContent {...props} hideLabel />
+                              )}
                         />
                         <Pie
                             data={chartData}

@@ -10,8 +10,8 @@ import {
     FormField,
     FormItem,
     FormMessage,
-} from "../ui/form";
-import { Input } from "../ui/input";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
 
 interface Props {
     form: UseFormReturn<z.infer<typeof BlockProducerSchema>>;

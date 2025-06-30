@@ -7,7 +7,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@shared/shadcn/ui/alert-dialog";
 import { PackageInfo } from "@/types";
 
 interface Props {

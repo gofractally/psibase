@@ -13,8 +13,8 @@ import {
     useReactTable,
 } from "@tanstack/react-table";
 
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@shared/shadcn/ui/checkbox";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
 import {
     Table,
@@ -23,7 +23,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@shared/shadcn/ui/table";
 import { PackageInfo } from "@/types";
 import { getId } from "@/lib/getId";
 

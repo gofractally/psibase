@@ -1,8 +1,8 @@
 import { InstallType, ProducerType } from "@/types";
 import { UseFormReturn } from "react-hook-form";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Label } from "@shared/shadcn/ui/label";
+import { Input } from "@shared/shadcn/ui/input";
+import { Button } from "@shared/shadcn/ui/button";
 
 interface ProducerFormProps {
     producerForm: UseFormReturn<ProducerType>;
@@ -33,7 +33,7 @@ export const ProducerForm = ({
                     className="mt-4 "
                     variant="secondary"
                     onClick={() => {
-                        let installType = typeForm.getValues("installType");
+                        const installType = typeForm.getValues("installType");
                         if (installType == "full") {
                             setCurrentPage("type");
                         } else if (installType == "custom") {

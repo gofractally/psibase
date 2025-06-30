@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface Action {
     sender: string;
     service: string;
@@ -19,16 +20,16 @@ interface ActionTrace {
     error?: string;
 }
 
-interface TransactionTrace {
+export interface TransactionTrace {
     actionTraces: ActionTrace[];
     error?: string;
 }
 
-const getActionStack = (trace: ActionTrace): Action[] | undefined => {
+export const getActionStack = (trace: ActionTrace): Action[] | undefined => {
     if (trace.error) {
-        for (let atrace of trace.innerTraces) {
+        for (const atrace of trace.innerTraces) {
             if (atrace.inner.ActionTrace) {
-                let result = getActionStack(atrace.inner.ActionTrace);
+                const result = getActionStack(atrace.inner.ActionTrace);
                 if (result) {
                     return [trace.action, ...result];
                 }

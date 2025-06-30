@@ -11,9 +11,9 @@ import {
     FormItem,
     FormLabel,
     FormMessage,
-} from "../ui/form";
-import { Input } from "../ui/input";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
+import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 
 import { useKeyDevices, useUnlockKeyDevice } from "../../hooks/useKeyDevices";
 

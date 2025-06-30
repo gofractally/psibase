@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { useConfig } from "../hooks/useConfig";
 import { usePeers } from "../hooks/usePeers";
 import {
@@ -15,12 +15,10 @@ import { Clipboard, MoreHorizontal, Plus, Trash, Unplug } from "lucide-react";
 import {
     Table,
     TableBody,
-    TableCaption,
-    TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@shared/shadcn/ui/table";
 import { EmptyBlock } from "@/components/EmptyBlock";
 
 import {
@@ -29,8 +27,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import { SmartConnectForm } from "@/components/forms/smart-connect-form";
 import { z } from "zod";
 
@@ -41,10 +38,10 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from "../components/ui/use-toast";
+} from "@shared/shadcn/ui/dropdown-menu";
+import { useToast } from "@/components/ui/use-toast";
 import { Pulse } from "@/components/Pulse";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 const randomIntFromInterval = (min: number, max: number) =>
     Math.floor(Math.random() * (max - min + 1) + min);
@@ -56,7 +53,7 @@ const combinePeers = (
     const configSet = new Set<string>();
     configPeers.forEach((peer) => configSet.add(peer));
 
-    let connectMap: { [index: string]: PeerType } = {};
+    const connectMap: { [index: string]: PeerType } = {};
     for (const peer of livePeers) {
         if (peer.url) {
             connectMap[peer.url] = peer;
@@ -120,7 +117,6 @@ const Status = ({ state }: { state: z.infer<typeof StateEnum> }) => {
 export const PeersPage = () => {
     const {
         data: livePeers,
-        error: peersError,
         refetch: refetchPeers,
     } = usePeers();
     const { data: config, refetch: refetchConfig } = useConfig();
@@ -128,7 +124,7 @@ export const PeersPage = () => {
 
     const combinedPeers = combinePeers(configPeers, livePeers);
 
-    const [configPeersError, setConfigPeersError] = useState<string>();
+    const [configPeersError] = useState<string>();
     const { toast } = useToast();
 
     const [showAddModalConnection, setShowModalConnection] = useState(false);
@@ -167,7 +163,7 @@ export const PeersPage = () => {
                     chain.disconnectPeer(peer.id),
                 ]);
                 refetchConfig();
-            } catch (e) {
+            } catch {
                 toast({
                     title: "Error",
                     description: "Failed to disconnect & remove peer",

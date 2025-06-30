@@ -1,3 +1,4 @@
+import type { TransactionTrace } from "./lib/actionStack";
 import { z } from "zod";
 
 export interface PackageRef {

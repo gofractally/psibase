@@ -1,7 +1,7 @@
 {
-    "extends": "../../../tsconfig.node.json",
+    "extends": "../../../tsconfig.app.json",
     "compilerOptions": {
-        "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
+        "tsBuildInfoFile": ".tmp/tsconfig.app.tsbuildinfo",
         "baseUrl": "./",
         "paths": {
             "@/*": ["./src/*"],
@@ -15,5 +15,5 @@
             "wasm-transpiled": ["./wasm-transpiled/x_admin.d.ts"]
         }
     },
-    "include": ["vite.config.mts"]
+    "include": ["src", "./wasm-transpiled/*.d.ts", "wasm-transpiled"]
 }

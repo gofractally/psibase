@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { LogConfig } from "../log/interfaces";
 import {
     PsinodeConfigUI,
@@ -18,8 +19,8 @@ export const mergeList = <T extends { key: string }>(
     updated: T[],
     user: T[]
 ): T[] => {
-    let leading: T[] = [];
-    let result = updated.map((item) => [item]);
+    const leading: T[] = [];
+    const result = updated.map((item) => [item]);
     let insertPoint = -1;
     const remove = (s: T): boolean => {
         const found = result.find(
@@ -41,7 +42,7 @@ export const mergeList = <T extends { key: string }>(
         }
     };
     // First delete anything that was deleted by the user
-    let baseMap: { [index: string]: number } = {};
+    const baseMap: { [index: string]: number } = {};
     let baseIndex = 0;
     for (const s of base) {
         if (!user.find((item) => item.key == s.key)) {
@@ -192,28 +193,6 @@ export function writeLoggers(loggers: { [index: string]: LogConfig }): {
         result[unescapeKey(key)] = writeLogger(loggers[key]);
     }
     return result;
-}
-
-function readListen(listen: ListenConfig): ListenConfig {
-    const result = { ...listen };
-    delete result.address;
-    delete result.port;
-    delete result.path;
-    if (listen.protocol == "http" || listen.protocol == "https") {
-        if (listen.address == "0.0.0.0") {
-            return { text: String(listen.port), ...result };
-        } else if (listen.address?.includes(":")) {
-            return {
-                text: "[" + listen.address + "]:" + listen.port,
-                ...result,
-            };
-        } else {
-            return { text: listen.address + ":" + listen.port, ...result };
-        }
-    } else if (listen.protocol == "local") {
-        return { text: listen.path, ...result };
-    }
-    return listen;
 }
 
 function writeListen(listen: ListenConfig): any {
