@@ -131,6 +131,7 @@ pub mod tables {
         }
 
         pub fn mint(&mut self, amount: Quantity, receiver: AccountNumber) {
+            self.check_is_owner(receiver);
             check(amount.value > 0, "mint quantity must be greater than 0");
 
             self.current_supply = self.current_supply + amount;
