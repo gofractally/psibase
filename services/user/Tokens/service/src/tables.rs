@@ -32,7 +32,9 @@ pub mod tables {
         #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
-        pub current_supply: Quantity,
+        pub issued_supply: Quantity,
+        #[graphql(skip)]
+        pub burned_supply: Quantity,
         #[graphql(skip)]
         pub max_supply: Quantity,
         pub settings_value: u8,
@@ -62,7 +64,7 @@ pub mod tables {
             tokens.pop()
         }
 
-        pub fn check_is_owner(&self, account: AccountNumber) {
+        fn check_is_owner(&self, account: AccountNumber) {
             let holder = self.nft_holder();
 
             check(
@@ -73,6 +75,8 @@ pub mod tables {
 
         pub fn map_symbol(&mut self, symbol: AccountNumber) {
             check_none(self.symbol, "already has symbol");
+            let sender = get_sender();
+            self.check_is_owner(sender);
             self.symbol = Some(symbol);
             self.save();
         }
@@ -88,7 +92,8 @@ pub mod tables {
             let mut new_instance = Self {
                 id: new_id,
                 nft_id: Nfts::call().mint(),
-                current_supply: 0.into(),
+                issued_supply: 0.into(),
+                burned_supply: 0.into(),
                 max_supply,
                 precision: Precision::try_from(precision).unwrap().value,
                 settings_value: TokenSetting::new().value,
@@ -119,6 +124,7 @@ pub mod tables {
         }
 
         pub fn set_settings(&mut self, index: u8, enabled: bool) {
+            self.check_is_owner(get_sender());
             let mut settings = self.settings();
             settings.set_index(index.into(), enabled);
             self.settings_value = settings.value;
@@ -135,16 +141,17 @@ pub mod tables {
             self.check_is_owner(sender);
             check(amount.value > 0, "mint quantity must be greater than 0");
 
-            self.current_supply = self.current_supply + amount;
-            psibase::check(self.current_supply <= self.max_supply, "over max supply");
+            self.issued_supply = self.issued_supply + amount;
+            psibase::check(self.issued_supply <= self.max_supply, "over max supply");
             self.save();
 
             Balance::get_or_new(sender, self.id).add_balance(amount);
         }
 
         pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
+            self.check_is_owner(get_sender());
             check(amount.value > 0, "burn quantity must be greater than 0");
-            self.current_supply = self.current_supply - amount;
+            self.burned_supply = self.burned_supply + amount;
             self.save();
 
             Balance::get_or_new(burnee, self.id).sub_balance(amount);
@@ -162,7 +169,14 @@ pub mod tables {
         }
 
         pub async fn current_supply(&self) -> Decimal {
-            Decimal::new(self.current_supply, self.precision.try_into().unwrap())
+            Decimal::new(
+                self.issued_supply - self.burned_supply,
+                self.precision.try_into().unwrap(),
+            )
+        }
+
+        pub async fn issued_supply(&self) -> Decimal {
+            Decimal::new(self.issued_supply, self.precision.try_into().unwrap())
         }
 
         pub async fn max_supply(&self) -> Decimal {

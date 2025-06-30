@@ -25,6 +25,7 @@ pub mod service {
         pub settings_value: u8,
         pub precision: Precision,
         pub current_supply: Quantity,
+        pub burned_supply: Quantity,
         pub max_supply: Quantity,
         pub symbol: SID,
     }
@@ -36,7 +37,8 @@ pub mod service {
                 nft_id: token.nft_id,
                 settings_value: token.settings_value,
                 precision: token.precision.try_into().unwrap(),
-                current_supply: token.current_supply,
+                current_supply: token.issued_supply - token.burned_supply,
+                burned_supply: token.burned_supply,
                 max_supply: token.max_supply,
                 symbol: token.symbol.unwrap_or(AccountNumber::from(0)),
             }
@@ -80,8 +82,7 @@ pub mod service {
     #[action]
     fn map_symbol(token_id: TID, symbol: AccountNumber) {
         let mut token = Token::get_assert(token_id);
-        let sender = get_sender();
-        token.check_is_owner(sender);
+
         token.map_symbol(symbol);
 
         let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
@@ -100,7 +101,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .symbol_mapped(token_id, sender, symbol);
+            .symbol_mapped(token_id, get_sender(), symbol);
     }
 
     #[action]
@@ -131,7 +132,6 @@ pub mod service {
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         let mut token = Token::get_assert(token_id);
-        token.check_is_owner(get_sender());
         token.set_settings(index, enabled);
     }
 
@@ -163,10 +163,8 @@ pub mod service {
         let mut token = Token::get_assert(token_id);
         let token_settings = token.settings();
 
-        check(sender != from, "cannot recall from self, use burn instead");
         check(!token_settings.is_unrecallable(), "token is not recallable");
 
-        token.check_is_owner(sender);
         token.burn(amount, from);
 
         Wrapper::emit()
