@@ -134,7 +134,7 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTokens RTransact SetCode Symbol
+        RHttpServer RSetCode RTransact SetCode Symbol
         Tokens Transact VerifySig XAdmin
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService SocketListService)
@@ -425,11 +425,16 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Tokens.psi
+    PATH services/user/Tokens
+    DEPENDS ${Tokens_js_DEP}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH services/user/Fractals
     DEPENDS ${Fractals_js_DEP}
 )
-
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
@@ -778,24 +783,6 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Tokens.psi
-    NAME Tokens
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Token service"
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
-    SERVICE tokens
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Tokens-schema.json
-        DATA ${Plugins_OUTPUT_FILE_tokens} /plugin.wasm
-        SERVER r-tokens
-        INIT
-    SERVICE r-tokens
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTokens-schema.json
-    DEPENDS ${Plugins_DEP}
-    DEPENDS wasm
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Symbol.psi

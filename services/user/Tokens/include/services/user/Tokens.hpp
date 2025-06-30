@@ -27,11 +27,7 @@ namespace UserService
       TID create(Precision precision, Quantity maxSupply);
 
       void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
-
-      //void lowerDailyInf(TID tokenId, uint8_t daily_limit_pct, Quantity daily_limit_qty);
-      //void lowerYearlyInf(TID tokenId, uint8_t yearly_limit_pct, Quantity yearly_limit_qty);
-
-      void burn(TID tokenId, Quantity amount);
+      void burn(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
 
       void setUserConf(psibase::EnumElement flag, bool enable);
       void setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable);
@@ -56,7 +52,7 @@ namespace UserService
                   Quantity                        amount,
                   psio::view<const psibase::Memo> memo);
 
-      void mapSymbol(TID tokenId, SID symbolId);
+      void map_symbol(TID tokenId, SID symbolId);
 
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
@@ -85,7 +81,7 @@ namespace UserService
          {
             void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, MemoView memo) {}
-            void burned(TID tokenId, Account burner, Quantity amount) {}
+            void burned(TID tokenId, Account burner, Quantity amount, MemoView memo) {}
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             void symbolMapped(TID tokenId, Account account, SID symbolId) {}
@@ -108,7 +104,6 @@ namespace UserService
       method(mint, tokenId, amount, memo),
 
       method(burn, tokenId, amount),
-      method(setUserConf, flag, enable),
       method(setTokenConf, tokenId, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, maxAmount, memo),
@@ -121,7 +116,7 @@ namespace UserService
       method(getSharedBal, tokenId, creditor, debitor),
       method(getUserConf, account, flag),
       method(getTokenConf, tokenId, flag),
-      method(mapSymbol, symbolId, tokenId),
+      method(map_symbol, symbolId, tokenId),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,

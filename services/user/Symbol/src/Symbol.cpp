@@ -57,18 +57,17 @@ void Symbol::init()
    initTable.put(InitializedRecord{});
 
    // Configure manualDebit for self on Token and NFT
-   to<Tokens>().setUserConf("manualDebit"_m, true);
    to<Nft>().setUserConf("manualDebit"_m, true);
 
    // Create system token
    constexpr auto precision = Precision{4};
    auto           tid       = to<Tokens>().create(precision, Quantity{1'000'000'000e4});
    check(tid == Tokens::sysToken, wrongSysTokenId);
-   auto tNft = to<Tokens>().getToken(tid).ownerNft;
+   auto tNft = to<Tokens>().getToken(tid).nft_id;
    to<Nft>().debit(tNft, "Taking ownership of system token");
 
    // Make system token default untradeable
-   to<Tokens>().setTokenConf(tid, "untradeable"_m, true);
+   // to<Tokens>().setTokenConf(tid, "untradeable"_m, true);
 
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)
@@ -107,7 +106,7 @@ void Symbol::init()
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
    to<Nft>().credit(symbolOwnerNft.ownerNft, Tokens::service, "System token symbol ownership nft");
-   recurse().to<Tokens>().mapSymbol(Tokens::sysToken, sysTokenSymbol);
+   recurse().to<Tokens>().map_symbol(Tokens::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);
