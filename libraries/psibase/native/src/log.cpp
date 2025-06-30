@@ -675,6 +675,7 @@ namespace psibase::loggers
          explicit ConsoleSinkConfig(const sink_args_type& args) {}
          static void init(backend_type& backend)
          {
+            backend.auto_flush(true);
             backend.add_stream(boost::shared_ptr<std::ostream>(&std::clog, [](void*) {}));
          }
          void apply(backend_type& backend) const {}
@@ -1146,7 +1147,7 @@ namespace psibase::loggers
          std::uint64_t                  maxSize;
          std::uint64_t                  rotationSize;
          std::string                    rotationTime;
-         bool                           flush = false;
+         bool                           flush = true;
          std::shared_ptr<time_rotation> rotationTimeFunc;
          bool                           resetCollector = true;
          bool                           needsScan      = true;
