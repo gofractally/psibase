@@ -184,8 +184,8 @@ namespace psio
    concept ReflectedAsMember = requires(QueryClass* v) { v->psio_get_reflect_impl(v, nullptr); };
 
    template <ReflectedAsMember QueryClass>
-   auto psio_get_reflect_impl(QueryClass* v,
-                              ReflectDummyParam*) -> decltype(v->psio_get_reflect_impl(v, nullptr));
+   auto psio_get_reflect_impl(QueryClass* v, ReflectDummyParam*)
+       -> decltype(v->psio_get_reflect_impl(v, nullptr));
 
    template <typename QueryClass>
    using reflect =
@@ -804,73 +804,77 @@ namespace psio
  *    * method(ident, arg1, ...)       method
  *    * numbered(int, ident)           non-static data member with field number
  */
-#define PSIO_REFLECT(STRUCT, ...)                                                                                 \
-   template <typename ReflectedType>                                                                              \
-   struct BOOST_PP_CAT(psio_reflect_impl_, PSIO_REFLECT_NAME(STRUCT))                                             \
-   {                                                                                                              \
-      static constexpr bool is_defined = true;                                                                    \
-      static constexpr bool is_struct  = true;                                                                    \
-      static constexpr bool definitionWillNotChange =                                                             \
-          PSIO_HAS_FLAG(definitionWillNotChange, __VA_ARGS__);                                                    \
-      static constexpr bool requires_compressed_method_names()                                                    \
-      {                                                                                                           \
-         constexpr bool allowHashedMethods = PSIO_HAS_FLAG(allowHashedMethods, __VA_ARGS__);                      \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_REQ_COMPRESS, ReflectedType,                                                  \
-                               PSIO_REFLECT_METHODS(__VA_ARGS__));                                                \
-         return !allowHashedMethods;                                                                              \
-      }                                                                                                           \
-      static constexpr psio::FixedString name = BOOST_PP_STRINGIZE(PSIO_REFLECT_NAME(STRUCT));                    \
-      using data_members                      = psio::MemberList<BOOST_PP_IIF(                                    \
+#define PSIO_REFLECT(STRUCT, ...)                                                                                          \
+   template <typename ReflectedType>                                                                                       \
+   struct BOOST_PP_CAT(psio_reflect_impl_, PSIO_REFLECT_NAME(STRUCT))                                                      \
+   {                                                                                                                       \
+      static constexpr bool is_defined = true;                                                                             \
+      static constexpr bool is_struct  = true;                                                                             \
+      static constexpr bool definitionWillNotChange =                                                                      \
+          PSIO_HAS_FLAG(definitionWillNotChange, __VA_ARGS__);                                                             \
+      static constexpr bool requires_compressed_method_names()                                                             \
+      {                                                                                                                    \
+         constexpr bool allowHashedMethods = PSIO_HAS_FLAG(allowHashedMethods, __VA_ARGS__);                               \
+         BOOST_PP_SEQ_FOR_EACH(PSIO_REQ_COMPRESS, ReflectedType,                                                           \
+                               PSIO_REFLECT_METHODS(__VA_ARGS__));                                                         \
+         return !allowHashedMethods;                                                                                       \
+      }                                                                                                                    \
+      static constexpr psio::FixedString name          = BOOST_PP_STRINGIZE(PSIO_REFLECT_NAME(STRUCT));                    \
+      using data_members                               = psio::MemberList<BOOST_PP_IIF(                                    \
           BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)),                      \
           PSIO_EMPTY,                                                                        \
           PSIO_SEQ_TO_VA_ARGS)(PSIO_SEQ_TRANSFORM(PSIO_REFLECT_MEMBER_POINTER,               \
-                                                                       ReflectedType,                             \
-                                                                       PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)))>; \
-      static constexpr const char* data_member_names[] = {                                                        \
-          BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_DATA_MEMBER_NAME,                                                    \
-                                ReflectedType,                                                                    \
-                                PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))};                                         \
-      using member_functions = psio::MemberList<BOOST_PP_IIF(                                                     \
-          BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_METHODS(__VA_ARGS__)),                                                \
-          PSIO_EMPTY,                                                                                             \
-          PSIO_SEQ_TO_VA_ARGS)(PSIO_SEQ_TRANSFORM(PSIO_REFLECT_MEMBER_POINTER,                                    \
-                                                  ReflectedType,                                                  \
-                                                  PSIO_REFLECT_METHODS(__VA_ARGS__)))>;                           \
-      static constexpr std::initializer_list<const char*> member_function_names[] = {                             \
-          BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_MEMBER_FUNCTION_NAME,                                                \
-                                ReflectedType,                                                                    \
-                                PSIO_REFLECT_METHODS(__VA_ARGS__))};                                              \
-      static constexpr auto member_pointers()                                                                     \
-      {                                                                                                           \
-         return std::make_tuple(                                                                                  \
-             PSIO_MEMBER_POINTER(ReflectedType, PSIO_REFLECT_MEMBERS(__VA_ARGS__)));                              \
-      }                                                                                                           \
-                                                                                                                  \
-      template <typename ProxyObject>                                                                             \
-      struct proxy                                                                                                \
-      {                                                                                                           \
-        private:                                                                                                  \
-         ProxyObject _psio_proxy_obj;                                                                             \
-                                                                                                                  \
-        public:                                                                                                   \
-         template <typename... Args>                                                                              \
-         explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)                            \
-         {                                                                                                        \
-         }                                                                                                        \
-         auto& psio_get_proxy() const                                                                             \
-         {                                                                                                        \
-            return _psio_proxy_obj;                                                                               \
-         }                                                                                                        \
-         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_DATA,                                                                 \
-                                 ReflectedType,                                                                   \
-                                 PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                                          \
-         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_METHOD,                                                               \
-                                 ReflectedType,                                                                   \
-                                 PSIO_REFLECT_METHODS(__VA_ARGS__))                                               \
-      };                                                                                                          \
-   };                                                                                                             \
-   PSIO_REFLECT_TEMPLATE_DECL(STRUCT)                                                                             \
-   BOOST_PP_CAT(psio_reflect_impl_, PSIO_REFLECT_NAME(STRUCT))<PSIO_REFLECT_TYPE(STRUCT)>                         \
+                                                                                ReflectedType,                             \
+                                                                                PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__)))>; \
+      static constexpr const char* data_member_names[] = {                                                                 \
+          BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_DATA_MEMBER_NAME,                                                             \
+                                ReflectedType,                                                                             \
+                                PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))};                                                  \
+      using member_functions = psio::MemberList<BOOST_PP_IIF(                                                              \
+          BOOST_PP_CHECK_EMPTY(PSIO_REFLECT_METHODS(__VA_ARGS__)),                                                         \
+          PSIO_EMPTY,                                                                                                      \
+          PSIO_SEQ_TO_VA_ARGS)(PSIO_SEQ_TRANSFORM(PSIO_REFLECT_MEMBER_POINTER,                                             \
+                                                  ReflectedType,                                                           \
+                                                  PSIO_REFLECT_METHODS(__VA_ARGS__)))>;                                    \
+      static constexpr std::initializer_list<const char*> member_function_names[] = {                                      \
+          BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_MEMBER_FUNCTION_NAME,                                                         \
+                                ReflectedType,                                                                             \
+                                PSIO_REFLECT_METHODS(__VA_ARGS__))};                                                       \
+      static constexpr auto member_pointers()                                                                              \
+      {                                                                                                                    \
+         return std::make_tuple(                                                                                           \
+             PSIO_MEMBER_POINTER(ReflectedType, PSIO_REFLECT_MEMBERS(__VA_ARGS__)));                                       \
+      }                                                                                                                    \
+                                                                                                                           \
+      template <typename ProxyObject>                                                                                      \
+      struct proxy                                                                                                         \
+      {                                                                                                                    \
+        private:                                                                                                           \
+         ProxyObject _psio_proxy_obj;                                                                                      \
+                                                                                                                           \
+        public:                                                                                                            \
+         template <typename... Args>                                                                                       \
+         explicit proxy(Args&&... args) : _psio_proxy_obj(std::forward<Args>(args)...)                                     \
+         {                                                                                                                 \
+         }                                                                                                                 \
+         auto& psio_get_proxy()                                                                                            \
+         {                                                                                                                 \
+            return _psio_proxy_obj;                                                                                        \
+         }                                                                                                                 \
+         auto& psio_get_proxy() const                                                                                      \
+         {                                                                                                                 \
+            return _psio_proxy_obj;                                                                                        \
+         }                                                                                                                 \
+         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_DATA,                                                                          \
+                                 ReflectedType,                                                                            \
+                                 PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                                                   \
+         BOOST_PP_SEQ_FOR_EACH_I(PSIO_PROXY_METHOD,                                                                        \
+                                 ReflectedType,                                                                            \
+                                 PSIO_REFLECT_METHODS(__VA_ARGS__))                                                        \
+      };                                                                                                                   \
+   };                                                                                                                      \
+   PSIO_REFLECT_TEMPLATE_DECL(STRUCT)                                                                                      \
+   BOOST_PP_CAT(psio_reflect_impl_, PSIO_REFLECT_NAME(STRUCT))<PSIO_REFLECT_TYPE(STRUCT)>                                  \
    psio_get_reflect_impl(PSIO_REFLECT_TYPE(STRUCT)*, ::psio::ReflectDummyParam*);
 
 namespace psio::reflection_impl

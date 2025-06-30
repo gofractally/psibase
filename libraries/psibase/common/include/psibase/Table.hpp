@@ -524,6 +524,27 @@ namespace psibase
          return psio::from_frac<T>(psio::prevalidated{buffer});
       }
 
+      template <compatible_key<K> K2 = K>
+      psio::shared_view_ptr<T> getView(K2&& k)
+      {
+         KeyView key_base{{prefix.data(), prefix.size()}};
+         auto    buffer = psio::composite_key(key_base, k);
+         int     res    = raw::kvGet(db, buffer.data(), buffer.size());
+         if (res < 0)
+         {
+            return nullptr;
+         }
+         if (is_secondary)
+         {
+            buffer.resize(res);
+            raw::getResult(buffer.data(), buffer.size(), 0);
+            res = raw::kvGet(db, buffer.data(), buffer.size());
+         }
+         psio::shared_view_ptr<T> v{psio::size_tag{static_cast<std::uint32_t>(res)}};
+         raw::getResult(v.data(), v.size(), 0);
+         return v;
+      }
+
      private:
       DbId              db;
       std::vector<char> prefix;
@@ -582,6 +603,33 @@ namespace psibase
       decltype(auto) invoke(T C::* f, const C& value)
       {
          return (value.*f);
+      }
+
+      template <std::uint32_t I, typename C, typename T>
+      constexpr auto get_view_member(psio::view<const C> v, T C::* m, psio::MemberList<>*)
+          -> psio::view<const T>
+      {
+         abortMessage("Member was not reflected");
+      }
+
+      template <std::uint32_t I, typename C, typename T, auto M0, auto... M>
+      constexpr auto get_view_member(psio::view<const C> v, T C::* m, psio::MemberList<M0, M...>*)
+          -> psio::view<const T>
+      {
+         if constexpr (std::is_same_v<decltype(m), decltype(M0)>)
+         {
+            if (m == M0)
+            {
+               return v.psio_get_proxy().template get<I, M0>();
+            }
+         }
+         return get_view_member<I + 1>(v, m, (psio::MemberList<M...>*)nullptr);
+      }
+
+      template <typename T, typename C>
+      decltype(auto) invoke(T C::* f, psio::view<const C> value)
+      {
+         return get_view_member<0>(value, f, (typename psio::reflect<C>::data_members*)nullptr);
       }
       template <typename R, typename C, typename... A>
       decltype(auto) invoke(R (C::*f)(A...) const, const C& value, A&&... a)
@@ -793,6 +841,25 @@ namespace psibase
          (erase_key(idx, wrap<Secondary>()), ...);
       }
 
+      void remove(psio::view<const T> oldValue)
+      {
+         std::vector<char> key_buffer = prefix;
+         key_buffer.push_back(0);
+         auto erase_key = [&](std::uint8_t& idx, auto wrapped)
+         {
+            auto key          = detail::invoke(decltype(wrapped)::value, oldValue);
+            key_buffer.back() = idx;
+            psio::convert_to_key(key, key_buffer);
+            raw::kvRemove(db, key_buffer.data(), key_buffer.size());
+            key_buffer.resize(prefix.size() + 1);
+            ++idx;
+         };
+         std::uint8_t idx = 0;
+         erase_key(idx, wrap<Primary>());
+         (erase_key(idx, wrap<Secondary>()), ...);
+      }
+      void remove(psio::view<T> oldValue) { remove(static_cast<psio::view<const T>>(oldValue)); }
+
       // TODO: get index by name
       /// Get a primary or secondary index
       ///
@@ -820,6 +887,13 @@ namespace psibase
       auto get(K&& key) const
       {
          return getIndex<0>().get(std::forward<K>(key));
+      }
+
+      /// Look up table object by key using the first table index by default
+      template <compatible_key<primary_key_type> K = primary_key_type>
+      auto getView(K&& key) const
+      {
+         return getIndex<0>().getView(std::forward<K>(key));
       }
 
      private:

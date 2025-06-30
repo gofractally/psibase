@@ -521,12 +521,14 @@ namespace
 
       for (auto id : txids)
       {
-         std::optional<std::vector<char>> trace;
+         std::shared_ptr<void>                             traceStorage;
+         std::optional<psio::view<const TransactionTrace>> traceView;
 
-         if (auto tx = successfulTxs.get(id))
+         if (auto tx = successfulTxs.getView(id))
          {
-            trace = psio::to_frac(tx->trace);
+            traceView.emplace(tx->trace());
             successfulTxs.remove(*tx);
+            traceStorage = std::move(tx).shared_data();
             PSIBASE_SUBJECTIVE_TX
             {
                // It is possible for a tx to have both failed and successful associated traces.
@@ -539,21 +541,24 @@ namespace
          {
             PSIBASE_SUBJECTIVE_TX
             {
-               if (auto tx = failedTxs.get(id))
+               if (auto tx = failedTxs.getView(id))
                {
-                  trace = psio::to_frac(tx->trace);
+                  traceView.emplace(tx->trace());
                   failedTxs.remove(*tx);
+                  traceStorage = std::move(tx).shared_data();
                }
             }
          }
 
-         if (!trace)
+         if (!traceView)
          {
-            trace = psio::to_frac(TransactionTrace{.error = "Transaction expired"});
+            auto p = psio::shared_view_ptr<TransactionTrace>(
+                TransactionTrace{.error = "Transaction expired"});
+            traceView.emplace(*p);
+            traceStorage = std::move(p).shared_data();
          }
 
-         auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
-         sendReply(id, traceView);
+         sendReply(id, *traceView);
       }
 
       stopTracking(txids);
