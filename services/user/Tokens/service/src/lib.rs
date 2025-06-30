@@ -110,27 +110,32 @@ pub mod service {
     }
 
     #[action]
-    fn get_user_global_config(account: AccountNumber) -> Holder {
+    #[allow(non_snake_case)]
+    fn getUserConf(account: AccountNumber) -> Holder {
         Holder::get_or_new(account)
     }
 
     #[action]
-    fn set_user_global_config(index: u8, enabled: bool) {
+    #[allow(non_snake_case)]
+    fn setUserConf(index: u8, enabled: bool) {
         Holder::get_or_new(get_sender()).set_settings(index, enabled);
     }
 
     #[action]
-    fn get_user_token_config(account: AccountNumber, token_id: TID) -> TokenHolder {
+    #[allow(non_snake_case)]
+    fn getTokHoldr(account: AccountNumber, token_id: TID) -> TokenHolder {
         TokenHolder::get_or_new(account, token_id)
     }
 
     #[action]
-    fn set_user_token_config(token_id: TID, index: u8, enabled: bool) {
+    #[allow(non_snake_case)]
+    fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
         TokenHolder::get_or_new(get_sender(), token_id).set_settings(index, enabled);
     }
 
     #[action]
-    fn set_token_config(token_id: TID, index: u8, enabled: bool) {
+    #[allow(non_snake_case)]
+    fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         let mut token = Token::get_assert(token_id);
         token.check_is_owner(get_sender());
         token.set_settings(index, enabled);
@@ -142,12 +147,14 @@ pub mod service {
     }
 
     #[action]
-    fn get_balance(user: AccountNumber, token_id: TID) -> Balance {
+    #[allow(non_snake_case)]
+    fn getBalance(token_id: TID, user: AccountNumber) -> Balance {
         Balance::get_or_new(user, token_id)
     }
 
     #[action]
-    fn get_shared_balance(
+    #[allow(non_snake_case)]
+    fn getSharedBal(
         creditor: AccountNumber,
         debitor: AccountNumber,
         token_id: TID,
