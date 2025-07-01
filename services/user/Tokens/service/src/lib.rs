@@ -124,7 +124,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
+    fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         TokenHolder::get_or_new(get_sender(), token_id).set_settings(index, enabled);
     }
 

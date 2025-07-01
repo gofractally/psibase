@@ -227,7 +227,7 @@ mod service {
     }
 
     #[action]
-    fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
+    fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
