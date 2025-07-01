@@ -34,5 +34,11 @@ export default defineConfig(({ command }) => ({
     build: {
         minify: false,
         sourcemap: false,
+        rollupOptions: {
+            input: {
+                main: path.resolve(serviceDir, "index.html"),
+                perms: path.resolve(serviceDir, "permissions.html"),
+            },
+        },
     },
 }));
