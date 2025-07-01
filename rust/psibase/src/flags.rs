@@ -1,109 +1,102 @@
 use crate::check;
 
-pub trait HasFlags<T> {
-    fn set_flag(&mut self, index: u8, value: bool);
-    fn get_flag(&self, index: u8) -> bool;
+pub trait FlagsType {
+    type BitsetType: Copy
+        + std::ops::BitOr<Output = Self::BitsetType>
+        + std::ops::BitAnd<Output = Self::BitsetType>
+        + std::ops::Not<Output = Self::BitsetType>
+        + std::ops::Shl<u8, Output = Self::BitsetType>
+        + PartialEq
+        + From<u8>;
+
+    type JsonType: serde::Serialize + serde::de::DeserializeOwned + async_graphql::OutputType;
+
+    fn index(&self) -> u8;
 }
 
 /// # Flags
 ///
-/// `Flags` represents a bitset structure with a boolean value for each bit.
+/// `Flags` represents a bitset structure that works with flag types implementing `FlagsType`.
 ///
-/// Provides a convenient way to manage an integer that represents a set of boolean flags.
-///
-/// It can work with any unsigned integer type (`u8`, `u16`, `u32`, `u64`, etc.). For example, Flags<u8>
-/// can work with 8 flags, Flags<u16> can work with 16 flags, etc.
+/// Provides a convenient way to manage an integer that represents a set of boolean flags
+/// using strongly-typed indices.
 ///
 /// # Type Parameter
 ///
-/// * `T` - The unsigned integer type to use for storing flags. Must implement
-///   the required bitwise operation traits.
-pub struct Flags<T> {
-    value: T,
+/// * `F` - The flag type that implements `FlagsType`
+pub struct Flags<F: FlagsType> {
+    value: F::BitsetType,
+    _phantom: std::marker::PhantomData<F>,
 }
 
-impl<T> Flags<T>
-where
-    T: Copy
-        + std::ops::BitOr<Output = T>
-        + std::ops::BitAnd<Output = T>
-        + std::ops::Not<Output = T>
-        + std::ops::Shl<u8, Output = T>
-        + PartialEq
-        + From<u8>,
-{
-    pub fn new(value: T) -> Self {
-        Self { value }
+impl<F: FlagsType> Flags<F> {
+    pub fn new(value: F::BitsetType) -> Self {
+        Self {
+            value,
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     fn validate_index(index: u8) {
-        check(index < std::mem::size_of::<T>() as u8 * 8, "invalid index");
+        check(
+            index < std::mem::size_of::<F::BitsetType>() as u8 * 8,
+            "invalid index",
+        );
     }
 
-    pub fn set(&mut self, index: u8, value: bool) -> &mut Self {
+    pub fn set(&mut self, flag: F, value: bool) -> &mut Self {
+        let index = flag.index();
         Self::validate_index(index);
+
         if value {
-            self.value = self.value | (T::from(1) << index);
+            self.value = self.value | (F::BitsetType::from(1) << index);
         } else {
-            self.value = self.value & !(T::from(1) << index);
+            self.value = self.value & !(F::BitsetType::from(1) << index);
         }
         self
     }
 
-    pub fn get(&self, index: u8) -> bool {
+    pub fn get(&self, flag: F) -> bool {
+        let index = flag.index();
         Self::validate_index(index);
-        (self.value & (T::from(1) << index)) != T::from(0)
+        (self.value & (F::BitsetType::from(1) << index)) != F::BitsetType::from(0)
     }
 
-    pub fn value(&self) -> T {
+    pub fn value(&self) -> F::BitsetType {
         self.value
     }
 }
 
-/// Macro to generate flag types with constants, get() method, and GraphQL schema
+/// Macro to generate a new struct that implements `FlagsType` so it can
+/// be used with `Flags`.
 ///
-/// > **WARNING:** This macro does not check if the number of flags exceeds the storage
-/// >              type capacity.
+/// ### Example
 ///
-/// ### Usage example
 /// ```rust,ignore
-/// define_flags!(StructName, u8, {
+/// define_flags!(SampleFlags, u8, {
 ///     first_flag,
 ///     second_flag,
 ///     third_flag,
 /// });
 /// ```
 ///
-/// This generates:
+/// This allows for usage like:
 ///
-/// - A struct with the given name and bool fields (snake_case names)
-/// - Constants for each flag index (SCREAMING_SNAKE_CASE names) starting from 0
-/// - A get() method that constructs the struct from a container's flags
-/// - The generated struct has derives for serde::{Serialize, Deserialize}
-///   and async_graphql::SimpleObject
+/// ```rust,ignore
+/// Flags::new(bitset).get(SampleFlags::FIRST_FLAG);
+/// Flags::new(bitset).set(SampleFlags::SECOND_FLAG, true);
+/// SampleFlagsJson::from(Flags::new(bitset));
+/// ```
 ///
-/// #### Example generated code:
+/// The SampleFlagsJson struct would look like:
 ///
 /// ```rust,ignore
 /// #[derive(serde::Serialize, serde::Deserialize, async_graphql::SimpleObject)]
-/// pub struct StructName {
-///     pub first_flag:  bool,
+/// #[serde(rename_all = "camelCase")]
+/// pub struct SampleFlagsJson {
+///     pub first_flag: bool,
 ///     pub second_flag: bool,
-///     pub third_flag:  bool,
-/// }
-///
-/// impl StructName {
-///     pub const FIRST_FLAG:  u8 = 0;
-///     pub const SECOND_FLAG: u8 = 1;
-///     pub const THIRD_FLAG:  u8 = 2;
-///
-///     pub fn get(container: &impl crate::flags::HasFlags<u8>) -> Self {
-///         Self {
-///             first_flag:  container.get_flag(StructName::FIRST_FLAG),
-///             second_flag: container.get_flag(StructName::SECOND_FLAG),
-///             third_flag:  container.get_flag(StructName::THIRD_FLAG),
-///         }
-///     }
+///     pub third_flag: bool,
 /// }
 /// ```
 #[macro_export]
@@ -118,24 +111,65 @@ macro_rules! define_flags {
 
     (@impl $name:ident, $storage:ty, $index:expr, [$($field:ident: $field_index:expr,)*], []) => {
         $crate::paste::paste! {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            pub struct $name(u8);
+
+            impl $name {
+                $(
+                    pub const [<$field:snake:upper>]: $name = $name($field_index);
+                )*
+            }
+
+            impl From<u8> for $name {
+                fn from(index: u8) -> Self {
+                    $name(index)
+                }
+            }
+
+            impl $crate::FlagsType for $name {
+                type BitsetType = $storage;
+                type JsonType = [<$name Json>];
+
+                fn index(&self) -> u8 {
+                    self.0
+                }
+            }
+
             #[derive(serde::Serialize, serde::Deserialize, async_graphql::SimpleObject)]
-            pub struct $name {
+            #[serde(rename_all = "camelCase")]
+            pub struct [<$name Json>] {
                 $(
                     pub $field: bool,
                 )*
             }
 
-            impl $name {
-                $(
-                    pub const [<$field:snake:upper>]: u8 = $field_index;
-                )*
-
-                pub fn get(container: &impl $crate::HasFlags<$storage>) -> Self {
+            impl [<$name Json>] {
+                pub fn from_flags(flags: &$crate::Flags<$name>) -> Self {
                     Self {
                         $(
-                            $field: container.get_flag($name::[<$field:snake:upper>]),
+                            $field: flags.get($name::[<$field:snake:upper>]),
                         )*
                     }
+                }
+
+                pub fn to_flags(&self) -> $crate::Flags<$name> {
+                    let mut flags = $crate::Flags::new(<$storage>::from(0));
+                    $(
+                        flags.set($name::[<$field:snake:upper>], self.$field);
+                    )*
+                    flags
+                }
+            }
+
+            impl From<$crate::Flags<$name>> for [<$name Json>] {
+                fn from(flags: $crate::Flags<$name>) -> Self {
+                    Self::from_flags(&flags)
+                }
+            }
+
+            impl From<[<$name Json>]> for $crate::Flags<$name> {
+                fn from(json: [<$name Json>]) -> Self {
+                    json.to_flags()
                 }
             }
         }
