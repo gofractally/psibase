@@ -1,28 +1,35 @@
 import path from "path";
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+
+import {
+    createPsibaseConfig,
+    createSharedViteConfig,
+    getSharedUIPlugins,
+    verifyViteCache,
+} from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
 verifyViteCache(serviceDir);
 
-// TODO: This currently bundles common-lib. This is easier while we're developing. It should ultimately reference common-lib as an external resource.
+// https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
     plugins: [
-        react(),
         createSharedViteConfig({
             projectDir: serviceDir,
         }),
         createPsibaseConfig({
             service: "supervisor",
-            serviceDir,
-            isServing: command === "serve"
+            serviceDir: serviceDir,
+            isServing: command === "serve",
+            useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
         }),
+        ...getSharedUIPlugins(),
     ],
     build: {
         target: "esnext",
         minify: false,
+        sourcemap: false,
         rollupOptions: {
             external: ["hash.js", "elliptic"],
             input: {
@@ -33,7 +40,7 @@ export default defineConfig(({ command }) => ({
                 entryFileNames: "assets/[name].js",
                 chunkFileNames: "assets/[name].js",
                 assetFileNames: "assets/[name].[ext]",
-            }
-        }
+            },
+        },
     },
 }));

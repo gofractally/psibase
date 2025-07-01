@@ -2902,15 +2902,14 @@ const RAW_RUNTIME_STATE =
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
           ["@rollup/browser", "npm:4.44.1"],\
-          ["@tanstack/react-query", "virtual:6471aeeccf6d7d39eaa7ac371d5ea707f776917d655540c779996f3e9742f8b2d01cb8c1b734701600c8896fdc2408b69ce5013a5cd95ac7181e6c3c652baa15#npm:4.40.0"],\
+          ["@tanstack/react-query", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:5.81.2"],\
           ["@types/node", "npm:22.15.33"],\
-          ["@types/react", "npm:18.3.23"],\
-          ["@types/react-dom", "virtual:e5065c764f3bb291d130a5719b8608d34ee8c4c41c501e0098c1a66e36d62401f1b12bf7a4e9be09a5a00fad04f56732086efb903a6f1495b620396de4dbeb75#npm:18.3.7"],\
+          ["@types/react", "npm:19.1.8"],\
+          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.6"],\
           ["@vitejs/plugin-react", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.6.0"],\
-          ["prettier", "npm:3.6.1"],\
-          ["prettier-plugin-tailwindcss", "virtual:23ffd5fef66e3094826609b25824b4cc8e93efd591484709f57b9799b300994440e2f2aa75325a50a3c8a2f95609e44796333afd0f119ecad7f07f451dad1978#npm:0.5.14"],\
-          ["react", "npm:18.3.1"],\
-          ["react-dom", "virtual:e5065c764f3bb291d130a5719b8608d34ee8c4c41c501e0098c1a66e36d62401f1b12bf7a4e9be09a5a00fad04f56732086efb903a6f1495b620396de4dbeb75#npm:18.3.1"],\
+          ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.29.0"],\
+          ["react", "npm:19.1.0"],\
+          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.0"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.19"],\
           ["zod", "npm:3.25.67"]\
@@ -6481,29 +6480,6 @@ const RAW_RUNTIME_STATE =
         ],\
         "packagePeers": [\
           "@types/react",\
-          "react"\
-        ],\
-        "linkType": "HARD"\
-      }],\
-      ["virtual:6471aeeccf6d7d39eaa7ac371d5ea707f776917d655540c779996f3e9742f8b2d01cb8c1b734701600c8896fdc2408b69ce5013a5cd95ac7181e6c3c652baa15#npm:4.40.0", {\
-        "packageLocation": "./.yarn/__virtual__/@tanstack-react-query-virtual-e6584d2f0c/2/.caches/yarn/@tanstack-react-query-npm-4.40.0-2945ff7861-e8f518cee2.zip/node_modules/@tanstack/react-query/",\
-        "packageDependencies": [\
-          ["@tanstack/query-core", "npm:4.40.0"],\
-          ["@tanstack/react-query", "virtual:6471aeeccf6d7d39eaa7ac371d5ea707f776917d655540c779996f3e9742f8b2d01cb8c1b734701600c8896fdc2408b69ce5013a5cd95ac7181e6c3c652baa15#npm:4.40.0"],\
-          ["@types/react", "npm:18.3.23"],\
-          ["@types/react-dom", "virtual:e5065c764f3bb291d130a5719b8608d34ee8c4c41c501e0098c1a66e36d62401f1b12bf7a4e9be09a5a00fad04f56732086efb903a6f1495b620396de4dbeb75#npm:18.3.7"],\
-          ["@types/react-native", null],\
-          ["react", "npm:18.3.1"],\
-          ["react-dom", "virtual:e5065c764f3bb291d130a5719b8608d34ee8c4c41c501e0098c1a66e36d62401f1b12bf7a4e9be09a5a00fad04f56732086efb903a6f1495b620396de4dbeb75#npm:18.3.1"],\
-          ["react-native", null],\
-          ["use-sync-external-store", "virtual:293c0c2744ba047c400698f551176e6896db0b546a8a7898b854dd24b3571d4ea3e2ba3c33a3a303f4bcc871795cddc26f9c3c7e6fbd1af0dd0b5b973be00f3b#npm:1.5.0"]\
-        ],\
-        "packagePeers": [\
-          "@types/react-dom",\
-          "@types/react-native",\
-          "@types/react",\
-          "react-dom",\
-          "react-native",\
           "react"\
         ],\
         "linkType": "HARD"\
