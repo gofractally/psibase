@@ -22,6 +22,7 @@ pub mod service {
         pub settings_value: u8,
         pub precision: Precision,
         pub current_supply: Quantity,
+        pub burned_supply: Quantity,
         pub max_supply: Quantity,
         pub symbol: SID,
     }
@@ -33,7 +34,8 @@ pub mod service {
                 nft_id: token.nft_id,
                 settings_value: token.settings_value,
                 precision: token.precision.try_into().unwrap(),
-                current_supply: token.current_supply,
+                current_supply: token.issued_supply - token.burned_supply,
+                burned_supply: token.burned_supply,
                 max_supply: token.max_supply,
                 symbol: token.symbol.unwrap_or(AccountNumber::from(0)),
             }
@@ -43,7 +45,6 @@ pub mod service {
     #[action]
     fn init() {
         let table = InitTable::new();
-        check_none(table.get_index_pk().get(&()), "service already initiated");
 
         let init_instance = InitRow { last_used_id: 0 };
         table.put(&init_instance).unwrap();
@@ -76,15 +77,9 @@ pub mod service {
     }
 
     #[action]
-    fn get_token_by_symbol(symbol: AccountNumber) -> Option<TokenRecord> {
-        Token::get_by_symbol(symbol).map(|token| token.into())
-    }
-
-    #[action]
     fn map_symbol(token_id: TID, symbol: AccountNumber) {
         let mut token = Token::get_assert(token_id);
-        let sender = get_sender();
-        token.check_is_owner(sender);
+
         token.map_symbol(symbol);
 
         let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
@@ -103,7 +98,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .symbol_mapped(token_id, sender, symbol);
+            .symbol_mapped(token_id, get_sender(), symbol);
     }
 
     #[action]
@@ -126,7 +121,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
+    fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         TokenHolder::get_or_new(get_sender(), token_id).set_flag(index, enabled);
     }
 
@@ -134,7 +129,6 @@ pub mod service {
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         let mut token = Token::get_assert(token_id);
-        token.check_is_owner(get_sender());
         token.set_flag(index, enabled);
     }
 
@@ -161,47 +155,25 @@ pub mod service {
 
     #[action]
     fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
-        let sender = get_sender();
-        let mut token = Token::get_assert(token_id);
-
-        check(sender != from, "cannot recall from self, use burn instead");
-        check(
-            !token.get_flag(TokenFlags::UNRECALLABLE),
-            "token is not recallable",
-        );
-
-        token.check_is_owner(sender);
-        token.burn(amount, from);
+        Token::get_assert(token_id).recall(amount, from);
 
         Wrapper::emit()
             .history()
-            .recall(token_id, amount, sender, from, memo);
+            .recalled(token_id, amount, get_sender(), from, memo);
     }
 
     #[action]
     fn burn(token_id: TID, amount: Quantity, memo: String) {
-        let sender = get_sender();
-        let mut token = Token::get_assert(token_id);
-
-        check(
-            !token.get_flag(TokenFlags::UNBURNABLE),
-            "token is not burnable",
-        );
-
-        token.burn(amount, sender);
+        Token::get_assert(token_id).burn(amount);
 
         Wrapper::emit()
             .history()
-            .burn(token_id, sender, amount, memo);
+            .burned(token_id, get_sender(), amount, memo);
     }
 
     #[action]
     fn mint(token_id: TID, amount: Quantity, memo: String) {
-        let mut token = Token::get_assert(token_id);
-        let sender = get_sender();
-        token.check_is_owner(sender);
-        token.mint(amount, sender);
+        Token::get_assert(token_id).mint(amount);
 
         Wrapper::emit().history().minted(token_id, amount, memo);
     }
@@ -233,17 +205,17 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn recall(
+    pub fn recalled(
         token_id: TID,
         amount: Quantity,
-        sender: AccountNumber,
-        burnee: AccountNumber,
+        burner: AccountNumber,
+        from: AccountNumber,
         memo: String,
     ) {
     }
 
     #[event(history)]
-    pub fn burn(token_id: TID, sender: AccountNumber, amount: Quantity, memo: String) {}
+    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: String) {}
 
     #[event(history)]
     pub fn created(token_id: TID, sender: AccountNumber, precision: u8, max_supply: Quantity) {}

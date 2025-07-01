@@ -30,7 +30,9 @@ pub mod tables {
         #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
-        pub current_supply: Quantity,
+        pub issued_supply: Quantity,
+        #[graphql(skip)]
+        pub burned_supply: Quantity,
         #[graphql(skip)]
         pub max_supply: Quantity,
         #[graphql(skip)]
@@ -67,7 +69,7 @@ pub mod tables {
             tokens.pop()
         }
 
-        pub fn check_is_owner(&self, account: AccountNumber) {
+        fn check_is_owner(&self, account: AccountNumber) {
             let holder = self.nft_holder();
 
             check(
@@ -78,6 +80,8 @@ pub mod tables {
 
         pub fn map_symbol(&mut self, symbol: AccountNumber) {
             check_none(self.symbol, "already has symbol");
+            let sender = get_sender();
+            self.check_is_owner(sender);
             self.symbol = Some(symbol);
             self.save();
         }
@@ -88,12 +92,13 @@ pub mod tables {
             let new_id = init_row.last_used_id.checked_add(1).unwrap();
 
             init_row.last_used_id = new_id;
-            init_table.put(&init_row).expect("failed to save init_row");
+            init_table.put(&init_row).unwrap();
 
             let mut new_instance = Self {
                 id: new_id,
                 nft_id: Nfts::call().mint(),
-                current_supply: 0.into(),
+                issued_supply: 0.into(),
+                burned_supply: 0.into(),
                 max_supply,
                 precision: Precision::try_from(precision).unwrap().value,
                 settings_value: 0,
@@ -124,27 +129,46 @@ pub mod tables {
             table.put(&self).unwrap();
         }
 
-        pub fn mint(&mut self, amount: Quantity, receiver: AccountNumber) {
+        pub fn mint(&mut self, amount: Quantity) {
+            let owner = get_sender();
+            self.check_is_owner(owner);
             check(amount.value > 0, "mint quantity must be greater than 0");
 
-            self.current_supply = self.current_supply + amount;
-            psibase::check(self.current_supply <= self.max_supply, "over max supply");
+            self.issued_supply = self.issued_supply + amount;
+            psibase::check(self.issued_supply <= self.max_supply, "over max issued supply");
             self.save();
 
-            Balance::get_or_new(receiver, self.id).add_balance(amount);
+            Balance::get_or_new(owner, self.id).add_balance(amount);
         }
 
-        pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
+        pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
+            self.check_is_owner(get_sender());
+
+
+            check(
+                !self.get_flag(TokenFlags::UNRECALLABLE),
+                "token is not recallable",
+            );
+
+            self.burn_supply(amount, from);
+        }
+
+        pub fn burn(&mut self, amount: Quantity) {
+            self.burn_supply(amount, get_sender());
+        }
+
+        fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {
             check(amount.value > 0, "burn quantity must be greater than 0");
-            self.current_supply = self.current_supply - amount;
+            self.burned_supply = self.burned_supply + amount;
             self.save();
 
-            Balance::get_or_new(burnee, self.id).sub_balance(amount);
+            Balance::get_or_new(from, self.id).sub_balance(amount);
         }
     }
 
     impl HasFlags<u8> for Token {
         fn set_flag(&mut self, index: u8, enabled: bool) {
+            self.check_is_owner(get_sender());
             self.settings_value = Flags::new(self.settings_value)
                 .set(index as u8, enabled)
                 .value();
@@ -167,7 +191,14 @@ pub mod tables {
         }
 
         pub async fn current_supply(&self) -> Decimal {
-            Decimal::new(self.current_supply, self.precision.try_into().unwrap())
+            Decimal::new(
+                self.issued_supply - self.burned_supply,
+                self.precision.try_into().unwrap(),
+            )
+        }
+
+        pub async fn issued_supply(&self) -> Decimal {
+            Decimal::new(self.issued_supply, self.precision.try_into().unwrap())
         }
 
         pub async fn max_supply(&self) -> Decimal {
@@ -299,6 +330,7 @@ pub mod tables {
         }
 
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
+            Token::get_assert(token_id);
             check(
                 creditor != debitor,
                 format!("{} cannot be the creditor and debitor", creditor).as_str(),

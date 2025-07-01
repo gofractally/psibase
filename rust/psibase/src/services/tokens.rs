@@ -202,11 +202,6 @@ mod service {
     }
 
     #[action]
-    fn get_token_by_symbol(symbol: AccountNumber) -> Option<TokenRecord> {
-        unimplemented!()
-    }
-
-    #[action]
     fn map_symbol(token_id: TID, symbol: AccountNumber) {
         unimplemented!()
     }
@@ -227,7 +222,7 @@ mod service {
     }
 
     #[action]
-    fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
+    fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 

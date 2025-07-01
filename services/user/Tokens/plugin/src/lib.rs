@@ -141,17 +141,17 @@ impl Intf for TokensPlugin {
         )
     }
 
-    fn set_token_holder(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
+    fn set_balance_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
-        let packed_args = tokens::action_structs::setTokHoldr {
+        let packed_args = tokens::action_structs::setBalConf {
             enabled,
             index,
             token_id,
         }
         .packed();
         add_action_to_transaction(
-            tokens::action_structs::setTokHoldr::ACTION_NAME,
+            tokens::action_structs::setBalConf::ACTION_NAME,
             &packed_args,
         )
     }
