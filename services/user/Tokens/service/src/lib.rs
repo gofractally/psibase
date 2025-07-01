@@ -158,33 +158,20 @@ pub mod service {
 
     #[action]
     fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: String) {
-        check(amount.value > 0, "must be greater than 0");
-        let sender = get_sender();
-        let mut token = Token::get_assert(token_id);
-        let token_settings = token.settings();
-
-        check(!token_settings.is_unrecallable(), "token is not recallable");
-
-        token.burn(amount, from);
+        Token::get_assert(token_id).recall(amount, from);
 
         Wrapper::emit()
             .history()
-            .recalled(token_id, amount, sender, from, memo);
+            .recalled(token_id, amount, get_sender(), from, memo);
     }
 
     #[action]
     fn burn(token_id: TID, amount: Quantity, memo: String) {
-        let sender = get_sender();
-        let mut token = Token::get_assert(token_id);
-        let token_settings = token.settings();
-
-        check(!token_settings.is_unburnable(), "token is not burnable");
-
-        token.burn(amount, sender);
+        Token::get_assert(token_id).burn(amount);
 
         Wrapper::emit()
             .history()
-            .burned(token_id, sender, amount, memo);
+            .burned(token_id, get_sender(), amount, memo);
     }
 
     #[action]

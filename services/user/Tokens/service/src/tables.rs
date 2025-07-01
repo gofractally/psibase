@@ -137,19 +137,33 @@ pub mod tables {
         }
 
         pub fn mint(&mut self, amount: Quantity) {
-            let sender = get_sender();
-            self.check_is_owner(sender);
+            let owner = get_sender();
+            self.check_is_owner(owner);
             check(amount.value > 0, "mint quantity must be greater than 0");
 
             self.issued_supply = self.issued_supply + amount;
-            psibase::check(self.issued_supply <= self.max_supply, "over max supply");
+            psibase::check(self.issued_supply <= self.max_supply, "over max issued supply");
             self.save();
 
-            Balance::get_or_new(sender, self.id).add_balance(amount);
+            Balance::get_or_new(owner, self.id).add_balance(amount);
         }
 
-        pub fn burn(&mut self, amount: Quantity, from: AccountNumber) {
+        pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
             self.check_is_owner(get_sender());
+
+            check(
+                !self.settings().is_unrecallable(),
+                "token is not recallable",
+            );
+
+            self.burn_supply(amount, from);
+        }
+
+        pub fn burn(&mut self, amount: Quantity) {
+            self.burn_supply(amount, get_sender());
+        }
+
+        fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {
             check(amount.value > 0, "burn quantity must be greater than 0");
             self.burned_supply = self.burned_supply + amount;
             self.save();

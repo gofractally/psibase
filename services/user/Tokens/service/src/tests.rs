@@ -124,12 +124,12 @@ mod tests {
         assert_shared_balance(&chain, alice, bob, token_id, 0.into());
 
         assert_error(
-            Wrapper::push_from(&chain, alice).mint(2, 67656.into(), "memo".to_string()),
-            "service 'tokens' aborted with message: over max supply",
+            Wrapper::push_from(&chain, alice).mint(token_id, 67656.into(), "memo".to_string()),
+            "service 'tokens' aborted with message: over max issued supply",
         );
 
         Wrapper::push_from(&chain, alice)
-            .mint(2, 67655.into(), "memo".to_string())
+            .mint(token_id, 67655.into(), "memo".to_string())
             .get()?;
 
         let token_detail = Wrapper::push_from(&chain, alice).getToken(token_id).get()?;
@@ -143,7 +143,7 @@ mod tests {
 
         // Bob can burn some of his balance
         Wrapper::push_from(&chain, bob)
-            .recall(token_id, bob, 3.into(), format!(""))
+            .burn(token_id, 3.into(), format!(""))
             .get()?;
 
         let supply_delta = token_detail.current_supply
