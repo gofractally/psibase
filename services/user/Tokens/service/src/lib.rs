@@ -1,12 +1,9 @@
-pub mod flags;
 pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-
-    use crate::tables::tables::{
-        Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
-    };
+    use crate::tables::tables::*;
+    pub use crate::tables::tables::{HolderFlags, TokenFlags, TokenHolderFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
     use psibase::{AccountNumber, Precision, Quantity};
@@ -118,7 +115,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setUserConf(index: u8, enabled: bool) {
-        Holder::get_or_new(get_sender()).set_settings(index, enabled);
+        Holder::get_or_new(get_sender()).set_flag(index, enabled);
     }
 
     #[action]
@@ -130,7 +127,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setTokHoldr(token_id: TID, index: u8, enabled: bool) {
-        TokenHolder::get_or_new(get_sender(), token_id).set_settings(index, enabled);
+        TokenHolder::get_or_new(get_sender(), token_id).set_flag(index, enabled);
     }
 
     #[action]
@@ -138,7 +135,7 @@ pub mod service {
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         let mut token = Token::get_assert(token_id);
         token.check_is_owner(get_sender());
-        token.set_settings(index, enabled);
+        token.set_flag(index, enabled);
     }
 
     #[action]
@@ -167,10 +164,12 @@ pub mod service {
         check(amount.value > 0, "must be greater than 0");
         let sender = get_sender();
         let mut token = Token::get_assert(token_id);
-        let token_settings = token.settings();
 
         check(sender != from, "cannot recall from self, use burn instead");
-        check(!token_settings.is_unrecallable(), "token is not recallable");
+        check(
+            !token.get_flag(TokenFlags::UNRECALLABLE),
+            "token is not recallable",
+        );
 
         token.check_is_owner(sender);
         token.burn(amount, from);
@@ -184,9 +183,11 @@ pub mod service {
     fn burn(token_id: TID, amount: Quantity, memo: String) {
         let sender = get_sender();
         let mut token = Token::get_assert(token_id);
-        let token_settings = token.settings();
 
-        check(!token_settings.is_unburnable(), "token is not burnable");
+        check(
+            !token.get_flag(TokenFlags::UNBURNABLE),
+            "token is not burnable",
+        );
 
         token.burn(amount, sender);
 
