@@ -202,11 +202,6 @@ mod service {
     }
 
     #[action]
-    fn get_token_by_symbol(symbol: AccountNumber) -> Option<TokenRecord> {
-        unimplemented!()
-    }
-
-    #[action]
     fn map_symbol(token_id: TID, symbol: AccountNumber) {
         unimplemented!()
     }
