@@ -169,7 +169,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .recall(token_id, amount, sender, from, memo);
+            .recalled(token_id, amount, sender, from, memo);
     }
 
     #[action]
@@ -184,7 +184,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .burn(token_id, sender, amount, memo);
+            .burned(token_id, sender, amount, memo);
     }
 
     #[action]
@@ -221,17 +221,17 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn recall(
+    pub fn recalled(
         token_id: TID,
         amount: Quantity,
-        sender: AccountNumber,
-        burnee: AccountNumber,
+        burner: AccountNumber,
+        from: AccountNumber,
         memo: String,
     ) {
     }
 
     #[event(history)]
-    pub fn burn(token_id: TID, sender: AccountNumber, amount: Quantity, memo: String) {}
+    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: String) {}
 
     #[event(history)]
     pub fn created(token_id: TID, sender: AccountNumber, precision: u8, max_supply: Quantity) {}

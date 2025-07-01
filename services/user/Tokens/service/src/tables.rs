@@ -148,13 +148,13 @@ pub mod tables {
             Balance::get_or_new(sender, self.id).add_balance(amount);
         }
 
-        pub fn burn(&mut self, amount: Quantity, burnee: AccountNumber) {
+        pub fn burn(&mut self, amount: Quantity, from: AccountNumber) {
             self.check_is_owner(get_sender());
             check(amount.value > 0, "burn quantity must be greater than 0");
             self.burned_supply = self.burned_supply + amount;
             self.save();
 
-            Balance::get_or_new(burnee, self.id).sub_balance(amount);
+            Balance::get_or_new(from, self.id).sub_balance(amount);
         }
     }
 
