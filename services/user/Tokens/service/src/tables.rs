@@ -6,7 +6,7 @@ pub mod tables {
     use psibase::{
         check, check_none, check_some, get_sender, AccountNumber, Decimal, Precision, Quantity,
     };
-    use psibase::{define_flags, Flags, HasFlags};
+    use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -135,7 +135,10 @@ pub mod tables {
             check(amount.value > 0, "mint quantity must be greater than 0");
 
             self.issued_supply = self.issued_supply + amount;
-            psibase::check(self.issued_supply <= self.max_supply, "over max issued supply");
+            psibase::check(
+                self.issued_supply <= self.max_supply,
+                "over max issued supply",
+            );
             self.save();
 
             Balance::get_or_new(owner, self.id).add_balance(amount);
@@ -144,13 +147,22 @@ pub mod tables {
         pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
             self.check_is_owner(get_sender());
 
-
             check(
                 !self.get_flag(TokenFlags::UNRECALLABLE),
                 "token is not recallable",
             );
 
             self.burn_supply(amount, from);
+        }
+
+        pub fn set_flag(&mut self, flag: TokenFlags, enabled: bool) {
+            self.check_is_owner(get_sender());
+            self.settings_value = Flags::new(self.settings_value).set(flag, enabled).value();
+            self.save();
+        }
+
+        pub fn get_flag(&self, flag: TokenFlags) -> bool {
+            Flags::new(self.settings_value).get(flag)
         }
 
         pub fn burn(&mut self, amount: Quantity) {
@@ -163,20 +175,6 @@ pub mod tables {
             self.save();
 
             Balance::get_or_new(from, self.id).sub_balance(amount);
-        }
-    }
-
-    impl HasFlags<u8> for Token {
-        fn set_flag(&mut self, index: u8, enabled: bool) {
-            self.check_is_owner(get_sender());
-            self.settings_value = Flags::new(self.settings_value)
-                .set(index as u8, enabled)
-                .value();
-            self.save();
-        }
-
-        fn get_flag(&self, index: u8) -> bool {
-            Flags::new(self.settings_value).get(index as u8)
         }
     }
 
@@ -205,8 +203,8 @@ pub mod tables {
             Decimal::new(self.max_supply, self.precision.try_into().unwrap())
         }
 
-        pub async fn settings(&self) -> TokenFlags {
-            TokenFlags::get(self)
+        pub async fn settings(&self) -> TokenFlagsJson {
+            TokenFlagsJson::from(Flags::new(self.settings_value))
         }
     }
 
@@ -457,20 +455,18 @@ pub mod tables {
                 .unwrap_or(Self::new(account))
         }
 
-        fn save(&mut self) {
-            let table = HolderTable::new();
-            table.put(&self).unwrap();
-        }
-    }
-
-    impl HasFlags<u8> for Holder {
-        fn set_flag(&mut self, index: u8, enabled: bool) {
-            self.flags = Flags::new(self.flags).set(index as u8, enabled).value();
+        pub fn set_flag(&mut self, flag: HolderFlags, enabled: bool) {
+            self.flags = Flags::new(self.flags).set(flag, enabled).value();
             self.save();
         }
 
-        fn get_flag(&self, index: u8) -> bool {
-            Flags::new(self.flags).get(index as u8)
+        pub fn get_flag(&self, flag: HolderFlags) -> bool {
+            Flags::new(self.flags).get(flag)
+        }
+
+        fn save(&mut self) {
+            let table = HolderTable::new();
+            table.put(&self).unwrap();
         }
     }
 
@@ -511,20 +507,18 @@ pub mod tables {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
-        fn save(&mut self) {
-            let table = TokenHolderTable::new();
-            table.put(&self).unwrap();
-        }
-    }
-
-    impl HasFlags<u8> for TokenHolder {
-        fn set_flag(&mut self, index: u8, enabled: bool) {
-            self.flags = Flags::new(self.flags).set(index as u8, enabled).value();
+        pub fn set_flag(&mut self, flag: TokenHolderFlags, enabled: bool) {
+            self.flags = Flags::new(self.flags).set(flag, enabled).value();
             self.save();
         }
 
-        fn get_flag(&self, index: u8) -> bool {
-            Flags::new(self.flags).get(index as u8)
+        pub fn get_flag(&self, flag: TokenHolderFlags) -> bool {
+            Flags::new(self.flags).get(flag)
+        }
+
+        fn save(&mut self) {
+            let table = TokenHolderTable::new();
+            table.put(&self).unwrap();
         }
     }
 }

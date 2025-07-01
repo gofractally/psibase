@@ -110,7 +110,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setUserConf(index: u8, enabled: bool) {
-        Holder::get_or_new(get_sender()).set_flag(index, enabled);
+        Holder::get_or_new(get_sender()).set_flag(HolderFlags::from(index), enabled);
     }
 
     #[action]
@@ -122,14 +122,14 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
-        TokenHolder::get_or_new(get_sender(), token_id).set_flag(index, enabled);
+        TokenHolder::get_or_new(get_sender(), token_id)
+            .set_flag(TokenHolderFlags::from(index), enabled);
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
-        let mut token = Token::get_assert(token_id);
-        token.set_flag(index, enabled);
+        Token::get_assert(token_id).set_flag(TokenFlags::from(index), enabled);
     }
 
     #[action]
