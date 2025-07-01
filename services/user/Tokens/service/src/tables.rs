@@ -316,6 +316,7 @@ pub mod tables {
         }
 
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
+            Token::get_assert(token_id);
             check(
                 creditor != debitor,
                 format!("{} cannot be the creditor and debitor", creditor).as_str(),
