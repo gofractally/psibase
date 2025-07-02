@@ -1,13 +1,11 @@
 #[psibase::service_tables]
 pub mod tables {
-    use crate::flags::token_flags::TokenSetting;
-    use crate::flags::token_holder_flags::TokenHolderFlags;
-
     use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{check, check_none, check_some, get_sender, AccountNumber};
+    use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -36,9 +34,16 @@ pub mod tables {
         pub burned_supply: Quantity,
         #[graphql(skip)]
         pub max_supply: Quantity,
+        #[graphql(skip)]
         pub settings_value: u8,
         pub symbol: Option<AccountNumber>,
     }
+
+    define_flags!(TokenFlags, u8, {
+        unburnable,
+        untransferable,
+        unrecallable,
+    });
 
     impl Token {
         #[secondary_key(1)]
@@ -95,7 +100,7 @@ pub mod tables {
                 burned_supply: 0.into(),
                 max_supply,
                 precision: Precision::try_from(precision).unwrap().value,
-                settings_value: TokenSetting::new().value,
+                settings_value: 0,
                 symbol: None,
             };
 
@@ -116,18 +121,6 @@ pub mod tables {
 
         pub fn nft_holder(&self) -> AccountNumber {
             Nfts::call().getNft(self.nft_id).owner
-        }
-
-        pub fn settings(&self) -> TokenSetting {
-            TokenSetting::from(self.settings_value)
-        }
-
-        pub fn set_settings(&mut self, index: u8, enabled: bool) {
-            self.check_is_owner(get_sender());
-            let mut settings = self.settings();
-            settings.set_index(index.into(), enabled);
-            self.settings_value = settings.value;
-            self.save();
         }
 
         fn save(&mut self) {
@@ -154,11 +147,21 @@ pub mod tables {
             self.check_is_owner(get_sender());
 
             check(
-                !self.settings().is_unrecallable(),
+                !self.get_flag(TokenFlags::UNRECALLABLE),
                 "token is not recallable",
             );
 
             self.burn_supply(amount, from);
+        }
+
+        pub fn set_flag(&mut self, flag: TokenFlags, enabled: bool) {
+            self.check_is_owner(get_sender());
+            self.settings_value = Flags::new(self.settings_value).set(flag, enabled).value();
+            self.save();
+        }
+
+        pub fn get_flag(&self, flag: TokenFlags) -> bool {
+            Flags::new(self.settings_value).get(flag)
         }
 
         pub fn burn(&mut self, amount: Quantity) {
@@ -199,20 +202,12 @@ pub mod tables {
             Decimal::new(self.max_supply, self.precision.try_into().unwrap())
         }
 
+        pub async fn settings(&self) -> TokenFlagsJson {
+            TokenFlagsJson::from(Flags::new(self.settings_value))
+        }
+
         pub async fn burned_supply(&self) -> Decimal {
             Decimal::new(self.burned_supply, self.precision.try_into().unwrap())
-        }
-
-        pub async fn is_unburnable(&self) -> bool {
-            self.settings().is_unburnable()
-        }
-
-        pub async fn is_unrecallable(&self) -> bool {
-            self.settings().is_unrecallable()
-        }
-
-        pub async fn is_untransferable(&self) -> bool {
-            self.settings().is_untransferable()
         }
     }
 
@@ -359,13 +354,13 @@ pub mod tables {
 
             let token = Token::get_assert(self.token_id);
             check(
-                !token.settings().is_untransferable(),
+                !token.get_flag(TokenFlags::UNTRANSFERABLE),
                 "token is untransferable",
             );
 
             let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
-                .map(|holder| holder.is_auto_debit())
-                .unwrap_or(Holder::get_or_new(self.debitor).is_auto_debit());
+                .map(|holder| holder.get_flag(TokenHolderFlags::AUTO_DEBIT))
+                .unwrap_or(false);
 
             if is_auto_debit {
                 self.debit(quantity, "Autodebit".to_string());
@@ -403,8 +398,8 @@ pub mod tables {
 
             if self.balance == 0.into() {
                 let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
-                    .map(|token_holder| token_holder.is_keep_zero_balances())
-                    .unwrap_or(Holder::get_or_new(self.creditor).is_keep_zero_balances());
+                    .map(|token_holder| token_holder.get_flag(TokenHolderFlags::KEEP_ZERO_BALANCES))
+                    .unwrap_or(false);
 
                 if keep_zero_balance {
                     self.save();
@@ -433,6 +428,11 @@ pub mod tables {
         pub flags: u8,
     }
 
+    define_flags!(HolderFlags, u8, {
+        auto_debit,
+        keep_zero_balances,
+    });
+
     impl Holder {
         #[primary_key]
         fn pk(&self) -> AccountNumber {
@@ -453,23 +453,13 @@ pub mod tables {
                 .unwrap_or(Self::new(account))
         }
 
-        pub fn is_auto_debit(&self) -> bool {
-            self.settings().is_auto_debit()
-        }
-
-        pub fn is_keep_zero_balances(&self) -> bool {
-            self.settings().is_keep_zero_balances()
-        }
-
-        pub fn set_settings(&mut self, index: u8, enabled: bool) {
-            let mut settings = self.settings();
-            settings.set_index(index.into(), enabled);
-            self.flags = settings.value;
+        pub fn set_flag(&mut self, flag: HolderFlags, enabled: bool) {
+            self.flags = Flags::new(self.flags).set(flag, enabled).value();
             self.save();
         }
 
-        fn settings(&self) -> TokenHolderFlags {
-            TokenHolderFlags::from(self.flags)
+        pub fn get_flag(&self, flag: HolderFlags) -> bool {
+            Flags::new(self.flags).get(flag)
         }
 
         fn save(&mut self) {
@@ -485,6 +475,11 @@ pub mod tables {
         pub token_id: TID,
         pub flags: u8,
     }
+
+    define_flags!(TokenHolderFlags, u8, {
+        auto_debit,
+        keep_zero_balances,
+    });
 
     impl TokenHolder {
         #[primary_key]
@@ -510,23 +505,13 @@ pub mod tables {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
-        pub fn is_auto_debit(&self) -> bool {
-            self.settings().is_auto_debit()
-        }
-
-        pub fn is_keep_zero_balances(&self) -> bool {
-            self.settings().is_keep_zero_balances()
-        }
-
-        fn settings(&self) -> TokenHolderFlags {
-            TokenHolderFlags::from(self.flags)
-        }
-
-        pub fn set_settings(&mut self, index: u8, enabled: bool) {
-            let mut settings = self.settings();
-            settings.set_index(index.into(), enabled);
-            self.flags = settings.value;
+        pub fn set_flag(&mut self, flag: TokenHolderFlags, enabled: bool) {
+            self.flags = Flags::new(self.flags).set(flag, enabled).value();
             self.save();
+        }
+
+        pub fn get_flag(&self, flag: TokenHolderFlags) -> bool {
+            Flags::new(self.flags).get(flag)
         }
 
         fn save(&mut self) {

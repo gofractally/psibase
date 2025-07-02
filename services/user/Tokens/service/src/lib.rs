@@ -1,12 +1,9 @@
-pub mod flags;
 pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-
-    use crate::tables::tables::{
-        Balance, Holder, InitRow, InitTable, SharedBalance, Token, TokenHolder,
-    };
+    use crate::tables::tables::*;
+    pub use crate::tables::tables::{HolderFlags, TokenFlags, TokenHolderFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
     use psibase::services::tokens::{Precision, Quantity};
@@ -114,7 +111,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setUserConf(index: u8, enabled: bool) {
-        Holder::get_or_new(get_sender()).set_settings(index, enabled);
+        Holder::get_or_new(get_sender()).set_flag(HolderFlags::from(index), enabled);
     }
 
     #[action]
@@ -126,14 +123,14 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
-        TokenHolder::get_or_new(get_sender(), token_id).set_settings(index, enabled);
+        TokenHolder::get_or_new(get_sender(), token_id)
+            .set_flag(TokenHolderFlags::from(index), enabled);
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
-        let mut token = Token::get_assert(token_id);
-        token.set_settings(index, enabled);
+        Token::get_assert(token_id).set_flag(TokenFlags::from(index), enabled);
     }
 
     #[action]
