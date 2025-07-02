@@ -1,9 +1,10 @@
 pub mod quantity;
+pub use quantity::Quantity;
 
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
 use fracpack::{Pack, ToSchema, Unpack};
-use quantity::Quantity;
+
 use serde::{Deserialize, Serialize};
 
 use crate::AccountNumber;

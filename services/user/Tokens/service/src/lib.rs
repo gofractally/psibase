@@ -9,7 +9,7 @@ pub mod service {
     };
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
-    use psibase::services::tokens::quantity::Quantity;
+    use psibase::services::tokens::Quantity;
     use psibase::{AccountNumber, Precision};
 
     use psibase::{Fracpack, ToSchema};

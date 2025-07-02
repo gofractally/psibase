@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::serialize_as_str;
-use crate::services::tokens::{quantity::Quantity, ConversionError};
+use crate::services::tokens::{ConversionError, Quantity};
 use crate::Precision;
 
 pub struct Decimal {

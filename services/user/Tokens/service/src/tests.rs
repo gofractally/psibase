@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::Wrapper;
-    use psibase::services::tokens::quantity::Quantity;
+    use psibase::services::tokens::Quantity;
     use psibase::*;
 
     fn credit(
