@@ -14,13 +14,11 @@ mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;
 mod method_number;
-
 pub mod native;
 pub mod native_raw;
 mod native_tables;
 mod package;
 mod plugin_error;
-
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
