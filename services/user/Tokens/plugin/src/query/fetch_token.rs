@@ -1,6 +1,7 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
-use psibase::{AccountNumber, Decimal, Precision};
+use psibase::services::tokens::Precision;
+use psibase::{AccountNumber, Decimal};
 
 use serde::{Deserialize, Serialize};
 

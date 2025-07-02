@@ -9,8 +9,8 @@ pub mod service {
     };
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
-    use psibase::services::tokens::Quantity;
-    use psibase::{AccountNumber, Precision};
+    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::AccountNumber;
 
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};

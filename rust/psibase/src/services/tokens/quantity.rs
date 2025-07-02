@@ -3,8 +3,7 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
-use crate::precision::Precision;
-use crate::services::tokens::ConversionError;
+use crate::services::tokens::{ConversionError, Precision};
 
 #[derive(
     Debug,

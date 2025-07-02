@@ -22,7 +22,6 @@ mod native_tables;
 mod package;
 mod plugin_error;
 
-pub mod precision;
 #[cfg(not(target_family = "wasm"))]
 mod rpc;
 mod schema;
@@ -59,7 +58,6 @@ pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;
 pub use package::*;
-pub use precision::*;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;

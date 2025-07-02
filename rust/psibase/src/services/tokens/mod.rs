@@ -1,4 +1,7 @@
+pub mod precision;
 pub mod quantity;
+
+pub use precision::Precision;
 pub use quantity::Quantity;
 
 use async_graphql::{InputObject, SimpleObject};
@@ -13,21 +16,6 @@ custom_error! { pub ConversionError
     InvalidNumber = "Invalid Number",
     PrecisionOverflow = "Precision overflow",
     Overflow = "Overflow",
-}
-
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, InputObject,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "PrecisionInput")]
-pub struct Precision {
-    pub value: u8,
-}
-
-impl From<u8> for Precision {
-    fn from(value: u8) -> Self {
-        Precision { value }
-    }
 }
 
 #[derive(
