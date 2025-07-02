@@ -299,7 +299,8 @@ namespace triedent
          {
             assert(initial_size >= sizeof(object_header));
             // This is only used if the program exits after updating swap_p
-            new (get_object(0)) object_header{.size = initial_size - sizeof(object_header)};
+            new (get_object(0))
+                object_header{.size = initial_size - sizeof(object_header), .id = 0};
             auto new_p       = _header->alloc_p & (_mask + 1);
             _header->swap_p  = new_p;
             _header->alloc_p = new_p;
