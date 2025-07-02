@@ -1,16 +1,10 @@
 use async_graphql::{InputObject, SimpleObject};
-use custom_error::custom_error;
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
 use crate::precision::Precision;
-
-custom_error! { pub ConversionError
-    InvalidNumber = "Invalid Number",
-    PrecisionOverflow = "Precision overflow",
-    Overflow = "Overflow",
-}
+use crate::services::tokens::ConversionError;
 
 #[derive(
     Debug,

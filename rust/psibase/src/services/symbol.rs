@@ -3,7 +3,10 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-use crate::{services::nft::NID, AccountNumber, Quantity};
+use crate::services::{nft, tokens};
+use crate::AccountNumber;
+use nft::NID;
+use tokens::quantity::Quantity;
 
 pub type SID = AccountNumber;
 
@@ -31,7 +34,7 @@ pub struct SymbolRecord {
 #[allow(unused_variables)]
 pub mod Service {
     use crate::services::symbol::SymbolRecord;
-    use crate::{AccountNumber, Quantity};
+    use crate::{services::tokens::quantity::Quantity, AccountNumber};
 
     #[action]
     fn create(new_symbol: AccountNumber, max_debit: Quantity) {
