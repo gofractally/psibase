@@ -202,7 +202,10 @@ namespace triedent
          {
             ::munmap(base + new_aligned_size, _size - new_aligned_size);
          }
-         ::ftruncate(_fd, new_size);
+         if (::ftruncate(_fd, new_size) < 0)
+         {
+            throw std::system_error{errno, std::generic_category()};
+         }
          _size = new_size;
       }
       else

@@ -281,24 +281,36 @@ namespace triedent
       {
          _file.unsafe_resize(file_size);
 
-         _header       = reinterpret_cast<header*>(_file.data());
-         _header->size = new_size;
-         _base         = reinterpret_cast<char*>(_header) + _header->start.load();
+         _header = reinterpret_cast<header*>(_file.data());
+         _base   = reinterpret_cast<char*>(_header) + _header->start.load();
          // Fill the new space with a dummy object
          auto old_end = get_object(old_size);
          new (old_end) object_header{.size = new_size - old_size - sizeof(object_header), .id = 0};
+         _header->size = new_size;
       }
       else if (new_size < old_size)
       {
          swap(old_size, std::forward<decltype(move_object)>(move_object));
-         _file.unsafe_resize(file_size);
 
-         _header          = reinterpret_cast<header*>(_file.data());
-         _header->size    = new_size;
-         _header->swap_p  = 0;
-         _header->alloc_p = 0;
-         _base            = reinterpret_cast<char*>(_header) + _header->start.load();
-         _end_free_p      = _header->swap_p.load() ^ (_mask + 1);
+         assert(_header->swap_p == _header->alloc_p);
+         auto initial_size = _header->swap_p & _mask;
+         // Make sure that swap_p and alloc_p are in bounds for the new size
+         if (initial_size != 0)
+         {
+            assert(initial_size >= sizeof(object_header));
+            // This is only used if the program exits after updating swap_p
+            new (get_object(0)) object_header{.size = initial_size - sizeof(object_header)};
+            auto new_p       = _header->alloc_p & (_mask + 1);
+            _header->swap_p  = new_p;
+            _header->alloc_p = new_p;
+         }
+         _header->size = new_size;
+
+         _end_free_p = _header->swap_p.load() ^ (_mask + 1);
+
+         _file.unsafe_resize(file_size);
+         _header = reinterpret_cast<header*>(_file.data());
+         _base   = reinterpret_cast<char*>(_header) + _header->start.load();
       }
    }
 
