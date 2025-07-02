@@ -360,7 +360,7 @@ pub mod tables {
 
             let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
                 .map(|holder| holder.get_flag(TokenHolderFlags::AUTO_DEBIT))
-                .unwrap_or(false);
+                .unwrap_or(Holder::get_or_new(self.debitor).get_flag(HolderFlags::AUTO_DEBIT));
 
             if is_auto_debit {
                 self.debit(quantity, "Autodebit".to_string());
@@ -368,14 +368,17 @@ pub mod tables {
         }
 
         pub fn uncredit(&mut self, quantity: Quantity) {
-            check(quantity.value > 0, "uncredit quantity be greater than 0");
+            check(
+                quantity.value > 0,
+                "uncredit quantity must be greater than 0",
+            );
 
             self.sub_balance(quantity);
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
         }
 
         pub fn debit(&mut self, quantity: Quantity, memo: String) {
-            check(quantity.value > 0, "debit quantity be greater than 0");
+            check(quantity.value > 0, "debit quantity must be greater than 0");
 
             crate::Wrapper::emit().history().debited(
                 self.token_id,
@@ -399,7 +402,9 @@ pub mod tables {
             if self.balance == 0.into() {
                 let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
                     .map(|token_holder| token_holder.get_flag(TokenHolderFlags::KEEP_ZERO_BALANCES))
-                    .unwrap_or(false);
+                    .unwrap_or(
+                        Holder::get_or_new(self.creditor).get_flag(HolderFlags::KEEP_ZERO_BALANCES),
+                    );
 
                 if keep_zero_balance {
                     self.save();
