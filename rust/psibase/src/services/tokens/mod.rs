@@ -1,6 +1,8 @@
+pub mod decimal;
 pub mod precision;
 pub mod quantity;
 
+pub use decimal::Decimal;
 pub use precision::Precision;
 pub use quantity::Quantity;
 

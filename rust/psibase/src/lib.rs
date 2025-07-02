@@ -15,7 +15,6 @@ mod internal_macros;
 mod local_socket;
 mod method_number;
 
-pub mod decimal;
 pub mod native;
 pub mod native_raw;
 mod native_tables;
@@ -46,7 +45,6 @@ pub use block::*;
 pub use boot::*;
 pub use crypto::*;
 pub use db::*;
-pub use decimal::*;
 pub use depgraph::*;
 pub use from_bin::*;
 pub use graph_ql::*;

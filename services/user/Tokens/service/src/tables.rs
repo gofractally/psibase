@@ -5,9 +5,9 @@ pub mod tables {
 
     use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::tokens::{Quantity, Precision};
-    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Decimal};
+    use psibase::services::nft::{Wrapper as Nfts, NID};
+    use psibase::services::tokens::{Quantity, Precision, Decimal};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ pub mod tables {
     pub struct Token {
         #[primary_key]
         pub id: TID,
-        pub nft_id: u32,
+        pub nft_id: NID,
         #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
