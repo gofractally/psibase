@@ -2,10 +2,9 @@
 pub mod tables {
     use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::services::nft::Wrapper as Nfts;
-    use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Decimal, Precision, Quantity,
-    };
+    use psibase::services::nft::{Wrapper as Nfts, NID};
+    use psibase::services::tokens::{Decimal, Precision, Quantity};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -26,7 +25,7 @@ pub mod tables {
     pub struct Token {
         #[primary_key]
         pub id: TID,
-        pub nft_id: u32,
+        pub nft_id: NID,
         #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
@@ -206,6 +205,10 @@ pub mod tables {
         pub async fn settings(&self) -> TokenFlagsJson {
             TokenFlagsJson::from(Flags::new(self.settings_value))
         }
+
+        pub async fn burned_supply(&self) -> Decimal {
+            Decimal::new(self.burned_supply, self.precision.try_into().unwrap())
+        }
     }
 
     #[table(name = "BalanceTable", index = 2)]
@@ -313,16 +316,11 @@ pub mod tables {
 
     impl SharedBalance {
         #[primary_key]
-        fn pk(&self) -> (TID, AccountNumber, AccountNumber) {
-            (self.token_id, self.creditor, self.debitor)
-        }
-
-        #[secondary_key(1)]
         fn by_creditor(&self) -> (AccountNumber, AccountNumber, TID) {
             (self.creditor, self.debitor, self.token_id)
         }
 
-        #[secondary_key(2)]
+        #[secondary_key(1)]
         fn by_debitor(&self) -> (AccountNumber, AccountNumber, TID) {
             (self.debitor, self.creditor, self.token_id)
         }
@@ -344,7 +342,7 @@ pub mod tables {
         pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             SharedBalanceTable::new()
                 .get_index_pk()
-                .get(&(token_id, creditor, debitor))
+                .get(&(creditor, debitor, token_id))
                 .unwrap_or(Self::new(creditor, debitor, token_id))
         }
 
@@ -414,7 +412,7 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            SharedBalanceTable::new().erase(&(self.pk()));
+            SharedBalanceTable::new().erase(&(self.by_creditor()));
         }
 
         fn save(&mut self) {

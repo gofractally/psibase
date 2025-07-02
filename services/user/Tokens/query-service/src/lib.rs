@@ -57,7 +57,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
             TableQuery::subindex::<(AccountNumber, u32)>(
-                SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_creditor(),
+                SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
                 &(user),
             )
             .first(first)

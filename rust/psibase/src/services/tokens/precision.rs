@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use fracpack::{Pack, ToSchema, Unpack};
 
-use crate::{serialize_as_str, ConversionError};
+use crate::{serialize_as_str, services::tokens::ConversionError};
 
 #[derive(PartialEq, Debug, Copy, Clone, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]

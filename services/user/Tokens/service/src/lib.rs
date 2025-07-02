@@ -6,7 +6,8 @@ pub mod service {
     pub use crate::tables::tables::{HolderFlags, TokenFlags, TokenHolderFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
-    use psibase::{AccountNumber, Precision, Quantity};
+    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::AccountNumber;
 
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};

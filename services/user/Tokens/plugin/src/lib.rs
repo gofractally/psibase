@@ -15,7 +15,8 @@ use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
-use psibase::{AccountNumber, Quantity};
+use psibase::services::tokens::quantity::Quantity;
+use psibase::AccountNumber;
 
 pub mod query {
     pub mod fetch_token;
