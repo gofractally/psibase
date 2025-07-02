@@ -18,9 +18,6 @@ export const useImportAccount = () => {
     },
     onSuccess: async () => {
       fetchAccounts();
-      setTimeout(() => {
-        fetchAccounts();
-      }, 2000);
     },
   });
 };
