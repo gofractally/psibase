@@ -17,7 +17,13 @@ using UserService::XAdmin;
 namespace
 {
    // Must be run inside PSIBASE_SUBJECTIVE_TX
-   void scheduleVerify(const Checksum256& id, const SignedTransaction& trx);
+   void scheduleVerify(const Checksum256&           id,
+                       const SignedTransaction&     trx,
+                       bool                         verified,
+                       std::optional<std::uint64_t> speculative);
+
+   void cancelSpeculative(const std::optional<std::uint64_t>& id);
+   void forwardTransaction(const SignedTransaction& trx);
 
    void initPreverifyTransaction()
    {
@@ -109,11 +115,11 @@ namespace
       }
    }
 
-   void validateTransaction(const Checksum256& id, const SignedTransaction& trx)
+   bool validateTransaction(const Checksum256& id, const SignedTransaction& trx)
    {
       check(trx.transaction->claims().size() == trx.proofs.size(),
             "proofs and claims must have same size");
-      to<Transact>().checkFirstAuth(id, *trx.transaction);
+      return to<Transact>().checkFirstAuth(id, *trx.transaction);
    }
 
 }  // namespace
@@ -315,7 +321,8 @@ namespace
    // Must be run in a subjective transaction
    void queueTransaction(const Checksum256&                                       id,
                          TimePointSec                                             expiration,
-                         std::vector<UnverifiedTransactionRecord::VerifyStatus>&& verifies)
+                         std::vector<UnverifiedTransactionRecord::VerifyStatus>&& verifies,
+                         std::optional<std::uint64_t>                             speculative)
    {
       auto pending = RTransact{}.open<PendingTransactionTable>();
       // Find the next sequence number
@@ -326,8 +333,9 @@ namespace
                    .expiration = expiration,
                    .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
                        std::chrono::system_clock::now()),
-                   .sequence = sequence,
-                   .verifies = resolveVerifies(std::move(verifies))});
+                   .sequence    = sequence,
+                   .verifies    = resolveVerifies(std::move(verifies)),
+                   .speculative = speculative});
 
       // Tell native that we have a transaction
       setTransactionReady();
@@ -463,7 +471,11 @@ namespace
       {
          for (auto id : txids)
          {
-            pendingTxTable.erase(id);
+            if (auto pending = pendingTxTable.get(id))
+            {
+               pendingTxTable.remove(*pending);
+               cancelSpeculative(pending->speculative);
+            }
             dataTable.erase(id);
          }
       }
@@ -634,6 +646,42 @@ namespace
    };
    PSIO_REFLECT(WaitFor, wait_for)
 
+   void cancelVerify(PendingVerifyTable& pendingVerifies, const UnverifiedTransactionRecord& tx)
+   {
+      for (const auto& v : tx.verifies)
+      {
+         if (auto* cancelId = std::get_if<std::uint64_t>(&v))
+         {
+            pendingVerifies.erase(*cancelId);
+            RunRow cancelledRun{
+                .id           = *cancelId,
+                .mode         = RunMode::rpc,
+                .maxTime      = std::chrono::milliseconds(0),
+                .action       = Action{.service = AccountNumber{"nop"}},
+                .continuation = {.service = RTransact::service, .method = MethodNumber{"onVerify"}},
+            };
+            kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+         }
+      }
+   }
+
+   void cancelSpeculative(const std::optional<std::uint64_t>& id)
+   {
+      auto speculative = RTransact{}.open<SpeculativeTransactionTable>();
+      if (id)
+      {
+         speculative.erase(*id);
+         RunRow cancelledRun{
+             .id           = *id,
+             .mode         = RunMode::rpc,
+             .maxTime      = std::chrono::milliseconds(0),
+             .action       = Action{.service = AccountNumber{"nop"}},
+             .continuation = {.service = RTransact::service, .method = MethodNumber{"onSpecTrx"}},
+         };
+         kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+      }
+   }
+
 }  // namespace
 
 void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
@@ -757,7 +805,11 @@ void RTransact::onBlock()
          }
          else
          {  // Stop tracking a finalized tx if no client is waiting for a reply.
-            pendingTxTable.erase(id);
+            if (auto pending = pendingTxTable.get(id))
+            {
+               pendingTxTable.remove(*pending);
+               cancelSpeculative(pending->speculative);
+            }
             dataTable.erase(id);
 
             successfulTxTable.erase(id);
@@ -781,6 +833,7 @@ void RTransact::onVerify(std::uint64_t                      id,
    auto clients                = open<TraceClientTable>();
    auto runVerifyId            = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
    auto errorTxId              = std::optional<Checksum256>{};
+   auto broadcastTxId          = std::optional<Checksum256>{};
    PSIBASE_SUBJECTIVE_TX
    {
       kvRemove(RunRow::db, runKey(id));
@@ -803,11 +856,15 @@ void RTransact::onVerify(std::uint64_t                      id,
          auto headVerifyId = reverify.get({}).value_or(ReverifySignaturesRecord{}).verifyId;
          if (tx->verifyId == Checksum256{})
             tx->verifyId = runVerifyId;
+         bool prevVerified = tx->verified;
+         tx->verified |= ready;
          if (!trace.error() && headVerifyId == tx->verifyId && tx->verifyId == runVerifyId)
          {
             if (ready)
             {
-               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies));
+               if (!prevVerified && !tx->speculative)
+                  broadcastTxId = tx->id;
+               queueTransaction(tx->id, tx->expiration, std::move(tx->verifies), tx->speculative);
                unverifiedTransactions.remove(*tx);
             }
             else
@@ -817,26 +874,11 @@ void RTransact::onVerify(std::uint64_t                      id,
          }
          else
          {
-            // Cancel all the other outstanding verifies
-            for (const auto& v : tx->verifies)
-            {
-               if (auto* cancelId = std::get_if<std::uint64_t>(&v))
-               {
-                  pendingVerifies.erase(*cancelId);
-                  RunRow cancelledRun{
-                      .id           = *cancelId,
-                      .mode         = RunMode::rpc,
-                      .maxTime      = std::chrono::milliseconds(0),
-                      .action       = Action{.service = AccountNumber{"nop"}},
-                      .continuation = {.service = RTransact::service,
-                                       .method  = MethodNumber{"onVerify"}},
-                  };
-                  kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
-               }
-            }
+            cancelVerify(pendingVerifies, *tx);
             if (trace.error())
             {
                unverifiedTransactions.remove(*tx);
+               cancelSpeculative(tx->speculative);
                open<TransactionDataTable>().erase(tx->id);
                if (auto client = clients.get(tx->id))
                {
@@ -856,7 +898,7 @@ void RTransact::onVerify(std::uint64_t                      id,
             {
                auto data = open<TransactionDataTable>().get(tx->id);
                check(data.has_value(), "Missing transaction data");
-               scheduleVerify(tx->id, data->trx);
+               scheduleVerify(tx->id, data->trx, tx->verified, tx->speculative);
             }
          }
       }
@@ -865,13 +907,124 @@ void RTransact::onVerify(std::uint64_t                      id,
    {
       sendReply(*errorTxId, trace, WaitFor::isApplied);
    }
+   if (broadcastTxId)
+   {
+      std::optional<TransactionData> data;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         data = open<TransactionDataTable>().get(*broadcastTxId);
+      }
+      if (data)
+      {
+         forwardTransaction(data->trx);
+      }
+   }
 }
 
 void RTransact::onRequeue(std::uint64_t id, psio::view<const TransactionTrace> trace)
 {
+   check(getSender() == AccountNumber{}, "Wrong sender");
    PSIBASE_SUBJECTIVE_TX
    {
       kvRemove(RunRow::db, runKey(id));
+   }
+}
+
+void RTransact::onSpecTrx(std::uint64_t id, psio::view<const TransactionTrace> trace)
+{
+   check(getSender() == AccountNumber{}, "Wrong sender");
+   auto                       speculative = open<SpeculativeTransactionTable>();
+   auto                       unverified  = open<UnverifiedTransactionTable>();
+   auto                       pending     = open<PendingTransactionTable>();
+   auto                       clients     = Subjective{}.open<TraceClientTable>();
+   std::optional<Checksum256> errorTxId;
+   std::optional<Checksum256> broadcastTxId;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      kvRemove(RunRow::db, runKey(id));
+      if (auto row = speculative.get(id))
+      {
+         speculative.remove(*row);
+
+         if (!trace.error().has_value())
+         {
+            if (auto trx = unverified.get(row->txid))
+            {
+               check(trx->speculative.has_value(), "Missing speculative runid in unverified");
+               check(*trx->speculative == id,
+                     "Wrong runid for speculative transaction in unverified");
+               trx->speculative.reset();
+               unverified.put(*trx);
+               if (trx->verified)
+                  broadcastTxId = trx->id;
+            }
+            else if (auto trx = pending.get(row->txid))
+            {
+               check(trx->speculative.has_value(), "Missing speculative runid in pending");
+               check(*trx->speculative == id, "Wrong runid for speculative transaction in pening");
+               trx->speculative.reset();
+               pending.put(*trx);
+               broadcastTxId = trx->id;
+            }
+            else
+            {
+               check(false,
+                     "Speculative execution should be cancelled when a transaction is dropped");
+            }
+         }
+         else
+         {
+            TimePointSec expiration;
+            if (auto trx = unverified.get(row->txid))
+            {
+               unverified.remove(*trx);
+               auto pending = open<PendingVerifyTable>();
+               cancelVerify(pending, *trx);
+               open<TransactionDataTable>().erase(trx->id);
+               expiration = trx->expiration;
+            }
+            else if (auto trx = pending.get(row->txid))
+            {
+               pending.remove(*trx);
+               expiration = trx->expiration;
+            }
+            else
+            {
+               check(false,
+                     "Speculative execution should be cancelled when a transaction is dropped");
+            }
+            open<TransactionDataTable>().erase(row->txid);
+            if (auto client = clients.get(row->txid))
+            {
+               if (std::ranges::any_of(client->clients, WaitFor::isApplied))
+                  errorTxId = row->txid;
+               if (std::ranges::any_of(client->clients, WaitFor::isFinal))
+               {
+                  open<TxFailedTable>().put({
+                      .id         = row->txid,
+                      .expiration = expiration,
+                      .trace      = trace.unpack(),
+                  });
+               }
+            }
+         }
+      }
+   }
+   if (errorTxId)
+   {
+      sendReply(*errorTxId, trace, WaitFor::isApplied);
+   }
+   if (broadcastTxId)
+   {
+      std::optional<TransactionData> data;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         data = open<TransactionDataTable>().get(*broadcastTxId);
+      }
+      if (data)
+      {
+         forwardTransaction(data->trx);
+      }
    }
 }
 
@@ -880,8 +1033,27 @@ namespace
    using Subjective = RTransact::Subjective;
    using WriteOnly  = RTransact::WriteOnly;
 
+   std::uint64_t scheduleSpeculative(const Checksum256& id, const SignedTransaction& trx)
+   {
+      transactor<Transact> transact{AccountNumber{}, Transact::service};
+      RunRow               row{
+                        .id      = 0,
+                        .mode    = RunMode::speculative,
+                        .maxTime = std::chrono::seconds(1),
+                        .action  = transact.execTrx(trx.transaction, true),
+                        .continuation = {.service = RTransact::service, .method = MethodNumber{"onSpecTrx"}}};
+      if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
+         row.id = prev->id + 1;
+      kvPut(RunRow::db, row.key(), row);
+      RTransact{}.open<SpeculativeTransactionTable>().put({id, row.id});
+      return row.id;
+   }
+
    // Must be run inside PSIBASE_SUBJECTIVE_TX
-   void scheduleVerify(const Checksum256& id, const SignedTransaction& trx)
+   void scheduleVerify(const Checksum256&           id,
+                       const SignedTransaction&     trx,
+                       bool                         verified,
+                       std::optional<std::uint64_t> speculative)
    {
       auto pendingVerifies        = RTransact{}.open<PendingVerifyTable>();
       auto unverifiedTransactions = RTransact{}.open<UnverifiedTransactionTable>();
@@ -915,20 +1087,23 @@ namespace
       }
       if (claims.empty())
       {
-         queueTransaction(id, trx.transaction->tapos().expiration(), std::move(remaining));
+         queueTransaction(id, trx.transaction->tapos().expiration(), std::move(remaining),
+                          speculative);
       }
       else
       {
          UnverifiedTransactionRecord row{
-             .id         = id,
-             .expiration = trx.transaction->tapos().expiration(),
-             .verifies   = std::move(remaining),
+             .id          = id,
+             .expiration  = trx.transaction->tapos().expiration(),
+             .verifies    = std::move(remaining),
+             .verified    = verified,
+             .speculative = speculative,
          };
          unverifiedTransactions.put(row);
       }
    }
 
-   bool pushTransaction(const Checksum256& id, const SignedTransaction& trx)
+   bool pushTransaction(const Checksum256& id, const SignedTransaction& trx, bool speculate)
    {
       PSIBASE_SUBJECTIVE_TX
       {
@@ -942,8 +1117,13 @@ namespace
          {
             return false;
          }
-         scheduleVerify(id, trx);
+         auto speculative = speculate ? std::optional{scheduleSpeculative(id, trx)} : std::nullopt;
+         scheduleVerify(id, trx, false, speculative);
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
+      }
+      if (!speculate && trx.transaction->claims().empty())
+      {
+         forwardTransaction(trx);
       }
       return true;
    }
@@ -1207,7 +1387,7 @@ void RTransact::requeue()
                auto data = txdata.get(item.id);
                check(!!data, "Missing transaction data");
 
-               scheduleVerify(item.id, data->trx);
+               scheduleVerify(item.id, data->trx, true, item.speculative);
 
                pending.remove(item);
             }
@@ -1222,10 +1402,9 @@ void RTransact::requeue()
 void RTransact::recv(const SignedTransaction& trx)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
-   auto id = psibase::sha256(trx.transaction.data(), trx.transaction.size());
-   validateTransaction(id, trx);
-   if (pushTransaction(id, trx))
-      forwardTransaction(trx);
+   auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+   bool enforceAuth = validateTransaction(id, trx);
+   pushTransaction(id, trx, enforceAuth);
 }
 
 std::string RTransact::login(std::string rootHost)
@@ -1285,11 +1464,11 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
 
-      auto query = request.query<WaitFor>();
-      auto trx   = psio::from_frac<SignedTransaction>(request.body);
-      auto id    = psibase::sha256(trx.transaction.data(), trx.transaction.size());
-      validateTransaction(id, trx);
-      bool json = acceptJson(request.headers);
+      auto query       = request.query<WaitFor>();
+      auto trx         = psio::from_frac<SignedTransaction>(request.body);
+      auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      bool enforceAuth = validateTransaction(id, trx);
+      bool json        = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {
          auto clients = Subjective{}.open<TraceClientTable>();
@@ -1299,8 +1478,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
       }
-      if (pushTransaction(id, trx))
-         forwardTransaction(trx);
+      pushTransaction(id, trx, enforceAuth);
    }
    else if (request.method == "POST" && target == "/login")
    {

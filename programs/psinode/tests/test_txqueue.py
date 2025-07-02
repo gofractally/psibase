@@ -39,7 +39,9 @@ class TestTransactionQueue(unittest.TestCase):
             txqueue.push_transaction(Transaction(a.get_tapos(timeout=4), [inc, fail], []))
         with a.get('/value', 's-counter') as response:
             response.raise_for_status()
-            self.assertEqual(response.json(), 1)
+            # Applying the transaction doesn't wait for speculative execution
+            # to complete, so the transaction may be attempted twice
+            self.assertIn(response.json(), [1, 2])
 
     @testutil.psinode_test
     def test_forward(self, cluster):
