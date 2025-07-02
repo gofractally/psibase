@@ -276,7 +276,7 @@ namespace triedent
    void ring_allocator::unsafe_resize(std::uint64_t new_size, auto&& move_object)
    {
       auto old_size  = _header->size.load();
-      auto file_size = round_to_page(sizeof(header) + new_size);
+      auto file_size = round_to_page(_header->start + new_size);
       if (new_size > old_size)
       {
          _file.unsafe_resize(file_size);
