@@ -199,6 +199,10 @@ pub mod tables {
             Decimal::new(self.max_supply, self.precision.try_into().unwrap())
         }
 
+        pub async fn burned_supply(&self) -> Decimal {
+            Decimal::new(self.burned_supply, self.precision.try_into().unwrap())
+        }
+
         pub async fn is_unburnable(&self) -> bool {
             self.settings().is_unburnable()
         }
