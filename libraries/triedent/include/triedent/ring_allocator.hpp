@@ -103,6 +103,9 @@ namespace triedent
       // Wakes up a thread that is blocked in wait_swap
       void notify_swap();
 
+      // Not thread-safe
+      void unsafe_resize(std::uint64_t new_size, auto&& move_object);
+
       // Blocking overload of allocate.
       // The session lock may be released and reaquired, invaliding any pointers
       // that it protects. The init function will be executed before the
@@ -268,6 +271,48 @@ namespace triedent
       }
       _header->swap_p.store(swap_p);
       return make_update_free(freed);
+   }
+
+   void ring_allocator::unsafe_resize(std::uint64_t new_size, auto&& move_object)
+   {
+      auto old_size  = _header->size.load();
+      auto file_size = round_to_page(_header->start + new_size);
+      if (new_size > old_size)
+      {
+         _file.unsafe_resize(file_size);
+
+         _header = reinterpret_cast<header*>(_file.data());
+         _base   = reinterpret_cast<char*>(_header) + _header->start.load();
+         // Fill the new space with a dummy object
+         auto old_end = get_object(old_size);
+         new (old_end) object_header{.size = new_size - old_size - sizeof(object_header), .id = 0};
+         _header->size = new_size;
+      }
+      else if (new_size < old_size)
+      {
+         swap(old_size, std::forward<decltype(move_object)>(move_object));
+
+         assert(_header->swap_p == _header->alloc_p);
+         auto initial_size = _header->swap_p & _mask;
+         // Make sure that swap_p and alloc_p are in bounds for the new size
+         if (initial_size != 0)
+         {
+            assert(initial_size >= sizeof(object_header));
+            // This is only used if the program exits after updating swap_p
+            new (get_object(0))
+                object_header{.size = initial_size - sizeof(object_header), .id = 0};
+            auto new_p       = _header->alloc_p & (_mask + 1);
+            _header->swap_p  = new_p;
+            _header->alloc_p = new_p;
+         }
+         _header->size = new_size;
+
+         _end_free_p = _header->swap_p.load() ^ (_mask + 1);
+
+         _file.unsafe_resize(file_size);
+         _header = reinterpret_cast<header*>(_file.data());
+         _base   = reinterpret_cast<char*>(_header) + _header->start.load();
+      }
    }
 
    template <typename F>

@@ -44,6 +44,7 @@ namespace triedent
             case open_mode::gc:
                return O_RDWR;
             case open_mode::create:
+            case open_mode::resize:
                return O_RDWR | O_CREAT;
             case open_mode::trunc:
                return O_RDWR | O_CREAT | O_TRUNC;
@@ -187,6 +188,29 @@ namespace triedent
       else
       {
          throw std::system_error{errno, std::generic_category()};
+      }
+   }
+
+   void mapping::unsafe_resize(std::size_t new_size)
+   {
+      if (new_size < _size)
+      {
+         auto        base             = reinterpret_cast<char*>(_data.load());
+         std::size_t pagesize         = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+         std::size_t new_aligned_size = ((new_size + pagesize - 1) / pagesize) * pagesize;
+         if (new_aligned_size < _size)
+         {
+            ::munmap(base + new_aligned_size, _size - new_aligned_size);
+         }
+         if (::ftruncate(_fd, new_size) < 0)
+         {
+            throw std::system_error{errno, std::generic_category()};
+         }
+         _size = new_size;
+      }
+      else
+      {
+         resize(new_size);
       }
    }
 
