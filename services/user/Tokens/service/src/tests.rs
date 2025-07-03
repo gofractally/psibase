@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Tokens"))]
-    fn test_set_thing(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
         let alice = account!("alice");
