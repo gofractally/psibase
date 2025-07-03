@@ -360,7 +360,7 @@ pub mod tables {
 
             let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
                 .map(|holder| holder.get_flag(TokenHolderFlags::AUTO_DEBIT))
-                .unwrap_or(Holder::get_or_new(self.debitor).get_flag(HolderFlags::AUTO_DEBIT));
+                .unwrap_or(false);
 
             if is_auto_debit {
                 self.debit(quantity, "Autodebit".to_string());
@@ -402,9 +402,7 @@ pub mod tables {
             if self.balance == 0.into() {
                 let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
                     .map(|token_holder| token_holder.get_flag(TokenHolderFlags::KEEP_ZERO_BALANCES))
-                    .unwrap_or(
-                        Holder::get_or_new(self.creditor).get_flag(HolderFlags::KEEP_ZERO_BALANCES),
-                    );
+                    .unwrap_or(false);
 
                 if keep_zero_balance {
                     self.save();
@@ -426,54 +424,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "HolderTable", index = 4)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct Holder {
-        pub account: AccountNumber,
-        pub flags: u8,
-    }
-
-    define_flags!(HolderFlags, u8, {
-        auto_debit,
-        keep_zero_balances,
-    });
-
-    impl Holder {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
-
-        fn new(account: AccountNumber) -> Self {
-            Self {
-                account: account,
-                flags: 0,
-            }
-        }
-
-        pub fn get_or_new(account: AccountNumber) -> Self {
-            HolderTable::new()
-                .get_index_pk()
-                .get(&account)
-                .unwrap_or(Self::new(account))
-        }
-
-        pub fn set_flag(&mut self, flag: HolderFlags, enabled: bool) {
-            self.flags = Flags::new(self.flags).set(flag, enabled).value();
-            self.save();
-        }
-
-        pub fn get_flag(&self, flag: HolderFlags) -> bool {
-            Flags::new(self.flags).get(flag)
-        }
-
-        fn save(&mut self) {
-            let table = HolderTable::new();
-            table.put(&self).unwrap();
-        }
-    }
-
-    #[table(name = "TokenHolderTable", index = 5)]
+    #[table(name = "TokenHolderTable", index = 4)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct TokenHolder {
         pub account: AccountNumber,

@@ -3,7 +3,7 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::*;
-    pub use crate::tables::tables::{HolderFlags, TokenFlags, TokenHolderFlags};
+    pub use crate::tables::tables::{TokenFlags, TokenHolderFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
     use psibase::services::tokens::{Precision, Quantity};
@@ -100,18 +100,6 @@ pub mod service {
         Wrapper::emit()
             .history()
             .symbol_mapped(token_id, get_sender(), symbol);
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getUserConf(account: AccountNumber) -> Holder {
-        Holder::get_or_new(account)
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn setUserConf(index: u8, enabled: bool) {
-        Holder::get_or_new(get_sender()).set_flag(HolderFlags::from(index), enabled);
     }
 
     #[action]

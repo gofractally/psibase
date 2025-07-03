@@ -134,14 +134,6 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
 
-    fn set_user_config(index: u8, enabled: bool) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::setUserConf { enabled, index }.packed();
-        add_action_to_transaction(
-            tokens::action_structs::setUserConf::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn set_balance_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
