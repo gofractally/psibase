@@ -451,7 +451,7 @@ pub mod tables {
             }
         }
 
-        pub fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
+        fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
             TokenHolderTable::new()
                 .get_index_pk()
                 .get(&(account, token_id))
@@ -470,9 +470,20 @@ pub mod tables {
             Flags::new(self.flags).get(flag)
         }
 
+        fn delete(&self) {
+            TokenHolderTable::new().erase(&(self.pk()));
+        }
+        
+        fn put(&mut self) {
+            TokenHolderTable::new().put(&self).unwrap();
+        }
+
         fn save(&mut self) {
-            let table = TokenHolderTable::new();
-            table.put(&self).unwrap();
+            if self.flags == 0 {
+                self.delete();
+            } else {
+                self.put();
+            }
         }
     }
 }
