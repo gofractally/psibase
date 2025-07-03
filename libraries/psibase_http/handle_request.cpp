@@ -730,7 +730,7 @@ namespace psibase::http
 
             if (req.method() == bhttp::verb::options)
             {
-               return send(ok_no_content(service != AccountNumber{}));
+               return send(ok_no_content(service == AccountNumber{}));
             }
 
             auto        startTime = steady_clock::now();
