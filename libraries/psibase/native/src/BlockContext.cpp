@@ -473,7 +473,7 @@ namespace psibase
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {
-            db.checkoutSubjective();
+            db.checkoutEmptySubjective();
             auto _ = psio::finally{[&] { db.abortSubjective(); }};
             tc.execNonTrxAction(0, action, atrace);
          }
