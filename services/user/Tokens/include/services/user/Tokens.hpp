@@ -62,7 +62,7 @@ namespace UserService
       SharedBalanceRecord getSharedBal(TID                    tokenId,
                                        psibase::AccountNumber creditor,
                                        psibase::AccountNumber debitor);
-      TokenHolderRecord   getTokenHolder(psibase::AccountNumber account);
+      TokenHolderRecord   getTokHoldr(psibase::AccountNumber account);
       bool                getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
       bool                getTokenConf(TID tokenId, psibase::EnumElement flag);
 

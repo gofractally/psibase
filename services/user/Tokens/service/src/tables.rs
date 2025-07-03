@@ -256,6 +256,10 @@ pub mod tables {
             table.put(&self).unwrap();
         }
 
+        fn delete(&mut self) {
+            BalanceTable::new().erase(&(&self.pk()));
+        }
+
         fn add_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance + quantity;
             self.save();
@@ -263,7 +267,22 @@ pub mod tables {
 
         fn sub_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance - quantity;
-            self.save();
+
+            if self.balance == 0.into() {
+                let keep_zero_balance = BalanceConfig::get(self.account, self.token_id)
+                    .map(|token_holder| {
+                        token_holder.get_flag(BalanceConfigFlags::KEEP_ZERO_BALANCES)
+                    })
+                    .unwrap_or(false);
+
+                if keep_zero_balance {
+                    self.save();
+                } else {
+                    self.delete();
+                }
+            } else {
+                self.save();
+            }
         }
     }
 
@@ -358,8 +377,8 @@ pub mod tables {
                 "token is untransferable",
             );
 
-            let is_auto_debit = TokenHolder::get(self.debitor, self.token_id)
-                .map(|holder| holder.get_flag(TokenHolderFlags::AUTO_DEBIT))
+            let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
+                .map(|holder| holder.get_flag(BalanceConfigFlags::AUTO_DEBIT))
                 .unwrap_or(false);
 
             if is_auto_debit {
@@ -400,8 +419,10 @@ pub mod tables {
             self.balance = self.balance - quantity;
 
             if self.balance == 0.into() {
-                let keep_zero_balance = TokenHolder::get(self.creditor, self.token_id)
-                    .map(|token_holder| token_holder.get_flag(TokenHolderFlags::KEEP_ZERO_BALANCES))
+                let keep_zero_balance = BalanceConfig::get(self.creditor, self.token_id)
+                    .map(|token_holder| {
+                        token_holder.get_flag(BalanceConfigFlags::KEEP_ZERO_BALANCES)
+                    })
                     .unwrap_or(false);
 
                 if keep_zero_balance {
@@ -424,20 +445,20 @@ pub mod tables {
         }
     }
 
-    #[table(name = "TokenHolderTable", index = 4)]
+    #[table(name = "BalanceConfigTable", index = 4)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct TokenHolder {
+    pub struct BalanceConfig {
         pub account: AccountNumber,
         pub token_id: TID,
         pub flags: u8,
     }
 
-    define_flags!(TokenHolderFlags, u8, {
+    define_flags!(BalanceConfigFlags, u8, {
         auto_debit,
         keep_zero_balances,
     });
 
-    impl TokenHolder {
+    impl BalanceConfig {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, TID) {
             (self.account, self.token_id)
@@ -452,7 +473,7 @@ pub mod tables {
         }
 
         fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
-            TokenHolderTable::new()
+            BalanceConfigTable::new()
                 .get_index_pk()
                 .get(&(account, token_id))
         }
@@ -461,21 +482,21 @@ pub mod tables {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
-        pub fn set_flag(&mut self, flag: TokenHolderFlags, enabled: bool) {
+        pub fn set_flag(&mut self, flag: BalanceConfigFlags, enabled: bool) {
             self.flags = Flags::new(self.flags).set(flag, enabled).value();
             self.save();
         }
 
-        pub fn get_flag(&self, flag: TokenHolderFlags) -> bool {
+        pub fn get_flag(&self, flag: BalanceConfigFlags) -> bool {
             Flags::new(self.flags).get(flag)
         }
 
         fn delete(&self) {
-            TokenHolderTable::new().erase(&(self.pk()));
+            BalanceConfigTable::new().erase(&(self.pk()));
         }
-        
+
         fn put(&mut self) {
-            TokenHolderTable::new().put(&self).unwrap();
+            BalanceConfigTable::new().put(&self).unwrap();
         }
 
         fn save(&mut self) {

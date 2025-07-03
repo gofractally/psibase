@@ -3,7 +3,7 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::*;
-    pub use crate::tables::tables::{TokenFlags, TokenHolderFlags};
+    pub use crate::tables::tables::{BalanceConfigFlags, TokenFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
     use psibase::services::tokens::{Precision, Quantity};
@@ -104,15 +104,15 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getTokHoldr(account: AccountNumber, token_id: TID) -> TokenHolder {
-        TokenHolder::get_or_new(account, token_id)
+    fn getTokHoldr(account: AccountNumber, token_id: TID) -> BalanceConfig {
+        BalanceConfig::get_or_new(account, token_id)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
-        TokenHolder::get_or_new(get_sender(), token_id)
-            .set_flag(TokenHolderFlags::from(index), enabled);
+        BalanceConfig::get_or_new(get_sender(), token_id)
+            .set_flag(BalanceConfigFlags::from(index), enabled);
     }
 
     #[action]
