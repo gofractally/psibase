@@ -466,9 +466,9 @@ namespace psibase
       TransactionContext tc{*this, trx, trace, mode};
       auto&              atrace = trace.actionTraces.emplace_back();
 
-      auto session = db.startWrite(writer);
       try
       {
+         auto session = db.startWrite(writer);
          auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
@@ -494,7 +494,8 @@ namespace psibase
 
       try
       {
-         auto token = sha256(
+         auto session = db.startWrite(writer);
+         auto token   = sha256(
              VerifyTokenData{!trace.error, row.mode(), action,
                              row.mode() == RunMode::verify ? getVerifyContextId() : Checksum256{}});
          // Run the continuation
