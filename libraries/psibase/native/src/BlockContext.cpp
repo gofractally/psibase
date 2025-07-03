@@ -471,7 +471,16 @@ namespace psibase
       {
          auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
-         tc.execNonTrxAction(0, action, atrace);
+         if (row.mode() == RunMode::speculative)
+         {
+            db.checkoutSubjective();
+            auto _ = psio::finally{[&] { db.abortSubjective(); }};
+            tc.execNonTrxAction(0, action, atrace);
+         }
+         else
+         {
+            tc.execNonTrxAction(0, action, atrace);
+         }
          PSIBASE_LOG(trxLogger, debug)
              << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
       }

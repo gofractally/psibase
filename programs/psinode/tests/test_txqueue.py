@@ -40,8 +40,22 @@ class TestTransactionQueue(unittest.TestCase):
         with a.get('/value', 's-counter') as response:
             response.raise_for_status()
             # Applying the transaction doesn't wait for speculative execution
-            # to complete, so the transaction may be attempted twice
-            self.assertIn(response.json(), [1, 2])
+            # to complete, so the transaction might be attempted or not.
+            # Speculative execution doesn't update the subjective database
+            counter = response.json()
+            self.assertIn(counter, [0, 1])
+
+        # Check that a transaction with an invalid signature can't change subjective data
+        class InvalidPrivateKey(PrivateKey):
+            def sign_prehashed(self, digest):
+                return b'';
+        badkey = InvalidPrivateKey()
+        with self.assertRaises(TransactionError, msg="Transaction expired"):
+            inc = Action('alice', 's-counter', 'inc', {"key":"","id":0})
+            txqueue.push_action('alice', 's-counter', 'inc', {"key":"","id":0}, keys=[badkey])
+        with a.get('/value', 's-counter') as response:
+            response.raise_for_status()
+            self.assertEqual(response.json(), counter)
 
     @testutil.psinode_test
     def test_forward(self, cluster):
