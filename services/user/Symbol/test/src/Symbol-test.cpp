@@ -17,7 +17,7 @@ namespace
 {
    const Memo     memo{"memo"};
    const TID      sysToken{Tokens::sysToken};
-   constexpr auto untradeable = "untradeable"_m;
+   const uint8_t  untradeable = 1;
 
    using Quantity_t = Quantity::Quantity_t;
 

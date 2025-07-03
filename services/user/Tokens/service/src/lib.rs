@@ -104,21 +104,26 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getTokHoldr(account: AccountNumber, token_id: TID) -> BalanceConfig {
-        BalanceConfig::get_or_new(account, token_id)
+    fn getBalConf(account: AccountNumber, token_id: TID, index: u8) -> bool {
+        BalanceConfig::get_or_new(account, token_id).get_flag(index.into())
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
-        BalanceConfig::get_or_new(get_sender(), token_id)
-            .set_flag(BalanceConfigFlags::from(index), enabled);
+        BalanceConfig::get_or_new(get_sender(), token_id).set_flag(index.into(), enabled);
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getTokenConf(token_id: TID, index: u8) -> bool {
+        Token::get_assert(token_id).get_flag(index.into())
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
-        Token::get_assert(token_id).set_flag(TokenFlags::from(index), enabled);
+        Token::get_assert(token_id).set_flag(index.into(), enabled);
     }
 
     #[action]

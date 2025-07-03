@@ -143,17 +143,6 @@ pub mod tables {
             Balance::get_or_new(owner, self.id).add_balance(amount);
         }
 
-        pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
-            self.check_is_owner(get_sender());
-
-            check(
-                !self.get_flag(TokenFlags::UNRECALLABLE),
-                "token is not recallable",
-            );
-
-            self.burn_supply(amount, from);
-        }
-
         pub fn set_flag(&mut self, flag: TokenFlags, enabled: bool) {
             self.check_is_owner(get_sender());
             self.settings_value = Flags::new(self.settings_value).set(flag, enabled).value();
@@ -166,6 +155,17 @@ pub mod tables {
 
         pub fn burn(&mut self, amount: Quantity) {
             self.burn_supply(amount, get_sender());
+        }
+
+        pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
+            self.check_is_owner(get_sender());
+
+            check(
+                !self.get_flag(TokenFlags::UNRECALLABLE),
+                "token is not recallable",
+            );
+
+            self.burn_supply(amount, from);
         }
 
         fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {

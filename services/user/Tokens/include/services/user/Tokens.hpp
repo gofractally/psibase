@@ -29,8 +29,10 @@ namespace UserService
       void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
       void burn(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
 
-      void setUserConf(psibase::EnumElement flag, bool enable);
-      void setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable);
+      void setBalConf(TID tokenId, uint8_t index, bool enable);
+      void setTokenConf(TID tokenId, uint8_t index, bool enable);
+
+
 
       void credit(TID                             tokenId,
                   psibase::AccountNumber          receiver,
@@ -62,10 +64,12 @@ namespace UserService
       SharedBalanceRecord getSharedBal(TID                    tokenId,
                                        psibase::AccountNumber creditor,
                                        psibase::AccountNumber debitor);
-      TokenHolderRecord   getTokHoldr(psibase::AccountNumber account);
-      bool                getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
-      bool                getTokenConf(TID tokenId, psibase::EnumElement flag);
 
+      bool getBalConf(psibase::AccountNumber account, TID tokenId, uint8_t index);
+
+      bool getTokenConf(TID tokenId, uint8_t index);
+
+         
      private:
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
@@ -114,7 +118,7 @@ namespace UserService
       method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(getUserConf, account, flag),
+      method(getBalConf, account, tokenId, flag),
       method(getTokenConf, tokenId, flag),
       method(map_symbol, symbolId, tokenId),
     );
