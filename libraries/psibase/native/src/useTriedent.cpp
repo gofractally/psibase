@@ -613,9 +613,8 @@ namespace psibase
       {
          check(subjectiveRevisions.empty(),
                "Checking out specific subjective content is only possible at the top level");
-         subjectiveRevisions.push_back({{}, 0, {DbPtr{}, DbPtr{}}, DbPtr{}});
+         subjectiveRevisions.resize(2);
          callbackFlags = 0;
-         checkoutSubjective();
       }
 
       void checkoutSubjective()
