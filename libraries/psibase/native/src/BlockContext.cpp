@@ -506,8 +506,9 @@ namespace psibase
       {
          trace.error = e.what();
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-         PSIBASE_LOG(trxLogger, warning) << "async continuation " << action.service.str()
-                                         << "::" << action.method.str() << " failed: " << e.what();
+         PSIBASE_LOG(trxLogger, warning)
+             << "async continuation " << row.continuation().service().unpack().str()
+             << "::" << row.continuation().method().unpack().str() << " failed: " << e.what();
       }
    }
 
