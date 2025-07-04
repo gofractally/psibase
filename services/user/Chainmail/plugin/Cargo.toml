@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "chainmail-plugin"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -14,7 +14,7 @@ chainmail = { path = "../service", version = "0.17.0" }
 serde_json = { workspace = true }
 serde = { workspace = true }
 serde-aux = "4.5.0"
-chrono = "0.4"
+chrono = { workspace = true }
 
 [dev-dependencies]
 chainmail_package = { path = "..", version = "0.17.0" }

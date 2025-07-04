@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "branding-plugin"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -9,9 +9,9 @@ publish = false
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = { version = "1.0.125" }
-wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wit-bindgen-rt = { workspace = true }
 branding = { path = "../service/", version = "0.17.0" }
 
 [lib]

@@ -194,6 +194,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 
 [[package]]
+name = "arrayref"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
+
+[[package]]
 name = "ascii_utils"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -363,6 +369,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
+name = "average"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75aacce61912644dbb732271789748142bc4bf7ce6382d67bb26850516b7a391"
+dependencies = [
+ "easy-cast",
+ "float-ord",
+ "num-traits",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -452,6 +469,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "branding"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "branding-pkg",
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "branding-pkg"
+version = "0.17.0"
+dependencies = [
+ "branding",
+ "branding-plugin",
+]
+
+[[package]]
+name = "branding-plugin"
+version = "0.17.0"
+dependencies = [
+ "branding",
+ "branding-pkg",
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.39.0",
+]
+
+[[package]]
 name = "brotli"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,6 +512,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli-codec"
+version = "0.17.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "brotli",
+ "brotli-codec-pkg",
+ "psibase",
+ "serde",
+]
+
+[[package]]
+name = "brotli-codec-pkg"
+version = "0.17.0"
+dependencies = [
+ "brotli-codec",
+ "brotlicodec-plugin",
+ "serde",
+]
+
+[[package]]
 name = "brotli-decompressor"
 version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -470,6 +540,17 @@ checksum = "74fa05ad7d803d413eb8380983b092cbbaf9a85f151b871360e7b00cd7060b37"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
+]
+
+[[package]]
+name = "brotlicodec-plugin"
+version = "0.17.0"
+dependencies = [
+ "brotli",
+ "brotli-codec",
+ "brotli-codec-pkg",
+ "psibase",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -507,6 +588,38 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "chainmail"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "chainmail_package",
+ "psibase",
+ "serde",
+]
+
+[[package]]
+name = "chainmail-plugin"
+version = "0.17.0"
+dependencies = [
+ "chainmail",
+ "chainmail_package",
+ "chrono",
+ "psibase",
+ "serde",
+ "serde-aux",
+ "serde_json",
+ "wit-bindgen-rt 0.39.0",
+]
+
+[[package]]
+name = "chainmail_package"
+version = "0.17.0"
+dependencies = [
+ "chainmail",
+ "chainmail-plugin",
+]
 
 [[package]]
 name = "chrono"
@@ -671,10 +784,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "critical-section"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
+
+[[package]]
 name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
+
+[[package]]
+name = "crunchy"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crypto-bigint"
@@ -820,6 +945,15 @@ dependencies = [
 
 [[package]]
 name = "digest"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
@@ -848,17 +982,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59f8e79d1fbf76bdfbde321e902714bf6c49df88a7dda6fc682fc2979226962d"
 
 [[package]]
+name = "easy-cast"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72852736692ec862655eca398c9bb1b476161b563c9f80f45f4808b9629750d6"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
 dependencies = [
  "der",
- "digest",
+ "digest 0.10.7",
  "elliptic-curve",
  "rfc6979",
  "signature",
  "spki",
+]
+
+[[package]]
+name = "ecies"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "011318cc6f4f1906c1dae015013fd381e92deac290a29ddcd9f2e0dd14786037"
+dependencies = [
+ "aes-gcm",
+ "getrandom 0.2.15",
+ "hkdf",
+ "libsecp256k1",
+ "once_cell",
+ "parking_lot",
+ "rand_core 0.6.4",
+ "sha2",
+ "typenum",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -875,7 +1036,7 @@ checksum = "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
 dependencies = [
  "base16ct",
  "crypto-bigint",
- "digest",
+ "digest 0.10.7",
  "ff",
  "generic-array",
  "group",
@@ -919,6 +1080,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "evaluations"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "rand 0.9.1",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "evaluations-pkg"
+version = "0.17.0"
+dependencies = [
+ "evaluations",
+ "evaluations-plugin",
+ "r-evaluations",
+]
+
+[[package]]
+name = "evaluations-plugin"
+version = "0.17.0"
+dependencies = [
+ "average",
+ "ecies",
+ "evaluations",
+ "psibase",
+ "rand 0.9.1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "wit-bindgen-rt 0.39.0",
+]
+
+[[package]]
 name = "fast_chemail"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -954,6 +1150,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-ord"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ce81f49ae8a0482e4c55ea62ebbd7e5a686af544c00b9d090bba3ff9be97b3d"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -979,6 +1181,40 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
+]
+
+[[package]]
+name = "fractals"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "evaluations",
+ "fractals-pkg",
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "fractals-pkg"
+version = "0.17.0"
+dependencies = [
+ "fractals",
+ "fractals-plugin",
+ "r-fractals",
+]
+
+[[package]]
+name = "fractals-plugin"
+version = "0.17.0"
+dependencies = [
+ "fractals",
+ "fractals-pkg",
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1197,12 +1433,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "hkdf"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+dependencies = [
+ "hmac",
+]
+
+[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -1436,6 +1681,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
+name = "identity"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "identity-pkg",
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "identity-pkg"
+version = "0.17.0"
+dependencies = [
+ "identity",
+ "identity-plugin",
+]
+
+[[package]]
+name = "identity-plugin"
+version = "0.17.0"
+dependencies = [
+ "identity",
+ "identity-pkg",
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.39.0",
+]
+
+[[package]]
 name = "idna"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1516,7 +1793,7 @@ dependencies = [
  "hex 0.4.3",
  "pem",
  "psibase",
- "rand",
+ "rand 0.9.1",
  "serde",
  "serde_json",
  "spki",
@@ -1575,7 +1852,7 @@ checksum = "6204285f77fe7d9784db3fdc449ecce1a0114927a51d5a41c4c7a292011c015f"
 dependencies = [
  "base64 0.13.1",
  "crypto-common",
- "digest",
+ "digest 0.10.7",
  "hmac",
  "serde",
  "serde_json",
@@ -1617,6 +1894,57 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
+]
+
+[[package]]
+name = "libm"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+
+[[package]]
+name = "libsecp256k1"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e79019718125edc905a079a70cfa5f3820bc76139fc91d6f9abc27ea2a887139"
+dependencies = [
+ "arrayref",
+ "base64 0.22.1",
+ "digest 0.9.0",
+ "libsecp256k1-core",
+ "libsecp256k1-gen-ecmult",
+ "libsecp256k1-gen-genmult",
+ "rand 0.8.5",
+ "serde",
+]
+
+[[package]]
+name = "libsecp256k1-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5be9b9bb642d8522a44d533eab56c16c738301965504753b03ad1de3425d5451"
+dependencies = [
+ "crunchy",
+ "digest 0.9.0",
+ "subtle",
+]
+
+[[package]]
+name = "libsecp256k1-gen-ecmult"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3038c808c55c87e8a172643a7d87187fc6c4174468159cb3090659d55bcb4809"
+dependencies = [
+ "libsecp256k1-core",
+]
+
+[[package]]
+name = "libsecp256k1-gen-genmult"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3db8d6ba2cec9eacc40e6e8ccc98931840301f1006e95647ceb2dd5c3aa06f7c"
+dependencies = [
+ "libsecp256k1-core",
 ]
 
 [[package]]
@@ -1713,6 +2041,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -1732,9 +2061,13 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.20.3"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "945462a4b81e43c4e3ba96bd7b49d834c6f61198356aa858733bc4acf3cbe62e"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+dependencies = [
+ "critical-section",
+ "portable-atomic",
+]
 
 [[package]]
 name = "opaque-debug"
@@ -1833,7 +2166,7 @@ version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
- "digest",
+ "digest 0.10.7",
  "hmac",
 ]
 
@@ -1964,7 +2297,7 @@ version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77957b295656769bb8ad2b6a6b09d897d94f05c41b069aede1fcdaa675eaea04"
 dependencies = [
- "zerocopy 0.7.35",
+ "zerocopy",
 ]
 
 [[package]]
@@ -2023,6 +2356,39 @@ name = "producers"
 version = "0.17.0"
 dependencies = [
  "psibase",
+ "wit-bindgen-rt 0.39.0",
+]
+
+[[package]]
+name = "profiles"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "profiles-pkg",
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "profiles-pkg"
+version = "0.17.0"
+dependencies = [
+ "profiles",
+ "profiles-plugin",
+ "r-profiles",
+]
+
+[[package]]
+name = "profiles-plugin"
+version = "0.17.0"
+dependencies = [
+ "profiles",
+ "profiles-pkg",
+ "psibase",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt 0.39.0",
 ]
 
@@ -2130,14 +2496,79 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-evaluations"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "evaluations",
+ "psibase",
+ "serde",
+ "serde-aux",
+ "serde_json",
+]
+
+[[package]]
+name = "r-fractals"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "fractals",
+ "psibase",
+ "serde",
+ "serde-aux",
+ "serde_json",
+]
+
+[[package]]
+name = "r-profiles"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "profiles",
+ "psibase",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-registry"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "registry",
+ "registry-pkg",
+ "serde",
+]
+
+[[package]]
+name = "r-staged-tx"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "serde",
+ "serde_json",
+ "staged-tx",
+]
+
+[[package]]
 name = "rand"
-version = "0.9.0"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3779b94aeb87e8bd4e834cee3650289ee9e0d5677f976ecdb6d219e5f4f6cd94"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+dependencies = [
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fbfd9d094a40bf3ae768db9361049ace4c0e04a4fd6b359518bd7b73a73dd97"
 dependencies = [
  "rand_chacha",
  "rand_core 0.9.3",
- "zerocopy 0.8.21",
 ]
 
 [[package]]
@@ -2205,6 +2636,40 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "registry"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "registry-pkg",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "registry-pkg"
+version = "0.17.0"
+dependencies = [
+ "r-registry",
+ "registry",
+ "registry-plugin",
+]
+
+[[package]]
+name = "registry-plugin"
+version = "0.17.0"
+dependencies = [
+ "chrono",
+ "psibase",
+ "registry",
+ "registry-pkg",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.39.0",
+]
 
 [[package]]
 name = "reqwest"
@@ -2279,7 +2744,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
 dependencies = [
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -2446,9 +2911,9 @@ dependencies = [
 
 [[package]]
 name = "serde-aux"
-version = "4.6.0"
+version = "4.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5290c39c5f6992b9dddbda28541d965dba46468294e6018a408fa297e6c602de"
+checksum = "207f67b28fe90fb596503a9bf0bf1ea5e831e21307658e177c5dfcdfc3ab8a0a"
 dependencies = [
  "chrono",
  "serde",
@@ -2527,7 +2992,7 @@ checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -2551,7 +3016,7 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
- "digest",
+ "digest 0.10.7",
  "rand_core 0.6.4",
 ]
 
@@ -2612,6 +3077,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
+name = "staged-tx"
+version = "0.17.0"
+dependencies = [
+ "async-graphql",
+ "pem",
+ "psibase",
+ "serde",
+ "serde_json",
+ "sha2",
+ "staged-tx-pkg",
+]
+
+[[package]]
+name = "staged-tx-pkg"
+version = "0.17.0"
+dependencies = [
+ "r-staged-tx",
+ "staged-tx",
+ "staged-tx-plugin",
+]
+
+[[package]]
+name = "staged-tx-plugin"
+version = "0.17.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "staged-tx",
+ "staged-tx-pkg",
+ "wit-bindgen-rt 0.39.0",
+]
+
+[[package]]
 name = "static_assertions_next"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2649,6 +3148,23 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 2.0.98",
+]
+
+[[package]]
+name = "subgroups"
+version = "0.17.0"
+dependencies = [
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "subgroups-pkg",
+]
+
+[[package]]
+name = "subgroups-pkg"
+version = "0.17.0"
+dependencies = [
+ "subgroups",
 ]
 
 [[package]]
@@ -3451,6 +3967,15 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b18e27825442721d23ed98591a80f55220cfe0bf883d92b1ead6c9be237bb34"
+dependencies = [
+ "bitflags 2.8.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
@@ -3538,16 +4063,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
 dependencies = [
  "byteorder",
- "zerocopy-derive 0.7.35",
-]
-
-[[package]]
-name = "zerocopy"
-version = "0.8.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf01143b2dd5d134f11f545cf9f1431b13b749695cb33bcce051e7568f99478"
-dependencies = [
- "zerocopy-derive 0.8.21",
+ "zerocopy-derive",
 ]
 
 [[package]]
@@ -3555,17 +4071,6 @@ name = "zerocopy-derive"
 version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.98",
-]
-
-[[package]]
-name = "zerocopy-derive"
-version = "0.8.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "712c8386f4f4299382c9abee219bee7084f78fb939d88b6840fcc1320d5f6da2"
 dependencies = [
  "proc-macro2",
  "quote",
