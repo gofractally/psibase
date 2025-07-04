@@ -5,7 +5,6 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 import { useCacheBust } from "@/hooks/use-cache-bust";
-import { AwaitTime } from "@/globals";
 
 export const useRemoveAvatar = () => {
     const { setBustedUser } = useCacheBust();
@@ -25,9 +24,7 @@ export const useRemoveAvatar = () => {
             );
             if (!currentUser) throw new Error("No current user");
 
-            setTimeout(() => {
-                setBustedUser(currentUser);
-            }, AwaitTime)
+            setBustedUser(currentUser);
         },
         onError: () => {
             toast.error("Failed to remove avatar from storage");

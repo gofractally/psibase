@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 import { supervisor } from "@/supervisor";
 
-import { AwaitTime } from "@/globals";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { LocalContact, zLocalContact } from "../types";
 import { upsertUserToCache } from "./use-contacts";
@@ -30,11 +30,9 @@ export const useCreateContact = () => {
                 queryClient.getQueryData(QueryKey.currentUser()),
             );
             upsertUserToCache(username, newContact);
-            setTimeout(() => {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.contacts(username),
-                });
-            }, AwaitTime);
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.contacts(username),
+            });
         },
         onError: (error, _, context) => {
             toast.error(error.message, { id: context?.toastId });

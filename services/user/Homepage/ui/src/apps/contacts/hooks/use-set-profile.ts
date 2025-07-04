@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { AwaitTime } from "@/globals";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
@@ -44,11 +43,9 @@ export const useSetProfile = () =>
                 }),
             );
 
-            setTimeout(() => {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.profile(currentUser),
-                });
-            }, AwaitTime);
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.profile(currentUser),
+            });
         },
         onError: () => {
             toast.error("Failed to set profile");

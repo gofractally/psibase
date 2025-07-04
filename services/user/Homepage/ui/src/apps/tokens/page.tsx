@@ -3,9 +3,7 @@ import { toast } from "@shared/shadcn/ui/sonner";
 
 import { ConfirmationModal } from "@/components";
 
-import { AwaitTime } from "@/globals";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
 
 import { CreditTable } from "@/apps/tokens/components/credit-table";
@@ -125,9 +123,8 @@ export const TokensPage = () => {
                         : `Unrecognised error, see logs.`,
             });
         } finally {
-            wait(AwaitTime).then(() => {
-                refetchUserBalances();
-            });
+            refetchUserBalances();
+
         }
     };
 
@@ -188,9 +185,7 @@ export const TokensPage = () => {
                         : `Unrecognised error, see logs.`,
             });
         } finally {
-            wait(AwaitTime).then(() => {
-                refetchUserBalances();
-            });
+            refetchUserBalances();
         }
     };
 
@@ -212,9 +207,7 @@ export const TokensPage = () => {
                 >
                     <FormCreate
                         onClose={() => {
-                            wait(AwaitTime).then(() => {
-                                refetchUserBalances();
-                            });
+                            refetchUserBalances();
                             setNewTokenModalOpen(false);
                         }}
                     />

@@ -5,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 import { siteConfigQueryKey, SiteConfigResponse } from "./useSiteConfig";
-import { AwaitTime } from "@/lib/globals";
 
 const Params = z.object({
   account: Account,
@@ -48,9 +47,7 @@ export const useRemovePath = () =>
         }
       })
 
-      setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: siteConfigQueryKey(account) });
-      }, AwaitTime)
     },
   });
 

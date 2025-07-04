@@ -14,9 +14,6 @@ export const useRejectInvite = (selectedAccount: string, token: string) => {
   return useMutation({
     onSuccess: () => {
       refetchToken();
-      setTimeout(() => {
-        refetchToken();
-      }, 3000);
     },
     mutationFn: async () => {
       if (!inviteToken) {
