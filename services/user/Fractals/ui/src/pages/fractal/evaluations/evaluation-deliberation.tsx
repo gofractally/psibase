@@ -3,7 +3,7 @@ import { AlignJustify, Info, Plus, X } from "lucide-react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 import { useGroupUsers } from "@/hooks/fractals/use-group-users";
 import { setCachedProposal, useProposal } from "@/hooks/fractals/use-proposal";

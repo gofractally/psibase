@@ -7,7 +7,7 @@ import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
-const zParams = z.object({
+export const zParams = z.object({
     fractal: zAccount,
     evaluationType: zEvalType,
 });

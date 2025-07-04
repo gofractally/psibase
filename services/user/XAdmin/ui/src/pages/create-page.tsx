@@ -12,7 +12,7 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-} from "@/components/ui/card";
+} from "@shared/shadcn/ui/card";
 
 // components
 import {
@@ -28,7 +28,6 @@ import { InstallationSummary } from "@/components/installation-summary";
 
 // lib
 import { bootChain } from "@/lib/bootChain";
-import { calculateIndex } from "@/lib/calculateIndex";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
 import { generateP256Key } from "@/lib/keys";
@@ -169,11 +168,6 @@ export const CreatePage = () => {
 
     const [loading, setLoading] = useState(false);
 
-    const selectedPackageIds = Object.keys(rows);
-    const selectedPackages = packages.filter((pack) =>
-        selectedPackageIds.some((id) => id == getId(pack))
-    );
-
     const initialLoadingStates = [{ text: "Preparing transactions" }];
     const [loadingStates, setLoadingStates] =
         useState<{ text: string }[]>(initialLoadingStates);
@@ -208,7 +202,7 @@ export const CreatePage = () => {
                     compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
-                            const [_, completed, started, labels] = state;
+                            const [, completed, started, labels] = state;
                             setLoadingStates([
                                 ...initialLoadingStates,
                                 ...labels.map((label) => ({ text: label })),

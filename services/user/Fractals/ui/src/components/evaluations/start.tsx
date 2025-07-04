@@ -6,7 +6,7 @@ import { WaitingStart } from "@/lib/getStatus";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { ErrorCard } from "../error-card";
-import { Button } from "../ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 const checkUnableToGroupUsers = (error: PluginError | null): boolean =>
     error ? error.message.includes("unable to group users") : false;

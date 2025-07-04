@@ -1,11 +1,11 @@
 import { queryClient } from "@/main";
-import { getEvaluation } from "@lib/graphql/getEvaluation";
-import { getLastCreatedEvaluationId } from "@lib/graphql/getLastCreatedEvaluation";
+import { getEvaluation } from "@/lib/graphql/getEvaluation";
+import { getLastCreatedEvaluationId } from "@/lib/graphql/getLastCreatedEvaluation";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Account, zAccount } from "@lib/zod/Account";
+import { Account, zAccount } from "@/lib/zod/Account";
 
 const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000);
 

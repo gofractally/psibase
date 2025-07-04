@@ -5,7 +5,7 @@ import {
     Controller,
 } from "react-hook-form";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { Service } from "../components";
 import {
     PsinodeConfigUI,
@@ -14,19 +14,19 @@ import {
 } from "./interfaces";
 import { defaultService, writeConfig, newId } from "./utils";
 import { Logger } from "../log/logger";
-import { Input } from "@/components/ui/input";
+import { Input } from "@shared/shadcn/ui/input";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+} from "@shared/shadcn/ui/select";
+import { Label } from "@shared/shadcn/ui/label";
+import { Switch } from "@shared/shadcn/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 import { Plus, Trash } from "lucide-react";
 
 export const ConfigurationPage = () => {
@@ -73,7 +73,7 @@ export const ConfigurationForm = ({
     });
 
     const onConfig = async (input: PsinodeConfigUI) => {
-        for (let service of input.services) {
+        for (const service of input.services) {
             if (service.host == "") {
                 service.host = defaultService(service.root);
             }
@@ -359,11 +359,10 @@ export const ConfigurationForm = ({
                             {loggers && (
                                 <div className="flex flex-col gap-4">
                                     {Object.entries(loggers).map(
-                                        ([name, _contents]) => (
+                                        ([name]) => (
                                             <Logger
                                                 key={name}
                                                 loggerKey={name}
-                                                control={configForm.control}
                                                 register={(field, options) =>
                                                     handleLoggerFieldRegister(
                                                         name,

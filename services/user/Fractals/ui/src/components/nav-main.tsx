@@ -14,10 +14,10 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 const browseMenu = [
     {

@@ -1,7 +1,6 @@
-import { Group } from "@radix-ui/react-dropdown-menu";
 import { z } from "zod";
 import { graphql } from "../graphql";
-import { Account } from "@lib/zod/Account";
+import { Account } from "@/lib/zod/Account";
 
 const ErrorResponse = z.object({
     errors: z.array(

@@ -1,10 +1,10 @@
 import { ChangeEvent } from "react";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Input } from "@shared/shadcn/ui/input";
+import { Card } from "@shared/shadcn/ui/card";
 import { useSetServiceCode } from "@/hooks/useSetServiceCode";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { Account } from "@/lib/zodTypes";
-import { Label } from "./ui/label";
+import { Label } from "@shared/shadcn/ui/label";
 import { useCodeHash } from "@/hooks/useCodeHash";
 
 interface FileInputProps {

@@ -96,6 +96,7 @@ const zFailedEvaluation = z.object({
 
 export type FailedEvaluation = z.infer<typeof zFailedEvaluation>;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const zStatus = z.discriminatedUnion("type", [
     zWaitingRegistration,
     zRegistrationPhase,

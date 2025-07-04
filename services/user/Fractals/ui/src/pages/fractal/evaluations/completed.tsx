@@ -8,7 +8,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@shared/shadcn/ui/table";
 
 import { EmptyBlock } from "@/components/empty-block";
 

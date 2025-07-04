@@ -1,13 +1,13 @@
 import { TriangleAlert } from "lucide-react";
 
-import { Button } from "./ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
-} from "./ui/card";
+} from "@shared/shadcn/ui/card";
 
 interface Props {
     error: Error;

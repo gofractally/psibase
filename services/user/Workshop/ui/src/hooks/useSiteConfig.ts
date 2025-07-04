@@ -1,7 +1,7 @@
 import { graphql } from "@/lib/graphql";
 import { Account } from "@/lib/zodTypes";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 

@@ -1,15 +1,15 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { useStatuses } from "../hooks/useStatuses";
 import { useConfig } from "../hooks/useConfig";
 import { usePeers } from "../hooks/usePeers";
 
 export const StatusBanner = () => {
-    const { data: peers, error: peersError } = usePeers();
+    const { error: peersError } = usePeers();
 
-    const { data: config, error: configError } = useConfig();
+    const { error: configError } = useConfig();
     const { data: status, error: statusError } = useStatuses();
 
-    let serverStatus = [
+    const serverStatus = [
         ...(status || []),
         ...(!statusError ? [] : [statusError]),
         ...(!peersError ? [] : [peersError]),

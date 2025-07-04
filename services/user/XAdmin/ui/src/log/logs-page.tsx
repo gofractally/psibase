@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { websocketURL } from "../helpers";
 import { LogFilterInputs, LogRecord } from "./interfaces";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import {
     Table,
     TableBody,
@@ -12,9 +12,9 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+} from "@shared/shadcn/ui/table";
+import { Switch } from "@shared/shadcn/ui/switch";
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { z } from "zod";
 
 const MAX_LOGS_ROWS = 20;
@@ -65,7 +65,7 @@ export const LogsPage = () => {
         if (logSocket === null && logTimeout === null) {
             const newSocket = new WebSocket(websocketURL("/native/admin/log"));
             setLogSocket(newSocket);
-            newSocket.addEventListener("open", (event: Event) => {
+            newSocket.addEventListener("open", () => {
                 setLogConnectionError(undefined);
                 if (logFilter) {
                     setFilterError(undefined);
