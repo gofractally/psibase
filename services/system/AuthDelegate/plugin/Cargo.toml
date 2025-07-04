@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.18.0" }
 
 [lib]
 crate-type = ["cdylib"]
