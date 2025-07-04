@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
-    "dependencies": {
+  "dependencies": {
     "@hookform/resolvers": "^5.1.1",
     "@psibase/common-lib": "workspace:*",
     "@tanstack/react-query": "^5.52.0",
