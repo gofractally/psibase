@@ -1,4 +1,5 @@
 type QueryKeyGenerator<Prefix extends string = string> = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...args: any[]
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
