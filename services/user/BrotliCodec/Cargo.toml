@@ -1,29 +1,11 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin"]
-
-[workspace.package]
-version = "0.17.0"
-edition = "2021"
-repository = "https://github.com/gofractally/psibase"
-homepage = "https://psibase.io"
-rust-version = "1.64"
-publish = false
-
 [package]
 name = "brotli-codec-pkg"
 description = "Compression/decompression library"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-publish.workspace = true
+version = "0.17.0"
+edition = "2021"
+rust-version = "1.64"
+publish = false
 
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "BrotliCodec"
@@ -39,5 +21,5 @@ crate-type = ["rlib"]
 
 [dependencies]
 brotli-codec = { path = "service", version = "0.17.0" }
-plugin = { path = "plugin", version = "0.17.0" }
-serde = { version = "1.0", features = ["derive"] }
+brotlicodec-plugin = { path = "plugin", version = "0.17.0" }
+serde = { workspace = true }

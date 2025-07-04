@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.32.0", features = ["bitflags"] }
+wit-bindgen-rt = { workspace = true }
 psibase = { path = "../../../../rust/psibase/" }
 brotli = "7.0.0"
 

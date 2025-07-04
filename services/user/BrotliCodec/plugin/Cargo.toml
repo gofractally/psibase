@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "brotlicodec-plugin"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -10,8 +10,8 @@ publish.workspace = true
 [dependencies]
 brotli-codec = { path = "../service", version = "0.17.0" }
 psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
-wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
-brotli = { version = "7.0.0" }
+wit-bindgen-rt = { workspace = true }
+brotli = { workspace = true }
 
 [lib]
 crate-type = ["cdylib"]

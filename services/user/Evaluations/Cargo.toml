@@ -1,27 +1,10 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin", "query-service"]
-
-[workspace.package]
+[package]
+name = "evaluations-pkg"
+description = "Facilitates the discovery of one or more groups' rank-ordered preferences over a list of elements"
 version = "0.17.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
-
-[package]
-name = "evaluations-pkg"                                                                                          # Crate name
-description = "Facilitates the discovery of one or more groups' rank-ordered preferences over a list of elements"
-version.workspace = true
-rust-version.workspace = true
-edition.workspace = true
-publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "Evaluations"
@@ -37,4 +20,4 @@ crate-type = ["rlib"]
 [dependencies]
 evaluations = { path = "service", version = "0.17.0" }
 r-evaluations = { path = "query-service", version = "0.17.0" }
-plugin = { path = "plugin", version = "0.17.0" }
+evaluations-plugin = { path = "plugin", version = "0.17.0" }

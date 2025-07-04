@@ -1,29 +1,11 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin"]
-
-[workspace.package]
-version = "0.17.0"
-rust-version = "1.64"
-edition = "2021"
-repository = "https://github.com/gofractally/psibase"
-homepage = "https://psibase.io"
-publish = false
-
 [package]
 name = "branding-pkg"
 description = "Allow operators to rebrand their network easily"
-version.workspace = true
-rust-version.workspace = true
-edition.workspace = true
-publish.workspace = true
+version = "0.17.0"
+rust-version = "1.64"
+edition = "2021"
+publish = false
 
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "Branding"
@@ -38,4 +20,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 branding = { path = "service", version = "0.17.0" }
-plugin = { path = "plugin", version = "0.17.0" }
+branding-plugin = { path = "plugin", version = "0.17.0" }
