@@ -1,0 +1,31 @@
+[package]
+name = "config"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
+wit-bindgen-rt = { version = "0.38.0", features = ["bitflags"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "config:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
+"chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }
+"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }

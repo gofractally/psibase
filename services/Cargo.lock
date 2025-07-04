@@ -598,6 +598,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.17.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.38.0",
+]
+
+[[package]]
 name = "console"
 version = "0.15.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
