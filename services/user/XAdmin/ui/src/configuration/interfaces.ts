@@ -109,7 +109,7 @@ export const psinodeConfigSchema = z
         admin: z.string().optional().nullable(),
         loggers: z.record(z.string(), LogConfigSchema),
     })
-    .strict();
+    .passthrough();
 
 export type PsinodeConfigSelect = z.infer<typeof psinodeConfigSchema>;
 const update = psinodeConfigSchema.partial();
