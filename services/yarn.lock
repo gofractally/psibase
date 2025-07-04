@@ -2018,7 +2018,6 @@ __metadata:
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
-    "@vitejs/plugin-react": "npm:^4.0.3"
     eslint: "npm:^9.15.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
@@ -4963,7 +4962,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vitejs/plugin-react@npm:^4.0.3, @vitejs/plugin-react@npm:^4.2.1, @vitejs/plugin-react@npm:^4.3.1":
+"@vitejs/plugin-react@npm:^4.2.1, @vitejs/plugin-react@npm:^4.3.1":
   version: 4.6.0
   resolution: "@vitejs/plugin-react@npm:4.6.0"
   dependencies:

@@ -1,6 +1,7 @@
 import { Button } from "@shared/shadcn/ui/button";
-import { useFieldContext } from "./app-form";
 import { Input } from "@shared/shadcn/ui/input";
+
+import { useFieldContext } from "./app-form";
 
 export const NumbersField = ({ label }: { label: string }) => {
     const field = useFieldContext<number[]>();
@@ -11,7 +12,6 @@ export const NumbersField = ({ label }: { label: string }) => {
             {field.state.value.map((value, index) => (
                 <Input
                     key={index}
-                    className="w-8"
                     value={value.toString()}
                     defaultValue={value.toString()}
                     onChange={(e) => {

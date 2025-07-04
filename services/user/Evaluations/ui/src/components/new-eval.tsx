@@ -1,8 +1,8 @@
-import { humanize } from "@/lib/humanize";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
 import { useCreateEvaluation } from "@/hooks/app/use-create-evaluation";
+import { humanize } from "@/lib/humanize";
 
 import { useAppForm } from "./app-form";
 import { NumbersField } from "./numbers-field";
@@ -96,25 +96,19 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                 <form.AppField
                     name="deliberationSeconds"
                     children={(field) => (
-                        <field.DurationField
-                            label="Registration duration"
-                        />
+                        <field.DurationField label="Registration duration" />
                     )}
                 />
                 <form.AppField
                     name="submissionSeconds"
                     children={(field) => (
-                        <field.DurationField
-                            label="Deliberation duration"
-                        />
+                        <field.DurationField label="Deliberation duration" />
                     )}
                 />
                 <form.AppField
                     name="finishBySeconds"
                     children={(field) => (
-                        <field.DurationField
-                            label="Submission duration"
-                        />
+                        <field.DurationField label="Submission duration" />
                     )}
                 />
                 <form.AppField

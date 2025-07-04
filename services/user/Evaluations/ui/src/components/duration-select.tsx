@@ -1,6 +1,7 @@
-import { Input } from "@shared/shadcn/ui/input";
+import { useMemo, useState } from "react";
 import { z } from "zod";
-import { useState, useMemo } from "react";
+
+import { Input } from "@shared/shadcn/ui/input";
 import {
     Select,
     SelectContent,
@@ -8,15 +9,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+
 import { useFieldContext } from "./app-form";
 
 const zDuration = z.enum(["Minutes", "Hours", "Days"]);
 
-export const DurationSelect = ({
-    label,
-}: {
-    label: string;
-}) => {
+export const DurationSelect = ({ label }: { label: string }) => {
     const [unit, setUnit] = useState<z.infer<typeof zDuration>>(
         zDuration.Values.Minutes,
     );
@@ -58,7 +56,7 @@ export const DurationSelect = ({
     };
 
     return (
-        <div className="py-2 flex flex-col gap-1">
+        <div className="flex flex-col gap-1 py-2">
             <div>{label}</div>
             <div className="flex gap-2">
                 <Input
@@ -66,7 +64,6 @@ export const DurationSelect = ({
                     value={displayValue}
                     onChange={(e) => handleValueChange(e.target.value)}
                     placeholder="Enter duration"
-                    className="w-10"
                 />
                 <Select value={unit} onValueChange={handleUnitChange}>
                     <SelectTrigger className="w-32">
