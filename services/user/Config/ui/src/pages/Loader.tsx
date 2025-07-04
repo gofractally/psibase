@@ -1,7 +1,6 @@
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useNavigate } from "react-router-dom";
-import { useBranding } from "@/hooks/useBranding";
-import { useEffect,  } from "react";
+import { useEffect } from "react";
 
 import {
   Card,
@@ -23,7 +22,6 @@ export const Loader = () => {
     }
   }, [currentUser, navigate]);
 
-  const { data: networkName } = useBranding();
 
   const isLoggedIn = typeof currentUser === "string";
 
@@ -37,9 +35,7 @@ export const Loader = () => {
         </div>
         <CardTitle>Config</CardTitle>
         <CardDescription>
-          {`The config app allows developers to deploy apps on the ${
-            networkName ? `${networkName} ` : ""
-          }network.`}
+          Live network administration.
         </CardDescription>
 
         <CardDescription>

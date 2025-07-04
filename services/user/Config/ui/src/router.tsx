@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { Layout } from "./components/layout";
 import { ProtectedRoute } from "./components/protected-route";
 import { Loader } from "./pages/Loader";
+import { BlockProduction } from "./pages/block-production";
 
 export const router = createBrowserRouter([
   {
@@ -16,7 +17,7 @@ export const router = createBrowserRouter([
         path: "block-production",
         element: (
           <ProtectedRoute>
-              Block production
+              <BlockProduction />
           </ProtectedRoute>
         ),
       },

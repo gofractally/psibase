@@ -2025,6 +2025,7 @@ __metadata:
     "@radix-ui/react-slot": "npm:^1.1.2"
     "@radix-ui/react-switch": "npm:^1.1.3"
     "@radix-ui/react-tooltip": "npm:^1.1.8"
+    "@tanstack/react-form": "npm:^1.12.4"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.5.0"
@@ -4559,6 +4560,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/form-core@npm:1.12.4":
+  version: 1.12.4
+  resolution: "@tanstack/form-core@npm:1.12.4"
+  dependencies:
+    "@tanstack/store": "npm:^0.7.1"
+  checksum: 10c0/9569b786eb84caf7da3145126f7c08035c5f98c04420caecfa6b5de236b64553e34d8a96290e6371bd11bb9a9069dbd68af706342da5c14390d46d9606d893cd
+  languageName: node
+  linkType: hard
+
 "@tanstack/pacer@npm:0.1.0, @tanstack/pacer@npm:^0.1.0":
   version: 0.1.0
   resolution: "@tanstack/pacer@npm:0.1.0"
@@ -4605,6 +4615,27 @@ __metadata:
     vinxi:
       optional: true
   checksum: 10c0/97fd2849eeb7ed4afcb35acb9802d2bf91156d4bc0675968430e68548f5d42983ce710688a883fdfeb15bb6391d330c7353925acd01573d59d02a55e59465431
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-form@npm:^1.12.4":
+  version: 1.12.4
+  resolution: "@tanstack/react-form@npm:1.12.4"
+  dependencies:
+    "@tanstack/form-core": "npm:1.12.4"
+    "@tanstack/react-store": "npm:^0.7.1"
+    decode-formdata: "npm:^0.9.0"
+    devalue: "npm:^5.1.1"
+  peerDependencies:
+    "@tanstack/react-start": ^1.112.0
+    react: ^17.0.0 || ^18.0.0 || ^19.0.0
+    vinxi: ^0.5.0
+  peerDependenciesMeta:
+    "@tanstack/react-start":
+      optional: true
+    vinxi:
+      optional: true
+  checksum: 10c0/9197e8227d3b43abbf1e760d3f443c5abedaa31319b171644e4e9bd99f93774eb4c48deb902f6664b23613c1efb5541e8f7da2dc5b342fb9216c2c0b24e2db6e
   languageName: node
   linkType: hard
 

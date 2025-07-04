@@ -852,8 +852,8 @@ psibase_package(
         "Chainmail(^${PSIBASE_VERSION})"
         "ClientData(^${PSIBASE_VERSION})"
     SERVICE config
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
-        DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Config/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_config} /plugin.wasm
     DEPENDS ${Config_js_DEP}
     DEPENDS ${Plugins_DEP}
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Config/postinstall.json
