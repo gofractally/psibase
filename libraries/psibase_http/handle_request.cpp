@@ -352,7 +352,7 @@ namespace psibase::http
       unsigned req_version        = req.version();
       bool     req_keep_alive     = req.keep_alive();
 
-      const auto set_cors = [&server](auto& res, bool allow_cors = false)
+      const auto set_cors = [&server](auto& res, bool allow_cors)
       {
          if (!server.http_config->allow_origin.empty() && allow_cors)
          {
@@ -428,7 +428,6 @@ namespace psibase::http
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::www_authenticate, std::move(www_auth));
-         set_cors(res);
          set_keep_alive(res);
          res.body() = to_vector("Not authorized");
          res.prepare_payload();
@@ -467,7 +466,6 @@ namespace psibase::http
       {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::accepted, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         set_cors(res);
          set_keep_alive(res);
          res.prepare_payload();
          return res;
@@ -482,7 +480,7 @@ namespace psibase::http
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::location, location);
          res.set(bhttp::field::content_type, content_type);
-         set_cors(res);
+         set_cors(res, allow_cors);
          set_keep_alive(res);
          res.body() = std::vector(msg.begin(), msg.end());
          res.prepare_payload();
@@ -732,7 +730,7 @@ namespace psibase::http
 
             if (req.method() == bhttp::verb::options)
             {
-               return send(ok_no_content(service != AccountNumber{}));
+               return send(ok_no_content(service == AccountNumber{}));
             }
 
             auto        startTime = steady_clock::now();
@@ -821,7 +819,7 @@ namespace psibase::http
             auto socket = makeHttpSocket(
                 send,
                 [req_version, set_cors, set_keep_alive,
-                 allow_cors = service != AccountNumber{}](HttpReply&& reply)
+                 allow_cors = service == AccountNumber{}](HttpReply&& reply)
                 {
                    bhttp::response<bhttp::vector_body<char>> res{
                        bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
@@ -829,8 +827,7 @@ namespace psibase::http
                    for (auto& h : reply.headers)
                       res.set(h.name, h.value);
                    res.set(bhttp::field::content_type, reply.contentType);
-                   if (allow_cors)
-                      set_cors(res);
+                   set_cors(res, allow_cors);
                    set_keep_alive(res);
                    res.body() = std::move(reply.body);
                    res.prepare_payload();
