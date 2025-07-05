@@ -2,6 +2,7 @@
 import type { Alias, Plugin, UserConfig } from "vite";
 
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import fs from "fs";
 import path from "path";
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -247,6 +248,6 @@ export const getSharedUIPlugins = (
     return [
         uiFramework === "react" ? react() : undefined,
         tsconfigPaths(),
-        // TODO: hoist tailwindcss() here once all UIs are on tailwind 4
+        tailwindcss(),
     ];
 };

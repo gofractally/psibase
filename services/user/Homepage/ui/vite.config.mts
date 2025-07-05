@@ -1,4 +1,3 @@
-import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { defineConfig } from "vite";
 import svgr from "vite-plugin-svgr";
@@ -31,7 +30,6 @@ export default defineConfig(({ command }) => ({
         }),
         ...getSharedUIPlugins(),
         svgr(),
-        tailwindcss(),
     ],
     build: {
         minify: false,
