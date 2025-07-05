@@ -1,4 +1,4 @@
-import { HoverBorderGradient } from "@shadcn/hover-border-gradient";
+import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
 import { siblingUrl } from "@psibase/common-lib";
 import { ModeToggle } from "./mode-toggle";
 import { AccountSwitcher } from "./account-switcher";

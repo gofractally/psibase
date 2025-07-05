@@ -4,10 +4,10 @@ import {
     useLoggedInUser,
     useLogout,
     useSelectAccount,
-} from "@hooks";
-import { Avatar, AvatarFallback } from "@shadcn/avatar";
+} from "@/hooks";
+import { Avatar, AvatarFallback } from "@shared/shadcn/ui/avatar";
 
-import { Button } from "@shadcn/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,7 +20,7 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-} from "@shadcn/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
 
 export function AccountSwitcher() {

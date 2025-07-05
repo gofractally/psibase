@@ -10,10 +10,10 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-} from "@shadcn/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 import { Settings, LogOut, Sun, Moon, UserPlus } from "lucide-react";
 
-import { Button } from "@shadcn/button";
+import { Button } from "@shared/shadcn/ui/button";
 import { useTheme } from "./theme-provider";
 
 export const SettingsDropdown = () => {
