@@ -1,4 +1,3 @@
-import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { defineConfig } from "vite";
 import topLevelAwait from "vite-plugin-top-level-await";
@@ -38,7 +37,6 @@ export default defineConfig(({ command }) => {
             wasm(),
             topLevelAwait(),
             ...getSharedUIPlugins(),
-            tailwindcss(),
         ],
         build: {
             minify: false,
