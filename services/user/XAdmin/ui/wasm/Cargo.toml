@@ -1,13 +1,13 @@
 [package]
 name = "x-admin"
-version = "0.17.0"
+version = "0.18.0"
 repository = "https://github.com/gofractally/psibase"
 edition = "2021"
 publish = false
 
 [dependencies]
 wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
-psibase = { path = "../../../../../rust/psibase/", version = "0.17.0" }
+psibase = { path = "../../../../../rust/psibase/", version = "0.18.0" }
 chrono = { version = "0.4" }
 pem = "3.0.4"
 spki = "0.7"

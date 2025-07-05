@@ -30,7 +30,7 @@ In top-level crate or any crate that builds a service:
 ```toml
 [package]
 name = "example"
-version = "0.1.0"
+version = "0.18.0"
 description = "An example package"
 
 [package.metadata.psibase]
@@ -40,7 +40,7 @@ package-name = "example"
 services = ["service1"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.17.0"
+HttpServer = "0.18.0"
 ```
 
 ./service/Cargo.toml
@@ -48,7 +48,7 @@ HttpServer = "0.17.0"
 ```toml
 [package]
 name = "service1"
-version = "0.1.0"
+version = "0.18.0"
 description = "A service to be included in the package"
 
 [package.metadata.psibase]

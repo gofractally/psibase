@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.17.0"
+version = "0.18.0"
 rust-version = "1.64"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
@@ -25,13 +25,13 @@ package-name = "Chainmail"
 services = ["chainmail"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.17.0"
-Supervisor = "0.17.0"
-Events = "0.17.0"
-SetCode = "0.17.0"
-Accounts = "0.17.0"
-CommonApi = "0.17.0"
-Sites = "0.17.0"
+HttpServer = "0.18.0"
+Supervisor = "0.18.0"
+Events = "0.18.0"
+SetCode = "0.18.0"
+Accounts = "0.18.0"
+CommonApi = "0.18.0"
+Sites = "0.18.0"
 
 [profile.release]
 codegen-units = 1
@@ -44,5 +44,5 @@ lto = true
 crate-type = ["rlib"]
 
 [dependencies]
-chainmail = { path = "service", version = "0.17.0" }
-plugin = { path = "plugin", version = "0.17.0" }
+chainmail = { path = "service", version = "0.18.0" }
+plugin = { path = "plugin", version = "0.18.0" }
