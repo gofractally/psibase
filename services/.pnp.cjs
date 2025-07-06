@@ -2957,6 +2957,7 @@ const RAW_RUNTIME_STATE =
           ["@radix-ui/react-dropdown-menu", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:2.1.15"],\
           ["@radix-ui/react-label", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:2.1.7"],\
           ["@radix-ui/react-scroll-area", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:1.2.9"],\
+          ["@radix-ui/react-select", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:2.2.5"],\
           ["@radix-ui/react-separator", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:1.1.7"],\
           ["@radix-ui/react-slot", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:1.2.3"],\
           ["@radix-ui/react-switch", "virtual:8d383be5609d08c336cfa9e5992bd677ee7535f00a67fb3a6f9c040cd9aabdd3695f27096cfbd8817c452b52a031ae32212d6c1f4fccd72ba51b021d7daccfb2#npm:1.2.5"],\

@@ -17,7 +17,7 @@ export const router = createBrowserRouter([
         path: "block-production",
         element: (
           <ProtectedRoute>
-              <BlockProduction />
+            Block production
           </ProtectedRoute>
         ),
       },
@@ -25,7 +25,7 @@ export const router = createBrowserRouter([
         path: "branding",
         element: (
           <ProtectedRoute>
-              Branding page
+              <BlockProduction />
           </ProtectedRoute>
         ),
       },
