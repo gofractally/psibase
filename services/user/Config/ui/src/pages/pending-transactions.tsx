@@ -1,7 +1,7 @@
-export const BlockProduction = () => {
+export const PendingTransactions = () => {
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            Block production
+            Pending transactions
         </div>
     );
 };
