@@ -9,6 +9,7 @@ import {
 } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
+const serviceName = "packages";
 
 verifyViteCache(serviceDir);
 
@@ -17,13 +18,10 @@ export default defineConfig(({ command }) => ({
     plugins: [
         createSharedViteConfig({
             projectDir: serviceDir,
-            manualChunks: {
-                vendor: ["react", "react-dom", "react-router-dom"],
-            },
         }),
         createPsibaseConfig({
-            service: "permissions",
-            serviceDir: serviceDir,
+            service: serviceName,
+            serviceDir,
             isServing: command === "serve",
             useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
         }),
@@ -32,11 +30,5 @@ export default defineConfig(({ command }) => ({
     build: {
         minify: false,
         sourcemap: false,
-        rollupOptions: {
-            input: {
-                main: path.resolve(serviceDir, "index.html"),
-                perms: path.resolve(serviceDir, "permissions.html"),
-            },
-        },
     },
 }));
