@@ -39,7 +39,7 @@ namespace psibase
          dbMode(dbMode),
          impl{std::make_unique<TransactionContextImpl>(blockContext.systemContext)}
    {
-      assert(blockContext.writer || dbMode.isReadOnly);
+      assert(blockContext.writer || dbMode.isReadOnly());
    }
 
    TransactionContext::~TransactionContext()
