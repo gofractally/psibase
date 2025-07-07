@@ -12,6 +12,11 @@ using namespace psibase;
 
 namespace SystemService
 {
+   struct cookie_data
+   {
+      std::string accessToken;
+   };
+   PSIO_REFLECT(cookie_data, accessToken);
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
@@ -77,6 +82,25 @@ namespace SystemService
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(trx),
+            };
+         }
+         if (request.target == "/common/set-cookie")
+         {
+            request.body.push_back(0);
+            psio::json_token_stream jstream{request.body.data()};
+            auto params = psio::from_json<cookie_data>(jstream);
+            
+            // Create response headers with host-only __Host-SESSION cookie
+            std::vector<HttpHeader> headers;
+            std::string cookieValue = "__Host-SESSION=" + params.accessToken + 
+                                    "; Path=/; HttpOnly; Secure; SameSite=Strict";
+            headers.push_back({"Set-Cookie", cookieValue});
+            
+            return HttpReply{
+                .status = HttpStatus::ok,
+                .contentType = "application/json",
+                .body = {},
+                .headers = headers
             };
          }
       }

@@ -95,10 +95,22 @@ namespace SystemService
                                                      "Content-Security-Policy",  //
                                                      "ETag"};
 
-      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
+      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result, 
+                        const std::string& requestTarget = "")
       {
          for (const auto& header : result.headers)
          {
+            // Special case: Allow Set-Cookie header only for /common/set-cookie endpoint
+            if (header.name == "Set-Cookie")
+            {
+               if (requestTarget != "/common/set-cookie")
+               {
+                  abortMessage("service " + service.str() + " attempted to set Set-Cookie header on unauthorized endpoint " + requestTarget);
+               }
+               continue; // Allow Set-Cookie for the authorized endpoint
+            }
+            
+            // Check standard allowed headers
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
                abortMessage("service " + service.str() + " attempted to set http header " +
@@ -187,7 +199,7 @@ namespace SystemService
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
-      sendReplyImpl(sender, socket, result);
+      sendReplyImpl(sender, socket, result, "");
    }
 
    extern "C" [[clang::export_name("serve")]] void serve()
@@ -236,7 +248,7 @@ namespace SystemService
       {
          if (result)
          {
-            sendReplyImpl(server, sock, std::move(*result));
+            sendReplyImpl(server, sock, std::move(*result), req.target);
          }
          else
          {
@@ -244,7 +256,7 @@ namespace SystemService
             sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
-                           .body        = std::vector(msg.begin(), msg.end())});
+                           .body        = std::vector(msg.begin(), msg.end())}, req.target);
          }
       }
    }  // serve()
