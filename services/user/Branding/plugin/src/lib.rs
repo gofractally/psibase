@@ -17,31 +17,13 @@ use errors::ErrorType;
 
 struct BrandingPlugin;
 
-struct Latch;
-
-impl Latch {
-    fn new() -> Self {
-        set_propose_latch(Some("branding")).unwrap();
-        Self
-    }
-}
-
-impl Drop for Latch {
-    fn drop(&mut self) {
-        set_propose_latch(None).unwrap();
-    }
-}
-
 impl Api for BrandingPlugin {
     fn set_network_name(name: String) {
-        let _latch = Latch::new();
-
         let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
-    fn set_logo(logo: Vec<u8>) {
-        let _latch = Latch::new();
 
+    fn set_logo(logo: Vec<u8>) {
         upload(
             &File {
                 path: String::from("/network_logo.svg"),

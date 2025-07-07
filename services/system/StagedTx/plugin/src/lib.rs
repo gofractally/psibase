@@ -119,7 +119,7 @@ impl Proposer for StagedTxPlugin {
             .app
             .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
 
-        if sender != active_app && active_app != "config" {
+        if sender != active_app {
             return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
         }
 
