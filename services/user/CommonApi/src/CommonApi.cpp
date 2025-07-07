@@ -88,33 +88,20 @@ namespace SystemService
          {
             request.body.push_back(0);
             psio::json_token_stream jstream{request.body.data()};
+            auto params = psio::from_json<cookie_data>(jstream);
             
-            try
-            {
-               auto params = psio::from_json<cookie_data>(jstream);
-               
-               // Create response headers with host-only __Host-SESSION cookie
-               std::vector<HttpHeader> headers;
-               std::string cookieValue = "__Host-SESSION=" + params.accessToken + 
-                                       "; Path=/; HttpOnly; Secure; SameSite=Strict";
-               headers.push_back({"Set-Cookie", cookieValue});
-               
-               return HttpReply{
-                   .status = HttpStatus::ok,
-                   .contentType = "application/json",
-                   .body = {},
-                   .headers = headers
-               };
-            }
-            catch (const std::exception& e)
-            {
-               std::string error = "Invalid JSON payload: " + std::string(e.what());
-               return HttpReply{
-                   .status = HttpStatus::badRequest,
-                   .contentType = "text/plain",
-                   .body = std::vector(error.begin(), error.end())
-               };
-            }
+            // Create response headers with host-only __Host-SESSION cookie
+            std::vector<HttpHeader> headers;
+            std::string cookieValue = "__Host-SESSION=" + params.accessToken + 
+                                    "; Path=/; HttpOnly; Secure; SameSite=Strict";
+            headers.push_back({"Set-Cookie", cookieValue});
+            
+            return HttpReply{
+                .status = HttpStatus::ok,
+                .contentType = "application/json",
+                .body = {},
+                .headers = headers
+            };
          }
       }
       return std::nullopt;
