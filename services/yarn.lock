@@ -1693,7 +1693,6 @@ __metadata:
   dependencies:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
@@ -1716,7 +1715,6 @@ __metadata:
   resolution: "@psibase/authsig-ui@workspace:system/AuthSig/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.5.0"
     "@types/react": "npm:^19.1.0"
@@ -1741,7 +1739,6 @@ __metadata:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -1788,7 +1785,6 @@ __metadata:
   resolution: "@psibase/evaluations-ui@workspace:user/Evaluations/ui"
   dependencies:
     "@noble/hashes": "npm:^1.7.1"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/pacer": "npm:^0.1.0"
     "@tanstack/react-form": "npm:^1.2.1"
     "@tanstack/react-pacer": "npm:^0.1.0"
@@ -1857,7 +1853,6 @@ __metadata:
   dependencies:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-form": "npm:^1.11.1"
     "@tanstack/react-pacer": "npm:^0.6.0"
     "@tanstack/react-query": "npm:^5.75.7"
@@ -1920,7 +1915,6 @@ __metadata:
   resolution: "@psibase/identity-ui@workspace:user/Identity/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@types/d3": "npm:^7.4.3"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -1941,7 +1935,6 @@ __metadata:
   resolution: "@psibase/permissions-ui@workspace:user/Permissions/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.62.8"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -1987,7 +1980,6 @@ __metadata:
     "@dicebear/core": "npm:^9.2.2"
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -2033,7 +2025,6 @@ __metadata:
     "@dicebear/core": "npm:^9.2.2"
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
@@ -2065,7 +2056,6 @@ __metadata:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@radix-ui/react-toast": "npm:^1.2.1"
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@tanstack/react-table": "npm:^8.20.4"
     "@types/node": "npm:^22.15.0"
@@ -10877,7 +10867,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "packages@workspace:user/Packages/ui"
   dependencies:
-    "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
