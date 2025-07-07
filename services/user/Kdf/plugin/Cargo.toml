@@ -1,5 +1,5 @@
 [package]
-name = "kdf"
+name = "kdf-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
