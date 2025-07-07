@@ -3009,7 +3009,7 @@ const RAW_RUNTIME_STATE =
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
           ["typescript-eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:8.35.0"],\
           ["vite", "virtual:6e514df2b8e0228a074e8360b39b08ff0e103bbd83e4ecec21d330903af5b53b76a3e96423e106c3219ef6e0fd1519477fccf3409868ad92de5b68d8e405d103#npm:4.5.14"],\
-          ["zod", "npm:3.25.67"]\
+          ["zod", "npm:3.25.74"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -21939,6 +21939,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/zod-npm-3.25.67-5734ab93c5-80a0cab303.zip/node_modules/zod/",\
         "packageDependencies": [\
           ["zod", "npm:3.25.67"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:3.25.74", {\
+        "packageLocation": "../.caches/yarn/zod-npm-3.25.74-57faebbbb4-59e38b046a.zip/node_modules/zod/",\
+        "packageDependencies": [\
+          ["zod", "npm:3.25.74"]\
         ],\
         "linkType": "HARD"\
       }]\

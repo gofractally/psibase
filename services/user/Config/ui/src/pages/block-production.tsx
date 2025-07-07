@@ -1,3 +1,4 @@
+import { useStore } from "@tanstack/react-form";
 import { Trash2 } from "lucide-react";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -15,23 +16,38 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { useAppForm } from "@/components/forms/app-form";
+import { FieldErrors } from "@/components/forms/field-errors";
+
+import {
+    Params,
+    SetProducerParams,
+    useSetProducers,
+} from "@/hooks/useSetProducers";
 
 export const BlockProduction = () => {
+    const { mutateAsync, error } = useSetProducers();
+
+    console.log({ error }, "big");
+
     const form = useAppForm({
         defaultValues: {
             prods: [{ name: "", authClaim: { tag: "pubkey-pem", val: "" } }],
             mode: "existing",
+        } as SetProducerParams,
+        validators: {
+            onChange: Params,
         },
-        onSubmit: (value) => {
-            console.log(value, "microwave");
+        onSubmit: async (data) => {
+            console.log(data.value, "microwave");
+            await mutateAsync(data.value);
         },
     });
 
-    const errors = form.state.errorMap;
+    const store = useStore(form.store, (state) => state);
 
-    console.log({ errors });
+    console.log(store);
     return (
-        <div className="mx-auto max-w-screen-lg space-y-6">
+        <div className="mx-auto w-full max-w-screen-lg space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Producers</h2>
                 <p className="text-muted-foreground text-sm">
@@ -39,12 +55,6 @@ export const BlockProduction = () => {
                     producer requires both fields.
                 </p>
             </div>
-
-            {form.state.errors && (
-                <p className="text-destructive text-sm">
-                    {form.state.errors.map((error) => JSON.stringify(error))}
-                </p>
-            )}
 
             <form
                 onSubmit={(e) => {
@@ -102,77 +112,81 @@ export const BlockProduction = () => {
                 {/* Producers List */}
                 <form.Field name="prods" mode="array">
                     {(field) =>
-                        field.state.value.map((_, index) => {
-                            return (
-                                <div
-                                    key={index}
-                                    className="flex flex-col gap-2 rounded-md border p-3"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <Label htmlFor={`prods.${index}.name`}>
-                                            Producer Name
-                                        </Label>
-                                        <Button
-                                            variant="destructive"
-                                            size="icon"
-                                            className="flex items-center justify-center p-2"
-                                            type="button"
-                                            onClick={() =>
-                                                field.removeValue(index)
-                                            }
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    <form.Field
-                                        key={index}
-                                        name={`prods[${index}].name`}
-                                    >
-                                        {(subfield) => (
-                                            <Input
-                                                id={`prods.${index}.name`}
-                                                placeholder="Producer name"
-                                                value={subfield.state.value}
-                                                onChange={(e) =>
-                                                    subfield.handleChange(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        )}
-                                    </form.Field>
-
-                                    <form.Field
-                                        key={index}
-                                        name={`prods[${index}].authClaim`}
-                                    >
-                                        {(subfield) => (
-                                            <>
-                                                <Label
-                                                    htmlFor={`prods.[${index}].authClaim.val`}
-                                                >
-                                                    PEM Key
-                                                </Label>
-                                                <Textarea
-                                                    id={`prods.[${index}].authClaim.val`}
-                                                    placeholder="Paste PEM key here (e.g., -----BEGIN PUBLIC KEY-----...)"
-                                                    rows={5}
-                                                    onChange={(e) =>
-                                                        subfield.handleChange({
-                                                            tag: "pubkey-pem",
-                                                            val: e.target.value,
-                                                        })
-                                                    }
-                                                    value={
-                                                        subfield.state.value.val
-                                                    }
-                                                />
-                                            </>
-                                        )}
-                                    </form.Field>
+                        field.state.value.map((_, index) => (
+                            <div
+                                key={index}
+                                className="flex flex-col gap-2 rounded-md border p-3"
+                            >
+                                <div>
+                                    <Label>#{index + 1}</Label>
                                 </div>
-                            );
-                        })
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor={`prods.${index}.name`}>
+                                        Producer Name
+                                    </Label>
+                                    <Button
+                                        variant="destructive"
+                                        size="icon"
+                                        className="flex items-center justify-center p-2"
+                                        type="button"
+                                        disabled={field.state.value.length == 1}
+                                        onClick={() => field.removeValue(index)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <form.Field
+                                    key={index}
+                                    name={`prods[${index}].name`}
+                                >
+                                    {(subfield) => (
+                                        <Input
+                                            id={`prods.${index}.name`}
+                                            placeholder="Producer name"
+                                            value={subfield.state.value}
+                                            onChange={(e) =>
+                                                subfield.handleChange(
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    )}
+                                </form.Field>
+                                <form.Subscribe
+                                    selector={(f) =>
+                                        f.fieldMeta[`prods[${index}].name`]
+                                    }
+                                    children={(fieldMeta) => (
+                                        <FieldErrors meta={fieldMeta} />
+                                    )}
+                                />
+
+                                <form.Field
+                                    key={index}
+                                    name={`prods[${index}].authClaim`}
+                                >
+                                    {(subfield) => (
+                                        <>
+                                            <Label>PEM Key</Label>
+                                            <Textarea
+                                                placeholder="Paste PEM key here (e.g., -----BEGIN PUBLIC KEY-----...)"
+                                                rows={5}
+                                                onChange={(e) =>
+                                                    subfield.handleChange({
+                                                        tag: "pubkey-pem",
+                                                        val: e.target.value,
+                                                    })
+                                                }
+                                                value={subfield.state.value.val}
+                                            />
+                                            <FieldErrors
+                                                meta={subfield.state.meta}
+                                            />
+                                        </>
+                                    )}
+                                </form.Field>
+                            </div>
+                        ))
                     }
                 </form.Field>
 

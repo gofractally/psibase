@@ -3,14 +3,14 @@ import type { AnyFieldMeta } from "@tanstack/react-form";
 import { parseError } from "@/lib/parseErrorMessage";
 
 type FieldErrorsProps = {
-    meta: AnyFieldMeta;
+    meta: AnyFieldMeta | undefined;
 };
 
 export const FieldErrors = ({ meta }: FieldErrorsProps) => {
-    if (!meta.isTouched || !meta.isBlurred) return null;
+    if (!meta) return null;
 
     return meta.errors.map(parseError).map((error, index) => (
-        <p key={index} className="text-destructive text-sm">
+        <p key={index} className="text-sm text-red-300">
             {error}
         </p>
     ));
