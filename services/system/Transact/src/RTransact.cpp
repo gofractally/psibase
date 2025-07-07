@@ -428,7 +428,7 @@ namespace
 
    auto finalizeBlocks(const psibase::BlockHeader& current) -> std::optional<FinalizedBlocks>
    {
-      auto commitNum  = current.commitNum;
+      auto commitNum  = current.commitNum - (current.blockNum == current.commitNum);
       auto reversible = RTransact::WriteOnly{}.open<ReversibleBlocksTable>();
       reversible.put({.blockNum = current.blockNum, .time = current.time});
 
