@@ -1,79 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import { Save, Trash, Upload } from "lucide-react";
+import { useState } from "react";
 
-import { supervisor } from "@/supervisor";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+import { useAppForm } from "@/components/forms/app-form";
+
+import { useSetLogo } from "@/hooks/use-set-logo";
+import { useSetNetworkName } from "@/hooks/use-set-network-name";
+import { useBranding } from "@/hooks/useBranding";
+import { fileToBase64 } from "@/lib/fileToBase64";
 
 export const Branding = () => {
-    const [changesMade, setChangesMade] = useState<boolean>(false);
-    const [networkName, setNetworkName] = useState<string>("");
+    const { data: networkName } = useBranding();
+
+    console.log({ networkName }, "ouaat");
+
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
-    const fileInput = useRef<HTMLInputElement>(null);
-    const [previewImgUrl, setPreviewImgUrl] = useState<string>("");
-    const [uploadStatus, setUploadStatus] = useState<string>("");
+    const [iconPreview, setPreview] = useState<string>("");
 
-    useEffect(() => {
-        const init = async () => {
-            await supervisor.onLoaded();
-            await getNetworkName();
-        };
+    const { mutateAsync: uploadLogo } = useSetLogo();
 
-        init();
-    }, []);
+    const { mutateAsync: setNetworkName } = useSetNetworkName();
 
-    const getNetworkName = async () => {
-        const queriedNetworkName = (await supervisor.functionCall({
-            service: "branding",
-            intf: "queries",
-            method: "getNetworkName",
-            params: [],
-        })) as string;
-        setNetworkName(queriedNetworkName);
-    };
-    const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
-        e,
-    ) => {
-        e.preventDefault();
-        try {
-            if (networkName) {
-                await supervisor.functionCall({
-                    service: "branding",
-                    intf: "api",
-                    method: "setNetworkName",
-                    params: [networkName],
-                });
-            }
+    const form = useAppForm({
+        defaultValues: {
+            networkName: networkName || "",
+        },
+        onSubmit: async (data) => {
+            setNetworkName(data.value.networkName);
+            form.reset();
+        },
+    });
 
-            if (logoBytes.length) {
-                await supervisor.functionCall({
-                    service: "branding",
-                    intf: "api",
-                    method: "setLogo",
-                    params: [logoBytes],
-                });
-            }
-
-            setUploadStatus("Successful");
-            setChangesMade(false);
-        } catch (e) {
-            if (e instanceof Error) {
-                console.error(`Error: ${e.message}\nStack: ${e.stack}`);
-                setUploadStatus(`Error: ${e.message}`);
-            } else {
-                console.error(
-                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
-                );
-                setUploadStatus(
-                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
-                );
-            }
-        }
-    };
-
-    const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (
+    const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
         event,
     ) => {
         const file = event.target.files?.[0];
@@ -93,110 +55,93 @@ export const Branding = () => {
         };
         reader.readAsArrayBuffer(file);
 
-        const reader2 = new FileReader();
-        reader2.onload = () => {
-            if (!reader2.result) {
-                console.error("no image selected");
-                return;
-            }
-            setPreviewImgUrl(reader2.result as string);
-        };
-        reader2.readAsDataURL(file);
-
-        setChangesMade(true);
-    };
-
-    const openFileClick = () => {
-        if (!fileInput.current) return;
-        fileInput.current.click();
+        const mimeType = file.type;
+        const base64Icon = await fileToBase64(file);
+        const iconSrc = `data:${mimeType};base64,${base64Icon}`;
+        setPreview(iconSrc);
     };
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <form className="mx-auto grid grid-cols-6">
-                <div
-                    className={
-                        uploadStatus === "Successful"
-                            ? "text-green-500"
-                            : "text-red-500"
-                    }
-                >
-                    {uploadStatus}
-                </div>
-                <div className="col-span-6 mt-6 grid grid-cols-6">
-                    <div className="col-span-2">
-                        <Label htmlFor="logoPath" className="block h-24 w-24">
-                            Logo
-                        </Label>
-                        <div className="text-extralight text-sm">
-                            Size: 96x96 px
-                        </div>
-                    </div>
-                    <div className="col-span-2">
-                        <img
-                            src={siblingUrl(
-                                null,
-                                "branding",
-                                "/network_logo.svg",
-                            )}
-                            height="96"
-                            width="96"
-                            className="b-1 col-span-3 h-24 w-24 object-cover"
-                            onClick={openFileClick}
+            <div className="w-96">
+                <div>Icon {iconPreview}</div>
+                <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                        <label htmlFor="icon-upload" className="cursor-pointer">
+                            <div className="flex h-10 w-full items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                <Upload className="mr-2 h-5 w-5" />
+                                Upload Icon
+                            </div>
+                        </label>
+                        <Input
+                            id="icon-upload"
+                            type="file"
+                            accept=".svg"
+                            onChange={handleFileChange}
+                            className="hidden"
                         />
-                        <div className="text-extralight text-sm">
-                            Click logo to replace.
-                        </div>
                     </div>
-                    <div
-                        className={
-                            "col-span-2" +
-                            (previewImgUrl.length ? "" : " invisible")
-                        }
-                    >
-                        <img
-                            src={previewImgUrl}
-                            height="96"
-                            width="96"
-                            className="block h-24 w-24 object-cover"
-                        />
-                        <div className="text-extralight align-bottom text-sm">
-                            Preview
-                        </div>
-                    </div>
-
-                    <Input
-                        id="logo-file"
-                        type="file"
-                        accept=".svg"
-                        className="invisible absolute"
-                        onChange={handleFileChange}
-                        ref={fileInput}
+                    <img
+                        src={siblingUrl(null, "branding", "/network_logo.svg")}
+                        alt="Icon preview"
+                        className="h-10 w-10 rounded-lg object-cover"
                     />
+
+                    <div className="mx-2 flex space-x-2">
+                        {iconPreview && (
+                            <img
+                                src={iconPreview}
+                                alt="Icon preview"
+                                className="w-full rounded-lg object-cover"
+                            />
+                        )}
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                uploadLogo(logoBytes);
+                            }}
+                            variant="outline"
+                            size="icon"
+                        >
+                            <Save className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                setPreview("");
+                            }}
+                            variant="outline"
+                            size="icon"
+                        >
+                            <Trash className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
+                <div className="text-muted-foregrund text-sm">
+                    Upload a logo for the network (recommended size: 512x512px)
+                </div>
+            </div>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="mx-auto grid grid-cols-6"
+            >
                 <div className="col-span-6 mt-6 grid grid-cols-6">
-                    <Label htmlFor="networkName" className="col-span-2">
-                        Network name
-                    </Label>
-                    <Input
-                        id="networkName"
-                        className="col-span-4"
-                        onChange={(e) => {
-                            setNetworkName(e.target.value);
-                            setChangesMade(true);
-                        }}
-                        value={networkName}
+                    <form.AppField
+                        name="networkName"
+                        children={(field) => (
+                            <field.TextField label="Network name" />
+                        )}
                     />
                 </div>
                 <div className="relative col-span-6 mt-6 font-medium">
-                    <Button
-                        type="submit"
-                        className="absolute right-0"
-                        disabled={!changesMade}
-                        onClick={updateAssets}
-                    >
-                        Save
-                    </Button>
+                    <form.AppForm>
+                        <form.SubmitButton labels={["Save", "Saving..."]} />
+                    </form.AppForm>
                 </div>
             </form>
         </div>

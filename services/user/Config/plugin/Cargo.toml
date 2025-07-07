@@ -26,6 +26,6 @@ world = "impl"
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
-"chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
-"registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }
+"branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
+

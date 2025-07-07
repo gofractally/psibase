@@ -7,7 +7,6 @@ use exports::branding::plugin::queries::Guest as Queries;
 use host::common::server as CommonServer;
 use host::common::types::Error;
 use sites::plugin::api::{upload, File};
-use staged_tx::plugin::proposer::*;
 use transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
@@ -26,8 +25,8 @@ impl Api for BrandingPlugin {
     fn set_logo(logo: Vec<u8>) {
         upload(
             &File {
-                path: String::from("/network_logo.svg"),
-                content_type: String::from("image/svg+xml"),
+                path: "/network_logo.svg".to_string(),
+                content_type: "image/svg+xml".to_string(),
                 content: logo,
             },
             11,

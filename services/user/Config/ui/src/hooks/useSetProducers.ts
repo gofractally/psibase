@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { Account } from "@/lib/zodTypes";
+import { zAccount } from "@/lib/zod/Account";
 
 export const PubKeyPem = z
     .string()
@@ -31,7 +31,7 @@ const AuthClaim = z.discriminatedUnion("tag", [
 
 const Producer = z.object({
     authClaim: AuthClaim,
-    name: Account,
+    name: zAccount,
 });
 
 export const Modes = z.enum(["cft", "bft", "existing"]);
