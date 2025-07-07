@@ -10,11 +10,11 @@ plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 
 [dependencies]
-psibase_macros = { path = "../../../../rust/psibase_macros", version = "0.17.0" }
-psibase = { path = "../../../../rust/psibase", version = "0.17.0" }
+psibase_macros = { path = "../../../../rust/psibase_macros", version = "0.18.0" }
+psibase = { path = "../../../../rust/psibase", version = "0.18.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 async-graphql = "=7.0.17"
 serde_json = "1.0.125"
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.17.0" }
+identity-pkg = { path = "..", version = "0.18.0" }
