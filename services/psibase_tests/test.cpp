@@ -1,27 +1,22 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
-#include "test-service.hpp"
+#include <services/test/EntryPoint.hpp>
 
 using namespace psibase;
+using namespace TestService;
 
-TEST_CASE("recursion")
+TEST_CASE("called entry point")
 {
    DefaultTestChain t;
-   t.addService(AccountNumber("test-service"), "test-service.wasm");
+   t.addService(EntryPoint::service, "EntryPoint.wasm");
+   CHECK(t.from(EntryPoint::service).to<EntryPoint>().call(3, "Counting down").returnVal() == 3);
 
-   REQUIRE(                         //
-       show(false,                  //
-            t.pushTransaction(      //
-                t.makeTransaction(  //
-                    {{
-                        .sender  = AccountNumber("test-service"),
-                        .service = AccountNumber("test-service"),
-                        .rawData = psio::convert_to_frac(test_cntr::payload{
-                            .number = 3,
-                            .memo   = "Counting down",
-                        }),
-                    }}))) == "");
-}  // recursion
+   auto counters = EntryPoint{}.open<CallCounterTable>();
+   auto called   = counters.get(CallCounterRow::called).value_or(CallCounterRow{});
+   CHECK(called.count == 4);
+   auto start = counters.get(CallCounterRow::start).value_or(CallCounterRow{});
+   CHECK(start.count == 1);
+}
 
 TEST_CASE("kv")
 {
