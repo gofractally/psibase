@@ -315,8 +315,8 @@ namespace psibase
       // are allowed.
       verify,
       // Access is equivalent to transactions. Changes to the
-      // chain state are allowed, but will be discarded after
-      // the continuation completes.
+      // database are allowed, but will be discarded after
+      // the action completes.
       speculative,
       // Read-only access to chain state. Read/write access
       // to chain-independent databases.
@@ -380,9 +380,7 @@ namespace psibase
    //
    // The state used to run the action is the head block state
    // whenever execution begins. The continuation is run with
-   // the same state as the action. It is unspecified whether
-   // changes to the chain state made by the action are seen
-   // by the continuation.
+   // the same state as the action.
    //
    // Execution can be terminated at any time. It is the
    // continuation's resposibility to remove the row. Native

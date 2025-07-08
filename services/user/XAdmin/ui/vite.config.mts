@@ -52,7 +52,7 @@ export default defineConfig(({ command }) => ({
         ...getSharedUIPlugins(),
     ],
     build: {
-        minify: false,
+        minify: true,
         sourcemap: false,
     },
 }));

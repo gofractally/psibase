@@ -33,13 +33,15 @@ namespace SystemService
       std::uint64_t         sequence;
       // One for each claim/proof
       std::vector<psibase::RunToken> verifies;
+      // If missing, speculative execution succeeded
+      std::optional<std::uint64_t> speculative;
 
       using CTimeKey      = psibase::CompositeKey<&PendingTransactionRecord::ctime,
                                                   &PendingTransactionRecord::sequence>;
       using ExpirationKey = psibase::CompositeKey<&PendingTransactionRecord::expiration,
                                                   &PendingTransactionRecord::sequence>;
    };
-   PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence, verifies);
+   PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence, verifies, speculative);
 
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
@@ -64,7 +66,19 @@ namespace SystemService
       psibase::TimePointSec     expiration;
       std::vector<VerifyStatus> verifies;
       psibase::Checksum256      verifyId;
-      PSIO_REFLECT(UnverifiedTransactionRecord, id, expiration, verifies, verifyId)
+      // Indicates that the signatures were successfully verified with
+      // any verify state. This is used to track when to broadcast the
+      // transaction.
+      bool verified;
+      // If missing, speculative execution succeeded
+      std::optional<std::uint64_t> speculative;
+      PSIO_REFLECT(UnverifiedTransactionRecord,
+                   id,
+                   expiration,
+                   verifies,
+                   verifyId,
+                   verified,
+                   speculative)
    };
 
    using UnverifiedTransactionTable =
@@ -91,6 +105,16 @@ namespace SystemService
    using ReverifySignaturesTable =
        psibase::Table<ReverifySignaturesRecord, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(ReverifySignaturesTable)
+
+   struct SpeculativeTransactionRecord
+   {
+      psibase::Checksum256 txid;
+      std::uint64_t        runid;
+      PSIO_REFLECT(SpeculativeTransactionRecord, txid, runid)
+   };
+   using SpeculativeTransactionTable =
+       psibase::Table<SpeculativeTransactionRecord, &SpeculativeTransactionRecord::runid>;
+   PSIO_REFLECT_TYPENAME(SpeculativeTransactionTable)
 
    // Follows forks
    struct UnappliedTransactionRecord
@@ -202,7 +226,8 @@ namespace SystemService
                                                                 TxFailedTable,
                                                                 UnverifiedTransactionTable,
                                                                 PendingVerifyTable,
-                                                                ReverifySignaturesTable>;
+                                                                ReverifySignaturesTable,
+                                                                SpeculativeTransactionTable>;
       using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
                                                                ReversibleBlocksTable,
                                                                TxSuccessTable,
@@ -219,6 +244,8 @@ namespace SystemService
       void onVerify(std::uint64_t                               id,
                     psio::view<const psibase::TransactionTrace> trace,
                     std::optional<psibase::RunToken>            token);
+      // Callback run after speculative transaction
+      void onSpecTrx(std::uint64_t id, psio::view<const psibase::TransactionTrace> trace);
       void requeue();
       void onRequeue(std::uint64_t id, psio::view<const psibase::TransactionTrace> trace);
       void onBlock();
@@ -239,6 +266,7 @@ namespace SystemService
                 method(onTrx, id, trace),
                 method(onBlock),
                 method(onVerify, id, trace, token),
+                method(onSpecTrx, id, trace),
                 method(requeue),
                 method(onRequeue, id, trace),
                 method(serveSys, request, socket, user),

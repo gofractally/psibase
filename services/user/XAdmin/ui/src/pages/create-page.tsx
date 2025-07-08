@@ -1,11 +1,30 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 // ShadCN UI Imports
 import { useToast } from "@/components/ui/use-toast";
+
+import { PrevNextButtons } from "@/components/PrevNextButtons";
+import { BlockProducerForm } from "@/components/forms/block-producer";
+// components
+import {
+    ChainTypeForm,
+    chainTypeSchema,
+} from "@/components/forms/chain-mode-form";
+import { KeyDeviceForm } from "@/components/forms/key-device-form";
+import { InstallationSummary } from "@/components/installation-summary";
+import { MultiStepLoader } from "@/components/multi-step-loader";
+import { Steps } from "@/components/steps";
+
+// lib
+import { bootChain } from "@/lib/bootChain";
+import { getId } from "@/lib/getId";
+import { getRequiredPackages } from "@/lib/getRequiredPackages";
+import { generateP256Key } from "@/lib/keys";
+
 import {
     Card,
     CardContent,
@@ -14,24 +33,14 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 
-// components
-import {
-    ChainTypeForm,
-    chainTypeSchema,
-} from "@/components/forms/chain-mode-form";
-import { BlockProducerForm } from "@/components/forms/block-producer";
-import { KeyDeviceForm } from "@/components/forms/key-device-form";
-import { MultiStepLoader } from "@/components/multi-step-loader";
-import { PrevNextButtons } from "@/components/PrevNextButtons";
-import { Steps } from "@/components/steps";
-import { InstallationSummary } from "@/components/installation-summary";
-
-// lib
-import { bootChain } from "@/lib/bootChain";
-import { getId } from "@/lib/getId";
-import { getRequiredPackages } from "@/lib/getRequiredPackages";
-import { generateP256Key } from "@/lib/keys";
-
+import { useConfig } from "../hooks/useConfig";
+import { useImportAccount } from "../hooks/useImportAccount";
+// hooks
+import { useAddServerKey } from "../hooks/useKeyDevices";
+import { usePackages } from "../hooks/usePackages";
+import { useSelectedRows } from "../hooks/useSelectedRows";
+import { useStepper } from "../hooks/useStepper";
+import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 // types
 import {
     BootCompleteSchema,
@@ -41,19 +50,9 @@ import {
     RequestUpdate,
     RequestUpdateSchema,
 } from "../types";
-
-// hooks
-import { useAddServerKey } from "../hooks/useKeyDevices";
-import { useConfig } from "../hooks/useConfig";
-import { useImportAccount } from "../hooks/useImportAccount";
-import { usePackages } from "../hooks/usePackages";
-import { useSelectedRows } from "../hooks/useSelectedRows";
-import { useStepper } from "../hooks/useStepper";
-import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
-
+import { DependencyDialog } from "./dependency-dialog";
 // relative imports
 import { SetupWrapper } from "./setup-wrapper";
-import { DependencyDialog } from "./dependency-dialog";
 
 export const BlockProducerSchema = z.object({
     name: z.string().min(1),
@@ -127,7 +126,7 @@ export const CreatePage = () => {
         {
             dev: isDev,
         },
-        packages
+        packages,
     );
 
     const { mutateAsync: createAndSetKey } = useAddServerKey();
@@ -152,14 +151,14 @@ export const CreatePage = () => {
             return new Promise((resolve) => {
                 prom = resolve;
             });
-        }
+        },
     );
 
     useEffect(() => {
         if (currentStep === Step.Confirmation) {
             const state = suggestedSelection.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
-                {}
+                {},
             );
 
             overWriteRows(state);
@@ -188,11 +187,11 @@ export const CreatePage = () => {
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
-                    desiredPackageIds.some((id) => id == getId(pack))
+                    desiredPackageIds.some((id) => id == getId(pack)),
                 );
                 const requiredPackages = getRequiredPackages(
                     packages,
-                    desiredPackages.map((pack) => pack.name)
+                    desiredPackages.map((pack) => pack.name),
                 );
                 bootChain({
                     packages: requiredPackages,

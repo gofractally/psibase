@@ -171,6 +171,7 @@ namespace psibase
          {
             auto         revision = systemContext->sharedDatabase.getHead();
             BlockContext bc{*systemContext, revision, writer, true};
+            bc.start();
             bc.callRun(item.get());
          }
       }

@@ -1,6 +1,10 @@
 import { RowSelectionState } from "@tanstack/react-table";
 import { Info } from "lucide-react";
 
+import { ConfirmationForm } from "@/components/forms/confirmation-form";
+
+import { PackageInfo } from "@/types";
+
 import {
     Accordion,
     AccordionContent,
@@ -13,9 +17,6 @@ import {
     PopoverTrigger,
 } from "@shared/shadcn/ui/popover";
 
-import { ConfirmationForm } from "@/components/forms/confirmation-form";
-import { PackageInfo } from "@/types";
-
 import { useKeyDevices } from "../hooks/useKeyDevices";
 
 interface ChipProps {
@@ -26,7 +27,7 @@ interface ChipProps {
 
 const Chip = ({ label, value, hint }: ChipProps) => (
     <div className="w-60 truncate rounded-md border p-2 text-right">
-        <div className="text-sm text-muted-foreground">{label}</div>
+        <div className="text-muted-foreground text-sm">{label}</div>
         <div className="flex items-center justify-end space-x-1">
             <div>{value}</div>
             {hint ? (

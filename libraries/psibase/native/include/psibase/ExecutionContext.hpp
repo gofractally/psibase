@@ -50,14 +50,17 @@ namespace psibase
 
    struct DbMode
    {
-      bool                    isSubjective;
-      bool                    isSync;
-      bool                    isReadOnly;
-      bool                    verifyOnly;
-      static constexpr DbMode transaction() { return {false, true, false, false}; }
-      static constexpr DbMode verify() { return {false, false, true, true}; }
-      static constexpr DbMode callback() { return {true, true, false, false}; }
-      static constexpr DbMode rpc() { return {true, false, false, false}; }
+      bool isSubjective;
+      bool isSync;
+      bool sockets;
+      bool verifyOnly;
+      // If true, a write session for the database is not required
+      constexpr bool          isReadOnly() const { return !isSubjective && !isSync && !sockets; }
+      static constexpr DbMode transaction() { return {false, true, true, false}; }
+      static constexpr DbMode speculative() { return {false, true, false, false}; }
+      static constexpr DbMode verify() { return {false, false, false, true}; }
+      static constexpr DbMode callback() { return {true, true, true, false}; }
+      static constexpr DbMode rpc() { return {true, false, true, false}; }
       static constexpr DbMode from(RunMode mode)
       {
          switch (mode)
@@ -65,7 +68,7 @@ namespace psibase
             case RunMode::verify:
                return DbMode::verify();
             case RunMode::speculative:
-               return DbMode::transaction();
+               return DbMode::speculative();
             case RunMode::rpc:
                return DbMode::rpc();
             case RunMode::callback:

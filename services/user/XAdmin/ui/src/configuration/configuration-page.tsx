@@ -1,20 +1,15 @@
+import { Plus, Trash } from "lucide-react";
 import {
+    Controller,
     RegisterOptions,
     useFieldArray,
     useForm,
-    Controller,
 } from "react-hook-form";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { Service } from "../components";
-import {
-    PsinodeConfigUI,
-    PsinodeConfigUpdate,
-    ServiceConfig,
-} from "./interfaces";
-import { defaultService, writeConfig, newId } from "./utils";
-import { Logger } from "../log/logger";
 import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 import {
     Select,
     SelectContent,
@@ -22,12 +17,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
-import { Label } from "@shared/shadcn/ui/label";
 import { Switch } from "@shared/shadcn/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@shared/shadcn/ui/tabs";
+
+import { Service } from "../components";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
-import { Plus, Trash } from "lucide-react";
+import { Logger } from "../log/logger";
+import {
+    PsinodeConfigUI,
+    PsinodeConfigUpdate,
+    ServiceConfig,
+} from "./interfaces";
+import { defaultService, newId, writeConfig } from "./utils";
 
 export const ConfigurationPage = () => {
     const { data: config, isLoading, isError } = useConfig();
@@ -124,7 +130,7 @@ export const ConfigurationForm = ({
     const handleLoggerFieldRegister = (
         loggerName: string,
         field: string,
-        options?: RegisterOptions
+        options?: RegisterOptions,
         // @ts-expect-error eee
     ) => configForm.register(`loggers.${loggerName}.${field}`, options);
 
@@ -224,7 +230,7 @@ export const ConfigurationForm = ({
                                                     <Input
                                                         type="text"
                                                         {...configForm.register(
-                                                            `hosts.${idx}.host`
+                                                            `hosts.${idx}.host`,
                                                         )}
                                                     />
                                                 </td>
@@ -276,7 +282,7 @@ export const ConfigurationForm = ({
                                                         <Input
                                                             type="number"
                                                             {...configForm.register(
-                                                                `listen.${idx}.port`
+                                                                `listen.${idx}.port`,
                                                             )}
                                                         />
                                                     </td>
@@ -294,10 +300,10 @@ export const ConfigurationForm = ({
                                                                         field.value
                                                                     }
                                                                     onValueChange={(
-                                                                        value
+                                                                        value,
                                                                     ) =>
                                                                         field.onChange(
-                                                                            value
+                                                                            value,
                                                                         )
                                                                     }
                                                                 >
@@ -325,7 +331,7 @@ export const ConfigurationForm = ({
                                                             variant="secondary"
                                                             onClick={() =>
                                                                 listeners.remove(
-                                                                    idx
+                                                                    idx,
                                                                 )
                                                             }
                                                         >
@@ -333,7 +339,7 @@ export const ConfigurationForm = ({
                                                         </Button>
                                                     </td>
                                                 </tr>
-                                            )
+                                            ),
                                         )}
                                     </tbody>
                                 </table>
@@ -358,30 +364,28 @@ export const ConfigurationForm = ({
                             </div>
                             {loggers && (
                                 <div className="flex flex-col gap-4">
-                                    {Object.entries(loggers).map(
-                                        ([name]) => (
-                                            <Logger
-                                                key={name}
-                                                loggerKey={name}
-                                                register={(field, options) =>
-                                                    handleLoggerFieldRegister(
-                                                        name,
-                                                        field,
-                                                        options
-                                                    )
-                                                }
-                                                watch={(field) =>
-                                                    handleLoggerFieldWatch(
-                                                        name,
-                                                        field
-                                                    )
-                                                }
-                                                remove={() =>
-                                                    handleLoggerRemove(name)
-                                                }
-                                            />
-                                        )
-                                    )}
+                                    {Object.entries(loggers).map(([name]) => (
+                                        <Logger
+                                            key={name}
+                                            loggerKey={name}
+                                            register={(field, options) =>
+                                                handleLoggerFieldRegister(
+                                                    name,
+                                                    field,
+                                                    options,
+                                                )
+                                            }
+                                            watch={(field) =>
+                                                handleLoggerFieldWatch(
+                                                    name,
+                                                    field,
+                                                )
+                                            }
+                                            remove={() =>
+                                                handleLoggerRemove(name)
+                                            }
+                                        />
+                                    ))}
                                 </div>
                             )}
                         </TabsContent>
@@ -422,12 +426,12 @@ export const ConfigurationForm = ({
                                                     configForm.register(
                                                         `services.${name}`,
                                                         // @ts-expect-error eeej
-                                                        options
+                                                        options,
                                                     )
                                                 }
                                                 getValues={() =>
                                                     configForm.getValues(
-                                                        `services.${index}`
+                                                        `services.${index}`,
                                                     ) as ServiceConfig
                                                 }
                                                 index={index}

@@ -1,8 +1,9 @@
+import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
+
 import { PeerType, PeersType, chain } from "@/lib/chainEndpoints";
 import { queryKeys } from "@/lib/queryKeys";
 import { recursiveFetch } from "@/lib/recursiveFetch";
-import { useMutation } from "@tanstack/react-query";
-import { z } from "zod";
 
 export const connectParam = z.object({
     url: z.string(),
@@ -15,7 +16,7 @@ interface PeersUpdate {
 
 const connectToPeer = async (
     data: z.infer<typeof connectParam>,
-    preExistingPeers: PeersType
+    preExistingPeers: PeersType,
 ): Promise<PeersUpdate> => {
     await chain.connect(data);
     return recursiveFetch(async () => {
@@ -23,7 +24,7 @@ const connectToPeer = async (
         if (newPeers.length !== preExistingPeers.length) {
             const newPeer = newPeers.find(
                 (peer) =>
-                    !preExistingPeers.some((p) => p.endpoint == peer.endpoint)
+                    !preExistingPeers.some((p) => p.endpoint == peer.endpoint),
             );
             if (!newPeer) return false;
             return {

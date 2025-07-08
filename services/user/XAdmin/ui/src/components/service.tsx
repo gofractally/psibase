@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RegisterOptions } from "react-hook-form";
+
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 
@@ -11,7 +12,7 @@ type ServiceConfig = {
 export type ServiceProps = {
     register: (
         name: `${number}.root` | `${number}.host` | `${number}.key`,
-        options?: RegisterOptions
+        options?: RegisterOptions,
     ) => any;
     getValues: () => ServiceConfig;
     index: number;

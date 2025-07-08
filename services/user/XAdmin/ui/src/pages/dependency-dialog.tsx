@@ -1,3 +1,5 @@
+import { PackageInfo } from "@/types";
+
 import {
     AlertDialog,
     AlertDialogAction,
@@ -8,7 +10,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-import { PackageInfo } from "@/types";
 
 interface Props {
     show: boolean;

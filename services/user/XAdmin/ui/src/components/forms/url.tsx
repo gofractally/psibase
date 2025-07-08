@@ -1,6 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Unplug } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Form,
@@ -11,7 +13,6 @@ import {
     FormRootError,
 } from "@shared/shadcn/ui/form";
 import { Input } from "@shared/shadcn/ui/input";
-import { Unplug } from "lucide-react";
 
 const FormSchema = z.object({
     url: z.string().url(),

@@ -466,12 +466,21 @@ namespace psibase
       TransactionContext tc{*this, trx, trace, mode};
       auto&              atrace = trace.actionTraces.emplace_back();
 
-      auto session = db.startWrite(writer);
       try
       {
+         auto session = db.startWrite(writer);
          auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
-         tc.execNonTrxAction(0, action, atrace);
+         if (row.mode() == RunMode::speculative)
+         {
+            db.checkoutEmptySubjective();
+            auto _ = psio::finally{[&] { db.abortSubjective(); }};
+            tc.execNonTrxAction(0, action, atrace);
+         }
+         else
+         {
+            tc.execNonTrxAction(0, action, atrace);
+         }
          PSIBASE_LOG(trxLogger, debug)
              << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
       }
@@ -485,7 +494,8 @@ namespace psibase
 
       try
       {
-         auto token = sha256(
+         auto session = db.startWrite(writer);
+         auto token   = sha256(
              VerifyTokenData{!trace.error, row.mode(), action,
                              row.mode() == RunMode::verify ? getVerifyContextId() : Checksum256{}});
          // Run the continuation

@@ -1,8 +1,10 @@
-import { InstallType, ProducerType } from "@/types";
 import { UseFormReturn } from "react-hook-form";
-import { Label } from "@shared/shadcn/ui/label";
-import { Input } from "@shared/shadcn/ui/input";
+
+import { InstallType, ProducerType } from "@/types";
+
 import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 
 interface ProducerFormProps {
     producerForm: UseFormReturn<ProducerType>;

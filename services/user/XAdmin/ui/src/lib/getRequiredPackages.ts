@@ -1,15 +1,16 @@
-import { PackageInfo, WrappedPackages } from "../types";
 import { packages as packageInterface } from "wasm-transpiled";
+
+import { PackageInfo, WrappedPackages } from "../types";
 
 export const getRequiredPackages = (
     packages: PackageInfo[],
-    packageNames: string[]
+    packageNames: string[],
 ): PackageInfo[] =>
     WrappedPackages.parse(
         JSON.parse(
             packageInterface.resolvePackages(
                 JSON.stringify(packages),
-                packageNames
-            )
-        )
+                packageNames,
+            ),
+        ),
     ).map((x) => x.Install);

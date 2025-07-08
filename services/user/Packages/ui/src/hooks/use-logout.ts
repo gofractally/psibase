@@ -19,9 +19,6 @@ export const useLogout = () => {
         },
         onSuccess: () => {
             queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            }, 2500);
         },
     });
 };
