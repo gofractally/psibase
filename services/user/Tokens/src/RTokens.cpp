@@ -263,10 +263,30 @@ PSIO_REFLECT(TokenQuery,
              method(userConf, user, flag))
 // clang-format on
 
-optional<HttpReply> RTokens::serveSys(HttpRequest request)
+optional<HttpReply> RTokens::serveSys(const HttpRequest& request,
+                                       std::optional<std::int32_t> socket,
+                                       std::optional<AccountNumber> user)
 {
    if (auto result = serveSimpleUI<Tokens, false>(request))
       return result;
+
+   // For GraphQL queries, check authentication for sensitive operations
+   if (request.method == "POST" && request.target == "/graphql") {
+      // Check if request contains userBalances query (simple string check)
+      std::string bodyStr(request.body.begin(), request.body.end());
+      if (bodyStr.find("userBalances") != std::string::npos) {
+         if (!user) {
+            std::string errorMsg = R"({"error":"Authentication required for userBalances query"})";
+            return HttpReply{
+               .status = static_cast<HttpStatus>(401), // 401 Unauthorized
+               .contentType = "application/json",
+               .body = std::vector<char>(errorMsg.begin(), errorMsg.end())
+            };
+         }
+         // Log the authenticated user for verification
+         print("Authenticated user for userBalances query: ", user->str());
+      }
+   }
 
    if (auto result = serveGraphQL(request, TokenQuery{}))
       return result;
