@@ -65,7 +65,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(Packages)
     add_subdirectory(Sites)
     add_subdirectory(Symbol)
-    add_subdirectory(Tokens)
     add_subdirectory(XAdmin)
 endif()
 

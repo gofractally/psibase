@@ -14,11 +14,11 @@ postinstall = [
 ]
 
 [dependencies]
-psibase = { version = "0.17.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.17.0", path = "../../../../rust/psibase_macros" }
+psibase = { version = "0.18.0", path = "../../../../rust/psibase" }
+psibase_macros = { version = "0.18.0", path = "../../../../rust/psibase_macros" }
 async-graphql = "=7.0.17"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.120"
 
 [dev-dependencies]
-tokens-pkg = { path = "..", version = "0.17.0" }
+tokens-pkg = { path = "..", version = "0.18.0" }
