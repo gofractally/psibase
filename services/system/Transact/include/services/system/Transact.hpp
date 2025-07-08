@@ -288,6 +288,10 @@ namespace SystemService
       /// Called by native code at the beginning of each block
       void startBlock();
 
+      /// Called by RTransact to execute a transaction speculatively
+      void execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
+                   bool                                                          speculative);
+
       /// Sets the time between snapshots
       ///
       /// A value of 0 will disable snapshots. This is a chain-wide
@@ -338,7 +342,7 @@ namespace SystemService
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Checks authorization for the sender of the first action
-      void checkFirstAuth(psibase::Checksum256                   id,
+      bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
 
       /// Get the currently executing transaction
@@ -363,6 +367,7 @@ namespace SystemService
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
+                method(execTrx, transaction, speculative),
                 method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
