@@ -1,8 +1,10 @@
-import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
-import { getSupervisor } from "@psibase/common-lib";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+
+import { getSupervisor } from "@psibase/common-lib";
+
+import QueryKey from "@/lib/queryKeys";
+import { Account } from "@/lib/zod/Account";
 
 export type GetCurrentUserRes = string | null;
 
