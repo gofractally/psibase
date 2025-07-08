@@ -10,7 +10,7 @@ export const Steps = ({
     numberOfSteps: number;
 }) => {
     return (
-        <div className="flex items-center ">
+        <div className="flex items-center justify-center">
             {Array.from({ length: numberOfSteps }).map((_, index) => {
                 const isPresentOrPast = currentStep >= index + 1;
                 const isHighlight = currentStep > index + 1;
