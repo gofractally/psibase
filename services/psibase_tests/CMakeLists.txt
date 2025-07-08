@@ -12,7 +12,7 @@ endfunction()
 
 function(add suffix)
     service(TestKV "${suffix}" src/TestKV.cpp)
-    service(test_table "${suffix}" test_table.cpp)
+    service(TestTable "${suffix}" src/TestTable.cpp)
     service(event-service "${suffix}" event-service.cpp)
     service(memo-service "${suffix}" memo-service.cpp)
     service(clock-service "${suffix}" clock-service.cpp)

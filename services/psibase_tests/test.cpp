@@ -2,6 +2,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <services/test/EntryPoint.hpp>
 #include <services/test/TestKV.hpp>
+#include <services/test/TestTable.hpp>
 
 using namespace psibase;
 using namespace TestService;
@@ -31,13 +32,12 @@ TEST_CASE("table")
 {
    DefaultTestChain t;
 
-   auto test_table_service = t.addService("test-table", "test_table.wasm");
-   REQUIRE(                         //
-       show(false,                  //
-            t.pushTransaction(      //
-                t.makeTransaction(  //
-                    {{
-                        .sender  = test_table_service,
-                        .service = test_table_service,
-                    }}))) == "");
+   t.addService(TestTable::service, "TestTable.wasm");
+   auto testTable = t.from(TestTable::service).to<TestTable>();
+   CHECK(testTable.getSingle().succeeded());
+   CHECK(testTable.getMulti().succeeded());
+   CHECK(testTable.getCompound().succeeded());
+   CHECK(testTable.removeSingle().succeeded());
+   CHECK(testTable.removeMulti().succeeded());
+   CHECK(testTable.subindex().succeeded());
 }  // table
