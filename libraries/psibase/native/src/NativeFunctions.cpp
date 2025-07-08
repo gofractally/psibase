@@ -2,6 +2,7 @@
 
 #include <psibase/ActionContext.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/saturating.hpp>
 
 #include <random>
 
@@ -295,6 +296,29 @@ namespace psibase
          }
       }
 
+      void verifySubjectiveCodeRow(psio::input_stream key, psio::input_stream value)
+      {
+         check(psio::fracpack_validate_strict<CodeRow>(value), "CodeRow has invalid format");
+         auto code         = psio::view<const CodeRow>(psio::prevalidated{value});
+         auto expected_key = psio::convert_to_key(codeKey(code.codeNum()));
+         check(key.remaining() == expected_key.size() &&
+                   !std::memcmp(key.pos, expected_key.data(), key.remaining()),
+               "CodeRow has incorrect key");
+      }
+
+      void verifySubjectiveRunTableRow(Database&          db,
+                                       psio::input_stream key,
+                                       psio::input_stream value)
+      {
+         // The runTable is only processed subjectively
+         if (psio::fracpack_validate<RunRow>({value.pos, value.end}))
+         {
+            auto row =
+                psio::view<const NotifyRow>(psio::prevalidated{std::span{value.pos, value.end}});
+            db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
+         }
+      }
+
       void verifyScheduledSnapshotRow(psio::input_stream key, psio::input_stream value)
       {
          check(psio::fracpack_validate_strict<ScheduledSnapshotRow>({value.pos, value.end}),
@@ -342,6 +366,12 @@ namespace psibase
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == notifyTable)
             verifySubjectiveNotifyTableRow(db, key, value);
+         else if (table == codeTable)
+            verifySubjectiveCodeRow(key, value);
+         else if (table == codeByHashTable)
+            verifyCodeByHashRow(key, value);
+         else if (table == runTable)
+            verifySubjectiveRunTableRow(db, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
@@ -476,12 +506,9 @@ namespace psibase
       // Ensure no overflow by capping the value. The exact value is not visible to
       // wasm and does not affect consensus and there's no way a transaction can
       // run for 300 years.
-      static constexpr uint64_t maxTransactionTime = INT64_MAX;
-      nanoseconds                                  = std::min(nanoseconds, maxTransactionTime);
       if (transactionContext.blockContext.isProducing)
-         transactionContext.setWatchdog(
-             std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                 std::chrono::nanoseconds{nanoseconds}));
+         transactionContext.setWatchdog(saturatingCast<CpuClock::duration>(
+             std::chrono::duration<std::uint64_t, std::nano>(nanoseconds)));
    }
 
    uint32_t NativeFunctions::getCurrentAction()

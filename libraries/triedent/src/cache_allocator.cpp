@@ -28,24 +28,42 @@ namespace triedent
    {
       if (mode != open_mode::read_only)
       {
+         // resize ring buffers if needed. This is not safe to run
+         // concurrently with the swap thread or any allocation.
+         if (mode == open_mode::resize)
+         {
+            gc_session       session{_gc};
+            std::unique_lock sl{session};
+            auto             move_one = [&](object_header* o, object_location loc)
+            {
+               if (auto lock = _obj_ids.lock({.id = o->id}, loc))
+               {
+                  void* p = _cold.try_allocate(sl, lock.get_id(), o->size,
+                                               [&](void* ptr, object_location newloc)
+                                               {
+                                                  std::memcpy(ptr, o->data(), o->size);
+                                                  _obj_ids.compare_and_move(lock, loc, newloc);
+                                               });
+                  return p != nullptr;
+               }
+               return true;
+            };
+            hot().unsafe_resize(cfg.hot_bytes, move_one);
+            warm().unsafe_resize(cfg.warm_bytes, move_one);
+            cool().unsafe_resize(cfg.cool_bytes, move_one);
+         }
+
+         // Start background threads
          _swap_thread = std::thread(
              [this]()
              {
                 thread_name("swap");
-#ifndef __APPLE__
-                pthread_setname_np(pthread_self(), "swap");
-#else  // if __APPLE__
-                pthread_setname_np("swap");
-#endif
+                set_current_thread_name("swap");
                 swap_loop();
              });
          _gc_thread = std::thread{[this]
                                   {
-#ifndef __APPLE__
-                                     pthread_setname_np(pthread_self(), "swap");
-#else  // if __APPLE__
-                                     pthread_setname_np("swap");
-#endif
+                                     set_current_thread_name("swap");
                                      _gc.run(&_done);
                                   }};
       }

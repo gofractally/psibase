@@ -1,9 +1,9 @@
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
+import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
+import { Separator } from "@shared/shadcn/ui/separator";
+import { Textarea } from "@shared/shadcn/ui/textarea";
+import { Button } from "@shared/shadcn/ui/button";
 import { useMail } from "@/hooks/useMail";
 import { useMessages } from "@/hooks/useMessages";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
@@ -15,7 +15,7 @@ import dayjs from "dayjs";
 import { useChainId } from "@/hooks/use-chain-id";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { RefreshCcw } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import humanizeDuration from "humanize-duration";
 
 export const Thread: React.FC = () => {

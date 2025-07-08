@@ -3,7 +3,7 @@ import {
     FunctionResponse,
     getUsersAndGroups,
 } from "../../lib/graphql/getUsers";
-import { Account } from "@lib/zod/Account";
+import { Account } from "@/lib/zod/Account";
 import { queryClient } from "@/main";
 import { z } from "zod";
 

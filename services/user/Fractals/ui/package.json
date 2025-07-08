@@ -1,0 +1,38 @@
+{
+    "name": "@psibase/fractals-ui",
+    "private": true,
+    "version": "0.0.0",
+    "scripts": {
+        "dev": "vite",
+        "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && yarn lint && vite build'",
+        "lint": "eslint .",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@dicebear/collection": "^9.2.2",
+        "@dicebear/core": "^9.2.2",
+        "@tanstack/react-form": "^1.11.1",
+        "@tanstack/react-pacer": "^0.6.0",
+        "@tanstack/react-query": "^5.75.7",
+        "@uidotdev/usehooks": "^2.4.1",
+        "dayjs": "^1.11.13",
+        "humanize-duration": "^3.32.2",
+        "lucide-react": "^0.475.0",
+        "nuqs": "^2.4.3",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "react-easy-sort": "^1.6.0",
+        "react-router-dom": "^6.26.1",
+        "usehooks-ts": "^3.1.1",
+        "zod": "^3.24.2"
+    },
+    "devDependencies": {
+        "@types/humanize-duration": "^3.27.4",
+        "@types/node": "^22.15.0",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "eslint": "^9.15.0",
+        "typescript": "^5.7.3",
+        "vite": "^5.4.1"
+    }
+}

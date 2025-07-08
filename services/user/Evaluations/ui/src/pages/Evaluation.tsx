@@ -1,19 +1,20 @@
-import { useCloseEvaluation } from "@hooks/app/use-close-evaluation";
-import { useCurrentUser } from "@hooks/use-current-user";
-import { useEvaluation } from "@hooks/app/use-evaluation";
-import { useRegister } from "@hooks/app/use-register";
-import { useStartEvaluation } from "@hooks/app/use-start-evaluation";
-import { useUnregister } from "@hooks/app/use-unregister";
-import { useUsersAndGroups } from "@hooks/app/use-users";
-import { getStatus, Types } from "@lib/getStatus";
-import { humanize } from "@lib/humanize";
-import { Button } from "@shadcn/button";
+import { Types, getStatus } from "@/lib/getStatus";
+import { humanize } from "@/lib/humanize";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useInterval, useLocalStorage } from "usehooks-ts";
-import { Switch } from "@shadcn/switch";
-import { zAccount } from "@lib/zod/Account";
+
+import { useCloseEvaluation } from "@/hooks/app/use-close-evaluation";
+import { useEvaluation } from "@/hooks/app/use-evaluation";
+import { useRegister } from "@/hooks/app/use-register";
+import { useStartEvaluation } from "@/hooks/app/use-start-evaluation";
+import { useUnregister } from "@/hooks/app/use-unregister";
+import { useUsersAndGroups } from "@/hooks/app/use-users";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+import { Button } from "@shared/shadcn/ui/button";
+import { Switch } from "@shared/shadcn/ui/switch";
 
 const defaultRefreshInterval = 10000;
 
@@ -104,8 +105,7 @@ export const EvaluationPage = () => {
             !isStartEvaluationSuccess
         ) {
             startEvaluation({
-                owner: zAccount.parse(owner),
-                id: evaluation!.id,
+                evaluationId: evaluation!.id,
             });
         }
     }, [
@@ -261,8 +261,7 @@ export const EvaluationPage = () => {
                             disabled={isStartEvaluationPending}
                             onClick={() => {
                                 startEvaluation({
-                                    owner: zAccount.parse(owner),
-                                    id: evaluation!.id,
+                                    evaluationId: evaluation!.id,
                                 });
                             }}
                         >
@@ -271,7 +270,7 @@ export const EvaluationPage = () => {
                                 : "Start evaluation"}
                         </Button>
                     ) : (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-muted-foreground text-sm">
                             Awaiting the evaluation to be started by the owner.
                         </div>
                     )}
@@ -296,7 +295,6 @@ export const EvaluationPage = () => {
                                 disabled={isCloseEvaluationPending}
                                 onClick={() => {
                                     closeEvaluation({
-                                        owner: evaluation!.owner,
                                         evaluationId: evaluation.id,
                                     });
                                 }}
@@ -331,7 +329,9 @@ export const EvaluationPage = () => {
                                 Group {group.groupNumber}
                             </div>
                             <div className="flex flex-col gap-1 text-center">
-                                {group.result.map(num => <div key={num}>{num}</div>)}
+                                {group.result.map((num) => (
+                                    <div key={num}>{num}</div>
+                                ))}
                             </div>
 
                             <div>Members: {group.users.join(", ")}</div>

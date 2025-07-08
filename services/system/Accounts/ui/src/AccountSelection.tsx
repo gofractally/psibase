@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 import { z } from "zod";
 
@@ -9,9 +9,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@shared/shadcn/ui/input";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -23,9 +23,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from "@shared/shadcn/ui/form";
 import debounce from "debounce";
-import { Button } from "./components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";

@@ -1,23 +1,23 @@
-import { RegisterOptions } from "react-hook-form";
+import { RegisterOptions, UseFormRegisterReturn } from "react-hook-form";
 import { LogConfig } from "./interfaces";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
+import { cn } from "@shared/lib/utils";
 import { Trash } from "lucide-react";
 
 interface LoggerProps {
     loggerKey: string;
-    control: any;
-    register: (name: keyof LogConfig, options?: RegisterOptions) => any;
+    register: (name: keyof LogConfig, options?: RegisterOptions) => UseFormRegisterReturn;
     watch: (name: keyof LogConfig) => string | boolean | undefined;
     remove: () => void;
 }
 
+const loggerOptionClass = "focus:bg-accent focus:text-accent-foreground flex w-full cursor-default select-none items-center rounded-sm py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
+
 export const Logger = ({
     loggerKey,
-    control,
     register,
     watch,
     remove,
@@ -40,16 +40,16 @@ export const Logger = ({
                         {...register("type")}
                         className="flex h-10 w-full items-center justify-between rounded-md  bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <option value="console" className="logger-option">
+                        <option value="console" className={loggerOptionClass}>
                             Console
                         </option>
-                        <option value="file" className="logger-option">
+                        <option value="file" className={loggerOptionClass}>
                             File
                         </option>
-                        <option value="local" className="logger-option">
+                        <option value="local" className={loggerOptionClass}>
                             Local socket
                         </option>
-                        <option value="pipe" className="logger-option">
+                        <option value="pipe" className={loggerOptionClass}>
                             Pipe
                         </option>
                     </select>

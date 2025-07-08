@@ -351,11 +351,10 @@ namespace psibase::http
       auto [req_host, req_target] = parse_request_target(req);
       unsigned req_version        = req.version();
       bool     req_keep_alive     = req.keep_alive();
-      bool     req_allow_cors     = !req_target.starts_with("/native/");
 
-      const auto set_cors = [&server, req_allow_cors](auto& res)
+      const auto set_cors = [&server](auto& res, bool allow_cors)
       {
-         if (!server.http_config->allow_origin.empty() && req_allow_cors)
+         if (!server.http_config->allow_origin.empty() && allow_cors)
          {
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
             res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
@@ -382,14 +381,15 @@ namespace psibase::http
       // Returns a method_not_allowed response
       const auto method_not_allowed = [&server, set_cors, req_version, set_keep_alive](
                                           beast::string_view target, beast::string_view method,
-                                          beast::string_view allowed_methods)
+                                          beast::string_view allowed_methods,
+                                          bool               allow_cors = false)
       {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::method_not_allowed,
                                                        req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::allow, allowed_methods);
-         set_cors(res);
+         set_cors(res, allow_cors);
          set_keep_alive(res);
          res.body() = to_vector("The resource '" + std::string(target) +
                                 "' does not accept the method " + std::string(method) + ".");
@@ -398,24 +398,24 @@ namespace psibase::http
       };
 
       // Returns an error response
-      const auto error =
-          [&server, set_cors, req_version, set_keep_alive](
-              bhttp::status status, beast::string_view why, const char* content_type = "text/html")
+      const auto error = [&server, set_cors, req_version, set_keep_alive](
+                             bhttp::status status, beast::string_view why, bool allow_cors = false,
+                             const char* content_type = "text/html")
       {
          bhttp::response<bhttp::vector_body<char>> res{status, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, content_type);
-         set_cors(res);
+         set_cors(res, allow_cors);
          set_keep_alive(res);
          res.body() = std::vector(why.begin(), why.end());
          res.prepare_payload();
          return res;
       };
 
-      const auto not_found = [&error](beast::string_view target)
+      const auto not_found = [&error](beast::string_view target, bool allow_cors = false)
       {
          return error(bhttp::status::not_found,
-                      "The resource '" + std::string(target) + "' was not found.");
+                      "The resource '" + std::string(target) + "' was not found.", allow_cors);
       };
       const auto bad_request = [&error](beast::string_view why)
       { return error(bhttp::status::bad_request, why); };
@@ -428,7 +428,6 @@ namespace psibase::http
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::content_type, "text/html");
          res.set(bhttp::field::www_authenticate, std::move(www_auth));
-         set_cors(res);
          set_keep_alive(res);
          res.body() = to_vector("Not authorized");
          res.prepare_payload();
@@ -437,7 +436,7 @@ namespace psibase::http
 
       const auto ok = [&server, set_cors, req_version, set_keep_alive](
                           std::vector<char> reply, const char* content_type,
-                          const std::vector<HttpHeader>* headers = nullptr)
+                          const std::vector<HttpHeader>* headers = nullptr, bool allow_cors = false)
       {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
@@ -445,18 +444,19 @@ namespace psibase::http
             for (auto& h : *headers)
                res.set(h.name, h.value);
          res.set(bhttp::field::content_type, content_type);
-         set_cors(res);
+         set_cors(res, allow_cors);
          set_keep_alive(res);
          res.body() = std::move(reply);
          res.prepare_payload();
          return res;
       };
 
-      const auto ok_no_content = [&server, set_cors, req_version, set_keep_alive]()
+      const auto ok_no_content =
+          [&server, set_cors, req_version, set_keep_alive](bool allow_cors = false)
       {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         set_cors(res);
+         set_cors(res, allow_cors);
          set_keep_alive(res);
          res.prepare_payload();
          return res;
@@ -466,21 +466,21 @@ namespace psibase::http
       {
          bhttp::response<bhttp::vector_body<char>> res{bhttp::status::accepted, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         set_cors(res);
          set_keep_alive(res);
          res.prepare_payload();
          return res;
       };
 
-      const auto redirect = [req_version, set_cors, set_keep_alive](
-                                bhttp::status status, beast::string_view location,
-                                beast::string_view msg, const char* content_type = "text/html")
+      const auto redirect =
+          [req_version, set_cors, set_keep_alive](bhttp::status status, beast::string_view location,
+                                                  beast::string_view msg, bool allow_cors = false,
+                                                  const char* content_type = "text/html")
       {
          bhttp::response<bhttp::vector_body<char>> res{status, req_version};
          res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
          res.set(bhttp::field::location, location);
          res.set(bhttp::field::content_type, content_type);
-         set_cors(res);
+         set_cors(res, allow_cors);
          set_keep_alive(res);
          res.body() = std::vector(msg.begin(), msg.end());
          res.prepare_payload();
@@ -645,6 +645,7 @@ namespace psibase::http
          else if (!req_target.starts_with("/native"))
          {
             auto [host, port] = split_port(req_host);
+            auto service      = AccountNumber{};
 
             if (auto iter = server.http_config->services.find(host);
                 iter != server.http_config->services.end())
@@ -654,12 +655,12 @@ namespace psibase::http
                {
                   if (req.method() == bhttp::verb::options)
                   {
-                     return send(ok_no_content());
+                     return send(ok_no_content(true));
                   }
                   else if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
                   {
                      return send(method_not_allowed(req.target(), req.method_string(),
-                                                    "GET, OPTIONS, HEAD"));
+                                                    "GET, OPTIONS, HEAD", true));
                   }
 
                   std::vector<char> contents;
@@ -669,11 +670,23 @@ namespace psibase::http
                   l.unlock();
                   contents.resize(size);
                   in.read(contents.data(), contents.size());
-                  return send(ok(std::move(contents), file->second.content_type.c_str()));
+                  return send(
+                      ok(std::move(contents), file->second.content_type.c_str(), nullptr, true));
                }
                else
                {
-                  return send(not_found(req.target()));
+                  if (auto pos = host.find('.'); pos != std::string::npos)
+                  {
+                     service = AccountNumber{host.substr(0, pos)};
+                  }
+                  if (service == AccountNumber{} || !is_admin(*server.http_config, req_host))
+                  {
+                     return send(not_found(req.target(), true));
+                  }
+                  if (!check_admin_auth(authz::mode_type::read_write))
+                  {
+                     return;
+                  }
                }
             }
 
@@ -692,7 +705,7 @@ namespace psibase::http
             if (root_host.empty())
             {
                if (server.http_config->hosts.empty())
-                  return send(not_found(req.target()));
+                  return send(not_found(req.target(), true));
                else
                {
                   std::string location;
@@ -710,13 +723,14 @@ namespace psibase::http
                   return send(redirect(bhttp::status::moved_permanently, location,
                                        "<html><body>"
                                        "This psibase server is hosted at <a href=\"" +
-                                           location + "\">" + location + "</a>.</body></html>\n"));
+                                           location + "\">" + location + "</a>.</body></html>\n",
+                                       true));
                }
             }
 
             if (req.method() == bhttp::verb::options)
             {
-               return send(ok_no_content());
+               return send(ok_no_content(service == AccountNumber{}));
             }
 
             auto        startTime = steady_clock::now();
@@ -738,9 +752,13 @@ namespace psibase::http
                data.method = "POST";
             else if (req.method() == bhttp::verb::head)
                data.method = "HEAD";
+            else if (req.method() == bhttp::verb::put)
+               data.method = "PUT";
+            else if (req.method() == bhttp::verb::delete_)
+               data.method = "DELETE";
             else
-               return send(
-                   method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
+               return send(method_not_allowed(req.target(), req.method_string(),
+                                              "GET, POST, OPTIONS", true));
             data.host        = {host.begin(), host.size()};
             data.rootHost    = root_host;
             data.target      = std::string(req_target);
@@ -757,7 +775,7 @@ namespace psibase::http
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
-            if (bc.needGenesisAction)
+            if (service == AccountNumber{} && bc.needGenesisAction)
             {
                std::string location;
                if (send.is_secure())
@@ -780,14 +798,15 @@ namespace psibase::http
                                        "<html><body>Node is not connected to any psibase network.  "
                                        "Visit <a href=\"" +
                                            location + "\">" + location +
-                                           "</a> for node setup.</body></html>\n"));
+                                           "</a> for node setup.</body></html>\n",
+                                       true));
                }
                else
                {
                   // No native service to redirect to. Just report an error
                   l.unlock();
                   return send(error(bhttp::status::internal_server_error,
-                                    "Node is not connected to any psibase network."));
+                                    "Node is not connected to any psibase network.", true));
                }
             }
 
@@ -799,7 +818,8 @@ namespace psibase::http
 
             auto socket = makeHttpSocket(
                 send,
-                [req_version, set_cors, set_keep_alive](HttpReply&& reply)
+                [req_version, set_cors, set_keep_alive,
+                 allow_cors = service == AccountNumber{}](HttpReply&& reply)
                 {
                    bhttp::response<bhttp::vector_body<char>> res{
                        bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
@@ -807,7 +827,7 @@ namespace psibase::http
                    for (auto& h : reply.headers)
                       res.set(h.name, h.value);
                    res.set(bhttp::field::content_type, reply.contentType);
-                   set_cors(res);
+                   set_cors(res, allow_cors);
                    set_keep_alive(res);
                    res.body() = std::move(reply.body);
                    res.prepare_payload();
@@ -842,7 +862,7 @@ namespace psibase::http
             {
                Action action{
                    .sender  = AccountNumber(),
-                   .service = proxyServiceNum,
+                   .service = service != AccountNumber{} ? service : proxyServiceNum,
                    .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
                };
                tc.execServe(action, atrace);

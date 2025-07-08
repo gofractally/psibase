@@ -1,10 +1,10 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { type Evaluation } from "@lib/graphql/getEvaluation";
+import { type Evaluation } from "@/lib/graphql/getEvaluation";
 import { Account } from "./zod/Account";
 import { User, zResult } from "./graphql/getUsers";
-import { Group, zGroup } from "./graphql/getGroups";
+import { Group } from "./graphql/getGroups";
 
 const zTimeStatus = z.enum([
     "pending",
@@ -98,6 +98,7 @@ const EvaluationNotStartedInTime = z.object({
     userShouldDelete: z.boolean(),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const zStatus = z.discriminatedUnion("type", [
     Pending,
     RegistrationAvailable,

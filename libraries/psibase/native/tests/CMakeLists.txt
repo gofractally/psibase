@@ -7,3 +7,6 @@ target_link_libraries(WatchdogTests psibase Catch2::Catch2WithMain Threads::Thre
 add_test(NAME WatchdogTests COMMAND WatchdogTests)
 
 set_tests_properties(WatchdogTests PROPERTIES PROCESSORS 2)
+
+add_executable(saturatingTests saturatingTests.cpp)
+target_link_libraries(saturatingTests psibase)

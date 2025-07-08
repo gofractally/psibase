@@ -4,19 +4,19 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@shared/shadcn/ui/collapsible";
 import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
+import { Button } from "@shared/shadcn/ui/button";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { cn } from "@shared/lib/utils";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { EmptyBlock } from "@/components/EmptyBlock";
 import { Account, Path } from "@/lib/zodTypes";
 import { useRemovePath } from "@/hooks/use-remove-path";

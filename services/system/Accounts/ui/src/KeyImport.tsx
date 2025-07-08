@@ -2,13 +2,13 @@ import { useSearchParams } from "react-router-dom";
 import { usePrivateToPublicKey } from "./hooks/usePrivateToPublicKey";
 import { useAccountsLookup } from "./hooks/useAccountsLookup";
 import { useEffect, useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "./lib/utils";
-import { Button } from "./components/ui/button";
+import { Checkbox } from "@shared/shadcn/ui/checkbox";
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { supervisor } from "./main";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { siblingUrl } from "@psibase/common-lib";
 import { useDecodeB64 } from "./hooks/useB64";
 

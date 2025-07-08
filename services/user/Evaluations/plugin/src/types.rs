@@ -118,3 +118,32 @@ impl TryFrom<String> for KeyHistoryResponse {
         Ok(response_root.data)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserConnection {
+    pub get_group_users: GetGroupUsersConnection,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetGroupUsersConnection {
+    pub nodes: Vec<UserNode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Pack, Unpack)]
+#[serde(rename_all = "camelCase")]
+pub struct UserNode {
+    pub user: String,
+}
+
+impl TryFrom<String> for UserConnection {
+    type Error = CommonTypes::Error;
+
+    fn try_from(response: String) -> Result<Self, Self::Error> {
+        let response_root: ResponseRoot<UserConnection> = serde_json::from_str(&response)
+            .map_err(|e| GraphQLParseError(format!("UserConnection: {}", e)))?;
+
+        Ok(response_root.data)
+    }
+}

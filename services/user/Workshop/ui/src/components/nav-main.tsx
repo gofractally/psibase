@@ -5,9 +5,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 import { useLocation, NavLink } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 export const appMenus = [
   {

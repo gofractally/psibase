@@ -675,6 +675,7 @@ namespace psibase::loggers
          explicit ConsoleSinkConfig(const sink_args_type& args) {}
          static void init(backend_type& backend)
          {
+            backend.auto_flush(true);
             backend.add_stream(boost::shared_ptr<std::ostream>(&std::clog, [](void*) {}));
          }
          void apply(backend_type& backend) const {}
@@ -1090,6 +1091,7 @@ namespace psibase::loggers
          static void init(backend_type&) {}
          void        apply(boost::log::sinks::text_file_backend& backend) const
          {
+            backend.set_open_mode(std::ios_base::out | std::ios_base::app);
             backend.set_file_name_pattern(filename.native());
             backend.set_target_file_name_pattern(target.native());
             backend.set_rotation_size(rotationSize);
@@ -1145,7 +1147,7 @@ namespace psibase::loggers
          std::uint64_t                  maxSize;
          std::uint64_t                  rotationSize;
          std::string                    rotationTime;
-         bool                           flush = false;
+         bool                           flush = true;
          std::shared_ptr<time_rotation> rotationTimeFunc;
          bool                           resetCollector = true;
          bool                           needsScan      = true;
@@ -1459,7 +1461,8 @@ namespace psibase::loggers
       boost::shared_ptr<boost::log::sinks::sink> make_sink(const sink_config& cfg)
       {
          return std::visit(
-             [&](auto& backend) {
+             [&](auto& backend)
+             {
                 return static_cast<boost::shared_ptr<boost::log::sinks::sink>>(
                     make_sink(cfg, backend));
              },

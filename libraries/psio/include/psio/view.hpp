@@ -715,6 +715,12 @@ namespace psio
          abort_error(stream_error::invalid_frac_encoding);
       return view<T>{prevalidated{data}};
    }
+
+   template <typename T, typename S>
+   void to_key(const view<T> v, S& stream)
+   {
+      to_key(v.unpack(), stream);
+   }
 }  // namespace psio
 
 namespace std

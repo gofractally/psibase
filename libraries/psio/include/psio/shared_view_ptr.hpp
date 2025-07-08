@@ -117,6 +117,16 @@ namespace psio
 
       auto unpack() const { return (*this)->unpack(); }
 
+      std::shared_ptr<char_t<T>[]> shared_data() const&
+      {
+         return std::shared_ptr<char_t<T>[]>(_data, data());
+      }
+
+      std::shared_ptr<char_t<T>[]> shared_data() &&
+      {
+         return std::shared_ptr<char_t<T>[]>(std::move(_data), data());
+      }
+
      private:
       static auto validate(const std::span<const char>& data)
       {

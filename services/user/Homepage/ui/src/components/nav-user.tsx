@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@shared/shadcn/ui/avatar";
 import {
     Dialog,
     DialogClose,
@@ -29,7 +29,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -42,13 +42,13 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 
 import { useAvatar } from "@/hooks/use-avatar";
 import { useCanExportAccount } from "@/hooks/use-can-export-account";
@@ -60,15 +60,15 @@ import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
 import { useProfile } from "@/hooks/use-profile";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 import { Account } from "@/lib/zod/Account";
 
 import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 
 import { useTheme } from "./theme-provider";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 
 function AccountMenuItem({
     account,

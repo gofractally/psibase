@@ -6,8 +6,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "./ui/button";
+} from "@shared/shadcn/ui/card";
+import { Button } from "@shared/shadcn/ui/button";
 import { useCreateApp } from "@/hooks/use-create-app";
 import { Account } from "@/lib/zodTypes";
 

@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AccountType } from "./types";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Avatar, AvatarFallback } from "@shared/shadcn/ui/avatar";
+import { cn } from "@shared/lib/utils";
 
 export const Account = ({
   name,

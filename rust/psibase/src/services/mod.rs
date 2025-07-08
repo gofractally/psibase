@@ -10,6 +10,7 @@ pub mod common_api;
 pub mod cpu_limit;
 pub mod evaluations;
 pub mod events;
+pub mod fractals;
 pub mod http_server;
 #[allow(non_snake_case)]
 pub mod invite;
@@ -26,3 +27,4 @@ pub mod symbol;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;
+pub mod x_admin;

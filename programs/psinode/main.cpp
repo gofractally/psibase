@@ -1,6 +1,7 @@
 #include <psibase/ConfigFile.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
+#include <psibase/RunQueue.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
@@ -393,6 +394,47 @@ void validate(boost::any& v, const std::vector<std::string>& values, native_serv
 std::filesystem::path config_template_path()
 {
    return installPrefix() / "share" / "psibase" / "config.in";
+}
+
+std::filesystem::path database_template_path()
+{
+   return installPrefix() / "share" / "psibase" / "services";
+}
+
+void load_subjective_services(Database& db)
+{
+   for (const auto& entry : std::filesystem::directory_iterator{database_template_path()})
+   {
+      auto filename = entry.path().filename();
+      if (filename.extension().string() == ".wasm")
+      {
+         auto account = AccountNumber{filename.stem().string()};
+         if (account != AccountNumber{})
+         {
+            PSIBASE_LOG(psibase::loggers::generic::get(), info)
+                << "Loading subjective service " << account.str();
+            std::ifstream             in(entry.path(), std::ios_base::binary);
+            std::vector<std::uint8_t> code(std::filesystem::file_size(entry.path()));
+            in.read(reinterpret_cast<char*>(code.data()), code.size());
+            if (!in)
+               throw std::runtime_error{"Failed to read " + entry.path().string()};
+
+            auto    codeHash = sha256(code.data(), code.size());
+            CodeRow codeRow{
+                .codeNum = account,
+                .flags   = CodeRow::allowWriteSubjective | CodeRow::allowSocket |
+                         CodeRow::allowNativeSubjective,
+                .codeHash = codeHash,
+            };
+            db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+            CodeByHashRow codeByHashRow{
+                .codeHash = codeHash,
+                .code     = std::move(code),
+            };
+            db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+         }
+      }
+   }
 }
 
 void load_service(const native_service& config,
@@ -1151,6 +1193,7 @@ struct PsinodeConfig
    http::admin_service         admin;
    std::vector<authz>          admin_authz;
    Timeout                     http_timeout;
+   std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
 };
 PSIO_REFLECT(PsinodeConfig,
@@ -1168,6 +1211,7 @@ PSIO_REFLECT(PsinodeConfig,
              admin,
              admin_authz,
              http_timeout,
+             service_threads,
              loggers);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
@@ -1261,6 +1305,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
       file.set("", "http-timeout", to_string(config.http_timeout),
                "The maximum time for HTTP clients to send or receive a message");
    }
+   file.set("", "service-threads", std::to_string(config.service_threads),
+            "The number of threads that run async actions posted by services");
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1285,6 +1331,7 @@ void run(const std::string&              db_path,
          http::admin_service&            admin,
          std::vector<authz>&             admin_authz,
          Timeout&                        http_timeout,
+         std::size_t&                    service_threads,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
@@ -1298,7 +1345,7 @@ void run(const std::string&              db_path,
        SharedDatabase{
            db_path,
            {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
-           triedent::open_mode::create},
+           triedent::open_mode::resize},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
@@ -1324,6 +1371,23 @@ void run(const std::string&              db_path,
          if (std::filesystem::is_regular_file(template_path))
          {
             std::filesystem::copy_file(template_path, config_path);
+         }
+      }
+   }
+
+   // If this is a new database, initialize subjective services
+   {
+      Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
+      SocketAutoCloseSet autoClose;
+      auto               session = db.startWrite(system->sharedDatabase.createWriter());
+      db.checkoutSubjective();
+      auto key = psio::convert_to_key(codePrefix());
+      if (!db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
+      {
+         load_subjective_services(db);
+         if (!db.commitSubjective(*system->sockets, autoClose))
+         {
+            throw std::runtime_error("Failed to initialize database");
          }
       }
    }
@@ -1436,6 +1500,10 @@ void run(const std::string&              db_path,
    // is destroyed.
    auto http_config = std::make_shared<http::http_config>();
 
+   // The runQueue needs to out-live the chainContext, so
+   // that notify is safe.
+   RunQueue runQueue{sharedState};
+
    boost::asio::io_context chainContext;
 
    auto server_work = boost::asio::make_work_guard(chainContext);
@@ -1466,6 +1534,13 @@ void run(const std::string&              db_path,
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
+
+   // The callback is *not* posted to chainContext. It can run concurrently.
+   node.chain().onChangeRunQueue([&] { runQueue.notify(); });
+
+   // This needs to be initialized after all chain state,
+   // because the thread pool can begin executing wasm immediately.
+   WasmThreadPool tpool{runQueue, service_threads};
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
@@ -1575,7 +1650,8 @@ void run(const std::string&              db_path,
                                  boost::asio::use_service<http::server_service>(
                                      static_cast<boost::asio::execution_context&>(chainContext))
                                      .async_close(restart,
-                                                  [&chainContext, &server_work]() {
+                                                  [&chainContext, &server_work]()
+                                                  {
                                                      boost::asio::post(chainContext,
                                                                        [&server_work]()
                                                                        { server_work.reset(); });
@@ -1682,7 +1758,8 @@ void run(const std::string&              db_path,
 
       http_config->set_config =
           [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &admin, &admin_authz,
-           &http_timeout, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one,
+           &http_timeout, &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca,
+           &pkcs11_modules, &connect_one,
            setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
@@ -1692,8 +1769,8 @@ void run(const std::string&              db_path,
              chainContext,
              [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
               &runResult, &http_config, &hosts, &services, &admin, &admin_authz, &http_timeout,
-              &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, setPKCS11Libs,
-              callback = std::move(callback)]() mutable
+              &service_threads, &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+              &connect_one, setPKCS11Libs, callback = std::move(callback)]() mutable
              {
                 std::optional<http::services_t> new_services;
                 for (auto& entry : config.services)
@@ -1734,12 +1811,13 @@ void run(const std::string&              db_path,
                    node.autoconnect(std::vector(config.peers), config.autoconnect.value,
                                     connect_one);
                 }
-                pkcs11_modules = config.pkcs11_modules;
-                hosts          = config.hosts;
-                services       = config.services;
-                admin          = config.admin;
-                admin_authz    = config.admin_authz;
-                http_timeout   = config.http_timeout;
+                pkcs11_modules  = config.pkcs11_modules;
+                hosts           = config.hosts;
+                services        = config.services;
+                admin           = config.admin;
+                admin_authz     = config.admin_authz;
+                http_timeout    = config.http_timeout;
+                service_threads = config.service_threads;
 #ifdef PSIBASE_ENABLE_SSL
                 tls_cert = config.tls.certificate;
                 tls_key  = config.tls.key;
@@ -1761,6 +1839,7 @@ void run(const std::string&              db_path,
                       http_config->services.swap(*new_services);
                    }
                 }
+                tpool.setNumThreads(service_threads);
                 {
                    auto       path = std::filesystem::path(db_path) / "config";
                    ConfigFile file{config_options};
@@ -1780,13 +1859,13 @@ void run(const std::string&              db_path,
       };
 
       http_config->get_config = [&chainContext, &node, &http_config, &hosts, &admin, &admin_authz,
-                                 &http_timeout, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
-                                 &services](http::get_config_callback callback)
+                                 &http_timeout, &service_threads, &tls_cert, &tls_key, &root_ca,
+                                 &pkcs11_modules, &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
                            [&chainContext, &node, &http_config, &hosts, &services, &admin,
-                            &admin_authz, &http_timeout, &tls_cert, &tls_key, &root_ca,
-                            &pkcs11_modules, callback = std::move(callback)]() mutable
+                            &admin_authz, &http_timeout, &service_threads, &tls_cert, &tls_key,
+                            &root_ca, &pkcs11_modules, callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
                               result.p2p = http_config->enable_p2p;
@@ -1800,11 +1879,12 @@ void run(const std::string&              db_path,
                               result.tls.key         = tls_key;
                               result.tls.trustfiles  = root_ca;
 #endif
-                              result.services     = services;
-                              result.admin        = admin;
-                              result.admin_authz  = admin_authz;
-                              result.http_timeout = http_timeout;
-                              result.loggers      = loggers::Config::get();
+                              result.services        = services;
+                              result.admin           = admin;
+                              result.admin_authz     = admin_authz;
+                              result.http_timeout    = http_timeout;
+                              result.service_threads = service_threads,
+                              result.loggers         = loggers::Config::get();
                               callback(
                                   [result = std::move(result)]() mutable
                                   {
@@ -2157,6 +2237,7 @@ int main(int argc, char* argv[])
    byte_size                   db_cache_size;
    byte_size                   db_size;
    Timeout                     http_timeout;
+   std::size_t                 service_threads;
 
    namespace po = boost::program_options;
 
@@ -2185,7 +2266,8 @@ int main(int argc, char* argv[])
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
        "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: "
-       "this will not modify an existing database. This option is subject to change.");
+       "If this is reduced, it may cause a significant delay on startup as the database is "
+       "reorganized. This option is subject to change.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");
@@ -2202,6 +2284,8 @@ int main(int argc, char* argv[])
        "Transaction leeway, in µs.");
    opt("http-timeout", po::value(&http_timeout)->default_value({}, "")->value_name("seconds"),
        "The maximum time for HTTP clients to send or receive a message");
+   opt("service-threads", po::value(&service_threads)->default_value(1, "")->value_name("num"),
+       "The number of threads that run async actions posted by services");
    desc.add(common_opts);
    opt = desc.add_options();
    // Options that can only be specified on the command line
@@ -2291,7 +2375,7 @@ int main(int argc, char* argv[])
          restart.soft              = true;
          run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
              autoconnect, enable_incoming_p2p, hosts, listen, services, admin, admin_authz,
-             http_timeout, root_ca, tls_cert, tls_key, leeway_us, restart);
+             http_timeout, service_threads, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

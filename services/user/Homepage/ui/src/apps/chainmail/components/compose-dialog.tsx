@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 
 import {
@@ -18,8 +18,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button, type ButtonProps } from "@/components/ui/button";
+} from "@shared/shadcn/ui/alert-dialog";
+import { Button, type ButtonProps } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -28,21 +28,21 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import {
     Form,
     FormControl,
     FormField,
     FormItem,
     FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
+import { Textarea } from "@shared/shadcn/ui/textarea";
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@shared/shadcn/ui/tooltip";
 
 import { AwaitTime } from "@/globals";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -101,7 +101,7 @@ export function ComposeDialog({
         }
     }, [message]);
 
-    const id = useRef<string>();
+    const id = useRef<string>("");
 
     const createDraft = () => {
         if (!id.current || !user) return;
@@ -122,7 +122,7 @@ export function ComposeDialog({
     };
 
     const updateDraft = () => {
-        let draft = allDrafts.find((msg) => msg.id === id.current);
+        const draft = allDrafts.find((msg) => msg.id === id.current);
         if (!draft) {
             createDraft();
         } else {
@@ -135,7 +135,7 @@ export function ComposeDialog({
     };
 
     const sendMessage = async () => {
-        let draft = allDrafts.find((msg) => msg.id === id.current);
+        const draft = allDrafts.find((msg) => msg.id === id.current);
         if (!draft) {
             return console.error("No message found to send");
         }

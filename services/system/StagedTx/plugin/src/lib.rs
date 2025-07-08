@@ -135,6 +135,20 @@ impl Proposer for StagedTxPlugin {
         Ok(())
     }
 
+    fn propose(actions: Vec<Action>, auto_exec: bool) -> Result<(), Error> {
+        let packages = psibase::services::packages::SERVICE.to_string();
+        get_assert_caller("propose", &[&packages])?;
+
+        add_action_to_transaction(
+            propose::ACTION_NAME,
+            &propose {
+                actions: actions.into_iter().map(|a| a.into()).collect(),
+                auto_exec,
+            }
+            .packed(),
+        )
+    }
+
     fn remove(id: u32) -> Result<(), Error> {
         add_action_to_transaction(
             remove::ACTION_NAME,

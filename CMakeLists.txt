@@ -135,9 +135,9 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode Symbol
-        Transact VerifySig
+        Transact VerifySig XAdmin
         PSubjectiveService CounterService AsyncQueryService
-        SubjectiveCounterService KeepSocketService SocketListService SocketAuth)
+        SubjectiveCounterService KeepSocketService SocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -279,6 +279,7 @@ add_rs_component_workspace(services/:Plugins
     setcode
     clientdata
     invite
+    packages
     permissions
     sites
     test
@@ -291,10 +292,11 @@ function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
-    DEPENDS XAdmin_js
+    DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
@@ -316,12 +318,12 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.17.0")
+set(PSIBASE_VERSION 0.18)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
     NAME Transact
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
@@ -336,13 +338,13 @@ psibase_package(
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
@@ -358,15 +360,15 @@ psibase_package(
     DEPENDS ${Accounts_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Base64.psi
     NAME Base64
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Base64 encoding and decoding"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE base64
         DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -375,9 +377,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Kdf.psi
     NAME Kdf
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Key Derivation Function"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE kdf
         DATA ${Plugins_OUTPUT_FILE_kdf} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -386,9 +388,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Aes.psi
     NAME Aes
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "AES encryption"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE aes
         DATA ${Plugins_OUTPUT_FILE_aes} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -398,8 +400,8 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/ClientData.psi
     NAME ClientData
     DESCRIPTION "Plugin for enabling simpler interactions with client-side data storage"
-    VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    VERSION ${PSIBASE_VERSION}.0
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Supervisor(^${PSIBASE_VERSION}.0)"
     SERVICE clientdata
         DATA ${Plugins_OUTPUT_FILE_clientdata} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -426,6 +428,13 @@ cargo_psibase_package(
     PATH services/user/Tokens
     DEPENDS ${Tokens_js_DEP}
 )
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Fractals.psi
+    PATH services/user/Fractals
+    DEPENDS ${Fractals_js_DEP}
+)
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
@@ -456,7 +465,7 @@ cargo_psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSig.psi
     NAME AuthSig
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
@@ -474,10 +483,10 @@ psibase_package(
     DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     # This dependency is removed as a hack to get tests to pass in CICD.
     # Test boots don't load UI elements, so the setCsp Permissions calls, fails
-    # "Permissions(^${PSIBASE_VERSION})"
+    # "Permissions(^${PSIBASE_VERSION}.0)"
 )
 
 set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi)
@@ -495,7 +504,7 @@ set(THIRD_FILES
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonApi.psi
     NAME CommonApi
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Service that contains the common files and libraries used by apps on psibase"
     SERVICE common-api
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
@@ -511,13 +520,13 @@ psibase_package(
     DEPENDS ${ComponentParser_DEP}
     DEPENDS ${PluginTester_js_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthDelegate.psi
     NAME AuthDelegate
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
@@ -529,13 +538,13 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate-schema.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthAny.psi
     NAME AuthAny
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Insecure auth service that allows any access"
     SERVICE auth-any
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
@@ -543,13 +552,13 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_auth_any} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CpuLimit.psi
     NAME CpuLimit
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Service that manages CPU billing"
     SERVICE cpu-limit
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
@@ -561,23 +570,23 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Docs.psi
     NAME Docs
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Psibase documentation"
     SERVICE docs
         DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Homepage.psi
     NAME Homepage
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network homepage"
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/ui/dist/*  /
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Profiles(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
 )
 
@@ -590,7 +599,7 @@ cargo_psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Nop.psi
     NAME Nop
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Service that does nothing"
     SERVICE nop
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
@@ -601,7 +610,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Sites.psi
     NAME Sites
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Provides web hosting to non-service accounts"
     SERVICE sites
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
@@ -610,13 +619,13 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_sites} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Producers.psi
     NAME Producers
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Manages the active producers"
     SERVICE producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
@@ -632,13 +641,13 @@ psibase_package(
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Producers_js_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/HttpServer.psi
     NAME HttpServer
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "The `http-server` service routes HTTP requests to the appropriate service"
     SERVICE http-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
@@ -654,7 +663,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SetCode.psi
     NAME SetCode
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
     SERVICE setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
@@ -668,13 +677,13 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RSetCode-schema.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Events.psi
     NAME Events
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Indexes events and provides querying"
     SERVICE events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
@@ -686,13 +695,13 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Explorer.psi
     NAME Explorer
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Block explorer"
     SERVICE explorer
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
@@ -701,15 +710,15 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Explorer/ui/dist /
     DEPENDS ${Explorer_js_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Invite.psi
     NAME Invite
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json
@@ -730,8 +739,8 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Nft.psi
     NAME Nft
-    VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})"
+    VERSION ${PSIBASE_VERSION}.0
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)"
     SERVICE nft
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
@@ -742,8 +751,8 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
     NAME Supervisor
-    VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
+    VERSION ${PSIBASE_VERSION}.0
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
@@ -752,9 +761,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Permissions.psi
     NAME Permissions
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Handler for client-side permissions"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/postinstall.json
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
@@ -767,8 +776,8 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
     NAME SupervisorTests
     DESCRIPTION "Plugin functions for testing Supervisor functionality"
-    VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    VERSION ${PSIBASE_VERSION}.0
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Supervisor(^${PSIBASE_VERSION}.0)"
     SERVICE sup-test
         DATA ${Plugins_OUTPUT_FILE_test} /test.wasm
     DEPENDS ${Plugins_DEP}
@@ -778,9 +787,9 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Symbol.psi
     NAME Symbol
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
     SERVICE symbol
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
@@ -791,19 +800,19 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
     NAME Workshop
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A dashboard for developers to create and manage apps"
     PACKAGE_DEPENDS 
-        "HttpServer(^${PSIBASE_VERSION})" 
-        "Sites(^${PSIBASE_VERSION})" 
-        "Accounts(^${PSIBASE_VERSION})" 
-        "CommonApi(^${PSIBASE_VERSION})" 
-        "Registry(^${PSIBASE_VERSION})" 
-        "StagedTx(^${PSIBASE_VERSION})" 
-        "Transact(^${PSIBASE_VERSION})"
-        "SetCode(^${PSIBASE_VERSION})"
-        "Chainmail(^${PSIBASE_VERSION})"
-        "ClientData(^${PSIBASE_VERSION})"
+        "HttpServer(^${PSIBASE_VERSION}.0)" 
+        "Sites(^${PSIBASE_VERSION}.0)" 
+        "Accounts(^${PSIBASE_VERSION}.0)" 
+        "CommonApi(^${PSIBASE_VERSION}.0)" 
+        "Registry(^${PSIBASE_VERSION}.0)" 
+        "StagedTx(^${PSIBASE_VERSION}.0)" 
+        "Transact(^${PSIBASE_VERSION}.0)"
+        "SetCode(^${PSIBASE_VERSION}.0)"
+        "Chainmail(^${PSIBASE_VERSION}.0)"
+        "ClientData(^${PSIBASE_VERSION}.0)"
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
@@ -815,46 +824,48 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION})" "Symbol(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/src/TokenUsers.json
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Packages.psi
     NAME Packages
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Package manager for psibase apps"
     SERVICE packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Packages-schema.json
         SERVER r-packages
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Packages/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_packages} /plugin.wasm
     SERVICE r-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
-    DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Nop(^${PSIBASE_VERSION})"
+    DEPENDS wasm ${Packages_js_DEP} ${Plugins_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Nop(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Evaluations Events Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs Evaluations Events Fractals Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ProdDefault.psi
     NAME ProdDefault
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs Events Explorer Fractals HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -862,7 +873,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
     NAME Minimal
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
                     SetCode Transact
@@ -871,7 +882,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TestDefault.psi
     NAME TestDefault
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Services used in the tester"
     PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
@@ -891,7 +902,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Evaluations Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs Events Evaluations Fractals Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -907,13 +918,14 @@ install(
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
-          ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/DevDefault.psi
           ${SERVICE_DIR}/ProdDefault.psi
+          ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
+          ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
@@ -945,34 +957,34 @@ install(
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/PSubjective.psi
     NAME PSubjective
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test service for parallel access to the subjective database"
     SERVICE psubjective
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
         FLAGS isSubjective allowWriteSubjective
         SERVER psubjective
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/Counter.psi
     NAME Counter
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test service than increments a counter"
     SERVICE counter
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CounterService-schema.json
         SERVER counter
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/AsyncQuery.psi
     NAME AsyncQuery
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test service for the various ways to respond to http requests"
     SERVICE as-query
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
@@ -980,64 +992,52 @@ psibase_package(
         SERVER as-query
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/AsyncQueryService.json
         FLAGS allowWriteSubjective
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SubjectiveCounter.psi
     NAME SubjectiveCounter
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test service that increments a counter in the subjective db"
     SERVICE s-counter
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService-schema.json
         SERVER s-counter
         FLAGS isSubjective allowWriteSubjective
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/KeepSocket.psi
     NAME KeepSocket
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Accepts HTTP requests, but never returns a response"
     SERVICE s-keep-sock
         WASM ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService-schema.json
         SERVER s-keep-sock
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketList.psi
     NAME SocketList
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Lists active sockets"
     SERVICE s-sock-list
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SocketListService-schema.json
         SERVER s-sock-list
         FLAGS allowNativeSubjective
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
-psibase_package(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketAuth.psi
-    NAME SocketAuth
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Try to break sockets"
-    SERVICE s-socket-auth
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketAuth.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SocketAuth-schema.json
-        FLAGS allowSocket isSubjective
-    DEPENDS wasm
-)
-
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList SocketAuth)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList)
 
 ExternalProject_Add(
     rust

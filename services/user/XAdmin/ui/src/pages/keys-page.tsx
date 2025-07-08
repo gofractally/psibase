@@ -23,14 +23,14 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@shared/shadcn/ui/table";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+} from "@shared/shadcn/ui/dropdown-menu";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -39,13 +39,11 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
-import { Tabs } from "@/components/ui/tabs";
-import { TabsList } from "@/components/ui/tabs";
-import { TabsTrigger } from "@/components/ui/tabs";
-import { TabsContent } from "@/components/ui/tabs";
+import { Tabs } from "@shared/shadcn/ui/tabs";
+import { TabsList, TabsTrigger, TabsContent } from "@shared/shadcn/ui/tabs";
 
 import { EmptyBlock } from "@/components/EmptyBlock";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";

@@ -1,5 +1,5 @@
 import { FilePlus2, type LucideProps } from "lucide-react";
-import { Button } from "./ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 interface Props {
     title: string;

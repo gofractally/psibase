@@ -39,6 +39,17 @@ namespace SystemService
             kvRemove(CodeByHashRow::db, codeByHashKey(codeHash, vmType, vmVersion));
          }
       }
+
+      void incrementVerifySeq(std::uint64_t flags)
+      {
+         if (flags & CodeRow::isAuthService)
+         {
+            auto verifySeq = SetCode{}.open<VerifySequenceTable>();
+            auto row       = verifySeq.get({}).value_or(VerifySequenceRow{});
+            ++row.seq;
+            verifySeq.put(row);
+         }
+      }
    }  // namespace
 
    void SetCode::init()
@@ -95,6 +106,8 @@ namespace SystemService
       {
          decrementRefCount(refsTable, account->codeHash, account->vmType, account->vmVersion);
       }
+
+      incrementVerifySeq(account->flags);
 
       account->codeHash  = codeHash;
       account->vmType    = vmType;
@@ -207,6 +220,8 @@ namespace SystemService
          decrementRefCount(refsTable, account->codeHash, account->vmType, account->vmVersion);
       }
 
+      incrementVerifySeq(account->flags);
+
       account->codeHash  = codeHash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
@@ -222,11 +237,18 @@ namespace SystemService
          account.emplace();
          account->codeNum = service;
       }
+      incrementVerifySeq(account->flags ^ flags);
+
       account->flags = flags;
       if (account->codeHash != Checksum256{} || account->flags)
          kvPut(account->db, account->key(), *account);
       else
          kvRemove(account->db, account->key());
+   }
+
+   std::uint64_t SetCode::verifySeq()
+   {
+      return open<VerifySequenceTable>().get({}).value_or(VerifySequenceRow{}).seq;
    }
 
 }  // namespace SystemService

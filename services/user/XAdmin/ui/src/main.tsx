@@ -7,8 +7,6 @@ import { Toaster } from "@/components/ui/toaster";
 
 import { Routing } from "./routing";
 
-import "./styles/globals.css";
-
 export const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

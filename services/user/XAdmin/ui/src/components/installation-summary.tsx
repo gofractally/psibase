@@ -6,12 +6,12 @@ import {
     AccordionContent,
     AccordionItem,
     AccordionTrigger,
-} from "@/components/ui/accordion";
+} from "@shared/shadcn/ui/accordion";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@shared/shadcn/ui/popover";
 
 import { ConfirmationForm } from "@/components/forms/confirmation-form";
 import { PackageInfo } from "@/types";

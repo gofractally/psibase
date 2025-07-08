@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.18.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.38.0", features = ["bitflags"] }
@@ -24,6 +24,7 @@ world = "impl"
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
 "chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }

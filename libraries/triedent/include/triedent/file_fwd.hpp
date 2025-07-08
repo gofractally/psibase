@@ -60,15 +60,18 @@ namespace triedent
       read_write = 1,
       // Create a new database if the database does not exist
       create = 2,
+      // If the database doesn't exist, create it. If it does
+      // resize the buffers.
+      resize = 3,
       // Create a new database, overwriting an existing database
-      trunc = 3,
+      trunc = 4,
       // Create a new database. It is an error if the database already exists
-      create_new = 4,
+      create_new = 5,
       // Create a unique temporary database which will be deleted when it is closed.
       // The path should be an existing directory.
-      temporary = 5,
+      temporary = 6,
       // Open an existing database for garbage collection
-      gc = 6,
+      gc = 7,
    };
 
 }  // namespace triedent

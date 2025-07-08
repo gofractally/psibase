@@ -18,11 +18,9 @@
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
         "react-router-dom": "^6.23.1",
-        "sonner": "^2.0.5",
         "zod": "^3.25.51"
     },
     "devDependencies": {
-        "@tailwindcss/vite": "^4.1.8",
         "@types/node": "^22.15.0",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",

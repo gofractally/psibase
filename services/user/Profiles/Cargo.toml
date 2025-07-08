@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.17.0"
+version = "0.18.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -28,13 +28,13 @@ package-name = "Profiles"
 services = ["profiles"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.17.0"
-Sites = "0.17.0"
+HttpServer = "0.18.0"
+Sites = "0.18.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-profiles = { path = "service", version = "0.17.0" }
-r-profiles = { path = "query-service", version = "0.17.0" }
-plugin = { path = "plugin", version = "0.17.0" }
+profiles = { path = "service", version = "0.18.0" }
+r-profiles = { path = "query-service", version = "0.18.0" }
+plugin = { path = "plugin", version = "0.18.0" }

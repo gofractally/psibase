@@ -20,7 +20,7 @@ import {
 import { useConnectedAccounts } from "./hooks/useConnectedAccounts";
 import { Copy, Download } from "lucide-react";
 import { Input } from "@shared/shadcn/ui/input";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import {
   Dialog,
   DialogContent,

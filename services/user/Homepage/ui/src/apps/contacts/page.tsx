@@ -1,14 +1,14 @@
 import { Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { useMediaQuery } from "usehooks-ts";
 
-import { Button } from "@/components/ui/button";
-import { DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Button } from "@shared/shadcn/ui/button";
+import { DialogTrigger } from "@shared/shadcn/ui/dialog";
+import { Input } from "@shared/shadcn/ui/input";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
+import { TooltipContent, TooltipTrigger } from "@shared/shadcn/ui/tooltip";
+import { Tooltip } from "@shared/shadcn/ui/tooltip";
 
 import { TwoColumnSelect } from "@/components/two-column-select";
 
@@ -84,11 +84,11 @@ export const ContactsPage = () => {
         }
     }, [isDesktop, search, contacts, selectedContactAccount]);
 
-    const handleTransferFunds = (contact: string | undefined) => {
+    const handleTransferFunds = () => {
         toast.error("Not implemented: Transfer funds");
     };
 
-    const chainMailUser = (contactId: string) => {
+    const chainMailUser = () => {
         toast.error("Not implemented: Chain mail user");
     };
 

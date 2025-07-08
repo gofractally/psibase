@@ -36,6 +36,7 @@ export const useConfig = () =>
             try {
                 return transformConfigServerToUI(await chain.getConfig());
             } catch (e) {
+                console.error(e);
                 const message = `Failed to fetch config`;
                 throw message;
             }

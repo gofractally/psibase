@@ -11,7 +11,7 @@ const zPermsOauthRequest = z.object({
     callee: z.string(),
 });
 
-type PermsOauthRequest = z.infer<typeof zPermsOauthRequest>;
+export type PermsOauthRequest = z.infer<typeof zPermsOauthRequest>;
 
 export class ActivePermsOauthRequest {
     static async get(): Promise<PermsOauthRequest> {

@@ -1,4 +1,4 @@
-import { FormLabel } from "@/components/ui/form";
+import { FormLabel } from "@shared/shadcn/ui/form";
 import { Check, UserX, LoaderCircle } from "lucide-react";
 
 export const AccountAvailabilityStatus = ({

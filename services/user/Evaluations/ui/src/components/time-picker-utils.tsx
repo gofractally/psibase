@@ -147,8 +147,7 @@ export function isValidHour(value: string) {
       case "hours":
         return getValidHour(String(date.getHours()));
       case "12hours":
-        const hours = display12HourValue(date.getHours());
-        return getValid12Hour(String(hours));
+        return getValid12Hour(String(display12HourValue(date.getHours())));
       default:
         return "00";
     }

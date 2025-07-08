@@ -1,4 +1,4 @@
-import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
 import { siblingUrl } from "@psibase/common-lib";
 
 function HoverBorderGradientDemo() {

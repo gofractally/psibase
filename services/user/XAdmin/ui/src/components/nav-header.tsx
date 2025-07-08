@@ -2,9 +2,9 @@ import { NavLink } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 
-import { HoverBorderGradient } from "./hover-border-gradient";
+import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
 import { MenuContent } from "./menu-content";
 import { useBranding } from "../hooks/useBranding";
 import { useStatuses } from "../hooks/useStatuses";

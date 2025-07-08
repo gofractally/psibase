@@ -4,7 +4,7 @@ import { recursiveFetch } from "@/lib/recursiveFetch";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-const connectParam = z.object({
+export const connectParam = z.object({
     url: z.string(),
 });
 
@@ -45,7 +45,7 @@ export const useConnect = () =>
                 const connectedPeer = await connectToPeer(param, beforePeers);
                 await chain.addPeer(param.url);
                 return connectedPeer;
-            } catch (e) {
+            } catch {
                 throw new Error("Failed connecting to node");
             }
         },

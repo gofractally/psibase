@@ -47,6 +47,7 @@ function(add suffix)
         Sites/include
         Symbol/include
         Tokens/include
+        XAdmin/include
     )
 endfunction(add)
 
@@ -64,6 +65,8 @@ if(DEFINED IS_WASM)
     add_subdirectory(Packages)
     add_subdirectory(Sites)
     add_subdirectory(Symbol)
+    add_subdirectory(Tokens)
+    add_subdirectory(XAdmin)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
