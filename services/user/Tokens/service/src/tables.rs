@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{check, check_none, check_some, get_sender, AccountNumber};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -40,7 +40,6 @@ pub mod tables {
     }
 
     define_flags!(TokenFlags, u8, {
-        unburnable,
         untransferable,
         unrecallable,
     });
@@ -270,10 +269,11 @@ pub mod tables {
 
             if self.balance == 0.into() {
                 let keep_zero_balance = BalanceConfig::get(self.account, self.token_id)
-                    .map(|token_holder| {
-                        token_holder.get_flag(BalanceConfigFlags::KEEP_ZERO_BALANCES)
-                    })
-                    .unwrap_or(false);
+                    .map(|token_holder| token_holder.get_flag(BalanceFlags::KEEP_ZERO_BALANCES))
+                    .unwrap_or(
+                        UserConfig::get_or_new(self.account)
+                            .get_flag(BalanceFlags::KEEP_ZERO_BALANCES),
+                    );
 
                 if keep_zero_balance {
                     self.save();
@@ -296,6 +296,14 @@ pub mod tables {
                     .try_into()
                     .unwrap(),
             )
+        }
+
+        pub async fn settings(&self) -> BalanceFlagsJson {
+            let flag = BalanceConfig::get(self.account, self.token_id)
+                .map(|bal| bal.flags)
+                .unwrap_or(UserConfig::get_or_new(self.account).flags);
+
+            BalanceFlagsJson::from(Flags::new(flag))
         }
     }
 
@@ -358,11 +366,21 @@ pub mod tables {
             }
         }
 
-        pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
+        fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
             SharedBalanceTable::new()
                 .get_index_pk()
                 .get(&(creditor, debitor, token_id))
-                .unwrap_or(Self::new(creditor, debitor, token_id))
+        }
+
+        pub fn get_assert(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
+            check_some(
+                Self::get(creditor, debitor, token_id),
+                "shared balance doesn't exist",
+            )
+        }
+
+        pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
+            Self::get(creditor, debitor, token_id).unwrap_or(Self::new(creditor, debitor, token_id))
         }
 
         pub fn credit(&mut self, quantity: Quantity) {
@@ -378,8 +396,8 @@ pub mod tables {
             );
 
             let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
-                .map(|holder| holder.get_flag(BalanceConfigFlags::AUTO_DEBIT))
-                .unwrap_or(false);
+                .map(|holder| holder.get_flag(BalanceFlags::AUTO_DEBIT))
+                .unwrap_or(UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::AUTO_DEBIT));
 
             if is_auto_debit {
                 self.debit(quantity, "Autodebit".to_string());
@@ -410,6 +428,20 @@ pub mod tables {
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
         }
 
+        pub fn reject(&mut self, memo: String) {
+            if self.balance.value > 0 {
+                crate::Wrapper::emit().history().rejected(
+                    self.token_id,
+                    self.creditor,
+                    self.debitor,
+                    memo,
+                );
+                let balance = self.balance;
+                self.sub_balance(balance);
+                Balance::get_or_new(self.debitor, self.token_id).add_balance(balance);
+            }
+        }
+
         fn add_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance + quantity;
             self.save();
@@ -420,10 +452,11 @@ pub mod tables {
 
             if self.balance == 0.into() {
                 let keep_zero_balance = BalanceConfig::get(self.creditor, self.token_id)
-                    .map(|token_holder| {
-                        token_holder.get_flag(BalanceConfigFlags::KEEP_ZERO_BALANCES)
-                    })
-                    .unwrap_or(false);
+                    .map(|token_holder| token_holder.get_flag(BalanceFlags::KEEP_ZERO_BALANCES))
+                    .unwrap_or(
+                        UserConfig::get_or_new(self.creditor)
+                            .get_flag(BalanceFlags::KEEP_ZERO_BALANCES),
+                    );
 
                 if keep_zero_balance {
                     self.save();
@@ -445,18 +478,18 @@ pub mod tables {
         }
     }
 
+    define_flags!(BalanceFlags, u8, {
+        auto_debit,
+        keep_zero_balances,
+    });
+
     #[table(name = "BalanceConfigTable", index = 4)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
     pub struct BalanceConfig {
         pub account: AccountNumber,
         pub token_id: TID,
         pub flags: u8,
     }
-
-    define_flags!(BalanceConfigFlags, u8, {
-        auto_debit,
-        keep_zero_balances,
-    });
 
     impl BalanceConfig {
         #[primary_key]
@@ -465,6 +498,7 @@ pub mod tables {
         }
 
         fn new(account: AccountNumber, token_id: TID) -> Self {
+            Token::get_assert(token_id);
             Self {
                 account,
                 token_id,
@@ -482,12 +516,12 @@ pub mod tables {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
-        pub fn set_flag(&mut self, flag: BalanceConfigFlags, enabled: bool) {
+        pub fn set_flag(&mut self, flag: BalanceFlags, enabled: bool) {
             self.flags = Flags::new(self.flags).set(flag, enabled).value();
             self.save();
         }
 
-        pub fn get_flag(&self, flag: BalanceConfigFlags) -> bool {
+        pub fn get_flag(&self, flag: BalanceFlags) -> bool {
             Flags::new(self.flags).get(flag)
         }
 
@@ -505,6 +539,68 @@ pub mod tables {
             } else {
                 self.put();
             }
+        }
+    }
+
+    #[ComplexObject]
+    impl BalanceConfig {
+        pub async fn settings(&self) -> BalanceFlagsJson {
+            BalanceFlagsJson::from(Flags::new(self.flags))
+        }
+    }
+
+    #[table(name = "UserConfigTable", index = 5)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
+    pub struct UserConfig {
+        #[primary_key]
+        pub account: AccountNumber,
+        pub flags: u8,
+    }
+
+    impl UserConfig {
+        fn new(account: AccountNumber) -> Self {
+            Self { account, flags: 0 }
+        }
+
+        fn get(account: AccountNumber) -> Option<Self> {
+            UserConfigTable::new().get_index_pk().get(&account)
+        }
+
+        pub fn get_or_new(account: AccountNumber) -> Self {
+            Self::get(account).unwrap_or(Self::new(account))
+        }
+
+        pub fn set_flag(&mut self, flag: BalanceFlags, enabled: bool) {
+            self.flags = Flags::new(self.flags).set(flag, enabled).value();
+            self.save();
+        }
+
+        pub fn get_flag(&self, flag: BalanceFlags) -> bool {
+            Flags::new(self.flags).get(flag)
+        }
+
+        fn delete(&self) {
+            UserConfigTable::new().erase(&(self.get_primary_key()));
+        }
+
+        fn put(&mut self) {
+            UserConfigTable::new().put(&self).unwrap();
+        }
+
+        fn save(&mut self) {
+            if self.flags == 0 {
+                self.delete();
+            } else {
+                self.put();
+            }
+        }
+    }
+
+    #[ComplexObject]
+    impl UserConfig {
+        pub async fn settings(&self) -> BalanceFlagsJson {
+            BalanceFlagsJson::from(Flags::new(self.flags))
         }
     }
 }

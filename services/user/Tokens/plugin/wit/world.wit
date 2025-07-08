@@ -38,6 +38,8 @@ interface intf {
 
     set-balance-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
     set-token-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
+    set-user-config: func(index: u8, enabled: bool) -> result<_, error>;
+    
 }
 
 interface queries {
@@ -53,6 +55,8 @@ interface transfer {
     uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
     credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
     debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    reject: func(token-id: token-id, creditor: account-number, memo: string) -> result<_, error>;
+
 
 }
 

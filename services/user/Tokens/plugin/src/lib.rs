@@ -163,6 +163,14 @@ impl Intf for TokensPlugin {
             &packed_args,
         )
     }
+
+    fn set_user_config(index: u8, enabled: bool) -> Result<(), Error> {
+        let packed_args = tokens::action_structs::setUserConf { enabled, index }.packed();
+        add_action_to_transaction(
+            tokens::action_structs::setUserConf::ACTION_NAME,
+            &packed_args,
+        )
+    }
 }
 
 impl Transfer for TokensPlugin {
@@ -210,6 +218,25 @@ impl Transfer for TokensPlugin {
         .packed();
 
         add_action_to_transaction(tokens::action_structs::debit::ACTION_NAME, &packed_args)
+    }
+
+    fn reject(
+        token_id: Wit::TokenId,
+        creditor: Wit::AccountNumber,
+        memo: String,
+    ) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let packed_args = tokens::action_structs::reject {
+            creditor: creditor.as_str().into(),
+            token_id: token.id,
+            memo,
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::reject::ACTION_NAME, &packed_args)
     }
 
     fn uncredit(

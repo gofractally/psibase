@@ -3,7 +3,7 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::*;
-    pub use crate::tables::tables::{BalanceConfigFlags, TokenFlags};
+    pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
     use psibase::services::tokens::{Precision, Quantity};
@@ -116,6 +116,18 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn getUserConf(account: AccountNumber, index: u8) -> bool {
+        UserConfig::get_or_new(account).get_flag(index.into())
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn setUserConf(index: u8, enabled: bool) {
+        UserConfig::get_or_new(get_sender()).set_flag(index.into(), enabled);
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn getTokenConf(token_id: TID, index: u8) -> bool {
         Token::get_assert(token_id).get_flag(index.into())
     }
@@ -186,7 +198,7 @@ pub mod service {
     fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: String) {
         let creditor = get_sender();
 
-        SharedBalance::get_or_new(creditor, debitor, token_id).uncredit(amount);
+        SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
 
         Wrapper::emit()
             .history()
@@ -195,7 +207,12 @@ pub mod service {
 
     #[action]
     fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: String) {
-        SharedBalance::get_or_new(creditor, get_sender(), token_id).debit(amount, memo);
+        SharedBalance::get_assert(creditor, get_sender(), token_id).debit(amount, memo);
+    }
+
+    #[action]
+    fn reject(token_id: TID, creditor: AccountNumber, memo: String) {
+        SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
     }
 
     #[event(history)]
@@ -249,6 +266,9 @@ pub mod service {
         memo: String,
     ) {
     }
+
+    #[event(history)]
+    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
 }
 
 #[cfg(test)]

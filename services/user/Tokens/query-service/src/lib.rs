@@ -7,7 +7,8 @@ mod service {
 
     use psibase::*;
     use tokens::tables::tables::{
-        Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
+        Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable, UserConfig,
+        UserConfigTable,
     };
 
     struct Query;
@@ -46,6 +47,16 @@ mod service {
             TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&token_id_to_number(token_id))
+        }
+
+        async fn user_settings(&self, user: AccountNumber) -> UserConfig {
+            UserConfigTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&user)
+                .unwrap_or(UserConfig {
+                    account: user,
+                    flags: 0,
+                })
         }
 
         async fn user_credits(
@@ -106,6 +117,19 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn user_balance(&self, user: AccountNumber, token_id: String) -> Balance {
+            let token_id = token_id_to_number(token_id);
+
+            BalanceTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&(user, token_id))
+                .unwrap_or(Balance {
+                    account: user,
+                    balance: 0.into(),
+                    token_id,
+                })
         }
 
         async fn user_tokens(&self, user: AccountNumber) -> Vec<Token> {
