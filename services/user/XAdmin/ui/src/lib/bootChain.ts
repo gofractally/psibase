@@ -2,10 +2,10 @@ import { boot } from "wasm-transpiled";
 
 import { BootState, PackageInfo } from "@/types";
 
+import { queryClient } from "../main";
 import { chain } from "./chainEndpoints";
 import { exportKeyToPEM } from "./keys";
 import { queryKeys } from "./queryKeys";
-import { queryClient } from "../main";
 
 type BootChainParams = {
     packages: PackageInfo[];
@@ -36,10 +36,10 @@ export const bootChain = async ({
         }
 
         const fetchedPackages: ArrayBuffer[] = await chain.getPackages(
-            packages.map((pack) => pack.file)
+            packages.map((pack) => pack.file),
         );
         const packageBuffers = fetchedPackages.map(
-            (buf) => new Uint8Array(buf)
+            (buf) => new Uint8Array(buf),
         );
 
         let blockSigningPubKeyPem: string | undefined;
@@ -48,18 +48,18 @@ export const bootChain = async ({
             if (blockSigningPubKey) {
                 blockSigningPubKeyPem = await exportKeyToPEM(
                     blockSigningPubKey,
-                    "PUBLIC KEY"
+                    "PUBLIC KEY",
                 );
             }
             if (txSigningPubKey) {
                 txSigningPubKeyPem = await exportKeyToPEM(
                     txSigningPubKey,
-                    "PUBLIC KEY"
+                    "PUBLIC KEY",
                 );
             }
         } catch {
             onProgressUpdate(
-                "Failed to export public key to PEM format during boot"
+                "Failed to export public key to PEM format during boot",
             );
             return;
         }
@@ -73,7 +73,7 @@ export const bootChain = async ({
                 packageBuffers,
                 blockSigningPubKeyPem,
                 txSigningPubKeyPem,
-                compression
+                compression,
             );
 
         const labels = ["Initializing chain", ...txlabels];

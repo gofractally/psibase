@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { websocketURL } from "../helpers";
-import { LogFilterInputs, LogRecord } from "./interfaces";
+import { z } from "zod";
+
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+import { Switch } from "@shared/shadcn/ui/switch";
 import {
     Table,
     TableBody,
@@ -13,9 +15,9 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { Switch } from "@shared/shadcn/ui/switch";
-import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
-import { z } from "zod";
+
+import { websocketURL } from "../helpers";
+import { LogFilterInputs, LogRecord } from "./interfaces";
 
 const MAX_LOGS_ROWS = 20;
 
@@ -75,7 +77,7 @@ export const LogsPage = () => {
             newSocket.addEventListener("message", (event: MessageEvent) => {
                 setLogData((prev) => {
                     const newRecord = LogRecordSchema.parse(
-                        JSON.parse(event.data)
+                        JSON.parse(event.data),
                     );
                     return [
                         newRecord,

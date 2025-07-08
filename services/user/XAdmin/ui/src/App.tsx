@@ -1,6 +1,7 @@
+import { Outlet } from "react-router-dom";
+
 import { NavHeader } from "./components/nav-header";
 import { StatusBanner } from "./components/status-banner";
-import { Outlet } from "react-router-dom";
 
 function App() {
     return (
