@@ -9,7 +9,6 @@ import { Input } from "@shared/shadcn/ui/input";
 
 import { FormProfile } from "@/components/form-profile";
 
-import { AwaitTime } from "@/globals";
 import { useAvatar } from "@/hooks/use-avatar";
 import { useCacheBust } from "@/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -59,11 +58,9 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
             });
             toast.success("Avatar uploaded");
 
-            setTimeout(async () => {
-                if (currentUser) {
-                    setBustedUser(currentUser);
-                }
-            }, AwaitTime);
+            if (currentUser) {
+                setBustedUser(currentUser);
+            }
         }
     };
 

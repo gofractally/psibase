@@ -573,3 +573,8 @@ std::optional<std::vector<char>> psibase::TestChain::kvGreaterEqualRaw(DbId     
       return std::nullopt;
    return psibase::getResult(size);
 }
+
+void psibase::TestChain::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
+{
+   tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
+}

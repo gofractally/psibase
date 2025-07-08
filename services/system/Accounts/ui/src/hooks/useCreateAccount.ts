@@ -7,7 +7,6 @@ import { useDecodeToken } from "./useDecodeToken";
 import { useImportAccount } from "./useImportAccount";
 
 const supervisor = getSupervisor();
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const useCreateAccount = (token: string) => {
     const { data: decodedToken } = useDecodeToken(token);
