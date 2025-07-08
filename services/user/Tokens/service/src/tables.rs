@@ -395,11 +395,13 @@ pub mod tables {
                 "token is untransferable",
             );
 
-            let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
-                .map(|holder| holder.get_flag(BalanceFlags::AUTO_DEBIT))
-                .unwrap_or(UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::AUTO_DEBIT));
+            let is_manual_debit = BalanceConfig::get(self.debitor, self.token_id)
+                .map(|holder| holder.get_flag(BalanceFlags::MANUAL_DEBIT))
+                .unwrap_or(
+                    UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::MANUAL_DEBIT),
+                );
 
-            if is_auto_debit {
+            if !is_manual_debit {
                 self.debit(quantity, "Autodebit".to_string());
             }
         }
@@ -479,7 +481,7 @@ pub mod tables {
     }
 
     define_flags!(BalanceFlags, u8, {
-        auto_debit,
+        manual_debit,
         keep_zero_balances,
     });
 
