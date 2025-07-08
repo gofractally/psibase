@@ -1,20 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 
-import { Button } from "@shadcn/button";
-import { Label } from "@shadcn/label";
-import { Input } from "@shadcn/input";
+import { Button } from "@shared/shadcn/ui/button";
+import { Label } from "@shared/shadcn/ui/label";
+import { Input } from "@shared/shadcn/ui/input";
 
-import { Nav } from "@components/nav";
-
-import { useCreateConnectionToken } from "@hooks";
+import { Nav } from "@/components/nav";
 
 import { getSupervisor, getArrayBuffer, getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 const supervisor = getSupervisor();
-
-type PackageSource = {
-    url?: string;
-    account?: string;
-}
 
 type PackageRef = {
     name: string,
@@ -49,9 +43,9 @@ type PackageInstallOp = {
 async function readPackageIndexGQL(url: string, account: string): Promise<PackageInfo[]> {
     let cursorArg = "";
     let done = false;
-    let result: PackageInfo[] = [];
+    const result: PackageInfo[] = [];
     while (!done) {
-        let query = `query { packages(owner: "${account}", first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } edges { node { name version description depends { name version } accounts sha256 file } } } }`;
+        const query = `query { packages(owner: "${account}", first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } edges { node { name version description depends { name version } accounts sha256 file } } } }`;
         const page = await postGraphQLGetJson<any>(url.replace(/\/?$/, "/graphql"), query);
         for (const edge of page.data.packages.edges) {
             result.push(edge.node)
@@ -72,14 +66,14 @@ async function getPackageIndex(owner: string): Promise<PackageRepo[]> {
     if (sources.length == 0) {
         sources = [{url:siblingUrl(null, 'x-admin', '/packages')}];
     }
-    let result = [];
+    const result = [];
     for (const source of sources) {
         if (source.account) {
             const url = source.url || siblingUrl(null, null, '/');
             const packagesUrl = new URL(url);
             packagesUrl.hostname = `packages.${packagesUrl.hostname}`;
             const index = await readPackageIndexGQL(packagesUrl.toString(), source.account);
-            let baseUrl = new URL(url);
+            const baseUrl = new URL(url);
             baseUrl.hostname = `${source.account}.${baseUrl.hostname}`;
             result.push({baseUrl: baseUrl.toString(), index})
         } else if (source.url) {
@@ -147,9 +141,6 @@ export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
     const [packageName, setPackageName] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
-    const thisServiceName = "packages";
-
-    const { mutateAsync: onLogin } = useCreateConnectionToken();
 
     const init = async () => {
         await getPackageIndex("root");

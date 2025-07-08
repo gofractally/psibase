@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { z } from "zod";
 
-import { Input } from "../ui/input";
+import { Input } from "@shared/shadcn/ui/input";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "../ui/select";
+} from "@shared/shadcn/ui/select";
 import { useFieldContext } from "./app-form";
 
 const zDuration = z.enum(["Minutes", "Hours", "Days"]);

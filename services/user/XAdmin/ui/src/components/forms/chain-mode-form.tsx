@@ -1,10 +1,10 @@
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
-import { Button } from "@/components/ui/button";
-import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Button } from "@shared/shadcn/ui/button";
+import { Form, FormField, FormItem, FormMessage } from "@shared/shadcn/ui/form";
 
 export const chainTypeSchema = z.object({
     type: z.enum(["dev", "prod"], {

@@ -1,7 +1,7 @@
 import { LogConfig } from "./interfaces";
 
 export function readLogger(config: LogConfig): LogConfig {
-    const result: any = { ...config };
+    const result: Record<string, unknown> = { ...config };
     for (const key of [
         "filename",
         "target",
@@ -44,7 +44,7 @@ export function readLogger(config: LogConfig): LogConfig {
             result.path = "";
         }
     }
-    return result;
+    return result as LogConfig;
 }
 
 // a . or a leading digit causes problems for react-hook-form
@@ -59,7 +59,7 @@ function escapeKey(k: string): string {
 export function readLoggers(config: { [index: string]: LogConfig }): {
     [index: string]: LogConfig;
 } {
-    const result: any = {};
+    const result: Record<string, LogConfig> = {};
     if (config !== undefined) {
         for (const key in config) {
             result[escapeKey(key)] = readLogger(config[key]);

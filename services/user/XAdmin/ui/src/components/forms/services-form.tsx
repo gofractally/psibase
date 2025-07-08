@@ -1,8 +1,8 @@
 import { PackageInfo, ServicesType } from "@/types";
 import { Controller, UseFormReturn } from "react-hook-form";
-import { Checkbox } from "../ui/checkbox";
-import { Label } from "../ui/label";
-import { Button } from "../ui/button";
+import { Checkbox } from "@shared/shadcn/ui/checkbox";
+import { Label } from "@shared/shadcn/ui/label";
+import { Button } from "@shared/shadcn/ui/button";
 import { filterHighestVersions } from "@/lib/filterHighestVersions";
 
 interface ServicesFormProps {
@@ -22,7 +22,7 @@ export const ServicesForm = ({
 
     return (
         <form
-            onSubmit={servicesForm.handleSubmit((state) => {
+            onSubmit={servicesForm.handleSubmit(() => {
                 setPackages(
                     serviceIndex
                         .map((meta) => meta.name)

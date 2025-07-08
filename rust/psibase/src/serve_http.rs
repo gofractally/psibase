@@ -3,7 +3,7 @@ use crate::{
     WithActionStruct,
 };
 use async_graphql::{
-    http::{graphiql_plugin_explorer, receive_body, GraphiQLSource},
+    http::{receive_body, GraphiQLSource},
     EmptyMutation, EmptySubscription,
 };
 use futures::executor::block_on;
@@ -204,11 +204,7 @@ pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
         Some(HttpReply {
             status: 200,
             contentType: "text/html".into(),
-            body: GraphiQLSource::build()
-                .endpoint("/graphql")
-                .plugins(&vec![graphiql_plugin_explorer()])
-                .finish()
-                .into(),
+            body: GraphiQLSource::build().endpoint("/graphql").finish().into(),
             headers: vec![],
         })
     } else {

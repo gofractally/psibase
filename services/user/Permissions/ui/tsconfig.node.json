@@ -1,17 +1,8 @@
 {
+    "extends": "../../../tsconfig.node.json",
     "compilerOptions": {
-        "composite": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "allowSyntheticDefaultImports": true,
-        "types": [
-            "node",
-            "react",
-            "react-dom"
-        ],
+        "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
+        "baseUrl": "./"
     },
-    "include": [
-        "vite.config.ts",
-        "../../../vite.shared.ts"
-    ]
+    "include": ["vite.config.mts"]
 }

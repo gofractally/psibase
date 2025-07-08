@@ -3,6 +3,7 @@ import { UseFormReturn } from "react-hook-form";
 
 type Step<T> = {
     step: T | "COMPLETION";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     form?: UseFormReturn<any>;
     skip?: boolean;
 };

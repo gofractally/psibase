@@ -1,15 +1,10 @@
-import {
-    BootCompleteSchema,
-    BootCompleteUpdate,
-    BootState,
-    RequestUpdate,
-    RequestUpdateSchema,
-} from "../types";
-import { Progress } from "./ui/progress";
+import { BootState, RequestUpdate, RequestUpdateSchema } from "../types";
+import { Progress } from "@shared/shadcn/ui/progress";
+import { getActionStack, type TransactionTrace } from "../lib/actionStack";
 
 const getStack = (trace: TransactionTrace) => {
-    for (let atrace of trace.actionTraces) {
-        let stack = getActionStack(atrace);
+    for (const atrace of trace.actionTraces) {
+        const stack = getActionStack(atrace);
         if (stack) {
             return (
                 <p>
@@ -33,9 +28,6 @@ interface ProgressPageProps {
 
 const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
     RequestUpdateSchema.safeParse(data).success;
-
-const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
-    BootCompleteSchema.safeParse(data).success;
 
 export const ProgressStatus = ({ state }: ProgressPageProps) => {
     if (state === undefined) {

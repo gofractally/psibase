@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
 
 import {
@@ -19,8 +20,6 @@ import {
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import { util } from "wasm-transpiled";
-
-type Buffer = number[];
 
 export const Peer = z
     .object({
@@ -169,8 +168,8 @@ class Chain {
     }
 
     public async pushArrayBufferTransaction(buffer: ArrayBufferLike) {
-        let url = siblingUrl(null, "transact", "/push_transaction?wait_for=applied");
-        let res = await throwIfError(
+        const url = siblingUrl(null, "transact", "/push_transaction?wait_for=applied");
+        const res = await throwIfError(
             await fetch(url, {
                 method: "POST",
                 headers: {

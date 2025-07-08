@@ -77,7 +77,7 @@ export const useSelectedRows = (
                 if (warning) {
                     const shouldContinue = await confirm(warning);
                     if (shouldContinue) {
-                        let updatedRows = incomingRows;
+                        const updatedRows = incomingRows;
                         warning.dependencies.forEach(
                             (dependency) =>
                                 delete updatedRows[getId(dependency)]

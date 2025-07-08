@@ -8,7 +8,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@shared/shadcn/ui/table";
 
 import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
 import { EmptyBlock } from "@/components/empty-block";

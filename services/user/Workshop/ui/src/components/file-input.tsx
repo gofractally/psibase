@@ -1,6 +1,6 @@
 import { ChangeEvent } from "react";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Input } from "@shared/shadcn/ui/input";
+import { Card } from "@shared/shadcn/ui/card";
 
 interface FileInputProps {
   onChange: (

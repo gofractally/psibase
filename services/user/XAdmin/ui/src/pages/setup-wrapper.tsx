@@ -1,4 +1,3 @@
-import { EaseIn } from "@/components/EaseIn";
 import { MenuContent } from "@/components/menu-content";
 import { ReactNode } from "react";
 

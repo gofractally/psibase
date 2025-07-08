@@ -3,7 +3,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
@@ -11,7 +11,7 @@ import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 
-import { Button } from "./ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 export const LoginButton = () => {
     const { mutate: login, isPending } = useCreateConnectionToken();

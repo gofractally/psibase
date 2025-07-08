@@ -1,8 +1,8 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMotionValue } from "framer-motion";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useMotionTemplate, motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 export const EvervaultCard = ({
     text,
@@ -17,18 +17,18 @@ export const EvervaultCard = ({
     gradient?: string;
     chars?: string;
 }) => {
-    let mouseX = useMotionValue(0);
-    let mouseY = useMotionValue(0);
+    const mouseX = useMotionValue(0);
+    const mouseY = useMotionValue(0);
 
     const [randomString, setRandomString] = useState("");
 
     useEffect(() => {
-        let str = generateRandomString(1500, chars);
+        const str = generateRandomString(1500, chars);
         setRandomString(str);
     }, []);
 
     function onMouseMove({ currentTarget, clientX, clientY }: any) {
-        let { left, top } = currentTarget.getBoundingClientRect();
+        const { left, top } = currentTarget.getBoundingClientRect();
         mouseX.set(clientX - left);
         mouseY.set(clientY - top);
 
@@ -68,8 +68,8 @@ export const EvervaultCard = ({
 };
 
 export function CardPattern({ mouseX, mouseY, randomString, gradient }: any) {
-    let maskImage = useMotionTemplate`radial-gradient(250px at ${mouseX}px ${mouseY}px, white, transparent)`;
-    let style = { maskImage, WebkitMaskImage: maskImage };
+    const maskImage = useMotionTemplate`radial-gradient(250px at ${mouseX}px ${mouseY}px, white, transparent)`;
+    const style = { maskImage, WebkitMaskImage: maskImage };
 
     return (
         <div className="pointer-events-none">

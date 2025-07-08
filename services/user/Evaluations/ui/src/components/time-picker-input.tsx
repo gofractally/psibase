@@ -1,5 +1,4 @@
-import { Input } from "@shadcn/input";
-import { cn } from "@/lib/utils";
+import { Input } from "@shared/shadcn/ui/input";
 import React from "react";
 import {
   Period,
@@ -25,7 +24,6 @@ const TimePickerInput = React.forwardRef<
 >(
   (
     {
-      className,
       type = "tel",
       value,
       id,

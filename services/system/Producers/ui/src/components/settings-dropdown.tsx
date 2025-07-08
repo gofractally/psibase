@@ -10,7 +10,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 import {
   Settings,
@@ -22,17 +22,17 @@ import {
   PlusCircle,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { useTheme } from "./theme-provider";
+import { Button } from "@shared/shadcn/ui/button";
+import { useTheme } from "@/components/theme-provider";
 import { useLogout } from "@/hooks/useLogout";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@shared/shadcn/ui/avatar";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 import { useNavigate } from "react-router-dom";
 
 export const SettingsDropdown = () => {

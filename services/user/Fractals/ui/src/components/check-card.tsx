@@ -1,5 +1,5 @@
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
+import { Label } from "@shared/shadcn/ui/label";
+import { Switch } from "@shared/shadcn/ui/switch";
 
 interface Props {
     onChange: (enabled: boolean) => void | Promise<void>;
