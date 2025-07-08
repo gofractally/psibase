@@ -36,8 +36,6 @@ export const useCreateAccount = (token: string) => {
                 intf: "invitee",
             }));
 
-            await wait(2000);
-
             await importAccount(account);
 
             void (await supervisor.functionCall({
