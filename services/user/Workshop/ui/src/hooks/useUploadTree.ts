@@ -4,7 +4,6 @@ import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { siteConfigQueryKey, SiteConfigResponse } from "./useSiteConfig";
-import { AwaitTime } from "@/lib/globals";
 
 const u8Schema = z.number().int().min(0).max(255);
 
@@ -65,9 +64,7 @@ export const useUploadTree = () =>
         }
       })
 
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: siteConfigQueryKey(account) });
-      }, AwaitTime)
+      queryClient.invalidateQueries({ queryKey: siteConfigQueryKey(account) });
     
     },
   });
