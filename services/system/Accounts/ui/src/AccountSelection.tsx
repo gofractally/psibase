@@ -151,10 +151,12 @@ export const AccountSelection = () => {
     : accounts || [];
 
   useEffect(() => {
+    console.log("Preloading auth-any...");
     async function preloadAuthAny() {
       await supervisor.preLoadPlugins([
         { service: "auth-any", plugin: "plugin" },
       ]);
+      console.log("Preloaded auth-any.");
     }
     preloadAuthAny();
   }, []);
