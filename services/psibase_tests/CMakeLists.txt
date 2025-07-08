@@ -11,7 +11,7 @@ function(service name suffix)
 endfunction()
 
 function(add suffix)
-    service(test_kv "${suffix}" test_kv.cpp)
+    service(TestKV "${suffix}" src/TestKV.cpp)
     service(test_table "${suffix}" test_table.cpp)
     service(event-service "${suffix}" event-service.cpp)
     service(memo-service "${suffix}" memo-service.cpp)

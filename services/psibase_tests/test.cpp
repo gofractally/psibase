@@ -1,6 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <services/test/EntryPoint.hpp>
+#include <services/test/TestKV.hpp>
 
 using namespace psibase;
 using namespace TestService;
@@ -22,15 +23,8 @@ TEST_CASE("kv")
 {
    DefaultTestChain t;
 
-   auto test_kv_service = t.addService("test-kv", "test_kv.wasm");
-   REQUIRE(                         //
-       show(false,                  //
-            t.pushTransaction(      //
-                t.makeTransaction(  //
-                    {{
-                        .sender  = test_kv_service,
-                        .service = test_kv_service,
-                    }}))) == "");
+   t.addService(TestKV::service, "TestKV.wasm");
+   CHECK(t.from(TestKV::service).to<TestKV>().test().succeeded());
 }  // kv
 
 TEST_CASE("table")
