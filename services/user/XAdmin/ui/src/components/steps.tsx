@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+
 import { cn } from "@shared/lib/utils";
 
 export const Steps = ({
@@ -18,17 +19,17 @@ export const Steps = ({
                     <Fragment key={index}>
                         <div
                             className={cn(
-                                "h-6 w-6 rounded-full bg-border transition-colors duration-300",
+                                "bg-border h-6 w-6 rounded-full transition-colors duration-300",
                                 {
                                     "bg-primary": isPresentOrPast,
-                                }
+                                },
                             )}
                         ></div>
                         {!isFinalStep && (
                             <div
                                 className={cn(
-                                    `h-1 w-96 bg-border transition-all duration-300`,
-                                    { "bg-primary": isHighlight }
+                                    `bg-border h-1 w-96 transition-all duration-300`,
+                                    { "bg-primary": isHighlight },
                                 )}
                             ></div>
                         )}

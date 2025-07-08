@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { queryKeys } from "@/lib/queryKeys";
 import { chain } from "@/lib/chainEndpoints";
+import { queryKeys } from "@/lib/queryKeys";
 
 export const useStatuses = () =>
     useQuery<string[], string>({
