@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { LogConfig } from "../log/interfaces";
 
 export type ServiceConfig = {

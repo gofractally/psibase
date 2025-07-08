@@ -44,9 +44,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { AwaitTime } from "@/globals";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
 
 import { zDraftMessage } from "@/apps/chainmail/types";
@@ -165,7 +163,6 @@ export function ComposeDialog({
 
     async function onSubmit() {
         await sendMessage();
-        await wait(AwaitTime);
         invalidateMailboxQueries(["sent"]);
     }
 

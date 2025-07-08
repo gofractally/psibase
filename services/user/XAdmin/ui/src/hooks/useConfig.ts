@@ -1,15 +1,17 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+import { chain } from "@/lib/chainEndpoints";
+import { queryKeys } from "@/lib/queryKeys";
+
 import {
     PsinodeConfigSelect,
     PsinodeConfigUI,
     PsinodeConfigUpdate,
 } from "../configuration/interfaces";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "../main";
-import { queryKeys } from "@/lib/queryKeys";
-import { chain } from "@/lib/chainEndpoints";
 
 const transformConfigServerToUI = (
-    serverConfig: PsinodeConfigSelect
+    serverConfig: PsinodeConfigSelect,
 ): PsinodeConfigUI => {
     return {
         ...serverConfig,

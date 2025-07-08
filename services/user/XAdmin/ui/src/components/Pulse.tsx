@@ -14,7 +14,7 @@ export const Pulse = ({ color = "green" }: PulseProps) => (
                     "bg-red-400": color == "red",
                     "bg-orange-400": color == "yellow",
                     "animate-ping": color !== "red",
-                }
+                },
             )}
         ></span>
         <span

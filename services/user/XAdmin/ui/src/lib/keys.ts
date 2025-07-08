@@ -20,7 +20,7 @@ function hexToArrayBuffer(hex: string): ArrayBuffer {
 }
 
 export async function hexDERPublicKeyToCryptoKey(
-    hexDER: string
+    hexDER: string,
 ): Promise<CryptoKey> {
     try {
         const derBuffer = hexToArrayBuffer(hexDER);
@@ -32,7 +32,7 @@ export async function hexDERPublicKeyToCryptoKey(
                 namedCurve: "P-256",
             },
             true,
-            ["verify"]
+            ["verify"],
         );
         return publicKey;
     } catch (error) {
@@ -49,7 +49,7 @@ export async function generateP256Key(): Promise<CryptoKeyPair> {
                 namedCurve: "P-256",
             },
             true, // Extractable for exporting
-            ["sign", "verify"]
+            ["sign", "verify"],
         );
     } catch (error) {
         console.error("Error generating key pair:", error);
@@ -59,7 +59,7 @@ export async function generateP256Key(): Promise<CryptoKeyPair> {
 
 export async function exportKeyToDER(
     key: CryptoKey,
-    keyType: "PUBLIC KEY" | "PRIVATE KEY"
+    keyType: "PUBLIC KEY" | "PRIVATE KEY",
 ): Promise<string> {
     try {
         const exportFormat = keyType === "PUBLIC KEY" ? "spki" : "pkcs8";
@@ -73,7 +73,7 @@ export async function exportKeyToDER(
 
 export async function exportKeyToPEM(
     key: CryptoKey,
-    keyType: "PUBLIC KEY" | "PRIVATE KEY"
+    keyType: "PUBLIC KEY" | "PRIVATE KEY",
 ) {
     try {
         const exportFormat = keyType === "PUBLIC KEY" ? "spki" : "pkcs8";

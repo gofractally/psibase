@@ -21,9 +21,6 @@ export const useSelectAccount = () => {
         },
         onSuccess: () => {
             queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            }, 2000);
         },
         onError: (error) => {
             toast.error(error.message);

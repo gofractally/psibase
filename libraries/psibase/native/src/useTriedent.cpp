@@ -609,6 +609,14 @@ namespace psibase
             writeRevisions.pop_back();
       }
 
+      void checkoutEmptySubjective()
+      {
+         check(subjectiveRevisions.empty(),
+               "Checking out specific subjective content is only possible at the top level");
+         subjectiveRevisions.resize(2);
+         callbackFlags = 0;
+      }
+
       void checkoutSubjective()
       {
          check(subjectiveRevisions.size() <= maxSubjectiveTransactionDepth,
@@ -828,6 +836,10 @@ namespace psibase
           });
    }
 
+   void Database::checkoutEmptySubjective()
+   {
+      impl->checkoutEmptySubjective();
+   }
    void Database::checkoutSubjective()
    {
       impl->checkoutSubjective();

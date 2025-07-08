@@ -4,7 +4,6 @@ import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { appMetadataQueryKey, MetadataResponse } from "./useAppMetadata";
-import { AwaitTime } from "@/lib/globals";
 
 const Params = z.object({
   metadata: Metadata,
@@ -37,8 +36,6 @@ export const useSetMetadata = () =>
           }
         }
       );
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: appMetadataQueryKey(account) });
-      }, AwaitTime);
+      queryClient.refetchQueries({ queryKey: appMetadataQueryKey(account) });
     },
   });

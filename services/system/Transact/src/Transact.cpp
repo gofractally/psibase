@@ -380,7 +380,7 @@ namespace SystemService
 
    namespace
    {
-      bool checkTapos(const Checksum256& id, const Tapos& tapos, bool checkFirstAuthAndExit)
+      bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
       {
          auto statusTable  = Transact{}.open<TransactStatusTable>();
          auto statusIdx    = statusTable.getIndex<0>();
@@ -397,7 +397,7 @@ namespace SystemService
          auto transactStatus = statusIdx.get(std::tuple{});
 
          std::optional<BlockSummary> summary;
-         if (checkFirstAuthAndExit)
+         if (speculative)
             summary = getBlockSummary();  // startBlock() might not have run
          else
             summary = summaryIdx.get(std::tuple<>{});
@@ -410,7 +410,7 @@ namespace SystemService
                 "fatal error: All boot transactions have been pushed, but finishBoot was not run.");
             check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
                   "transaction references non-existing block");
-            if (!checkFirstAuthAndExit)
+            if (!speculative)
             {
                check(id == bootTransactions.front(),
                      "Wrong transaction during boot " + psio::convert_to_json(id) +
@@ -479,35 +479,20 @@ namespace SystemService
                            claims);
       }
    }  // namespace
-   void Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
+   bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
       check(trx.actions().size() > 0, "transaction has no actions");
-      if (checkTapos(id, trx.tapos(), true))
+      bool enforceAuth = checkTapos(id, trx.tapos(), true);
+      if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
+      return enforceAuth;
    }
 
-   // Native code calls this on the Transact account
-   //
-   // All transactions pass through this function, so it's critical
-   // for chain operations. A bug here can stop any new transactions
-   // from entering the chain, including transactions which try to
-   // fix the problem.
-   //
-   // TODO: reconsider which functions, if any, are direct exports
-   //       instead of going through dispatch
-   extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
+   static void processTransactionImpl(
+       psio::view<const psio::shared_view_ptr<psibase::Transaction>> arg,
+       bool                                                          speculative)
    {
-      if constexpr (enable_print)
-         std::printf("processTransaction\n");
-
-      // TODO: check max_net_usage_words, max_cpu_usage_ms
-      // TODO: resource billing
-      // TODO: subjective mitigation hooks
-      // TODO: limit execution time
-      // TODO: limit charged CPU & NET which can go into a block
-      auto top_act = getCurrentActionView();
-      auto args    = psio::view<const ProcessTransactionArgs>(top_act->rawData());
-      auto t       = args.transaction().data_without_size_prefix();
+      auto t = arg.data_without_size_prefix();
       check(psio::fracpack_validate_strict<Transaction>(t), "transaction has invalid format");
       trxData  = t;
       auto trx = psio::view<const Transaction>(psio::prevalidated{t});
@@ -523,10 +508,9 @@ namespace SystemService
       auto includedIdx   = includedTable.getIndex<0>();
 
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
-      if (!args.checkFirstAuthAndExit())
-         includedTable.put({tapos.expiration, id});
+      includedTable.put({tapos.expiration, id});
 
-      bool enforceAuth = checkTapos(id, tapos, args.checkFirstAuthAndExit());
+      bool enforceAuth = checkTapos(id, tapos, speculative);
 
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
@@ -535,11 +519,8 @@ namespace SystemService
       {
          if (enforceAuth)
          {
-            checkAuth(act, claims, get_view_data(act) == get_view_data(trx.actions()[0]),
-                      args.checkFirstAuthAndExit());
+            checkAuth(act, claims, get_view_data(act) == get_view_data(trx.actions()[0]), false);
          }
-         if (args.checkFirstAuthAndExit())
-            break;
          if constexpr (enable_print)
             std::printf("call action\n");
 
@@ -571,6 +552,39 @@ namespace SystemService
       }
 
       trxData = std::span<const char>{};
+   }
+
+   void Transact::execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
+                          bool                                                          speculative)
+   {
+      check(trxData.data() == nullptr, "Cannot reenter execTrx");
+      check(getSender() == AccountNumber{}, "Wrong sender");
+      auto _ = recurse();
+      processTransactionImpl(trx, speculative);
+   }
+
+   // Native code calls this on the Transact account
+   //
+   // All transactions pass through this function, so it's critical
+   // for chain operations. A bug here can stop any new transactions
+   // from entering the chain, including transactions which try to
+   // fix the problem.
+   //
+   // TODO: reconsider which functions, if any, are direct exports
+   //       instead of going through dispatch
+   extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
+   {
+      if constexpr (enable_print)
+         std::printf("processTransaction\n");
+
+      // TODO: check max_net_usage_words, max_cpu_usage_ms
+      // TODO: resource billing
+      // TODO: subjective mitigation hooks
+      // TODO: limit execution time
+      // TODO: limit charged CPU & NET which can go into a block
+      auto top_act = getCurrentActionView();
+      auto args    = psio::view<const ProcessTransactionArgs>(top_act->rawData());
+      processTransactionImpl(args.transaction(), false);
    }
 
    extern "C" [[clang::export_name("nextTransaction")]] void nextTransaction()

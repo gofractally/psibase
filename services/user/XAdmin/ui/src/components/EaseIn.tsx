@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
 import { motion } from "framer-motion";
+import { ReactNode } from "react";
 
 export const EaseIn = ({ children }: { children: ReactNode }) => (
     <motion.div

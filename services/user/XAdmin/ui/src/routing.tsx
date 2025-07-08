@@ -2,15 +2,15 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 
 import App from "./App";
+import { ConfigurationPage } from "./configuration/configuration-page";
+import { useStatuses } from "./hooks/useStatuses";
 import { LogsPage } from "./log/logs-page";
+import { CreatePage } from "./pages/create-page";
 import { DashboardPage } from "./pages/dashboard-page";
+import { JoinPage } from "./pages/join-page";
+import { KeysPage } from "./pages/keys-page";
 import { SetupPage } from "./pages/setup-page";
 import { PeersPage } from "./peers/peers-page";
-import { ConfigurationPage } from "./configuration/configuration-page";
-import { JoinPage } from "./pages/join-page";
-import { CreatePage } from "./pages/create-page";
-import { KeysPage } from "./pages/keys-page";
-import { useStatuses } from "./hooks/useStatuses";
 
 export const Routing = () => {
     const { data: status, isLoading } = useStatuses();

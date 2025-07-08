@@ -32,7 +32,7 @@ export default defineConfig(({ command }) => ({
         svgr(),
     ],
     build: {
-        minify: false,
+        minify: true,
         sourcemap: false,
     },
 }));
