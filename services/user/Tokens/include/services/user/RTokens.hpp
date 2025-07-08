@@ -7,14 +7,12 @@ namespace UserService
      public:
       static constexpr auto service = psibase::AccountNumber("r-tokens");
 
-      auto serveSys(const psibase::HttpRequest& request,
-                    std::optional<std::int32_t> socket,
-                    std::optional<psibase::AccountNumber> user) -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
 
      private:
       std::optional<psibase::HttpReply> _serveRestEndpoints(psibase::HttpRequest& request);
    };
-   PSIO_REFLECT(RTokens, method(serveSys, request, socket, user))
+   PSIO_REFLECT(RTokens, method(serveSys, request))
    PSIBASE_REFLECT_TABLES(RTokens)
 
 }  // namespace UserService
