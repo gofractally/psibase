@@ -3,7 +3,7 @@ pub mod tables {
     use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
-    use psibase::services::tokens::{Decimal, Precision, Quantity, Memo};
+    use psibase::services::tokens::{Decimal, Memo, Precision, Quantity};
     use psibase::{check, check_none, check_some, get_sender, AccountNumber, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
@@ -169,10 +169,10 @@ pub mod tables {
 
         fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {
             check(amount.value > 0, "burn quantity must be greater than 0");
-            self.burned_supply = self.burned_supply + amount;
-            self.save();
 
             Balance::get_or_new(from, self.id).sub_balance(amount);
+            self.burned_supply = self.burned_supply + amount;
+            self.save();
         }
     }
 
@@ -238,7 +238,6 @@ pub mod tables {
         pub fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
             BalanceTable::new().get_index_pk().get(&(account, token_id))
         }
-
 
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
