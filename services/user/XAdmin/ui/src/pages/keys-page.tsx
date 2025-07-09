@@ -1,35 +1,35 @@
+import {
+    CircleAlert,
+    FileKey,
+    FileKey2,
+    Fingerprint,
+    FolderKey,
+    Hexagon,
+    Loader2,
+    Lock,
+    MoreHorizontal,
+    ShieldOff,
+    SquarePlus,
+    Unlock,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import {
-    MoreHorizontal,
-    SquarePlus,
-    FileKey2,
-    FileKey,
-    FolderKey,
-    CircleAlert,
-    Loader2,
-    Lock,
-    Unlock,
-    Fingerprint,
-    Hexagon,
-    ShieldOff,
-} from "lucide-react";
+
+import { ToastAction } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/use-toast";
+
+import { EmptyBlock } from "@/components/EmptyBlock";
+import { KeyDeviceForm } from "@/components/forms/key-device-form";
 
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@shared/shadcn/ui/table";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@shared/shadcn/ui/dropdown-menu";
+    calculateKeyFingerprint,
+    exportKeyToPEM,
+    hexDERPublicKeyToCryptoKey,
+} from "@/lib/keys";
+import { getErrorMessage } from "@/lib/utils";
+import { KeyDeviceSchema } from "@/types";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -40,25 +40,27 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-import { ToastAction } from "@/components/ui/toast";
-import { useToast } from "@/components/ui/use-toast";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@shared/shadcn/ui/dropdown-menu";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@shared/shadcn/ui/table";
 import { Tabs } from "@shared/shadcn/ui/tabs";
-import { TabsList, TabsTrigger, TabsContent } from "@shared/shadcn/ui/tabs";
-
-import { EmptyBlock } from "@/components/EmptyBlock";
-import { KeyDeviceForm } from "@/components/forms/key-device-form";
-import { KeyDeviceSchema } from "@/types";
-import {
-    hexDERPublicKeyToCryptoKey,
-    exportKeyToPEM,
-    calculateKeyFingerprint,
-} from "@/lib/keys";
-import { getErrorMessage } from "@/lib/utils";
+import { TabsContent, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 
 import {
-    useServerKeys,
     useAddServerKey,
     useKeyDevices,
+    useServerKeys,
 } from "../hooks/useKeyDevices";
 
 const copyToClipboard = async (text: string) => {
@@ -103,7 +105,7 @@ export const KeysPage = () => {
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
     const [fingerprints, setFingerprints] = useState<Record<string, string>>(
-        {}
+        {},
     );
 
     useEffect(() => {
@@ -130,7 +132,7 @@ export const KeysPage = () => {
             const prints: Record<string, string> = {};
             for (const key of serverKeys) {
                 prints[key.rawData] = await calculateKeyFingerprint(
-                    key.rawData
+                    key.rawData,
                 );
             }
             setFingerprints(prints);
@@ -155,7 +157,7 @@ export const KeysPage = () => {
 
     const onSubmit = async (
         e?: React.SyntheticEvent,
-        shouldCreateKey: boolean = false
+        shouldCreateKey: boolean = false,
     ) => {
         e?.preventDefault();
         try {
@@ -494,7 +496,7 @@ export const KeysPage = () => {
                                                                         fingerprints[
                                                                             key
                                                                                 .rawData
-                                                                        ]?.toUpperCase()
+                                                                        ]?.toUpperCase(),
                                                                     );
                                                                     toast({
                                                                         title: "Copied",
@@ -509,7 +511,7 @@ export const KeysPage = () => {
                                                             <DropdownMenuItem
                                                                 onClick={() => {
                                                                     copyToClipboard(
-                                                                        key.rawData
+                                                                        key.rawData,
                                                                     );
                                                                     toast({
                                                                         title: "Copied",
@@ -524,7 +526,7 @@ export const KeysPage = () => {
                                                             <DropdownMenuItem
                                                                 onClick={() =>
                                                                     copyKeyAsPEM(
-                                                                        key.rawData
+                                                                        key.rawData,
                                                                     )
                                                                 }
                                                             >
@@ -534,7 +536,7 @@ export const KeysPage = () => {
                                                             <DropdownMenuItem
                                                                 onClick={() =>
                                                                     downloadKeyAsPEM(
-                                                                        key.rawData
+                                                                        key.rawData,
                                                                     )
                                                                 }
                                                             >

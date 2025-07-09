@@ -34,8 +34,6 @@ const Params = z
         path: ["registration"],
     });
 
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
-
 // numOptions
 
 export const useCreateEvaluation = () => {
@@ -71,7 +69,6 @@ export const useCreateEvaluation = () => {
                     useHooks,
                 ],
             }));
-            await wait(3000);
 
             const currentUser = zAccount.parse(
                 queryClient.getQueryData(["currentUser"]),

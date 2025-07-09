@@ -93,12 +93,20 @@ export const AccountSelection = () => {
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
                 await createAccount(values.username);
-                // Now we need to login and set auth cookie
+                void (await acceptInvite({
+                    origin: inviteToken
+                        ? inviteToken.appDomain
+                        : connectionToken!.origin,
+                    app: inviteToken ? inviteToken.app : connectionToken!.app,
+                    accountName: values.username,
+                    token: z.string().parse(token),
+                }));
             } else {
                 // Import existing account and perform login
                 await importAccount(values.username);
                 origin = connectionToken!.origin;
             }
+            // Now we need to login and set auth cookie
             await handleLogin(values.username, origin);
             window.location.href = origin;
         } catch (error) {
@@ -178,7 +186,7 @@ export const AccountSelection = () => {
             }
 
             try {
-                await handleLogin(accountId, connectionToken.origin);
+                void (await handleLogin(accountId, connectionToken.origin));
                 window.location.href = connectionToken.origin;
             } catch (error) {
                 console.error("❌ Error logging in:", error);
@@ -296,7 +304,6 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                                     : "Import a pre-existing account prior to accepting / denying an invite."}
                             </DialogDescription>
-                            {/* <ImportAccountOrAcceptInviteForm /> */}
                             <Form {...form}>
                                 <form
                                     onSubmit={form.handleSubmit(onSubmit)}
