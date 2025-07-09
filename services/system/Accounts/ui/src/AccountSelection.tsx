@@ -114,6 +114,10 @@ export const AccountSelection = () => {
                     connectionToken!.origin,
                 );
             }
+
+            const origin = inviteToken
+                ? inviteToken.appDomain
+                : connectionToken!.origin;
             window.location.href = origin;
         } catch (error) {
             console.error("❌ Error in logging in:", error);
@@ -182,8 +186,6 @@ export const AccountSelection = () => {
     const disableModalSubmit: boolean =
         accountStatus !== (isInvite ? "Available" : "Taken");
 
-    // AccountsList only shows accounts already connected to apps,
-    // so all that's needed here is a "direct" login.
     const onAccountSelection = async (accountId: string) => {
         setSelectedAccountId(accountId);
         if (!isInvite) {
@@ -277,7 +279,6 @@ export const AccountSelection = () => {
         return <InviteExpiredCard token={token} />;
     }
 
-    // I believe this is dead code
     const onAcceptOrLogin = async () => {
         if (isInvite) {
             if (!inviteToken) {
@@ -290,6 +291,7 @@ export const AccountSelection = () => {
                 origin: inviteToken.appDomain,
             });
         } else {
+            // This is dead code; no handled by the click event on an account
             // Login
             if (!connectionToken) {
                 throw new Error(`Expected connection token for a login`);
@@ -300,6 +302,10 @@ export const AccountSelection = () => {
                 accountName: selectedAccount!.account,
             });
         }
+        const origin = isInvite
+            ? inviteToken?.appDomain
+            : connectionToken!.origin;
+        window.location.href = origin!;
     };
 
     return (
