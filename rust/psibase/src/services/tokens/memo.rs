@@ -21,6 +21,13 @@ impl Memo {
 
         Self { contents }
     }
+
+    pub fn validate(&self) {
+        assert!(
+            self.contents.len() <= 80,
+            "memo must be equal to or less than 80 bytes"
+        );
+    }
 }
 
 impl fmt::Display for Memo {

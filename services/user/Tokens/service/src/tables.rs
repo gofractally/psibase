@@ -239,12 +239,6 @@ pub mod tables {
             BalanceTable::new().get_index_pk().get(&(account, token_id))
         }
 
-        pub fn add(account: AccountNumber, token_id: TID) -> Self {
-            check_none(Self::get(account, token_id), "balance already exists");
-            let mut instance = Self::new(account, token_id);
-            instance.save();
-            instance
-        }
 
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
