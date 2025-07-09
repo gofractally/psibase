@@ -150,6 +150,17 @@ impl Intf for TokensPlugin {
         )
     }
 
+    fn del_balance_config(token_id: Wit::TokenId) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let packed_args = tokens::action_structs::delBalConf { token_id }.packed();
+
+        add_action_to_transaction(
+            tokens::action_structs::delBalConf::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn set_token_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 

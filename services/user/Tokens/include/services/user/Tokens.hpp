@@ -32,8 +32,6 @@ namespace UserService
       void setBalConf(TID tokenId, uint8_t index, bool enable);
       void setTokenConf(TID tokenId, uint8_t index, bool enable);
 
-
-
       void credit(TID                             tokenId,
                   psibase::AccountNumber          receiver,
                   Quantity                        amount,
@@ -59,7 +57,6 @@ namespace UserService
       // Read-only interface:
       TokenRecord         getToken(TID tokenId);
       SID                 getTokenSymbol(TID tokenId);
-      bool                exists(TID tokenId);
       BalanceRecord       getBalance(TID tokenId, psibase::AccountNumber account);
       SharedBalanceRecord getSharedBal(TID                    tokenId,
                                        psibase::AccountNumber creditor,
@@ -69,7 +66,6 @@ namespace UserService
 
       bool getTokenConf(TID tokenId, uint8_t index);
 
-         
      private:
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
@@ -88,7 +84,6 @@ namespace UserService
             void burned(TID tokenId, Account burner, Quantity amount, MemoView memo) {}
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
-            void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             // TODO: time is redundant with which block the event was written in
             void transferred(TID tokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
             void recalled(TID tokenId, psibase::BlockTime time, Account from, Quantity amount, MemoView memo) {}
@@ -115,7 +110,6 @@ namespace UserService
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getTokenSymbol, tokenId),
-      method(exists, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, flag),
@@ -129,8 +123,6 @@ namespace UserService
       method(burned, tokenId, burner, amount),
       method(userConfSet, account, flag, enable),
       method(tokenConfSet, tokenId, setter, flag, enable),
-      method(symbolMapped, tokenId, account, symbolId),
-      method(transferred, tokenId, time, sender, receiver, amount, memo),
       method(recalled, tokenId, time, from, amount, memo),
    );
    PSIBASE_REFLECT_UI_EVENTS(Tokens);
