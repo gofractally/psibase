@@ -225,6 +225,7 @@ export const AccountSelection = () => {
     const { mutateAsync: logout } = useLogout();
 
     const handleLogin = async (accountName: string, origin: string) => {
+        console.log("handleLogin().origin:", origin);
         await loginDirect({
             accountName,
             app: connectionToken!.app,

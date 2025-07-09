@@ -15,9 +15,16 @@ function replyToAccountsApp(message: any) {
 }
 
 console.log("🍪 Auth cookie script loaded (using /common/set-cookie endpoint)");
+console.log("🌐 Current window.location.origin:", window.location.origin);
+console.log("🎯 Expected ACCOUNTS_ORIGIN:", ACCOUNTS_ORIGIN);
 
 // Listen for postMessage from Accounts app
 window.addEventListener("message", async (/** @type {MessageEvent} */ event) => {
+    console.log("📨 Auth cookie received message:");
+    console.log("  Event origin:", event.origin);
+    console.log("  Expected ACCOUNTS_ORIGIN:", ACCOUNTS_ORIGIN);
+    console.log("  Message data:", event.data);
+    
     // Only accept messages from the Accounts app subdomain
     if (event.origin !== ACCOUNTS_ORIGIN) {
         console.log("❌ Rejecting message from wrong origin. Expected:", ACCOUNTS_ORIGIN, "Got:", event.origin);
@@ -40,6 +47,9 @@ window.addEventListener("message", async (/** @type {MessageEvent} */ event) => 
     let success = false;
     let error = undefined;
     try {
+        console.log("🔄 Calling /common/set-cookie endpoint with token:", accessToken);
+        console.log("🌐 Current origin for cookie:", window.location.origin);
+        
         // Use the new /common/set-cookie endpoint instead of client-side cookie setting
         const response = await fetch('/common/set-cookie', {
             method: 'POST',
@@ -53,6 +63,15 @@ window.addEventListener("message", async (/** @type {MessageEvent} */ event) => 
             success = true;
             console.log("🍪 Cookie set via /common/set-cookie endpoint");
             console.log("🍪 Response status:", response.status);
+            console.log("🍪 Response headers:", response.headers);
+            
+            // Try to read the response text
+            try {
+                const responseText = await response.text();
+                console.log("🍪 Response body:", responseText);
+            } catch (e) {
+                console.log("🍪 Could not read response body:", e);
+            }
         } else {
             error = `Server returned ${response.status}: ${response.statusText}`;
             console.error("❌ Failed to set cookie:", error);
