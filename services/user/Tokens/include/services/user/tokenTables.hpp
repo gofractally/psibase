@@ -18,7 +18,7 @@ namespace UserService
       uint8_t   settings_value;
       Precision precision;
       Quantity  current_supply;
-      Quantity  max_supply;
+      Quantity  max_issued_supply;
       SID       symbol;
 
       using Configurations =
@@ -37,7 +37,14 @@ namespace UserService
 
       auto operator<=>(const TokenRecord&) const = default;
    };
-   PSIO_REFLECT(TokenRecord, id, nft_id, settings_value, precision, current_supply, max_supply, symbol);
+   PSIO_REFLECT(TokenRecord,
+                id,
+                nft_id,
+                settings_value,
+                precision,
+                current_supply,
+                max_issued_supply,
+                symbol);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    PSIO_REFLECT_TYPENAME(TokenTable)
 

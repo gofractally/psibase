@@ -14,7 +14,7 @@ interface types {
         precision: u8,
         symbol-id: string,
         current-supply: quantity,
-        max-supply: quantity,
+        max-issued-supply: quantity,
     }
 
     record balance {

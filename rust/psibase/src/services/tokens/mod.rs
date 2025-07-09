@@ -34,7 +34,7 @@ pub struct TokenRecord {
     pub settings_value: u8,
     pub precision: Precision,
     pub current_supply: Quantity,
-    pub max_supply: Quantity,
+    pub max_issued_supply: Quantity,
     pub symbol: AccountNumber,
 }
 
@@ -108,7 +108,7 @@ mod service {
     }
 
     #[action]
-    fn create(max_supply: Quantity, precision: Precision) -> TID {
+    fn create(max_issued_supply: Quantity, precision: Precision) -> TID {
         unimplemented!()
     }
 

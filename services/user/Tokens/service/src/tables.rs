@@ -33,7 +33,7 @@ pub mod tables {
         #[graphql(skip)]
         pub burned_supply: Quantity,
         #[graphql(skip)]
-        pub max_supply: Quantity,
+        pub max_issued_supply: Quantity,
         #[graphql(skip)]
         pub settings_value: u8,
         pub symbol: Option<AccountNumber>,
@@ -84,7 +84,7 @@ pub mod tables {
             self.save();
         }
 
-        pub fn add(max_supply: Quantity, precision: u8) -> Self {
+        pub fn add(max_issued_supply: Quantity, precision: u8) -> Self {
             let init_table = InitTable::new();
             let mut init_row = init_table.get_index_pk().get(&()).unwrap();
             let new_id = init_row.last_used_id.checked_add(1).unwrap();
@@ -97,7 +97,7 @@ pub mod tables {
                 nft_id: Nfts::call().mint(),
                 issued_supply: 0.into(),
                 burned_supply: 0.into(),
-                max_supply,
+                max_issued_supply,
                 precision: Precision::try_from(precision).unwrap().value,
                 settings_value: 0,
                 symbol: None,
@@ -134,7 +134,7 @@ pub mod tables {
 
             self.issued_supply = self.issued_supply + amount;
             psibase::check(
-                self.issued_supply <= self.max_supply,
+                self.issued_supply <= self.max_issued_supply,
                 "over max issued supply",
             );
             self.save();
@@ -197,8 +197,8 @@ pub mod tables {
             Decimal::new(self.issued_supply, self.precision.try_into().unwrap())
         }
 
-        pub async fn max_supply(&self) -> Decimal {
-            Decimal::new(self.max_supply, self.precision.try_into().unwrap())
+        pub async fn max_issued_supply(&self) -> Decimal {
+            Decimal::new(self.max_issued_supply, self.precision.try_into().unwrap())
         }
 
         pub async fn settings(&self) -> TokenFlagsJson {

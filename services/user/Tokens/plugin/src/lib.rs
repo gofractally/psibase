@@ -54,11 +54,12 @@ fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, Error> {
 }
 
 impl Intf for TokensPlugin {
-    fn create(precision: u8, max_supply: Wit::Quantity) -> Result<(), Error> {
-        let max_supply = Quantity::from_str(&max_supply, precision.try_into().unwrap()).unwrap();
+    fn create(precision: u8, max_issued_supply: Wit::Quantity) -> Result<(), Error> {
+        let max_issued_supply =
+            Quantity::from_str(&max_issued_supply, precision.try_into().unwrap()).unwrap();
 
         let packed_args = tokens::action_structs::create {
-            max_supply,
+            max_issued_supply,
             precision,
         }
         .packed();
@@ -276,7 +277,7 @@ impl Queries for TokensPlugin {
                 .unwrap_or("".to_string()),
             precision: token.precision.value,
             current_supply: token.current_supply.to_string(),
-            max_supply: token.max_supply.to_string(),
+            max_issued_supply: token.max_issued_supply.to_string(),
         })
     }
 }
