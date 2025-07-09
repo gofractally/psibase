@@ -74,9 +74,9 @@ class TestTransactionQueue(unittest.TestCase):
 
     @testutil.psinode_test
     def test_signed(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(3))
-        testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'TokenUsers'])
-        (a, b, c) = prods
+        prods = cluster.complete(*testutil.generate_names(4))
+        testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'TokenUsers'])
+        (a, b, c, d) = prods
 
         tokens = Tokens(a)
         old_balance = tokens.balance('alice', token=1)
@@ -94,10 +94,13 @@ class TestTransactionQueue(unittest.TestCase):
         b_balance = Tokens(b).balance('alice', token=1)
         c.wait(pred)
         c_balance = Tokens(c).balance('alice', token=1)
+        d.wait(pred)
+        d_balance = Tokens(d).balance('alice', token=1)
         expected_balance = old_balance - 10000
         self.assertEqual(a_balance, expected_balance)
         self.assertEqual(b_balance, expected_balance)
         self.assertEqual(c_balance, expected_balance)
+        self.assertEqual(d_balance, expected_balance)
 
     @testutil.psinode_test
     def test_restart_node(self, cluster):
