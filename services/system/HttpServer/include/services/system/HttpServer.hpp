@@ -46,6 +46,7 @@ namespace SystemService
    {
       static constexpr auto service          = psibase::proxyServiceNum;
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
+      static constexpr auto commonApiPrefix  = "/common/";
       static constexpr auto homepageService  = psibase::AccountNumber("homepage");
       using Tables                           = psibase::ServiceTables<RegServTable>;
 
