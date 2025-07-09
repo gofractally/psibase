@@ -507,6 +507,13 @@ pub mod tables {
                 .get(&(account, token_id))
         }
 
+        pub fn get_assert(account: AccountNumber, token_id: TID) -> Self {
+            check_some(
+                Self::get(account, token_id),
+                "balance config does not exist",
+            )
+        }
+
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
@@ -520,7 +527,7 @@ pub mod tables {
             Flags::new(self.flags).get(flag)
         }
 
-        fn delete(&self) {
+        pub fn delete(&self) {
             BalanceConfigTable::new().erase(&(self.pk()));
         }
 
@@ -529,11 +536,7 @@ pub mod tables {
         }
 
         fn save(&mut self) {
-            if self.flags == 0 {
-                self.delete();
-            } else {
-                self.put();
-            }
+            self.put();
         }
     }
 

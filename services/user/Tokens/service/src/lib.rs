@@ -157,6 +157,18 @@ pub mod service {
         BalanceConfig::get_or_new(get_sender(), token_id).set_flag(index.into(), enabled);
     }
 
+    /// Delete balance configuration
+    ///
+    /// Delete the balance configuration of sender.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier.
+    #[action]
+    #[allow(non_snake_case)]
+    fn delBalConf(token_id: TID) {
+        BalanceConfig::get_assert(get_sender(), token_id).delete();
+    }
+
     /// Get user global configuration.
     ///
     /// Settings apply to all tokens without a user balance configuration.
