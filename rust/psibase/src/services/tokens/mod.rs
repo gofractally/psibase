@@ -83,7 +83,7 @@ pub struct Balance {
 mod service {
 
     use super::{
-        Balance, Holder, Precision, Quantity, SharedBalance, TokenHolder, TokenRecord, TID,
+        Balance, Holder, Memo, Precision, Quantity, SharedBalance, TokenHolder, TokenRecord, TID,
     };
     use crate::AccountNumber;
 
