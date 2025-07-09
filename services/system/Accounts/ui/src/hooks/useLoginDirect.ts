@@ -14,13 +14,16 @@ const setCookieViaIframe = (token: string, origin: string): Promise<void> => {
         console.log("🚀 setCookieViaIframe called with:");
         console.log("  Token:", token);
         console.log("  Origin:", origin);
-        console.log("  Current window.location.origin:", window.location.origin);
-        
+        console.log(
+            "  Current window.location.origin:",
+            window.location.origin,
+        );
+
         const iframe = document.createElement("iframe");
         const iframeSrc = `${origin}/common/auth-cookie.html`;
         iframe.src = iframeSrc;
         iframe.style.display = "none";
-        
+
         console.log("📱 Creating iframe with src:", iframeSrc);
 
         const handleMessage = (event: MessageEvent) => {
@@ -28,7 +31,7 @@ const setCookieViaIframe = (token: string, origin: string): Promise<void> => {
             console.log("  Event origin:", event.origin);
             console.log("  Expected origin:", origin);
             console.log("  Message data:", event.data);
-            
+
             // Only accept messages from the app's origin
             if (event.origin !== origin) {
                 console.log("❌ Rejecting message from wrong origin");
@@ -71,8 +74,8 @@ const setCookieViaIframe = (token: string, origin: string): Promise<void> => {
     });
 };
 
-export const useLoginDirect = () =>
-    useMutation<void, Error, z.infer<typeof LoginParams>>({
+export const useLoginDirect = () => {
+    return useMutation<void, Error, z.infer<typeof LoginParams>>({
         mutationFn: async (params) => {
             const { accountName, app, origin } = LoginParams.parse(params);
             console.log("useLoginDirect().origin:", origin);
@@ -97,3 +100,4 @@ export const useLoginDirect = () =>
             }
         },
     });
+};

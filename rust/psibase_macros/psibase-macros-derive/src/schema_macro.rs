@@ -1,4 +1,4 @@
-use crate::fracpack_macro::Options as FracpackOptions;
+use crate::fracpack_macro::{skip_field, Options as FracpackOptions};
 use darling::{error::Accumulator, FromDeriveInput, FromVariant};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
@@ -39,6 +39,7 @@ fn visit_fields_named(
     let visit_fields = fields
         .named
         .iter()
+        .filter(|field| !skip_field(field))
         .map(|field| {
             let name_str = field.ident.as_ref().unwrap().to_string();
             let ty = visit_type(&field.ty);

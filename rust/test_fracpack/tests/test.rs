@@ -60,6 +60,7 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_o_o_str: None,
             field_o_o_str2: Some(Some("".into())),
             field_o_o_inner: None,
+            skipped: NotPackable,
         },
         OuterStruct {
             field_u8: 0xff,
@@ -167,6 +168,7 @@ fn get_tests1() -> [OuterStruct; 3] {
             field_o_o_str: Some(None),
             field_o_o_str2: None,
             field_o_o_inner: Some(None),
+            skipped: NotPackable,
         },
         OuterStruct {
             field_u8: 0xff,
@@ -260,6 +262,7 @@ fn get_tests1() -> [OuterStruct; 3] {
                 inner_option_vec_u16: Some(vec![0x1234, 0x5678]),
                 inner_o_vec_o_u16: Some(vec![]),
             })),
+            skipped: NotPackable,
         },
     ]
 } // get_tests1()

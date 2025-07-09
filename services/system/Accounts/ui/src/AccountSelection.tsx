@@ -88,18 +88,31 @@ export const AccountSelection = () => {
     const { isDirty, isSubmitting } = form.formState;
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        let origin = inviteToken?.appDomain || connectionToken!.origin;
         try {
+            const origin = inviteToken
+                ? inviteToken.appDomain
+                : connectionToken!.origin;
+            const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
+                console.log("onSubmit().connectionToken:", connectionToken);
                 await createAccount(values.username);
-                // Now we need to login and set auth cookie
+                void (await acceptInvite({
+                    origin,
+                    app,
+                    accountName: values.username,
+                    token: z.string().parse(token),
+                }));
             } else {
                 // Import existing account and perform login
                 await importAccount(values.username);
-                origin = connectionToken!.origin;
+                if (!connectionToken) {
+                    throw new Error("Invalid connectionToken");
+                }
+                // Now we need to login and set auth cookie
+                await handleLogin(values.username, app, origin);
             }
-            await handleLogin(values.username, origin);
+
             window.location.href = origin;
         } catch (error) {
             console.error("❌ Error in logging in:", error);
@@ -149,12 +162,10 @@ export const AccountSelection = () => {
         : accounts || [];
 
     useEffect(() => {
-        console.log("Preloading auth-any...");
         async function preloadAuthAny() {
             await supervisor.preLoadPlugins([
                 { service: "auth-any", plugin: "plugin" },
             ]);
-            console.log("Preloaded auth-any.");
         }
         preloadAuthAny();
     }, []);
@@ -170,8 +181,6 @@ export const AccountSelection = () => {
     const disableModalSubmit: boolean =
         accountStatus !== (isInvite ? "Available" : "Taken");
 
-    // AccountsList only shows accounts already connected to apps,
-    // so all that's needed here is a "direct" login.
     const onAccountSelection = async (accountId: string) => {
         setSelectedAccountId(accountId);
         if (!isInvite) {
@@ -180,7 +189,11 @@ export const AccountSelection = () => {
             }
 
             try {
-                await handleLogin(accountId, connectionToken.origin);
+                void (await handleLogin(
+                    accountId,
+                    connectionToken.app,
+                    connectionToken.origin,
+                ));
                 window.location.href = connectionToken.origin;
             } catch (error) {
                 console.error("❌ Error logging in:", error);
@@ -224,11 +237,18 @@ export const AccountSelection = () => {
         useLoginDirect();
     const { mutateAsync: logout } = useLogout();
 
-    const handleLogin = async (accountName: string, origin: string) => {
-        console.log("handleLogin().origin:", origin);
+    const handleLogin = async (
+        accountName: string,
+        app: string,
+        origin: string,
+    ) => {
+        console.log("handleLogin().connectionToken:", connectionToken);
+        if (!connectionToken) {
+            throw new Error(`Expected connection token for a login`);
+        }
         await loginDirect({
             accountName,
-            app: connectionToken!.app,
+            app,
             origin,
         });
     };
@@ -254,7 +274,6 @@ export const AccountSelection = () => {
         return <InviteExpiredCard token={token} />;
     }
 
-    // I believe this is dead code
     const onAcceptOrLogin = async () => {
         if (isInvite) {
             if (!inviteToken) {
@@ -267,6 +286,7 @@ export const AccountSelection = () => {
                 origin: inviteToken.appDomain,
             });
         } else {
+            // This is dead code; no handled by the click event on an account
             // Login
             if (!connectionToken) {
                 throw new Error(`Expected connection token for a login`);
@@ -277,6 +297,10 @@ export const AccountSelection = () => {
                 accountName: selectedAccount!.account,
             });
         }
+        const origin = isInvite
+            ? inviteToken?.appDomain
+            : connectionToken!.origin;
+        window.location.href = origin!;
     };
 
     return (
