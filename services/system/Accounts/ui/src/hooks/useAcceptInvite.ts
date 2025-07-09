@@ -43,12 +43,12 @@ export const useAcceptInvite = () =>
             });
             console.log("queryToken:", queryToken);
 
-            if (window.location?.href) {
-                window.location.href = origin;
-            } else {
-                throw new Error(
-                    `Failed to redirect window to origin ${origin}`,
-                );
-            }
+            // if (window.location?.href) {
+            //     window.location.href = origin;
+            // } else {
+            //     throw new Error(
+            //         `Failed to redirect window to origin ${origin}`,
+            //     );
+            // }
         },
     });

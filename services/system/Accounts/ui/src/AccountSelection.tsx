@@ -88,10 +88,10 @@ export const AccountSelection = () => {
     const { isDirty, isSubmitting } = form.formState;
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        let origin = inviteToken?.appDomain || connectionToken!.origin;
         try {
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
+                console.log("onSubmit().connectionToken:", connectionToken);
                 await createAccount(values.username);
                 void (await acceptInvite({
                     origin: inviteToken
@@ -104,10 +104,16 @@ export const AccountSelection = () => {
             } else {
                 // Import existing account and perform login
                 await importAccount(values.username);
-                origin = connectionToken!.origin;
+                if (!connectionToken) {
+                    throw new Error("Invalid connectionToken");
+                }
+                // Now we need to login and set auth cookie
+                await handleLogin(
+                    values.username,
+                    connectionToken!.app,
+                    connectionToken!.origin,
+                );
             }
-            // Now we need to login and set auth cookie
-            await handleLogin(values.username, origin);
             window.location.href = origin;
         } catch (error) {
             console.error("❌ Error in logging in:", error);
@@ -186,7 +192,11 @@ export const AccountSelection = () => {
             }
 
             try {
-                void (await handleLogin(accountId, connectionToken.origin));
+                void (await handleLogin(
+                    accountId,
+                    connectionToken.app,
+                    connectionToken.origin,
+                ));
                 window.location.href = connectionToken.origin;
             } catch (error) {
                 console.error("❌ Error logging in:", error);
@@ -230,10 +240,18 @@ export const AccountSelection = () => {
         useLoginDirect();
     const { mutateAsync: logout } = useLogout();
 
-    const handleLogin = async (accountName: string, origin: string) => {
+    const handleLogin = async (
+        accountName: string,
+        app: string,
+        origin: string,
+    ) => {
+        console.log("handleLogin().connectionToken:", connectionToken);
+        if (!connectionToken) {
+            throw new Error(`Expected connection token for a login`);
+        }
         await loginDirect({
             accountName,
-            app: connectionToken!.app,
+            app,
             origin,
         });
     };
