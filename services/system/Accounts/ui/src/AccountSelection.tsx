@@ -89,15 +89,17 @@ export const AccountSelection = () => {
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
+            const origin = inviteToken
+                ? inviteToken.appDomain
+                : connectionToken!.origin;
+            const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
                 console.log("onSubmit().connectionToken:", connectionToken);
                 await createAccount(values.username);
                 void (await acceptInvite({
-                    origin: inviteToken
-                        ? inviteToken.appDomain
-                        : connectionToken!.origin,
-                    app: inviteToken ? inviteToken.app : connectionToken!.app,
+                    origin,
+                    app,
                     accountName: values.username,
                     token: z.string().parse(token),
                 }));
@@ -108,16 +110,9 @@ export const AccountSelection = () => {
                     throw new Error("Invalid connectionToken");
                 }
                 // Now we need to login and set auth cookie
-                await handleLogin(
-                    values.username,
-                    connectionToken!.app,
-                    connectionToken!.origin,
-                );
+                await handleLogin(values.username, app, origin);
             }
 
-            const origin = inviteToken
-                ? inviteToken.appDomain
-                : connectionToken!.origin;
             window.location.href = origin;
         } catch (error) {
             console.error("❌ Error in logging in:", error);

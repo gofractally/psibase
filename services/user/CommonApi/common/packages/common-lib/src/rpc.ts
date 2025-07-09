@@ -58,9 +58,9 @@ export function siblingUrl(
 ): string {
     const currentUrl = new URL(baseUrl || window.location.href);
     const hostnameParts = currentUrl.hostname.split(".");
-    if (hostnameParts.join(".") === "psibase.localhost") {
-        baseUrlIncludesSibling = false;
-    }
+    // if (hostnameParts.join(".") === "psibase.localhost") {
+    //     baseUrlIncludesSibling = false;
+    // }
     if (baseUrlIncludesSibling) {
         hostnameParts.shift();
     }

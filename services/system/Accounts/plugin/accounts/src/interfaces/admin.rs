@@ -44,7 +44,6 @@ impl Admin for AccountsPlugin {
 
         assert_valid_account(&user);
 
-        // TODO: global flag to switch getting a query token or not?
         let query_token =
             TransactAuthApi::get_query_token(&get_accounts_app().app.unwrap(), &user).unwrap();
 
@@ -52,12 +51,6 @@ impl Admin for AccountsPlugin {
         UserTable::new(&user).add_connected_app(&app);
 
         Some(query_token)
-    }
-
-    fn logout() {
-        assert_caller_admin("logout");
-        // TODO: request server to remove query token cookie
-        println!("logout(). REMOVE cookie");
     }
 
     fn decode_connection_token(token: String) -> Option<AppDetails> {
