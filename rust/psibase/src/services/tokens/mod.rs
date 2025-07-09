@@ -34,18 +34,9 @@ pub struct TokenRecord {
     pub settings_value: u8,
     pub precision: Precision,
     pub current_supply: Quantity,
+    pub burned_supply: Quantity,
     pub max_supply: Quantity,
     pub symbol: AccountNumber,
-}
-
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct TokenHolder {
-    pub account: AccountNumber,
-    pub token_id: TID,
-    pub flags: u8,
 }
 
 #[derive(
@@ -82,9 +73,7 @@ pub struct Balance {
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
-    use super::{
-        Balance, Holder, Memo, Precision, Quantity, SharedBalance, TokenHolder, TokenRecord, TID,
-    };
+    use super::{Balance, Memo, Quantity, SharedBalance, TokenRecord, TID};
     use crate::AccountNumber;
 
     #[action]
@@ -93,12 +82,12 @@ mod service {
     }
 
     #[action]
-    fn credit(tokenId: TID, receiver: AccountNumber, amount: Quantity, memo: Memo) {
+    fn credit(tokenId: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn uncredit(tokenId: TID, receiver: AccountNumber, maxAmount: Quantity, memo: Memo) {
+    fn uncredit(tokenId: TID, debitor: AccountNumber, maxAmount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -108,12 +97,12 @@ mod service {
     }
 
     #[action]
-    fn create(max_supply: Quantity, precision: Precision) -> TID {
+    fn create(max_supply: Quantity, precision: u8) -> TID {
         unimplemented!()
     }
 
     #[action]
-    fn burn(tokenId: TID, amount: Quantity) {
+    fn burn(tokenId: TID, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -139,7 +128,7 @@ mod service {
     }
 
     #[action]
-    fn getUserConf(account: AccountNumber) -> Holder {
+    fn getUserConf(account: AccountNumber) -> bool {
         unimplemented!()
     }
 
@@ -149,22 +138,27 @@ mod service {
     }
 
     #[action]
-    fn getTokHoldr(account: AccountNumber, token_id: TID) -> TokenHolder {
-        unimplemented!()
-    }
-
-    #[action]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
     #[action]
-    fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
+    fn delBalConf(token_id: TID) {
         unimplemented!()
     }
 
     #[action]
-    fn open(token_id: TID) {
+    fn getTokenConf(token_id: TID, index: u8) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
