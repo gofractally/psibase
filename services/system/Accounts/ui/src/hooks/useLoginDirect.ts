@@ -97,6 +97,11 @@ export const useLoginDirect = () => {
             // Set cookie via iframe
             if (queryToken) {
                 await setCookieViaIframe(queryToken, origin);
+
+                console.log(
+                    "done waiting for set-cookie iframe; redirecting...",
+                );
+                window.location.href = origin;
             }
         },
     });
