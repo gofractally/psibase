@@ -6,7 +6,7 @@ pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
-    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::services::tokens::{Memo, Precision, Quantity};
     use psibase::AccountNumber;
 
     use psibase::{Fracpack, ToSchema};
@@ -163,7 +163,7 @@ pub mod service {
     }
 
     #[action]
-    fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: String) {
+    fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
         Token::get_assert(token_id).recall(amount, from);
 
         Wrapper::emit()
@@ -172,7 +172,7 @@ pub mod service {
     }
 
     #[action]
-    fn burn(token_id: TID, amount: Quantity, memo: String) {
+    fn burn(token_id: TID, amount: Quantity, memo: Memo) {
         Token::get_assert(token_id).burn(amount);
 
         Wrapper::emit()
@@ -181,14 +181,14 @@ pub mod service {
     }
 
     #[action]
-    fn mint(token_id: TID, amount: Quantity, memo: String) {
+    fn mint(token_id: TID, amount: Quantity, memo: Memo) {
         Token::get_assert(token_id).mint(amount);
 
         Wrapper::emit().history().minted(token_id, amount, memo);
     }
 
     #[action]
-    fn credit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: String) {
+    fn credit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         let creditor = get_sender();
         SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
 
@@ -198,7 +198,7 @@ pub mod service {
     }
 
     #[action]
-    fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: String) {
+    fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         let creditor = get_sender();
 
         SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
@@ -209,12 +209,12 @@ pub mod service {
     }
 
     #[action]
-    fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: String) {
+    fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
         SharedBalance::get_assert(creditor, get_sender(), token_id).debit(amount, memo);
     }
 
     #[action]
-    fn reject(token_id: TID, creditor: AccountNumber, memo: String) {
+    fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
         SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
     }
 
@@ -224,18 +224,18 @@ pub mod service {
         amount: Quantity,
         burner: AccountNumber,
         from: AccountNumber,
-        memo: String,
+        memo: Memo,
     ) {
     }
 
     #[event(history)]
-    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: String) {}
+    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
 
     #[event(history)]
     pub fn created(token_id: TID, sender: AccountNumber, precision: u8, max_supply: Quantity) {}
 
     #[event(history)]
-    pub fn minted(token_id: TID, amount: Quantity, memo: String) {}
+    pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
 
     #[event(history)]
     pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
@@ -246,7 +246,7 @@ pub mod service {
         creditor: AccountNumber,
         debitor: AccountNumber,
         amount: Quantity,
-        memo: String,
+        memo: Memo,
     ) {
     }
 
@@ -256,7 +256,7 @@ pub mod service {
         creditor: AccountNumber,
         debitor: AccountNumber,
         amount: Quantity,
-        memo: String,
+        memo: Memo,
     ) {
     }
 
@@ -266,12 +266,12 @@ pub mod service {
         creditor: AccountNumber,
         debitor: AccountNumber,
         amount: Quantity,
-        memo: String,
+        memo: Memo,
     ) {
     }
 
     #[event(history)]
-    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
+    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: Memo) {}
 }
 
 #[cfg(test)]

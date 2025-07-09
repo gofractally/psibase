@@ -75,7 +75,7 @@ impl Intf for TokensPlugin {
 
         let packed_args = tokens::action_structs::burn {
             amount,
-            memo,
+            memo: memo.into(),
             token_id: token.id,
         }
         .packed();
@@ -97,7 +97,7 @@ impl Intf for TokensPlugin {
         let packed_args = tokens::action_structs::recall {
             amount,
             from: from.as_str().into(),
-            memo,
+            memo: memo.into(),
             token_id: token.id,
         }
         .packed();
@@ -127,7 +127,7 @@ impl Intf for TokensPlugin {
 
         let packed_args = tokens::action_structs::mint {
             amount,
-            memo,
+            memo: memo.into(),
             token_id: token.id,
         }
         .packed();
@@ -188,7 +188,7 @@ impl Transfer for TokensPlugin {
 
         let packed_args = tokens::action_structs::credit {
             amount,
-            memo,
+            memo: memo.into(),
             debitor: debitor.as_str().into(),
             token_id: token.id,
         }
@@ -212,7 +212,7 @@ impl Transfer for TokensPlugin {
         let packed_args = tokens::action_structs::debit {
             amount,
             creditor: creditor.as_str().into(),
-            memo,
+            memo: memo.into(),
             token_id: token.id,
         }
         .packed();
@@ -232,7 +232,7 @@ impl Transfer for TokensPlugin {
         let packed_args = tokens::action_structs::reject {
             creditor: creditor.as_str().into(),
             token_id: token.id,
-            memo,
+            memo: memo.into(),
         }
         .packed();
 
@@ -252,7 +252,7 @@ impl Transfer for TokensPlugin {
 
         let packed_args = tokens::action_structs::uncredit {
             amount,
-            memo,
+            memo: memo.into(),
             debitor: debitor.as_str().into(),
             token_id: token.id,
         }
