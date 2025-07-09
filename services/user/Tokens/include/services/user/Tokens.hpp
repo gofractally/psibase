@@ -24,7 +24,7 @@ namespace UserService
 
       void init();
 
-      TID create(Precision precision, Quantity maxSupply);
+      TID create(Precision precision, Quantity maxIssuedSupply);
 
       void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
       void burn(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
@@ -79,7 +79,7 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void created(TID tokenId, Account creator, Precision precision, Quantity maxSupply) {}
+            void created(TID tokenId, Account creator, Precision precision, Quantity maxIssuedSupply) {}
             void minted(TID tokenId, Account minter, Quantity amount, MemoView memo) {}
             void burned(TID tokenId, Account burner, Quantity amount, MemoView memo) {}
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
@@ -99,7 +99,7 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Tokens,
       method(init),
-      method(create, precision, maxSupply),
+      method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),
 
       method(burn, tokenId, amount),
@@ -118,7 +118,7 @@ namespace UserService
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
-      method(created, tokenId, creator, precision, maxSupply),
+      method(created, tokenId, creator, precision, maxIssuedSupply),
       method(minted, tokenId, minter, amount, memo),
       method(burned, tokenId, burner, amount),
       method(userConfSet, account, flag, enable),
