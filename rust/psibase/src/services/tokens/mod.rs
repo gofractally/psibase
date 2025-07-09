@@ -1,8 +1,10 @@
 pub mod decimal;
+pub mod memo;
 pub mod precision;
 pub mod quantity;
 
 pub use decimal::Decimal;
+pub use memo::Memo;
 pub use precision::Precision;
 pub use quantity::Quantity;
 
@@ -18,15 +20,6 @@ custom_error! { pub ConversionError
     InvalidNumber = "Invalid Number",
     PrecisionOverflow = "Precision overflow",
     Overflow = "Overflow",
-}
-
-#[derive(
-    Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "MemoInput")]
-pub struct Memo {
-    pub contents: String,
 }
 
 pub type TID = u32;
@@ -100,17 +93,17 @@ mod service {
     }
 
     #[action]
-    fn credit(tokenId: TID, receiver: AccountNumber, amount: Quantity, memo: String) {
+    fn credit(tokenId: TID, receiver: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn uncredit(tokenId: TID, receiver: AccountNumber, maxAmount: Quantity, memo: String) {
+    fn uncredit(tokenId: TID, receiver: AccountNumber, maxAmount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn debit(tokenId: TID, sender: AccountNumber, amount: Quantity, memo: String) {
+    fn debit(tokenId: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -125,12 +118,12 @@ mod service {
     }
 
     #[action]
-    fn mint(tokenId: TID, amount: Quantity, memo: String) {
+    fn mint(tokenId: TID, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn recall(tokenId: TID, from: AccountNumber, amount: Quantity, memo: String) {
+    fn recall(tokenId: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 

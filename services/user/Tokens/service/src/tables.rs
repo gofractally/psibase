@@ -3,7 +3,7 @@ pub mod tables {
     use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
-    use psibase::services::tokens::{Decimal, Precision, Quantity};
+    use psibase::services::tokens::{Decimal, Precision, Quantity, Memo};
     use psibase::{check, check_none, check_some, get_sender, AccountNumber, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
@@ -402,7 +402,7 @@ pub mod tables {
                 );
 
             if !is_manual_debit {
-                self.debit(quantity, "Autodebit".to_string());
+                self.debit(quantity, "Autodebit".to_string().into());
             }
         }
 
@@ -416,7 +416,7 @@ pub mod tables {
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
         }
 
-        pub fn debit(&mut self, quantity: Quantity, memo: String) {
+        pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
             check(quantity.value > 0, "debit quantity must be greater than 0");
 
             crate::Wrapper::emit().history().debited(
@@ -430,7 +430,7 @@ pub mod tables {
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
         }
 
-        pub fn reject(&mut self, memo: String) {
+        pub fn reject(&mut self, memo: Memo) {
             if self.balance.value > 0 {
                 crate::Wrapper::emit().history().rejected(
                     self.token_id,
