@@ -3,8 +3,6 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::check;
-
 #[derive(
     Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
@@ -16,10 +14,11 @@ pub struct Memo {
 
 impl Memo {
     pub fn new(contents: String) -> Self {
-        check(
+        assert!(
             contents.len() <= 80,
-            "memo must be equal to or less than 80 bytes",
+            "memo must be equal to or less than 80 bytes"
         );
+
         Self { contents }
     }
 }

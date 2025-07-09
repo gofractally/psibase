@@ -13,7 +13,12 @@ mod tests {
         debitor: AccountNumber,
         amount: Quantity,
     ) -> ChainEmptyResult {
-        Wrapper::push_from(chain, creditor).credit(token_id, debitor, amount, "memo".to_string())
+        Wrapper::push_from(chain, creditor).credit(
+            token_id,
+            debitor,
+            amount,
+            "memo".to_string().into(),
+        )
     }
 
     fn debit(
@@ -23,7 +28,12 @@ mod tests {
         debitor: AccountNumber,
         amount: Quantity,
     ) -> ChainEmptyResult {
-        Wrapper::push_from(chain, debitor).debit(token_id, creditor, amount, "debit".to_string())
+        Wrapper::push_from(chain, debitor).debit(
+            token_id,
+            creditor,
+            amount,
+            "debit".to_string().into(),
+        )
     }
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
@@ -88,7 +98,7 @@ mod tests {
 
         // Alice cannot mint a token that does not yet exist.
         assert_error(
-            Wrapper::push_from(&chain, alice).mint(2, 12345.into(), "memo".to_string()),
+            Wrapper::push_from(&chain, alice).mint(2, 12345.into(), "memo".to_string().into()),
             "service 'tokens' aborted with message: failed to find token",
         );
 
@@ -100,7 +110,7 @@ mod tests {
         // Alice can mint a portion of the token supply;
         assert_balance(&chain, alice, token_id, 0.into());
         Wrapper::push_from(&chain, alice)
-            .mint(token_id, 12345.into(), format!(""))
+            .mint(token_id, 12345.into(), format!("").into())
             .get()?;
         assert_balance(&chain, alice, token_id, 12345.into());
 
@@ -125,12 +135,16 @@ mod tests {
         assert_shared_balance(&chain, alice, bob, token_id, 0.into());
 
         assert_error(
-            Wrapper::push_from(&chain, alice).mint(token_id, 67656.into(), "memo".to_string()),
+            Wrapper::push_from(&chain, alice).mint(
+                token_id,
+                67656.into(),
+                "memo".to_string().into(),
+            ),
             "service 'tokens' aborted with message: over max issued supply",
         );
 
         Wrapper::push_from(&chain, alice)
-            .mint(token_id, 67655.into(), "memo".to_string())
+            .mint(token_id, 67655.into(), "memo".to_string().into())
             .get()?;
 
         let token_detail = Wrapper::push_from(&chain, alice).getToken(token_id).get()?;
@@ -144,7 +158,7 @@ mod tests {
 
         // Bob can burn some of his balance
         Wrapper::push_from(&chain, bob)
-            .burn(token_id, 3.into(), format!(""))
+            .burn(token_id, 3.into(), format!("").into())
             .get()?;
 
         let supply_delta = token_detail.current_supply
@@ -156,7 +170,7 @@ mod tests {
 
         // Alice can burn some of Bobs balance
         Wrapper::push_from(&chain, alice)
-            .recall(token_id, bob, 6.into(), format!(""))
+            .recall(token_id, bob, 6.into(), format!("").into())
             .get()?;
 
         assert_balance(&chain, bob, token_id, 12336.into());
