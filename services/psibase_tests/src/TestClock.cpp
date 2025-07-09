@@ -1,4 +1,4 @@
-#include "clock-service.hpp"
+#include <services/test/TestClock.hpp>
 
 #include <psibase/dispatch.hpp>
 
@@ -20,7 +20,7 @@ void check_err(int err)
    check(err == 0, "errno: " + std::to_string(errno));
 }
 
-void ClockService::testReal()
+void TestClock::testReal()
 {
    struct timespec time;
    auto            err = ::clock_gettime(CLOCK_REALTIME, &time);
@@ -28,7 +28,7 @@ void ClockService::testReal()
    validate_timespec(time);
 }
 
-void ClockService::testMono()
+void TestClock::testMono()
 {
    struct timespec time1;
    auto            err = ::clock_gettime(CLOCK_MONOTONIC, &time1);
@@ -43,7 +43,7 @@ void ClockService::testMono()
          "monotonic clock must not decrease");
 }
 
-void ClockService::testCpu()
+void TestClock::testCpu()
 {
    struct timespec time1;
    auto            err = ::clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time1);
@@ -58,25 +58,25 @@ void ClockService::testCpu()
    check(time1.tv_nsec <= time2.tv_nsec, "cpu clock must not decrease");
 }
 
-void ClockService::testSystem()
+void TestClock::testSystem()
 {
    std::chrono::system_clock::now();
 }
 
-//void ClockService::testUtc() {
+//void TestClock::testUtc() {
 //   std::chrono::utc_clock::now();
 //}
 
-void ClockService::testSteady()
+void TestClock::testSteady()
 {
    auto t1 = std::chrono::steady_clock::now();
    auto t2 = std::chrono::steady_clock::now();
    check(t1 <= t2, "std::chrono::steady_clock must not decrease");
 }
 
-void ClockService::testHiRes()
+void TestClock::testHiRes()
 {
    std::chrono::high_resolution_clock::now();
 }
 
-PSIBASE_DISPATCH(ClockService)
+PSIBASE_DISPATCH(TestClock)
