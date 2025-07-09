@@ -415,13 +415,16 @@ namespace psibase
                PSIBASE_LOG(trxLogger, debug) << "preverifyTransaction succeeded";
                if (result)
                {
-                  for (const auto& [token, out] : std::views::zip(*result, tokens))
-                  {
-                     if (token && token->size() == out.size())
-                     {
-                        std::ranges::copy(*token, out.begin());
-                     }
-                  }
+                  std::ranges::transform(std::views::take(*result, tokens.size()), tokens.begin(),
+                                         [](const auto& token)
+                                         {
+                                            Checksum256 value = {};
+                                            if (token && token->size() == value.size())
+                                            {
+                                               std::ranges::copy(*token, value.begin());
+                                            }
+                                            return value;
+                                         });
                   break;
                }
             }
