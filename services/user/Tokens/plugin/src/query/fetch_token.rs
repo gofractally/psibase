@@ -22,7 +22,7 @@ pub struct Token {
     pub id: u32,
     pub nft_id: u32,
     pub current_supply: Decimal,
-    pub max_supply: Decimal,
+    pub max_issued_supply: Decimal,
     pub owner: AccountNumber,
     pub symbol: Option<AccountNumber>,
 }
@@ -35,7 +35,7 @@ pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
         		id
         		nftId
         		currentSupply
-        		maxSupply
+        		maxIssuedSupply
                 symbol
                 owner
         	}}

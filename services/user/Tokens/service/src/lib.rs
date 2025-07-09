@@ -24,7 +24,7 @@ pub mod service {
         pub precision: Precision,
         pub current_supply: Quantity,
         pub burned_supply: Quantity,
-        pub max_supply: Quantity,
+        pub max_issued_supply: Quantity,
         pub symbol: SID,
     }
 
@@ -37,7 +37,7 @@ pub mod service {
                 precision: token.precision.try_into().unwrap(),
                 current_supply: token.issued_supply - token.burned_supply,
                 burned_supply: token.burned_supply,
-                max_supply: token.max_supply,
+                max_issued_supply: token.max_issued_supply,
                 symbol: token.symbol.unwrap_or(AccountNumber::from(0)),
             }
         }
@@ -65,18 +65,21 @@ pub mod service {
     /// Create a new token.
     ///
     /// # Arguments
-    /// * `max_supply` - The permanent max supply of the token.
+    /// * `max_issued_supply` - The permanent max issued supply of the token.
     /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
     ///
     /// # Returns the unique token identifier aka TID (u32)
     #[action]
-    fn create(max_supply: Quantity, precision: u8) -> TID {
-        check(max_supply.value > 0, "max supply must be greator than 0");
-        let new_token = Token::add(max_supply, precision);
+    fn create(max_issued_supply: Quantity, precision: u8) -> TID {
+        check(
+            max_issued_supply.value > 0,
+            "max issued supply must be greater than 0",
+        );
+        let new_token = Token::add(max_issued_supply, precision);
 
         Wrapper::emit()
             .history()
-            .created(new_token.id, get_sender(), precision, max_supply);
+            .created(new_token.id, get_sender(), precision, max_issued_supply);
 
         new_token.id
     }
@@ -84,7 +87,7 @@ pub mod service {
     /// Lookup token details.
     ///
     /// # Arguments
-    /// * `token_id` - The permanent max supply of the token.
+    /// * `token_id` - Unique token identifier.
     ///
     /// # Returns token information including current, burned supply and precision.
     #[action]
@@ -302,7 +305,7 @@ pub mod service {
 
     /// Mint tokens.
     ///
-    /// Mint / Issue new tokens into existence. Total issuance cannot exceed the max supply
+    /// Mint / Issue new tokens into existence. Total issuance cannot exceed the max issued supply
     ///
     /// * Requires - Sender holds the Token owner NFT
     ///
@@ -411,7 +414,13 @@ pub mod service {
     pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
 
     #[event(history)]
-    pub fn created(token_id: TID, sender: AccountNumber, precision: u8, max_supply: Quantity) {}
+    pub fn created(
+        token_id: TID,
+        sender: AccountNumber,
+        precision: u8,
+        max_issued_supply: Quantity,
+    ) {
+    }
 
     #[event(history)]
     pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}

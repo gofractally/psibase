@@ -35,7 +35,7 @@ pub struct TokenRecord {
     pub precision: Precision,
     pub current_supply: Quantity,
     pub burned_supply: Quantity,
-    pub max_supply: Quantity,
+    pub max_issued_supply: Quantity,
     pub symbol: AccountNumber,
 }
 

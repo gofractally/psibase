@@ -150,8 +150,8 @@ mod tests {
         let token_detail = Wrapper::push_from(&chain, alice).getToken(token_id).get()?;
 
         assert!(
-            token_detail.current_supply == token_detail.max_supply,
-            "expected the current supply to be the max supply",
+            token_detail.current_supply == token_detail.max_issued_supply,
+            "expected the current supply to be the max issued supply",
         );
 
         assert_balance(&chain, bob, token_id, 12345.into());
