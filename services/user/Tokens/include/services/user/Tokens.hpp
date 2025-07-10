@@ -29,6 +29,7 @@ namespace UserService
       void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
       void burn(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
 
+      void setUserConf(uint8_t index, bool enable);
       void setBalConf(TID tokenId, uint8_t index, bool enable);
       void setTokenConf(TID tokenId, uint8_t index, bool enable);
 
@@ -85,7 +86,7 @@ namespace UserService
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             // TODO: time is redundant with which block the event was written in
-            void transferred(TID tokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
+            void transferred(TID tmanualDebitokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
             void recalled(TID tokenId, psibase::BlockTime time, Account from, Quantity amount, MemoView memo) {}
          };
 
@@ -101,8 +102,9 @@ namespace UserService
       method(init),
       method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),
-
-      method(burn, tokenId, amount),
+      method(burn, tokenId, amount, memo),
+      method(setBalConf, tokenId, index, enable),
+      method(setUserConf, index, enable),
       method(setTokenConf, tokenId, flag, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, maxAmount, memo),
