@@ -28,7 +28,7 @@ struct Catch::StringMaker<std::optional<T>>
 TEST_CASE("subjective db")
 {
    DefaultTestChain t;
-   t.addService(SubjectiveDb::service, "subjective-service.wasm");
+   t.addService(SubjectiveDb::service, "SubjectiveDb.wasm");
    t.from(SetCode::service)
        .to<SetCode>()
        .setFlags(SubjectiveDb::service, SubjectiveDb::serviceFlags);
