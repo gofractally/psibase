@@ -838,7 +838,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Config.psi
     NAME Config
-    VERSION ${PSIBASE_VERSION}
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A dashboard for developers to create and manage apps"
     PACKAGE_DEPENDS 
         "HttpServer(^${PSIBASE_VERSION})" 
