@@ -41,6 +41,7 @@ set(UI_PROJECTS
     user/Permissions/ui:Permissions_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
+    user/Config/ui:Config_js
     user/XAdmin/ui:XAdmin_js
 )
 

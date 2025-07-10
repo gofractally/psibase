@@ -23,6 +23,7 @@
             "user/Packages/ui",
             "user/Permissions/ui",
             "user/Workshop/ui",
+            "user/Config/ui",
             "user/XAdmin/ui"
         ]
     },

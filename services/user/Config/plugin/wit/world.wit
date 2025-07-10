@@ -1,0 +1,19 @@
+package config:plugin;
+
+
+
+interface app {
+    use sites:plugin/types.{file};
+    use host:common/types.{error};
+
+
+    upload-network-logo: func(logo: list<u8>) -> result<_, error>;
+    remove-network-logo: func() -> result<_, error>;
+    set-network-name: func(name: string) -> result<_, error>;
+
+  }
+
+
+world imports {
+    import app;
+}
