@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-import { CreateFractalModal } from "../components/create-fractal-modal";
-import { LoginButton } from "../components/login-button";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -14,6 +12,9 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
+
+import { CreateFractalModal } from "../components/create-fractal-modal";
+import { LoginButton } from "../components/login-button";
 
 export const Loader = () => {
     const { data: currentUser } = useCurrentUser();

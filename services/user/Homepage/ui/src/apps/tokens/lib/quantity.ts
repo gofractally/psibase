@@ -1,5 +1,6 @@
-import { formatThousands } from "@/lib/formatNumber";
 import { z } from "zod";
+
+import { formatThousands } from "@/lib/formatNumber";
 
 const Decimal = z.number().or(z.string());
 
