@@ -236,7 +236,7 @@ pub mod service {
     /// * `token_id` - Unique token identifier.
     /// * `account` - User account.
     ///
-    /// # Returns user balance
+    /// # Returns user balance information
     #[action]
     #[allow(non_snake_case)]
     fn getBalance(token_id: TID, user: AccountNumber) -> Balance {
