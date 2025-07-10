@@ -282,7 +282,8 @@ add_rs_component_workspace(services/:Plugins
     packages
     permissions
     sites
-    test
+    host-privileged
+    host-common
     tokens
     transact
     workshop
@@ -406,6 +407,18 @@ psibase_package(
     SERVICE clientdata
         DATA ${Plugins_OUTPUT_FILE_clientdata} /plugin.wasm
     DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Host.psi
+    NAME Host
+    DESCRIPTION "Plugin that acts as the bridge to the host environment"
+    VERSION ${PSIBASE_VERSION}.0
+    SERVICE host
+        DATA ${Plugins_OUTPUT_FILE_host_privileged} /privileged.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+    DEPENDS ${Plugins_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
 cargo_psibase_package(
@@ -768,17 +781,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
-    NAME SupervisorTests
-    DESCRIPTION "Plugin functions for testing Supervisor functionality"
-    VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Supervisor(^${PSIBASE_VERSION}.0)"
-    SERVICE sup-test
-        DATA ${Plugins_OUTPUT_FILE_test} /test.wasm
-    DEPENDS ${Plugins_DEP}
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     NAME Tokens
     VERSION ${PSIBASE_VERSION}.0
@@ -868,7 +870,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Evaluations Events Fractals Explorer HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs Evaluations Events Fractals Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -878,7 +880,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractals HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -915,7 +917,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Evaluations Fractals Explorer Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -939,6 +941,7 @@ install(
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractals.psi
+          ${SERVICE_DIR}/Host.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
@@ -957,7 +960,6 @@ install(
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
-          ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/Tokens.psi

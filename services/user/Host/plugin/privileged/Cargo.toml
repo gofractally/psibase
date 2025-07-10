@@ -1,5 +1,5 @@
 [package]
-name = "test"
+name = "host-privileged"
 version.workspace = true
 edition.workspace = true
 
@@ -10,8 +10,11 @@ wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "supervisor:test"
+package = "host:privileged"
+
+[package.metadata.component.target]
+world = "impl"
 
 [package.metadata.component.target.dependencies]
-"wasi:keyvalue" = { path = "../../CommonApi/common/packages/wit/wasi-keyvalue.wit" }
-"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"supervisor:bridge" = { path = "../supervisor/wit/world.wit" }
+"host:common" = { path = "../common/wit/world.wit" }

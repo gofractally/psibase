@@ -3,7 +3,6 @@ import { rollup } from "@rollup/browser";
 import { plugin } from "./index.js";
 
 const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
-import hostShimCode from "./host-api.js?raw";
 import privilegedShimCode from "./privileged-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI, Functions } from "../witExtraction.js";
@@ -47,7 +46,7 @@ function getProxiedImports({
     const interfaces = allInterfaces.filter(
         (i) =>
             i.namespace !== "wasi" &&
-            i.namespace !== "host" &&
+            i.namespace !== "supervisor" &&
             i.funcs.length !== 0,
     );
 
@@ -127,22 +126,10 @@ async function getWasiImports(): Promise<ImportDetails> {
     };
 }
 
-async function getHostImports(): Promise<ImportDetails> {
-    const hostShimName = "./host-api.js"; // internal name used by bundler
-    const host_importMap: Array<[PkgId, FilePath]> = [
-        [`host:common/*`, `${hostShimName}#*`],
-    ];
-    const host_ShimFile: [FilePath, Code] = [hostShimName, hostShimCode];
-    return {
-        importMap: host_importMap,
-        files: [host_ShimFile],
-    };
-}
-
 async function getPrivilegedImports(): Promise<ImportDetails> {
     const privilegedShimName = "./privileged-api.js"; // internal name used by bundler
     const privileged_importMap: Array<[PkgId, FilePath]> = [
-        [`host:privileged/*`, `${privilegedShimName}#*`],
+        [`supervisor:bridge/*`, `${privilegedShimName}#*`],
     ];
     const privileged_ShimFile: [FilePath, Code] = [
         privilegedShimName,
@@ -165,6 +152,8 @@ function mergeImports(importDetails: ImportDetails[]): ImportDetails {
 }
 
 export async function loadPlugin(
+    service: string,
+    privileged: boolean,
     wasmBytes: Uint8Array,
     pluginHost: HostInterface,
     api: ComponentAPI,
@@ -172,8 +161,7 @@ export async function loadPlugin(
     const imports = mergeImports(
         await Promise.all([
             getWasiImports(),
-            getHostImports(),
-            getPrivilegedImports(),
+            privileged ? getPrivilegedImports() : new ImportDetails([], []),
             getProxiedImports(api.importedFuncs),
             getNonstandardWasiImports(),
         ]),
@@ -181,7 +169,7 @@ export async function loadPlugin(
     const pluginModule = await load(
         wasmBytes,
         imports,
-        `${pluginHost.myServiceAccount()}.plugin.js`,
+        `${service}.plugin.js`,
     );
     pluginModule.__setHost(pluginHost);
 
@@ -216,6 +204,7 @@ async function load(
     const bundleCode: string = await rollup({
         input: name + ".js",
         plugins: [plugin([...files_2, ...imports.files], true, debugFileName)],
+        treeshake: false,
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
@@ -252,6 +241,7 @@ export async function loadBasic(wasmBytes: Uint8Array, debugFileName: string) {
     const bundleCode: string = await rollup({
         input: name + ".js",
         plugins: [plugin(files_2, false, debugFileName)],
+        treeshake: false,
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);

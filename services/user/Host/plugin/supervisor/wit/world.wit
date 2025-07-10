@@ -1,0 +1,60 @@
+package supervisor:bridge;
+
+interface types {
+    record error {
+        code: u32,
+        producer: plugin-id,
+        message: string,
+    }
+
+    record plugin-id {
+        service: string,
+        plugin: string,
+    }
+
+    record origination-data {
+        app: option<string>,
+        origin: string
+    }
+
+    variant body-types {
+        bytes(list<u8>),
+        json(string),
+        text(string),
+    }
+
+    record header {
+        key: string,
+        value: string,
+    }
+
+    record http-request {
+        uri: string,
+        method: string,
+        headers: list<header>,
+        body: option<body-types>,
+    }
+
+    record http-response {
+        status: u32,
+        headers: list<header>,
+        body: option<body-types>,
+    }
+}
+
+interface intf {
+    use types.{http-request, http-response, origination-data, error, plugin-id};
+
+    get-active-app: func() -> origination-data;
+
+    sync-send: func(req: http-request) -> result<http-response, error>;
+
+    // The last items in the list are the most recent services in the callstack
+    service-stack: func() -> list<string>;
+
+    get-root-domain: func() -> string;
+}
+
+world imports {
+    import intf;
+}
