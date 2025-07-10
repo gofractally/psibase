@@ -8,11 +8,11 @@
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
-
-#include "RemoveCode.hpp"
+#include <services/test/RemoveCode.hpp>
 
 using namespace psibase;
 using namespace SystemService;
+using namespace TestService;
 
 namespace
 {

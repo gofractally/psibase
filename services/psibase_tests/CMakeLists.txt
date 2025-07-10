@@ -17,7 +17,7 @@ function(add suffix)
     service(TestMemo "${suffix}" src/TestMemo.cpp)
     service(TestClock "${suffix}" src/TestClock.cpp)
     service(SubjectiveDb "${suffix}" src/SubjectiveDb.cpp)
-    service(RemoveCode "${suffix}" RemoveCode.cpp)
+    service(RemoveCode "${suffix}" src/RemoveCode.cpp)
     service(AbortService "${suffix}" AbortService.cpp)
     service(EntryPoint "${suffix}" src/EntryPoint.cpp)
 
