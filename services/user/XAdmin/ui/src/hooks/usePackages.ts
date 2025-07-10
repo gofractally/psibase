@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/queryKeys";
+
 import { getJson } from "@psibase/common-lib";
+
+import { queryKeys } from "@/lib/queryKeys";
 import { PackageInfo } from "@/types";
 
 export const usePackages = () =>

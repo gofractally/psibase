@@ -5,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { Message, MessageType } from "./useMessages";
 import dayjs from "dayjs";
-import { AwaitTime } from "@/lib/globals";
 
 const BaseAction = z.object({
   app: Account,
@@ -69,10 +68,8 @@ export const useMail = () =>
             return Message.array().parse(newMessages);
           }
         });
+        queryClient.invalidateQueries({ queryKey });
 
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey });
-        }, AwaitTime);
       }
     },
   });

@@ -1,9 +1,9 @@
-use darling::{FromDeriveInput, FromVariant};
+use darling::{FromDeriveInput, FromField, FromVariant};
 use proc_macro::TokenStream;
 use quote::quote;
 use std::str::FromStr;
 use syn::{
-    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
+    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed,
     LitStr,
 };
 
@@ -26,9 +26,17 @@ impl Default for Options {
     }
 }
 
+/// Fracpack field level options
+#[derive(Debug, Default, FromField)]
+#[darling(default, attributes(fracpack))]
+pub(crate) struct FieldOptions {
+    pub(crate) skip: bool,
+}
+
 struct StructField<'a> {
     name: &'a proc_macro2::Ident,
     ty: &'a syn::Type,
+    skip: bool,
 }
 
 struct EnumField<'a> {
@@ -39,6 +47,14 @@ struct EnumField<'a> {
     unpack: proc_macro2::TokenStream,
 }
 
+pub(crate) fn skip_field(field: &Field) -> bool {
+    FieldOptions::from_field(field).map_or(false, |attr| attr.skip)
+}
+
+fn use_field(field: &&StructField) -> bool {
+    !field.skip
+}
+
 fn struct_fields(data: &DataStruct) -> Vec<StructField> {
     match &data.fields {
         Fields::Named(named) => named
@@ -47,6 +63,7 @@ fn struct_fields(data: &DataStruct) -> Vec<StructField> {
             .map(|field| StructField {
                 name: field.ident.as_ref().unwrap(),
                 ty: &field.ty,
+                skip: skip_field(field),
             })
             .collect(),
         Fields::Unnamed(_) => unimplemented!(),
@@ -298,12 +315,12 @@ fn process_struct(
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let fields = struct_fields(data);
 
-    let optional_fields = fields.iter().map(|field| {
+    let optional_fields = fields.iter().filter(use_field).map(|field| {
         let ty = &field.ty;
         quote! {<#ty as #fracpack_mod::Pack>::IS_OPTIONAL}
     });
 
-    let check_optional_fields = fields.iter().map(|field| {
+    let check_optional_fields = fields.iter().filter(use_field).map(|field| {
         let name = &field.name;
         let ty = &field.ty;
         if opts.definition_will_not_change {
@@ -318,6 +335,7 @@ fn process_struct(
     } else {
         fields
             .iter()
+            .filter(use_field)
             .map(|field| {
                 let ty = &field.ty;
                 quote! {<#ty as #fracpack_mod::Pack>::VARIABLE_SIZE}
@@ -327,6 +345,7 @@ fn process_struct(
 
     let fixed_size = fields
         .iter()
+        .filter(use_field)
         .map(|field| {
             let ty = &field.ty;
             quote! {<#ty as #fracpack_mod::Pack>::FIXED_SIZE}
@@ -335,6 +354,7 @@ fn process_struct(
 
     let fixed_data_size = fields
         .iter()
+        .filter(use_field)
         .enumerate()
         .map(|(i, field)| {
             let ty = &field.ty;
@@ -344,6 +364,7 @@ fn process_struct(
 
     let positions: Vec<syn::Ident> = fields
         .iter()
+        .filter(use_field)
         .map(|field| {
             let name = &field.name;
             let concatenated = format!("pos_{}", name);
@@ -363,6 +384,7 @@ fn process_struct(
 
     let pack_fixed_members = fields
         .iter()
+        .filter(use_field)
         .enumerate()
         .map(|(i, field)| {
             let name = &field.name;
@@ -383,6 +405,7 @@ fn process_struct(
 
     let pack_variable_members = fields
         .iter()
+        .filter(use_field)
         .enumerate()
         .map(|(i, field)| {
             let name = &field.name;
@@ -399,6 +422,7 @@ fn process_struct(
 
     let unpack = fields
         .iter()
+        .filter(use_field)
         .enumerate()
         .map(|(i, field)| {
             let name = &field.name;
@@ -417,8 +441,12 @@ fn process_struct(
         .iter()
         .map(|field| {
             let name = &field.name;
-            quote! {
-                #name,
+            if field.skip {
+                quote! { #name: Default::default(), }
+            } else {
+                quote! {
+                    #name,
+                }
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -427,6 +455,7 @@ fn process_struct(
     // TODO: option to verify no unknown members
     let verify = fields
         .iter()
+        .filter(use_field)
         .enumerate()
         .map(|(i, field)| {
             let ty = &field.ty;

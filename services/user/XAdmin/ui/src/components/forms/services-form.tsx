@@ -1,9 +1,11 @@
-import { PackageInfo, ServicesType } from "@/types";
 import { Controller, UseFormReturn } from "react-hook-form";
+
+import { filterHighestVersions } from "@/lib/filterHighestVersions";
+import { PackageInfo, ServicesType } from "@/types";
+
+import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Label } from "@shared/shadcn/ui/label";
-import { Button } from "@shared/shadcn/ui/button";
-import { filterHighestVersions } from "@/lib/filterHighestVersions";
 
 interface ServicesFormProps {
     setPackages: (names: string[]) => void;
@@ -26,7 +28,7 @@ export const ServicesForm = ({
                 setPackages(
                     serviceIndex
                         .map((meta) => meta.name)
-                        .filter((name) => servicesForm.getValues(name))
+                        .filter((name) => servicesForm.getValues(name)),
                 );
                 setCurrentPage("producer");
             })}

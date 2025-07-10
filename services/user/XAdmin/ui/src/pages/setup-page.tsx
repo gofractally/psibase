@@ -1,7 +1,9 @@
-import { EaseIn } from "@/components/EaseIn";
+import { useNavigate } from "react-router-dom";
+
 import { EvervaultCard } from "@/components/ui/evervault-card";
 import { FlipWords } from "@/components/ui/flip-words";
-import { useNavigate } from "react-router-dom";
+
+import { EaseIn } from "@/components/EaseIn";
 
 const words: string[] = [
     "started",
@@ -18,7 +20,7 @@ export const SetupPage = () => {
         <EaseIn>
             <div className="flex w-full flex-col justify-center sm:h-dvh ">
                 <div className="mx-auto">
-                    <div className="mx-auto mb-4 flex text-4xl font-normal text-muted-foreground ">
+                    <div className="text-muted-foreground mx-auto mb-4 flex text-4xl font-normal ">
                         Let's get
                         <FlipWords words={words} />
                     </div>

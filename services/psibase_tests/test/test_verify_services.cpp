@@ -20,6 +20,25 @@ namespace psibase
 
 namespace
 {
+   auto pubFromPem = [](std::string param) {  //
+      return AuthSig::SubjectPublicKeyInfo{AuthSig::parseSubjectPublicKeyInfo(param)};
+   };
+
+   auto privFromPem = [](std::string param) {  //
+      return AuthSig::PrivateKeyInfo{AuthSig::parsePrivateKeyInfo(param)};
+   };
+
+   auto aliceKeys =
+       KeyPair{pubFromPem("-----BEGIN PUBLIC KEY-----\n"
+                          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWdALpn+cGuD1klsSRXTdapYlG5mu\n"
+                          "WgoALofZYufL838GRUo43UuoGzxu/mW5T6r9Ix4/qc4gH2B+Zc6VYw/pKQ==\n"
+                          "-----END PUBLIC KEY-----\n"),
+               privFromPem("-----BEGIN PRIVATE KEY-----\n"
+                           "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg9h35bFuOZyB8i+GT\n"
+                           "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
+                           "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
+                           "-----END PRIVATE KEY-----\n")};
+
    std::vector<BlockHeaderAuthAccount> getActual(TestChain& t)
    {
       std::vector<BlockHeaderAuthAccount> result;
@@ -174,4 +193,33 @@ TEST_CASE("Verify service tracking")
 
    t.finishBlock();
    CHECK(getReported(t) == getActual(t));
+}
+
+TEST_CASE("No subjective verify")
+{
+   DefaultTestChain t;
+   {
+      auto          nopWasm  = readWholeFile("Nop.wasm");
+      auto          codeHash = sha256(nopWasm.data(), nopWasm.size());
+      CodeByHashRow codeByHash{
+          .codeHash = codeHash,
+          .code{nopWasm.begin(), nopWasm.end()},
+      };
+      t.kvPut(DbId::nativeSubjective, codeByHash.key(), codeByHash);
+      CodeRow code{
+          .codeNum  = VerifySig::service,
+          .flags    = CodeRow::isAuthService,
+          .codeHash = codeHash,
+      };
+      t.kvPut(DbId::nativeSubjective, code.key(), code);
+   }
+   CHECK(t.from(SetCode::service)
+             .to<SetCode>()
+             .setFlags(VerifySig::service, CodeRow::isSubjective | CodeRow::isAuthService)
+             .succeeded());
+   t.startBlock();
+   auto alice = t.addAccount("alice", aliceKeys.first);
+   auto trx   = t.signTransaction(t.makeTransaction({{alice, AccountNumber{"nop"}}}), {aliceKeys});
+   trx.proofs[0].clear();
+   CHECK(Result<void>{t.pushTransaction(trx)}.failed("signature invalid"));
 }

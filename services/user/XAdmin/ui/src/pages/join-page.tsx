@@ -1,8 +1,11 @@
+import { useNavigate } from "react-router-dom";
+
+import { useToast } from "@/components/ui/use-toast";
+
 import { Schema, UrlForm } from "@/components/forms/url";
+
 import { useConnect } from "../hooks/useConnect";
 import { SetupWrapper } from "./setup-wrapper";
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
 
 export const JoinPage = () => {
     const { mutateAsync: connect } = useConnect();
@@ -27,7 +30,7 @@ export const JoinPage = () => {
                 <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
                     Join
                 </h1>{" "}
-                <p className="mt-3 leading-7 text-muted-foreground">
+                <p className="text-muted-foreground mt-3 leading-7">
                     Connect to a psibase compatible node to join a network.
                 </p>
                 <div>

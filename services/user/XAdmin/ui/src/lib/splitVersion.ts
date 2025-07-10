@@ -12,7 +12,7 @@ export const splitVersion = (version: string): ParsedVersion | undefined => {
 
 export const isLeftLessThanRight = (
     left: ParsedVersion | undefined,
-    right: ParsedVersion | undefined
+    right: ParsedVersion | undefined,
 ): boolean => {
     if (left && right) {
         for (let i = 0; i < 3; ++i) {

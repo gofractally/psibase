@@ -257,14 +257,14 @@ class API:
             if len(keys) != 0:
                 raise Exception("Transaction is already signed")
             return trx
-    def push_transaction(self, trx, keys=[]):
+    def push_transaction(self, trx, keys=[], wait_for="applied"):
         '''
         Push a transaction to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
         packed = self.pack_signed_transaction(trx, keys)
-        with self.post('/push_transaction?wait_for=applied', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
+        with self.post('/push_transaction?wait_for=%s' % wait_for, service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
             if trace['error'] is not None:
