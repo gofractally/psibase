@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useChainId } from "@/hooks/use-chain-id";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useExpectCurrentUser } from "@/hooks/use-expect-current-user";
+import { useSelectAccount } from "@/hooks/use-select-account";
+import { createIdenticon } from "@/lib/createIdenticon";
+
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -14,16 +23,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-
-import { useChainId } from "@/hooks/use-chain-id";
-import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useExpectCurrentUser } from "@/hooks/use-expect-current-user";
-import { useSelectAccount } from "@/hooks/use-select-account";
-import { createIdenticon } from "@/lib/createIdenticon";
-
-import { Button } from "@shared/shadcn/ui/button";
 
 const Other = "-other" as const;
 
