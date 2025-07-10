@@ -88,20 +88,18 @@ namespace SystemService
          {
             request.body.push_back(0);
             psio::json_token_stream jstream{request.body.data()};
-            auto params = psio::from_json<cookie_data>(jstream);
-            
+            auto                    params = psio::from_json<cookie_data>(jstream);
+
             // Create response headers with host-only __Host-SESSION cookie
             std::vector<HttpHeader> headers;
-            std::string cookieValue = "__Host-SESSION=" + params.accessToken + 
-                                    "; Path=/; HttpOnly; Secure; SameSite=Strict";
+            std::string             cookieValue = "__Host-SESSION=" + params.accessToken +
+                                      "; Path=/; HttpOnly; Secure; SameSite=Strict";
             headers.push_back({"Set-Cookie", cookieValue});
-            
-            return HttpReply{
-                .status = HttpStatus::ok,
-                .contentType = "application/json",
-                .body = {},
-                .headers = headers
-            };
+
+            return HttpReply{.status      = HttpStatus::ok,
+                             .contentType = "application/json",
+                             .body        = {},
+                             .headers     = headers};
          }
       }
       return std::nullopt;

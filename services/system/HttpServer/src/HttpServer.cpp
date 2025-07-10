@@ -8,6 +8,7 @@
 #include "services/system/Accounts.hpp"
 
 #include <algorithm>
+#include <iostream>
 
 static constexpr bool enable_print = false;
 
@@ -95,8 +96,10 @@ namespace SystemService
                                                      "Content-Security-Policy",  //
                                                      "ETag"};
 
-      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result, 
-                        const std::string& requestTarget = "")
+      void sendReplyImpl(AccountNumber      service,
+                         std::int32_t       socket,
+                         const HttpReply&   result,
+                         const std::string& requestTarget = "")
       {
          for (const auto& header : result.headers)
          {
@@ -105,11 +108,13 @@ namespace SystemService
             {
                if (requestTarget != "/common/set-cookie")
                {
-                  abortMessage("service " + service.str() + " attempted to set Set-Cookie header on unauthorized endpoint " + requestTarget);
+                  abortMessage("service " + service.str() +
+                               " attempted to set Set-Cookie header on unauthorized endpoint " +
+                               requestTarget);
                }
-               continue; // Allow Set-Cookie for the authorized endpoint
+               continue;  // Allow Set-Cookie for the authorized endpoint
             }
-            
+
             // Check standard allowed headers
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
@@ -209,8 +214,23 @@ namespace SystemService
       // TODO: use a view
       auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
 
+      // Log cookie presence
+      bool hasCookie = false;
+      for (const auto& header : req.headers) {
+         if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower)) {
+            std::cout << "🍪 HttpServer: Cookie header found: " << header.value << std::endl;
+            hasCookie = true;
+            break;
+         }
+      }
+      if (!hasCookie) {
+         std::cout << "❌ HttpServer: No cookie header found in request" << std::endl;
+      }
+
       Actor<RTransact> rtransact(act.service, RTransact::service);
       auto             user = rtransact.getUser(req);
+      
+      std::cout << "👤 HttpServer: User from RTransact: " << (user ? user->str() : "None") << std::endl;
 
       auto iface = [&](AccountNumber server)
       { return psibase::Actor<ServerInterface>(act.service, server); };
@@ -256,7 +276,8 @@ namespace SystemService
             sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
-                           .body        = std::vector(msg.begin(), msg.end())}, req.target);
+                           .body        = std::vector(msg.begin(), msg.end())},
+                          req.target);
          }
       }
    }  // serve()
