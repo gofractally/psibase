@@ -1003,7 +1003,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService-schema.json
         SERVER as-query
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/AsyncQueryService.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/src/AsyncQueryService.json
         FLAGS allowWriteSubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
