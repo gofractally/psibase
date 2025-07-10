@@ -1,8 +1,11 @@
-import { siblingUrl } from "@psibase/common-lib";
-import { modifyUrlParams } from "@/lib/modifyUrlParams";
-import { z } from "zod";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+import { siblingUrl } from "@psibase/common-lib";
+
+import { modifyUrlParams } from "@/lib/modifyUrlParams";
+
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useCreateConnectionToken = () =>
@@ -14,14 +17,14 @@ export const useCreateConnectionToken = () =>
                     params: [],
                     service: "accounts",
                     intf: "activeApp",
-                })
+                }),
             ),
         onSuccess: (token) => {
             window.location.href = modifyUrlParams(
                 siblingUrl(undefined, "accounts", null, false),
                 {
                     token,
-                }
+                },
             );
         },
         onError: (error) => {
