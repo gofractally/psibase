@@ -68,13 +68,16 @@ mod service {
         // Check if this is a GraphQL request
         if request.target.starts_with("/graphql") && request.method == "POST" {
             println!("🔒 GraphQL request detected");
+            println!("  Content-Type: {}", request.contentType);
+            println!("  Body: {}", String::from_utf8_lossy(&request.body));
+            
             // For GraphQL requests, check if user is authenticated
             if user.is_none() {
-                println!("❌ No user found - returning 401");
+                println!("❌ No user found - returning GraphQL error");
                 return Some(HttpReply {
-                    status: 401,
+                    status: 200,
                     contentType: "application/json".into(),
-                    body: r#"{"error":"Authentication required for GraphQL requests"}"#.as_bytes().to_vec().into(),
+                    body: r#"{"data":null,"errors":[{"message":"Authentication required for GraphQL requests","extensions":{"code":"UNAUTHENTICATED"}}]}"#.as_bytes().to_vec().into(),
                     headers: vec![],
                 });
             } else {
