@@ -3,8 +3,8 @@
 
 #include <services/system/SetCode.hpp>
 #include <services/system/VerifySig.hpp>
+#include <services/test/AbortService.hpp>
 #include <services/test/RemoveCode.hpp>
-#include "AbortService.hpp"
 
 using namespace psibase;
 using namespace SystemService;

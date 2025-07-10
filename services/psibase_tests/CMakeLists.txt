@@ -18,7 +18,7 @@ function(add suffix)
     service(TestClock "${suffix}" src/TestClock.cpp)
     service(SubjectiveDb "${suffix}" src/SubjectiveDb.cpp)
     service(RemoveCode "${suffix}" src/RemoveCode.cpp)
-    service(AbortService "${suffix}" AbortService.cpp)
+    service(AbortService "${suffix}" src/AbortService.cpp)
     service(EntryPoint "${suffix}" src/EntryPoint.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
