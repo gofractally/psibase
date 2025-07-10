@@ -10,7 +10,6 @@ import { cn } from "@shared/lib/utils";
 import {
     Table,
     TableBody,
-    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -43,37 +42,47 @@ export const AllMembers = () => {
         .sort((a, b) => b.score - a.score);
 
     return (
-        <div className="w-full max-w-screen-xl p-4">
-            <Table>
-                <TableCaption>All Members</TableCaption>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Account</TableHead>
-                        <TableHead>Reputation</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created At</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {sortedMembers?.map((member, index) => (
-                        <TableRow
-                            key={member.account}
-                            className={cn({ "bg-background/80": index < 6 })}
-                        >
-                            <TableCell className="font-medium">
-                                {member.account}
-                            </TableCell>
-                            <TableCell>{formatScore(member.score)}</TableCell>
-                            <TableCell>
-                                {getMemberLabel(member.memberStatus)}
-                            </TableCell>
-                            <TableCell>
-                                {dayjs(member.createdAt).format("MMMM D, YYYY")}
-                            </TableCell>
+        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+            <div className="flex h-9 items-center">
+                <h1 className="text-lg font-semibold">All members</h1>
+            </div>
+            <div className="mt-3">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Account</TableHead>
+                            <TableHead>Reputation</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Created At</TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {sortedMembers?.map((member, index) => (
+                            <TableRow
+                                key={member.account}
+                                className={cn({
+                                    "bg-background/80": index < 6,
+                                })}
+                            >
+                                <TableCell className="font-medium">
+                                    {member.account}
+                                </TableCell>
+                                <TableCell>
+                                    {formatScore(member.score)}
+                                </TableCell>
+                                <TableCell>
+                                    {getMemberLabel(member.memberStatus)}
+                                </TableCell>
+                                <TableCell>
+                                    {dayjs(member.createdAt).format(
+                                        "MMMM D, YYYY",
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     );
 };
