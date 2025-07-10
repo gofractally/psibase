@@ -1,4 +1,5 @@
-import { isEqual, QualifiedPluginId } from "@psibase/common-lib";
+import { QualifiedPluginId, isEqual } from "@psibase/common-lib";
+
 import { Plugins } from "./plugins";
 
 class PluginIdSet {
