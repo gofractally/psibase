@@ -1,4 +1,4 @@
-#include <services/test/EntryPoint.hpp>
+#include <services/test/TestServiceEntry.hpp>
 
 using namespace psibase;
 using namespace TestService;
@@ -24,10 +24,10 @@ extern "C" void __wasm_call_ctors();
 extern "C" void start(AccountNumber this_service)
 {
    __wasm_call_ctors();
-   check(this_service == EntryPoint::service,
-         std::format("{} != {}", this_service.str(), EntryPoint::service.str()));
+   check(this_service == TestServiceEntry::service,
+         std::format("{} != {}", this_service.str(), TestServiceEntry::service.str()));
    ++start_called;
-   auto counter = EntryPoint{}.open<CallCounterTable>();
+   auto counter = TestServiceEntry{}.open<CallCounterTable>();
    auto row     = counter.get(CallCounterRow::start)
                   .value_or(CallCounterRow{.id = CallCounterRow::start, .count = 0});
    ++row.count;
@@ -40,14 +40,14 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
    auto pl  = psio::from_frac_strict<payload>(act.rawData);
    check(ctors_called == 1, "ctors != 1");
    check(start_called == 1, "start != 1");
-   check(this_service == EntryPoint::service, "called: this_service = " + this_service.str());
-   check(sender == EntryPoint::service, "called: sender = " + sender.str());
-   check(act.sender == EntryPoint::service, "called: act.sender = " + act.sender.str());
-   check(act.service == EntryPoint::service, "called: act.service = " + act.service.str());
+   check(this_service == TestServiceEntry::service, "called: this_service = " + this_service.str());
+   check(sender == TestServiceEntry::service, "called: sender = " + sender.str());
+   check(act.sender == TestServiceEntry::service, "called: act.sender = " + act.sender.str());
+   check(act.service == TestServiceEntry::service, "called: act.service = " + act.service.str());
    check(act.method == MethodNumber{"call"}, "called: act.method = " + act.method.str());
    check(pl.memo == "Counting down", "memo: " + pl.memo);
    {
-      auto counter = EntryPoint{}.open<CallCounterTable>();
+      auto counter = TestServiceEntry{}.open<CallCounterTable>();
       auto row     = counter.get(CallCounterRow::called)
                      .value_or(CallCounterRow{.id = CallCounterRow::called, .count = 0});
       int depth = 3 - pl.number;

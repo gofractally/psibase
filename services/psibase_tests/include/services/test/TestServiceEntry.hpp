@@ -15,12 +15,12 @@ namespace TestService
    using CallCounterTable = psibase::Table<CallCounterRow, &CallCounterRow::id>;
    PSIO_REFLECT_TYPENAME(CallCounterTable)
 
-   struct EntryPoint : psibase::Service
+   struct TestServiceEntry : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"entry-point"};
       using Tables                  = psibase::ServiceTables<CallCounterTable>;
       int call(int number, std::string memo);
    };
-   PSIO_REFLECT(EntryPoint, method(call, number, memo))
-   PSIBASE_REFLECT_TABLES(EntryPoint, EntryPoint::Tables)
+   PSIO_REFLECT(TestServiceEntry, method(call, number, memo))
+   PSIBASE_REFLECT_TABLES(TestServiceEntry, TestServiceEntry::Tables)
 }  // namespace TestService
