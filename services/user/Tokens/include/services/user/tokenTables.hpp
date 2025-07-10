@@ -11,44 +11,15 @@
 
 namespace UserService
 {
-   struct InfSettingsRecord
-   {
-      uint64_t dailyLimitPct;
-      uint64_t dailyLimitQty;
-      uint64_t yearlyLimitPct;
-
-      auto operator<=>(const InfSettingsRecord&) const = default;
-   };
-   PSIO_REFLECT(InfSettingsRecord, dailyLimitPct, dailyLimitQty, yearlyLimitPct);
-
-   struct InfStatsRecord
-   {
-      int64_t avgDaily;
-      int64_t avgYearly;
-
-      auto operator<=>(const InfStatsRecord&) const = default;
-   };
-   PSIO_REFLECT(InfStatsRecord, avgDaily, avgYearly);
-
-   struct InflationRecord
-   {
-      InfSettingsRecord settings;
-      InfStatsRecord    stats;
-
-      auto operator<=>(const InflationRecord&) const = default;
-   };
-   PSIO_REFLECT(InflationRecord, settings, stats);
-
    struct TokenRecord
    {
-      TID                id;
-      NID                ownerNft;
-      InflationRecord    inflation;
-      psibase::Bitset<8> config;
-      Precision          precision;
-      Quantity           currentSupply;
-      Quantity           maxSupply;
-      SID                symbolId;
+      TID       id;
+      NID       nft_id;
+      uint8_t   settings_value;
+      Precision precision;
+      Quantity  current_supply;
+      Quantity  max_issued_supply;
+      SID       symbol;
 
       using Configurations =
           psibase::Enum<psibase::EnumElement{"unrecallable"}, psibase::EnumElement{"untradeable"}>;
@@ -68,13 +39,12 @@ namespace UserService
    };
    PSIO_REFLECT(TokenRecord,
                 id,
-                ownerNft,
-                inflation,
-                config,
+                nft_id,
+                settings_value,
                 precision,
-                currentSupply,
-                maxSupply,
-                symbolId);
+                current_supply,
+                max_issued_supply,
+                symbol);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    PSIO_REFLECT_TYPENAME(TokenTable)
 

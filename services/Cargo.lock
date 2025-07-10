@@ -2053,6 +2053,7 @@ dependencies = [
  "indicatif",
  "jwt",
  "mime_guess",
+ "paste",
  "pem",
  "percent-encoding",
  "pkcs8",
@@ -2808,16 +2809,6 @@ checksum = "9117f5d4db391c1cf6927e7bea3db74b9a1c1add8f7eda9ffd5364f40f57b82f"
 dependencies = [
  "displaydoc",
  "zerovec",
-]
-
-[[package]]
-name = "tokens"
-version = "0.18.0"
-dependencies = [
- "psibase",
- "serde",
- "serde_json",
- "wit-bindgen-rt 0.26.0",
 ]
 
 [[package]]

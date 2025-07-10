@@ -18,7 +18,6 @@ members = [
     "user/Supervisor/plugin",
     "user/Packages/plugin",
     "user/Permissions/plugin",
-    "user/Tokens/plugin",
     "user/Workshop/plugin",
 ]
 resolver = "2"
