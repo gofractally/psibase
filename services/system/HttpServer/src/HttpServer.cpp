@@ -8,7 +8,6 @@
 #include "services/system/Accounts.hpp"
 
 #include <algorithm>
-#include <iostream>
 
 static constexpr bool enable_print = false;
 
@@ -214,23 +213,8 @@ namespace SystemService
       // TODO: use a view
       auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
 
-      // Log cookie presence
-      bool hasCookie = false;
-      for (const auto& header : req.headers) {
-         if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower)) {
-            std::cout << "🍪 HttpServer: Cookie header found: " << header.value << std::endl;
-            hasCookie = true;
-            break;
-         }
-      }
-      if (!hasCookie) {
-         std::cout << "❌ HttpServer: No cookie header found in request" << std::endl;
-      }
-
       Actor<RTransact> rtransact(act.service, RTransact::service);
       auto             user = rtransact.getUser(req);
-      
-      std::cout << "👤 HttpServer: User from RTransact: " << (user ? user->str() : "None") << std::endl;
 
       auto iface = [&](AccountNumber server)
       { return psibase::Actor<ServerInterface>(act.service, server); };

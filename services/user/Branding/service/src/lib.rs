@@ -59,32 +59,6 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest, _socket: Option<i32>, user: Option<AccountNumber>) -> Option<HttpReply> {
-        // Debug logging
-        println!("🔍 Branding serveSys called");
-        println!("  Method: {}", request.method);
-        println!("  Target: {}", request.target);
-        println!("  User: {:?}", user);
-        
-        // Check if this is a GraphQL request
-        if request.target.starts_with("/graphql") && request.method == "POST" {
-            println!("🔒 GraphQL request detected");
-            println!("  Content-Type: {}", request.contentType);
-            println!("  Body: {}", String::from_utf8_lossy(&request.body));
-            
-            // For GraphQL requests, check if user is authenticated
-            if user.is_none() {
-                println!("❌ No user found - returning GraphQL error");
-                return Some(HttpReply {
-                    status: 200,
-                    contentType: "application/json".into(),
-                    body: r#"{"data":null,"errors":[{"message":"Authentication required for GraphQL requests","extensions":{"code":"UNAUTHENTICATED"}}]}"#.as_bytes().to_vec().into(),
-                    headers: vec![],
-                });
-            } else {
-                println!("✅ User authenticated: {:?}", user);
-            }
-        }
-        
         None.or_else(|| serve_graphql(&request, Query))
     }
 }
