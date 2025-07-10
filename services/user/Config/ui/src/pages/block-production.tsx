@@ -23,6 +23,7 @@ import {
     SetProducerParams,
     useSetProducers,
 } from "@/hooks/useSetProducers";
+import { isAccountAvailable } from "@/lib/isAccountAvailable";
 
 export const BlockProduction = () => {
     const { mutateAsync, error } = useSetProducers();
@@ -138,6 +139,18 @@ export const BlockProduction = () => {
                                 <form.Field
                                     key={index}
                                     name={`prods[${index}].name`}
+                                    validators={{
+                                        onChangeAsync: async ({ value }) => {
+                                            const status =
+                                                await isAccountAvailable(value);
+                                            if (status == "Available") {
+                                                return "Account does not exist";
+                                            } else if (status == "Invalid") {
+                                                return "Account is invalid";
+                                            }
+                                        },
+                                    }}
+                                    asyncDebounceMs={600}
                                 >
                                     {(subfield) => (
                                         <Input
