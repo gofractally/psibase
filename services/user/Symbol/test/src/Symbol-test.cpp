@@ -50,7 +50,8 @@ SCENARIO("Buying a symbol")
       sysIssuer.setTokenConf(sysToken, untradeable, false);
       sysIssuer.mint(sysToken, q(20'000, precision), memo);
       sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
-      sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      auto derp = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      CHECK(derp.succeeded());
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
