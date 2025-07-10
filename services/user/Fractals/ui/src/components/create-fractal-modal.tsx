@@ -5,7 +5,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 
 import { useCreateFractal } from "@/hooks/fractals/use-create-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";

@@ -1,11 +1,8 @@
 {
-    "compilerOptions": {
-        "composite": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "allowSyntheticDefaultImports": true
-    },
-    "include": [
-        "vite.config.ts"
-    ]
+  "extends": "../../../tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
+    "baseUrl": "./"
+  },
+  "include": ["vite.config.mts"]
 }

@@ -1,4 +1,12 @@
-"use client";
+import { Moon, Power, RotateCcw, Sun } from "lucide-react";
+import { Cog } from "lucide-react";
+import { Link } from "react-router-dom";
+
+import { useTheme } from "@/components/theme-provider";
+
+import { chain } from "@/lib/chainEndpoints";
+
+import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -6,13 +14,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuSub,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Moon, Sun, Power, RotateCcw } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
-import { Button } from "./ui/button";
-import { Cog } from "lucide-react";
-import { Link } from "react-router-dom";
-import { chain } from "@/lib/chainEndpoints";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
     const { setTheme } = useTheme();

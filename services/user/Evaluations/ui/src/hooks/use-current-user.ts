@@ -2,7 +2,6 @@ import { Account, zAccount } from "@/lib/zod/Account";
 import { queryClient } from "@/main";
 import { getSupervisor } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
 export type GetCurrentUserRes = string | null;
 

@@ -2,10 +2,9 @@ import { Account } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 import { siteConfigQueryKey, SiteConfigResponse } from "./useSiteConfig";
-import { AwaitTime } from "@/lib/globals";
 
 const Params = z.object({
   account: Account,
@@ -65,8 +64,6 @@ export const useDeleteCsp = () =>
         }
       });
 
-      setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: siteConfigQueryKey(account) });
-      }, AwaitTime)
     },
   });

@@ -201,6 +201,7 @@ namespace psibase
       void             setPrevAuthServices(ConstRevisionPtr revision);
 
       // Manage access to subjective database
+      void checkoutEmptySubjective();
       void checkoutSubjective();
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
       void abortSubjective();

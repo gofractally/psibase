@@ -1,34 +1,8 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": [
-      "ES2023",
-      "DOM",
-      "DOM.Iterable",
-      "WebWorker"
-    ],
-    "module": "ESNext",
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "types": [
-      "node",
-      "vite/client",
-      "react",
-      "react-dom"
-    ],
-    "skipLibCheck": true
-  },
-  "include": [
-    "vite.config.ts",
-    "../../../vite.shared.ts",
-  ]
+    "extends": "../../../tsconfig.node.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
+        "baseUrl": "./"
+    },
+    "include": ["vite.config.mts"]
 }

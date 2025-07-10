@@ -1,11 +1,11 @@
 import { queryClient } from "@/main";
-import { getEvaluation } from "@lib/graphql/getEvaluation";
-import { getLastCreatedEvaluationId } from "@lib/graphql/getLastCreatedEvaluation";
+import { getEvaluation } from "@/lib/graphql/getEvaluation";
+import { getLastCreatedEvaluationId } from "@/lib/graphql/getLastCreatedEvaluation";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Account, zAccount } from "@lib/zod/Account";
+import { Account, zAccount } from "@/lib/zod/Account";
 
 const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000);
 
@@ -33,8 +33,6 @@ const Params = z
         message: "Cannot register evaluation in the past",
         path: ["registration"],
     });
-
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // numOptions
 
@@ -71,7 +69,6 @@ export const useCreateEvaluation = () => {
                     useHooks,
                 ],
             }));
-            await wait(3000);
 
             const currentUser = zAccount.parse(
                 queryClient.getQueryData(["currentUser"]),

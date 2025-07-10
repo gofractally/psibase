@@ -361,13 +361,14 @@ namespace psibase
 
    std::vector<Checksum256> BlockContext::callPreverify(const SignedTransaction& trx)
    {
-      auto notifyType = NotifyType::preverifyTransaction;
-      auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
+      std::vector<Checksum256> tokens(trx.proofs.size());
+      auto                     notifyType = NotifyType::preverifyTransaction;
+      auto                     notifyData = systemContext.sharedDatabase.kvGetSubjective(
           *writer, psio::convert_to_key(notifyKey(notifyType)));
       if (!notifyData)
-         return {};
+         return tokens;
       if (!psio::fracpack_validate<NotifyRow>(*notifyData))
-         return {};
+         return tokens;
 
       auto actions = psio::view<const NotifyRow>(psio::prevalidated{*notifyData}).actions();
 
@@ -376,8 +377,6 @@ namespace psibase
       isProducing         = true;
 
       Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tie(trx))};
-
-      std::vector<Checksum256> tokens;
 
       for (auto a : actions)
       {
@@ -416,15 +415,16 @@ namespace psibase
                PSIBASE_LOG(trxLogger, debug) << "preverifyTransaction succeeded";
                if (result)
                {
-                  for (const auto& token : *result)
-                  {
-                     Checksum256 value = {};
-                     if (token && token->size() == Checksum256{}.size())
-                     {
-                        std::ranges::copy(*token, value.begin());
-                     }
-                     tokens.push_back(value);
-                  }
+                  std::ranges::transform(std::views::take(*result, tokens.size()), tokens.begin(),
+                                         [](const auto& token)
+                                         {
+                                            Checksum256 value = {};
+                                            if (token && token->size() == value.size())
+                                            {
+                                               std::ranges::copy(*token, value.begin());
+                                            }
+                                            return value;
+                                         });
                   break;
                }
             }
@@ -437,7 +437,6 @@ namespace psibase
          }
       }
 
-      tokens.resize(trx.proofs.size());
       return tokens;
    }
 
@@ -466,12 +465,21 @@ namespace psibase
       TransactionContext tc{*this, trx, trace, mode};
       auto&              atrace = trace.actionTraces.emplace_back();
 
-      auto session = db.startWrite(writer);
       try
       {
+         auto session = db.startWrite(writer);
          auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
-         tc.execNonTrxAction(0, action, atrace);
+         if (row.mode() == RunMode::speculative)
+         {
+            db.checkoutEmptySubjective();
+            auto _ = psio::finally{[&] { db.abortSubjective(); }};
+            tc.execNonTrxAction(0, action, atrace);
+         }
+         else
+         {
+            tc.execNonTrxAction(0, action, atrace);
+         }
          PSIBASE_LOG(trxLogger, debug)
              << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
       }
@@ -485,7 +493,8 @@ namespace psibase
 
       try
       {
-         auto token = sha256(
+         auto session = db.startWrite(writer);
+         auto token   = sha256(
              VerifyTokenData{!trace.error, row.mode(), action,
                              row.mode() == RunMode::verify ? getVerifyContextId() : Checksum256{}});
          // Run the continuation

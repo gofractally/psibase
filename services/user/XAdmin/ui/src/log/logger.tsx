@@ -1,30 +1,30 @@
-import { RegisterOptions } from "react-hook-form";
-import { LogConfig } from "./interfaces";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { Trash } from "lucide-react";
+import { RegisterOptions, UseFormRegisterReturn } from "react-hook-form";
+
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+
+import { LogConfig } from "./interfaces";
 
 interface LoggerProps {
     loggerKey: string;
-    control: any;
-    register: (name: keyof LogConfig, options?: RegisterOptions) => any;
+    register: (
+        name: keyof LogConfig,
+        options?: RegisterOptions,
+    ) => UseFormRegisterReturn;
     watch: (name: keyof LogConfig) => string | boolean | undefined;
     remove: () => void;
 }
 
-export const Logger = ({
-    loggerKey,
-    control,
-    register,
-    watch,
-    remove,
-}: LoggerProps) => {
+const loggerOptionClass =
+    "focus:bg-accent focus:text-accent-foreground flex w-full cursor-default select-none items-center rounded-sm py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
+
+export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
     const type_ = watch("type") as string;
     return (
-        <fieldset className="flex flex-col gap-2 rounded-md bg-muted p-3">
+        <fieldset className="bg-muted flex flex-col gap-2 rounded-md p-3">
             <div className="flex justify-between py-2">
                 <legend className="scroll-m-20 text-2xl font-semibold tracking-tight">
                     {loggerKey}
@@ -38,18 +38,18 @@ export const Logger = ({
                     <Label>Type</Label>
                     <select
                         {...register("type")}
-                        className="flex h-10 w-full items-center justify-between rounded-md  bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-10  w-full items-center justify-between rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        <option value="console" className="logger-option">
+                        <option value="console" className={loggerOptionClass}>
                             Console
                         </option>
-                        <option value="file" className="logger-option">
+                        <option value="file" className={loggerOptionClass}>
                             File
                         </option>
-                        <option value="local" className="logger-option">
+                        <option value="local" className={loggerOptionClass}>
                             Local socket
                         </option>
-                        <option value="pipe" className="logger-option">
+                        <option value="pipe" className={loggerOptionClass}>
                             Pipe
                         </option>
                     </select>
@@ -124,7 +124,7 @@ export const Logger = ({
             >
                 <Label>Flush every record</Label>
                 <input
-                    className="peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                    className="border-primary ring-offset-background focus-visible:ring-ring data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground peer h-4 w-4 shrink-0 rounded-sm border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="checkbox"
                     {...register("flush", { disabled: type_ != "file" })}
                 />

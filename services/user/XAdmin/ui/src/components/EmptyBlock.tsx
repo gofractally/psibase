@@ -1,5 +1,6 @@
 import { FilePlus2, type LucideProps } from "lucide-react";
-import { Button } from "./ui/button";
+
+import { Button } from "@shared/shadcn/ui/button";
 
 interface Props {
     title: string;
@@ -24,7 +25,7 @@ export const EmptyBlock = ({
                 <ButtonIcon className="h-12 w-12 " />
                 <h3 className="mt-4 text-lg font-semibold">{title}</h3>
                 {description && (
-                    <p className="mb-4 mt-2 text-sm text-muted-foreground">
+                    <p className="text-muted-foreground mb-4 mt-2 text-sm">
                         {description}
                     </p>
                 )}

@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import { useFieldContext } from "./app-form";
 import { FieldErrors } from "./field-errors";
 

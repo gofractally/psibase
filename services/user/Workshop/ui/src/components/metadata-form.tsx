@@ -11,11 +11,11 @@ import {
   FormLabel,
   FormMessage,
   FormRootError,
-} from "./ui/form";
-import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
-import { toast } from "sonner";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
+import { Textarea } from "@shared/shadcn/ui/textarea";
+import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { useState } from "react";
 import { fileToBase64 } from "@/lib/fileToBase64";
 import { Trash, Upload } from "lucide-react";
@@ -25,8 +25,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
-import { Separator } from "./ui/separator";
+} from "@shared/shadcn/ui/card";
+import { Separator } from "@shared/shadcn/ui/separator";
 
 const formSchema = z.object({
   name: z.string(),

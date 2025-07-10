@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "evaluations"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -802,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "fractals"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-graphql",
  "evaluations",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "fractals-pkg"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "fractals",
  "plugin",
@@ -1668,7 +1668,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "fractals",
  "fractals-pkg",
@@ -1737,7 +1737,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1791,7 +1791,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1805,7 +1805,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1817,14 +1817,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "seahash",
 ]
@@ -1846,7 +1846,7 @@ checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
 
 [[package]]
 name = "r-fractals"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-graphql",
  "fractals",

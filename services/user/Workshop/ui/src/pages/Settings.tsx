@@ -3,7 +3,7 @@ import { useAppMetadata } from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { ErrorCard } from "@/components/error-card";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@shared/components/spinner";
 import { MetaDataForm } from "@/components/metadata-form";
 import { Account } from "@/lib/zodTypes";
 import { ControlPanel } from "@/components/control-panel";

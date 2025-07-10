@@ -1,7 +1,6 @@
-"use client";
-import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState, useEffect } from "react";
+
+import { cn } from "@shared/lib/utils";
 
 const CheckIcon = ({ className }: { className?: string }) => {
     return (
@@ -54,7 +53,7 @@ const LoaderCore = ({
                 const distance = Math.max(
                     completed - index,
                     index - started + 1,
-                    0
+                    0,
                 );
                 const opacity = Math.max(1 - distance * 0.2, 0); // Minimum opacity is 0, keep it 0.2 if you're sane.
                 const isPending = index >= completed && index < started;
@@ -75,7 +74,8 @@ const LoaderCore = ({
                                 <CheckFilled
                                     className={cn(
                                         "text-primary",
-                                        isPending && "text-primary opacity-100 "
+                                        isPending &&
+                                            "text-primary opacity-100 ",
                                     )}
                                 />
                             )}
@@ -83,7 +83,7 @@ const LoaderCore = ({
                         <span
                             className={cn(
                                 "text-primary ",
-                                isPending && "text-primary opacity-100 "
+                                isPending && "text-primary opacity-100 ",
                             )}
                         >
                             {loadingState.text}

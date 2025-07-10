@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { LogConfig } from "../log/interfaces";
 import {
-    PsinodeConfigUI,
-    ServiceConfig,
     ListenConfig,
+    PsinodeConfigUI,
     PsinodeConfigUpdate,
+    ServiceConfig,
 } from "./interfaces";
 
 export const emptyService = (s: ServiceConfig) => {
@@ -16,14 +17,14 @@ export const mergeSimple = <T>(prev: T, updated: T, user: T): T =>
 export const mergeList = <T extends { key: string }>(
     base: T[],
     updated: T[],
-    user: T[]
+    user: T[],
 ): T[] => {
-    let leading: T[] = [];
-    let result = updated.map((item) => [item]);
+    const leading: T[] = [];
+    const result = updated.map((item) => [item]);
     let insertPoint = -1;
     const remove = (s: T): boolean => {
         const found = result.find(
-            (item) => item.length && item[0].key == s.key
+            (item) => item.length && item[0].key == s.key,
         );
         if (found) {
             found.shift();
@@ -33,7 +34,7 @@ export const mergeList = <T extends { key: string }>(
     };
     const replace = (s: T): void => {
         const pos = result.findIndex(
-            (item) => item.length && item[0].key == s.key
+            (item) => item.length && item[0].key == s.key,
         );
         if (pos != -1) {
             result[pos][0] = s;
@@ -41,7 +42,7 @@ export const mergeList = <T extends { key: string }>(
         }
     };
     // First delete anything that was deleted by the user
-    let baseMap: { [index: string]: number } = {};
+    const baseMap: { [index: string]: number } = {};
     let baseIndex = 0;
     for (const s of base) {
         if (!user.find((item) => item.key == s.key)) {
@@ -87,7 +88,7 @@ export const mergeList = <T extends { key: string }>(
 export const mergeLogger = (
     prev: LogConfig,
     updated: LogConfig,
-    user: LogConfig
+    user: LogConfig,
 ) => {
     const result = { ...updated };
     if (updated.filter == prev.filter) {
@@ -101,28 +102,28 @@ export const mergeLogger = (
         result.filename = mergeSimple(
             prev.filename,
             updated.filename,
-            user.filename
+            user.filename,
         );
         result.target = mergeSimple(prev.target, updated.target, user.target);
         result.rotationSize = mergeSimple(
             prev.rotationSize,
             updated.rotationSize,
-            user.rotationSize
+            user.rotationSize,
         );
         result.rotationTime = mergeSimple(
             prev.rotationTime,
             updated.rotationTime,
-            user.rotationTime
+            user.rotationTime,
         );
         result.maxSize = mergeSimple(
             prev.maxSize,
             updated.maxSize,
-            user.maxSize
+            user.maxSize,
         );
         result.maxFiles = mergeSimple(
             prev.maxFiles,
             updated.maxFiles,
-            user.maxFiles
+            user.maxFiles,
         );
         result.flush = mergeSimple(prev.flush, updated.flush, user.flush);
     } else if (user.type == "local" && updated.type == prev.type) {
@@ -135,7 +136,7 @@ export const mergeLogger = (
 export const mergeLoggers = (
     prev: { [index: string]: LogConfig },
     updated: { [index: string]: LogConfig },
-    user: { [index: string]: LogConfig }
+    user: { [index: string]: LogConfig },
 ): { [index: string]: LogConfig } => {
     const result = { ...user };
     for (const key in prev) {
@@ -194,28 +195,6 @@ export function writeLoggers(loggers: { [index: string]: LogConfig }): {
     return result;
 }
 
-function readListen(listen: ListenConfig): ListenConfig {
-    const result = { ...listen };
-    delete result.address;
-    delete result.port;
-    delete result.path;
-    if (listen.protocol == "http" || listen.protocol == "https") {
-        if (listen.address == "0.0.0.0") {
-            return { text: String(listen.port), ...result };
-        } else if (listen.address?.includes(":")) {
-            return {
-                text: "[" + listen.address + "]:" + listen.port,
-                ...result,
-            };
-        } else {
-            return { text: listen.address + ":" + listen.port, ...result };
-        }
-    } else if (listen.protocol == "local") {
-        return { text: listen.path, ...result };
-    }
-    return listen;
-}
-
 function writeListen(listen: ListenConfig): any {
     if (listen.protocol == "http" || listen.protocol == "https") {
         if (listen.port && listen.address) {
@@ -256,7 +235,7 @@ function writeListen(listen: ListenConfig): any {
 export const mergeConfig = (
     prev: PsinodeConfigUI,
     updated: PsinodeConfigUI,
-    user: PsinodeConfigUI
+    user: PsinodeConfigUI,
 ): PsinodeConfigUI => {
     return {
         ...updated,
@@ -267,7 +246,7 @@ export const mergeConfig = (
         services: mergeList(
             prev.services.filter((item) => !emptyService(item)),
             updated.services,
-            user.services
+            user.services,
         ),
         admin: mergeSimple(prev.admin, updated.admin, user.admin),
         loggers: mergeLoggers(prev.loggers, updated.loggers, user.loggers),
@@ -300,7 +279,7 @@ export const resolveListDiff = <T>(
     base: T[],
     updated: T[],
     user: T[],
-    eq: (a: T, b: T) => boolean
+    eq: (a: T, b: T) => boolean,
 ): T[] => {
     return updated.map((s: any) => {
         const compare = (item: T) => eq(item, s);

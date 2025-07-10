@@ -383,10 +383,14 @@ TEST_CASE("Test push_transaction")
 
       SECTION("run in transact mode")
       {
-         auto trace = psibase::tester::runAction(
-             t.nativeHandle(), RunMode::speculative, true,
-             makeVerify(strx, sha256(strx.transaction.data(), strx.transaction.size()), 0));
-         CHECK(trace.error.value_or("") == "");
+         // Sanity check to ensure that the action fails because
+         // it's forbidden in verify, not because of other errors.
+         auto act = makeVerify(strx, sha256(strx.transaction.data(), strx.transaction.size()), 0);
+         // We need a valid sender when running in a transaction.
+         // The sender is irrelevant for this particular test, so
+         // just pick alice.
+         act.sender = alice;
+         CHECK(Result<void>{t.pushTransaction(t.makeTransaction({act}))}.succeeded());
       }
       SECTION("keep flags")
       {

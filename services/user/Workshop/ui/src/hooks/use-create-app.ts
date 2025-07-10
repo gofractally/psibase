@@ -2,11 +2,10 @@ import { Account } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { AccountNameStatus } from "./useAccountStatus";
 import { z } from "zod";
 import { appMetadataQueryKey } from "./useAppMetadata";
-import { AwaitTime } from "@/lib/globals";
 
 const Params = z.object({
   account: Account,
@@ -42,11 +41,9 @@ export const useCreateApp = () =>
       );
 
       queryClient.setQueryData(appMetadataQueryKey(account), () => null);
-      setTimeout(() => {
         queryClient.invalidateQueries({
           queryKey: appMetadataQueryKey(account),
         });
-      }, AwaitTime);
 
       if (result === Result.Enum.Added) {
         toast.success(`Added app ${account}`);

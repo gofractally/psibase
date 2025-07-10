@@ -1,11 +1,12 @@
 import { PackageInfo } from "@/types";
+
 import { isLeftLessThanRight, splitVersion } from "./splitVersion";
 
 export const filterHighestVersions = (
-    packages: PackageInfo[]
+    packages: PackageInfo[],
 ): PackageInfo[] => {
     const byNameDictionary = new Map();
-    for (let info of packages) {
+    for (const info of packages) {
         const version = splitVersion(info.version);
         if (version) {
             const existingPackage = byNameDictionary.get(info.name);
@@ -13,7 +14,7 @@ export const filterHighestVersions = (
                 !existingPackage ||
                 isLeftLessThanRight(
                     splitVersion(existingPackage.version),
-                    version
+                    version,
                 )
             ) {
                 byNameDictionary.set(info.name, info);

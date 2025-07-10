@@ -1,8 +1,10 @@
 import { Controller, UseFormReturn } from "react-hook-form";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+
 import { InstallType } from "@/types";
+
+import { Button } from "@shared/shadcn/ui/button";
+import { Label } from "@shared/shadcn/ui/label";
+import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 
 interface TypeFormProps {
     setPackages: (names: string[]) => void;

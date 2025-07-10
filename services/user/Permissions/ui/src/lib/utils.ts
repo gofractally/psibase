@@ -1,10 +1,3 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
-
 export function formatDate(input: string | number): string {
     const date = new Date(input);
     return date.toLocaleDateString("en-US", {
@@ -14,16 +7,16 @@ export function formatDate(input: string | number): string {
     });
 }
 
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
     cb: T,
     wait: number,
-) {
-    let h: any;
-    const callable = (...args: any) => {
+): (...args: Parameters<T>) => void {
+    let h: NodeJS.Timeout;
+    const callable = (...args: Parameters<T>) => {
         clearTimeout(h);
         h = setTimeout(() => cb(...args), wait);
     };
-    return <T>(<any>callable);
+    return callable as T;
 }
 
 export const modifyUrlParams = (

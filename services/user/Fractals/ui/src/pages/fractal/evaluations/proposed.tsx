@@ -2,13 +2,13 @@ import dayjs from "dayjs";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@shared/shadcn/ui/dialog";
 
 import { EmptyBlock } from "@/components/empty-block";
 import { useAppForm } from "@/components/form/app-form";

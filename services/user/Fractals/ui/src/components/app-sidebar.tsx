@@ -6,7 +6,7 @@ import {
     SidebarFooter,
     SidebarHeader,
     SidebarRail,
-} from "@/components/ui/sidebar";
+} from "@shared/shadcn/ui/sidebar";
 
 import { AppSwitcher } from "@/components/fractal-switcher";
 import { NavMain } from "@/components/nav-main";

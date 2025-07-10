@@ -1,8 +1,7 @@
-import { AwaitTime } from "@/lib/globals";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useSelectAccount = () =>
   useMutation<void, Error, string>({
@@ -17,9 +16,7 @@ export const useSelectAccount = () =>
     },
     onSuccess: (_, accountName) => {
       queryClient.setQueryData(["loggedInUser"], () => accountName);
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-      }, AwaitTime);
+      queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
     },
     onError: (error) => {
       if (error instanceof Error) {

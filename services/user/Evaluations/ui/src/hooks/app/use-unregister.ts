@@ -1,5 +1,5 @@
 import { queryClient } from "@/main";
-import { zUser } from "@lib/graphql/getUsers";
+import { zUser } from "@/lib/graphql/getUsers";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "../use-current-user";

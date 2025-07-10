@@ -2,10 +2,9 @@ import { Account } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 import { codeHashQueryKey } from "./useCodeHash";
-import { AwaitTime } from "@/lib/globals";
 
 const Params = z.object({
   account: Account,
@@ -34,11 +33,9 @@ export const useSetServiceCode = () =>
         description: `Uploaded service to ${params.account}`,
       });
 
-      setTimeout(() => {
-        queryClient.invalidateQueries({
-          queryKey: codeHashQueryKey(params.account),
-        });
-      }, AwaitTime);
+      queryClient.invalidateQueries({
+        queryKey: codeHashQueryKey(params.account),
+      });
     },
     onError: (error) => {
       if (error instanceof Error) {

@@ -1,4 +1,3 @@
-import * as React from "react";
 import {
     ColumnDef,
     ColumnFiltersState,
@@ -12,10 +11,13 @@ import {
     getSortedRowModel,
     useReactTable,
 } from "@tanstack/react-table";
+import * as React from "react";
 
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { getId } from "@/lib/getId";
+import { PackageInfo } from "@/types";
 
+import { Checkbox } from "@shared/shadcn/ui/checkbox";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 import {
     Table,
     TableBody,
@@ -23,9 +25,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-import { PackageInfo } from "@/types";
-import { getId } from "@/lib/getId";
+} from "@shared/shadcn/ui/table";
 
 export const columns: ColumnDef<PackageInfo>[] = [
     {
@@ -68,7 +68,7 @@ export const columns: ColumnDef<PackageInfo>[] = [
         header: () => <div className="text-right ">Version</div>,
         cell: ({ row }) => {
             return (
-                <div className="text-right text-muted-foreground">
+                <div className="text-muted-foreground text-right">
                     {row.getValue("version")}
                 </div>
             );
@@ -138,7 +138,7 @@ export function ConfirmationForm({
                                                     : flexRender(
                                                           header.column
                                                               .columnDef.header,
-                                                          header.getContext()
+                                                          header.getContext(),
                                                       )}
                                             </TableHead>
                                         );
@@ -159,7 +159,7 @@ export function ConfirmationForm({
                                             <TableCell key={cell.id}>
                                                 {flexRender(
                                                     cell.column.columnDef.cell,
-                                                    cell.getContext()
+                                                    cell.getContext(),
                                                 )}
                                             </TableCell>
                                         ))}

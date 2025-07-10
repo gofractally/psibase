@@ -1,4 +1,3 @@
-import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { defineConfig } from "vite";
 
@@ -23,16 +22,15 @@ export default defineConfig(({ command }) => ({
             },
         }),
         createPsibaseConfig({
-            service: "auth-sig",
+            service: "accounts",
             serviceDir: serviceDir,
             isServing: command === "serve",
             useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
         }),
         ...getSharedUIPlugins(),
-        tailwindcss(),
     ],
     build: {
-        minify: false,
+        minify: true,
         sourcemap: false,
     },
 }));

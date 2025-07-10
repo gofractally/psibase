@@ -1,13 +1,13 @@
 import { CircleSlash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@shared/shadcn/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 
 import { EmptyBlock } from "@/components/empty-block";
 
 import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/lib/utils";
 
 // const data = [
 //     {
