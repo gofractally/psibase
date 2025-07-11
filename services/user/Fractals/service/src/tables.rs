@@ -6,7 +6,7 @@ pub mod tables {
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
-        ToKey, ToSchema,
+        ToSchema,
     };
 
     use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
