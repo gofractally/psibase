@@ -16,5 +16,5 @@ services = ["tpack"]
 crate-type = ["rlib"]
 
 [dependencies]
-tpack = { path = "service", version = "0.18.0" }
-r-tpack = { path = "query", version = "0.18.0" }
+tpack = { path = "service", version = "0.19.0" }
+r-tpack = { path = "query", version = "0.19.0" }

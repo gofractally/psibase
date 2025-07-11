@@ -5,7 +5,7 @@
  * @param {function(T, number, T[]): boolean} predicate Function that determines which elements to update
  * @param {function(T, number, T[]): T} updater Function that returns the new value for matching elements
  * @returns {T[]} A new array with updated elements
- * 
+ *
  * @example
  * // Double even numbers in an array
  * const numbers = [1, 2, 3, 4];
@@ -16,10 +16,10 @@
  * ); // [1, 4, 3, 8]
  */
 export const updateArray = <T>(
-  arr: T[],
-  predicate: (item: T, index: number, arr: T[]) => boolean,
-  updater: (item: T, index: number, arr: T[]) => T
+    arr: T[],
+    predicate: (item: T, index: number, arr: T[]) => boolean,
+    updater: (item: T, index: number, arr: T[]) => T,
 ): T[] =>
-  arr.map((i, index, arr) =>
-    predicate(i, index, arr) ? updater(i, index, arr) : i
-  );
+    arr.map((i, index, arr) =>
+        predicate(i, index, arr) ? updater(i, index, arr) : i,
+    );

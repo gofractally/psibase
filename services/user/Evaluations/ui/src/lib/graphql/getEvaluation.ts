@@ -1,6 +1,7 @@
 import { z } from "zod";
+
 import { graphql } from "../graphql";
-import { zAccount, Account } from "../zod/Account";
+import { Account, zAccount } from "../zod/Account";
 import { zUnix } from "../zod/unix";
 
 export const zEvaluation = z.object({
