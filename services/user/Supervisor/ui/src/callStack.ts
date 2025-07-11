@@ -33,10 +33,6 @@ export class CallStack {
             (onlyPrintRootCalls && this.storage.length > 1)
         )
             return;
-
-        console.log(
-            `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}+${toString(args)}`,
-        );
     }
 
     pop(): Call | undefined {
@@ -58,7 +54,7 @@ export class CallStack {
             const popped = this.peek(0)!;
             const resolutionTime = Date.now() - popped.startTime!;
             console.log(
-                `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(popped.args)} [${resolutionTime} ms]`,
+                `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}${toString(popped.args)} [${resolutionTime} ms]`,
             );
         }
 
