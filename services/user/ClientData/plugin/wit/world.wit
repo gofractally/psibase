@@ -5,8 +5,6 @@ package clientdata:plugin;
 //   The `clientdata` plugin creates a table for each caller plugin, and all reads/writes
 //   from that plugin will modify records in that plugin's one and only table.
 interface keyvalue {
-    use host:common/types.{error};
-
     /// Gets the value of the record with the specified key.
     /// If the record does not exist, None is returned.
     get: func(key: string) -> option<list<u8>>;
@@ -14,8 +12,7 @@ interface keyvalue {
     /// Stores the <key, value> record. 
     /// If a record with the specified key does not exist, it is created.
     /// If a record with the specified key already exists, the value is overwritten.
-    /// If the value is empty, `set` will return an error.
-    set: func(key: string, value: list<u8>) -> result<_, error>;
+    set: func(key: string, value: list<u8>);
 
     /// Deletes the record with the specified key.
     /// If the key does not exist, it does nothing.
