@@ -1,7 +1,11 @@
 import { useNavigate } from "react-router-dom";
 
-import { useCreateFractal } from "@/hooks/fractals/use-create-fractal";
+import {
+    useCreateFractal,
+    zParams as zCreateFractalSchema,
+} from "@/hooks/fractals/use-create-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
+import { isAccountAvailable } from "@/hooks/use-account-status";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import {
@@ -33,13 +37,15 @@ export const CreateFractalModal = ({
             mission: "",
             name: "",
         },
+        onSubmit: async (data) => {
+            await createFractal(data.value);
+            data.formApi.reset();
+            openChange(false);
+            navigate(`/fractal/${data.value.account}`);
+            refetch();
+        },
         validators: {
-            onSubmitAsync: async (data) => {
-                await createFractal(data.value);
-                openChange(false);
-                navigate(`/fractal/${data.value.account}`);
-                refetch();
-            },
+            onChange: zCreateFractalSchema,
         },
     });
 
@@ -47,33 +53,47 @@ export const CreateFractalModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a fractal</DialogTitle>
+                    <DialogTitle>Create a new fractal</DialogTitle>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
                             void form.handleSubmit();
                         }}
-                        className="w-full space-y-6"
+                        className="mt-3 w-full space-y-6"
                     >
-                        <form.AppField
-                            name="account"
-                            children={(field) => (
-                                <field.TextField
-                                    label="Username"
-                                    description="Unique identifier"
-                                />
-                            )}
-                        />
                         <form.AppField
                             name="name"
                             children={(field) => (
-                                <field.TextField label="Name" />
+                                <field.TextField label="Fractal name" />
                             )}
                         />
                         <form.AppField
                             name="mission"
                             children={(field) => (
                                 <field.TextField label="Mission" />
+                            )}
+                        />
+                        <form.AppField
+                            name="account"
+                            validators={{
+                                onChangeAsyncDebounceMs: 1000,
+                                onChangeAsync: async ({ value }) => {
+                                    const status =
+                                        await isAccountAvailable(value);
+                                    if (status === "Taken") {
+                                        return "Account name is already taken";
+                                    }
+                                    if (status === "Invalid") {
+                                        return "Invalid account name";
+                                    }
+                                    return undefined;
+                                },
+                            }}
+                            children={(field) => (
+                                <field.TextField
+                                    label="Account name"
+                                    description="Unique identifier"
+                                />
                             )}
                         />
 
