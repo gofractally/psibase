@@ -1,27 +1,11 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin", "query-service"]
-
-[workspace.package]
+[package]
+name = "fractals-pkg"
+description = "Fractal governance"
 version = "0.19.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
 
-[package]
-name = "fractals-pkg"              # Crate name
-description = "Fractal governance"
-version.workspace = true
-rust-version.workspace = true
-edition.workspace = true
-publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "Fractals"
@@ -35,6 +19,6 @@ Sites = "0.19.0"
 crate-type = ["rlib"]
 
 [dependencies]
+fractals-plugin = { path = "plugin", version = "0.19.0" }
 fractals = { path = "service", version = "0.19.0" }
 r-fractals = { path = "query-service", version = "0.19.0" }
-plugin = { path = "plugin", version = "0.19.0" }

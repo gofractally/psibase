@@ -333,7 +333,20 @@ function(cargo_psibase_package)
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    
+    # Check if workspace uses shared target directory
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/.cargo/config.toml")
+        # Read the config to find target-dir setting
+        file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/.cargo/config.toml" CARGO_CONFIG_CONTENT)
+        if(CARGO_CONFIG_CONTENT MATCHES "target-dir[[:space:]]*=[[:space:]]*\"([^\"]+)\"")
+            set(TARGET_DIR "${CMAKE_MATCH_1}")
+            set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/${TARGET_DIR}/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+        else()
+            set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+        endif()
+    else()
+        set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    endif()
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext

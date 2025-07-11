@@ -1,10 +1,10 @@
 [package]
-name = "auth-any"
+name = "authany-plugin"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
+wit-bindgen-rt = { workspace = true }
 
 [lib]
 crate-type = ["cdylib"]
