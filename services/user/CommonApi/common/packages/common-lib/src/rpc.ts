@@ -58,10 +58,6 @@ export function siblingUrl(
 ): string {
     const currentUrl = new URL(baseUrl || window.location.href);
     const hostnameParts = currentUrl.hostname.split(".");
-    // Firefox requires this; doesn't work with localhost subdomains as well as Chrome does.
-    if (hostnameParts.join(".") === "psibase.localhost") {
-        baseUrlIncludesSibling = false;
-    }
     if (baseUrlIncludesSibling) {
         hostnameParts.shift();
     }
