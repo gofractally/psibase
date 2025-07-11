@@ -140,7 +140,8 @@ impl Actions for AuthSig {
 
         if !from_auth_sig_ui() {
             if !is_auth(&caller)? {
-                prompt_auth(&caller)?;
+                //prompt_auth(&caller)?; // TEMPORARILY COMMENT OUT DURING HOST REFACTORING
+                return Err(Unauthorized("set_key").into());
             }
         }
 
