@@ -19,4 +19,4 @@ package = "host:common"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"supervisor:bridge" = { path = "../supervisor/wit/world.wit" }
+"supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
