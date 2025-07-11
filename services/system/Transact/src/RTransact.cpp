@@ -428,7 +428,7 @@ namespace
 
    auto finalizeBlocks(const psibase::BlockHeader& head) -> std::optional<FinalizedBlocks>
    {
-      auto commitNum  = head.commitNum - (head.blockNum == head.commitNum);
+      auto commitNum  = head.commitNum;
       auto reversible = RTransact::WriteOnly{}.open<ReversibleBlocksTable>();
       reversible.put({.blockNum = head.blockNum, .time = head.time});
 
@@ -446,7 +446,11 @@ namespace
          }
          else
          {
-            result->count++;
+            // Don't send responses for transactions in the current block,
+            // because the client expects the results of the transaction
+            // to be visible to queries, which doesn't happen till after onBlock.
+            if (r.blockNum < head.blockNum)
+               result->count++;
             result->time = r.time;
          }
 
