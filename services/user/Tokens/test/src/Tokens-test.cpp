@@ -844,8 +844,8 @@ TEST_CASE("GraphQL Queries")
    auto userTokens = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userTokens(user: "symbol") { edges { node { id precision { value } currentSupply { value }  maxIssuedSupply { value } symbolId } } } } )"});
+           R"( query { userTokens(user: "symbol") { edges { node { id precision { value } issuedSupply { value }  maxIssuedSupply { value } symbolId } } } } )"});
    CHECK(
        std::string(userTokens.body.begin(), userTokens.body.end()) ==
-       R"({"data": {"userTokens":{"edges":[{"node":{"id":1,"precision":{"value":4},"currentSupply":{"value":"10000000000"},"maxIssuedSupply":{"value":"10000000000000"},"symbolId":"psi"}}]}}})");
+       R"({"data": {"userTokens":{"edges":[{"node":{"id":1,"precision":{"value":4},"issuedSupply":{"value":"10000000000"},"maxIssuedSupply":{"value":"10000000000000"},"symbolId":"psi"}}]}}})");
 }

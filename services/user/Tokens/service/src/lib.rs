@@ -16,35 +16,6 @@ pub mod service {
 
     pub type TID = u32;
 
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
-    pub struct TokenRecord {
-        pub id: TID,
-        pub nft_id: NID,
-        pub settings_value: u8,
-        pub precision: Precision,
-        pub current_supply: Quantity,
-        pub issued_supply: Quantity,
-        pub burned_supply: Quantity,
-        pub max_issued_supply: Quantity,
-        pub symbol: SID,
-    }
-
-    impl From<Token> for TokenRecord {
-        fn from(token: Token) -> Self {
-            Self {
-                id: token.id,
-                nft_id: token.nft_id,
-                settings_value: token.settings_value,
-                precision: token.precision.try_into().unwrap(),
-                issued_supply: token.issued_supply,
-                current_supply: token.issued_supply - token.burned_supply,
-                burned_supply: token.burned_supply,
-                max_issued_supply: token.max_issued_supply,
-                symbol: token.symbol.unwrap_or(AccountNumber::from(0)),
-            }
-        }
-    }
-
     #[action]
     fn init() {
         let table = InitTable::new();
@@ -94,8 +65,8 @@ pub mod service {
     /// # Returns token information including current, burned supply and precision.
     #[action]
     #[allow(non_snake_case)]
-    fn getToken(token_id: TID) -> TokenRecord {
-        Token::get_assert(token_id).into()
+    fn getToken(token_id: TID) -> Token {
+        Token::get_assert(token_id)
     }
 
     /// Map a symbol to a token.
@@ -258,9 +229,9 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getSharedBal(
+        token_id: TID,
         creditor: AccountNumber,
         debitor: AccountNumber,
-        token_id: TID,
     ) -> SharedBalance {
         SharedBalance::get_or_new(creditor, debitor, token_id)
     }

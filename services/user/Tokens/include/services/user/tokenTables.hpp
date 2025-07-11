@@ -13,15 +13,14 @@ namespace UserService
 {
    struct TokenRecord
    {
-      TID       id;
-      NID       nft_id;
-      uint8_t   settings_value;
-      Precision precision;
-      Quantity  current_supply;
-      Quantity  burned_supply;
-      Quantity  issued_supply;
-      Quantity  max_issued_supply;
-      SID       symbol;
+      TID                id;
+      NID                nft_id;
+      uint8_t            settings_value;
+      uint8_t            precision;
+      Quantity           issued_supply;
+      Quantity           burned_supply;
+      Quantity           max_issued_supply;
+      std::optional<SID> symbol;
 
       static bool isValidKey(TID tokenId)
       {
@@ -41,7 +40,8 @@ namespace UserService
                 nft_id,
                 settings_value,
                 precision,
-                current_supply,
+                issued_supply,
+                burned_supply,
                 max_issued_supply,
                 symbol);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;

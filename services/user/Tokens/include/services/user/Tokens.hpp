@@ -17,6 +17,8 @@ namespace UserService
       using Tables = psibase::
           ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
 
+      using Memo = psibase::Memo;
+
       static constexpr auto service  = psibase::AccountNumber("tokens");
       static constexpr auto sysToken = TID{1};
 
@@ -27,11 +29,11 @@ namespace UserService
       /// Create a new token.
       ///
       /// # Arguments
-      /// * `max_issued_supply` - The permanent max issued supply of the token.
       /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
+      /// * `max_issued_supply` - The permanent max issued supply of the token.
       ///
       /// # Returns the unique token identifier aka TID (u32)
-      TID create(Precision precision, Quantity maxIssuedSupply);
+      TID create(Quantity maxIssuedSupply, uint8_t precision);
 
       /// Mint tokens.
       ///
@@ -43,7 +45,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier.
       /// * `amount`   - Amount of tokens to burn.
       /// * `memo`     - Memo
-      void mint(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
+      void mint(TID tokenId, Quantity amount, Memo memo);
 
       /// Burn tokens.
       ///
@@ -54,7 +56,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier.
       /// * `amount`   - Amount of tokens to burn.
       /// * `memo`     - Memo
-      void burn(TID tokenId, Quantity amount, psio::view<const psibase::Memo> memo);
+      void burn(TID tokenId, Quantity amount, Memo memo);
 
       /// Set user global configuration of sender.
       ///
@@ -94,10 +96,7 @@ namespace UserService
       /// * `debitor`  - Debitor / recipient of shared balance.
       /// * `amount`   - Amount to credit towards shared balance.
       /// * `memo`     - Memo
-      void credit(TID                             tokenId,
-                  psibase::AccountNumber          receiver,
-                  Quantity                        amount,
-                  psio::view<const psibase::Memo> memo);
+      void credit(TID tokenId, psibase::AccountNumber receiver, Quantity amount, Memo memo);
 
       /// Uncredit
       ///
@@ -110,10 +109,7 @@ namespace UserService
       /// * `debitor`  - Debitor / recipient of shared balance.
       /// * `amount`   - Amount to uncredit from shared balance,
       /// * `memo`     - Memo
-      void uncredit(TID                             tokenId,
-                    psibase::AccountNumber          receiver,
-                    Quantity                        maxAmount,
-                    psio::view<const psibase::Memo> memo);
+      void uncredit(TID tokenId, psibase::AccountNumber receiver, Quantity maxAmount, Memo memo);
 
       /// Reject
       ///
@@ -125,9 +121,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier.
       /// * `creditor`  - Debitor / recipient of shared balance.
       /// * `memo`     - Memo
-      void reject(TID                             tokenId,
-                  psibase::AccountNumber          receiver,
-                  psio::view<const psibase::Memo> memo);
+      void reject(TID tokenId, psibase::AccountNumber receiver, Memo memo);
 
       /// Debit
       ///
@@ -141,10 +135,7 @@ namespace UserService
       /// * `creditor` - User which previously sent balance towards debitor (sender).
       /// * `amount`   - Amount to debit / take from shared balance.
       /// * `memo`     - Memo
-      void debit(TID                             tokenId,
-                 psibase::AccountNumber          sender,
-                 Quantity                        amount,
-                 psio::view<const psibase::Memo> memo);
+      void debit(TID tokenId, psibase::AccountNumber sender, Quantity amount, Memo memo);
 
       /// Recall a user balance.
       ///
@@ -157,10 +148,7 @@ namespace UserService
       /// * `from`     - User balance to be burned
       /// * `amount`   - Amount of tokens to burn.
       /// * `memo`     - Memo
-      void recall(TID                             tokenId,
-                  psibase::AccountNumber          from,
-                  Quantity                        amount,
-                  psio::view<const psibase::Memo> memo);
+      void recall(TID tokenId, psibase::AccountNumber from, Quantity amount, Memo memo);
 
       /// Map a symbol to a token.
       ///
@@ -251,20 +239,20 @@ namespace UserService
      public:
       struct Events
       {
-         using Account  = psibase::AccountNumber;
-         using MemoView = psio::view<const psibase::Memo>;
+         using Account = psibase::AccountNumber;
+         using Memo    = psibase::Memo;
 
          // clang-format off
          struct History
          {
             void created(TID tokenId, Account creator, Precision precision, Quantity maxIssuedSupply) {}
-            void minted(TID tokenId, Account minter, Quantity amount, MemoView memo) {}
-            void burned(TID tokenId, Account burner, Quantity amount, MemoView memo) {}
+            void minted(TID tokenId, Account minter, Quantity amount, Memo memo) {}
+            void burned(TID tokenId, Account burner, Quantity amount, Memo memo) {}
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             // TODO: time is redundant with which block the event was written in
-            void transferred(TID tmanualDebitokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
-            void recalled(TID tokenId, psibase::BlockTime time, Account from, Quantity amount, MemoView memo) {}
+            void transferred(TID tmanualDebitokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, Memo memo) {}
+            void recalled(TID tokenId, psibase::BlockTime time, Account from, Quantity amount, Memo memo) {}
          };
 
          struct Ui {};
@@ -277,7 +265,7 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Tokens,
       method(init),
-      method(create, precision, maxIssuedSupply),
+      method(create, maxIssuedSupply, precision),
       method(mint, tokenId, amount, memo),
       method(burn, tokenId, amount, memo),
       method(setBalConf, tokenId, index, enable),

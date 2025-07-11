@@ -27,6 +27,8 @@ pub mod tables {
         pub id: TID,
         pub nft_id: NID,
         #[graphql(skip)]
+        pub settings_value: u8,
+        #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
         pub issued_supply: Quantity,
@@ -34,8 +36,6 @@ pub mod tables {
         pub burned_supply: Quantity,
         #[graphql(skip)]
         pub max_issued_supply: Quantity,
-        #[graphql(skip)]
-        pub settings_value: u8,
         pub symbol: Option<AccountNumber>,
     }
 

@@ -29,7 +29,7 @@ namespace
       const int  targetNrSymbolsPerDay = 24;
    }  // namespace SymbolPricing
 
-   auto q = [](Quantity_t amt, Precision p) { return Quantity{amt * std::pow(10, p.value)}; };
+   auto q = [](Quantity_t amt, uint8_t p) { return Quantity{amt * std::pow(10, p)}; };
 
 }  // namespace
 

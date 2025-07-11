@@ -1,11 +1,9 @@
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, ToSchema, Unpack};
+use fracpack::{Error, Pack, Result, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(
-    Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
-)]
+#[derive(Debug, Clone, ToSchema, Serialize, Deserialize, SimpleObject, InputObject, Default)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "MemoInput")]
 pub struct Memo {
@@ -39,5 +37,50 @@ impl fmt::Display for Memo {
 impl From<String> for Memo {
     fn from(value: String) -> Self {
         Self::new(value)
+    }
+}
+
+impl<'a> Pack for Memo {
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        dest.extend_from_slice(&(self.contents.len() as u32).to_le_bytes());
+        dest.extend_from_slice(self.contents.as_bytes());
+    }
+
+    fn is_empty_container(&self) -> bool {
+        self.contents.is_empty()
+    }
+}
+
+impl<'a> Unpack<'a> for Memo {
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Memo> {
+        let len = u32::unpack(src, pos)?;
+        let bytes = src
+            .get(*pos as usize..(*pos + len) as usize)
+            .ok_or(Error::ReadPastEnd)?;
+        *pos += len;
+
+        Ok(Self {
+            contents: String::from_utf8(bytes.to_vec()).or(Err(Error::BadUTF8))?,
+        })
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        let len = u32::unpack(src, pos)?;
+        let bytes = src
+            .get(*pos as usize..(*pos + len) as usize)
+            .ok_or(Error::ReadPastEnd)?;
+        *pos += len;
+        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
+        Ok(())
+    }
+
+    fn new_empty_container() -> Result<Self> {
+        Ok(Default::default())
     }
 }
