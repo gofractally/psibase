@@ -7,8 +7,6 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/to_json.hpp>
 
-#include "test-service.hpp"
-
 using namespace psibase;
 
 auto pubFromPem = [](std::string param) {  //
@@ -47,7 +45,6 @@ auto pub_key2 = pubFromPem(
 TEST_CASE("ec")
 {
    DefaultTestChain t;
-   auto             test_service = t.addService("test-service"_a, "test-service.wasm");
 
    transactor<SystemService::AuthSig::AuthSig> authsig(SystemService::AuthSig::AuthSig::service,
                                                        SystemService::AuthSig::AuthSig::service);
@@ -60,22 +57,21 @@ TEST_CASE("ec")
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
                          .sender  = bob,
-                         .service = test_service,
+                         .service = AccountNumber{"nop"},
                      }})))
              .failed("sender does not have a public key"));
    t.startBlock(0);
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
                          .sender  = sue,
-                         .service = test_service,
+                         .service = AccountNumber{"nop"},
                      }})))
              .failed("transaction does not include a claim for the key"));
    t.startBlock(0);
 
    auto ec_trx = t.makeTransaction({{
        .sender  = sue,
-       .service = test_service,
-       .rawData = psio::convert_to_frac(test_cntr::payload{}),
+       .service = AccountNumber{"nop"},
    }});
    ec_trx.claims.push_back({
        .service = SystemService::VerifySig::service,
@@ -99,8 +95,7 @@ TEST_CASE("ec")
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
                                            .sender  = sue,
-                                           .service = test_service,
-                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                           .service = AccountNumber{"nop"},
                                        }}),
                                        {{pub_key1, priv_key1}}))
              .succeeded());
@@ -108,8 +103,7 @@ TEST_CASE("ec")
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
                                            .sender  = sue,
-                                           .service = test_service,
-                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                           .service = AccountNumber{"nop"},
                                        }}),
                                        {{pub_key2, priv_key2}}))
              .failed("transaction does not include a claim for the key"));
@@ -117,8 +111,7 @@ TEST_CASE("ec")
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
                                            .sender  = sue,
-                                           .service = test_service,
-                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                           .service = AccountNumber{"nop"},
                                        }}),
                                        {{pub_key1, priv_key2}}))
              .failed("signature invalid"));
@@ -131,8 +124,7 @@ TEST_CASE("ec")
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
                                            .sender  = sue,
-                                           .service = test_service,
-                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                           .service = AccountNumber{"nop"},
                                        }}),
                                        {{pub_key2, priv_key2}}))
              .succeeded());

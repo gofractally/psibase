@@ -59,9 +59,6 @@ function(add suffix)
     )
 endfunction(add)
 
-add_library(services_test INTERFACE)
-target_include_directories(services_test INTERFACE ../psibase_tests)
-
 add("")
 add("-debug")
 
