@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { AwaitTime } from "@/globals";
 import QueryKey from "@/lib/queryKeys";
 
 import { useCurrentUser } from "./use-current-user";
@@ -29,7 +28,7 @@ export const useLogout = () => {
                 queryClient.refetchQueries({
                     queryKey: QueryKey.currentUser(),
                 });
-            }, AwaitTime);
+            }, 2000);
         },
     });
 };

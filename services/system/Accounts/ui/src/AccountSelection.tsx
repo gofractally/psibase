@@ -104,7 +104,7 @@ export const AccountSelection = () => {
                 if (!connectionToken) {
                     throw new Error("Invalid connectionToken");
                 }
-                // Now we need to login and set auth cookie
+                // Login and set auth cookie
                 await handleLogin(values.username, app, origin);
             }
         } catch (error) {
@@ -269,7 +269,7 @@ export const AccountSelection = () => {
             });
             window.location.href = inviteToken?.appDomain;
         } else {
-            // This is dead code; no handled by the click event on an account
+            // This is dead code; now handled by the click event on an account
             // Login
             if (!connectionToken) {
                 throw new Error(`Expected connection token for a login`);
