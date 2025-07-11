@@ -55,7 +55,7 @@ SCENARIO("Buying a symbol")
       auto lastCredit = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
       CHECK(lastCredit.succeeded());
 
-      const Quantity quantity{q(5, precision)};
+      const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
       THEN("Alice cannot create a symbol with numbers")
       {
