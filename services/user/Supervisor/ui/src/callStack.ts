@@ -1,5 +1,5 @@
 import { assertTruthy, toString } from "@psibase/common-lib";
-import { QualifiedFunctionCallArgs } from "@psibase/common-lib/messaging";
+import { QualifiedFunctionCallArgs, QualifiedPluginId } from "@psibase/common-lib/messaging";
 
 import { OriginationData } from "./utils";
 
@@ -82,5 +82,12 @@ export class CallStack {
 
     reset(): void {
         this.storage = [];
+    }
+
+    export(): QualifiedPluginId[] {
+        return this.storage.map((frame) => ({
+            service: frame.args.service,
+            plugin: frame.args.plugin,
+        }));
     }
 }
