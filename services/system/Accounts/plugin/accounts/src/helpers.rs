@@ -34,9 +34,8 @@ pub fn get_assert_top_level_app(
     }
 
     return Err(Unauthorized(&format!(
-        "{} can only be called by the top-level app. \nSender: {}",
-        context,
-        sender.app.as_ref().unwrap().as_str()
+        "{} can only be called by the top-level app.",
+        context
     ))
     .into());
 }

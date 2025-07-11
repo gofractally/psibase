@@ -20,8 +20,8 @@ package = "accounts:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../../user/CommonApi/common/packages/wit/host-common.wit" }
-"host:privileged" = { path = "../../../../user/CommonApi/common/packages/wit/host-privileged.wit" }
+"host:common" = { path = "../../../../user/Host/plugin/common/wit/world.wit" }
+"host:privileged" = { path = "../../../../user/Host/plugin/privileged/wit/world.wit" }
 "transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:account-tokens" = { path = "../account_tokens/wit/world.wit" }

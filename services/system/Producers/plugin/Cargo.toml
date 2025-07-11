@@ -19,7 +19,7 @@ world = "impl"
 [package.metadata.component.dependencies]
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../AuthSig/plugin/wit/world.wit" }
 "staged-tx:plugin" = { path = "../../StagedTx/plugin/wit/world.wit" }
