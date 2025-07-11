@@ -1,41 +1,46 @@
-import { Account, Metadata } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { appMetadataQueryKey, MetadataResponse } from "./useAppMetadata";
+
+import { supervisor } from "@/supervisor";
+
+import { Account, Metadata } from "@/lib/zodTypes";
+
+import { MetadataResponse, appMetadataQueryKey } from "./useAppMetadata";
 
 const Params = z.object({
-  metadata: Metadata,
-  account: Account,
+    metadata: Metadata,
+    account: Account,
 });
 
 export const useSetMetadata = () =>
-  useMutation<null, Error, z.infer<typeof Params>>({
-    mutationKey: ["setMetdata"],
-    mutationFn: async (params) => {
-      const { metadata, account } = Params.parse(params);
-      await supervisor.functionCall({
-        method: "setAppMetadata",
-        params: [account, metadata],
-        service: "workshop",
-        intf: "registry",
-      });
-      return null;
-    },
-    onSuccess: (_, { account, metadata }) => {
-      queryClient.setQueryData(
-        appMetadataQueryKey(account),
-        (updater: unknown) => {
-          if (updater) {
-            const oldData = MetadataResponse.parse(updater);
-            return MetadataResponse.parse({
-              appMetadata: metadata,
-              extraMetadata: oldData.extraMetadata,
+    useMutation<null, Error, z.infer<typeof Params>>({
+        mutationKey: ["setMetdata"],
+        mutationFn: async (params) => {
+            const { metadata, account } = Params.parse(params);
+            await supervisor.functionCall({
+                method: "setAppMetadata",
+                params: [account, metadata],
+                service: "workshop",
+                intf: "registry",
             });
-          }
-        }
-      );
-      queryClient.refetchQueries({ queryKey: appMetadataQueryKey(account) });
-    },
-  });
+            return null;
+        },
+        onSuccess: (_, { account, metadata }) => {
+            queryClient.setQueryData(
+                appMetadataQueryKey(account),
+                (updater: unknown) => {
+                    if (updater) {
+                        const oldData = MetadataResponse.parse(updater);
+                        return MetadataResponse.parse({
+                            appMetadata: metadata,
+                            extraMetadata: oldData.extraMetadata,
+                        });
+                    }
+                },
+            );
+            queryClient.refetchQueries({
+                queryKey: appMetadataQueryKey(account),
+            });
+        },
+    });

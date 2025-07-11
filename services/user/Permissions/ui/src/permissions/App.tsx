@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
+
 import { Button } from "@shared/shadcn/ui/button";
 
-import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 import { ActivePermsOauthRequest, type PermsOauthRequest } from "./db";
 
 const supervisor = getSupervisor();
@@ -10,7 +11,8 @@ const supervisor = getSupervisor();
 export const App = () => {
     const thisServiceName = "permissions";
     const [isLoading, setIsLoading] = useState(true);
-    const [validPermRequest, setValidPermRequest] = useState<PermsOauthRequest | null>(null);
+    const [validPermRequest, setValidPermRequest] =
+        useState<PermsOauthRequest | null>(null);
     const [error, setError] = useState<string | null>(null);
     const initApp = async () => {
         let permReqPayload;

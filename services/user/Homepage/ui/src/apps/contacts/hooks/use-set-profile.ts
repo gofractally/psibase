@@ -1,12 +1,13 @@
 import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { ProfileResponse } from "../../../hooks/use-profile";
 

@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
 import { siblingUrl } from "@psibase/common-lib";
-import { ActiveOauthRequest, zOauthRequest, OauthRequest } from "./db";
+
+import { ActiveOauthRequest, OauthRequest, zOauthRequest } from "./db";
 
 const buildIframeUrl = (promptUserReq: OauthRequest) => {
     const urlParams = new URLSearchParams(window.location.search);

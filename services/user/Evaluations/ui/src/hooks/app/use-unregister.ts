@@ -1,7 +1,10 @@
 import { queryClient } from "@/main";
-import { zUser } from "@/lib/graphql/getUsers";
-import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
+
+import { getSupervisor } from "@psibase/common-lib";
+
+import { zUser } from "@/lib/graphql/getUsers";
+
 import { useCurrentUser } from "../use-current-user";
 
 export const useUnregister = () => {

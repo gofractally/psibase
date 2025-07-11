@@ -1,7 +1,8 @@
 import { queryClient, supervisor } from "@/main";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useSelectAccount = () =>
     useMutation<void, Error, string>({

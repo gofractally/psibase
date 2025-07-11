@@ -1,6 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -12,6 +11,7 @@ import {
     FormMessage,
 } from "@shared/shadcn/ui/form";
 import { Input } from "@shared/shadcn/ui/input";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { LocalContact, zLocalContact } from "../types";
 

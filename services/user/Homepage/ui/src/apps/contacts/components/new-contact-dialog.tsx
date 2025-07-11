@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { Account } from "@/lib/zod/Account";
+
 import {
     Dialog,
     DialogContent,
@@ -7,8 +9,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { Account } from "@/lib/zod/Account";
 
 import { useCreateContact } from "../hooks/use-create-contact";
 import { ContactForm } from "./contact-form";

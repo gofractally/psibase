@@ -1,5 +1,3 @@
-import { Types, getStatus } from "@/lib/getStatus";
-import { humanize } from "@/lib/humanize";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -12,6 +10,8 @@ import { useStartEvaluation } from "@/hooks/app/use-start-evaluation";
 import { useUnregister } from "@/hooks/app/use-unregister";
 import { useUsersAndGroups } from "@/hooks/app/use-users";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Types, getStatus } from "@/lib/getStatus";
+import { humanize } from "@/lib/humanize";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Switch } from "@shared/shadcn/ui/switch";

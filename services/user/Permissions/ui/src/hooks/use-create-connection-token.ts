@@ -1,12 +1,12 @@
-import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
+import { supervisor } from "src/main";
+import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
 import { modifyUrlParams } from "@/lib/utils";
 
-import { supervisor } from "src/main";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useCreateConnectionToken = () =>
     useMutation<string, Error>({

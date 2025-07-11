@@ -1,9 +1,11 @@
-import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
 import { queryClient } from "@/main";
-import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+
+import QueryKey from "@/lib/queryKeys";
+import { Account } from "@/lib/zod/Account";
 
 export type GetCurrentUserRes = string | null;
 

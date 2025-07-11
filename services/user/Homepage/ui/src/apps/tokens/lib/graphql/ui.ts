@@ -1,49 +1,49 @@
 import { graphql } from "@/lib/graphql";
 
 export interface Root {
-  data: Data;
+    data: Data;
 }
 
 export interface Data {
-  userBalances: User;
-  userTokens: UserTokens;
-  userCredits: User;
-  userDebits: User;
+    userBalances: User;
+    userTokens: UserTokens;
+    userCredits: User;
+    userDebits: User;
 }
 
 export interface User {
-  edges: UserBalancesEdge[];
+    edges: UserBalancesEdge[];
 }
 
 export interface UserBalancesEdge {
-  node: SharedBalanceNode;
+    node: SharedBalanceNode;
 }
 
 export interface SharedBalanceNode {
-  tokenId: number;
-  balance: string;
-  symbolId: string;
-  precision: Precision;
-  creditedTo?: string;
-  debitableFrom?: string;
+    tokenId: number;
+    balance: string;
+    symbolId: string;
+    precision: Precision;
+    creditedTo?: string;
+    debitableFrom?: string;
 }
 
 export interface Precision {
-  value: number;
+    value: number;
 }
 
 export interface UserTokens {
-  edges: UserTokensEdge[];
+    edges: UserTokensEdge[];
 }
 
 export interface UserTokensEdge {
-  node: UserBalanceToken;
+    node: UserBalanceToken;
 }
 
 export interface UserBalanceToken {
-  id: number;
-  precision: Precision;
-  symbolId: string;
+    id: number;
+    precision: Precision;
+    symbolId: string;
 }
 
 const queryString = (username: string) => `
@@ -107,12 +107,12 @@ const queryString = (username: string) => `
 `;
 
 export const fetchUi = async (username: string) => {
-  const res = await graphql<Data>(queryString(username), "tokens");
+    const res = await graphql<Data>(queryString(username), "tokens");
 
-  return {
-    userDebits: res.userDebits.edges.map(({ node }) => node),
-    userCredits: res.userCredits.edges.map(({ node }) => node),
-    userBalances: res.userBalances.edges.map(({ node }) => node),
-    userTokens: res.userTokens.edges.map(({ node }) => node),
-  };
+    return {
+        userDebits: res.userDebits.edges.map(({ node }) => node),
+        userCredits: res.userCredits.edges.map(({ node }) => node),
+        userBalances: res.userBalances.edges.map(({ node }) => node),
+        userTokens: res.userTokens.edges.map(({ node }) => node),
+    };
 };

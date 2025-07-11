@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { graphql } from "../graphql";
 import { Account, zAccount } from "../zod/Account";
 
@@ -20,15 +21,15 @@ export const zGroup = z.object({
 export const zResult = z.object({
     groupNumber: z.number(),
     result: z.number().array(),
-    users: zAccount.array()
-})
+    users: zAccount.array(),
+});
 
 export type User = z.infer<typeof zUser>;
 
 export const FunctionResponse = z.object({
     users: zUser.array(),
     groups: zGroup.array(),
-    results: zResult.array()
+    results: zResult.array(),
 });
 
 export const getUsersAndGroups = async (
@@ -75,8 +76,8 @@ export const getUsersAndGroups = async (
                     nodes: zGroup.array(),
                 }),
                 getGroupResult: z.object({
-                    nodes: zResult.array()
-                })
+                    nodes: zResult.array(),
+                }),
             }),
         })
         .parse(res);
@@ -84,6 +85,6 @@ export const getUsersAndGroups = async (
     return FunctionResponse.parse({
         users: response.data.getUsers.nodes,
         groups: response.data.getGroups.nodes,
-        results: response.data.getGroupResult.nodes
+        results: response.data.getGroupResult.nodes,
     });
 };

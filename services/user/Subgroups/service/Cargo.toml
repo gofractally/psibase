@@ -6,9 +6,9 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { version = "0.18.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.18.0", path = "../../../../rust/psibase_macros" }
+psibase = { version = "0.19.0", path = "../../../../rust/psibase" }
+psibase_macros = { version = "0.19.0", path = "../../../../rust/psibase_macros" }
 serde = { version = "1.0.208", features = ["derive"] }
 
 [dev-dependencies]
-subgroups-pkg = { path = "..", version = "0.18.0" }
+subgroups-pkg = { path = "..", version = "0.19.0" }

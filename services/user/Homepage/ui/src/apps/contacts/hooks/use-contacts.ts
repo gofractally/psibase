@@ -40,8 +40,8 @@ export const upsertUserToCache = (
 
             return isExisting
                 ? parsed.map((c) =>
-                    c.account === contact.account ? contact : c,
-                )
+                      c.account === contact.account ? contact : c,
+                  )
                 : [...parsed, contact];
         }
         return [contact];

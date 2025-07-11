@@ -49,7 +49,10 @@ namespace psibase
       void      callStartBlock();
       void      callOnBlock();
       void      callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
-      std::optional<SignedTransaction>         callNextTransaction();
+      std::optional<SignedTransaction> callNextTransaction();
+      // \post The size of the result is the number of proofs in the
+      // transaction. Entries that cannot be filled (including due to
+      // errors) will be set to zero.
       std::vector<Checksum256>                 callPreverify(const SignedTransaction& trx);
       void                                     callRun(psio::view<const RunRow> row);
       Checksum256                              makeEventMerkleRoot();

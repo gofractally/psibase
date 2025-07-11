@@ -10,15 +10,15 @@ server = "r-registry"
 plugin = "plugin"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.18.0"
-Sites = "0.18.0"
+HttpServer = "0.19.0"
+Sites = "0.19.0"
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase", version = "0.18.0" }
+psibase = { path = "../../../../rust/psibase", version = "0.19.0" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "=7.0.17"
 serde_json = "1.0.120"
 url = "2.5.2"
 
 [dev-dependencies]
-registry-pkg = { path = "..", version = "0.18.0" }
+registry-pkg = { path = "..", version = "0.19.0" }

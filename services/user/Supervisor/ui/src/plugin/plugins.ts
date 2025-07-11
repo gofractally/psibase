@@ -1,7 +1,8 @@
-import { Supervisor } from "../supervisor";
-import { LoadedPlugin, ServiceContext } from "./serviceContext";
-import { PluginHost } from "./pluginHost";
 import { QualifiedPluginId, siblingUrl } from "@psibase/common-lib";
+
+import { Supervisor } from "../supervisor";
+import { PluginHost } from "./pluginHost";
+import { LoadedPlugin, ServiceContext } from "./serviceContext";
 
 export class Plugins {
     private supervisor: Supervisor;

@@ -1,3 +1,9 @@
+import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
+import { Quantity } from "@/apps/tokens/lib/quantity";
+
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
 import {
     AlertDialog,
     AlertDialogAction,
@@ -8,12 +14,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-
-import { useAvatar } from "@/hooks/use-avatar";
-import { useCurrentUser } from "@/hooks/use-current-user";
-
-import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { Quantity } from "@/apps/tokens/lib/quantity";
 
 interface Props {
     open: boolean;
@@ -70,7 +70,7 @@ export const TransferModal = ({
                                 key={label}
                                 className="flex flex-col items-center gap-1 "
                             >
-                                <div className="text-center text-muted-foreground">
+                                <div className="text-muted-foreground text-center">
                                     {label}
                                 </div>
                                 <div>

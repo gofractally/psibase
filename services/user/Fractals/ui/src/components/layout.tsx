@@ -1,5 +1,9 @@
 import { Outlet, useLocation } from "react-router-dom";
 
+import { AppSidebar } from "@/components/app-sidebar";
+
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -14,10 +18,6 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
-
-import { AppSidebar } from "@/components/app-sidebar";
-
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
 import { fractalMenus } from "./nav-main";
 

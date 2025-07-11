@@ -1,28 +1,28 @@
 {
-  "name": "@psibase/identity-ui",
-  "private": true,
-  "version": "0.0.0",
-  "scripts": {
-    "dev": "vite",
-    "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && yarn lint && vite build'",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@psibase/common-lib": "workspace:*",
-    "d3": "^7.9.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^6.26.1"
-  },
-  "devDependencies": {
-    "@types/d3": "^7.4.3",
-    "@types/node": "^22.15.0",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
-    "@types/react-router-dom": "5.3.3",
-    "eslint": "^9.15.0",
-    "typescript": "^5.7.3",
-    "vite": "^5.4.1"
-  }
+    "name": "@psibase/identity-ui",
+    "private": true,
+    "version": "0.0.0",
+    "scripts": {
+        "dev": "vite",
+        "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && yarn lint && vite build'",
+        "lint": "eslint .",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@psibase/common-lib": "workspace:*",
+        "d3": "^7.9.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "react-router-dom": "^6.26.1"
+    },
+    "devDependencies": {
+        "@types/d3": "^7.4.3",
+        "@types/node": "^22.15.0",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "@types/react-router-dom": "5.3.3",
+        "eslint": "^9.15.0",
+        "typescript": "^5.7.3",
+        "vite": "^5.4.1"
+    }
 }

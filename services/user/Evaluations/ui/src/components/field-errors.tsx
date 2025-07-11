@@ -16,7 +16,7 @@ const parseErrors = (errors: unknown[]): string[] =>
 
 export const FieldErrors = ({ meta }: FieldErrorsProps) => {
     return parseErrors(meta.errors).map((error, index) => (
-        <p key={index} className="text-sm text-destructive">
+        <p key={index} className="text-destructive text-sm">
             {error}
         </p>
     ));

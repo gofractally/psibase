@@ -9,6 +9,15 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useChainId } from "@/hooks/use-chain-id";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useLogout } from "@/hooks/use-logout";
+import { useSelectAccount } from "@/hooks/use-select-account";
+import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
+
+import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import {
     DropdownMenu,
@@ -30,18 +39,9 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
-
-import { useChainId } from "@/hooks/use-chain-id";
-import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useLogout } from "@/hooks/use-logout";
-import { useSelectAccount } from "@/hooks/use-select-account";
-import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
-import { cn } from "@shared/lib/utils";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { useTheme } from "./theme-provider";
-import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export function NavUser() {
     const { isMobile } = useSidebar();

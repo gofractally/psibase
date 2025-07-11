@@ -1,8 +1,11 @@
-import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
-import { siblingUrl } from "@psibase/common-lib";
-import { ModeToggle } from "./mode-toggle";
-import { AccountSwitcher } from "./account-switcher";
 import { useNavigate } from "react-router-dom";
+
+import { siblingUrl } from "@psibase/common-lib";
+
+import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
+
+import { AccountSwitcher } from "./account-switcher";
+import { ModeToggle } from "./mode-toggle";
 
 function HoverBorderGradientDemo() {
     return (

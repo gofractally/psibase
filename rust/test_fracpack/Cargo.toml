@@ -9,9 +9,9 @@ publish = false
 
 [dependencies]
 cxx = "1.0"
-fracpack = { version = "0.18.0", path = "../fracpack" }
+fracpack = { version = "0.19.0", path = "../fracpack" }
 hex = "0.3.1"
-psibase_macros = { version = "0.18.0", path = "../psibase_macros" }
+psibase_macros = { version = "0.19.0", path = "../psibase_macros" }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 

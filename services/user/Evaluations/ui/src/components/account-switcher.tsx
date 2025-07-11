@@ -1,3 +1,5 @@
+import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
+
 import {
     useCreateConnectionToken,
     useCurrentAccounts,
@@ -5,7 +7,6 @@ import {
     useSelectAccount,
 } from "@/hooks";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";

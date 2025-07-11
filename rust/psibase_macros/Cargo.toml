@@ -9,4 +9,4 @@ description = "Macros to support psibase development"
 license = "MIT"
 
 [dependencies]
-psibase-macros-derive = { path = "psibase-macros-derive", version = "0.18.0" }
+psibase-macros-derive = { path = "psibase-macros-derive", version = "0.19.0" }

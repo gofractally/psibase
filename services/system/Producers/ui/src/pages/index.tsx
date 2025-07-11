@@ -1,14 +1,15 @@
 import { ProducersForm } from "@/components/forms/producers-form";
-import { useSetProducers } from "../hooks/useSetProducers";
+
 import { Nav } from "../components/nav";
+import { useSetProducers } from "../hooks/useSetProducers";
 
 export const Home = () => {
-  const { mutateAsync: setProducers } = useSetProducers();
+    const { mutateAsync: setProducers } = useSetProducers();
 
-  return (
-    <div className="max-w-2xl mx-auto mt-4">
-      <Nav />
-      <ProducersForm onSubmit={setProducers} />
-    </div>
-  );
+    return (
+        <div className="mx-auto mt-4 max-w-2xl">
+            <Nav />
+            <ProducersForm onSubmit={setProducers} />
+        </div>
+    );
 };

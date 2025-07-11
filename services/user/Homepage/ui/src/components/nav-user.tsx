@@ -1,3 +1,4 @@
+import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 import { type UseMutationResult } from "@tanstack/react-query";
 import {
     ChevronsUpDown,
@@ -15,12 +16,25 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCanExportAccount } from "@/hooks/use-can-export-account";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGenerateInvite } from "@/hooks/use-generate-invite";
+import { useLogout } from "@/hooks/use-logout";
+import { useProfile } from "@/hooks/use-profile";
+import { useSelectAccount } from "@/hooks/use-select-account";
+import { Account } from "@/lib/zod/Account";
+
+import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/shadcn/ui/avatar";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogClose,
@@ -43,32 +57,17 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
-
-import { useAvatar } from "@/hooks/use-avatar";
-import { useCanExportAccount } from "@/hooks/use-can-export-account";
-import { useChainId } from "@/hooks/use-chain-id";
-import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useGenerateInvite } from "@/hooks/use-generate-invite";
-import { useLogout } from "@/hooks/use-logout";
-import { useProfile } from "@/hooks/use-profile";
-import { useSelectAccount } from "@/hooks/use-select-account";
-import { cn } from "@shared/lib/utils";
-import { Account } from "@/lib/zod/Account";
-
-import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useTheme } from "./theme-provider";
-import { Button } from "@shared/shadcn/ui/button";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 
 function AccountMenuItem({
     account,
@@ -218,7 +217,7 @@ export function NavUser() {
                                                 currentUser ||
                                                 "Not logged in"}{" "}
                                             {profile?.profile?.displayName ? (
-                                                <span className="text-xs text-muted-foreground">
+                                                <span className="text-muted-foreground text-xs">
                                                     {`(${currentUser})`}
                                                 </span>
                                             ) : (

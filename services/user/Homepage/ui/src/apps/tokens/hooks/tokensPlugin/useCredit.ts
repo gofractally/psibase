@@ -1,7 +1,9 @@
-import { Account } from "@/lib/zod/Account";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+
+import { Account } from "@/lib/zod/Account";
 
 const Args = z.object({
     tokenId: z.string(),

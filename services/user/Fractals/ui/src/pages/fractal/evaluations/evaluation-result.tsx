@@ -1,13 +1,18 @@
 import { CircleSlash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { Badge } from "@shared/shadcn/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
-
 import { EmptyBlock } from "@/components/empty-block";
 
 import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
+
 import { cn } from "@shared/lib/utils";
+import { Badge } from "@shared/shadcn/ui/badge";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 
 // const data = [
 //     {
@@ -75,7 +80,7 @@ export const EvaluationResult = () => {
                                                         key={`group-${group.groupNumber}-member-${member}`}
                                                         className="flex items-center gap-4 rounded-md border p-2 transition-colors"
                                                     >
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 bg-background text-sm font-medium">
+                                                        <div className="bg-background flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-medium">
                                                             {index + 1}
                                                         </div>
                                                         <span className="flex-1 text-sm font-medium">
@@ -103,7 +108,7 @@ export const EvaluationResult = () => {
                                                                 key={index}
                                                                 className="flex items-center gap-4 rounded-md border p-2 transition-colors"
                                                             >
-                                                                <div className="flex h-8 w-8 items-center justify-center bg-background">
+                                                                <div className="bg-background flex h-8 w-8 items-center justify-center">
                                                                     <CircleSlash2 className="h-3/5 w-3/5" />
                                                                 </div>
                                                                 <span className="flex-1 text-sm font-medium">

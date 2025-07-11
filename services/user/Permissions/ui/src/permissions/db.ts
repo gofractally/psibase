@@ -1,6 +1,7 @@
 import { OAUTH_REQUEST_KEY } from "@/constants";
-import { getSupervisor } from "@psibase/common-lib";
 import { z } from "zod";
+
+import { getSupervisor } from "@psibase/common-lib";
 
 const supervisor = getSupervisor();
 
@@ -19,14 +20,17 @@ export class ActivePermsOauthRequest {
             service: "clientdata",
             intf: "keyvalue",
             method: "get",
-            params: [OAUTH_REQUEST_KEY]});
+            params: [OAUTH_REQUEST_KEY],
+        });
 
         if (!oauthReqBytes) {
             throw new Error("No active oauth request found");
         }
 
-        const oauthReq = zPermsOauthRequest.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
-        return oauthReq
+        const oauthReq = zPermsOauthRequest.parse(
+            JSON.parse(new TextDecoder().decode(oauthReqBytes)),
+        );
+        return oauthReq;
     }
 
     static async delete() {

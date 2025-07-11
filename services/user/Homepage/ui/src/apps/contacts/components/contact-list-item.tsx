@@ -1,9 +1,9 @@
-import { AvatarImage } from "@shared/shadcn/ui/avatar";
-import { Avatar } from "@shared/shadcn/ui/avatar";
-
 import { useAvatar } from "@/hooks/use-avatar";
 import { useProfile } from "@/hooks/use-profile";
+
 import { cn } from "@shared/lib/utils";
+import { AvatarImage } from "@shared/shadcn/ui/avatar";
+import { Avatar } from "@shared/shadcn/ui/avatar";
 
 import { LocalContact } from "../types";
 import { formatNames } from "../utils/formatNames";
@@ -48,7 +48,7 @@ export const ContactItem = ({
             {secondaryName && (
                 <div className="flex flex-col justify-center">
                     <div>
-                        <p className="text-right text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-right text-sm">
                             {secondaryName}
                         </p>
                     </div>

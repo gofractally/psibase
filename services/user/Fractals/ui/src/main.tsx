@@ -4,9 +4,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 
-import { Toaster } from "@shared/shadcn/ui/sonner";
-
 import { ThemeProvider } from "@/components/theme-provider";
+
+import { Toaster } from "@shared/shadcn/ui/sonner";
 
 import { queryClient } from "./queryClient";
 import { router } from "./router";

@@ -1,6 +1,10 @@
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
+import { EmptyBlock } from "@/components/empty-block";
+
+import { useCompletedEvaluation } from "@/hooks/fractals/use-completed-evaluations";
+
 import {
     Table,
     TableBody,
@@ -9,10 +13,6 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-
-import { EmptyBlock } from "@/components/empty-block";
-
-import { useCompletedEvaluation } from "@/hooks/fractals/use-completed-evaluations";
 
 export const Completed = () => {
     const { data: evaluations } = useCompletedEvaluation();

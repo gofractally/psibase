@@ -1,13 +1,12 @@
-import { useEffect } from "react";
-
-import { TwoColumnSelect } from "@/components/two-column-select";
-
 import {
     MailList,
     MailboxHeader,
     MessageDetail,
 } from "@/apps/chainmail/components";
 import { useArchivedMessages, useIsDesktop } from "@/apps/chainmail/hooks";
+import { useEffect } from "react";
+
+import { TwoColumnSelect } from "@/components/two-column-select";
 
 export default function ArchivePage() {
     const isDesktop = useIsDesktop();

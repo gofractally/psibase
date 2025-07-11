@@ -11,6 +11,10 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useProfile } from "@/hooks/use-profile";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -26,10 +30,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-
-import { useAvatar } from "@/hooks/use-avatar";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useProfile } from "@/hooks/use-profile";
 
 import { useDeleteContact } from "../hooks/use-delete-contact";
 import { useUpdateContact } from "../hooks/use-update-contact";
@@ -154,7 +154,7 @@ export function ContactDetails({
                                     <div className="py-2">
                                         Edit your{" "}
                                         <button
-                                            className="underline hover:text-primary focus:outline-none"
+                                            className="hover:text-primary underline focus:outline-none"
                                             onClick={() =>
                                                 setModalPage(
                                                     modalPages.Values
@@ -224,19 +224,19 @@ export function ContactDetails({
                     <div className="text-lg font-medium">{primaryName}</div>
                     {secondaryName && (
                         <div className="flex flex-col gap-1">
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-muted-foreground text-sm">
                                 {secondaryName?.toLowerCase()}
                             </div>
                         </div>
                     )}
                     {profile?.profile?.bio && (
                         <div className="flex flex-col gap-1">
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-muted-foreground text-sm">
                                 {profile?.profile?.bio}
                             </div>
                         </div>
                     )}
-                    <div className="flex w-full justify-center gap-2 text-muted-foreground ">
+                    <div className="text-muted-foreground flex w-full justify-center gap-2 ">
                         <Button
                             onClick={() => onTransferFunds(contact.account)}
                             size="icon"

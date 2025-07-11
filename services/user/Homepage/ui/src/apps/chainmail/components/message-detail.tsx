@@ -1,17 +1,5 @@
 import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
-import { ArrowLeft, Trash2 } from "lucide-react";
-import { toast } from "@shared/shadcn/ui/sonner";
-
-import { Avatar } from "@shared/shadcn/ui/avatar";
-import { Button } from "@shared/shadcn/ui/button";
-import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "@shared/shadcn/ui/tooltip";
-
 // import { AwaitTime } from "@/globals";
 // import { wait } from "@/lib/wait";
 
@@ -23,6 +11,17 @@ import {
     // useSaveMessage,
 } from "@/apps/chainmail/hooks";
 import { formatDate } from "@/apps/chainmail/utils";
+import { ArrowLeft, Trash2 } from "lucide-react";
+
+import { Avatar } from "@shared/shadcn/ui/avatar";
+import { Button } from "@shared/shadcn/ui/button";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
+import { toast } from "@shared/shadcn/ui/sonner";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@shared/shadcn/ui/tooltip";
 
 import {
     ComposeDialog,
@@ -186,13 +185,13 @@ export function MessageDetail({
                     <div className="mb-6 flex items-start justify-between">
                         <div className="flex gap-3">
                             <Avatar className="h-10 w-10">
-                                <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground">
+                                <div className="bg-primary text-primary-foreground flex h-full w-full items-center justify-center">
                                     {account.charAt(0)}
                                 </div>
                             </Avatar>
                             <div>
                                 <p className="font-medium">{account}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="text-muted-foreground mt-1 text-xs">
                                     {formatDate(message.datetime)}
                                 </p>
                             </div>
@@ -205,7 +204,7 @@ export function MessageDetail({
                         )}
                     </div>
 
-                    <article className="prose max-w-none dark:prose-invert">
+                    <article className="prose dark:prose-invert max-w-none">
                         {message.body.split("\n\n").map((paragraph, i) => (
                             <p key={i}>{paragraph}</p>
                         ))}

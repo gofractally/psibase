@@ -1,6 +1,8 @@
 import { AppConfigType } from "@/configuredApps";
-import { Account } from "@/lib/zod/Account";
 import { BookUser } from "lucide-react";
+
+import { Account } from "@/lib/zod/Account";
+
 import { ContactsPage } from "./page";
 
 export const contactsConfig: AppConfigType = {

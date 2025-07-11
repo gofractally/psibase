@@ -1,3 +1,7 @@
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { createIdenticon } from "@/lib/createIdenticon";
+
+import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -5,10 +9,6 @@ import {
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
 
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
-import { createIdenticon } from "@/lib/createIdenticon";
-
-import { Button } from "@shared/shadcn/ui/button";
 import { useChainId } from "./hooks/use-chain-id";
 import { useConnectedAccounts } from "./hooks/use-connected-accounts";
 import { useSelectAccount } from "./hooks/use-select-account";

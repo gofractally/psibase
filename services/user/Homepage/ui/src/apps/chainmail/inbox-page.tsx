@@ -1,7 +1,3 @@
-import { useEffect } from "react";
-
-import { TwoColumnSelect } from "@/components/two-column-select";
-
 import {
     MailList,
     MailboxHeader,
@@ -9,6 +5,9 @@ import {
     NoMessageSelected,
 } from "@/apps/chainmail/components";
 import { useIncomingMessages, useIsDesktop } from "@/apps/chainmail/hooks";
+import { useEffect } from "react";
+
+import { TwoColumnSelect } from "@/components/two-column-select";
 
 export default function InboxPage() {
     const isDesktop = useIsDesktop();

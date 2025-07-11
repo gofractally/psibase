@@ -1,4 +1,7 @@
+import { configuredApps } from "@/configuredApps";
 import { type LucideIcon } from "lucide-react";
+import { NavLink } from "react-router-dom";
+
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -6,8 +9,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
-import { configuredApps } from "@/configuredApps";
-import { NavLink } from "react-router-dom";
 
 export interface App {
     name: string;
