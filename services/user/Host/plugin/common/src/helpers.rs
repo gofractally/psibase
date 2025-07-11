@@ -40,3 +40,10 @@ pub fn get_callstack() -> Vec<String> {
     stack.pop();
     stack
 }
+
+pub fn check_caller(allowed: &[&str], context: &str) {
+    let app = caller();
+    if !allowed.contains(&app.as_str()) {
+        panic!("[{}] Unauthorized caller: {}", context, app);
+    }
+}

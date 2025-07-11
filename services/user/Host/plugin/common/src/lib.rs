@@ -45,20 +45,24 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
 
 impl Admin for HostCommon {
     fn get_active_app() -> OriginationData {
-        let app = caller();
-
-        if app != "accounts" && app != "staged-tx" {
-            panic!(
-                "Only accounts and staged-tx can call this function, current app: {}",
-                app
-            );
-        }
+        check_caller(
+            &["accounts", "staged-tx"],
+            "get-active-app@host:common/admin",
+        );
 
         let active_app = Supervisor::get_active_app();
         OriginationData {
             app: active_app.app,
             origin: active_app.origin,
         }
+    }
+
+    fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
+        check_caller(&["accounts"], "post@host:common/admin");
+
+        let endpoint = normalize_endpoint(request.endpoint);
+        let res = do_post(app, endpoint, request.body)?;
+        Ok(res.body.map(Into::into))
     }
 }
 

@@ -120,10 +120,13 @@ interface client {
 }
 
 interface admin {
-    use types.{origination-data};
+    use types.{origination-data, post-request, body-types, error};
     
     /// Get active app (the top level app with which the user is interacting)
     get-active-app: func() -> origination-data;
+
+    /// Make a post request
+    post: func(app: string, request: post-request) -> result<option<body-types>, error>;
 }
 
 world imports {
