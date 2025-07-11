@@ -426,11 +426,11 @@ namespace
       psibase::BlockTime time;   // Time of the last finalized block
    };
 
-   auto finalizeBlocks(const psibase::BlockHeader& current) -> std::optional<FinalizedBlocks>
+   auto finalizeBlocks(const psibase::BlockHeader& head) -> std::optional<FinalizedBlocks>
    {
-      auto commitNum  = current.commitNum - (current.blockNum == current.commitNum);
+      auto commitNum  = head.commitNum - (head.blockNum == head.commitNum);
       auto reversible = RTransact::WriteOnly{}.open<ReversibleBlocksTable>();
-      reversible.put({.blockNum = current.blockNum, .time = current.time});
+      reversible.put({.blockNum = head.blockNum, .time = head.time});
 
       BlockTime irreversibleTime = {};
 
@@ -738,15 +738,11 @@ void RTransact::onBlock()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
-   if (!stat)
-      return;
+   check(stat && stat->head, "Head block should be set before calling onBlock");
 
-   if (stat->head)
-   {
-      checkReverify(stat->head->blockId);
-   }
+   checkReverify(stat->head->blockId);
 
-   auto finalized = finalizeBlocks(stat->current);
+   auto finalized = finalizeBlocks(stat->head->header);
    if (!finalized)
       return;
 
