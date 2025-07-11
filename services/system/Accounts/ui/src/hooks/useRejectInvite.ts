@@ -44,9 +44,7 @@ export const useRejectInvite = (selectedAccount: string, token: string) => {
 
                 void (await supervisor.functionCall(rejectParams));
             } else {
-                // Use proper logout hook that includes cookie deletion
                 await logout();
-
                 void (await supervisor.functionCall(rejectParams));
             }
         },

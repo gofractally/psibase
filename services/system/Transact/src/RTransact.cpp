@@ -6,7 +6,6 @@
 #include <services/user/XAdmin.hpp>
 
 #include <functional>
-#include <iostream>
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
 #include <ranges>
@@ -380,8 +379,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-       -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id,
+                         const ClientFilter&         clientFilter) -> ClaimedSockets
    {
       {
          auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
@@ -1420,8 +1419,6 @@ std::string RTransact::login(std::string rootHost)
 
 std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
-   std::cout << "🔍 RTransact::getUser called for host: " << request.rootHost << std::endl;
-   
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
    for (const auto& header : request.headers)
@@ -1449,31 +1446,14 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    // Check for __Host-SESSION cookie
    if (auto token = request.getCookie("__Host-SESSION"))
    {
-      std::cout << "🍪 RTransact: Found __Host-SESSION cookie: " << *token << std::endl;
       auto decoded = decodeJWT<LoginTokenData>(key, *token);
-      std::cout << "🔓 RTransact: Decoded JWT - sub: " << decoded.sub.str() 
-                << ", aud: " << decoded.aud 
-                << ", exp: " << decoded.exp << std::endl;
-      std::cout << "🏠 RTransact: Request rootHost: " << request.rootHost << std::endl;
-      
+
       if (decoded.aud == request.rootHost && checkExp(decoded.exp))
       {
-         std::cout << "✅ RTransact: Cookie validation successful, user: " << decoded.sub.str() << std::endl;
          return decoded.sub;
       }
-      else
-      {
-         std::cout << "❌ RTransact: Cookie validation failed - aud match: " 
-                   << (decoded.aud == request.rootHost ? "YES" : "NO") 
-                   << ", exp valid: " << (checkExp(decoded.exp) ? "YES" : "NO") << std::endl;
-      }
    }
-   else
-   {
-      std::cout << "❌ RTransact: No __Host-SESSION cookie found" << std::endl;
-   }
-   
-   std::cout << "🚫 RTransact: Returning no user" << std::endl;
+
    return {};
 }
 

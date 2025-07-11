@@ -95,7 +95,6 @@ export const AccountSelection = () => {
             const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
-                console.log("onSubmit().connectionToken:", connectionToken);
                 await createAccount(values.username);
                 void (await acceptInvite({
                     origin,
@@ -109,7 +108,7 @@ export const AccountSelection = () => {
                 if (!connectionToken) {
                     throw new Error("Invalid connectionToken");
                 }
-                // Now we need to login and set auth cookie
+                // Login and set auth cookie
                 await handleLogin(values.username, app, origin);
             }
         } catch (error) {
@@ -283,7 +282,7 @@ export const AccountSelection = () => {
             });
             window.location.href = inviteToken?.appDomain;
         } else {
-            // This is dead code; no handled by the click event on an account
+            // This is dead code; now handled by the click event on an account
             // Login
             if (!connectionToken) {
                 throw new Error(`Expected connection token for a login`);
@@ -316,7 +315,6 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                                     : "Import a pre-existing account prior to accepting / denying an invite."}
                             </DialogDescription>
-                            {/* <ImportAccountOrAcceptInviteForm /> */}
                             <Form {...form}>
                                 <form
                                     onSubmit={form.handleSubmit(onSubmit)}
