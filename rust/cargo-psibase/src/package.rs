@@ -259,7 +259,7 @@ pub async fn build_package(
             }
         }
     } else {
-        Err(anyhow!("Cannot package a virtual workspace"))?
+        Err(anyhow!("Cannot package a virtual psi package"))?
     }
 
     while !queue.is_empty() {
@@ -292,7 +292,7 @@ pub async fn build_package(
                     &metadata.metadata.workspace_members,
                     &plugin,
                 ) else {
-                    return Err(anyhow!("{} is not a workspace member", plugin,));
+                    return Err(anyhow!("{} is not a psi package member", plugin,));
                 };
                 plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
             }
