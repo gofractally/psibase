@@ -38,7 +38,7 @@ export interface HostInterface {
 
     syncCallDyn: (args: QualifiedDynCallArgs) => any;
 
-    syncSend: (req: HttpRequest) => Result<HttpResponse, RecoverableErrorPayload>;
+    sendRequest: (req: HttpRequest) => Result<HttpResponse, RecoverableErrorPayload>;
 
     getActiveApp(): OriginationData;
 

@@ -3,8 +3,8 @@ export const intf = {
         return host.getActiveApp();
     },
 
-    syncSend(req) {
-        return host.syncSend(req);
+    sendRequest(req) {
+        return host.sendRequest(req);
     },
 
     serviceStack() {

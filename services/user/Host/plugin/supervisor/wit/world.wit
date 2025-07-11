@@ -47,7 +47,7 @@ interface intf {
 
     get-active-app: func() -> origination-data;
 
-    sync-send: func(req: http-request) -> result<http-response, error>;
+    send-request: func(req: http-request) -> result<http-response, error>;
 
     // The last items in the list are the most recent services in the callstack
     service-stack: func() -> list<string>;

@@ -1,175 +1,90 @@
 #[allow(warnings)]
 mod bindings;
-
 use bindings::*;
-use exports::host::common::types::{
-    BodyTypes, Error, GuestPluginRef, OriginationData, PluginId, PostRequest,
-};
-use exports::host::common::{
-    client::Guest as Client, server::Guest as Server, types::Guest as Types,
-};
-use supervisor::bridge::intf as Supervisor;
-use url::Url;
 
-use crate::bindings::supervisor::bridge::types::{
-    self as BridgeTypes, Header, HttpRequest, HttpResponse,
+mod helpers;
+use helpers::*;
+mod plugin_ref;
+
+mod types;
+use exports::host::common::{
+    client::Guest as Client,
+    server::Guest as Server,
+    types::Guest as Types,
+    types::{BodyTypes, Error, OriginationData, PostRequest},
 };
+use supervisor::bridge::{
+    intf as Supervisor,
+    types::{self as BridgeTypes, HttpRequest, HttpResponse},
+};
+use url::Url;
 
 struct HostCommon;
 
-impl From<BridgeTypes::PluginId> for PluginId {
-    fn from(e: BridgeTypes::PluginId) -> Self {
-        PluginId {
-            service: e.service,
-            plugin: e.plugin,
-        }
-    }
-}
-
-impl From<BridgeTypes::Error> for Error {
-    fn from(e: BridgeTypes::Error) -> Self {
-        Error {
-            code: e.code,
-            producer: e.producer.into(),
-            message: e.message,
-        }
-    }
-}
-
-fn get_self() -> PluginId {
-    PluginId {
-        service: "host".to_string(),
-        plugin: "common".to_string(),
-    }
-}
-
-fn make_error(message: &str) -> Error {
-    Error {
-        code: 0,
-        producer: get_self(),
-        message: message.to_string(),
-    }
-}
-
-fn post_graphql(origin: String, graphql: String) -> Result<HttpResponse, BridgeTypes::Error> {
-    let req = HttpRequest {
-        uri: format!("{}/graphql", origin),
+fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
+    let (ty, content) = content.get_content();
+    Ok(HttpRequest {
+        uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "POST".to_string(),
-        headers: vec![Header {
-            key: "Content-Type".to_string(),
-            value: "application/graphql".to_string(),
-        }],
-        body: Some(BridgeTypes::BodyTypes::Text(graphql)),
-    };
-    Supervisor::sync_send(&req)
+        headers: make_headers(&[("Content-Type", &ty)]),
+        body: Some(content),
+    }
+    .send()?)
 }
 
-fn get_json_request(url: String) -> Result<HttpResponse, BridgeTypes::Error> {
-    let req = HttpRequest {
-        uri: url,
+fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
+    Ok(HttpRequest {
+        uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "GET".to_string(),
-        headers: vec![Header {
-            key: "Accept".to_string(),
-            value: "application/json".to_string(),
-        }],
+        headers: make_headers(&[("Accept", "application/json")]),
         body: None,
-    };
-    Supervisor::sync_send(&req)
-}
-
-fn post_graphql_from_app_get_json(app: String, graphql: String) -> Result<String, Error> {
-    let origin = HostCommon::get_app_url(app.clone());
-    let res = post_graphql(origin, graphql).map_err(|e| Error::from(e))?;
-
-    if let Some(BridgeTypes::BodyTypes::Json(body)) = res.body {
-        let json: serde_json::Value =
-            serde_json::from_str(&body).map_err(|e| make_error(&e.to_string()))?;
-
-        if json["errors"].is_null() {
-            return Ok(body);
-        } else {
-            return Err(make_error(&json["errors"].to_string()));
-        }
     }
-
-    Err(make_error("Http response body absent or wrong type"))
-}
-
-fn caller() -> String {
-    let stack = get_callstack();
-    assert!(stack.len() > 0);
-    stack.last().unwrap().clone()
-}
-
-fn get_callstack() -> Vec<String> {
-    let mut stack = Supervisor::service_stack();
-    // the last element is always this plugin, so we can pop it
-    // We are interested in the callstack before this call
-    stack.pop();
-    stack
-}
-
-impl From<BridgeTypes::BodyTypes> for BodyTypes {
-    fn from(e: BridgeTypes::BodyTypes) -> Self {
-        match e {
-            BridgeTypes::BodyTypes::Text(t) => BodyTypes::Text(t),
-            BridgeTypes::BodyTypes::Bytes(b) => BodyTypes::Bytes(b),
-            BridgeTypes::BodyTypes::Json(j) => BodyTypes::Json(j),
-        }
-    }
+    .send()?)
 }
 
 impl Server for HostCommon {
     fn post_graphql_get_json(graphql: String) -> Result<String, Error> {
-        post_graphql_from_app_get_json(caller(), graphql)
+        let res = HttpRequest {
+            uri: format!("{}/{}", HostCommon::get_app_url(caller()), "graphql"),
+            method: "POST".to_string(),
+            headers: make_headers(&[("Content-Type", "application/graphql")]),
+            body: Some(BridgeTypes::BodyTypes::Text(graphql)),
+        }
+        .send()?;
+
+        if let Some(BridgeTypes::BodyTypes::Json(body)) = res.body {
+            let json: serde_json::Value =
+                serde_json::from_str(&body).map_err(|e| make_error(&e.to_string()))?;
+
+            if json["errors"].is_null() {
+                return Ok(body);
+            } else {
+                return Err(make_error(&json["errors"].to_string()));
+            }
+        }
+
+        Err(make_error("Invalid graphql response: 'body' must be JSON"))
     }
 
     fn post(request: PostRequest) -> Result<BodyTypes, Error> {
-        let endpoint = request
-            .endpoint
-            .strip_prefix('/')
-            .unwrap_or(&request.endpoint)
-            .to_string();
+        let endpoint = normalize_endpoint(request.endpoint);
+        let res = do_post(caller(), endpoint, request.body)?;
 
-        let url = format!("{}/{}", Self::get_app_url(caller()), endpoint);
-
-        let (content_type, body) = match &request.body {
-            BodyTypes::Bytes(b) => (
-                "application/octet-stream",
-                BridgeTypes::BodyTypes::Bytes(b.clone()),
-            ),
-            BodyTypes::Json(j) => ("application/json", BridgeTypes::BodyTypes::Json(j.clone())),
-            BodyTypes::Text(t) => ("text/plain", BridgeTypes::BodyTypes::Text(t.clone())),
-        };
-
-        let headers = vec![Header {
-            key: "Content-Type".to_string(),
-            value: content_type.to_string(),
-        }];
-
-        let req = HttpRequest {
-            uri: url,
-            method: "POST".to_string(),
-            headers,
-            body: Some(body),
-        };
-
-        let res = Supervisor::sync_send(&req)?;
-        if res.body.is_none() {
-            return Err(make_error("Http response body absent"));
+        // TODO: post should return Option<BodyTypes> because not all posts return a body
+        match res.body {
+            Some(body) => Ok(body.into()),
+            None => Err(make_error("Http response body absent")),
         }
-
-        Ok(res.body.unwrap().into())
     }
 
     fn get_json(endpoint: String) -> Result<String, Error> {
-        let endpoint = endpoint.strip_prefix('/').unwrap_or(&endpoint).to_string();
-        let res = get_json_request(format!("{}/{}", Self::get_app_url(caller()), endpoint))?;
-        if let Some(BridgeTypes::BodyTypes::Json(body)) = res.body {
-            return Ok(body);
-        }
+        let endpoint = normalize_endpoint(endpoint);
+        let res = do_get(caller(), endpoint)?;
 
-        return Err(make_error("Http response body absent or wrong type"));
+        match res.body {
+            Some(BridgeTypes::BodyTypes::Json(body)) => Ok(body),
+            _ => Err(make_error("Http response body absent or wrong type")),
+        }
     }
 }
 
@@ -213,49 +128,8 @@ impl Client for HostCommon {
     }
 }
 
-pub struct MyPluginRef {
-    pub service: String,
-    pub plugin: String,
-    pub intf: String,
-}
-
-fn to_camel(s: &str) -> String {
-    s.split('-')
-        .enumerate()
-        .map(|(i, part)| {
-            if i == 0 {
-                part.to_string()
-            } else {
-                part[..1].to_uppercase() + &part[1..]
-            }
-        })
-        .collect()
-}
-
-impl GuestPluginRef for MyPluginRef {
-    fn new(service: String, plugin: String, intf: String) -> Self {
-        MyPluginRef {
-            service,
-            plugin,
-            intf: to_camel(&intf),
-        }
-    }
-
-    fn get_service(&self) -> String {
-        self.service.clone()
-    }
-
-    fn get_plugin(&self) -> String {
-        self.plugin.clone()
-    }
-
-    fn get_intf(&self) -> String {
-        self.intf.clone()
-    }
-}
-
 impl Types for HostCommon {
-    type PluginRef = MyPluginRef;
+    type PluginRef = plugin_ref::PluginRef;
 }
 
 bindings::export!(HostCommon with_types_in bindings);
