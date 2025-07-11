@@ -344,11 +344,7 @@ mod service {
     ///
     /// # Returns user balance
     #[action]
-    fn getSharedBal(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-    ) -> SharedBalance {
+    fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
         unimplemented!()
     }
 }

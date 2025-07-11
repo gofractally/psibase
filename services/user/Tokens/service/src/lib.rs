@@ -228,12 +228,8 @@ pub mod service {
     /// # Returns user balance
     #[action]
     #[allow(non_snake_case)]
-    fn getSharedBal(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-    ) -> SharedBalance {
-        SharedBalance::get_or_new(creditor, debitor, token_id)
+    fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
+        SharedBalance::get_or_new(creditor, debitor, token_id).balance
     }
 
     /// Recall a user balance.

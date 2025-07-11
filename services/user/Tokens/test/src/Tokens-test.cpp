@@ -601,7 +601,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
                CHECK(50e4 == b.getBalance(tokenId, bob).returnVal().balance);
                AND_THEN("Bob owns 50 tokens in his shared balance with Alice")
                {
-                  CHECK(50e4 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
+                  CHECK(50e4 == b.getSharedBal(tokenId, bob, alice).returnVal().value);
                }
             }
             THEN("Bob may try to uncredit 51 tokens, but will only uncredit 50")
@@ -619,7 +619,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
                   CHECK(b.uncredit(tokenId, alice, 25e4, memo).succeeded());
                   AND_THEN("Bob owns 0 tokens in his shared balance with Alice")
                   {
-                     CHECK(0e4 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
+                     CHECK(0e4 == b.getSharedBal(tokenId, bob, alice).returnVal().value);
 
                      AND_THEN("Bob may not uncredit any tokens")
                      {
@@ -636,7 +636,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
                   CHECK(a.debit(tokenId, bob, 25e4, memo).succeeded());
                   AND_THEN("Bob has 0 tokens in his shared balance with Alice")
                   {
-                     CHECK(0e4 == b.getSharedBal(tokenId, bob, alice).returnVal().balance);
+                     CHECK(0e4 == b.getSharedBal(tokenId, bob, alice).returnVal().value);
                   }
                   AND_THEN("Bob owns 75 tokens in his individual balance")
                   {

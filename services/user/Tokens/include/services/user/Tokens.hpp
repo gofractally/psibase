@@ -192,9 +192,9 @@ namespace UserService
       /// * `token_id` - Unique token identifier.
       ///
       /// # Returns user balance
-      SharedBalanceRecord getSharedBal(TID                    tokenId,
-                                       psibase::AccountNumber creditor,
-                                       psibase::AccountNumber debitor);
+      Quantity getSharedBal(TID                    tokenId,
+                            psibase::AccountNumber creditor,
+                            psibase::AccountNumber debitor);
 
       /// Get user balance configuration.
       ///

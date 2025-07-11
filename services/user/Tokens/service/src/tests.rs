@@ -80,7 +80,6 @@ mod tests {
             .getSharedBal(token_id, creditor, debitor)
             .get()
             .unwrap()
-            .balance
     }
 
     #[psibase::test_case(packages("Tokens"))]

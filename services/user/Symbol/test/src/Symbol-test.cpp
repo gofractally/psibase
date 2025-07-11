@@ -116,7 +116,7 @@ SCENARIO("Buying a symbol")
          {
             auto getSharedBalance = alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service);
             CHECK(getSharedBalance.succeeded());
-            CHECK(getSharedBalance.returnVal().balance == 0);
+            CHECK(getSharedBalance.returnVal().value == 0);
          }
 
          AND_THEN("Alice cannot create the same symbol again")
@@ -213,7 +213,7 @@ SCENARIO("Measuring price increases")
             CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
             a.create(SID{"bcd"}, quantity);
             auto balance =
-                alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().balance;
+                alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().value;
             CHECK(balance == 0);
          }
       }
