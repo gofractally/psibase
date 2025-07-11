@@ -29,7 +29,7 @@ export const useAcceptInvite = () =>
                 intf: "invitee",
             }));
 
-            void (await supervisor.functionCall({
+            const queryToken = await supervisor.functionCall({
                 method: "loginDirect",
                 params: [
                     {
@@ -40,14 +40,7 @@ export const useAcceptInvite = () =>
                 ],
                 service: "accounts",
                 intf: "admin",
-            }));
-
-            if (window.location && window.location.href) {
-                window.location.href = origin;
-            } else {
-                throw new Error(
-                    `Failed to redirect window to origin ${origin}`,
-                );
-            }
+            });
+            console.log("queryToken:", queryToken);
         },
     });

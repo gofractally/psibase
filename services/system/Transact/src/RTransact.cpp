@@ -379,8 +379,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-       -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id,
+                         const ClientFilter&         clientFilter) -> ClaimedSockets
    {
       {
          auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
@@ -1443,12 +1443,17 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
             return result;
       }
    }
+   // Check for __Host-SESSION cookie
    if (auto token = request.getCookie("__Host-SESSION"))
    {
       auto decoded = decodeJWT<LoginTokenData>(key, *token);
+
       if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+      {
          return decoded.sub;
+      }
    }
+
    return {};
 }
 

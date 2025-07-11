@@ -18,10 +18,11 @@ export const useCreateConnectionToken = () =>
                 }),
             ),
         onSuccess: (token) => {
-            window.open(
-                modifyUrlParams(siblingUrl(undefined, "accounts"), {
+            window.location.href = modifyUrlParams(
+                siblingUrl(undefined, "accounts"),
+                {
                     token,
-                }),
+                },
             );
         },
     });
