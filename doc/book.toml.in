@@ -1,7 +1,7 @@
 [book]
 language = "en"
 multilingual = false
-src = "${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src"
+src = "${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
 title = "psibase"
 
 [build]
