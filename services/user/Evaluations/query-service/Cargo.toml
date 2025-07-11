@@ -7,9 +7,9 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { version = "0.18.0", path = "../../../../rust/psibase" }
+psibase = { version = "0.19.0", path = "../../../../rust/psibase" }
 serde = "1.0"
 serde_json = "1.0"
-evaluations = { path = "../service", version = "0.18.0" }
+evaluations = { path = "../service", version = "0.19.0" }
 async-graphql = "=7.0.17"
 serde-aux = "4.7.0"

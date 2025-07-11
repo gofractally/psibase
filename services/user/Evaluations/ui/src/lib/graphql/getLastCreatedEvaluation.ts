@@ -1,6 +1,7 @@
 import { z } from "zod";
+
 import { graphql } from "../graphql";
-import { zAccount, Account } from "../zod/Account";
+import { Account, zAccount } from "../zod/Account";
 
 export const getLastCreatedEvaluationId = async (account: Account) => {
     const parsed = zAccount.parse(account);

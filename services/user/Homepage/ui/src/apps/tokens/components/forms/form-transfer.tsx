@@ -1,7 +1,13 @@
+import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
+import { Tab, TabType } from "@/apps/tokens/hooks/useTab";
+import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Form,
@@ -13,13 +19,6 @@ import {
 } from "@shared/shadcn/ui/form";
 import { Input } from "@shared/shadcn/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
-
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { cn } from "@shared/lib/utils";
-
-import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { Tab, TabType } from "@/apps/tokens/hooks/useTab";
-import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
 
 import {
     AmountInput,

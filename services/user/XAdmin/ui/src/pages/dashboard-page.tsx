@@ -15,6 +15,7 @@ import {
     type CustomTooltipProps,
 } from "@shared/shadcn/ui/chart";
 import { Separator } from "@shared/shadcn/ui/separator";
+
 import { usePerformance } from "../hooks/usePerformance";
 
 const chartConfig = {
@@ -103,7 +104,7 @@ export function Component() {
                             cursor={false}
                             content={(props: CustomTooltipProps) => (
                                 <ChartTooltipContent {...props} hideLabel />
-                              )}
+                            )}
                         />
                         <Pie
                             data={chartData}
@@ -152,12 +153,12 @@ export function Component() {
             <CardFooter className="flex flex-row border-t p-4">
                 <div className="flex w-full items-center gap-2">
                     <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                             Failed
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
                             {data?.transactions.failed}
-                            <span className="text-sm font-normal text-muted-foreground">
+                            <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
                         </div>
@@ -167,12 +168,12 @@ export function Component() {
                         className="mx-2 h-10 w-px"
                     />
                     <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                             Skipped
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
                             {data?.transactions.skipped}
-                            <span className="text-sm font-normal text-muted-foreground">
+                            <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
                         </div>
@@ -182,12 +183,12 @@ export function Component() {
                         className="mx-2 h-10 w-px"
                     />
                     <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                             Unprocessed
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
                             {data?.transactions.unprocessed}
-                            <span className="text-sm font-normal text-muted-foreground">
+                            <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
                         </div>
@@ -197,12 +198,12 @@ export function Component() {
                         className="mx-2 h-10 w-px"
                     />
                     <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                             Succeeded
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
                             {data?.transactions.succeeded}
-                            <span className="text-sm font-normal text-muted-foreground">
+                            <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
                         </div>

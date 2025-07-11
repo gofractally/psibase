@@ -1,21 +1,28 @@
 import {
-    QualifiedPluginId,
     QualifiedFunctionCallArgs,
-    siblingUrl,
-    buildFunctionCallResponse,
+    QualifiedPluginId,
     assertTruthy,
+    buildFunctionCallResponse,
+    siblingUrl,
 } from "@psibase/common-lib";
 
-import { AppInterface } from "./appInterace";
-import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
-import { CallContext } from "./callContext";
-import { isRecoverableError } from "./plugin/errors";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { pluginId } from "@psibase/common-lib/messaging/PluginId";
-import { Plugins } from "./plugin/plugins";
-import { PluginLoader } from "./plugin/pluginLoader";
-import { getResourceCallArgs, PluginErrorObject, QualifiedDynCallArgs, QualifiedResourceCallArgs, RedirectErrorObject, toQualifiedFunctionCallArgs } from "@psibase/common-lib/messaging";
+import { 
+    getResourceCallArgs, 
+    PluginErrorObject, 
+    QualifiedDynCallArgs, 
+    QualifiedResourceCallArgs, 
+    RedirectErrorObject, 
+    toQualifiedFunctionCallArgs 
+} from "@psibase/common-lib/messaging";
+import { AppInterface } from "./appInterace";
+import { CallContext } from "./callContext";
 import { REDIRECT_ERROR_CODE } from "./constants";
+import { isRecoverableError } from "./plugin/errors";
+import { PluginLoader } from "./plugin/pluginLoader";
+import { Plugins } from "./plugin/plugins";
+import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -428,14 +435,17 @@ export class Supervisor implements AppInterface {
                 //   converted to a PluginError to be handled by the client.
                 let newError;
                 if (e.payload.code === REDIRECT_ERROR_CODE) {
-                    newError = new RedirectErrorObject(e.payload.producer, e.payload.message);
+                    newError = new RedirectErrorObject(
+                        e.payload.producer,
+                        e.payload.message,
+                    );
                 } else {
-                    newError = new PluginErrorObject(e.payload.producer, e.payload.message);
+                    newError = new PluginErrorObject(
+                        e.payload.producer,
+                        e.payload.message,
+                    );
                 }
-                this.replyToParent(
-                    id,
-                    newError
-                );
+                this.replyToParent(id, newError);
             } else {
                 this.replyToParent(id, e);
             }

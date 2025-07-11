@@ -1,13 +1,14 @@
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 const zAvatar = z.object({
     contentType: z.string(),
     content: z.any(),
 });
-
 
 const Params = z.object({
     avatar: zAvatar,
@@ -27,7 +28,9 @@ export const useUploadAvatar = () =>
             }));
         },
         onSuccess: (_, __, toastId) => {
-            toast.success("Avatar uploaded", { id: z.string().or(z.number()).parse(toastId) });
+            toast.success("Avatar uploaded", {
+                id: z.string().or(z.number()).parse(toastId),
+            });
         },
         onMutate: () => toast.loading("Uploading avatar..."),
         onError: (error, _, toastId) => {

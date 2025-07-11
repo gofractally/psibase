@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useState } from "react";
+
 import { cn } from "@shared/lib/utils";
 
 export const FlipWords = ({
@@ -59,7 +60,7 @@ export const FlipWords = ({
                 }}
                 className={cn(
                     "relative z-10 inline-block px-2 text-left text-neutral-900 dark:text-neutral-100",
-                    className
+                    className,
                 )}
                 key={currentWord}
             >

@@ -1,7 +1,13 @@
+import { Clipboard, MoreHorizontal, Plus, Trash, Unplug } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@shared/shadcn/ui/button";
-import { useConfig } from "../hooks/useConfig";
-import { usePeers } from "../hooks/usePeers";
+import { z } from "zod";
+
+import { useToast } from "@/components/ui/use-toast";
+
+import { EmptyBlock } from "@/components/EmptyBlock";
+import { Pulse } from "@/components/Pulse";
+import { SmartConnectForm } from "@/components/forms/smart-connect-form";
+
 import {
     PeerType,
     PeersType,
@@ -10,17 +16,8 @@ import {
     chain,
 } from "@/lib/chainEndpoints";
 
-import { Clipboard, MoreHorizontal, Plus, Trash, Unplug } from "lucide-react";
-
-import {
-    Table,
-    TableBody,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@shared/shadcn/ui/table";
-import { EmptyBlock } from "@/components/EmptyBlock";
-
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -28,9 +25,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { SmartConnectForm } from "@/components/forms/smart-connect-form";
-import { z } from "zod";
-
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -39,16 +33,23 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-import { useToast } from "@/components/ui/use-toast";
-import { Pulse } from "@/components/Pulse";
-import { cn } from "@shared/lib/utils";
+import {
+    Table,
+    TableBody,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@shared/shadcn/ui/table";
+
+import { useConfig } from "../hooks/useConfig";
+import { usePeers } from "../hooks/usePeers";
 
 const randomIntFromInterval = (min: number, max: number) =>
     Math.floor(Math.random() * (max - min + 1) + min);
 
 const combinePeers = (
     configPeers: string[],
-    livePeers: PeersType
+    livePeers: PeersType,
 ): z.infer<typeof UIPeer>[] => {
     const configSet = new Set<string>();
     configPeers.forEach((peer) => configSet.add(peer));
@@ -84,7 +85,7 @@ const combinePeers = (
                 state: "transient",
                 url: peer.url ?? "",
                 ...peer,
-            })
+            }),
         );
 
     return UIPeer.array().parse([...persistentPeers, ...transientPeers]);
@@ -95,15 +96,15 @@ const Status = ({ state }: { state: z.infer<typeof StateEnum> }) => {
         state == "persistent"
             ? "green"
             : state == "transient"
-            ? "yellow"
-            : "red";
+              ? "yellow"
+              : "red";
 
     const label =
         state == "persistent"
             ? "Online"
             : state == "transient"
-            ? "Transient"
-            : "Disconnected";
+              ? "Transient"
+              : "Disconnected";
     return (
         <div className="flex gap-1">
             <div className="my-auto">
@@ -115,10 +116,7 @@ const Status = ({ state }: { state: z.infer<typeof StateEnum> }) => {
 };
 
 export const PeersPage = () => {
-    const {
-        data: livePeers,
-        refetch: refetchPeers,
-    } = usePeers();
+    const { data: livePeers, refetch: refetchPeers } = usePeers();
     const { data: config, refetch: refetchConfig } = useConfig();
     const configPeers = config?.peers || [];
 
@@ -147,7 +145,7 @@ export const PeersPage = () => {
 
         if (peer.state == "transient") {
             throw new Error(
-                "Only disconnections from transient connections are possible."
+                "Only disconnections from transient connections are possible.",
             );
         } else if (peer.state == "backup") {
             await chain.removePeer(peer.url!);
@@ -253,7 +251,7 @@ export const PeersPage = () => {
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(
                                                         peer.url ||
-                                                            peer.endpoint
+                                                            peer.endpoint,
                                                     );
                                                 }}
                                             >

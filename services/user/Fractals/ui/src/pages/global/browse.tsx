@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { CreateFractalModal } from "@/components/create-fractal-modal";
+import { EmptyBlock } from "@/components/empty-block";
+
+import { useFractals } from "@/hooks/fractals/use-fractals";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Table,
@@ -10,11 +15,6 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-
-import { CreateFractalModal } from "@/components/create-fractal-modal";
-import { EmptyBlock } from "@/components/empty-block";
-
-import { useFractals } from "@/hooks/fractals/use-fractals";
 
 export const Browse = () => {
     const { data: fractals } = useFractals();

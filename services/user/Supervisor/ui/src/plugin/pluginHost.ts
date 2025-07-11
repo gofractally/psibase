@@ -1,18 +1,23 @@
+import { z } from "zod";
+
 import {
-    assertTruthy,
     PluginError,
     QualifiedDynCallArgs,
     QualifiedFunctionCallArgs,
     QualifiedResourceCallArgs,
+    assertTruthy,
     siblingUrl,
 } from "@psibase/common-lib";
+
+import {
+    OAUTH_REQUEST_EXPIRATION,
+    OAUTH_REQUEST_KEY,
+    REDIRECT_ERROR_CODE,
+} from "../constants";
 import { HostInterface, HttpRequest, HttpResponse, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
-
-import { OAUTH_REQUEST_EXPIRATION, OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
-import { z } from "zod";
 
 const zSupervisorPromptPayload = z.object({
     id: z.string().min(1),
@@ -171,31 +176,38 @@ export class PluginHost implements HostInterface {
         return this.self.app;
     }
 
-    private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
-        const up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
-        
+    private setActiveUserPrompt(
+        subpath: string | undefined,
+        upPayloadJsonStr: string,
+    ): Result<string, RecoverableErrorPayload> {
+        let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
         // In Supervisor localStorage space, store id, subdomain, and subpath
-        const supervisorUP: SupervisorPromptPayload = zSupervisorPromptPayload.parse({
-            id: up_id,
-            subdomain: this.self.app,
-            subpath: subpath,
-            expiry_timestamp: Math.floor(new Date().getTime() / 1000) + OAUTH_REQUEST_EXPIRATION,
-        });
+        const supervisorUP: SupervisorPromptPayload =
+            zSupervisorPromptPayload.parse({
+                id: up_id,
+                subdomain: this.self.app,
+                subpath: subpath,
+                expiry_timestamp:
+                    Math.floor(new Date().getTime() / 1000) +
+                    OAUTH_REQUEST_EXPIRATION,
+            });
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
             intf: "keyvalue",
             method: "set",
             params: [
-                OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
+                OAUTH_REQUEST_KEY,
+                new TextEncoder().encode(JSON.stringify(supervisorUP)),
+            ],
+        } as QualifiedFunctionCallArgs);
 
         const currentUser = this.supervisor.call(this.self, {
             service: "accounts",
             plugin: "plugin",
             intf: "api",
             method: "getCurrentUser",
-            params: []
+            params: [],
         });
         if (!currentUser) {
             throw this.recoverableError("No logged in user found");
@@ -212,23 +224,37 @@ export class PluginHost implements HostInterface {
             intf: "keyvalue",
             method: "set",
             params: [
-                OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(parsedUpPayload))]} as QualifiedFunctionCallArgs);
-        return up_id
+                OAUTH_REQUEST_KEY,
+                new TextEncoder().encode(JSON.stringify(parsedUpPayload)),
+            ],
+        } as QualifiedFunctionCallArgs);
+        return up_id;
     }
 
-    
     // Client interface
-    promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
+    promptUser(
+        subpath: string | undefined,
+        payloadJsonStr: string | undefined,
+    ): Result<void, PluginError> {
         if (!!subpath && subpath?.length > 0 && subpath.includes("?")) {
-            console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");
+            console.error(
+                "Query params stripped from subpath for security reasons; all params should be passed via the payload",
+            );
             subpath = subpath.substring(0, subpath.indexOf("?"));
         }
 
-        const aup_id = this.setActiveUserPrompt(subpath, payloadJsonStr || JSON.stringify({}));
+        const aup_id = this.setActiveUserPrompt(
+            subpath,
+            payloadJsonStr || JSON.stringify({}),
+        );
 
         if (typeof aup_id === "string") {
-            const oauthUrl = siblingUrl(null, "supervisor", "/oauth.html", true);
+            const oauthUrl = siblingUrl(
+                null,
+                "supervisor",
+                "/oauth.html",
+                true,
+            );
             const re = this.recoverableError(oauthUrl + "?id=" + aup_id);
             re.code = REDIRECT_ERROR_CODE;
             throw re;

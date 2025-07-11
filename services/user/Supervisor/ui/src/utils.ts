@@ -1,6 +1,7 @@
 import { siblingUrl } from "@psibase/common-lib";
-import { DownloadFailed } from "./errors";
+
 import { loadBasic } from "./component-loading";
+import { DownloadFailed } from "./errors";
 
 export const wasmFromUrl = (url: string) =>
     fetch(url)

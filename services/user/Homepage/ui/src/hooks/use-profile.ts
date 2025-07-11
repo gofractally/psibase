@@ -1,8 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
-import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
 export const ProfileResponse = z.object({
     profile: z
