@@ -22,9 +22,9 @@ namespace
 
    const psibase::Memo memo{"memo"};
 
-   constexpr auto manualDebit  = "manualDebit"_m;
-   constexpr auto unrecallable = "unrecallable"_m;
-   constexpr auto untradeable  = "untradeable"_m;
+   constexpr uint8_t untradeable  = 0;
+   constexpr uint8_t unrecallable = 1;
+   constexpr uint8_t manualDebit  = 0;
 
 }  // namespace
 
@@ -129,7 +129,7 @@ SCENARIO("Creating a token")
 
             AND_THEN("The owner NFT is different from the first token owner NFT")
             {
-               CHECK(token1.ownerNft != token2.ownerNft);
+               CHECK(token1.nft_id != token2.nft_id);
             }
          }
       }
@@ -211,8 +211,7 @@ SCENARIO("Recalling tokens")
 
       THEN("The token is recallable by default")
       {
-         auto unrecallableBit = TokenRecord::Configurations::value(unrecallable);
-         CHECK(false == token.config.get(unrecallableBit));
+         CHECK(a.getTokenConf(tokenId, unrecallable).returnVal() == false);
       }
       THEN("Alice can recall Bob's tokens")
       {
@@ -232,8 +231,7 @@ SCENARIO("Recalling tokens")
       {
          CHECK(a.setTokenConf(tokenId, unrecallable, true).succeeded());
 
-         uint8_t unrecallableBit = TokenRecord::Configurations::value(unrecallable);
-         CHECK(a.getToken(tokenId).returnVal().config.get(unrecallableBit));
+         CHECK(a.getTokenConf(tokenId, unrecallable).returnVal());
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
@@ -260,7 +258,7 @@ SCENARIO("Interactions with the Issuer NFT")
 
       auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto nft     = alice.to<Nft>().getNft(token.ownerNft).returnVal();
+      auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal();
 
       THEN("The Issuer NFT is owned by Alice")
       {
@@ -272,7 +270,7 @@ SCENARIO("Interactions with the Issuer NFT")
 
          THEN("The NFT is owned by Bob")
          {
-            auto newNft = alice.to<Nft>().getNft(token.ownerNft).returnVal();
+            auto newNft = alice.to<Nft>().getNft(token.nft_id).returnVal();
             nft.owner   = bob.id;
             CHECK((newNft.id == nft.id && newNft.issuer == nft.issuer  //
                    && newNft.owner == nft.owner));
@@ -709,7 +707,7 @@ SCENARIO("Mapping a symbol to a token")
 
       THEN("Bob is unable to map the symbol to the token")
       {
-         CHECK(b.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
+         CHECK(b.map_symbol(newToken, symbolId).failed(missingRequiredAuth));
       }
       WHEN("Alice burns the symbol owner NFT")
       {
@@ -717,33 +715,33 @@ SCENARIO("Mapping a symbol to a token")
 
          THEN("Alice is unable to map the symbol to the token")
          {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
+            CHECK(a.map_symbol(newToken, symbolId).failed(missingRequiredAuth));
          }
       }
       WHEN("Alice burns the token owner NFT")
       {
-         auto tokenNft = a.getToken(newToken).returnVal().ownerNft;
+         auto tokenNft = a.getToken(newToken).returnVal().nft_id;
          alice.to<Nft>().burn(tokenNft);
 
          THEN("Alice is unable to map the symbol to the token")
          {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
+            CHECK(a.map_symbol(newToken, symbolId).failed(missingRequiredAuth));
          }
       }
       THEN("Alice is unable to map a symbol to a nonexistent token")
       {
          TID invalidTokenId = 999;
-         CHECK(a.mapSymbol(invalidTokenId, symbolId).failed(tokenDNE));
+         CHECK(a.map_symbol(invalidTokenId, symbolId).failed(tokenDNE));
       }
       THEN("Alice is unable to map a nonexistent symbol to a token")
       {
          SID invalidSymbolId = "zzz"_a;
-         CHECK(a.mapSymbol(newToken, invalidSymbolId).failed(symbolDNE));
+         CHECK(a.map_symbol(newToken, invalidSymbolId).failed(symbolDNE));
       }
       THEN("Alice is able to map the symbol to the token")
       {
          alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         CHECK(a.mapSymbol(newToken, symbolId).succeeded());
+         CHECK(a.map_symbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
          {
@@ -753,7 +751,7 @@ SCENARIO("Mapping a symbol to a token")
       WHEN("Alice maps the symbol to the token")
       {
          alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         a.mapSymbol(newToken, symbolId);
+         a.map_symbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
          {
@@ -769,7 +767,7 @@ SCENARIO("Mapping a symbol to a token")
             auto newNft = alice.to<Symbol>().getSymbol(newSymbol).returnVal().ownerNft;
 
             alice.to<Nft>().credit(newNft, Tokens::service, memo);
-            CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
+            CHECK(a.map_symbol(newToken, newSymbol).failed(tokenHasSymbol));
          }
       }
    }

@@ -15,9 +15,9 @@ using namespace UserService::Errors;
 
 namespace
 {
-   const Memo     memo{"memo"};
-   const TID      sysToken{Tokens::sysToken};
-   const uint8_t  untradeable = 1;
+   const Memo    memo{"memo"};
+   const TID     sysToken{Tokens::sysToken};
+   const uint8_t untradeable = 0;
 
    using Quantity_t = Quantity::Quantity_t;
 
@@ -48,11 +48,14 @@ SCENARIO("Buying a symbol")
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
       sysIssuer.setTokenConf(sysToken, untradeable, false);
-      sysIssuer.mint(sysToken, q(20'000, precision), memo);
-      sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
-      sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      CHECK(issuance.succeeded());
 
-      const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
+      sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
+      auto lastCredit = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      CHECK(lastCredit.succeeded());
+
+      const Quantity quantity{q(5, precision)};
 
       THEN("Alice cannot create a symbol with numbers")
       {

@@ -221,6 +221,17 @@ namespace UserService
       /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
       bool getBalConf(psibase::AccountNumber account, TID tokenId, uint8_t index);
 
+      /// Get user global configuration.
+      ///
+      /// Settings apply to all tokens without a user balance configuration.
+      ///
+      /// # Arguments
+      /// * `token_id` - Unique token identifier.
+      /// * `index` - Position between 0 - 7
+      ///
+      /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
+      bool getUserConf(psibase::AccountNumber account, uint8_t index);
+
       /// Get token configuration.
       ///
       /// Determine settings e.g. unrecallable and untransferable
@@ -271,18 +282,19 @@ namespace UserService
       method(burn, tokenId, amount, memo),
       method(setBalConf, tokenId, index, enable),
       method(setUserConf, index, enable),
-      method(setTokenConf, tokenId, flag, enable),
+      method(setTokenConf, tokenId, index, enable),
       method(credit, tokenId, receiver, amount, memo),
       method(uncredit, tokenId, receiver, maxAmount, memo),
       method(reject, tokenId, receiver, memo),
       method(debit, tokenId, sender, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
+      method(getUserConf, account, index),
       method(getTokenSymbol, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
-      method(getBalConf, account, tokenId, flag),
-      method(getTokenConf, tokenId, flag),
+      method(getBalConf, account, tokenId, index),
+      method(getTokenConf, tokenId, index),
       method(map_symbol, symbolId, tokenId),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);

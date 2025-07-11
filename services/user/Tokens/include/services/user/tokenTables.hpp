@@ -18,11 +18,10 @@ namespace UserService
       uint8_t   settings_value;
       Precision precision;
       Quantity  current_supply;
+      Quantity  burned_supply;
+      Quantity  issued_supply;
       Quantity  max_issued_supply;
       SID       symbol;
-
-      using Configurations =
-          psibase::Enum<psibase::EnumElement{"unrecallable"}, psibase::EnumElement{"untradeable"}>;
 
       static bool isValidKey(TID tokenId)
       {
