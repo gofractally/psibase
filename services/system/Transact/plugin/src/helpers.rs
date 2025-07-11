@@ -1,6 +1,7 @@
 use crate::bindings::accounts::plugin::api::get_account;
 use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::host::common as Host;
+use crate::bindings::host::common::types::BodyTypes;
 use crate::bindings::transact::plugin::hook_handlers::*;
 use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
@@ -22,7 +23,7 @@ pub fn validate_action_name(action_name: &str) -> Result<(), Host::types::Error>
 
 pub fn assert_from_supervisor() {
     let sender_app = Client::get_sender_app().app.expect("Sender app not set");
-    assert!(sender_app == "supervisor", "Unauthorized");
+    assert!(sender_app == "supervisor", "Unauthorized: {}", sender_app);
 }
 
 pub fn get_sender_app() -> String {
@@ -219,11 +220,11 @@ pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transa
 }
 
 pub trait Publish {
-    fn publish(self) -> Result<String, Host::types::Error>;
+    fn publish(self) -> Result<BodyTypes, Host::types::Error>;
 }
 
 impl Publish for SignedTransaction {
-    fn publish(self) -> Result<String, Host::types::Error> {
+    fn publish(self) -> Result<BodyTypes, Host::types::Error> {
         Ok(Server::post(&Host::types::PostRequest {
             endpoint: "/push_transaction".to_string(),
             body: Host::types::BodyTypes::Bytes(self.packed()),
