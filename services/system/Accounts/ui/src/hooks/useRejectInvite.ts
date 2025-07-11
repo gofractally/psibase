@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { getSupervisor } from "@psibase/common-lib";
 
+import { useLogout } from "./use-logout";
 import { useDecodeInviteToken } from "./useDecodeInviteToken";
 import { useDecodeToken } from "./useDecodeToken";
 
@@ -13,6 +14,8 @@ export const useRejectInvite = (selectedAccount: string, token: string) => {
         token,
         decodedToken?.tag == "invite-token",
     );
+    const { mutateAsync: logout } = useLogout();
+
     return useMutation({
         onSuccess: () => {
             refetchToken();
@@ -41,12 +44,8 @@ export const useRejectInvite = (selectedAccount: string, token: string) => {
 
                 void (await supervisor.functionCall(rejectParams));
             } else {
-                void (await supervisor.functionCall({
-                    method: "logout",
-                    params: [],
-                    service: "accounts",
-                    intf: "activeApp",
-                }));
+                // Use proper logout hook that includes cookie deletion
+                await logout();
 
                 void (await supervisor.functionCall(rejectParams));
             }
