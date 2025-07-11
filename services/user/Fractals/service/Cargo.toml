@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-fractals"
-plugin = "plugin"
+plugin = "fractals-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },

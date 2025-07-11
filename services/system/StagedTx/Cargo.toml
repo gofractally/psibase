@@ -25,4 +25,4 @@ crate-type = ["rlib"]
 [dependencies]
 staged-tx = { path = "service", version = "0.19.0" }
 r-staged-tx = { path = "query-service", version = "0.19.0" }
-plugin = { path = "plugin", version = "0.19.0" }
+staged-tx-plugin = { path = "plugin", version = "0.19.0" }

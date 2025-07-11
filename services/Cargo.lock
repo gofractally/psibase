@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "account-tokens"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.25.0",
@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "accounts"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "serde",
@@ -83,7 +83,7 @@ dependencies = [
 
 [[package]]
 name = "aes-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "aes-gcm",
  "wit-bindgen-rt 0.25.0",
@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "auth-delegate"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.25.0",
@@ -335,7 +335,7 @@ dependencies = [
 
 [[package]]
 name = "auth-invite"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.25.0",
@@ -343,7 +343,7 @@ dependencies = [
 
 [[package]]
 name = "auth-sig"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "p256",
  "pem",
@@ -357,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "authany-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "wit-bindgen-rt 0.25.0",
 ]
@@ -408,7 +408,7 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "base64 0.22.1",
  "wit-bindgen-rt 0.25.0",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "branding"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "branding-pkg",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "branding-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "branding",
  "branding-plugin",
@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "branding-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "branding",
  "branding-pkg",
@@ -513,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "brotli-codec"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -525,7 +525,7 @@ dependencies = [
 
 [[package]]
 name = "brotli-codec-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "brotli-codec",
  "brotlicodec-plugin",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "brotlicodec-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "brotli",
  "brotli-codec",
@@ -591,7 +591,7 @@ checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
 name = "chainmail"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "chainmail_package",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "chainmail-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "chainmail",
  "chainmail_package",
@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "chainmail_package"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "chainmail",
  "chainmail-plugin",
@@ -687,7 +687,7 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
 name = "clientdata"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.33.0",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "evaluations"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1092,7 +1092,7 @@ dependencies = [
 
 [[package]]
 name = "evaluations-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "evaluations",
  "evaluations-plugin",
@@ -1101,7 +1101,7 @@ dependencies = [
 
 [[package]]
 name = "evaluations-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "average",
  "ecies",
@@ -1172,7 +1172,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "custom_error",
  "hex 0.3.2",
@@ -1185,7 +1185,7 @@ dependencies = [
 
 [[package]]
 name = "fractals"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "evaluations",
@@ -1198,7 +1198,7 @@ dependencies = [
 
 [[package]]
 name = "fractals-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "fractals",
  "fractals-plugin",
@@ -1207,7 +1207,7 @@ dependencies = [
 
 [[package]]
 name = "fractals-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "fractals",
  "fractals-pkg",
@@ -1651,7 +1651,7 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "identity-pkg",
@@ -1663,7 +1663,7 @@ dependencies = [
 
 [[package]]
 name = "identity-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "identity",
  "identity-plugin",
@@ -1671,7 +1671,7 @@ dependencies = [
 
 [[package]]
 name = "identity-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "identity",
  "identity-pkg",
@@ -1756,7 +1756,7 @@ dependencies = [
 
 [[package]]
 name = "invite"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "chrono",
  "hex 0.4.3",
@@ -1841,7 +1841,7 @@ dependencies = [
 
 [[package]]
 name = "kdf-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "pbkdf2",
  "sha2",
@@ -2084,7 +2084,7 @@ dependencies = [
 
 [[package]]
 name = "packages"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2183,7 +2183,7 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "permissions"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -2347,7 +2347,7 @@ dependencies = [
 
 [[package]]
 name = "producers"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.25.0",
@@ -2355,7 +2355,7 @@ dependencies = [
 
 [[package]]
 name = "profiles"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "profiles-pkg",
@@ -2367,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "profiles-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "profiles",
  "profiles-plugin",
@@ -2376,7 +2376,7 @@ dependencies = [
 
 [[package]]
 name = "profiles-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "profiles",
  "profiles-pkg",
@@ -2388,7 +2388,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2442,7 +2442,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2456,7 +2456,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -2468,14 +2468,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "seahash",
 ]
@@ -2497,7 +2497,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-evaluations"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "evaluations",
@@ -2509,7 +2509,7 @@ dependencies = [
 
 [[package]]
 name = "r-fractals"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "fractals",
@@ -2521,7 +2521,7 @@ dependencies = [
 
 [[package]]
 name = "r-profiles"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "profiles",
@@ -2532,7 +2532,7 @@ dependencies = [
 
 [[package]]
 name = "r-registry"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2543,7 +2543,7 @@ dependencies = [
 
 [[package]]
 name = "r-staged-tx"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2639,7 +2639,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "registry"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2651,7 +2651,7 @@ dependencies = [
 
 [[package]]
 name = "registry-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "r-registry",
  "registry",
@@ -2660,7 +2660,7 @@ dependencies = [
 
 [[package]]
 name = "registry-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -2978,7 +2978,7 @@ dependencies = [
 
 [[package]]
 name = "setcode"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.25.0",
@@ -3022,7 +3022,7 @@ dependencies = [
 
 [[package]]
 name = "sites"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "brotli",
  "psibase",
@@ -3075,7 +3075,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "staged-tx"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "pem",
@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "r-staged-tx",
  "staged-tx",
@@ -3097,7 +3097,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3149,7 +3149,7 @@ dependencies = [
 
 [[package]]
 name = "subgroups"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "psibase_macros",
@@ -3159,7 +3159,7 @@ dependencies = [
 
 [[package]]
 name = "subgroups-pkg"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "subgroups",
 ]
@@ -3182,7 +3182,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "supervisor-plugin"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "wit-bindgen-rt 0.25.0",
 ]
@@ -3324,7 +3324,7 @@ dependencies = [
 
 [[package]]
 name = "tokens"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3454,7 +3454,7 @@ dependencies = [
 
 [[package]]
 name = "transact"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -4134,7 +4134,7 @@ dependencies = [
 
 [[package]]
 name = "workshop"
-version = "0.17.0"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "serde",

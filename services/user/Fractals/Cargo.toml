@@ -19,8 +19,6 @@ Sites = "0.19.0"
 crate-type = ["rlib"]
 
 [dependencies]
-r-fractals = { path = "query-service", version = "0.17.0" }
-fractals-plugin = { path = "plugin", version = "0.17.0" }
+fractals-plugin = { path = "plugin", version = "0.19.0" }
 fractals = { path = "service", version = "0.19.0" }
 r-fractals = { path = "query-service", version = "0.19.0" }
-plugin = { path = "plugin", version = "0.19.0" }
