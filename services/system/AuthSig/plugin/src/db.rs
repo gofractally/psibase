@@ -12,7 +12,7 @@ pub struct ManagedKeys;
 
 impl ManagedKeys {
     pub fn add(pubkey: &Pem, privkey: &[u8]) {
-        Keyvalue::set(&get_hash(pubkey), &privkey).expect("ManagedKeys::set: Failed to add key");
+        Keyvalue::set(&get_hash(pubkey), &privkey);
     }
 
     pub fn get(pubkey: &Pem) -> Vec<u8> {

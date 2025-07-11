@@ -8,8 +8,8 @@ impl InviteKeys {
     const KEY_PRV: &'static str = "prv_key";
 
     pub fn add(keys: &InvKeys) {
-        Keyvalue::set(Self::KEY_PUB, &keys.pub_key).expect("Failed to set pub key");
-        Keyvalue::set(Self::KEY_PRV, &keys.priv_key).expect("Failed to set priv key");
+        Keyvalue::set(Self::KEY_PUB, &keys.pub_key);
+        Keyvalue::set(Self::KEY_PRV, &keys.priv_key);
     }
 
     pub fn delete() {

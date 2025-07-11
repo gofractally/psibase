@@ -8,7 +8,7 @@ impl CurrentSender {
 
     pub fn set(sender: Option<String>) {
         match sender {
-            Some(s) => Keyvalue::set(Self::KEY, &s.packed()).expect("Failed to set sender"),
+            Some(s) => Keyvalue::set(Self::KEY, &s.packed()),
             None => Keyvalue::delete(Self::KEY),
         }
     }
