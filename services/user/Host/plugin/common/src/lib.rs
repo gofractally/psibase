@@ -8,6 +8,7 @@ mod plugin_ref;
 
 mod types;
 use exports::host::common::{
+    admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
     types::Guest as Types,
@@ -40,6 +41,25 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
         body: None,
     }
     .send()?)
+}
+
+impl Admin for HostCommon {
+    fn get_active_app() -> OriginationData {
+        let app = caller();
+
+        if app != "accounts" && app != "staged-tx" {
+            panic!(
+                "Only accounts and staged-tx can call this function, current app: {}",
+                app
+            );
+        }
+
+        let active_app = Supervisor::get_active_app();
+        OriginationData {
+            app: active_app.app,
+            origin: active_app.origin,
+        }
+    }
 }
 
 impl Server for HostCommon {
@@ -90,6 +110,8 @@ impl Server for HostCommon {
 
 impl Client for HostCommon {
     fn get_sender_app() -> OriginationData {
+        // This is exported for use by other plugins who want to know which app called *them*
+        // So need to look back 2 frames in the callstack
         let frame = 2;
         let stack = get_callstack();
         assert!(stack.len() >= frame);

@@ -1,6 +1,6 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
-use crate::bindings::host::privileged::api as Privileged;
+use crate::bindings::host::common::admin as Privileged;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;

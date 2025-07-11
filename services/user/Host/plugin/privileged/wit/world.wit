@@ -3,8 +3,7 @@ package host:privileged;
 interface api {
     use host:common/types.{origination-data};
 
-    /// Get active app (the top level app with which the user is interacting)
-    get-active-app: func() -> origination-data;
+    
 }
 
 world imports {

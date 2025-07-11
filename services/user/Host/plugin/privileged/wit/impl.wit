@@ -1,8 +1,0 @@
-package host:privileged;
-
-world impl {
-    include supervisor:bridge/imports;
-    include host:common/imports;
-
-    export api;
-}

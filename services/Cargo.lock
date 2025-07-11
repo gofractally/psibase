@@ -1216,13 +1216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-privileged"
-version = "0.19.0"
-dependencies = [
- "wit-bindgen-rt 0.28.0",
-]
-
-[[package]]
 name = "http"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"

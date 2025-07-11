@@ -119,8 +119,19 @@ interface client {
     get-app-url: func(app: string) -> string;
 }
 
+interface admin {
+    use types.{origination-data};
+    
+    /// Get active app (the top level app with which the user is interacting)
+    get-active-app: func() -> origination-data;
+}
+
 world imports {
     import types;
     import server;
     import client;
+}
+
+world privileged {
+    import admin;
 }

@@ -282,7 +282,6 @@ add_rs_component_workspace(services/:Plugins
     packages
     permissions
     sites
-    host-privileged
     host-common
     tokens
     transact
@@ -415,7 +414,6 @@ psibase_package(
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
     SERVICE host
-        DATA ${Plugins_OUTPUT_FILE_host_privileged} /privileged.wasm
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"

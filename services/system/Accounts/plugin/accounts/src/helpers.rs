@@ -1,6 +1,6 @@
 use crate::bindings::accounts::plugin::types::AppDetails;
+use crate::bindings::host::common::admin as Privileged;
 use crate::bindings::host::common::{client as Client, types as CommonTypes};
-use crate::bindings::host::privileged::api as Privileged;
 use crate::errors::ErrorType::*;
 
 /// Asserts that the caller of the current plugin function is the top-level app,
