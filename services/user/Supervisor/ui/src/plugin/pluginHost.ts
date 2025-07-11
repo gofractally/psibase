@@ -14,7 +14,12 @@ import {
     OAUTH_REQUEST_KEY,
     REDIRECT_ERROR_CODE,
 } from "../constants";
-import { HostInterface, HttpRequest, HttpResponse, Result } from "../hostInterface";
+import {
+    HostInterface,
+    HttpRequest,
+    HttpResponse,
+    Result,
+} from "../hostInterface";
 import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
@@ -28,7 +33,9 @@ const zSupervisorPromptPayload = z.object({
 
 type SupervisorPromptPayload = z.infer<typeof zSupervisorPromptPayload>;
 
-function convert(headers: { key: string; value: string }[]): Record<string, string> {
+function convert(
+    headers: { key: string; value: string }[],
+): Record<string, string> {
     const record: Record<string, string> = {};
     headers.forEach(({ key, value }) => {
         record[key] = value;
@@ -36,7 +43,9 @@ function convert(headers: { key: string; value: string }[]): Record<string, stri
     return record;
 }
 
-function convertBack(headers: Array<[string, string]>): { key: string; value: string }[] {
+function convertBack(
+    headers: Array<[string, string]>,
+): { key: string; value: string }[] {
     return headers.map(([key, value]) => ({ key, value }));
 }
 
@@ -75,7 +84,7 @@ export class PluginHost implements HostInterface {
         } else if (contentType.includes("application/octet-stream")) {
             return "bytes";
         } else if (contentType.includes("text/plain")) {
-            return "text" 
+            return "text";
         } else {
             throw this.recoverableError(
                 `Unsupported content type in response: ${contentType}`,

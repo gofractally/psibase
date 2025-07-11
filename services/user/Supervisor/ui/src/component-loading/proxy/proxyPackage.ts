@@ -31,7 +31,6 @@ class Func {
     }
 
     private proxy = (): string => {
-
         if (this.isDynamic) {
             let handle = `plugin_ref.handle`;
             return [
@@ -42,7 +41,6 @@ class Func {
                 `${col(2)}});`,
                 ``,
             ].join("\n");
-
         }
 
         let service = `"${this.service}"`;
@@ -76,7 +74,7 @@ class Func {
     };
 }
 
-// ResourceFunc must be separate from Func because unfortunately there are minor differences 
+// ResourceFunc must be separate from Func because unfortunately there are minor differences
 // in the syntax for the bindings. (e.g. the methods don't end with a comma)
 class ResourceFunc {
     type: string;
@@ -142,10 +140,7 @@ class ResourceFunc {
                 ``,
             ].join("\n");
         } else {
-            return [
-                `${col(3)}return ${syncCallResource};`,
-                ``,
-            ].join("\n");
+            return [`${col(3)}return ${syncCallResource};`, ``].join("\n");
         }
     };
 
@@ -172,9 +167,11 @@ class Resource {
     }
 
     static isResourceMethod(f: FuncShape) {
-        return f.name.includes("[constructor]")
-            || f.name.includes("[method]")
-            || f.name.includes("[static]");
+        return (
+            f.name.includes("[constructor]") ||
+            f.name.includes("[method]") ||
+            f.name.includes("[static]")
+        );
     }
 
     static resourceName(fname: string) {
@@ -204,7 +201,7 @@ class Resource {
 
     public code(): string {
         const functions: string[] = this.funcs.map((f) => f.code());
-         return this.pre() + functions.join("\n") + this.post();
+        return this.pre() + functions.join("\n") + this.post();
     }
 }
 
@@ -243,10 +240,25 @@ class Intf {
         this.name = intfName;
         funcs.forEach((f) => {
             if (Resource.isResourceMethod(f)) {
-                const resourceName = toPascalCase(Resource.resourceName(f.name));
-                this.resources.get(resourceName).addFunc(new ResourceFunc(service, plugin, intfName, resourceName, f.name, f.dynamicLink));
+                const resourceName = toPascalCase(
+                    Resource.resourceName(f.name),
+                );
+                this.resources
+                    .get(resourceName)
+                    .addFunc(
+                        new ResourceFunc(
+                            service,
+                            plugin,
+                            intfName,
+                            resourceName,
+                            f.name,
+                            f.dynamicLink,
+                        ),
+                    );
             } else {
-                this.funcs.push(new Func(service, plugin, intfName, f.name, f.dynamicLink));
+                this.funcs.push(
+                    new Func(service, plugin, intfName, f.name, f.dynamicLink),
+                );
             }
         });
     }
@@ -262,7 +274,12 @@ class Intf {
     code = (): string => {
         const functions: string[] = this.funcs.map((f) => f.code());
         const resourceFuncs: string[] = this.resources.code();
-        return this.pre() + resourceFuncs.join("\n") + functions.join("\n") + this.post();
+        return (
+            this.pre() +
+            resourceFuncs.join("\n") +
+            functions.join("\n") +
+            this.post()
+        );
     };
 }
 

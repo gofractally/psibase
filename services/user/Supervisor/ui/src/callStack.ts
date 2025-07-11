@@ -1,5 +1,8 @@
 import { assertTruthy, toString } from "@psibase/common-lib";
-import { QualifiedFunctionCallArgs, QualifiedPluginId } from "@psibase/common-lib/messaging";
+import {
+    QualifiedFunctionCallArgs,
+    QualifiedPluginId,
+} from "@psibase/common-lib/messaging";
 
 import { OriginationData } from "./utils";
 

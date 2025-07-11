@@ -97,7 +97,13 @@ export class Plugin {
     private async doReady(): Promise<void> {
         const api = await this.parsed;
         const privileged = this.id.service === "host";
-        this.pluginModule = await loadPlugin(this.id.service,privileged, this.bytes!, this.host, api);
+        this.pluginModule = await loadPlugin(
+            this.id.service,
+            privileged,
+            this.bytes!,
+            this.host,
+            api,
+        );
     }
 
     constructor(id: QualifiedPluginId, host: HostInterface) {
@@ -132,39 +138,61 @@ export class Plugin {
         return func(...params);
     }
 
-    resourceCall(intf: string | undefined, type: string, handle: number | undefined, method: string, params: any[]) {
+    resourceCall(
+        intf: string | undefined,
+        type: string,
+        handle: number | undefined,
+        method: string,
+        params: any[],
+    ) {
         if (this.bytes === undefined || this.pluginModule === undefined) {
             throw new PluginInvalid(this.id);
         }
 
         if (method === "constructor") {
             if (handle !== undefined) {
-                throw new InvalidCall(this.id, intf, `Handle is not allowed for ${type}.constructor`);
+                throw new InvalidCall(
+                    this.id,
+                    intf,
+                    `Handle is not allowed for ${type}.constructor`,
+                );
             }
             const module = intf ? this.pluginModule[intf] : this.pluginModule;
             const resourceClass = module?.[type];
             if (!resourceClass) {
                 throw new InvalidCall(this.id, intf, `${type}.constructor`);
             }
-            
+
             const resource = new resourceClass(...params);
             const resourceHandle = this.nextResourceHandle++;
             this.resources.set(resourceHandle, resource);
-            
+
             return resourceHandle;
         }
 
         if (handle === undefined) {
-            throw new InvalidCall(this.id, intf, `${type}.${method} call missing handle`);
+            throw new InvalidCall(
+                this.id,
+                intf,
+                `${type}.${method} call missing handle`,
+            );
         }
 
         const resource = this.resources.get(handle);
         if (!resource) {
-            throw new InvalidCall(this.id, intf, `${type}.${method} invalid handle`);
+            throw new InvalidCall(
+                this.id,
+                intf,
+                `${type}.${method} invalid handle`,
+            );
         }
 
-        if (typeof resource[method] !== 'function') {
-            throw new InvalidCall(this.id, intf, `${type}.${method} is not a function`);
+        if (typeof resource[method] !== "function") {
+            throw new InvalidCall(
+                this.id,
+                intf,
+                `${type}.${method} is not a function`,
+            );
         }
 
         return resource[method](...params);

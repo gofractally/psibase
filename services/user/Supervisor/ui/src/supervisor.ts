@@ -5,17 +5,17 @@ import {
     buildFunctionCallResponse,
     siblingUrl,
 } from "@psibase/common-lib";
-
+import {
+    PluginErrorObject,
+    QualifiedDynCallArgs,
+    QualifiedResourceCallArgs,
+    RedirectErrorObject,
+    getResourceCallArgs,
+    toQualifiedFunctionCallArgs,
+} from "@psibase/common-lib/messaging";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { pluginId } from "@psibase/common-lib/messaging/PluginId";
-import { 
-    getResourceCallArgs, 
-    PluginErrorObject, 
-    QualifiedDynCallArgs, 
-    QualifiedResourceCallArgs, 
-    RedirectErrorObject, 
-    toQualifiedFunctionCallArgs 
-} from "@psibase/common-lib/messaging";
+
 import { AppInterface } from "./appInterace";
 import { CallContext } from "./callContext";
 import { REDIRECT_ERROR_CODE } from "./constants";
@@ -237,8 +237,14 @@ export class Supervisor implements AppInterface {
         const bottomFrame = this.context.stack.peekBottom(0);
         assertTruthy(bottomFrame, "Invalid callstack");
         const topLevelApp = bottomFrame.caller.app;
-        assertTruthy(topLevelApp, "Top-level app must be mappable to a psibase service");
-        return [topLevelApp, ...this.context.stack.export().map(p => p.service)];
+        assertTruthy(
+            topLevelApp,
+            "Top-level app must be mappable to a psibase service",
+        );
+        return [
+            topLevelApp,
+            ...this.context.stack.export().map((p) => p.service),
+        ];
     }
 
     // Manages callstack and calls plugins
@@ -281,39 +287,54 @@ export class Supervisor implements AppInterface {
     }
 
     callDyn(sender: OriginationData, args: QualifiedDynCallArgs): any {
-        const service = this.supervisorResourceCall(getResourceCallArgs(
-            "host",
-            "common",
-            "api",
-            "PluginRef",
-            args.handle,
-            "getService",
-            [],
-        ));
-        const plugin = this.supervisorResourceCall(getResourceCallArgs(
-            "host",
-            "common",
-            "api",
-            "PluginRef",
-            args.handle,
-            "getPlugin",
-            [],
-        ));
-        const intf = this.supervisorResourceCall(getResourceCallArgs(
-            "host",
-            "common",
-            "api",
-            "PluginRef",
-            args.handle,
-            "getIntf",
-            [],
-        ));
+        const service = this.supervisorResourceCall(
+            getResourceCallArgs(
+                "host",
+                "common",
+                "api",
+                "PluginRef",
+                args.handle,
+                "getService",
+                [],
+            ),
+        );
+        const plugin = this.supervisorResourceCall(
+            getResourceCallArgs(
+                "host",
+                "common",
+                "api",
+                "PluginRef",
+                args.handle,
+                "getPlugin",
+                [],
+            ),
+        );
+        const intf = this.supervisorResourceCall(
+            getResourceCallArgs(
+                "host",
+                "common",
+                "api",
+                "PluginRef",
+                args.handle,
+                "getIntf",
+                [],
+            ),
+        );
 
-        let callArgs = getCallArgs(service, plugin, intf, args.method, args.params);
+        let callArgs = getCallArgs(
+            service,
+            plugin,
+            intf,
+            args.method,
+            args.params,
+        );
         return this.call(sender, callArgs);
     }
 
-    callResource(sender: OriginationData, args: QualifiedResourceCallArgs): any {
+    callResource(
+        sender: OriginationData,
+        args: QualifiedResourceCallArgs,
+    ): any {
         assertTruthy(this.context, "Uninitialized call context");
         assertTruthy(this.parentOrigination, "Uninitialized call origination");
 

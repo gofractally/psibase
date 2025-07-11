@@ -167,11 +167,7 @@ export async function loadPlugin(
             getNonstandardWasiImports(),
         ]),
     );
-    const pluginModule = await load(
-        wasmBytes,
-        imports,
-        `${service}.plugin.js`,
-    );
+    const pluginModule = await load(wasmBytes, imports, `${service}.plugin.js`);
     pluginModule.__setHost(pluginHost);
 
     return pluginModule;
