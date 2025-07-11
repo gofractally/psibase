@@ -1,9 +1,11 @@
-import { getId } from "@/lib/getId";
-import { detectChange } from "@/lib/rowElements";
-import { PackageInfo, PackageInfoSchema } from "../types";
 import { RowSelectionState } from "@tanstack/react-table";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+
+import { getId } from "@/lib/getId";
+import { detectChange } from "@/lib/rowElements";
+
+import { PackageInfo, PackageInfoSchema } from "../types";
 
 interface ChangeWarning {
     removedPackage: PackageInfo;
@@ -17,17 +19,17 @@ const ChangeWarningSchema = z.object({
 
 const getChangeWarning = (
     removingPackagename: string,
-    selectedPackages: PackageInfo[]
+    selectedPackages: PackageInfo[],
 ) => {
     const dependants = selectedPackages.filter((pack) =>
-        pack.depends.map((x) => x.name).includes(removingPackagename)
+        pack.depends.map((x) => x.name).includes(removingPackagename),
     );
 
     if (dependants.length > 0) {
         return ChangeWarningSchema.parse({
             dependencies: dependants,
             removedPackage: selectedPackages.find(
-                (pack) => pack.name == removingPackagename
+                (pack) => pack.name == removingPackagename,
             )!,
         });
     }
@@ -35,7 +37,7 @@ const getChangeWarning = (
 
 export const useSelectedRows = (
     allPackages: PackageInfo[],
-    confirm: (warning: ChangeWarning) => Promise<boolean>
+    confirm: (warning: ChangeWarning) => Promise<boolean>,
 ) => {
     const [outgoingRows, setOutgoingRows] = useState<RowSelectionState>({});
     const [incomingRows, setIncomingRows] = useState<RowSelectionState>({});
@@ -49,11 +51,11 @@ export const useSelectedRows = (
             if (change.isAddition) {
                 const newSelected = Object.keys(incomingRows);
                 const dependenciesOfPackage = pack.depends.map(
-                    (pack) => pack.name
+                    (pack) => pack.name,
                 );
                 const deps = allPackages
                     .filter((pack) =>
-                        dependenciesOfPackage.some((p) => p == pack.name)
+                        dependenciesOfPackage.some((p) => p == pack.name),
                     )
                     .map(getId);
 
@@ -61,7 +63,7 @@ export const useSelectedRows = (
                     .filter((item, index, arr) => arr.indexOf(item) == index)
                     .reduce<RowSelectionState>(
                         (acc, item) => ({ ...acc, [item]: true }),
-                        {}
+                        {},
                     );
                 setOutgoingRows(final);
                 setIncomingRows(final);
@@ -70,17 +72,17 @@ export const useSelectedRows = (
                     pack.name,
                     allPackages.filter((pack) =>
                         Object.keys(outgoingRows).some(
-                            (id) => getId(pack) == id
-                        )
-                    )
+                            (id) => getId(pack) == id,
+                        ),
+                    ),
                 );
                 if (warning) {
                     const shouldContinue = await confirm(warning);
                     if (shouldContinue) {
-                        let updatedRows = incomingRows;
+                        const updatedRows = incomingRows;
                         warning.dependencies.forEach(
                             (dependency) =>
-                                delete updatedRows[getId(dependency)]
+                                delete updatedRows[getId(dependency)],
                         );
                         setOutgoingRows(updatedRows);
                     } else {

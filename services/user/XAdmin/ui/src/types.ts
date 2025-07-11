@@ -1,3 +1,5 @@
+import type { TransactionTrace } from "./lib/actionStack";
+
 import { z } from "zod";
 
 export interface PackageRef {
@@ -30,7 +32,7 @@ export type RequestUpdate = [
     type: string,
     completed: number,
     started: number,
-    labels: string[]
+    labels: string[],
 ];
 
 export const RequestUpdateSchema = z.tuple([

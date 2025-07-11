@@ -1,16 +1,16 @@
 import {
-    siblingUrl,
     QualifiedPluginId,
     assertTruthy,
     pluginString,
+    siblingUrl,
 } from "@psibase/common-lib";
 
-import { HostInterface } from "../hostInterface";
-import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
-import { parser, wasmFromUrl } from "../utils";
-import { DownloadFailed } from "../errors";
 import { loadPlugin } from "../component-loading/loader";
+import { DownloadFailed } from "../errors";
+import { HostInterface } from "../hostInterface";
+import { parser, wasmFromUrl } from "../utils";
 import { ComponentAPI } from "../witExtraction";
+import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
 export class Plugin {
     private host: HostInterface;

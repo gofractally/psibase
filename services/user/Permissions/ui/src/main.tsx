@@ -1,12 +1,12 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import "./styles/globals.css";
-import { App } from "./App";
-import { ThemeProvider } from "@components/theme-provider";
-
 import { getSupervisor } from "@psibase/common-lib";
+
+import { ThemeProvider } from "@/components/theme-provider";
+
+import { App } from "./App";
 
 export const supervisor = getSupervisor();
 const queryClient = new QueryClient();

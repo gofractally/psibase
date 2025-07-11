@@ -1,12 +1,15 @@
 import type { DraftMessage, Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
+import { zDraftMessage } from "@/apps/chainmail/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { toast } from "@shared/shadcn/ui/sonner";
 import { z } from "zod";
+
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { Account } from "@/lib/zod/Account";
 
 import {
     AlertDialog,
@@ -37,19 +40,13 @@ import {
     FormMessage,
 } from "@shared/shadcn/ui/form";
 import { Input } from "@shared/shadcn/ui/input";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { Textarea } from "@shared/shadcn/ui/textarea";
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
-
-import { AwaitTime } from "@/globals";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { wait } from "@/lib/wait";
-import { Account } from "@/lib/zod/Account";
-
-import { zDraftMessage } from "@/apps/chainmail/types";
 
 import {
     useDraftMessages,
@@ -101,7 +98,7 @@ export function ComposeDialog({
         }
     }, [message]);
 
-    const id = useRef<string>();
+    const id = useRef<string>("");
 
     const createDraft = () => {
         if (!id.current || !user) return;
@@ -165,7 +162,6 @@ export function ComposeDialog({
 
     async function onSubmit() {
         await sendMessage();
-        await wait(AwaitTime);
         invalidateMailboxQueries(["sent"]);
     }
 

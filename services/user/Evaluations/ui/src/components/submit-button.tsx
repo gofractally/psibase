@@ -1,5 +1,6 @@
+import { Button } from "@shared/shadcn/ui/button";
+
 import { useFormContext } from "./app-form";
-import { Button } from "@shadcn/button";
 
 type SubmitButtonLabels = [
     label: string,

@@ -1,10 +1,11 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { type Evaluation } from "@lib/graphql/getEvaluation";
-import { Account } from "./zod/Account";
+import { type Evaluation } from "@/lib/graphql/getEvaluation";
+
+import { Group } from "./graphql/getGroups";
 import { User, zResult } from "./graphql/getUsers";
-import { Group, zGroup } from "./graphql/getGroups";
+import { Account } from "./zod/Account";
 
 const zTimeStatus = z.enum([
     "pending",
@@ -90,7 +91,7 @@ const AwaitingUserSubmission = z.object({
 const CanWatchResults = z.object({
     type: z.literal(Types.CanWatchResults),
     submissionDeadline: Unix,
-    results: zResult.array()
+    results: zResult.array(),
 });
 
 const EvaluationNotStartedInTime = z.object({
@@ -98,6 +99,7 @@ const EvaluationNotStartedInTime = z.object({
     userShouldDelete: z.boolean(),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const zStatus = z.discriminatedUnion("type", [
     Pending,
     RegistrationAvailable,
@@ -115,7 +117,7 @@ export const getStatus = (
     currentUser: Account,
     users: User[],
     groups: Group[],
-    results: z.infer<typeof zResult>[]
+    results: z.infer<typeof zResult>[],
 ): z.infer<typeof zStatus> => {
     const currentTime = dayjs().unix();
     const timeStatus = getTimeStatus(evaluation, currentTime);

@@ -1,13 +1,13 @@
 import { TriangleAlert } from "lucide-react";
 
-import { Button } from "./ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
-} from "./ui/card";
+} from "@shared/shadcn/ui/card";
 
 interface Props {
     error: Error;
@@ -20,7 +20,7 @@ export const ErrorCard = ({ error, retry, retryLabel = "Login" }: Props) => {
         <Card className="mx-auto mt-4 w-[350px]">
             <CardHeader>
                 <div className="mx-auto">
-                    <TriangleAlert className="h-12 w-12 text-destructive" />
+                    <TriangleAlert className="text-destructive h-12 w-12" />
                 </div>
                 <CardTitle>Uh oh</CardTitle>
                 <CardDescription>{error.message}</CardDescription>

@@ -1,4 +1,3 @@
-import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { defineConfig } from "vite";
 
@@ -29,10 +28,9 @@ export default defineConfig(({ command }) => ({
             useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
         }),
         ...getSharedUIPlugins(),
-        tailwindcss(),
     ],
     build: {
-        minify: false,
+        minify: true,
         sourcemap: false,
     },
 }));

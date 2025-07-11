@@ -1,15 +1,16 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useStatuses } from "../hooks/useStatuses";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
+
 import { useConfig } from "../hooks/useConfig";
 import { usePeers } from "../hooks/usePeers";
+import { useStatuses } from "../hooks/useStatuses";
 
 export const StatusBanner = () => {
-    const { data: peers, error: peersError } = usePeers();
+    const { error: peersError } = usePeers();
 
-    const { data: config, error: configError } = useConfig();
+    const { error: configError } = useConfig();
     const { data: status, error: statusError } = useStatuses();
 
-    let serverStatus = [
+    const serverStatus = [
         ...(status || []),
         ...(!statusError ? [] : [statusError]),
         ...(!peersError ? [] : [peersError]),
@@ -30,14 +31,14 @@ export const StatusBanner = () => {
                     <>
                         No chain running.{" "}
                         <a
-                            className="font-medium text-primary underline underline-offset-4"
+                            className="text-primary font-medium underline underline-offset-4"
                             href="#Boot"
                         >
                             Create a new chain
                         </a>{" "}
                         or{" "}
                         <a
-                            className="font-medium text-primary underline underline-offset-4"
+                            className="text-primary font-medium underline underline-offset-4"
                             href="#Peers"
                         >
                             connect to an existing chain

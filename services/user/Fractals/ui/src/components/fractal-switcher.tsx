@@ -3,22 +3,6 @@ import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    SidebarGroupLabel,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    useSidebar,
-} from "@/components/ui/sidebar";
-
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
@@ -27,6 +11,22 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { zFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
+
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@shared/shadcn/ui/dropdown-menu";
+import {
+    SidebarGroupLabel,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    useSidebar,
+} from "@shared/shadcn/ui/sidebar";
 
 import { CreateFractalModal } from "./create-fractal-modal";
 
@@ -64,7 +64,7 @@ export function AppSwitcher() {
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
-                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-background text-sidebar-primary-foreground">
+                            <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                                 <img
                                     className="size-4"
                                     src={createIdenticon(
@@ -93,7 +93,7 @@ export function AppSwitcher() {
                         side={isMobile ? "bottom" : "right"}
                         sideOffset={4}
                     >
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                        <DropdownMenuLabel className="text-muted-foreground text-xs">
                             Global
                         </DropdownMenuLabel>
                         <DropdownMenuItem className="flex items-center justify-between gap-2 p-2">
@@ -110,7 +110,7 @@ export function AppSwitcher() {
                         <DropdownMenuSeparator />
 
                         {fractals && fractals?.length > 0 && (
-                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                            <DropdownMenuLabel className="text-muted-foreground text-xs">
                                 Fractals
                             </DropdownMenuLabel>
                         )}
@@ -159,10 +159,10 @@ export function AppSwitcher() {
                                 setShowCreateFractalModal(true);
                             }}
                         >
-                            <div className="flex size-6 items-center justify-center rounded-md border bg-background">
+                            <div className="bg-background flex size-6 items-center justify-center rounded-md border">
                                 <Plus className="size-4" />
                             </div>
-                            <div className="font-medium text-muted-foreground">
+                            <div className="text-muted-foreground font-medium">
                                 Create fractal
                             </div>
                         </DropdownMenuItem>

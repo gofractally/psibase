@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 
-import { Button } from "@shadcn/button";
-
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
-import { ActivePermsOauthRequest } from "./db";
+
+import { Button } from "@shared/shadcn/ui/button";
+
+import { ActivePermsOauthRequest, type PermsOauthRequest } from "./db";
 
 const supervisor = getSupervisor();
 
 export const App = () => {
     const thisServiceName = "permissions";
     const [isLoading, setIsLoading] = useState(true);
-    const [validPermRequest, setValidPermRequest] = useState<any>(null);
+    const [validPermRequest, setValidPermRequest] =
+        useState<PermsOauthRequest | null>(null);
     const [error, setError] = useState<string | null>(null);
     const initApp = async () => {
         let permReqPayload;
@@ -121,7 +123,7 @@ export const App = () => {
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <h2 style={{ textAlign: "center" }}>Grant access?</h2>
             <p>
-                {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
+                {`"${validPermRequest?.caller}" is requesting full access to "${validPermRequest?.callee}".`}
             </p>
             {!!error && <div>ERROR: {error}</div>}
             <div className="flex justify-center gap-4">

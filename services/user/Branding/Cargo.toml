@@ -1,7 +1,7 @@
 [package]
 name = "branding-pkg"
 description = "Allow operators to rebrand their network easily"
-version = "0.17.0"
+version = "0.19.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -12,12 +12,12 @@ package-name = "Branding"
 services = ["branding"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.17.0"
-Sites = "0.17.0"
+HttpServer = "0.19.0"
+Sites = "0.19.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-branding = { path = "service", version = "0.17.0" }
-branding-plugin = { path = "plugin", version = "0.17.0" }
+branding = { path = "service", version = "0.19.0" }
+branding-plugin = { path = "plugin", version = "0.19.0" }

@@ -1,10 +1,9 @@
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
-import { cn } from "@/lib/utils";
-
-import { Button } from "@/components/ui/button";
-import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
+import { Form, FormField, FormItem, FormMessage } from "@shared/shadcn/ui/form";
 
 export const chainTypeSchema = z.object({
     type: z.enum(["dev", "prod"], {
@@ -43,13 +42,13 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                                     className={cn(
                                         "h-auto w-0 flex-1 select-none flex-col gap-1.5 whitespace-normal disabled:cursor-not-allowed",
                                         {
-                                            "border-2 border-primary":
+                                            "border-primary border-2":
                                                 field.value === "dev",
-                                        }
+                                        },
                                     )}
                                 >
                                     <h2 className="text-2xl">Development</h2>
-                                    <p className="text-center text-sm text-muted-foreground">
+                                    <p className="text-muted-foreground text-center text-sm">
                                         Boot chain with development apps,
                                         pre-built users and insecure
                                         authentication
@@ -70,19 +69,19 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                                         className={cn(
                                             "h-auto w-0 flex-1 select-none flex-col gap-1.5 whitespace-normal",
                                             {
-                                                "border-2 border-primary":
+                                                "border-primary border-2":
                                                     field.value === "prod",
-                                            }
+                                            },
                                         )}
                                         disabled={!window.isSecureContext}
                                     >
                                         <h2 className="text-2xl">Production</h2>
-                                        <p className="text-center text-sm text-muted-foreground">
+                                        <p className="text-muted-foreground text-center text-sm">
                                             Create a secure production
                                             blockchain
                                         </p>
                                         {!window.isSecureContext ? (
-                                            <p className="text-center text-sm text-muted-foreground">
+                                            <p className="text-muted-foreground text-center text-sm">
                                                 ⚠️ Only available via HTTPS or
                                                 localhost
                                             </p>

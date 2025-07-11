@@ -1,8 +1,8 @@
 [package]
 name = "registry-pkg"
 description = "Registry for psibase apps"
-version = "0.17.0"
-rust-version = "1.64"
+version = "0.19.0"
+ust-version = "1.64"
 edition = "2021"
 publish = false
 
@@ -15,6 +15,6 @@ services = ["registry"]
 crate-type = ["rlib"]
 
 [dependencies]
-registry = { path = "service", version = "0.17.0" }
-r-registry = { path = "query", version = "0.17.0" }
-registry-plugin = { path = "plugin", version = "0.17.0" }
+registry = { path = "service", version = "0.19.0" }
+r-registry = { path = "query", version = "0.19.0" }
+registry-plugin = { path = "plugin", version = "0.19.0" }

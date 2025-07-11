@@ -6,8 +6,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-profiles = { path = "../service/", version = "0.17.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.17.0" }
+profiles = { path = "../service/", version = "0.19.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 wit-bindgen-rt = { workspace = true }
@@ -29,4 +29,4 @@ world = "impl"
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.17.0" }
+profiles-pkg = { path = "..", version = "0.19.0" }

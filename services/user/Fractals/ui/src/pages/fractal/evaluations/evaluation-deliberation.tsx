@@ -3,8 +3,6 @@ import { AlignJustify, Info, Plus, X } from "lucide-react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
-
 import { useGroupUsers } from "@/hooks/fractals/use-group-users";
 import { setCachedProposal, useProposal } from "@/hooks/fractals/use-proposal";
 import { usePropose } from "@/hooks/fractals/use-propose";
@@ -15,6 +13,8 @@ import { useNowUnix } from "@/hooks/use-now-unix";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
 import { Account } from "@/lib/zod/Account";
+
+import { Button } from "@shared/shadcn/ui/button";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -148,7 +148,7 @@ export const EvaluationDeliberation = () => {
 
             <div>
                 <div>Ranked numbers</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-muted-foreground text-sm">
                     Sort from highest to lowest in value.
                 </div>
                 <SortableList
@@ -177,7 +177,7 @@ export const EvaluationDeliberation = () => {
                             </SortableItem>
                         ))
                     ) : (
-                        <div className="flex items-center gap-2 text-sm italic text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
                             <Info className="h-4 w-4" />
                             Select the numbers below to rank them.
                         </div>
@@ -188,7 +188,7 @@ export const EvaluationDeliberation = () => {
             <div className="flex flex-col gap-2">
                 <div>
                     <div>Unranked numbers</div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                         Numbers you consider should not be ranked in the
                         evaluation.
                     </div>
@@ -207,7 +207,7 @@ export const EvaluationDeliberation = () => {
                             </Button>
                         ))
                     ) : (
-                        <div className="text-sm italic text-muted-foreground">
+                        <div className="text-muted-foreground text-sm italic">
                             All users are ranked.
                         </div>
                     )}

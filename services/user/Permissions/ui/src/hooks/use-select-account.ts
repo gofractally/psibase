@@ -1,8 +1,8 @@
-import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supervisor } from "src/main";
 import { z } from "zod";
 
-import { supervisor } from "src/main";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useSelectAccount = () => {
     const queryClient = useQueryClient();
@@ -19,9 +19,6 @@ export const useSelectAccount = () => {
         },
         onSuccess: () => {
             queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            }, 2000);
         },
         onError: (error) => {
             toast.error(error.message);

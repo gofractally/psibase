@@ -1,15 +1,16 @@
 import { transpile } from "@bytecodealliance/jco";
 import { rollup } from "@rollup/browser";
+
+import { HostInterface } from "../hostInterface.js";
+import { assert } from "../utils.js";
+import { ComponentAPI, Functions } from "../witExtraction.js";
+import hostShimCode from "./host-api.js?raw";
+import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 import { plugin } from "./index.js";
+import privilegedShimCode from "./privileged-api.js?raw";
+import { ProxyPkg } from "./proxy/proxyPackage.js";
 
 const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
-import hostShimCode from "./host-api.js?raw";
-import privilegedShimCode from "./privileged-api.js?raw";
-import { HostInterface } from "../hostInterface.js";
-import { ComponentAPI, Functions } from "../witExtraction.js";
-import { assert } from "../utils.js";
-import { ProxyPkg } from "./proxy/proxyPackage.js";
-import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];

@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { LocalContact } from "../types";
 

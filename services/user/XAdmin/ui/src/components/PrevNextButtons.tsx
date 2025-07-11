@@ -1,10 +1,11 @@
-import { Button } from "@/components/ui/button";
 import {
-    ChevronRight,
-    ChevronLeft,
-    ChevronLast,
     ChevronFirst,
+    ChevronLast,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
+
+import { Button } from "@shared/shadcn/ui/button";
 
 interface PrevNextProps {
     previous: () => void;

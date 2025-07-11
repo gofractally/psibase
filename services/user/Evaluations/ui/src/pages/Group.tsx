@@ -1,23 +1,23 @@
-import { useEvaluation } from "@hooks/app/use-evaluation";
+import { useAsyncDebouncer } from "@tanstack/react-pacer";
 import dayjs from "dayjs";
+import { AlignJustify, Info, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useNavigate, useParams } from "react-router-dom";
 import { useInterval } from "usehooks-ts";
 
-import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
-import { Button } from "@shadcn/button";
-import { AlignJustify, Info, Plus, X } from "lucide-react";
-import { humanize } from "@lib/humanize";
-import { usePropose } from "@hooks/app/use-propose";
-import { arrayMove } from "@lib/arrayMove";
-import { setCachedProposal, useProposal } from "@hooks/app/use-proposal";
-import { useCurrentUser } from "@hooks/use-current-user";
+import { useAttest } from "@/hooks/app/use-attest";
+import { useEvaluation } from "@/hooks/app/use-evaluation";
+import { setCachedProposal, useProposal } from "@/hooks/app/use-proposal";
+import { usePropose } from "@/hooks/app/use-propose";
+import { useUsersAndGroups } from "@/hooks/app/use-users";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { arrayMove } from "@/lib/arrayMove";
+import { humanize } from "@/lib/humanize";
+import { zAccount } from "@/lib/zod/Account";
 
-import { useAsyncDebouncer } from "@tanstack/react-pacer";
-import { useAttest } from "@hooks/app/use-attest";
-import { toast } from "sonner";
-import { useUsersAndGroups } from "@hooks/app/use-users";
-import { zAccount } from "@lib/zod/Account";
+import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 const wait = (ms: number = 2500) =>
     new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,7 +75,7 @@ export const GroupPage = () => {
                 evaluationId: Number(id),
                 groupNumber: Number(groupNumber),
             }).then(() => {
-                let pending = toast.loading("Attested, loading results...");
+                const pending = toast.loading("Attested, loading results...");
                 wait(2500).then(() => {
                     refetchUsers().then(() => {
                         toast.dismiss(pending);
@@ -174,7 +174,7 @@ export const GroupPage = () => {
 
             <div>
                 <div>Ranked numbers</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-muted-foreground text-sm">
                     Sort from highest to lowest in value.
                 </div>
                 <SortableList
@@ -203,7 +203,7 @@ export const GroupPage = () => {
                             </SortableItem>
                         ))
                     ) : (
-                        <div className="flex items-center gap-2 text-sm italic text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
                             <Info className="h-4 w-4" />
                             Select the numbers below to rank them.
                         </div>
@@ -214,7 +214,7 @@ export const GroupPage = () => {
             <div className="flex flex-col gap-2">
                 <div>
                     <div>Unranked numbers</div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                         Numbers you consider should not be ranked in the
                         evaluation.
                     </div>
@@ -233,7 +233,7 @@ export const GroupPage = () => {
                             </Button>
                         ))
                     ) : (
-                        <div className="text-sm italic text-muted-foreground">
+                        <div className="text-muted-foreground text-sm italic">
                             All numbers are ranked.
                         </div>
                     )}

@@ -1,5 +1,5 @@
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
+import { Label } from "@shared/shadcn/ui/label";
+import { Switch } from "@shared/shadcn/ui/switch";
 
 interface Props {
     onChange: (enabled: boolean) => void | Promise<void>;
@@ -20,7 +20,7 @@ export const CheckCard = ({
         <div className="flex flex-row items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
                 <Label className="text-base">{title}</Label>
-                <div className="text-sm text-muted-foreground">
+                <div className="text-muted-foreground text-sm">
                     {description}
                 </div>
             </div>

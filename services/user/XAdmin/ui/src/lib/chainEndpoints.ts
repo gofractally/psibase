@@ -1,15 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { util } from "wasm-transpiled";
 import { z } from "zod";
 
 import {
-    postJson,
+    getArrayBuffer,
     getJson,
     postArrayBufferGetJson,
-    getArrayBuffer,
+    postJson,
     siblingUrl,
     throwIfError,
 } from "@psibase/common-lib";
 
-import { recursiveFetch } from "./recursiveFetch";
 import {
     type KeyDevice,
     type PsinodeConfigSelect,
@@ -18,9 +19,7 @@ import {
     psinodeConfigSchema,
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
-import { util } from "wasm-transpiled";
-
-type Buffer = number[];
+import { recursiveFetch } from "./recursiveFetch";
 
 export const Peer = z
     .object({
@@ -87,12 +86,14 @@ class Chain {
 
     public async getPackages(fileNames: string[]): Promise<ArrayBuffer[]> {
         return Promise.all(
-            fileNames.map((fileName) => getArrayBuffer(`/packages/${fileName}`))
+            fileNames.map((fileName) =>
+                getArrayBuffer(`/packages/${fileName}`),
+            ),
         );
     }
 
     private async mergeConfig(
-        config: PsinodeConfigUpdate
+        config: PsinodeConfigUpdate,
     ): Promise<PsinodeConfigSelect> {
         const existingConfig = await this.getConfig();
         return psinodeConfigSchema.parse({
@@ -118,7 +119,7 @@ class Chain {
         const existingPeer = currentConfig.peers.includes(peerUrl);
         if (!existingPeer) throw new Error(`No peer of ${peerUrl} was found.`);
         const withoutPeer = currentConfig.peers.filter(
-            (peer) => peer !== peerUrl
+            (peer) => peer !== peerUrl,
         );
         await this.updateConfigOnNode({
             ...currentConfig,
@@ -137,7 +138,7 @@ class Chain {
     }
 
     private async updateConfigOnNode(
-        newConfig: PsinodeConfigSelect
+        newConfig: PsinodeConfigSelect,
     ): Promise<void> {
         const result = await putJson("/native/admin/config", newConfig);
         if (!result.ok) {
@@ -150,7 +151,7 @@ class Chain {
         const foundPeer = currentPeers.find((peer) => peer.id == id);
         if (!foundPeer)
             throw new Error(
-                `Failed to find peer with ID ${id} in existing peers`
+                `Failed to find peer with ID ${id} in existing peers`,
             );
         await postJson("/native/admin/disconnect", { id });
         await recursiveFetch(async () => {
@@ -158,7 +159,7 @@ class Chain {
             const isPeerExisting = newPeers.some(
                 (peer) =>
                     peer.endpoint == foundPeer.endpoint &&
-                    peer.id == foundPeer.id
+                    peer.id == foundPeer.id,
             );
             return !isPeerExisting;
         });
@@ -169,8 +170,12 @@ class Chain {
     }
 
     public async pushArrayBufferTransaction(buffer: ArrayBufferLike) {
-        let url = siblingUrl(null, "transact", "/push_transaction?wait_for=applied");
-        let res = await throwIfError(
+        const url = siblingUrl(
+            null,
+            "transact",
+            "/push_transaction?wait_for=applied",
+        );
+        const res = await throwIfError(
             await fetch(url, {
                 method: "POST",
                 headers: {
@@ -178,10 +183,10 @@ class Chain {
                     Accept: "application/octet-stream",
                 },
                 body: buffer as any,
-            })
+            }),
         );
         return JSON.parse(
-            util.deserializeTrace(new Uint8Array(await res.arrayBuffer()))
+            util.deserializeTrace(new Uint8Array(await res.arrayBuffer())),
         );
     }
 

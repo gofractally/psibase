@@ -5,7 +5,7 @@ import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance"
 import { useFormatRelative } from "@/hooks/use-format-relative";
 import { SubmissionPhase } from "@/lib/getStatus";
 
-import { Button } from "../ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 export const Submission = ({ status }: { status: SubmissionPhase }) => {
     const { label } = useFormatRelative(status.submissionDeadline);

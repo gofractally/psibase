@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { LogConfig } from "../log/interfaces";
 
 export type ServiceConfig = {
@@ -112,6 +113,6 @@ export const psinodeConfigSchema = z
     .passthrough();
 
 export type PsinodeConfigSelect = z.infer<typeof psinodeConfigSchema>;
-const update = psinodeConfigSchema.partial();
+export const update = psinodeConfigSchema.partial();
 
 export type PsinodeConfigUpdate = z.infer<typeof update>;

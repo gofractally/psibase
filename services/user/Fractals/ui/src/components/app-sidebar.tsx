@@ -1,16 +1,16 @@
 import * as React from "react";
 
+import { AppSwitcher } from "@/components/fractal-switcher";
+import { NavMain } from "@/components/nav-main";
+import { NavUser } from "@/components/nav-user";
+
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
     SidebarRail,
-} from "@/components/ui/sidebar";
-
-import { AppSwitcher } from "@/components/fractal-switcher";
-import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
+} from "@shared/shadcn/ui/sidebar";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (

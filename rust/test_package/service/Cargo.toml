@@ -13,12 +13,12 @@ server = "r-tpack"
 postinstall = [{ sender = "tpack", service = "tpack", method = "init" }]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.17.0"
-Sites = "0.17.0"
+HttpServer = "0.19.0"
+Sites = "0.19.0"
 
 [dependencies]
-psibase = { path = "../../psibase", version = "0.17.0" }
+psibase = { path = "../../psibase", version = "0.19.0" }
 serde = "1.0"
 
 [dev-dependencies]
-test_package = { path = "..", version = "0.17.0" }
+test_package = { path = "..", version = "0.19.0" }

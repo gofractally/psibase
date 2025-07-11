@@ -532,6 +532,14 @@ namespace psibase
             return std::nullopt;
          return psio::from_frac<V>(*v);
       }
+
+      void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
+
+      template <typename K, typename V>
+      void kvPut(DbId db, const K& key, const V& value)
+      {
+         kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+      }
    };  // TestChain
 
 }  // namespace psibase

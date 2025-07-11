@@ -1,8 +1,9 @@
-"use client";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Unplug } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
+
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Form,
     FormControl,
@@ -10,9 +11,8 @@ import {
     FormItem,
     FormMessage,
     FormRootError,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Unplug } from "lucide-react";
+} from "@shared/shadcn/ui/form";
+import { Input } from "@shared/shadcn/ui/input";
 
 const FormSchema = z.object({
     url: z.string().url(),
@@ -39,7 +39,7 @@ export function UrlForm({ onSubmit: handleSubmit, existingValues }: Props) {
         try {
             await handleSubmit(values);
         } catch (e) {
-            let message = "Unrecognised error";
+            const message = "Unrecognised error";
             if (e instanceof Error) {
                 form.setError("root", { message: e.message });
             } else if (typeof e == "string") {

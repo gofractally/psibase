@@ -5,7 +5,7 @@ import { useNowUnix } from "@/hooks/use-now-unix";
 import { RegistrationPhase } from "@/lib/getStatus";
 import { humanize } from "@/lib/humanize";
 
-import { Button } from "../ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 export const Register = ({ status }: { status: RegistrationPhase }) => {
     const { evaluation, evaluationInstance } = useEvaluationInstance();

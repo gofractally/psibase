@@ -5,7 +5,7 @@ import { useFractal } from "@/hooks/fractals/use-fractal";
 import { DeliberationPhase } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 
-import { Button } from "../ui/button";
+import { Button } from "@shared/shadcn/ui/button";
 
 export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
     const { data: fractal } = useFractal();

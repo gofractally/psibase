@@ -2,10 +2,10 @@ import { boot } from "wasm-transpiled";
 
 import { BootState, PackageInfo } from "@/types";
 
+import { queryClient } from "../main";
 import { chain } from "./chainEndpoints";
 import { exportKeyToPEM } from "./keys";
 import { queryKeys } from "./queryKeys";
-import { queryClient } from "../main";
 
 type BootChainParams = {
     packages: PackageInfo[];
@@ -30,16 +30,16 @@ export const bootChain = async ({
                 producer: producerName,
             });
             queryClient.invalidateQueries({ queryKey: queryKeys.config });
-        } catch (e) {
+        } catch {
             onProgressUpdate("Failed to set producer name");
             return;
         }
 
         const fetchedPackages: ArrayBuffer[] = await chain.getPackages(
-            packages.map((pack) => pack.file)
+            packages.map((pack) => pack.file),
         );
         const packageBuffers = fetchedPackages.map(
-            (buf) => new Uint8Array(buf)
+            (buf) => new Uint8Array(buf),
         );
 
         let blockSigningPubKeyPem: string | undefined;
@@ -48,18 +48,18 @@ export const bootChain = async ({
             if (blockSigningPubKey) {
                 blockSigningPubKeyPem = await exportKeyToPEM(
                     blockSigningPubKey,
-                    "PUBLIC KEY"
+                    "PUBLIC KEY",
                 );
             }
             if (txSigningPubKey) {
                 txSigningPubKeyPem = await exportKeyToPEM(
                     txSigningPubKey,
-                    "PUBLIC KEY"
+                    "PUBLIC KEY",
                 );
             }
-        } catch (e) {
+        } catch {
             onProgressUpdate(
-                "Failed to export public key to PEM format during boot"
+                "Failed to export public key to PEM format during boot",
             );
             return;
         }
@@ -73,10 +73,10 @@ export const bootChain = async ({
                 packageBuffers,
                 blockSigningPubKeyPem,
                 txSigningPubKeyPem,
-                compression
+                compression,
             );
 
-        let labels = ["Initializing chain", ...txlabels];
+        const labels = ["Initializing chain", ...txlabels];
 
         let i = 1;
         onProgressUpdate(["push", 0, 1, labels]);
@@ -90,11 +90,12 @@ export const bootChain = async ({
 
         for (const [t, completed, started] of transactions) {
             onProgressUpdate(["push", completed + 1, started + 1, labels]);
-            let trace = await chain.pushArrayBufferTransaction(t.buffer);
+            const trace = await chain.pushArrayBufferTransaction(t.buffer);
             if (trace.error) {
                 onProgressUpdate(trace);
                 return;
             }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             i++;
         }
         onProgressUpdate(["push", labels.length, labels.length, labels]);

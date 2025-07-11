@@ -2,16 +2,15 @@ import dayjs from "dayjs";
 import { CalendarIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
+import { Calendar } from "@shared/shadcn/ui/calendar";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-
-import { cn } from "@/lib/utils";
+} from "@shared/shadcn/ui/popover";
+import { ScrollArea, ScrollBar } from "@shared/shadcn/ui/scroll-area";
 
 import { useFieldContext } from "./app-form";
 
@@ -72,7 +71,7 @@ export function DateTimePicker24h({
                     </Button>
                 </PopoverTrigger>
             </div>
-            <div className="py-2 text-sm text-muted-foreground">
+            <div className="text-muted-foreground py-2 text-sm">
                 {description}
             </div>
             <PopoverContent className="w-auto p-0">

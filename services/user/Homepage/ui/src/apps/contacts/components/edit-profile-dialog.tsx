@@ -1,19 +1,18 @@
 import { Trash, Upload } from "lucide-react";
-import { toast } from "@shared/shadcn/ui/sonner";
+
+import { FormProfile } from "@/components/form-profile";
+
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCacheBust } from "@/hooks/use-cache-bust";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useProfile } from "@/hooks/use-profile";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogDescription } from "@shared/shadcn/ui/dialog";
 import { DialogTitle } from "@shared/shadcn/ui/dialog";
 import { DialogContent } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
-
-import { FormProfile } from "@/components/form-profile";
-
-import { AwaitTime } from "@/globals";
-import { useAvatar } from "@/hooks/use-avatar";
-import { useCacheBust } from "@/hooks/use-cache-bust";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useProfile } from "@/hooks/use-profile";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useRemoveAvatar } from "../hooks/use-remove-avatar";
 import { useSetProfile } from "../hooks/use-set-profile";
@@ -59,11 +58,9 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
             });
             toast.success("Avatar uploaded");
 
-            setTimeout(async () => {
-                if (currentUser) {
-                    setBustedUser(currentUser);
-                }
-            }, AwaitTime);
+            if (currentUser) {
+                setBustedUser(currentUser);
+            }
         }
     };
 

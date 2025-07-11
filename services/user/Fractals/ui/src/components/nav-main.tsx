@@ -8,16 +8,16 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+
+import { cn } from "@shared/lib/utils";
 import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar";
-
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { cn } from "@/lib/utils";
+} from "@shared/shadcn/ui/sidebar";
 
 const browseMenu = [
     {
@@ -100,7 +100,7 @@ export function NavMain() {
                                 {({ isActive }) => (
                                     <SidebarMenuItem
                                         className={cn({
-                                            "rounded-sm bg-muted/50 font-semibold":
+                                            "bg-muted/50 rounded-sm font-semibold":
                                                 isActive,
                                         })}
                                     >

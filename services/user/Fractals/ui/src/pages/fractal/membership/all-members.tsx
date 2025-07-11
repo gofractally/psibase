@@ -1,5 +1,12 @@
 import dayjs from "dayjs";
 
+import { useMembers } from "@/hooks/fractals/use-members";
+import { useScores } from "@/hooks/fractals/use-scores";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+import { getMemberLabel } from "@/lib/getMemberLabel";
+import { EvalType } from "@/lib/zod/EvaluationType";
+
+import { cn } from "@shared/lib/utils";
 import {
     Table,
     TableBody,
@@ -8,14 +15,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-
-import { useMembers } from "@/hooks/fractals/use-members";
-import { useScores } from "@/hooks/fractals/use-scores";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { getMemberLabel } from "@/lib/getMemberLabel";
-import { cn } from "@/lib/utils";
-import { EvalType } from "@/lib/zod/EvaluationType";
+} from "@shared/shadcn/ui/table";
 
 const formatScore = (num: number): string => {
     // Would it be neat to make the score a flat integer out of 100?

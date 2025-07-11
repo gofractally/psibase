@@ -1,15 +1,15 @@
 import { useNavigate } from "react-router-dom";
 
+import { useCreateFractal } from "@/hooks/fractals/use-create-fractal";
+import { useMemberships } from "@/hooks/fractals/use-memberships";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
-
-import { useCreateFractal } from "@/hooks/fractals/use-create-fractal";
-import { useMemberships } from "@/hooks/fractals/use-memberships";
-import { useCurrentUser } from "@/hooks/use-current-user";
+} from "@shared/shadcn/ui/dialog";
 
 import { useAppForm } from "./form/app-form";
 

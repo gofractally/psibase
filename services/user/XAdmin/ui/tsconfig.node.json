@@ -1,12 +1,19 @@
 {
+    "extends": "../../../tsconfig.node.json",
     "compilerOptions": {
-        "composite": true,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "allowSyntheticDefaultImports": true
+        "tsBuildInfoFile": ".tmp/tsconfig.node.tsbuildinfo",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": ["./src/*"],
+            "@shared/*": ["../../../shared-ui/*"],
+            "@psibase/common-lib": [
+                "../../CommonApi/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../CommonApi/common/packages/common-lib/src/*"
+            ],
+            "wasm-transpiled": ["./wasm-transpiled/x_admin.d.ts"]
+        }
     },
-    "include": [
-        "vite.config.ts",
-        "../../../vite.shared.ts"
-    ]
+    "include": ["vite.config.mts"]
 }

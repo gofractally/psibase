@@ -37,6 +37,9 @@ pub struct DefWontChangeInnerStruct {
     pub field_i32: i32,
 }
 
+#[derive(PartialEq, Eq, Debug, Default)]
+pub struct NotPackable;
+
 #[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
@@ -84,6 +87,8 @@ pub struct OuterStruct {
     pub field_o_o_str: Option<Option<String>>,
     pub field_o_o_str2: Option<Option<String>>,
     pub field_o_o_inner: Option<Option<InnerStruct>>,
+    #[fracpack(skip)]
+    pub skipped: NotPackable,
 }
 
 #[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]

@@ -1,6 +1,7 @@
-import { getEvaluation, Evaluation } from "@lib/graphql/getEvaluation";
 import { useQuery } from "@tanstack/react-query";
-import { Account } from "@lib/zod/Account";
+
+import { Evaluation, getEvaluation } from "@/lib/graphql/getEvaluation";
+import { Account } from "@/lib/zod/Account";
 
 export const useEvaluation = (
     owner: Account | undefined | null,

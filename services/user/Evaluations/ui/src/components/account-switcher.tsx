@@ -1,13 +1,15 @@
+import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
+
 import {
     useCreateConnectionToken,
     useCurrentAccounts,
     useLogout,
     useSelectAccount,
-} from "@hooks";
-import { useCurrentUser } from "@hooks/use-current-user";
-import { Avatar, AvatarFallback } from "@shadcn/avatar";
+} from "@/hooks";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
-import { Button } from "@shadcn/button";
+import { Avatar, AvatarFallback } from "@shared/shadcn/ui/avatar";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,8 +22,7 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-} from "@shadcn/dropdown-menu";
-import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
+} from "@shared/shadcn/ui/dropdown-menu";
 
 export function AccountSwitcher() {
     const { mutateAsync: onLogin } = useCreateConnectionToken();

@@ -1,6 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
@@ -8,10 +7,12 @@ import { getSupervisor } from "@psibase/common-lib";
 import { fractalsService } from "@/lib/constants";
 import { paths } from "@/lib/paths";
 
+import { toast } from "@shared/shadcn/ui/sonner";
+
 import { useCurrentFractal } from "../use-current-fractal";
 import { updateAttestation } from "./use-users-and-groups";
 
-const zParams = z.object({
+export const zParams = z.object({
     evaluationId: z.number(),
     groupNumber: z.number(),
 });

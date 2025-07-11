@@ -1,7 +1,9 @@
-import { zAccount } from "@lib/zod/Account";
-import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
+
+import { getSupervisor } from "@psibase/common-lib";
+
+import { zAccount } from "@/lib/zod/Account";
 
 const Params = z.object({
     owner: zAccount,

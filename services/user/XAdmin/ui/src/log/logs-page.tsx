@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { websocketURL } from "../helpers";
-import { LogFilterInputs, LogRecord } from "./interfaces";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { z } from "zod";
+
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+import { Switch } from "@shared/shadcn/ui/switch";
 import {
     Table,
     TableBody,
@@ -12,10 +14,10 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { z } from "zod";
+} from "@shared/shadcn/ui/table";
+
+import { websocketURL } from "../helpers";
+import { LogFilterInputs, LogRecord } from "./interfaces";
 
 const MAX_LOGS_ROWS = 20;
 
@@ -65,7 +67,7 @@ export const LogsPage = () => {
         if (logSocket === null && logTimeout === null) {
             const newSocket = new WebSocket(websocketURL("/native/admin/log"));
             setLogSocket(newSocket);
-            newSocket.addEventListener("open", (event: Event) => {
+            newSocket.addEventListener("open", () => {
                 setLogConnectionError(undefined);
                 if (logFilter) {
                     setFilterError(undefined);
@@ -75,7 +77,7 @@ export const LogsPage = () => {
             newSocket.addEventListener("message", (event: MessageEvent) => {
                 setLogData((prev) => {
                     const newRecord = LogRecordSchema.parse(
-                        JSON.parse(event.data)
+                        JSON.parse(event.data),
                     );
                     return [
                         newRecord,

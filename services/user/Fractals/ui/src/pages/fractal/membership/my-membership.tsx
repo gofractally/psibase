@@ -1,14 +1,19 @@
 import dayjs from "dayjs";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getMemberLabel } from "@/lib/getMemberLabel";
+
+import { Button } from "@shared/shadcn/ui/button";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 
 export const MyMembership = () => {
     const fractalAccount = useCurrentFractal();
@@ -29,7 +34,7 @@ export const MyMembership = () => {
 
     return (
         <div className="container mx-auto max-w-4xl p-6">
-            <h1 className="mb-6 text-2xl font-bold text-foreground">
+            <h1 className="text-foreground mb-6 text-2xl font-bold">
                 My Membership
             </h1>
             <div className="space-y-6">
@@ -37,7 +42,7 @@ export const MyMembership = () => {
 
                 <div>
                     <div className="">{fractal?.fractal?.name}</div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                         {fractal?.fractal?.mission}
                     </div>
                 </div>
@@ -45,13 +50,13 @@ export const MyMembership = () => {
                 {/* Membership Information Card */}
                 <Card className="shadow-md">
                     <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-foreground">
+                        <CardTitle className="text-foreground text-lg font-semibold">
                             Membership Status
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         <div className="flex justify-between">
-                            <span className="font-medium text-muted-foreground">
+                            <span className="text-muted-foreground font-medium">
                                 Status:
                             </span>
                             <span
@@ -67,7 +72,7 @@ export const MyMembership = () => {
                         {membership ? (
                             <>
                                 <div className="flex justify-between">
-                                    <span className="font-medium text-muted-foreground">
+                                    <span className="text-muted-foreground font-medium">
                                         Joined:
                                     </span>
                                     <span>
@@ -103,7 +108,7 @@ export const MyMembership = () => {
                                             fractal: fractalAccount!,
                                         });
                                     }}
-                                    className="bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                                    className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
                                     disabled={!fractalAccount}
                                 >
                                     Join Fractal
