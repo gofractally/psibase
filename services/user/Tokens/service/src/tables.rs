@@ -258,6 +258,7 @@ pub mod tables {
         }
 
         fn sub_balance(&mut self, quantity: Quantity) {
+            check(self.balance >= quantity, "Insufficient token balance");
             self.balance = self.balance - quantity;
 
             if self.balance == 0.into() {
