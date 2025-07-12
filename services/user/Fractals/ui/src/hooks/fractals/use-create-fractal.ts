@@ -12,10 +12,10 @@ import { toast } from "@shared/shadcn/ui/sonner";
 
 import { zAccountNameStatus } from "../use-account-status";
 
-const zParams = z.object({
+export const zParams = z.object({
     account: zAccount,
-    name: z.string(),
-    mission: z.string(),
+    name: z.string().min(1, { message: "Name is required." }),
+    mission: z.string().min(1, { message: "Mission is required." }),
 });
 
 export const useCreateFractal = () =>
@@ -23,23 +23,19 @@ export const useCreateFractal = () =>
         mutationKey: QueryKey.createFractal(),
         mutationFn: async (params) => {
             const { account, mission, name } = zParams.parse(params);
-            toast.promise(
-                async () => {
-                    void (await supervisor.functionCall({
-                        method: "createFractal",
-                        params: [zAccount.parse(account), name, mission],
-                        service: fractalsService,
-                        intf: "admin",
-                    }));
-                },
-                { description: `Created fractal ${name || account}` },
-            );
+            await supervisor.functionCall({
+                method: "createFractal",
+                params: [zAccount.parse(account), name, mission],
+                service: fractalsService,
+                intf: "admin",
+            });
         },
         onSuccess: (_, { account }) => {
             queryClient.setQueryData(
                 QueryKey.userAccount(account),
                 () => zAccountNameStatus.Enum.Taken,
             );
+            toast.success(`Created fractal ${account}`);
         },
         onError: (error) => {
             if (error instanceof Error) {

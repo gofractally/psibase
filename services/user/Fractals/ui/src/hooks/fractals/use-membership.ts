@@ -9,15 +9,27 @@ import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
 
+const queryFn = async (fractal: string, user: string) => {
+    try {
+        return await getMembership(
+            zAccount.parse(fractal),
+            zAccount.parse(user),
+        );
+    } catch (error) {
+        const message = "Error getting membership";
+        console.error(message, error);
+        throw new Error(message);
+    }
+};
+
 export const useMembership = (
     fractal: OptionalAccount,
     user: OptionalAccount,
 ) =>
     useQuery({
         queryKey: QueryKey.membership(fractal, user),
-        enabled: !!(fractal && user),
-        queryFn: async () =>
-            getMembership(zAccount.parse(fractal), zAccount.parse(user)),
+        enabled: Boolean(fractal && user),
+        queryFn: () => queryFn(fractal!, user!),
     });
 
 export const setDefaultMembership = (

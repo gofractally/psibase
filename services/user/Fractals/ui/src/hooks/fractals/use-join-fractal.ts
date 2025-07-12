@@ -15,17 +15,26 @@ const zParams = z.object({
     fractal: zAccount,
 });
 
+const mutationFn = async (fractal: string) => {
+    try {
+        await supervisor.functionCall({
+            method: "join",
+            params: [fractal],
+            service: fractalsService,
+            intf: "user",
+        });
+    } catch (error) {
+        const message = "Error joining fractal";
+        console.error(message, error);
+        throw new Error(message);
+    }
+};
+
 export const useJoinFractal = () =>
     useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             const { fractal } = zParams.parse(params);
-
-            void (await supervisor.functionCall({
-                method: "join",
-                params: [fractal],
-                service: fractalsService,
-                intf: "user",
-            }));
+            void (await mutationFn(fractal));
         },
         onSuccess: (_, params) => {
             const { fractal } = zParams.parse(params);

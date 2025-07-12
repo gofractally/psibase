@@ -10,13 +10,19 @@ import { Account, zAccount } from "@/lib/zod/Account";
 export type GetCurrentUserRes = string | null;
 
 export const queryFn = async () => {
-    const res = await supervisor.functionCall({
-        method: "getCurrentUser",
-        params: [],
-        service: "accounts",
-        intf: "api",
-    });
-    return res ? z.string().parse(res) : null;
+    try {
+        const res = await supervisor.functionCall({
+            method: "getCurrentUser",
+            params: [],
+            service: "accounts",
+            intf: "api",
+        });
+        return res ? z.string().parse(res) : null;
+    } catch (error) {
+        const message = "Error getting current user";
+        console.error(message, error);
+        throw new Error(message);
+    }
 };
 
 export const useCurrentUser = (refetchInterval?: number) =>

@@ -30,36 +30,40 @@ export const ActiveAndUpcoming = () => {
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
-            <h1 className="mb-3 text-lg font-semibold">Active & upcoming</h1>
-            {fractal && fractal.evaluations.length > 0 && (
-                <CurrentEvaluationCard />
-            )}
-            {fractal?.evaluations.length == 0 ? (
-                <EmptyBlock
-                    title="No evaluations scheduled"
-                    buttonLabel="Schedule evaluation"
-                    onButtonClick={() => {
-                        navigate("proposed?modal=true");
-                    }}
-                />
-            ) : (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Date</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {nextSchedules?.map((date) => (
-                            <TableRow key={date.getTime()}>
-                                <TableCell>
-                                    {dayjs(date).format("MMMM D, YYYY")}
-                                </TableCell>
+            <div className="flex h-9 items-center">
+                <h1 className="text-lg font-semibold">Active & upcoming</h1>
+            </div>
+            <div className="mt-3">
+                {fractal && fractal.evaluations.length > 0 && (
+                    <CurrentEvaluationCard />
+                )}
+                {fractal?.evaluations.length == 0 ? (
+                    <EmptyBlock
+                        title="No evaluations scheduled"
+                        buttonLabel="Schedule evaluation"
+                        onButtonClick={() => {
+                            navigate("proposed?modal=true");
+                        }}
+                    />
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
+                        </TableHeader>
+                        <TableBody>
+                            {nextSchedules?.map((date) => (
+                                <TableRow key={date.getTime()}>
+                                    <TableCell>
+                                        {dayjs(date).format("MMMM D, YYYY")}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </div>
         </div>
     );
 };
