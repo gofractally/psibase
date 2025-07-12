@@ -174,7 +174,8 @@ namespace psibase
    // are sent can be changed without breaking consensus.
    enum class NotifyType : std::uint32_t
    {
-      // A block is produced or validated
+      // A block is produced or validated. The notification is
+      // sent after the StatusRow is updated with the new head.
       acceptBlock,
       // A transaction is accepted or validated
       acceptTransaction,
