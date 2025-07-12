@@ -1,10 +1,11 @@
-#include "subjective-service.hpp"
+#include <services/test/SubjectiveDb.hpp>
 
 #include <psibase/dispatch.hpp>
 
 using namespace psibase;
+using namespace TestService;
 
-void SubjectiveService::write(std::string key, std::string value)
+void SubjectiveDb::write(std::string key, std::string value)
 {
    PSIBASE_SUBJECTIVE_TX
    {
@@ -12,7 +13,7 @@ void SubjectiveService::write(std::string key, std::string value)
    }
 }
 
-std::optional<std::string> SubjectiveService::read(std::string key)
+std::optional<std::string> SubjectiveDb::read(std::string key)
 {
    PSIBASE_SUBJECTIVE_TX
    {
@@ -22,7 +23,7 @@ std::optional<std::string> SubjectiveService::read(std::string key)
    return {};
 }
 
-void SubjectiveService::testRFail1(std::string key, bool txBefore, int op)
+void SubjectiveDb::testRFail1(std::string key, bool txBefore, int op)
 {
    if (txBefore)
    {
@@ -39,7 +40,7 @@ void SubjectiveService::testRFail1(std::string key, bool txBefore, int op)
       --index.end();
 }
 
-void SubjectiveService::testRFail2(AccountNumber account, std::string key, int op)
+void SubjectiveDb::testRFail2(AccountNumber account, std::string key, int op)
 {
    auto index = Tables{account}.open<SubjectiveTable>().getIndex<0>();
    PSIBASE_SUBJECTIVE_TX
@@ -55,12 +56,12 @@ void SubjectiveService::testRFail2(AccountNumber account, std::string key, int o
    }
 }
 
-void SubjectiveService::testWFail1(std::string key, std::string value)
+void SubjectiveDb::testWFail1(std::string key, std::string value)
 {
    Tables{}.open<SubjectiveTable>().put({key, value});
 }
 
-void SubjectiveService::abort(std::string key, std::string value, int op)
+void SubjectiveDb::abort(std::string key, std::string value, int op)
 {
    PSIBASE_SUBJECTIVE_TX
    {
@@ -74,7 +75,7 @@ void SubjectiveService::abort(std::string key, std::string value, int op)
    }
 }
 
-void SubjectiveService::nested(std::string key, std::string value1, std::string value2)
+void SubjectiveDb::nested(std::string key, std::string value1, std::string value2)
 {
    auto table = Tables{}.open<SubjectiveTable>();
    PSIBASE_SUBJECTIVE_TX
@@ -88,13 +89,13 @@ void SubjectiveService::nested(std::string key, std::string value1, std::string 
    }
 }
 
-void SubjectiveService::nestFail1a(bool commit)
+void SubjectiveDb::nestFail1a(bool commit)
 {
    psibase::checkoutSubjective();
-   recurse().to<SubjectiveService>().nestFail1b(commit);
+   recurse().to<SubjectiveDb>().nestFail1b(commit);
 }
 
-void SubjectiveService::nestFail1b(bool commit)
+void SubjectiveDb::nestFail1b(bool commit)
 {
    if (commit)
       psibase::commitSubjective();
@@ -102,31 +103,31 @@ void SubjectiveService::nestFail1b(bool commit)
       psibase::abortSubjective();
 }
 
-void SubjectiveService::nestFail2a(bool commit)
+void SubjectiveDb::nestFail2a(bool commit)
 {
-   recurse().to<SubjectiveService>().nestFail2b();
+   recurse().to<SubjectiveDb>().nestFail2b();
    if (commit)
       psibase::commitSubjective();
    else
       psibase::abortSubjective();
 }
 
-void SubjectiveService::nestFail2b()
+void SubjectiveDb::nestFail2b()
 {
    psibase::checkoutSubjective();
 }
 
-void SubjectiveService::nestFail3a(bool commit1, bool commit2)
+void SubjectiveDb::nestFail3a(bool commit1, bool commit2)
 {
    psibase::checkoutSubjective();
-   recurse().to<SubjectiveService>().nestFail3b(commit2);
+   recurse().to<SubjectiveDb>().nestFail3b(commit2);
    if (commit1)
       psibase::commitSubjective();
    else
       psibase::abortSubjective();
 }
 
-void SubjectiveService::nestFail3b(bool commit)
+void SubjectiveDb::nestFail3b(bool commit)
 {
    if (commit)
       psibase::commitSubjective();
@@ -135,7 +136,7 @@ void SubjectiveService::nestFail3b(bool commit)
    psibase::checkoutSubjective();
 }
 
-std::optional<HttpReply> SubjectiveService::serveSys(const HttpRequest& req)
+std::optional<HttpReply> SubjectiveDb::serveSys(const HttpRequest& req)
 {
    if (req.target == "/write")
    {
@@ -165,4 +166,4 @@ std::optional<HttpReply> SubjectiveService::serveSys(const HttpRequest& req)
    return {};
 }
 
-PSIBASE_DISPATCH(SubjectiveService)
+PSIBASE_DISPATCH(SubjectiveDb)

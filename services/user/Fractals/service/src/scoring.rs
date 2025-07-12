@@ -1,7 +1,3 @@
-pub fn calculate_ema(new_score: f32, previous_score: f32, alpha: f32) -> f32 {
-    alpha * new_score + (1.0 - alpha) * previous_score
-}
-
 pub fn calculate_ema_u32(new_val: u32, prev_val: u32, alpha: Fraction) -> u32 {
     ema_u32_q(new_val, prev_val, alpha.to_q16())
 }
@@ -19,10 +15,6 @@ impl Fraction {
             numerator,
             denominator,
         }
-    }
-
-    pub fn to_f32(self) -> f32 {
-        self.numerator as f32 / self.denominator as f32
     }
 
     /// Converts the fraction to Q0.16 fixed-point (0‥=65 535)
@@ -58,6 +50,16 @@ fn ema_u32_q(new_val: u32, prev_val: u32, alpha_q16: u16) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl Fraction {
+        fn to_f32(self) -> f32 {
+            self.numerator as f32 / self.denominator as f32
+        }
+    }
+
+    fn calculate_ema(new_score: f32, previous_score: f32, alpha: f32) -> f32 {
+        alpha * new_score + (1.0 - alpha) * previous_score
+    }
 
     #[test]
     fn test_fraction_conversion() {

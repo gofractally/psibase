@@ -2,11 +2,12 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
-#include "subjective-service.hpp"
+#include <services/test/SubjectiveDb.hpp>
 
 using namespace psibase;
 using namespace psio;
 using namespace SystemService;
+using namespace TestService;
 
 template <typename T>
 struct Catch::StringMaker<std::optional<T>>
@@ -27,12 +28,12 @@ struct Catch::StringMaker<std::optional<T>>
 TEST_CASE("subjective db")
 {
    DefaultTestChain t;
-   t.addService(SubjectiveService::service, "subjective-service.wasm");
+   t.addService(SubjectiveDb::service, "SubjectiveDb.wasm");
    t.from(SetCode::service)
        .to<SetCode>()
-       .setFlags(SubjectiveService::service, SubjectiveService::serviceFlags);
-   t.from(SubjectiveService::service).to<HttpServer>().registerServer(SubjectiveService::service);
-   auto subjective = t.from(SubjectiveService::service).to<SubjectiveService>();
+       .setFlags(SubjectiveDb::service, SubjectiveDb::serviceFlags);
+   t.from(SubjectiveDb::service).to<HttpServer>().registerServer(SubjectiveDb::service);
+   auto subjective = t.from(SubjectiveDb::service).to<SubjectiveDb>();
 
    CHECK(subjective.write("a", "b").succeeded());
    CHECK(subjective.read("a").returnVal() == std::optional{std::string("b")});
@@ -72,7 +73,7 @@ TEST_CASE("subjective db")
       }
    }
 
-   t.post(SubjectiveService::service, "/write", SubjectiveRow{"c", "d"});
-   CHECK(t.post<std::optional<std::string>>(SubjectiveService::service, "/read", "c") ==
+   t.post(SubjectiveDb::service, "/write", SubjectiveRow{"c", "d"});
+   CHECK(t.post<std::optional<std::string>>(SubjectiveDb::service, "/read", "c") ==
          std::optional{std::string("d")});
 }

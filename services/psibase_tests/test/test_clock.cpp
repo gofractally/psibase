@@ -1,4 +1,4 @@
-#include "clock-service.hpp"
+#include <services/test/TestClock.hpp>
 
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -10,9 +10,9 @@ using namespace psibase;
 TEST_CASE("test clock")
 {
    DefaultTestChain t;
-   t.addService<ClockService>("clock-service.wasm");
+   t.addService<TestClock>("TestClock.wasm");
 
-   auto clockService = t.from(ClockService::service).to<ClockService>();
+   auto clockService = t.from(TestClock::service).to<TestClock>();
 
    CHECK(clockService.testReal().succeeded());
    CHECK(clockService.testMono().succeeded());

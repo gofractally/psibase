@@ -29,15 +29,16 @@ pub fn get_latest() -> Option<AsymKey> {
     get().ok()?.into_iter().last()
 }
 
-pub fn save(keys: Vec<AsymKey>) -> Result<(), Error> {
-    Keyvalue::set(KEY, &keys.packed())
+pub fn save(keys: Vec<AsymKey>) {
+    Keyvalue::set(KEY, &keys.packed());
 }
 
 pub fn add(new_key: AsymKey) -> Result<(), Error> {
     let mut current_keys = get()?;
     current_keys.push(new_key);
     current_keys.sort_by_key(|k| k.created_at);
-    save(current_keys)
+    save(current_keys);
+    Ok(())
 }
 
 impl AsymKey {
@@ -114,21 +115,16 @@ impl SymmetricKey {
     }
 
     pub fn generate(salt: Vec<u8>) -> Self {
-        let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().random();
+        let new_shared_symmetric_key: [u8; 32] = rand::rng().random();
         Self {
             key: new_shared_symmetric_key.to_vec(),
             salt,
         }
     }
 
-    pub fn save(
-        &self,
-        owner: AccountNumber,
-        evaluation_id: u32,
-        group_number: u32,
-    ) -> Result<(), Error> {
+    pub fn save(&self, owner: AccountNumber, evaluation_id: u32, group_number: u32) {
         let key = Self::storage_key(owner, evaluation_id, group_number);
         let packed_key = self.packed();
-        Keyvalue::set(&key, &packed_key)
+        Keyvalue::set(&key, &packed_key);
     }
 }

@@ -1,4 +1,4 @@
-#include "event-service.hpp"
+#include <services/test/EmitEvents.hpp>
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -7,36 +7,37 @@
 #include <services/user/Packages.hpp>
 
 using namespace psibase;
+using namespace TestService;
 
-void EventService::init()
+void EmitEvents::init()
 {
-   to<SystemService::HttpServer>().registerServer(EventService::service);
+   to<SystemService::HttpServer>().registerServer(EmitEvents::service);
 
-   to<UserService::Packages>().setSchema(ServiceSchema::make<EventService>());
+   to<UserService::Packages>().setSchema(ServiceSchema::make<EmitEvents>());
 }
 
-psibase::EventNumber EventService::foo(std::string s, int i)
+psibase::EventNumber EmitEvents::foo(std::string s, int i)
 {
    return emit().history().e(s, i);
 }
 
-void EventService::foo2(std::string s, int i)
+void EmitEvents::foo2(std::string s, int i)
 {
    emit().history().e(s, i);
 }
 
-psibase::EventNumber EventService::emitMerkle(std::string s)
+psibase::EventNumber EmitEvents::emitMerkle(std::string s)
 {
    return emit().merkle().m(s);
 }
 
-psibase::EventNumber EventService::emitFail(std::string s, int i)
+psibase::EventNumber EmitEvents::emitFail(std::string s, int i)
 {
    emit().history().e(s, i);
    abortMessage("die");
 }
 
-void EventService::emitExample(ExampleRecord r)
+void EmitEvents::emitExample(ExampleRecord r)
 {
    emit().history().e2(r);
 }
@@ -86,7 +87,7 @@ PSIO_REFLECT(Query,  //
              method(foo2Events, first, last, before, after),
              method(exampleRecords, first, last, before, after))
 
-std::optional<psibase::HttpReply> EventService::serveSys(psibase::HttpRequest request)
+std::optional<psibase::HttpReply> EmitEvents::serveSys(psibase::HttpRequest request)
 {
    if (auto result = serveGraphQL(request, Query{}))
       return result;
@@ -94,4 +95,4 @@ std::optional<psibase::HttpReply> EventService::serveSys(psibase::HttpRequest re
    return std::nullopt;
 }
 
-PSIBASE_DISPATCH(EventService)
+PSIBASE_DISPATCH(EmitEvents)

@@ -1,9 +1,12 @@
 #include <psibase/api.hpp>
+#include <psibase/dispatch.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_bin.hpp>
 #include <psio/to_key.hpp>
+#include <services/test/TestKV.hpp>
 
 using namespace psibase;
+using namespace TestService;
 
 static constexpr bool enable_print = false;
 
@@ -53,8 +56,9 @@ std::vector<item> items = {
 };
 // clang-format on
 
-void test(AccountNumber thisService)
+void TestKV::test()
 {
+   auto thisService = getReceiver();
    if (enable_print)
       printf("kvPut\n");
    for (const auto& item : items)
@@ -157,13 +161,4 @@ void test(AccountNumber thisService)
 
 }  // test()
 
-extern "C" void called(AccountNumber thisService, AccountNumber sender)
-{
-   test(thisService);
-}
-
-extern "C" void __wasm_call_ctors();
-extern "C" void start(AccountNumber thisService)
-{
-   __wasm_call_ctors();
-}
+PSIBASE_DISPATCH(TestKV)

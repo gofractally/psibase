@@ -1,12 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-mod errors;
-use errors::ErrorType::*;
-
 use bindings::exports::clientdata::plugin::keyvalue::Guest as KeyValue;
 use bindings::host::common::client as Client;
-use bindings::host::common::types as CommonTypes;
 use bindings::wasi::keyvalue as Kv;
 
 use bindings::exports::clientdata::plugin::tests::Guest as Tests;
@@ -44,12 +40,7 @@ impl KeyValue for ClientData {
         None
     }
 
-    fn set(key: String, value: Vec<u8>) -> Result<(), CommonTypes::Error> {
-        // Don't set empty records
-        if value.len() == 0 {
-            return Err(EmptyValue(key).into());
-        }
-
+    fn set(key: String, value: Vec<u8>) {
         let bucket =
             Kv::store::open(&get_sender()).expect("Failed to open table in keyvalue store");
 
@@ -58,8 +49,6 @@ impl KeyValue for ClientData {
             .set(&key, &value)
             .map_err(|e| format!("Error setting value on key {}: {}", key, e.to_string()))
             .unwrap_or_else(|e| panic!("{}", e));
-
-        Ok(())
     }
 
     fn delete(key: String) {
