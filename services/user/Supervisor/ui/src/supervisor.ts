@@ -120,7 +120,7 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    public supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
+    private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         let newContext = false;
         if (!this.context) {
             newContext = true;
