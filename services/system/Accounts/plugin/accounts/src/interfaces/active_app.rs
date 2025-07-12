@@ -1,11 +1,15 @@
-use crate::bindings::accounts::account_tokens::types::*;
-use crate::bindings::exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
-use crate::bindings::exports::accounts::plugin::api::Guest;
+use crate::bindings::*;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
+use accounts::account_tokens::types::*;
+use exports::accounts::plugin::{
+    active_app::{Guest as ActiveApp, *},
+    api::Guest,
+};
+use host::common::{client::get_app_url, types::OriginationData};
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
@@ -17,17 +21,9 @@ impl ActiveApp for AccountsPlugin {
 
         let app = get_assert_top_level_app("login", &vec![])?;
 
-        let app_name = match &app.app {
-            Some(name) => name,
-            None => {
-                let msg = format!("Unrecognized app: {}", app.origin);
-                return Err(InvalidApp(msg).into());
-            }
-        };
-
-        if *app_name != psibase::services::accounts::SERVICE.to_string() {
+        if *app != psibase::services::accounts::SERVICE.to_string() {
             let connected_apps = UserTable::new(&user).get_connected_apps();
-            if !connected_apps.contains(app_name) {
+            if !connected_apps.contains(&app) {
                 return Err(NotConnected(user).into());
             }
         }
@@ -49,6 +45,11 @@ impl ActiveApp for AccountsPlugin {
 
     fn create_connection_token() -> Result<String, Error> {
         let app = get_assert_top_level_app("create_connection_token", &vec![])?;
-        Ok(Token::new_connection_token(app).into())
+        let origin = get_app_url(&app);
+        Ok(Token::new_connection_token(OriginationData {
+            app: Some(app),
+            origin,
+        })
+        .into())
     }
 }

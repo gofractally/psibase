@@ -40,7 +40,7 @@ impl Api for PermissionsPlugin {
 
     fn is_auth(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
-        match Accounts::get_current_user()? {
+        match Accounts::get_current_user() {
             Some(current_user) => Ok(AccessGrants::get(&current_user, &caller, &callee).is_some()),
             None => Err(ErrorType::LoggedInUserDNE().into()),
         }
