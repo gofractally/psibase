@@ -1,0 +1,15 @@
+package host:prompt;
+
+interface api {
+    use host:common/types.{error};
+    get-active-prompt: func(id: u32, return-path: string) -> result<string, error>;
+}
+
+world impl {
+    include clientdata:plugin/imports;
+    include accounts:plugin/imports;
+    include host:common/imports;
+
+    export api;
+    export web;
+}

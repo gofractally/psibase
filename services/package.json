@@ -14,6 +14,7 @@
             "system/AuthSig/ui",
             "system/Producers/ui",
             "user/Supervisor/ui",
+            "user/Host/ui",
             "user/Branding/ui",
             "user/Explorer/ui",
             "user/Evaluations/ui",

@@ -34,7 +34,6 @@ export default defineConfig(({ command }) => ({
             external: ["hash.js", "elliptic"],
             input: {
                 main: path.resolve(serviceDir, "index.html"),
-                oauth: path.resolve(serviceDir, "oauth.html"),
             },
             output: {
                 entryFileNames: "assets/[name].js",

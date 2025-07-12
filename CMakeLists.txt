@@ -283,6 +283,7 @@ add_rs_component_workspace(services/:Plugins
     permissions
     sites
     host-common
+    host-prompt
     tokens
     transact
     workshop
@@ -414,8 +415,10 @@ psibase_package(
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
     SERVICE host
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Host/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
-    DEPENDS ${Plugins_DEP}
+        DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
+    DEPENDS ${Plugins_DEP} ${Host_js_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
