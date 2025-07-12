@@ -16,7 +16,7 @@ flowchart TD
    A --> B --> C
    sites --> E{{was site data found?}} -->|yes| 200
    E -->|no| 404
-   C --> G{{target begins with '/common'?}}
+   C --> G{{target begins with '/common/'?}}
    G -->|yes| common['common-api' service's serveSys action] --> serveSys
    G -->|no| I{{on a subdomain?}} -->|no| home['homepage' service's serveSys action] --> serveSys
    I -->|yes| J{{Has registered server?}}
@@ -28,7 +28,7 @@ flowchart TD
 
 `psinode` passes most HTTP requests to the [SystemService::HttpServer] service, which then routes requests to the appropriate service's [serveSys](https://docs.rs/psibase/latest/psibase/server_interface/struct.ServerActions.html#method.serveSys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId](https://docs.rs/psibase/latest/psibase/enum.DbId.html).
 
-[SystemService::CommonApi] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+[SystemService::CommonApi] provides services common to all domains under the `/common/` tree.
 
 [SystemService::Sites] provides web hosting for non-service accounts or service accounts that did not [register](#registration) for HTTP handling.
 

@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 package = "clientdata:plugin"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "wasi:keyvalue" = { path = "../../../user/CommonApi/common/packages/wit/wasi-keyvalue.wit" }
 
 [package.metadata.component.target]

@@ -6,6 +6,15 @@ interface types {
     /// A reference to a specific plugin interface. Used for dynamically linking to other plugin functions.
     resource plugin-ref {
         constructor(service: string, plugin: string, intf: string);
+
+        /// Gets the name of the service whose plugin is referenced
+        get-service: func() -> string;
+
+        /// Gets the name of the plugin on which the function is being called
+        get-plugin: func() -> string;
+
+        /// Gets the name of the function being called
+        get-intf: func() -> string;
     }
 
     /// A standard error type plugins can use to propagate errors
@@ -42,6 +51,7 @@ interface types {
     variant body-types {
         bytes(list<u8>),
         json(string),
+        text(string),
     }
 
     /// The object needed to specify a post request
@@ -59,7 +69,7 @@ interface types {
 /// Common calls related to interactions with the server
 interface server {
 
-    use types.{error, post-request};
+    use types.{error, post-request, body-types};
 
     /// Used to post graphql to the server and get a JSON response back
     /// The graphql payload is automatically posted to the app's own `/graphql` endpoint.
@@ -72,7 +82,7 @@ interface server {
     /// 
     /// Parameters
     /// * `request`: The required details of the post request
-    post: func(request: post-request) -> result<string, error>;
+    post: func(request: post-request) -> result<body-types, error>;
 
     /// Used to call a GET endpoint on the app's own http server to retrieve a JSON
     /// payload.
@@ -109,8 +119,22 @@ interface client {
     get-app-url: func(app: string) -> string;
 }
 
+interface admin {
+    use types.{origination-data, post-request, body-types, error};
+    
+    /// Get active app (the top level app with which the user is interacting)
+    get-active-app: func() -> origination-data;
+
+    /// Make a post request
+    post: func(app: string, request: post-request) -> result<option<body-types>, error>;
+}
+
 world imports {
     import types;
     import server;
     import client;
+}
+
+world privileged {
+    import admin;
 }

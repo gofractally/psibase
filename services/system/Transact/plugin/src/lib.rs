@@ -31,6 +31,8 @@ use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, Transact
 use serde::Deserialize;
 use serde_json::from_str;
 
+use crate::bindings::host::common::types::BodyTypes;
+
 // The transaction construction cycle, including hooks, is as follows:
 //
 // 1. start-tx
@@ -186,7 +188,13 @@ impl Admin for TransactPlugin {
         // Could allow a user to inspect a final transaction rather than publish
         //   (Helpful for debugging, post-install scripts, offline msig, etc.)
 
-        let trace = from_str::<TransactionTrace>(&signed_tx.publish()?).unwrap();
+        let body = signed_tx.publish()?;
+        let trace = match body {
+            BodyTypes::Json(t) => from_str::<TransactionTrace>(&t).unwrap(),
+            _ => {
+                return Err(TransactionError("Invalid response body".to_string()).into());
+            }
+        };
 
         // TODO (idea): on_hook_post_publish(trace)
         // Could be for logging, or for other post-transaction client-side processing
@@ -252,9 +260,16 @@ impl Login for TransactPlugin {
             endpoint: "/login".to_string(),
             body: Host::types::BodyTypes::Bytes(signed_tx.packed()),
         })?;
-        let body: LoginReply =
-            serde_json::from_str(&response).expect("Failed to deserialize response");
-        Ok(body.access_token)
+
+        let reply = match response {
+            BodyTypes::Json(t) => {
+                serde_json::from_str::<LoginReply>(&t).expect("Failed to deserialize response")
+            }
+            _ => {
+                return Err(BadResponse("Invalid body type").into());
+            }
+        };
+        Ok(reply.access_token)
     }
 }
 

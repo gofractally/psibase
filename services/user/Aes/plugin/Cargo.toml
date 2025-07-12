@@ -20,4 +20,4 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "kdf:plugin" = { path = "../../Kdf/plugin/wit/world.wit" }
-"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }

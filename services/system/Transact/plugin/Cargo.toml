@@ -22,7 +22,7 @@ package = "transact:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 

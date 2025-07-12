@@ -26,7 +26,7 @@ package = "invite:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "accounts:account-tokens" = { path = "../../../system/Accounts/plugin/account_tokens/wit/world.wit" }

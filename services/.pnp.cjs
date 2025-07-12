@@ -677,6 +677,21 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@bytecodealliance/jco", [\
+      ["npm:1.10.2", {\
+        "packageLocation": "../.caches/yarn/@bytecodealliance-jco-npm-1.10.2-71adf3c8c0-61f16bbba6.zip/node_modules/@bytecodealliance/jco/",\
+        "packageDependencies": [\
+          ["@bytecodealliance/componentize-js", "npm:0.17.0"],\
+          ["@bytecodealliance/jco", "npm:1.10.2"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
+          ["binaryen", "npm:122.0.0"],\
+          ["chalk-template", "npm:1.1.0"],\
+          ["commander", "npm:12.1.0"],\
+          ["mkdirp", "npm:3.0.1"],\
+          ["ora", "npm:8.2.0"],\
+          ["terser", "npm:5.43.1"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["npm:1.11.2", {\
         "packageLocation": "../.caches/yarn/@bytecodealliance-jco-npm-1.11.2-d9611a2eda-7767f14256.zip/node_modules/@bytecodealliance/jco/",\
         "packageDependencies": [\
@@ -2871,7 +2886,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/Supervisor/ui", {\
         "packageLocation": "./user/Supervisor/ui/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco", "npm:1.11.2"],\
+          ["@bytecodealliance/jco", "npm:1.10.2"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
           ["@rollup/browser", "npm:4.44.1"],\
@@ -8705,6 +8720,13 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["binaryen", [\
+      ["npm:122.0.0", {\
+        "packageLocation": "../.caches/yarn/binaryen-npm-122.0.0-5b79369e74-db7f0b014c.zip/node_modules/binaryen/",\
+        "packageDependencies": [\
+          ["binaryen", "npm:122.0.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["npm:123.0.0", {\
         "packageLocation": "../.caches/yarn/binaryen-npm-123.0.0-0c6ca2c6be-586dbd8422.zip/node_modules/binaryen/",\
         "packageDependencies": [\

@@ -1,8 +1,14 @@
 package clientdata:plugin;
 
+interface tests {
+    use wasi:keyvalue/store@0.2.0-draft.{error};
+    kv-test: func() -> result<_, error>;
+}
+
 world impl {
     include host:common/imports;
     include wasi:keyvalue/imports@0.2.0-draft;
 
     export keyvalue;
+    export tests;
 }

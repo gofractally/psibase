@@ -398,6 +398,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@bytecodealliance/jco@npm:1.10.2":
+  version: 1.10.2
+  resolution: "@bytecodealliance/jco@npm:1.10.2"
+  dependencies:
+    "@bytecodealliance/componentize-js": "npm:^0.17.0"
+    "@bytecodealliance/preview2-shim": "npm:^0.17.2"
+    binaryen: "npm:^122.0.0"
+    chalk-template: "npm:^1"
+    commander: "npm:^12"
+    mkdirp: "npm:^3"
+    ora: "npm:^8"
+    terser: "npm:^5"
+  bin:
+    jco: src/jco.js
+  checksum: 10c0/61f16bbba699d03ef789cfc7cf203ed47fe71412cd7d3b834774fa174a3cf6b57d277e92446c4607fa7cf7b7ab43a41035fd8a4b48fd8fee9c305115bf577075
+  languageName: node
+  linkType: hard
+
 "@bytecodealliance/jco@npm:^1.3.1, @bytecodealliance/jco@npm:^1.9.1":
   version: 1.11.2
   resolution: "@bytecodealliance/jco@npm:1.11.2"
@@ -2001,7 +2019,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/supervisor-ui@workspace:user/Supervisor/ui"
   dependencies:
-    "@bytecodealliance/jco": "npm:^1.3.1"
+    "@bytecodealliance/jco": "npm:1.10.2"
     "@psibase/common-lib": "workspace:*"
     "@rollup/browser": "npm:^4.9.0"
     "@tanstack/react-query": "npm:^5.52.0"
@@ -6051,6 +6069,23 @@ __metadata:
   version: 2.3.0
   resolution: "binary-extensions@npm:2.3.0"
   checksum: 10c0/75a59cafc10fb12a11d510e77110c6c7ae3f4ca22463d52487709ca7f18f69d886aa387557cc9864fbdb10153d0bdb4caacabf11541f55e89ed6e18d12ece2b5
+  languageName: node
+  linkType: hard
+
+"binaryen@npm:^122.0.0":
+  version: 122.0.0
+  resolution: "binaryen@npm:122.0.0"
+  bin:
+    wasm-as: bin/wasm-as
+    wasm-ctor-eval: bin/wasm-ctor-eval
+    wasm-dis: bin/wasm-dis
+    wasm-merge: bin/wasm-merge
+    wasm-metadce: bin/wasm-metadce
+    wasm-opt: bin/wasm-opt
+    wasm-reduce: bin/wasm-reduce
+    wasm-shell: bin/wasm-shell
+    wasm2js: bin/wasm2js
+  checksum: 10c0/db7f0b014c5b3126923d3d7609cd16d553542334da333a838ffb74c2f83f98a336beb4f8b1c530bfed34d094491c8bbc546fee6b92ce8704c3810bca60b99763
   languageName: node
   linkType: hard
 

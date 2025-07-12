@@ -23,7 +23,7 @@ interface admin {
 
 world impl {
     include host:common/imports;
-    include host:privileged/imports;
+    include host:common/privileged;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
     include accounts:account-tokens/imports;

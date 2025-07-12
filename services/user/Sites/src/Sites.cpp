@@ -8,6 +8,7 @@
 #include <psibase/serveSimpleUI.hpp>
 #include <regex>
 #include <services/system/Accounts.hpp>
+#include <services/system/HttpServer.hpp>
 
 using namespace psibase;
 
@@ -50,8 +51,8 @@ namespace SystemService
          std::string serviceName;
 
          // Path reserved across all subdomains
-         if (req.target.starts_with("/common"))
-            serviceName = "common-api";
+         if (req.target.starts_with(HttpServer::commonApiPrefix))
+            serviceName = HttpServer::commonApiService.str();
 
          // subdomain
          else if (isSubdomain(req))
@@ -59,7 +60,7 @@ namespace SystemService
 
          // root domain
          else
-            serviceName = "homepage";
+            serviceName = HttpServer::homepageService.str();
 
          return AccountNumber(serviceName);
       }

@@ -24,7 +24,7 @@ package = "packages:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
