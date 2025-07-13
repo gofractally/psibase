@@ -40,7 +40,7 @@ impl<F: FlagsType> Flags<F> {
     fn validate_index(index: u8) {
         check(
             index < std::mem::size_of::<F::BitsetType>() as u8 * 8,
-            "invalid index",
+            format!("invalid index of {}", index).as_str(),
         );
     }
 

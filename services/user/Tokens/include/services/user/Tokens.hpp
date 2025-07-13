@@ -14,8 +14,7 @@ namespace UserService
    class Tokens : public psibase::Service
    {
      public:
-      using Tables = psibase::
-          ServiceTables<TokenTable, BalanceTable, SharedBalanceTable, TokenHolderTable, InitTable>;
+      using Tables = psibase::ServiceTables<TokenTable, TokenHolderTable, InitTable>;
 
       using Memo = psibase::Memo;
 
@@ -180,7 +179,7 @@ namespace UserService
       /// * `account` - User account.
       ///
       /// # Returns user balance information
-      BalanceRecord getBalance(TID tokenId, psibase::AccountNumber account);
+      Quantity getBalance(TID tokenId, psibase::AccountNumber account);
 
       /// Get shared balance.
       ///

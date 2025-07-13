@@ -73,7 +73,7 @@ pub struct Balance {
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
-    use super::{Balance, Memo, Quantity, SharedBalance, TokenRecord, TID};
+    use super::{Balance, Memo, Quantity, TokenRecord, TID};
     use crate::AccountNumber;
 
     #[action]
@@ -190,12 +190,24 @@ mod service {
     /// Lookup token details.
     ///
     /// # Arguments
-    /// * `token_id` - The permanent max supply of the token.
+    /// * `token_id` - Unique token identifier.
     ///
     /// # Returns token information including current, burned supply and precision.
     #[action]
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> TokenRecord {
+        unimplemented!()
+    }
+
+    /// Lookup token symbol by token_id.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier.
+    ///
+    /// # Returns token symbol.
+    #[action]
+    #[allow(non_snake_case)]
+    fn getTokenSymbol(token_id: TID) -> AccountNumber {
         unimplemented!()
     }
 

@@ -220,11 +220,11 @@ SCENARIO("Recalling tokens")
 
          AND_THEN("Bob's token balance has decreased")
          {
-            CHECK(a.getBalance(tokenId, bob).returnVal().balance == 0);
+            CHECK(a.getBalance(tokenId, bob).returnVal().value == 0);
          }
          AND_THEN("Alice's token balance has not changed")
          {
-            CHECK(a.getBalance(tokenId, alice).returnVal().balance == 0);
+            CHECK(a.getBalance(tokenId, alice).returnVal().value == 0);
          }
       }
       THEN("The token issuer may turn off recallability")

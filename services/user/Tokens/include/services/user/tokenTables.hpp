@@ -47,53 +47,6 @@ namespace UserService
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    PSIO_REFLECT_TYPENAME(TokenTable)
 
-   struct BalanceKey
-   {
-      psibase::AccountNumber account;
-      TID                    tokenId;
-
-      auto operator<=>(const BalanceKey&) const = default;
-   };
-   PSIO_REFLECT(BalanceKey, account, tokenId);
-
-   struct BalanceRecord
-   {
-      BalanceKey key;
-      uint64_t   balance;
-
-      auto operator<=>(const BalanceRecord&) const = default;
-   };
-   PSIO_REFLECT(BalanceRecord, key, balance);
-   using BalanceTable = psibase::Table<BalanceRecord, &BalanceRecord::key>;
-   PSIO_REFLECT_TYPENAME(BalanceTable)
-
-   struct SharedBalanceKey
-   {
-      psibase::AccountNumber creditor;
-      psibase::AccountNumber debitor;
-      TID                    tokenId;
-
-      auto operator<=>(const SharedBalanceKey&) const = default;
-   };
-   PSIO_REFLECT(SharedBalanceKey, creditor, debitor, tokenId);
-
-   struct SharedBalanceRecord
-   {
-      SharedBalanceKey key;
-      uint64_t         balance;
-
-      using ByDebitor = psibase::NestedKey<&SharedBalanceRecord::key,
-                                           psibase::CompositeKey<&SharedBalanceKey::debitor,
-                                                                 &SharedBalanceKey::creditor,
-                                                                 &SharedBalanceKey::tokenId>{}>;
-
-      auto operator<=>(const SharedBalanceRecord&) const = default;
-   };
-   PSIO_REFLECT(SharedBalanceRecord, key, balance);
-   using SharedBalanceTable = psibase::
-       Table<SharedBalanceRecord, &SharedBalanceRecord::key, SharedBalanceRecord::ByDebitor{}>;
-   PSIO_REFLECT_TYPENAME(SharedBalanceTable)
-
    struct TokenHolderRecord
    {
       psibase::AccountNumber account;

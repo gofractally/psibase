@@ -4,13 +4,10 @@ pub mod tables;
 pub mod service {
     use crate::tables::tables::*;
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
-    use psibase::services::nft::{Wrapper as Nfts, NID};
-    use psibase::services::symbol::{Service::Wrapper as Symbol, SID};
-    use psibase::services::tokens::{Memo, Precision, Quantity};
+    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::symbol::Service::Wrapper as Symbol;
+    use psibase::services::tokens::{Memo, Quantity};
     use psibase::AccountNumber;
-
-    use psibase::{Fracpack, ToSchema};
-    use serde::{Deserialize, Serialize};
 
     use psibase::*;
 
@@ -67,6 +64,21 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> Token {
         Token::get_assert(token_id)
+    }
+
+    /// Lookup token details.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier.
+    ///
+    /// # Returns token information including current, burned supply and precision.
+    #[action]
+    #[allow(non_snake_case)]
+    fn getTokenSymbol(token_id: TID) -> AccountNumber {
+        check_some(
+            Token::get_assert(token_id).symbol,
+            "token does not have symbol",
+        )
     }
 
     /// Map a symbol to a token.
