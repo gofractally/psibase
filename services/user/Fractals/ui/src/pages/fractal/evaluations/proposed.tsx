@@ -107,7 +107,7 @@ export const Proposed = () => {
                                 children={(field) => (
                                     <field.DateTime
                                         label="Registration start"
-                                        description="When users may register / RSVP for the evaluation, it's recommended to set this 15 minutes prior to evaluation start."
+                                        description="When users may register/RSVP for the evaluation."
                                     />
                                 )}
                             />
@@ -117,8 +117,6 @@ export const Proposed = () => {
                                     <field.Duration label="Registration duration" />
                                 )}
                             />
-                            No evaluations scheduled This fractal has no
-                            scheduled evaluations.
                             <form.AppField
                                 name="deliberationSeconds"
                                 children={(field) => (
