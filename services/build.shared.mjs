@@ -41,7 +41,7 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
         
         if (stat.isDirectory()) {
           // Skip target and dist directories as they are build outputs
-          if (file === 'target' || file === 'dist' || file === '.vite-cache' || file === '.svelte-kit' || file === '.tsbuildinfo') continue;
+          if (file === 'target' || file === '.tmp' || file === 'dist' || file === '.vite-cache' || file === '.svelte-kit' || file === '.tsbuildinfo') continue;
           const subHashes = calculateFileHashes(filePath);
           for (const [subPath, hash] of subHashes) {
             fileHashes.set(subPath, hash);
