@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -39,7 +40,6 @@ export const CreateFractalModal = ({
         },
         onSubmit: async (data) => {
             await createFractal(data.value);
-            data.formApi.reset();
             openChange(false);
             navigate(`/fractal/${data.value.account}`);
             refetch();
@@ -48,6 +48,12 @@ export const CreateFractalModal = ({
             onChange: zCreateFractalSchema,
         },
     });
+
+    useEffect(() => {
+        if (show && form.state.isSubmitSuccessful) {
+            form.reset();
+        }
+    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
