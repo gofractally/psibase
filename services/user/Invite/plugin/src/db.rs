@@ -7,7 +7,7 @@ use types::InviteRecordSubset;
 pub struct InvitesTable {}
 impl InvitesTable {
     pub fn add_invite(id: u32, invite: &InviteRecordSubset) {
-        clientdata::set(&id.to_string(), &invite.packed()).unwrap();
+        clientdata::set(&id.to_string(), &invite.packed());
     }
 
     pub fn get_invite(id: u32) -> Option<InviteRecordSubset> {

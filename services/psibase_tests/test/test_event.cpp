@@ -1,4 +1,4 @@
-#include "event-service.hpp"
+#include <services/test/EmitEvents.hpp>
 
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -7,6 +7,7 @@
 #include <catch2/catch_all.hpp>
 
 using namespace psibase;
+using namespace TestService;
 using namespace std::literals::string_literals;
 
 ///////////////////////////////////
@@ -111,7 +112,7 @@ auto query(DefaultTestChain& t, const std::string& query_str)
    auto             query    = GraphQLBody{query_sv};
 
    std::cout << "Querying: " << std::string(query_sv) << "\n";
-   auto res = t.post(EventService::service, "/graphql", query);
+   auto res = t.post(EmitEvents::service, "/graphql", query);
 
    auto body = std::string(res.body.begin(), res.body.end());
    std::cout << "Response: " << body << "\n";
@@ -130,13 +131,13 @@ TEST_CASE("test events")
 {
    DefaultTestChain t;
    auto             event_service =
-       t.from(t.addService("event-service"_a, "event-service.wasm")).to<EventService>();
+       t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
    REQUIRE(event_service.init().succeeded());
 
    auto evId = event_service.foo("antidisestablishmentarianism", 42).returnVal();
 
    {
-      auto [s, i] = EventService().events().history().e(evId);
+      auto [s, i] = EmitEvents().events().history().e(evId);
       CHECK(s == "antidisestablishmentarianism"s);
       CHECK(i == 42);
    }
@@ -145,8 +146,8 @@ TEST_CASE("test events")
 TEST_CASE("test merkle events")
 {
    DefaultTestChain t;
-   t.addService("event-service"_a, "event-service.wasm");
-   auto event_service = t.from("event-service"_a).to<EventService>();
+   t.addService(EmitEvents::service, "EmitEvents.wasm");
+   auto event_service = t.from(EmitEvents::service).to<EmitEvents>();
    t.setAutoBlockStart(false);
    t.startBlock();
    {
@@ -182,7 +183,7 @@ TEST_CASE("test event in failed transaction")
    DefaultTestChain t;
 
    auto event_service =
-       t.from(t.addService("event-service"_a, "event-service.wasm")).to<EventService>();
+       t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
 
    auto id1 = event_service.foo("a", 1).returnVal();
    auto id2 = event_service.foo("b", 2).returnVal();
@@ -196,7 +197,7 @@ TEST_CASE("graphql")
    DefaultTestChain t;
 
    auto event_service =
-       t.from(t.addService("event-service"_a, "event-service.wasm")).to<EventService>();
+       t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
    REQUIRE(event_service.init().succeeded());
 
    auto query = [](std::string query_name, std::string params, std::string fields) {  //

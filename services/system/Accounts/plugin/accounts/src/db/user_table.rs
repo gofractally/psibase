@@ -52,8 +52,7 @@ impl UserTable {
         Keyvalue::set(
             &self.prefixed_key(DbKeys::CONNECTED_APPS),
             &connected_apps.packed(),
-        )
-        .expect("Failed to set connected apps");
+        );
     }
 
     pub fn get_connected_apps(&self) -> Vec<String> {

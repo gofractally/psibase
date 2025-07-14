@@ -203,14 +203,14 @@ function(ADD_BOOK_FILES path extension)
     set(doc-src ${doc-src} ${DOC_FILES} PARENT_SCOPE)
 endfunction()
 
-configure_file(doc/psidk/book.toml.in doc/psidk/book.toml)
-configure_file(doc/psidk/theme/index.hbs doc/psidk/theme/index.hbs)
-ADD_BOOK_FILES("/doc/psidk/theme/js/" "js")
-ADD_BOOK_FILES("/doc/psidk/theme/css/" "css")
-ADD_BOOK_FILES("/doc/psidk/src/_img/" "svg")
+configure_file(doc/book.toml.in doc/book.toml)
+configure_file(doc/theme/index.hbs doc/theme/index.hbs)
+ADD_BOOK_FILES("/doc/theme/js/" "js")
+ADD_BOOK_FILES("/doc/theme/css/" "css")
+ADD_BOOK_FILES("/doc/src/_img/" "svg")
 
-file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/*.md)
-list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/book.toml)
+file(GLOB_RECURSE doc-src ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/*.md)
+list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/book.toml)
 
 file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
 file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
@@ -221,7 +221,7 @@ add_custom_command(
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/book/html
     DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} ${doc-headers} ${doc-service-headers}
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/book
-    COMMAND mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk
+    COMMAND mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc
     COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/book "(" -name ".*" -o -name "*~" ")" -delete
     VERBATIM
 )
@@ -232,12 +232,12 @@ add_custom_target(
 
 function(add_manpage name)
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1
-        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/${name}.md
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/${name}.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1
+        DEPENDS md2man doc/src/run-infrastructure/cli/${name}.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/run-infrastructure/cli/${name}.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1
     )
-    add_custom_target(${name}.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1 TYPE MAN COMPONENT Client)
+    add_custom_target(${name}.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1 TYPE MAN COMPONENT Client)
 endfunction()
 
 add_manpage(psinode)
@@ -1005,7 +1005,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService-schema.json
         SERVER as-query
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/AsyncQueryService.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/src/AsyncQueryService.json
         FLAGS allowWriteSubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
@@ -1067,7 +1067,7 @@ install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPO
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
-    add_subdirectory(doc/psidk/src/development/services/cpp-service doc-examples)
+    add_subdirectory(doc/src/development/services/cpp-service doc-examples)
 endif()
 
 include(CPackComponent)
