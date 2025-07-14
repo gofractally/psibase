@@ -54,7 +54,7 @@ export const LoginButton = () => {
                             <span>{account}</span>
                         </DropdownMenuItem>
                     ))}
-                <DropdownMenuItem onClick={() => onSelect("-other")}>
+                <DropdownMenuItem onClick={() => login()}>
                     Other...
                 </DropdownMenuItem>
             </DropdownMenuContent>
