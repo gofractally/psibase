@@ -7,8 +7,6 @@ import { useForm } from "react-hook-form";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
 import { useAcceptInvite } from "@/hooks/useAcceptInvite";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
@@ -49,8 +47,6 @@ import { useLogout } from "./hooks/use-logout";
 import { useCreateAccount } from "./hooks/useCreateAccount";
 import { useImportAccount } from "./hooks/useImportAccount";
 import { useRejectInvite } from "./hooks/useRejectInvite";
-
-const supervisor = getSupervisor();
 
 dayjs.extend(relativeTime);
 
@@ -95,7 +91,6 @@ export const AccountSelection = () => {
             const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
-                console.log("onSubmit().connectionToken:", connectionToken);
                 await createAccount(values.username);
                 void (await acceptInvite({
                     origin,
@@ -104,7 +99,7 @@ export const AccountSelection = () => {
                     token: z.string().parse(token),
                 }));
             } else {
-                // Import existing account and perform login
+                // Import existing account
                 await importAccount(values.username);
                 if (!connectionToken) {
                     throw new Error("Invalid connectionToken");
@@ -160,15 +155,6 @@ export const AccountSelection = () => {
                   .includes(activeSearch.toLowerCase()),
           )
         : accounts || [];
-
-    useEffect(() => {
-        async function preloadAuthAny() {
-            await supervisor.preLoadPlugins([
-                { service: "auth-any", plugin: "plugin" },
-            ]);
-        }
-        preloadAuthAny();
-    }, []);
 
     const selectedAccount = (accountsToRender || []).find(
         (account) => account.id == selectedAccountId,
@@ -242,7 +228,6 @@ export const AccountSelection = () => {
         app: string,
         origin: string,
     ) => {
-        console.log("handleLogin().connectionToken:", connectionToken);
         if (!connectionToken) {
             throw new Error(`Expected connection token for a login`);
         }
@@ -279,7 +264,7 @@ export const AccountSelection = () => {
             if (!inviteToken) {
                 throw new Error(`Expected invite token loaded`);
             }
-            acceptInvite({
+            await acceptInvite({
                 token: z.string().parse(token),
                 accountName: z.string().parse(selectedAccount?.account),
                 app: inviteToken.app,

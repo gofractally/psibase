@@ -16,7 +16,6 @@ export const useLoginDirect = () =>
         mutationFn: async (params) => {
             const { accountName, app, origin } = LoginParams.parse(params);
 
-            console.log("8");
             const queryToken = await supervisor.functionCall({
                 method: "loginDirect",
                 params: [
