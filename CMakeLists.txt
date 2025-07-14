@@ -414,6 +414,7 @@ psibase_package(
     NAME Host
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
+    ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Host/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
