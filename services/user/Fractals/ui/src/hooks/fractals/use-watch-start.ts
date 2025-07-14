@@ -31,7 +31,7 @@ export const useWatchStart = (status: EvaluationStatus | undefined) => {
                 ),
             );
         }
-    }, [isAwaitingStart, status]);
+    }, [fractal, isAwaitingStart, navigate, status]);
 
     useEffect(() => {
         if (
@@ -40,5 +40,5 @@ export const useWatchStart = (status: EvaluationStatus | undefined) => {
         ) {
             setIsAwaitingStart(true);
         }
-    }, [status]);
+    }, [isAwaitingStart, status]);
 };
