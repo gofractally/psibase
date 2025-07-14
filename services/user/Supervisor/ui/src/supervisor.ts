@@ -3,6 +3,7 @@ import {
     QualifiedPluginId,
     assertTruthy,
     buildFunctionCallResponse,
+    postGraphQLGetJson,
     siblingUrl,
 } from "@psibase/common-lib";
 import {
@@ -33,10 +34,14 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
 ];
-interface Account {
-    accountNum: string;
+interface AuthService {
     authService: string;
-    resourceBalance?: number;
+}
+
+interface GetAccountsResponse {
+    data: {
+        getAccounts: (AuthService | null)[];
+    };
 }
 
 // The supervisor facilitates all communication
@@ -87,22 +92,38 @@ export class Supervisor implements AppInterface {
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: Loads plugins needed by the current user
-        let user = this.getCurrentUser();
-        if (!user) return;
+        // Phase 2: Load the auth services for all connected accounts
+        const connectedAccounts = this.supervisorCall(
+            getCallArgs(
+                "accounts",
+                "plugin",
+                "activeApp",
+                "getConnectedAccounts",
+                [],
+            ),
+        );
+        if (!connectedAccounts) return;
+        const gql_endpoint = siblingUrl(null, "accounts", "/graphql", true);
+        const accounts = connectedAccounts
+            .map((a: string) => `"${a}"`)
+            .join(",");
+        const { data } = await postGraphQLGetJson<GetAccountsResponse>(
+            gql_endpoint,
+            `{
+                getAccounts(accounts: [${accounts}]) {
+                    authService
+                }
+            }`,
+        );
+        const auth_services: (AuthService | null)[] = data?.getAccounts || [];
 
-        const account = this.getAccount(user);
-        if (account === undefined) {
-            console.warn(
-                `Invalid user account '${user}' detected. Automatically logging out.`,
-            );
-            this.logout();
-            // Consider deleting the user from the accounts plugin db
-            return;
+        const addtl_plugins: QualifiedPluginId[] = [];
+        for (const service of auth_services) {
+            if (!service) continue;
+            addtl_plugins.push(pluginId(service.authService, "plugin"));
         }
+        this.loader.trackPlugins(addtl_plugins);
 
-        // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
-        this.loader.trackPlugins([pluginId(account.authService, "plugin")]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
     }
@@ -132,47 +153,6 @@ export class Supervisor implements AppInterface {
         }
 
         return ret;
-    }
-
-    private getCurrentUser(): string | undefined {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        let getCurrentUser = getCallArgs(
-            "accounts",
-            "plugin",
-            "api",
-            "getCurrentUser",
-            [],
-        );
-        return this.supervisorCall(getCurrentUser);
-    }
-
-    private getAccount(user: string): Account | undefined {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        const getAccount = getCallArgs(
-            "accounts",
-            "plugin",
-            "api",
-            "getAccount",
-            [user],
-        );
-        let account: Account | undefined = this.supervisorCall(getAccount);
-        return account;
-    }
-
-    private logout() {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        const logout = getCallArgs(
-            "accounts",
-            "plugin",
-            "activeApp",
-            "logout",
-            [],
-        );
-
-        this.supervisorCall(logout);
     }
 
     constructor() {

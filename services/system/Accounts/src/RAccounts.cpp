@@ -22,8 +22,19 @@ namespace SystemService
          Accounts::Tables tables{Accounts::service};
          return tables.open<AccountTable>().get(account);
       }
+
+      auto getAccounts(std::vector<AccountNumber> accounts) const
+      {
+         std::vector<std::optional<Account>> result;
+         for (auto account : accounts)
+         {
+            Accounts::Tables tables{Accounts::service};
+            result.push_back(tables.open<AccountTable>().get(account));
+         }
+         return result;
+      }
    };
-   PSIO_REFLECT(AccountsQuery, method(getAccount, account));
+   PSIO_REFLECT(AccountsQuery, method(getAccount, account), method(getAccounts, accounts));
 
    std::optional<HttpReply> RAccounts::serveSys(HttpRequest request)
    {
