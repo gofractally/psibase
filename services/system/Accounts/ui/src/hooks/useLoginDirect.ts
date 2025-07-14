@@ -1,6 +1,7 @@
-import { supervisor } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
+
+import { getSupervisor } from "@psibase/common-lib";
 
 const LoginParams = z.object({
     app: z.string(),
@@ -8,11 +9,14 @@ const LoginParams = z.object({
     accountName: z.string(),
 });
 
-export const useLoginDirect = () => {
-    return useMutation<void, Error, z.infer<typeof LoginParams>>({
+const supervisor = getSupervisor();
+
+export const useLoginDirect = () =>
+    useMutation<void, Error, z.infer<typeof LoginParams>>({
         mutationFn: async (params) => {
             const { accountName, app, origin } = LoginParams.parse(params);
 
+            console.log("8");
             const queryToken = await supervisor.functionCall({
                 method: "loginDirect",
                 params: [
@@ -28,4 +32,3 @@ export const useLoginDirect = () => {
             console.log("returned queryToken:", queryToken);
         },
     });
-};
