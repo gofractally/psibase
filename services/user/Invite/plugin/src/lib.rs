@@ -227,8 +227,6 @@ impl Inviter for InvitePlugin {
             .packed(),
         )?;
 
-        println!("Attempting to create invite");
-
         let seed_u64 = u64::from_le_bytes(seed.as_slice().try_into().unwrap());
         let invite_token = InviteToken { pk: seed_u64, id };
 

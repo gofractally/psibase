@@ -14,6 +14,7 @@ namespace SystemService
    {
       /// "common-api"
       static constexpr auto service = HttpServer::commonApiService;
+      static constexpr auto prefix  = HttpServer::commonApiPrefix;
 
       /// This is a standard action that allows common-api to serve http requests.
       ///
