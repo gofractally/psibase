@@ -32,7 +32,15 @@ impl API for AccountsPlugin {
         let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
+<<<<<<< Updated upstream
             "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance {{ value }} }} }}",
+=======
+<<<<<<< Updated upstream
+            "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
+=======
+            "query {{ getAccount(accountName: \"{}\") {{ accountNum, authService, resourceBalance {{ value }} }} }}",
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
             acct_num 
         );
 
