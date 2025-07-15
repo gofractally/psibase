@@ -334,33 +334,9 @@ function(cargo_psibase_package)
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
     
-    # Check if workspace uses shared target directory
-    set(CARGO_CONFIG_PATH "")
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/.cargo/config.toml")
-        set(CARGO_CONFIG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/.cargo/config.toml")
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/services/.cargo/config.toml")
-        set(CARGO_CONFIG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/services/.cargo/config.toml")
-    endif()
-    
-    if(CARGO_CONFIG_PATH)
-        # Read the config to find target-dir setting
-        file(READ "${CARGO_CONFIG_PATH}" CARGO_CONFIG_CONTENT)
-        if(CARGO_CONFIG_CONTENT MATCHES "target-dir[ \t]*=[ \t]*\"([^\"]+)\"")
-            set(TARGET_DIR "${CMAKE_MATCH_1}")
-            # If using services workspace config, adjust the path (TARGET_DIR is relative to services directory)
-            if(CARGO_CONFIG_PATH MATCHES "services/\\.cargo/config\\.toml")
-                # TARGET_DIR is relative to services/, e.g., "../.caches/target-shared"
-                get_filename_component(ABSOLUTE_TARGET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/services/${TARGET_DIR}" ABSOLUTE)
-                set(PACKAGE_OUTPUT ${ABSOLUTE_TARGET_DIR}/wasm32-wasip1/release/packages/${PACKAGE_NAME})
-            else()
-                set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/${TARGET_DIR}/wasm32-wasip1/release/packages/${PACKAGE_NAME})
-            endif()
-        else()
-            set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
-        endif()
-    else()
-        set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
-    endif()
+    # Use hardcoded shared cache directory for services workspace
+    # All services now use the shared cache at /root/psibase/.caches/target-shared
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared/wasm32-wasip1/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext

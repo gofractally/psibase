@@ -17,7 +17,7 @@ name = "account-tokens"
 version = "0.19.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -28,7 +28,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -86,7 +86,7 @@ name = "aes-plugin"
 version = "0.19.0"
 dependencies = [
  "aes-gcm",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -330,7 +330,7 @@ name = "auth-delegate"
 version = "0.19.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -338,7 +338,7 @@ name = "auth-invite"
 version = "0.19.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -352,14 +352,14 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
 name = "authany-plugin"
 version = "0.19.0"
 dependencies = [
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -411,7 +411,7 @@ name = "base64"
 version = "0.19.0"
 dependencies = [
  "base64 0.22.1",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -497,7 +497,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -550,7 +550,7 @@ dependencies = [
  "brotli-codec",
  "brotli-codec-pkg",
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -610,7 +610,7 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1111,7 +1111,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1214,7 +1214,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1678,7 +1678,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1767,7 +1767,7 @@ dependencies = [
  "serde_json",
  "spki",
  "urlencoding",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -1845,7 +1845,7 @@ version = "0.19.0"
 dependencies = [
  "pbkdf2",
  "sha2",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2350,7 +2350,7 @@ name = "producers"
 version = "0.19.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2383,7 +2383,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2668,7 +2668,7 @@ dependencies = [
  "registry-pkg",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -2981,7 +2981,7 @@ name = "setcode"
 version = "0.19.0"
 dependencies = [
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -3026,7 +3026,7 @@ version = "0.19.0"
 dependencies = [
  "brotli",
  "psibase",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -3104,7 +3104,7 @@ dependencies = [
  "serde_json",
  "staged-tx",
  "staged-tx-pkg",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -3184,7 +3184,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 name = "supervisor-plugin"
 version = "0.19.0"
 dependencies = [
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -3329,7 +3329,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -3462,7 +3462,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]
@@ -4089,15 +4089,6 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef83e2f948056d4195b4c2a236a10378b70c8fd7501039c5a106c1a756fa7da6"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b18e27825442721d23ed98591a80f55220cfe0bf883d92b1ead6c9be237bb34"
@@ -4139,7 +4130,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.25.0",
+ "wit-bindgen-rt 0.39.0",
 ]
 
 [[package]]

@@ -61,7 +61,7 @@ publish = false
 [workspace.dependencies]
 async-graphql = "=7.0.17"
 # Standardize external dependencies to enable build artifact sharing
-wit-bindgen-rt = { version = "0.25.0", features = ["bitflags"] }
+wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"

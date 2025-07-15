@@ -49,3 +49,10 @@ sha2 = "0.10"
 url = "2.5"
 regex = "1.0"
 pem = "3.0"
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true

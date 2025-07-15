@@ -1,2 +1,4 @@
+# This .cargo/config.toml is required because this package is excluded from the services workspace
+# Exclusion reason: component-parser uses a different compile target than other services
 [build]
 target-dir = "../../../../../../.caches/target-shared"

@@ -1,2 +1,4 @@
+# This .cargo/config.toml is required because this package is excluded from the services workspace
+# Exclusion reason: XAdmin does its own internal compilation and manages its own special compile step
 [build]
 target-dir = "../../../../../.caches/target-shared"
