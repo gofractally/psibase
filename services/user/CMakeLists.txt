@@ -66,6 +66,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(Sites)
     add_subdirectory(Symbol)
     add_subdirectory(XAdmin)
+    add_subdirectory(Tokens)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

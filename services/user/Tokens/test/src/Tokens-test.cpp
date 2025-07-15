@@ -43,6 +43,8 @@ SCENARIO("Using system token")
       auto sysToken    = Tokens::sysToken;
       sysIssuer.mint(sysToken, userBalance, memo);
 
+      CHECK(false);
+
       THEN("The system token is untradeable by default")
       {
          auto isUntradeable = a.getTokenConf(sysToken, untradeable);
@@ -384,7 +386,7 @@ SCENARIO("Burning tokens")
 
          THEN("Her balance is 0")
          {  //
-            CHECK(a.getBalance(tokenId, alice).returnVal().balance == 0e4);
+            CHECK(a.getBalance(tokenId, alice).returnVal().value == 0e4);
          }
          THEN("She may not burn any more")
          {
