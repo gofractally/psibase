@@ -333,7 +333,10 @@ function(cargo_psibase_package)
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    
+    # Use hardcoded shared cache directory for services workspace
+    # All services now use the shared cache at /root/psibase/.caches/target-shared
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared/wasm32-wasip1/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext

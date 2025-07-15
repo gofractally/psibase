@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-evaluations"
-plugin = "plugin"
+plugin = "evaluations-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     # { sender = "evaluations", service = "evaluations", method = "init", rawData = "0000" },

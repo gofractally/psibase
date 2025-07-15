@@ -10,7 +10,7 @@ publish = false
 [package.metadata.psibase]
 flags = ["allowSudo"]
 server = "r-staged-tx"
-plugin = "plugin"
+plugin = "staged-tx-plugin"
 postinstall = [{ sender = "staged-tx", service = "staged-tx", method = "init" }]
 
 [dependencies]
