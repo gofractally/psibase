@@ -4,10 +4,9 @@ package host:prompt;
 interface web {
     use host:common/types.{error};
 
-    /// `prompt-user` prompts the user for input. `prompt-user` will display the content at `subpath`, supplying an arbitrary payload `payload-json-str`
-    /// * `subpath`: Optional: the subpath to visit on the caller's subdomain to access the prompting
-    /// * `payload-json`: Optional: any data payload that the prompt page may need as a serialized JSON string
-    prompt-user: func(subpath: option<string>, payload-json: option<string>) -> result<_, error>;
+    /// Initiates a procedure that intends to display the content at the specified subpath (on
+    ///    the caller's subdomain) to the current user.
+    prompt-user: func(subpath: option<string>, context-id: option<u32>) -> result<_, error>;
 }
 
 world imports {

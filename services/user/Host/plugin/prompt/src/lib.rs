@@ -5,6 +5,7 @@ use bindings::*;
 mod errors;
 use errors::ErrorType;
 
+use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
 use host::common::client::{get_app_url, get_sender_app};
 use host::common::types::{Error, PluginId};
@@ -20,21 +21,27 @@ struct HostPrompt;
 struct ActivePrompt {
     id: u32,
     subdomain: String,
-    subpath: String,
+    payload: String, // e.g. subpath for web platform
     expiry_timestamp: u32,
+    context_id: Option<u32>,
+    return_payload: Option<String>, // e.g. subpath on subdomain for web platform
 }
 
 const PROMPT_EXPIRATION_SEC: u32 = 2 * 60;
 const ACTIVE_PROMPT_REQ: &str = "active_prompt_request";
 const REDIRECT_ERROR_CODE: u32 = 999999999;
 
-// TODO: ensure this can only be called by the host plugin
 impl Api for HostPrompt {
-    fn get_active_prompt(id: u32, return_path: String) -> Result<String, Error> {
-        assert_eq!(get_sender_app().app.unwrap(), "host", "Unauthorized");
+    fn get_prompt_trigger_details(
+        id: String,
+        return_payload: String,
+    ) -> Result<TriggerDetails, Error> {
+        assert_eq!(get_sender_app().app.unwrap(), "supervisor", "Unauthorized");
+
+        let id = id.parse::<u32>().unwrap();
 
         let val = KeyValue::get(ACTIVE_PROMPT_REQ).ok_or(ErrorType::NoActivePrompt())?;
-        let details = <ActivePrompt>::unpacked(&val).unwrap();
+        let mut details = <ActivePrompt>::unpacked(&val).unwrap();
 
         if id != details.id {
             return Err(ErrorType::PromptNotFound(id).into());
@@ -45,15 +52,29 @@ impl Api for HostPrompt {
             return Err(ErrorType::PromptExpired(id).into());
         }
 
-        let url = format!(
-            "{}/{}?id={}&returnUrlPath={}",
-            get_app_url(&details.subdomain).trim_end_matches('/'),
-            details.subpath.trim_start_matches('/'),
-            id,
-            urlencoding::encode(&return_path)
-        );
+        // Update the prompt with the registered return path
+        details.return_payload = Some(return_payload);
+        KeyValue::set(ACTIVE_PROMPT_REQ, &details.packed());
 
-        Ok(url)
+        Ok(TriggerDetails {
+            subdomain: details.subdomain,
+            payload: details.payload,
+            context_id: details.context_id,
+        })
+    }
+
+    fn get_return_details(id: String) -> Option<String> {
+        assert_eq!(get_sender_app().app.unwrap(), "supervisor", "Unauthorized");
+
+        let val = KeyValue::get(ACTIVE_PROMPT_REQ).unwrap();
+        let details = <ActivePrompt>::unpacked(&val).unwrap();
+        assert_eq!(id.parse::<u32>().unwrap(), details.id);
+
+        // If the return URL is being requested, it implies that the prompt has been finished
+        // and we are redirecting back to the caller app. Therefore, the prompt can be deleted.
+        KeyValue::delete(ACTIVE_PROMPT_REQ);
+
+        details.return_payload
     }
 }
 
@@ -67,7 +88,10 @@ fn validate_subpath(subpath: &str) -> Result<(), Error> {
 }
 
 impl Web for HostPrompt {
-    fn prompt_user(subpath: Option<String>, _payload_json: Option<String>) -> Result<(), Error> {
+    // TODO: Rather than prompting with a subpath, the app must register a name for a
+    //   prompt, and they specify it by name. When the host goes to frame the prompt, it will
+    //   dynamically look up the subpath via the registered prompt name.
+    fn prompt_user(subpath: Option<String>, context_id: Option<u32>) -> Result<(), Error> {
         let mut subpath = subpath.unwrap_or("/".to_string());
         validate_subpath(&subpath)?;
 
@@ -83,20 +107,16 @@ impl Web for HostPrompt {
             &ActivePrompt {
                 id,
                 subdomain: get_sender_app().app.unwrap(),
-                subpath: subpath.clone(),
+                payload: subpath.clone(),
                 expiry_timestamp: Utc::now().timestamp() as u32 + PROMPT_EXPIRATION_SEC,
+                context_id,
+                return_payload: None,
             }
             .packed(),
         );
 
-        // In old code, here we added the id and the current user to the object stored
-        //    in the app's namespace:
-        // let current_user = get_current_user().expect("No currently logged-in user");
-        // Obj = _appPayload + id + current_user
-        // KeyValue::set_foreign(caller(), ACTIVE_PROMPT_REQ, Obj)
-
-        let redirect_url = get_app_url("host");
-        let redirect_url = format!("{}/oauth.html?id={}", redirect_url, id);
+        let redirect_url = get_app_url("supervisor");
+        let redirect_url = format!("{}/prompt.html?id={}", redirect_url, id);
 
         return Err(Error {
             code: REDIRECT_ERROR_CODE,
