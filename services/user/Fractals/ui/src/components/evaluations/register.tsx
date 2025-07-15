@@ -17,14 +17,11 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
     const now = useNowUnix();
 
     return (
-        <div>
-            <div>
-                Evaluation starts in...{" "}
-                {evaluation && humanize(now - evaluation.deliberationStarts)}
-            </div>
+        <div className="flex items-center gap-2">
             {status.isRegistered ? (
                 <Button
                     variant="secondary"
+                    size="sm"
                     disabled={isUnregistering}
                     onClick={() => {
                         unregister({
@@ -36,6 +33,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                 </Button>
             ) : (
                 <Button
+                    size="sm"
                     disabled={isRegistering}
                     onClick={() => {
                         register({
@@ -46,6 +44,10 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     {isRegistering ? "Registering" : "Register"}
                 </Button>
             )}
+            <div>
+                Evaluation starts in...{" "}
+                {evaluation && humanize(now - evaluation.deliberationStarts)}
+            </div>
         </div>
     );
 };
