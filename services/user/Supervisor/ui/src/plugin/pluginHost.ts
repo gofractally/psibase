@@ -12,7 +12,7 @@ import {
     Result,
 } from "../hostInterface";
 import { Supervisor } from "../supervisor";
-import { OriginationData, QualifiedOriginationData } from "../utils";
+import { QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -148,10 +148,6 @@ export class PluginHost implements HostInterface {
 
     syncCallResource(args: QualifiedResourceCallArgs) {
         return this.supervisor.callResource(this.self, kebabToCamel(args));
-    }
-
-    getActiveApp(): OriginationData {
-        return this.supervisor.getActiveApp(this.self);
     }
 
     getServiceStack(): string[] {

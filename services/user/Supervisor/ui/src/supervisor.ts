@@ -93,7 +93,7 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
 
         // Phase 2: Loads plugins needed by the current user
-        let user = this.getCurrentUser();
+        const user = this.getCurrentUser();
         if (!user) return;
 
         const account = this.getAccount(user);
@@ -161,7 +161,7 @@ export class Supervisor implements AppInterface {
     private getCurrentUser(): string | undefined {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
 
-        let getCurrentUser = getCallArgs(
+        const getCurrentUser = getCallArgs(
             "accounts",
             "plugin",
             "api",
@@ -181,7 +181,7 @@ export class Supervisor implements AppInterface {
             "getAccount",
             [user],
         );
-        let account: Account | undefined = this.supervisorCall(getAccount);
+        const account: Account | undefined = this.supervisorCall(getAccount);
         return account;
     }
 
@@ -205,20 +205,6 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
-    }
-
-    getActiveApp(sender: OriginationData): OriginationData {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        assertTruthy(
-            sender.app,
-            "[supervisor:getActiveApp] Unauthorized - only callable by host",
-        );
-        assert(
-            sender.app === "host",
-            "[supervisor:getActiveApp] Unauthorized - Only callable by host",
-        );
-
-        return this.parentOrigination;
     }
 
     getRootDomain(): string {
@@ -321,14 +307,10 @@ export class Supervisor implements AppInterface {
             ),
         );
 
-        let callArgs = getCallArgs(
-            service,
-            plugin,
-            intf,
-            args.method,
-            args.params,
+        return this.call(
+            sender,
+            getCallArgs(service, plugin, intf, args.method, args.params),
         );
-        return this.call(sender, callArgs);
     }
 
     callResource(

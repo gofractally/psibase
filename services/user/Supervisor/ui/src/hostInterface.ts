@@ -5,7 +5,6 @@ import {
 } from "@psibase/common-lib";
 
 import { RecoverableErrorPayload } from "./plugin/errors";
-import { OriginationData } from "./utils";
 
 export type Result<T, E> = T | E;
 
@@ -45,8 +44,6 @@ export interface HostInterface {
     sendRequest: (
         req: HttpRequest,
     ) => Result<HttpResponse, RecoverableErrorPayload>;
-
-    getActiveApp(): OriginationData;
 
     getServiceStack(): string[];
 
