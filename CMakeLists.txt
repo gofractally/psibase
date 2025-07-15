@@ -416,10 +416,9 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Host/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
-    DEPENDS ${Plugins_DEP} ${Host_js_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
