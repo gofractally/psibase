@@ -5,6 +5,11 @@ use bindings::exports::clientdata::plugin::keyvalue::Guest as KeyValue;
 use bindings::host::common::client as Client;
 use bindings::wasi::keyvalue as Kv;
 
+use bindings::exports::clientdata::plugin::tests::Guest as Tests;
+
+mod tests;
+use tests::*;
+
 struct ClientData;
 
 fn get_sender() -> String {
@@ -51,6 +56,28 @@ impl KeyValue for ClientData {
             Kv::store::open(&get_sender()).expect("Failed to open table in keyvalue store");
 
         bucket.delete(&key).expect("Error deleting key");
+    }
+}
+
+impl Tests for ClientData {
+    fn kv_test() -> Result<(), Kv::store::Error> {
+        let bucket = test_open()?;
+
+        test_set(&bucket)?;
+        test_get(&bucket)?;
+        test_exists(&bucket)?;
+        test_delete(&bucket)?;
+
+        test_set_many(&bucket)?;
+        test_get_many(&bucket)?;
+        //test_list_keys(&bucket)?;
+        test_delete_many(&bucket)?;
+
+        test_increment(&bucket)?;
+
+        //test_pagination(&bucket)?;
+
+        Ok(())
     }
 }
 
