@@ -20,7 +20,7 @@ export const CurrentEvaluationCard = () => {
     useWatchClose(status);
 
     return (
-        <div className="w-full rounded-sm border p-4">
+        <div className="w-full rounded-md border p-4">
             {status?.type == "waitingRegistration" && (
                 <WaitingRegistration status={status} />
             )}
