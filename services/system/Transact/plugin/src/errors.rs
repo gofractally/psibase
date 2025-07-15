@@ -8,4 +8,5 @@ plugin_error! {
     TransactionError(msg: String) => "Transaction error: {msg}",
     ClaimProofMismatch => "Number of proofs does not match number of claims",
     WrongOrigin(origin: &'a str) => "Cannot be called by {origin}",
+    BadResponse(msg: &'a str) => "Bad response: {msg}",
 }

@@ -1,32 +1,26 @@
-#[allow(warnings)]
-mod bindings;
+use crate::Kv;
 
-use bindings::exports::supervisor::test::tests::Guest as Tests;
-use bindings::wasi::keyvalue as Kv;
-
-struct Supervisor;
-
-fn err<'a>(test_name: &'a str) -> impl Fn(Kv::store::Error) -> Kv::store::Error + 'a {
+pub fn err<'a>(test_name: &'a str) -> impl Fn(Kv::store::Error) -> Kv::store::Error + 'a {
     move |e: Kv::store::Error| {
         eprintln!("[{}] Failed", test_name);
         e
     }
 }
 
-fn test_open() -> Result<Kv::store::Bucket, Kv::store::Error> {
+pub fn test_open() -> Result<Kv::store::Bucket, Kv::store::Error> {
     let b = Kv::store::open("test-bucket").map_err(err("open"))?;
     println!("[open] Success");
     Ok(b)
 }
 
-fn test_set(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_set(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     b.set("testkey", "test value".as_bytes())
         .map_err(err("set"))?;
     println!("[set] Success. Inserted (\"testkey\", \"test value\")");
     Ok(())
 }
 
-fn test_get(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_get(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     let value = b.get("testkey").map_err(err("get"))?;
     assert!(
         value.is_some(),
@@ -43,7 +37,7 @@ fn test_get(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-fn test_exists(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_exists(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     let exists = b.exists("testkey").map_err(err("exists"))?;
     assert!(
         exists,
@@ -57,7 +51,7 @@ fn test_exists(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-fn test_delete(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_delete(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     b.delete("testkey").map_err(err("delete"))?;
     let val = b.exists("testkey").map_err(err("delete:exists"))?;
     assert!(!val, "[delete:exists] Failed. Value exists after delete");
@@ -69,7 +63,7 @@ fn test_delete(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-fn test_set_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_set_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     let key_values = vec![
         ("key1".to_string(), "value1".as_bytes().to_vec()),
         ("key2".to_string(), "value2".as_bytes().to_vec()),
@@ -79,7 +73,7 @@ fn test_set_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-fn test_get_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_get_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     let keys = vec!["key1".to_string(), "key2".to_string()];
     let results = Kv::batch::get_many(b, &keys).map_err(err("get_many"))?;
     assert_eq!(
@@ -123,7 +117,7 @@ fn test_get_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-// fn test_list_keys(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+// pub fn test_list_keys(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
 //     let key_response = b.list_keys(None).map_err(err("list_keys"))?;
 //     assert!(
 //         !key_response.keys.is_empty(),
@@ -142,7 +136,7 @@ fn test_get_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
 //     Ok(())
 // }
 
-fn test_delete_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_delete_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     let keys = vec!["key1".to_string(), "key2".to_string()];
     Kv::batch::delete_many(b, &keys).map_err(err("delete_many"))?;
     let deleted = Kv::batch::get_many(b, &keys)
@@ -155,7 +149,7 @@ fn test_delete_many(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-fn test_increment(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+pub fn test_increment(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     let key = "counter";
     let delta = 5;
     b.set(key, "3".as_bytes()).map_err(err("increment:set"))?;
@@ -167,7 +161,7 @@ fn test_increment(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
     Ok(())
 }
 
-// fn test_pagination(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
+// pub fn test_pagination(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
 //     // Start out empty
 //     let key_response = b.list_keys(None).map_err(err("pagination:list_keys"))?;
 //     assert_eq!(
@@ -257,27 +251,3 @@ fn test_increment(b: &Kv::store::Bucket) -> Result<(), Kv::store::Error> {
 
 //     Ok(())
 // }
-
-impl Tests for Supervisor {
-    fn kv_test() -> Result<(), Kv::store::Error> {
-        let bucket = test_open()?;
-
-        test_set(&bucket)?;
-        test_get(&bucket)?;
-        test_exists(&bucket)?;
-        test_delete(&bucket)?;
-
-        test_set_many(&bucket)?;
-        test_get_many(&bucket)?;
-        //test_list_keys(&bucket)?;
-        test_delete_many(&bucket)?;
-
-        test_increment(&bucket)?;
-
-        //test_pagination(&bucket)?;
-
-        Ok(())
-    }
-}
-
-bindings::export!(Supervisor with_types_in bindings);
