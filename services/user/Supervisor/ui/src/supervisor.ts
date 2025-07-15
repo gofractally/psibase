@@ -115,7 +115,7 @@ export class Supervisor implements AppInterface {
         const { data } = await postGraphQLGetJson<GetAccountsResponse>(
             gql_endpoint,
             `{
-                getAccounts(accounts: [${accounts}]) {
+                getAccounts(accountNames: [${accounts}]) {
                     authService
                 }
             }`,
@@ -125,6 +125,8 @@ export class Supervisor implements AppInterface {
         const addtl_plugins: QualifiedPluginId[] = [];
         for (const service of auth_services) {
             if (!service) continue;
+
+            // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
             addtl_plugins.push(pluginId(service.authService, "plugin"));
         }
         this.loader.trackPlugins(addtl_plugins);
