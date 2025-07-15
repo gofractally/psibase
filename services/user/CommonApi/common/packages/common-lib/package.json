@@ -30,6 +30,12 @@
             "require": "./dist/messaging/*.js",
             "types": "./dist/messaging/*.d.ts",
             "default": "./dist/messaging/*.js"
+        },
+        "./prompts": {
+            "import": "./dist/prompts.js",
+            "require": "./dist/prompts.js",
+            "types": "./dist/prompts.d.ts",
+            "default": "./dist/prompts.js"
         }
     },
     "files": [

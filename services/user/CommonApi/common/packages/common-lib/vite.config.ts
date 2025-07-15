@@ -13,6 +13,7 @@ export default defineConfig({
             fileName: "common-lib",
         },
         minify: false,
+        sourcemap: true,
     },
     plugins: [
         dts()
