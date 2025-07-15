@@ -13,7 +13,7 @@ use types::*;
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::host::common::client::get_sender_app;
 use bindings::host::common::types as CommonTypes;
-use bindings::permissions::plugin::api::is_auth;
+use bindings::permissions::plugin::api::{is_auth, prompt_auth};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -140,7 +140,7 @@ impl Actions for AuthSig {
 
         if !from_auth_sig_ui() {
             if !is_auth(&caller)? {
-                //prompt_auth(&caller)?; // TEMPORARILY COMMENT OUT DURING HOST REFACTORING
+                prompt_auth(&caller)?;
                 return Err(Unauthorized("set_key").into());
             }
         }
