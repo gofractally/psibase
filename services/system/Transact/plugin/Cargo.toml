@@ -27,4 +27,4 @@ world = "impl"
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 
 [package.metadata.component.bindings]
-derives = ["psibase::Pack", "psibase::Unpack"]
+derives = ["serde::Serialize", "serde::Deserialize"]
