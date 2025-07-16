@@ -46,7 +46,7 @@ namespace triedent
       // session._sequence == _end is unambiguous.
       while (_size == _queue.size() - 1)
       {
-         auto end_ready = start_wait(start, end);
+         auto end_ready = start_wait(start, end, true);
          if (end_ready == start)
          {
             assert(_waiting);
@@ -60,6 +60,7 @@ namespace triedent
             break;
          }
       }
+      assert(!_queue[end]);
       _queue[end] = std::move(element);
       _end.store(next(end));
       ++_size;
@@ -75,9 +76,7 @@ namespace triedent
       std::lock_guard                    l{_queue_mutex};
       auto                               end   = _end.load();
       auto                               start = (end + _queue.size() - _size) % _queue.size();
-      // _queue.size() is distinct from any sequence that
-      // a session can hold (including npos)
-      pop_some(popped_items, start, start_wait(_queue.size(), end));
+      pop_some(popped_items, start, start_wait(start, end, false));
    }
 
    void gc_queue::flush()
@@ -99,7 +98,7 @@ namespace triedent
          _queue_cond.wait(l, [&] { return done->load() || (_size != 0 && !_waiting); });
          auto end   = _end.load();
          auto start = (end + _queue.size() - _size) % _queue.size();
-         pop_some(popped_items, start, start_wait(start, end));
+         pop_some(popped_items, start, start_wait(start, end, true));
          l.unlock();
          popped_items.clear();
          l.lock();
@@ -136,6 +135,7 @@ namespace triedent
             //   std::osyncstream(std::cout) << "run gc: " << start << std::endl;
          }
          out.push_back(std::move(_queue[start]));
+         assert(_size != 0);
          --_size;
       }
    }
@@ -143,7 +143,7 @@ namespace triedent
    // \post
    // for each index in [start, R):
    //   either U happens before W or P happens before L
-   gc_queue::size_type gc_queue::start_wait(size_type start, size_type end)
+   gc_queue::size_type gc_queue::start_wait(size_type start, size_type end, bool block)
    {
       std::size_t     lowest_sequence = end;
       auto            order           = make_sequence_order(end);
@@ -155,7 +155,7 @@ namespace triedent
          // Let P be the push for some resource, that happens before this wait
          //
          // If W sees the value written by L,
-         //   - If the value is from a push earlier than P, then then then the element is not popped - okay
+         //   - If the value is from a push earlier than P, then the element is not popped - okay
          //   - If the value is from P or a later push, then P happens before L (acquire/release) - okay
          // If W sees the value written by U or a later lock or unlock
          //   - U happens before W (acquire/release) - okay
@@ -163,7 +163,7 @@ namespace triedent
          //   - W is before L in seq_cst (seq_cst load sees the most recent seq_cst store)
          //   - Therefore P happens before L (see lock) - okay
          auto seq = session->_sequence.load() & ~wait_bit;
-         if (seq == start)
+         if (seq == start && block)
          {
             if (_waiting)
             {
@@ -175,7 +175,10 @@ namespace triedent
                return start;
             }
          }
-         if (order(seq) < order(lowest_sequence))
+         // If seq is before start, then acquiring the lock will retry
+         // unless end wraps all the way around, which is still okay
+         // because we hold the lock that protects end.
+         if (order(start) <= order(seq) && order(seq) < order(lowest_sequence))
          {
             lowest_sequence = seq;
          }
