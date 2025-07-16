@@ -12,7 +12,7 @@ pub fn test_open() -> Result<KvStore::Bucket, Error> {
         mode: DbMode::NonTransactional,
         duration: StorageDuration::Persistent,
     };
-    let b = KvStore::open(db, "test-bucket").map_err(err("open"))?;
+    let b = KvStore::Bucket::new(db, "test-bucket");
     println!("[open] Success");
     Ok(b)
 }

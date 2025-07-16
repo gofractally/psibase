@@ -169,12 +169,12 @@ interface store {
         duration: storage-duration,
     }
 
-    /// Get the bucket with the specified identifier.
-    open: func(db: database, identifier: string) -> result<bucket, error>;
-
-    /// A bucket is a collection of key-value pairs. Each key-value pair is stored as a entry in the
-    /// bucket.
+    /// A bucket is a collection of key-value pairs.
     resource bucket {
+
+        /// Get a bucket from the specified database with the specified identifier
+        constructor(db: database, identifier: string);
+
         /// Get the value associated with the specified `key`
         ///
         /// The value is returned as an option. If the key-value pair exists in the

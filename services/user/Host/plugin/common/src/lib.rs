@@ -13,12 +13,10 @@ use exports::host::common::{
     client::Guest as Client,
     server::Guest as Server,
     store::Guest as Store,
-    store::{Bucket, Database, DbMode, StorageDuration},
     types::Guest as Types,
     types::{BodyTypes, Error, OriginationData, PostRequest},
 };
 use helpers::make_error;
-use regex::Regex;
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
@@ -163,59 +161,8 @@ impl Types for HostCommon {
     type PluginRef = plugin_ref::PluginRef;
 }
 
-fn validate_identifier(identifier: &str) -> Result<(), Error> {
-    // Validate identifier with regex /^[0-9a-zA-Z-]+$/
-    let valid_identifier_regex = Regex::new(r"^[0-9a-zA-Z-]+$").unwrap();
-    if !valid_identifier_regex.is_match(&identifier) {
-        return Err(make_error(
-            "Invalid bucket identifier: Identifier must conform to /^[0-9a-zA-Z-]+$/",
-        )
-        .into());
-    }
-    Ok(())
-}
-
-// +---------------------+---------------------+---------------------+
-// |                     |  NonTransactional   |    Transactional*   |
-// +---------------------+---------------------+---------------------+
-// | Ephemeral*          |      Valid          |      Not valid      |
-// +---------------------+---------------------+---------------------+
-// | Session*            |      Valid          |        Valid        |
-// +---------------------+---------------------+---------------------+
-// | Persistent          |      Valid          |        Valid        |
-// +---------------------+---------------------+---------------------+
-//
-// * Not yet supported
-//
-fn validate_db(db: &Database) -> Result<(), Error> {
-    if db.mode == DbMode::Transactional {
-        return Err(make_error("Transactional database not yet supported"));
-    }
-    if db.duration == StorageDuration::Ephemeral {
-        return Err(make_error("Transient database not yet supported"));
-    }
-    if db.duration == StorageDuration::Session {
-        return Err(make_error("Session database not yet supported"));
-    }
-    if db.duration == StorageDuration::Ephemeral {
-        if db.mode == DbMode::Transactional {
-            return Err(make_error(
-                "Ephemeral database not supported in transactional mode",
-            ));
-        }
-    }
-    Ok(())
-}
-
 impl Store for HostCommon {
     type Bucket = bucket::Bucket;
-
-    fn open(db: Database, identifier: String) -> Result<Bucket, Error> {
-        validate_db(&db)?;
-        validate_identifier(&identifier)?;
-        let bucket = bucket::Bucket::new(db, identifier);
-        Ok(Bucket::new(bucket))
-    }
 }
 
 bindings::export!(HostCommon with_types_in bindings);

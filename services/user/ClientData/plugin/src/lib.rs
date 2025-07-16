@@ -26,8 +26,7 @@ impl KeyValue for ClientData {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
         };
-        let bucket =
-            KvStore::open(db, &get_sender()).expect("Failed to open table in keyvalue store");
+        let bucket = KvStore::Bucket::new(db, &get_sender());
 
         let record = bucket.get(&key).expect("Failed to get record value");
 
@@ -42,8 +41,7 @@ impl KeyValue for ClientData {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
         };
-        let bucket =
-            KvStore::open(db, &get_sender()).expect("Failed to open table in keyvalue store");
+        let bucket = KvStore::Bucket::new(db, &get_sender());
 
         // Set the value on the key
         bucket
@@ -57,8 +55,7 @@ impl KeyValue for ClientData {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
         };
-        let bucket =
-            KvStore::open(db, &get_sender()).expect("Failed to open table in keyvalue store");
+        let bucket = KvStore::Bucket::new(db, &get_sender());
 
         bucket.delete(&key).expect("Error deleting key");
     }
