@@ -237,11 +237,6 @@ export class PluginHost implements HostInterface {
         return this.supervisor.getRootDomain();
     }
 
-    // TODO - remove this once "wasi-keyvalue" is moved to keyvalue:plugin
-    myServiceAccount(): string {
-        return this.self.app;
-    }
-
     private setActiveUserPrompt(
         subpath: string | undefined,
         upPayloadJsonStr: string,
