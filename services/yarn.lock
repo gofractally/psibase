@@ -2020,6 +2020,7 @@ __metadata:
   resolution: "@psibase/supervisor-ui@workspace:user/Supervisor/ui"
   dependencies:
     "@bytecodealliance/jco": "npm:1.10.2"
+    "@bytecodealliance/preview2-shim": "npm:^0.17.2"
     "@psibase/common-lib": "workspace:*"
     "@rollup/browser": "npm:^4.9.0"
     "@tanstack/react-query": "npm:^5.52.0"

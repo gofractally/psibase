@@ -2887,6 +2887,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./user/Supervisor/ui/",\
         "packageDependencies": [\
           ["@bytecodealliance/jco", "npm:1.10.2"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
           ["@rollup/browser", "npm:4.44.1"],\

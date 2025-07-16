@@ -1,5 +1,5 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
-import { rollup } from "@rollup/browser";
+import { rollup, type WarningHandlerWithDefault } from "@rollup/browser";
 
 import { HostInterface } from "../hostInterface.js";
 import { assert } from "../utils.js";
@@ -8,8 +8,6 @@ import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 import { plugin } from "./index.js";
 import privilegedShimCode from "./privileged-api.js?raw";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
-
-const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -83,6 +81,19 @@ async function getNonstandardWasiImports(): Promise<ImportDetails> {
     };
 }
 
+function generateWasiShimCode(): string {
+    // Generate a module that re-exports the required WASI interfaces from preview2-shim
+    const exports = [
+        'export { environment, exit, stderr, stdin, stdout } from "@bytecodealliance/preview2-shim/cli";',
+        'export { monotonicClock, wallClock } from "@bytecodealliance/preview2-shim/clocks";',
+        'export { types, preopens } from "@bytecodealliance/preview2-shim/filesystem";',
+        'export { error, streams } from "@bytecodealliance/preview2-shim/io";',
+        'export { random } from "@bytecodealliance/preview2-shim/random";',
+    ];
+    
+    return exports.join('\n');
+}
+
 async function getWasiImports(): Promise<ImportDetails> {
     /*
       I'm taking a whitelisting approach, as opposed to providing all wasi imports by default.
@@ -119,7 +130,7 @@ async function getWasiImports(): Promise<ImportDetails> {
     //    import {  as _, } from './shim.js';
     // It is very likely an issue with an invalid import mapping.
 
-    const wasi_shimCode = await fetch(wasiShimURL).then((r) => r.text());
+    const wasi_shimCode = generateWasiShimCode();
     const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
     return {
         importMap: wasi_nameMapping,
@@ -195,7 +206,7 @@ async function loadWasmComponent(
 
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
 
-    const onwarn = (warning: any, warn: (warning: any) => void) => {
+    const onwarn: WarningHandlerWithDefault = (warning, warn) => {
         if (warning.code !== "CIRCULAR_DEPENDENCY") {
             warn(warning);
         }
