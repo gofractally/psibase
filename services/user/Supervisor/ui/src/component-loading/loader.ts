@@ -84,7 +84,13 @@ async function getNonstandardWasiImports(): Promise<ImportDetails> {
 async function generateWasiShimCode(): Promise<string> {
     // Import the JCO preview2-shim modules at build time and create a clean wrapper
     try {
-        const preview2Shim = await import('@bytecodealliance/preview2-shim') as any;
+        const preview2Shim = await import('@bytecodealliance/preview2-shim') as {
+            cli: unknown;
+            clocks: unknown;
+            filesystem: unknown;
+            io: unknown;
+            random: unknown;
+        };
         
         // Extract the specific interfaces we need
         const { cli, clocks, filesystem, io, random } = preview2Shim;
@@ -136,10 +142,10 @@ export const random = createShimWrapper(jcoShims.random.random);
 `;
         
         // Set up the global reference for runtime access
-        (globalThis as Record<string, any>).__jcoShims = { cli, clocks, filesystem, io, random };
+        (globalThis as Record<string, unknown>).__jcoShims = { cli, clocks, filesystem, io, random };
         
         return shimCode;
-    } catch (error) {
+    } catch {
         // Fallback to bundled shim if JCO is not available
         const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
         return await fetch(wasiShimURL).then((r) => r.text());
