@@ -10,7 +10,6 @@
     },
     "dependencies": {
         "@bytecodealliance/jco": "1.10.2",
-        "@bytecodealliance/preview2-shim": "^0.17.2",
         "@psibase/common-lib": "workspace:*",
         "@rollup/browser": "^4.9.0",
         "@tanstack/react-query": "^5.52.0",
