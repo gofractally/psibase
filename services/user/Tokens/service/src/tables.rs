@@ -28,7 +28,6 @@ pub mod tables {
         pub nft_id: NID,
         #[graphql(skip)]
         pub settings_value: u8,
-        #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
         pub issued_supply: Quantity,
@@ -55,7 +54,7 @@ pub mod tables {
         }
 
         pub fn get_assert(id: TID) -> Self {
-            check_some(Self::get(id), "failed to find token")
+            check_some(Self::get(id), "Token DNE")
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
@@ -70,21 +69,18 @@ pub mod tables {
         fn check_is_owner(&self, account: AccountNumber) {
             let holder = self.nft_holder();
 
-            check(
-                account == holder,
-                &format!("{} does not hold the issuer NFT, {} does", account, holder),
-            );
+            check(account == holder, "Missing required authority");
         }
 
         pub fn map_symbol(&mut self, symbol: AccountNumber) {
-            check_none(self.symbol, "already has symbol");
+            check_none(self.symbol, "Token already has a symbol");
             let sender = get_sender();
             self.check_is_owner(sender);
             self.symbol = Some(symbol);
             self.save();
         }
 
-        pub fn add(max_issued_supply: Quantity, precision: u8) -> Self {
+        pub fn add(precision: u8, max_issued_supply: Quantity) -> Self {
             let init_table = InitTable::new();
             let mut init_row = init_table.get_index_pk().get(&()).unwrap();
             let new_id = init_row.last_used_id.checked_add(1).unwrap();
@@ -135,7 +131,7 @@ pub mod tables {
             self.issued_supply = self.issued_supply + amount;
             psibase::check(
                 self.issued_supply <= self.max_issued_supply,
-                "over max issued supply",
+                "Max issued supply exceeded",
             );
             self.save();
 
@@ -144,6 +140,9 @@ pub mod tables {
 
         pub fn set_flag(&mut self, flag: TokenFlags, enabled: bool) {
             self.check_is_owner(get_sender());
+            if flag == TokenFlags::UNRECALLABLE {
+                check(enabled, "Invalid configuration update")
+            }
             self.settings_value = Flags::new(self.settings_value).set(flag, enabled).value();
             self.save();
         }
@@ -161,7 +160,7 @@ pub mod tables {
 
             check(
                 !self.get_flag(TokenFlags::UNRECALLABLE),
-                "token is not recallable",
+                "Token unrecallable",
             );
 
             self.burn_supply(amount, from);
@@ -180,10 +179,6 @@ pub mod tables {
     impl Token {
         pub async fn owner(&self) -> AccountNumber {
             self.nft_holder()
-        }
-
-        pub async fn precision(&self) -> Precision {
-            self.precision.try_into().unwrap()
         }
 
         pub async fn current_supply(&self) -> Decimal {
@@ -299,6 +294,17 @@ pub mod tables {
 
             BalanceFlagsJson::from(Flags::new(flag))
         }
+
+        pub async fn symbol(&self) -> Option<AccountNumber> {
+            Token::get_assert(self.token_id).symbol
+        }
+
+        pub async fn precision(&self) -> Precision {
+            Token::get_assert(self.token_id)
+                .precision
+                .try_into()
+                .unwrap()
+        }
     }
 
     #[table(name = "SharedBalanceTable", index = 3)]
@@ -333,6 +339,14 @@ pub mod tables {
                     .unwrap(),
             )
         }
+
+        pub async fn symbol(&self) -> Option<AccountNumber> {
+            Token::get_assert(self.token_id).symbol
+        }
+
+        pub async fn precision(&self) -> u8 {
+            Token::get_assert(self.token_id).precision
+        }
     }
 
     impl SharedBalance {
@@ -350,7 +364,7 @@ pub mod tables {
             Token::get_assert(token_id);
             check(
                 creditor != debitor,
-                format!("{} cannot be the creditor and debitor", creditor).as_str(),
+                format!("Sender cannot be receiver").as_str(),
             );
             Self {
                 token_id,
@@ -369,7 +383,7 @@ pub mod tables {
         pub fn get_assert(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             check_some(
                 Self::get(creditor, debitor, token_id),
-                "shared balance doesn't exist",
+                "Shared balance does not exist",
             )
         }
 
@@ -384,10 +398,11 @@ pub mod tables {
             self.add_balance(quantity);
 
             let token = Token::get_assert(self.token_id);
-            check(
-                !token.get_flag(TokenFlags::UNTRANSFERABLE),
-                "token is untransferable",
-            );
+
+            let is_untransferable = token.get_flag(TokenFlags::UNTRANSFERABLE);
+            if is_untransferable {
+                check(token.nft_holder() == get_sender(), "Token untradeable");
+            }
 
             let is_manual_debit = BalanceConfig::get(self.debitor, self.token_id)
                 .map(|holder| holder.get_flag(BalanceFlags::MANUAL_DEBIT))
@@ -405,7 +420,7 @@ pub mod tables {
                 quantity.value > 0,
                 "uncredit quantity must be greater than 0",
             );
-
+            let quantity = quantity.min(self.balance);
             self.sub_balance(quantity);
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
         }

@@ -1,12 +1,13 @@
+use async_graphql::scalar;
 use fracpack::{Error, Pack, Result, ToSchema, Unpack};
-use std::{fmt, str::FromStr};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
-use crate::serialize_as_str;
-use custom_error::custom_error;
-
-#[derive(Debug, Clone, ToSchema, Default, Pack)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Default, Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Memo(String);
+
+scalar!(Memo);
 
 impl Memo {
     pub fn new(contents: String) -> Self {
@@ -68,42 +69,3 @@ impl<'a> Unpack<'a> for Memo {
         Ok(Default::default())
     }
 }
-
-custom_error! { pub DerpError
-    Idunno = "DerpError"
-}
-struct Derp {
-    contents: String,
-}
-
-impl fmt::Display for Derp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.contents.as_str())
-    }
-}
-
-impl FromStr for Derp {
-    type Err = DerpError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            contents: "hello".to_string(),
-        })
-    }
-}
-
-serialize_as_str!(Derp, "derp");
-
-// 1100 - Call work
-
-//
-// 1615 Bunnings Brendale
-// 1700 Kickinn
-
-// Minecraft right now
-// After minecraft, she wants GYG
-// Bunnings, metal mouse traps;
-// After that, we go to a park or something and read
-// Clean a bit
-// Pick outfit and go to dinner.
-//

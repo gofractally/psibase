@@ -19,6 +19,8 @@ use crate::services::tokens::{ConversionError, Precision};
     InputObject,
     PartialOrd,
     PartialEq,
+    Ord,
+    Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "QuantityInput")]

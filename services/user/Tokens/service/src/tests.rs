@@ -45,7 +45,6 @@ mod tests {
             .getBalance(token_id, account)
             .get()
             .unwrap()
-            .balance
     }
 
     fn assert_balance(
@@ -103,7 +102,7 @@ mod tests {
 
         // Alice can create a new token
         let token_id = Wrapper::push_from(&chain, alice)
-            .create(80000.into(), 4.into())
+            .create(4.into(), 80000.into())
             .get()?;
 
         // Alice can mint a portion of the token supply;

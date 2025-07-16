@@ -73,7 +73,7 @@ pub struct Balance {
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
-    use super::{Balance, Memo, Quantity, TokenRecord, TID};
+    use super::{Memo, Quantity, TokenRecord, TID};
     use crate::AccountNumber;
 
     #[action]
@@ -133,12 +133,12 @@ mod service {
     /// Create a new token.
     ///
     /// # Arguments
-    /// * `max_supply` - The permanent max supply of the token.
     /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
+    /// * `max_supply` - The permanent max supply of the token.
     ///
     /// # Returns the unique token identifier aka TID (u32)
     #[action]
-    fn create(max_supply: Quantity, precision: u8) -> TID {
+    fn create(precision: u8, max_supply: Quantity) -> TID {
         unimplemented!()
     }
 
@@ -341,7 +341,7 @@ mod service {
     ///
     /// # Returns user balance
     #[action]
-    fn getBalance(token_id: TID, user: AccountNumber) -> Balance {
+    fn getBalance(token_id: TID, user: AccountNumber) -> Quantity {
         unimplemented!()
     }
 

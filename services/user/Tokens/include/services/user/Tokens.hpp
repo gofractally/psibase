@@ -32,7 +32,7 @@ namespace UserService
       /// * `max_issued_supply` - The permanent max issued supply of the token.
       ///
       /// # Returns the unique token identifier aka TID (u32)
-      TID create(Quantity maxIssuedSupply, uint8_t precision);
+      TID create(uint8_t precision, Quantity maxIssuedSupply);
 
       /// Mint tokens.
       ///
@@ -168,7 +168,7 @@ namespace UserService
       ///
       /// # Returns token information including current, burned supply and precision.
       TokenRecord getToken(TID tokenId);
-      SID         getTokenSymbol(TID tokenId);
+      SID         getTokenSym(TID tokenId);
 
       /// Get user balance.
       ///
@@ -264,7 +264,7 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Tokens,
       method(init),
-      method(create, maxIssuedSupply, precision),
+      method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),
       method(burn, tokenId, amount, memo),
       method(setBalConf, tokenId, index, enable),
@@ -277,7 +277,7 @@ namespace UserService
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
-      method(getTokenSymbol, tokenId),
+      method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),

@@ -35,17 +35,17 @@ pub mod service {
     /// Create a new token.
     ///
     /// # Arguments
-    /// * `max_issued_supply` - The permanent max issued supply of the token.
     /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
+    /// * `max_issued_supply` - The permanent max issued supply of the token.
     ///
     /// # Returns the unique token identifier aka TID (u32)
     #[action]
-    fn create(max_issued_supply: Quantity, precision: u8) -> TID {
+    fn create(precision: u8, max_issued_supply: Quantity) -> TID {
         check(
             max_issued_supply.value > 0,
-            "max issued supply must be greater than 0",
+            "Max issued supply must be greater than 0",
         );
-        let new_token = Token::add(max_issued_supply, precision);
+        let new_token = Token::add(precision, max_issued_supply);
 
         Wrapper::emit()
             .history()
@@ -74,7 +74,7 @@ pub mod service {
     /// # Returns token information including current, burned supply and precision.
     #[action]
     #[allow(non_snake_case)]
-    fn getTokenSymbol(token_id: TID) -> AccountNumber {
+    fn getTokenSym(token_id: TID) -> AccountNumber {
         check_some(
             Token::get_assert(token_id).symbol,
             "token does not have symbol",
@@ -98,6 +98,7 @@ pub mod service {
         let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
             .getSymbol(symbol)
             .ownerNft;
+        check(symbol_owner_nft != 0, "Symbol does not exist");
 
         Nfts::call_from(Wrapper::SERVICE).debit(
             symbol_owner_nft,
@@ -224,8 +225,8 @@ pub mod service {
     /// # Returns user balance information
     #[action]
     #[allow(non_snake_case)]
-    fn getBalance(token_id: TID, user: AccountNumber) -> Balance {
-        Balance::get_or_new(user, token_id)
+    fn getBalance(token_id: TID, user: AccountNumber) -> Quantity {
+        Balance::get_or_new(user, token_id).balance
     }
 
     /// Get shared balance.

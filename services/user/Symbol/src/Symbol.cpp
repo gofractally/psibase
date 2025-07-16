@@ -62,7 +62,7 @@ void Symbol::init()
 
    // Create system token
    constexpr uint8_t precision = 4;
-   auto              tid       = to<Tokens>().create(Quantity{1'000'000'000e4}, precision);
+   auto              tid       = to<Tokens>().create(precision, Quantity{1'000'000'000e4});
    check(tid == Tokens::sysToken, wrongSysTokenId);
    auto tNft = to<Tokens>().getToken(tid).nft_id;
    to<Nft>().debit(tNft, "Taking ownership of system token");
