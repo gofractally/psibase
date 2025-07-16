@@ -6,7 +6,7 @@ interface admin {
 
     /// Logs the specified user into the specified app without any user interaction.
     /// This function is only callable by the accounts app itself.
-    login-direct: func(app: app-details, user: string);
+    login-direct: func(app: app-details, user: string) -> option<string>;
 
     /// Gets app details
     decode-connection-token: func(token: string) -> option<app-details>;
@@ -23,12 +23,13 @@ interface admin {
 
 world impl {
     include host:common/imports;
-    include host:privileged/imports;
+    include host:common/privileged;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
     include accounts:account-tokens/imports;
 
     export api;
     export active-app;
+
     export admin;
 }

@@ -1,6 +1,6 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
-use crate::bindings::host::privileged::intf as Privileged;
+use crate::bindings::host::common::admin as Privileged;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
@@ -32,7 +32,7 @@ impl API for AccountsPlugin {
         let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
-            "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
+            "query {{ getAccount(accountName: \"{}\") {{ accountNum, authService, resourceBalance {{ value }} }} }}",
             acct_num 
         );
 

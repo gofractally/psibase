@@ -238,7 +238,7 @@ namespace triedent
       }
    }
 
-   std::uint64_t region_allocator::evacuate_region(queue_item& item)
+   std::uint64_t region_allocator::evacuate_region(queue_item& item, char* base)
    {
       auto begin    = item.src_begin.load();
       auto end      = item.src_end.load();
@@ -257,7 +257,7 @@ namespace triedent
             {
                break;
             }
-            void* new_location = _base + dest;
+            void* new_location = base + dest;
             std::memcpy(new_location, p, object_size);
             item.dest_begin.store(dest + object_size);
             if (_obj_ids.compare_and_move(lock, loc,
@@ -394,10 +394,11 @@ namespace triedent
             std::cout << "evacuating region: " << item.src_begin.load() / _h->region_size
                       << std::endl;
          }
+         auto base = _base;
          l.unlock();
          auto orig_src  = item.src_begin.load();
          auto orig_dest = item.dest_begin.load();
-         auto end       = evacuate_region(item);
+         auto end       = evacuate_region(item, base);
          l.lock();
          auto src_region  = orig_src / _h->region_size;
          auto dest_region = orig_dest / _h->region_size;

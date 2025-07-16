@@ -1,13 +1,3 @@
-import { useEffect, useState } from "react";
-import { toast } from "@shared/shadcn/ui/sonner";
-
-import { ConfirmationModal } from "@/components";
-
-import { AwaitTime } from "@/globals";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { wait } from "@/lib/wait";
-import { Account } from "@/lib/zod/Account";
-
 import { CreditTable } from "@/apps/tokens/components/credit-table";
 import { FormCreate } from "@/apps/tokens/components/forms/form-create";
 import FormTransfer from "@/apps/tokens/components/forms/form-transfer";
@@ -23,6 +13,14 @@ import { useCredit } from "@/apps/tokens/hooks/tokensPlugin/useCredit";
 import { useMint } from "@/apps/tokens/hooks/tokensPlugin/useMint";
 import { Tab, useTab } from "@/apps/tokens/hooks/useTab";
 import { useTokenForm } from "@/apps/tokens/hooks/useTokenForm";
+import { useEffect, useState } from "react";
+
+import { ConfirmationModal } from "@/components";
+
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { Account } from "@/lib/zod/Account";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
@@ -125,9 +123,7 @@ export const TokensPage = () => {
                         : `Unrecognised error, see logs.`,
             });
         } finally {
-            wait(AwaitTime).then(() => {
-                refetchUserBalances();
-            });
+            refetchUserBalances();
         }
     };
 
@@ -188,9 +184,7 @@ export const TokensPage = () => {
                         : `Unrecognised error, see logs.`,
             });
         } finally {
-            wait(AwaitTime).then(() => {
-                refetchUserBalances();
-            });
+            refetchUserBalances();
         }
     };
 
@@ -212,9 +206,7 @@ export const TokensPage = () => {
                 >
                     <FormCreate
                         onClose={() => {
-                            wait(AwaitTime).then(() => {
-                                refetchUserBalances();
-                            });
+                            refetchUserBalances();
                             setNewTokenModalOpen(false);
                         }}
                     />

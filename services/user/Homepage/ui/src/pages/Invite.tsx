@@ -1,5 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import {
+    AlarmClockMinus,
+    LoaderCircle,
+    TicketCheck,
+    TriangleAlert,
+} from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+import { siblingUrl } from "@psibase/common-lib";
+
+import { modifyUrlParams } from "@/lib/modifyUrlParams";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -10,19 +24,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import dayjs from "dayjs";
-
-import relativeTime from "dayjs/plugin/relativeTime";
-import {
-    AlarmClockMinus,
-    LoaderCircle,
-    TicketCheck,
-    TriangleAlert,
-} from "lucide-react";
-import {  siblingUrl } from "@psibase/common-lib";
-import { modifyUrlParams } from "@/lib/modifyUrlParams";
-import { z } from "zod";
-import { supervisor } from "@/supervisor";
 
 dayjs.extend(relativeTime);
 
@@ -36,7 +37,6 @@ const inviteObject = z.object({
 });
 
 const fetchInvite = async (token: string) => {
-
     const tokenRes = await supervisor.functionCall({
         service: "invite",
         intf: "invitee",

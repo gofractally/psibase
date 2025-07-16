@@ -217,7 +217,7 @@ pub fn decrypt_existing_key(
         return Err(ErrorType::KeyMismatch.into());
     }
 
-    symmetric_key.save(evaluation_owner, evaluation_id, group_number)?;
+    symmetric_key.save(evaluation_owner, evaluation_id, group_number);
     Ok(symmetric_key)
 }
 

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
-
 import { supervisor } from "src/main";
+import { z } from "zod";
 
 export const useCurrentAccounts = (enabled = true) =>
     useQuery({

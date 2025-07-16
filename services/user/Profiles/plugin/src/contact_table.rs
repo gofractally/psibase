@@ -46,8 +46,8 @@ impl ContactTable {
         self.user.to_string()
     }
 
-    fn save_contacts(&self, contacts: Vec<ContactEntry>) -> Result<(), Error> {
-        Keyvalue::set(&self.key(), &contacts.packed())
+    fn save_contacts(&self, contacts: Vec<ContactEntry>) {
+        Keyvalue::set(&self.key(), &contacts.packed());
     }
 
     pub fn set(&self, contact: Contact, overwrite: bool) -> Result<(), Error> {
@@ -64,7 +64,8 @@ impl ContactTable {
             }
             None => contacts.push(contact),
         }
-        self.save_contacts(contacts)
+        self.save_contacts(contacts);
+        Ok(())
     }
 
     pub fn get_contacts(&self) -> Vec<ContactEntry> {
@@ -84,7 +85,8 @@ impl ContactTable {
         match contacts.iter().position(|c| c.account == account_number) {
             Some(index) => {
                 contacts.remove(index);
-                self.save_contacts(contacts)
+                self.save_contacts(contacts);
+                Ok(())
             }
             None => Err(ErrorType::ContactNotFound(account.to_string()).into()),
         }

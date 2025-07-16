@@ -22,6 +22,6 @@ package = "tokens:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }

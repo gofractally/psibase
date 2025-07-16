@@ -1,35 +1,33 @@
-import { supervisor } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { getSupervisor } from "@psibase/common-lib";
+
 const LoginParams = z.object({
-  app: z.string(),
-  origin: z.string(),
-  accountName: z.string(),
+    app: z.string(),
+    origin: z.string(),
+    accountName: z.string(),
 });
 
+const supervisor = getSupervisor();
+
 export const useLoginDirect = () =>
-  useMutation<void, Error, z.infer<typeof LoginParams>>({
-    mutationFn: async (params) => {
-      const { accountName, app, origin } = LoginParams.parse(params);
+    useMutation<void, Error, z.infer<typeof LoginParams>>({
+        mutationFn: async (params) => {
+            const { accountName, app, origin } = LoginParams.parse(params);
 
-      void (await supervisor.functionCall({
-        method: "loginDirect",
-        params: [
-          {
-            app,
-            origin,
-          },
-          accountName,
-        ],
-        service: "accounts",
-        intf: "admin",
-      }));
-
-      if (window.location && window.location.href) {
-        window.location.href = origin;
-      } else {
-        throw new Error(`Expected window location to redirect to`);
-      }
-    },
-  });
+            const queryToken = await supervisor.functionCall({
+                method: "loginDirect",
+                params: [
+                    {
+                        app,
+                        origin,
+                    },
+                    accountName,
+                ],
+                service: "accounts",
+                intf: "admin",
+            });
+            console.log("returned queryToken:", queryToken);
+        },
+    });

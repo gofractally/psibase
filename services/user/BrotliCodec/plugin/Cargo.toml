@@ -8,8 +8,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-brotli-codec = { path = "../service", version = "0.18.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.18.0" }
+brotli-codec = { path = "../service", version = "0.19.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
 wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
 brotli = { version = "7.0.0" }
 
@@ -23,7 +23,7 @@ package = "brotli-codec:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 
 [dev-dependencies]
-brotli-codec-pkg = { path = "..", version = "0.18.0" }
+brotli-codec-pkg = { path = "..", version = "0.19.0" }

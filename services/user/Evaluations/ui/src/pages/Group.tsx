@@ -1,3 +1,11 @@
+import { useAsyncDebouncer } from "@tanstack/react-pacer";
+import dayjs from "dayjs";
+import { AlignJustify, Info, Plus, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
+import { useNavigate, useParams } from "react-router-dom";
+import { useInterval } from "usehooks-ts";
+
 import { useAttest } from "@/hooks/app/use-attest";
 import { useEvaluation } from "@/hooks/app/use-evaluation";
 import { setCachedProposal, useProposal } from "@/hooks/app/use-proposal";
@@ -7,16 +15,9 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
 import { zAccount } from "@/lib/zod/Account";
-import { useAsyncDebouncer } from "@tanstack/react-pacer";
-import dayjs from "dayjs";
-import { AlignJustify, Info, Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
-import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "@shared/shadcn/ui/sonner";
-import { useInterval } from "usehooks-ts";
 
 import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 const wait = (ms: number = 2500) =>
     new Promise((resolve) => setTimeout(resolve, ms));

@@ -264,7 +264,7 @@ namespace psibase
             auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
             check(ca.has_value(), "unknown service account: " + service.str());
             check(ca->codeHash != Checksum256{}, "service account has no code");
-            if (ca->flags & CodeRow::isSubjective)
+            if ((ca->flags & CodeRow::isSubjective) && !dbMode.verifyOnly)
             {
                auto subjectiveCode =
                    database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));

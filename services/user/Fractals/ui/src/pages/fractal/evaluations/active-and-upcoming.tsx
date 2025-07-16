@@ -1,6 +1,13 @@
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
+import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
+import { EmptyBlock } from "@/components/empty-block";
+
+import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
+
 import {
     Table,
     TableBody,
@@ -9,13 +16,6 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-
-import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
-import { EmptyBlock } from "@/components/empty-block";
-
-import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
-import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 
 export const ActiveAndUpcoming = () => {
     const { data: fractal } = useFractal();

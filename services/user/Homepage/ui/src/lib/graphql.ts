@@ -1,6 +1,8 @@
-import { Account } from "@/lib/zod/Account";
-import { siblingUrl } from "@psibase/common-lib";
 import { z } from "zod";
+
+import { siblingUrl } from "@psibase/common-lib";
+
+import { Account } from "@/lib/zod/Account";
 
 interface Error {
     message: string;

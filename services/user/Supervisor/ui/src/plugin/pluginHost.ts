@@ -1,29 +1,28 @@
+import { z } from "zod";
+
 import {
-    assertTruthy,
     PluginError,
+    QualifiedDynCallArgs,
     QualifiedFunctionCallArgs,
+    QualifiedResourceCallArgs,
+    assertTruthy,
     siblingUrl,
 } from "@psibase/common-lib";
-import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
+
+import {
+    OAUTH_REQUEST_EXPIRATION,
+    OAUTH_REQUEST_KEY,
+    REDIRECT_ERROR_CODE,
+} from "../constants";
+import {
+    HostInterface,
+    HttpRequest,
+    HttpResponse,
+    Result,
+} from "../hostInterface";
 import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
-
-import { OAUTH_REQUEST_EXPIRATION, OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
-import { z } from "zod";
-
-interface HttpRequest {
-    uri: string;
-    method: string;
-    headers: Record<string, string>;
-    body?: string | Uint8Array;
-}
-
-interface HttpResponse {
-    status: number;
-    headers: Array<[string, string]>;
-    body: string;
-}
 
 const zSupervisorPromptPayload = z.object({
     id: z.string().min(1),
@@ -34,21 +33,26 @@ const zSupervisorPromptPayload = z.object({
 
 type SupervisorPromptPayload = z.infer<typeof zSupervisorPromptPayload>;
 
-function convert(tuples: [string, string][]): Record<string, string> {
+function convert(
+    headers: { key: string; value: string }[],
+): Record<string, string> {
     const record: Record<string, string> = {};
-    tuples.forEach(([key, value]) => {
+    headers.forEach(({ key, value }) => {
         record[key] = value;
     });
     return record;
 }
 
-function kebabToCamel(
-    args: QualifiedFunctionCallArgs,
-): QualifiedFunctionCallArgs {
-    const intf = args.intf ? kebabToCamelStr(args.intf) : undefined;
+function convertBack(
+    headers: Array<[string, string]>,
+): { key: string; value: string }[] {
+    return headers.map(([key, value]) => ({ key, value }));
+}
+
+function kebabToCamel<T extends { intf?: string }>(args: T): T {
     return {
         ...args,
-        intf,
+        intf: args.intf ? kebabToCamelStr(args.intf) : args.intf,
     };
 }
 
@@ -74,23 +78,37 @@ export class PluginHost implements HostInterface {
         };
     }
 
+    private getBodyTagFromContentType(contentType: string): string {
+        if (contentType.includes("application/json")) {
+            return "json";
+        } else if (contentType.includes("application/octet-stream")) {
+            return "bytes";
+        } else if (contentType.includes("text/plain")) {
+            return "text";
+        } else {
+            throw this.recoverableError(
+                `Unsupported content type in response: ${contentType}`,
+            );
+        }
+    }
+
     // A synchronous web request.
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
     //    from BytecodeAlliance's JCO project.
-    private syncSend(
+    public sendRequest(
         req: HttpRequest,
     ): Result<HttpResponse, RecoverableErrorPayload> {
         try {
             const xhr = new XMLHttpRequest();
             xhr.open(req.method.toString(), req.uri, false);
-            const requestHeaders = new Headers(req.headers);
-            for (let [name, value] of requestHeaders.entries()) {
+            const requestHeaders = new Headers(convert(req.headers));
+            for (const [name, value] of requestHeaders.entries()) {
                 if (name !== "user-agent" && name !== "host") {
                     xhr.setRequestHeader(name, value);
                 }
             }
-            xhr.send(req.body && req.body.length > 0 ? req.body : null);
+            xhr.send(req.body && req.body.val.length > 0 ? req.body.val : null);
             if (xhr.status === 500) {
                 throw this.recoverableError(
                     `Http request error: ${xhr.response}`,
@@ -108,10 +126,15 @@ export class PluginHost implements HostInterface {
                     const value = parts.join(": ");
                     headers.push([key, value]);
                 });
+            const contentType = xhr.getResponseHeader("content-type") || "";
+            const tag = this.getBodyTagFromContentType(contentType);
             return {
                 status: xhr.status,
-                headers,
-                body,
+                headers: convertBack(headers),
+                body: {
+                    tag,
+                    val: body,
+                },
             };
         } catch (err: any) {
             if (
@@ -127,32 +150,6 @@ export class PluginHost implements HostInterface {
         }
     }
 
-    private postGraphQL(
-        url: string,
-        graphql: string,
-    ): Result<HttpResponse, RecoverableErrorPayload> {
-        return this.syncSend({
-            uri: url,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/graphql",
-            },
-            body: graphql,
-        });
-    }
-
-    private getRequest(
-        url: string,
-    ): Result<HttpResponse, RecoverableErrorPayload> {
-        return this.syncSend({
-            uri: url,
-            method: "GET",
-            headers: {
-                Accept: "application/json",
-            },
-        });
-    }
-
     constructor(supervisor: Supervisor, self: QualifiedOriginationData) {
         this.supervisor = supervisor;
         this.self = self;
@@ -163,96 +160,63 @@ export class PluginHost implements HostInterface {
         return this.supervisor.call(this.self, kebabToCamel(args));
     }
 
-    post(request: PluginPostDetails): Result<string, RecoverableErrorPayload> {
-        const endpoint = request.endpoint.replace(/^\/+/, "");
-        const url = `${this.self.origin}/${endpoint}`;
-        const contentType =
-            request.body.tag === "bytes"
-                ? "application/octet-stream"
-                : "application/json";
-        const res = this.syncSend({
-            uri: url,
-            method: "POST",
-            headers: convert([["Content-Type", contentType]]),
-            body: request.body.val,
-        });
-        if ("body" in res) {
-            return res.body;
-        }
-        return res;
+    syncCallDyn(args: QualifiedDynCallArgs) {
+        return this.supervisor.callDyn(this.self, args);
     }
 
-    postGraphqlGetJson(
-        graphql: string,
-    ): Result<string, RecoverableErrorPayload> {
-        const res = this.postGraphQL(`${this.self.origin}/graphql`, graphql);
-        if ("body" in res) {
-            const json = JSON.parse(res.body);
-            if (json.errors?.length) {
-                throw this.recoverableError(JSON.stringify(json.errors));
-            } else {
-                return res.body;
-            }
-        }
-        return res;
-    }
-
-    getJson(endpoint: string): Result<string, RecoverableErrorPayload> {
-        // Strip leading "/"
-        endpoint = endpoint.replace(/^\/+/, "");
-        const res = this.getRequest(`${this.self.origin}/${endpoint}`);
-        if ("body" in res) {
-            return res.body;
-        }
-        return res;
+    syncCallResource(args: QualifiedResourceCallArgs) {
+        return this.supervisor.callResource(this.self, kebabToCamel(args));
     }
 
     getActiveApp(): OriginationData {
         return this.supervisor.getActiveApp(this.self);
     }
 
-    // Client interface
-    getSenderApp(): OriginationData {
-        return this.supervisor.getCaller(this.self);
+    getServiceStack(): string[] {
+        return this.supervisor.getServiceStack();
     }
 
+    getRootDomain(): string {
+        return this.supervisor.getRootDomain();
+    }
+
+    // TODO - remove this once "wasi-keyvalue" is moved to keyvalue:plugin
     myServiceAccount(): string {
         return this.self.app;
     }
 
-    myServiceOrigin(): string {
-        return this.self.origin;
-    }
-
-    getAppUrl(app: string): string {
-        return `${siblingUrl(null, app)}`;
-    }
-    
-    private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
+    private setActiveUserPrompt(
+        subpath: string | undefined,
+        upPayloadJsonStr: string,
+    ): Result<string, RecoverableErrorPayload> {
         let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
-        
         // In Supervisor localStorage space, store id, subdomain, and subpath
-        const supervisorUP: SupervisorPromptPayload = zSupervisorPromptPayload.parse({
-            id: up_id,
-            subdomain: this.self.app,
-            subpath: subpath,
-            expiry_timestamp: Math.floor(new Date().getTime() / 1000) + OAUTH_REQUEST_EXPIRATION,
-        });
+        const supervisorUP: SupervisorPromptPayload =
+            zSupervisorPromptPayload.parse({
+                id: up_id,
+                subdomain: this.self.app,
+                subpath: subpath,
+                expiry_timestamp:
+                    Math.floor(new Date().getTime() / 1000) +
+                    OAUTH_REQUEST_EXPIRATION,
+            });
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
             intf: "keyvalue",
             method: "set",
             params: [
-                OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
+                OAUTH_REQUEST_KEY,
+                new TextEncoder().encode(JSON.stringify(supervisorUP)),
+            ],
+        } as QualifiedFunctionCallArgs);
 
         const currentUser = this.supervisor.call(this.self, {
             service: "accounts",
             plugin: "plugin",
             intf: "api",
             method: "getCurrentUser",
-            params: []
+            params: [],
         });
         if (!currentUser) {
             throw this.recoverableError("No logged in user found");
@@ -269,23 +233,37 @@ export class PluginHost implements HostInterface {
             intf: "keyvalue",
             method: "set",
             params: [
-                OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(parsedUpPayload))]} as QualifiedFunctionCallArgs);
-        return up_id
+                OAUTH_REQUEST_KEY,
+                new TextEncoder().encode(JSON.stringify(parsedUpPayload)),
+            ],
+        } as QualifiedFunctionCallArgs);
+        return up_id;
     }
 
-    
     // Client interface
-    promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
+    promptUser(
+        subpath: string | undefined,
+        payloadJsonStr: string | undefined,
+    ): Result<void, PluginError> {
         if (!!subpath && subpath?.length > 0 && subpath.includes("?")) {
-            console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");
+            console.error(
+                "Query params stripped from subpath for security reasons; all params should be passed via the payload",
+            );
             subpath = subpath.substring(0, subpath.indexOf("?"));
         }
 
-        const aup_id = this.setActiveUserPrompt(subpath, payloadJsonStr || JSON.stringify({}));
+        const aup_id = this.setActiveUserPrompt(
+            subpath,
+            payloadJsonStr || JSON.stringify({}),
+        );
 
         if (typeof aup_id === "string") {
-            const oauthUrl = siblingUrl(null, "supervisor", "/oauth.html", true);
+            const oauthUrl = siblingUrl(
+                null,
+                "supervisor",
+                "/oauth.html",
+                true,
+            );
             const re = this.recoverableError(oauthUrl + "?id=" + aup_id);
             re.code = REDIRECT_ERROR_CODE;
             throw re;

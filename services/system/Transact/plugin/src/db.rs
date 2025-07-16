@@ -9,7 +9,7 @@ impl ActionAuthPlugins {
     const KEY: &'static str = "action_auth_plugin";
 
     pub fn set(auth_plugin: String) {
-        Keyvalue::set(Self::KEY, &auth_plugin.packed()).expect("Failed to set auth plugin");
+        Keyvalue::set(Self::KEY, &auth_plugin.packed());
     }
 
     pub fn get() -> Option<String> {
@@ -87,7 +87,7 @@ impl ActionClaims {
             });
         }
 
-        Keyvalue::set(Self::KEY_CLAIMS, &all_claims.packed()).expect("Failed to set claims");
+        Keyvalue::set(Self::KEY_CLAIMS, &all_claims.packed());
     }
 
     pub fn clear() {
@@ -100,7 +100,7 @@ impl ActionSenderHook {
     const KEY: &'static str = "action_sender";
 
     pub fn set(sender: String) {
-        Keyvalue::set(Self::KEY, &sender.packed()).expect("Failed to set action sender");
+        Keyvalue::set(Self::KEY, &sender.packed());
     }
 
     pub fn get() -> Option<String> {
@@ -123,9 +123,8 @@ impl TxTransformLabel {
     const KEY_PLUGIN: &'static str = "tx_transform_app";
 
     pub fn set(transformer: String, label: Option<String>) {
-        Keyvalue::set(Self::KEY_LABEL, &label.packed()).expect("Failed to set tx transform label");
-        Keyvalue::set(Self::KEY_PLUGIN, &transformer.packed())
-            .expect("Failed to set tx transform app");
+        Keyvalue::set(Self::KEY_LABEL, &label.packed());
+        Keyvalue::set(Self::KEY_PLUGIN, &transformer.packed());
     }
 
     pub fn get_transformer_plugin() -> Option<String> {

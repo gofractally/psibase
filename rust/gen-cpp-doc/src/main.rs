@@ -800,7 +800,7 @@ fn parse<'tu>(
     repo_path: &str,
     build_path: &str,
 ) -> Result<TranslationUnit<'tu>, anyhow::Error> {
-    let mut parser = index.parser(repo_path.to_owned() + "/doc/psidk/src/doc-root.cpp");
+    let mut parser = index.parser(repo_path.to_owned() + "/doc/src/doc-root.cpp");
     let wasi_sdk_prefix = env::var("WASI_SDK_PREFIX")?;
     let wasi_include_dir = get_wasi_include_dir(&wasi_sdk_prefix);
     let clang_include_dir = get_clang_include_dir(&wasi_sdk_prefix);

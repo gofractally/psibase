@@ -5,9 +5,9 @@ import { RouterProvider } from "react-router-dom";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { Toaster } from "@shared/shadcn/ui/sonner";
-
 import { ThemeProvider } from "@/components/theme-provider";
+
+import { Toaster } from "@shared/shadcn/ui/sonner";
 
 import Router from "./router";
 
