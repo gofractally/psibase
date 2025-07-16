@@ -163,8 +163,14 @@ interface store {
         ephemeral
     }
 
+    /// Data sufficient to specify a particular database
+    record database {
+        mode: db-mode,
+        duration: storage-duration,
+    }
+
     /// Get the bucket with the specified identifier.
-    open: func(mode: db-mode, duration: storage-duration, identifier: string) -> result<bucket, error>;
+    open: func(db: database, identifier: string) -> result<bucket, error>;
 
     /// A bucket is a collection of key-value pairs. Each key-value pair is stored as a entry in the
     /// bucket.

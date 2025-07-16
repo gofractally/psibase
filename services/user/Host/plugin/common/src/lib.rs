@@ -4,6 +4,7 @@ use bindings::*;
 
 mod helpers;
 use helpers::*;
+mod bucket;
 mod plugin_ref;
 
 mod types;
@@ -12,7 +13,7 @@ use exports::host::common::{
     client::Guest as Client,
     server::Guest as Server,
     store::Guest as Store,
-    store::{Bucket, DbMode, StorageDuration},
+    store::{Bucket, Database, DbMode, StorageDuration},
     types::Guest as Types,
     types::{BodyTypes, Error, OriginationData, PostRequest},
 };
@@ -174,16 +175,45 @@ fn validate_identifier(identifier: &str) -> Result<(), Error> {
     Ok(())
 }
 
-impl Store for HostCommon {
-    type Bucket = types::Bucket;
+// +---------------------+---------------------+---------------------+
+// |                     |  NonTransactional   |    Transactional*   |
+// +---------------------+---------------------+---------------------+
+// | Ephemeral*          |      Valid          |      Not valid      |
+// +---------------------+---------------------+---------------------+
+// | Session*            |      Valid          |        Valid        |
+// +---------------------+---------------------+---------------------+
+// | Persistent          |      Valid          |        Valid        |
+// +---------------------+---------------------+---------------------+
+//
+// * Not yet supported
+//
+fn validate_db(db: &Database) -> Result<(), Error> {
+    if db.mode == DbMode::Transactional {
+        return Err(make_error("Transactional database not yet supported"));
+    }
+    if db.duration == StorageDuration::Ephemeral {
+        return Err(make_error("Transient database not yet supported"));
+    }
+    if db.duration == StorageDuration::Session {
+        return Err(make_error("Session database not yet supported"));
+    }
+    if db.duration == StorageDuration::Ephemeral {
+        if db.mode == DbMode::Transactional {
+            return Err(make_error(
+                "Ephemeral database not supported in transactional mode",
+            ));
+        }
+    }
+    Ok(())
+}
 
-    fn open(
-        _mode: DbMode,
-        _duration: StorageDuration,
-        identifier: String,
-    ) -> Result<Bucket, Error> {
+impl Store for HostCommon {
+    type Bucket = bucket::Bucket;
+
+    fn open(db: Database, identifier: String) -> Result<Bucket, Error> {
+        validate_db(&db)?;
         validate_identifier(&identifier)?;
-        let bucket = types::Bucket::new(identifier);
+        let bucket = bucket::Bucket::new(db, identifier);
         Ok(Bucket::new(bucket))
     }
 }

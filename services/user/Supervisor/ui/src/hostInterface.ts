@@ -51,4 +51,15 @@ export interface HostInterface {
     getServiceStack(): string[];
 
     getRootDomain(): string;
+
+    dbGet: (mode: number, duration: number, key: string) => Uint8Array | null;
+
+    dbSet: (
+        mode: number,
+        duration: number,
+        key: string,
+        value: Uint8Array,
+    ) => void;
+
+    dbRemove: (mode: number, duration: number, key: string) => void;
 }
