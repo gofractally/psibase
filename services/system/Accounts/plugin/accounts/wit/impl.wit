@@ -19,8 +19,6 @@ interface admin {
 
     /// Gets a list of all accounts that are known by the accounts app on this device.
     get-all-accounts: func() -> list<string>;
-
-    logout: func();
 }
 
 world impl {

@@ -20,7 +20,6 @@ export const App = () => {
 
     useEffect(() => {
         const init = async () => {
-            await supervisor.onLoaded();
             await getNetworkName();
         };
 
