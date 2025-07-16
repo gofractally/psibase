@@ -146,9 +146,7 @@ export const random = createShimWrapper(jcoShims.random.random);
         
         return shimCode;
     } catch {
-        // Fallback to bundled shim if JCO is not available
-        const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
-        return await fetch(wasiShimURL).then((r) => r.text());
+        console.error("Failed to load WASI shim code from JCO");
     }
 }
 
