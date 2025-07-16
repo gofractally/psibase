@@ -28,7 +28,7 @@ import {
 export const ActiveAndUpcoming = () => {
     const currentFractal = useCurrentFractal();
     const { data: currentUser } = useCurrentUser();
-    const { data: fractal, isPending: isFractalPending } = useFractal();
+    const { data, isPending: isFractalPending } = useFractal();
     const { data: membership, isPending: isMembershipPending } = useMembership(
         currentFractal,
         currentUser,
@@ -40,13 +40,16 @@ export const ActiveAndUpcoming = () => {
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
     const isCitizen = membership?.memberStatus === MemberStatus.Citizen;
-    const hasEvaluations = fractal && fractal?.evaluations.length > 0;
+    const hasEvaluations = data && data?.evaluations.length > 0;
+    const isCouncilMember = Boolean(
+        data?.fractal?.council.includes(currentUser ?? ""),
+    );
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <div className="flex h-9 items-center justify-between">
                 <h1 className="text-lg font-semibold">Active & upcoming</h1>
-                {isCitizen && (
+                {isCouncilMember && (
                     <ScheduleDialog
                         isOpen={isScheduleDialogOpen}
                         setIsOpen={setIsScheduleDialogOpen}
@@ -67,7 +70,7 @@ export const ActiveAndUpcoming = () => {
                     <EvaluationsTable />
                 ) : (
                     <EmptyState
-                        isCitizen={isCitizen}
+                        canSchedule={isCouncilMember}
                         isPending={isFractalPending || isMembershipPending}
                         onScheduleClick={() => {
                             setIsScheduleDialogOpen(true);
@@ -80,11 +83,11 @@ export const ActiveAndUpcoming = () => {
 };
 
 const EmptyState = ({
-    isCitizen,
+    canSchedule,
     isPending,
     onScheduleClick,
 }: {
-    isCitizen: boolean;
+    canSchedule: boolean;
     isPending: boolean;
     onScheduleClick: () => void;
 }) => {
@@ -92,7 +95,7 @@ const EmptyState = ({
         return <Skeleton className="h-[450px] w-full rounded-md" />;
     }
 
-    if (isCitizen) {
+    if (canSchedule) {
         return (
             <EmptyBlock
                 title="No evaluations scheduled"

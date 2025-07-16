@@ -12,7 +12,11 @@ export const useEvaluationStatus = (
     now: number,
     type: EvalType = EvalType.Reputation,
 ): EvaluationStatus | undefined => {
-    const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
+    const {
+        data,
+        isLoading: isLoadingFractal,
+        error: fractalError,
+    } = useFractal();
 
     const { evaluation, evaluationInstance } = useEvaluationInstance(type);
 
@@ -37,7 +41,9 @@ export const useEvaluationStatus = (
 
     const isLoading = isLoadingFractal || isLoadingUsersAndGroups;
 
-    const currentUserCanActOnBehalfOfFractal = true;
+    const currentUserCanActOnBehalfOfFractal = Boolean(
+        data?.fractal?.council.includes(currentUser ?? ""),
+    );
 
     if (isLoading) return undefined;
     if (usersAndGroupsError || fractalError) {
