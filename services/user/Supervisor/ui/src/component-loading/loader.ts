@@ -146,7 +146,7 @@ export const random = createShimWrapper(jcoShims.random.random);
         
         return shimCode;
     } catch {
-        console.error("Failed to load WASI shim code from JCO");
+        throw new Error("Failed to load WASI shim code from JCO");
     }
 }
 
