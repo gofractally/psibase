@@ -36,7 +36,7 @@ export const router = createBrowserRouter([
             {
                 path: ":fractalName",
                 index: true,
-                loader: () => redirect("evaluations/"),
+                loader: () => redirect("membership"),
             },
             {
                 path: ":fractalName/membership",
