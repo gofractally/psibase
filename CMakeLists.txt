@@ -354,7 +354,7 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
-        INIT
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
