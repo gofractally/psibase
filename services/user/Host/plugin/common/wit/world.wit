@@ -200,11 +200,17 @@ interface store {
         exists: func(key: string) -> result<bool, error>;
     }
 
-    /// Flushes the databases with the specified mode to the host.
-    /// Ephemeral databases are never flushed.
+    /// Flushes the transactional data to the host.
+    /// Ephemeral and Non-Transactional databases are never flushed.
     ///
     /// This method can only be called by the transact plugin.
-    flush: func(mode: db-mode); 
+    flush-transactional-data: func(); 
+
+    /// Clears all data from all buffers.
+    /// Should be called at the start of every plugin execution context.
+    ///
+    /// This method can only be called by the transact plugin.
+    clear-buffers: func();
 }
 
 world imports {

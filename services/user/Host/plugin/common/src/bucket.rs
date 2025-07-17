@@ -91,17 +91,27 @@ pub mod host_buffer {
 
         results
     }
+
+    pub fn clear_all() {
+        WRITE_BUFFERS.with(|buffers| {
+            buffers.borrow_mut().clear();
+        });
+    }
 }
 
 // +---------------------+---------------------+---------------------+
 // |                     |  NonTransactional   |    Transactional    |
 // +---------------------+---------------------+---------------------+
-// | Ephemeral           |      Valid          |      Not valid      |
+// | Ephemeral           |      N/A            |        N/A          |
 // +---------------------+---------------------+---------------------+
 // | Session             |      Valid          |        Valid        |
 // +---------------------+---------------------+---------------------+
 // | Persistent          |      Valid          |        Valid        |
 // +---------------------+---------------------+---------------------+
+//
+// The ephemeral database never is written to the host.
+// The Non-transactional database is never written to the buffer, always directly to the host.
+// The Transactional database is written to the buffer, flushed to host when instructed by `transact`
 
 pub struct Bucket {
     bucket_id: String,
@@ -131,10 +141,10 @@ impl Bucket {
 
     fn validate_identifier(identifier: &str) -> Result<(), Error> {
         // Validate identifier with regex /^[0-9a-zA-Z-]+$/
-        let valid_identifier_regex = Regex::new(r"^[0-9a-zA-Z-]+$").unwrap();
+        let valid_identifier_regex = Regex::new(r"^[0-9a-zA-Z_-]+$").unwrap();
         if !valid_identifier_regex.is_match(&identifier) {
             return Err(make_error(
-                "Invalid bucket identifier: Identifier must conform to /^[0-9a-zA-Z-]+$/",
+                "Invalid bucket identifier: Identifier must conform to /^[0-9a-zA-Z_-]+$/",
             )
             .into());
         }
@@ -159,10 +169,16 @@ impl GuestBucket for Bucket {
         self.validate_key_size(&key)?;
         let prefixed_key = self.get_key(&key);
 
-        if host_buffer::exists(&self.db, &prefixed_key) {
-            Ok(host_buffer::get(&self.db, &prefixed_key))
-        } else {
-            Ok(HostDb::get(self.db.duration as u8, &prefixed_key))
+        match (self.db.duration, self.db.mode) {
+            (StorageDuration::Ephemeral, _) => Ok(host_buffer::get(&self.db, &prefixed_key)),
+            (_, DbMode::NonTransactional) => Ok(HostDb::get(self.db.duration as u8, &prefixed_key)),
+            (_, DbMode::Transactional) => {
+                if host_buffer::exists(&self.db, &prefixed_key) {
+                    Ok(host_buffer::get(&self.db, &prefixed_key))
+                } else {
+                    Ok(HostDb::get(self.db.duration as u8, &prefixed_key))
+                }
+            }
         }
     }
 
@@ -170,29 +186,59 @@ impl GuestBucket for Bucket {
         self.validate_key_size(&key)?;
         self.validate_value_size(&value)?;
 
-        host_buffer::set(&self.db, &self.get_key(&key), &value);
+        match (self.db.duration, self.db.mode) {
+            (StorageDuration::Ephemeral, _) => {
+                host_buffer::set(&self.db, &self.get_key(&key), &value);
+            }
+            (_, DbMode::NonTransactional) => {
+                HostDb::set(self.db.duration as u8, &self.get_key(&key), &value);
+            }
+            (_, DbMode::Transactional) => {
+                host_buffer::set(&self.db, &self.get_key(&key), &value);
+            }
+        }
         Ok(())
     }
 
     fn delete(&self, key: String) -> Result<(), Error> {
         self.validate_key_size(&key)?;
 
-        host_buffer::remove(&self.db, &self.get_key(&key));
+        match (self.db.duration, self.db.mode) {
+            (StorageDuration::Ephemeral, _) => {
+                host_buffer::remove(&self.db, &self.get_key(&key));
+            }
+            (_, DbMode::NonTransactional) => {
+                HostDb::remove(self.db.duration as u8, &self.get_key(&key));
+            }
+            (_, DbMode::Transactional) => {
+                host_buffer::remove(&self.db, &self.get_key(&key));
+            }
+        }
         Ok(())
     }
 
     fn exists(&self, key: String) -> Result<bool, Error> {
         self.validate_key_size(&key)?;
-
         let prefixed_key = self.get_key(&key);
 
-        if host_buffer::exists(&self.db, &prefixed_key) {
-            match host_buffer::get(&self.db, &prefixed_key) {
-                Some(_) => Ok(true),
-                None => Ok(false), // Key was deleted
+        match (self.db.duration, self.db.mode) {
+            (StorageDuration::Ephemeral, _) => {
+                // Doesn't matter if the key dne, or if it does but is a delete OP
+                Ok(host_buffer::get(&self.db, &prefixed_key).is_some())
             }
-        } else {
-            Ok(HostDb::get(self.db.duration as u8, &prefixed_key).is_some())
+            (_, DbMode::NonTransactional) => {
+                Ok(HostDb::get(self.db.duration as u8, &prefixed_key).is_some())
+            }
+            (_, DbMode::Transactional) => {
+                if host_buffer::exists(&self.db, &prefixed_key) {
+                    match host_buffer::get(&self.db, &prefixed_key) {
+                        Some(_) => Ok(true),
+                        None => Ok(false), // Key was deleted
+                    }
+                } else {
+                    Ok(HostDb::get(self.db.duration as u8, &prefixed_key).is_some())
+                }
+            }
         }
     }
 }

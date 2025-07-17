@@ -17,7 +17,7 @@ use transact::plugin::hook_handlers::*;
 // Other plugins
 use host::common::{
     self as Host, server as Server,
-    store::{self as Store, DbMode},
+    store::{self as Store},
     types::{self as CommonTypes, BodyTypes},
 };
 
@@ -139,6 +139,7 @@ impl Intf for TransactPlugin {
 
 impl Admin for TransactPlugin {
     fn start_tx() {
+        Store::clear_buffers();
         assert_from_supervisor();
         if CurrentActions::has_actions() {
             println!("[Warning] Transaction should already have been cleared.");
@@ -168,9 +169,8 @@ impl Admin for TransactPlugin {
 
         let actions = CurrentActions::get();
 
-        Store::flush(DbMode::NonTransactional);
         if actions.len() == 0 {
-            Store::flush(DbMode::Transactional);
+            Store::flush_transactional_data();
             return Ok(());
         }
 
@@ -205,7 +205,7 @@ impl Admin for TransactPlugin {
             Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");
-                Store::flush(DbMode::Transactional);
+                Store::flush_transactional_data();
                 Ok(())
             }
         }

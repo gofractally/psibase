@@ -164,13 +164,20 @@ impl Types for HostCommon {
 impl Store for HostCommon {
     type Bucket = bucket::Bucket;
 
-    fn flush(mode: DbMode) {
-        check_caller(&["transact"], "flush@host:common/store");
+    fn clear_buffers() {
+        use crate::bucket::host_buffer;
 
+        check_caller(&["transact"], "clear-buffers@host:common/store");
+        host_buffer::clear_all();
+    }
+
+    fn flush_transactional_data() {
         use crate::bucket::host_buffer;
         use crate::supervisor::bridge::database as HostDb;
 
-        let buffer_data = host_buffer::drain_all(mode);
+        check_caller(&["transact"], "flush@host:common/store");
+
+        let buffer_data = host_buffer::drain_all(DbMode::Transactional);
 
         for (db, entries) in buffer_data {
             for (key, op) in entries {
