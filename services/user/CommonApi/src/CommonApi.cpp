@@ -90,10 +90,16 @@ namespace SystemService
             psio::json_token_stream jstream{request.body.data()};
             auto                    params = psio::from_json<cookie_data>(jstream);
 
-            // Create response headers with host-only __Host-SESSION cookie
             std::vector<HttpHeader> headers;
-            std::string             cookieValue = "__Host-SESSION=" + params.accessToken +
-                                      "; Path=/; HttpOnly; Secure; SameSite=Strict";
+            bool                    dev_chain     = true;
+            std::string             cookieName    = "__Host-SESSION=";
+            std::string             cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict";
+            if (dev_chain)
+            {
+               cookieName    = "authed-query";
+               cookieAttribs = "Path=/";
+            }
+            std::string cookieValue = cookieName + params.accessToken + "; " + cookieAttribs;
             headers.push_back({"Set-Cookie", cookieValue});
 
             return HttpReply{.status      = HttpStatus::ok,
