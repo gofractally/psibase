@@ -75,12 +75,6 @@ function base64ToBytes(str: string): Uint8Array {
 enum storageDuration {
     persistent = 0,
     session = 1,
-    ephemeral = 2,
-}
-
-enum dbMode {
-    nonTransactional = 0,
-    transactional = 1,
 }
 
 // This host interface is given to each serviceContext, but each is given a host interface
@@ -173,10 +167,7 @@ export class PluginHost implements HostInterface {
         }
     }
 
-    private validateDb(mode: number, duration: number): void {
-        if (mode !== dbMode.nonTransactional) {
-            throw new Error("Invalid db mode");
-        }
+    private validateDb(duration: number): void {
         if (duration !== storageDuration.persistent) {
             throw new Error("Invalid duration");
         }
@@ -186,8 +177,8 @@ export class PluginHost implements HostInterface {
         this.self = self;
     }
 
-    dbGet(mode: number, duration: number, key: string): Uint8Array | null {
-        this.validateDb(mode, duration);
+    dbGet(duration: number, key: string): Uint8Array | null {
+        this.validateDb(duration);
 
         const storedValue = localStorage.getItem(key);
         if (storedValue === null) {
@@ -196,19 +187,14 @@ export class PluginHost implements HostInterface {
         return base64ToBytes(storedValue);
     }
 
-    dbSet(
-        mode: number,
-        duration: number,
-        key: string,
-        value: Uint8Array,
-    ): void {
-        this.validateDb(mode, duration);
+    dbSet(duration: number, key: string, value: Uint8Array): void {
+        this.validateDb(duration);
         const base64Value = bytesToBase64(value);
         localStorage.setItem(key, base64Value);
     }
 
-    dbRemove(mode: number, duration: number, key: string): void {
-        this.validateDb(mode, duration);
+    dbRemove(duration: number, key: string): void {
+        this.validateDb(duration);
         localStorage.removeItem(key);
     }
 

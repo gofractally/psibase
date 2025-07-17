@@ -91,49 +91,25 @@ impl GuestBucket for Bucket {
 
     fn get(&self, key: String) -> Result<Option<Vec<u8>>, Error> {
         self.validate_key_size(&key)?;
-
-        match HostDb::get(
-            self.db.mode as u8,
-            self.db.duration as u8,
-            &self.get_key(&key),
-        ) {
-            Some(data) => Ok(Some(data)),
-            None => Ok(None),
-        }
+        Ok(HostDb::get(self.db.duration as u8, &self.get_key(&key)))
     }
 
     fn set(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         self.validate_key_size(&key)?;
         self.validate_value_size(&value)?;
-
-        HostDb::set(
-            self.db.mode as u8,
-            self.db.duration as u8,
-            &self.get_key(&key),
-            &value,
-        );
+        HostDb::set(self.db.duration as u8, &self.get_key(&key), &value);
         Ok(())
     }
 
     fn delete(&self, key: String) -> Result<(), Error> {
         self.validate_key_size(&key)?;
-
-        HostDb::remove(
-            self.db.mode as u8,
-            self.db.duration as u8,
-            &self.get_key(&key),
-        );
+        HostDb::remove(self.db.duration as u8, &self.get_key(&key));
         Ok(())
     }
 
     fn exists(&self, key: String) -> Result<bool, Error> {
         match self.validate_key_size(&key) {
-            Ok(_) => Ok(HostDb::get(
-                self.db.mode as u8,
-                self.db.duration as u8,
-                &self.get_key(&key),
-            )
-            .is_some()),
+            Ok(_) => Ok(HostDb::get(self.db.duration as u8, &self.get_key(&key)).is_some()),
             Err(_) => Ok(false),
         }
     }
