@@ -6,7 +6,6 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-fractals = { path = "../service/", version = "0.19.0" }
 psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -27,5 +26,3 @@ world = "impl"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 "evaluations:plugin" = { path = "../../Evaluations/plugin/wit/world.wit" }
-
-

@@ -114,7 +114,7 @@ impl SymmetricKey {
     }
 
     pub fn generate(salt: Vec<u8>) -> Self {
-        let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().random();
+        let new_shared_symmetric_key: [u8; 32] = rand::rng().random();
         Self {
             key: new_shared_symmetric_key.to_vec(),
             salt,

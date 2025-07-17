@@ -493,7 +493,6 @@ name = "branding-plugin"
 version = "0.19.0"
 dependencies = [
  "branding",
- "branding-pkg",
  "psibase",
  "serde",
  "serde_json",
@@ -594,9 +593,17 @@ name = "chainmail"
 version = "0.19.0"
 dependencies = [
  "async-graphql",
- "chainmail_package",
+ "chainmail-pkg",
  "psibase",
  "serde",
+]
+
+[[package]]
+name = "chainmail-pkg"
+version = "0.19.0"
+dependencies = [
+ "chainmail",
+ "chainmail-plugin",
 ]
 
 [[package]]
@@ -604,21 +611,13 @@ name = "chainmail-plugin"
 version = "0.19.0"
 dependencies = [
  "chainmail",
- "chainmail_package",
+ "chainmail-pkg",
  "chrono",
  "psibase",
  "serde",
  "serde-aux",
  "serde_json",
  "wit-bindgen-rt 0.39.0",
-]
-
-[[package]]
-name = "chainmail_package"
-version = "0.19.0"
-dependencies = [
- "chainmail",
- "chainmail-plugin",
 ]
 
 [[package]]
@@ -1189,7 +1188,6 @@ version = "0.19.0"
 dependencies = [
  "async-graphql",
  "evaluations",
- "fractals-pkg",
  "psibase",
  "psibase_macros",
  "serde",
@@ -1201,7 +1199,6 @@ name = "fractals-pkg"
 version = "0.19.0"
 dependencies = [
  "fractals",
- "fractals-plugin",
  "r-fractals",
 ]
 
@@ -1209,7 +1206,6 @@ dependencies = [
 name = "fractals-plugin"
 version = "0.19.0"
 dependencies = [
- "fractals",
  "psibase",
  "serde",
  "serde_json",

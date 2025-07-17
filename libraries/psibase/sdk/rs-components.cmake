@@ -86,3 +86,124 @@ function(add_rs_component_workspace TARGET_TUPLE)
     # Expose the target name to the caller of this function
     set(${TARGET_NAME}_DEP ${TARGET_NAME} PARENT_SCOPE)
 endfunction()
+
+# Function to filter workspace members to only include plugin directories
+# This addresses the issue where cargo component build tries to process service packages
+# that should be regular libraries, not WebAssembly components
+function(filter_plugin_workspace_members WORKSPACE_PATH OUTPUT_VAR)
+    # Read the workspace Cargo.toml to get the members list
+    set(CARGO_TOML_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${WORKSPACE_PATH}/Cargo.toml")
+    
+    if(NOT EXISTS ${CARGO_TOML_PATH})
+        message(FATAL_ERROR "Workspace Cargo.toml not found at: ${CARGO_TOML_PATH}")
+    endif()
+    
+    file(READ ${CARGO_TOML_PATH} CARGO_TOML_CONTENT)
+    
+    # Extract all quoted strings from the file - this will get the members
+    string(REGEX MATCHALL "\"([^\"]+)\"" QUOTED_MEMBERS ${CARGO_TOML_CONTENT})
+    
+    # Extract just the paths (remove quotes)  
+    set(MEMBERS_LIST "")
+    foreach(QUOTED_MEMBER ${QUOTED_MEMBERS})
+        string(REGEX REPLACE "\"([^\"]+)\"" "\\1" MEMBER_PATH ${QUOTED_MEMBER})
+        # Only add if it looks like a workspace member path (contains / and doesn't start with name/version)
+        if(MEMBER_PATH MATCHES ".*/.*" AND NOT MEMBER_PATH MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
+            list(APPEND MEMBERS_LIST ${MEMBER_PATH})
+        endif()
+    endforeach()
+    
+    # Filter to only include paths ending with /plugin or /plugin/
+    set(PLUGIN_MEMBERS "")
+    foreach(MEMBER ${MEMBERS_LIST})
+        if(MEMBER MATCHES ".*/plugin/?$")
+            list(APPEND PLUGIN_MEMBERS ${MEMBER})
+        endif()
+    endforeach()
+    
+    # Debug output
+    list(LENGTH PLUGIN_MEMBERS PLUGIN_COUNT)
+    message(STATUS "Found ${PLUGIN_COUNT} plugin members: ${PLUGIN_MEMBERS}")
+    
+    set(${OUTPUT_VAR} ${PLUGIN_MEMBERS} PARENT_SCOPE)
+endfunction()
+
+# Enhanced version of add_rs_component_workspace that only processes plugin packages
+# This prevents cargo component build from trying to process service packages as components
+function(add_rs_component_workspace_filtered TARGET_TUPLE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
+
+    # Get only plugin workspace members
+    filter_plugin_workspace_members(${PATH} PLUGIN_MEMBERS)
+    
+    # Create a temporary workspace manifest that only includes plugin packages
+    set(TEMP_WORKSPACE_DIR "${CMAKE_CURRENT_BINARY_DIR}/temp_plugin_workspace")
+    set(TEMP_CARGO_TOML "${TEMP_WORKSPACE_DIR}/Cargo.toml")
+    
+    file(MAKE_DIRECTORY ${TEMP_WORKSPACE_DIR})
+    
+    # Read the original workspace Cargo.toml to get workspace-level settings
+    set(ORIGINAL_CARGO_TOML "${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml")
+    file(READ ${ORIGINAL_CARGO_TOML} ORIGINAL_CONTENT)
+    
+    # Create a minimal workspace with only plugin members
+    set(FILTERED_CONTENT "[workspace]\nmembers = [\n")
+    
+    foreach(PLUGIN_MEMBER ${PLUGIN_MEMBERS})
+        string(APPEND FILTERED_CONTENT "    \"${PLUGIN_MEMBER}\",\n")
+    endforeach()
+    
+    string(APPEND FILTERED_CONTENT "]\nresolver = \"2\"\n\n")
+    
+    # Copy workspace-level settings (profile, dependencies, etc.)
+    string(REGEX MATCH "\\[workspace\\][^\\[]*members\\s*=\\s*\\[[^\\]]+\\]\\s*resolver\\s*=\\s*\"[^\"]+\"\\s*(.*)" REST_MATCH ${ORIGINAL_CONTENT})
+    if(CMAKE_MATCH_1)
+        string(APPEND FILTERED_CONTENT ${CMAKE_MATCH_1})
+    endif()
+    
+    # Write the filtered workspace manifest
+    file(WRITE ${TEMP_CARGO_TOML} ${FILTERED_CONTENT})
+
+    set(OUTPUT_FILEPATHS "")
+    set(OUTPUT_FILES "")
+    foreach(FILENAME ${ARGN})
+        string(REGEX REPLACE "-" "_" FILENAME ${FILENAME})
+        
+        # Sets a variable called {TARGET_NAME}_OUTPUT_FILE_{FILENAME} and expose it to the caller of this function
+        set(${TARGET_NAME}_OUTPUT_FILE_${FILENAME} ${COMPONENT_BIN_DIR}/${FILENAME}.wasm PARENT_SCOPE)
+
+        set(FILENAME ${FILENAME}.wasm)
+        list(APPEND OUTPUT_FILEPATHS ${COMPONENT_BIN_DIR}/${FILENAME})
+        list(APPEND OUTPUT_FILES ${FILENAME})
+    endforeach()
+
+    # Get the appropriate shared cache directory
+    get_shared_cache_dir(TARGET_DIR ${PATH})
+    set(TARGET_ARCH wasm32-wasip1)
+
+    set(COPY_COMMANDS "")
+    foreach(FILENAME ${OUTPUT_FILES})
+        set(SOURCE_FILE ${TARGET_DIR}/${TARGET_ARCH}/release/${FILENAME})
+        set(DEST_FILE ${COMPONENT_BIN_DIR}/${FILENAME})
+        list(APPEND COPY_COMMANDS
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_FILE} ${DEST_FILE}
+        )
+    endforeach()
+
+    ExternalProject_Add(${TARGET_NAME}
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
+        BUILD_BYPRODUCTS ${OUTPUT_FILEPATHS}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND cargo component build -r
+            --target ${TARGET_ARCH}
+            --manifest-path ${TEMP_CARGO_TOML}
+            --target-dir ${TARGET_DIR}
+        ${COPY_COMMANDS}
+        BUILD_ALWAYS 1
+        INSTALL_COMMAND ""
+    )
+
+    # Expose the target name to the caller of this function
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} PARENT_SCOPE)
+endfunction()

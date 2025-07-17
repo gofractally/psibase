@@ -266,7 +266,7 @@ include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
-add_rs_component_workspace(services/:Plugins 
+add_rs_component_workspace_filtered(services/:Plugins 
     accounts
     account-tokens
     aes

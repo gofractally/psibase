@@ -6,7 +6,6 @@ rust-version = "1.64"
 edition = "2021"
 publish = false
 
-
 [package.metadata.psibase]
 package-name = "Fractals"
 services = ["fractals"]
@@ -19,6 +18,5 @@ Sites = "0.19.0"
 crate-type = ["rlib"]
 
 [dependencies]
-fractals-plugin = { path = "plugin", version = "0.19.0" }
 fractals = { path = "service", version = "0.19.0" }
 r-fractals = { path = "query-service", version = "0.19.0" }

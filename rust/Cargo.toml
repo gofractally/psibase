@@ -49,6 +49,7 @@ sha2 = "0.10"
 url = "2.5"
 regex = "1.0"
 pem = "3.0"
+rand = "0.9"
 
 [profile.release]
 codegen-units = 1

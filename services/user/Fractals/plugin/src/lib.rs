@@ -10,6 +10,7 @@ use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
+use psibase::services::fractals;
 
 mod errors;
 mod helpers;

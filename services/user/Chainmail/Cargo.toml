@@ -1,5 +1,5 @@
 [package]
-name = "chainmail_package"
+name = "chainmail-pkg"
 description = "Message-sending application"
 version = "0.19.0"
 rust-version = "1.64"
