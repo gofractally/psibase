@@ -5,6 +5,7 @@ use crate::exports::host::common::{
 };
 use crate::make_error;
 use crate::supervisor::bridge::database as HostDb;
+use crate::supervisor::bridge::intf::get_chain_id;
 use crate::HostCommon;
 use regex::Regex;
 use std::cell::RefCell;
@@ -115,9 +116,8 @@ impl Bucket {
     }
 
     fn validate_key_size(&self, key: &str) -> Result<(), Error> {
-        // ~80 bytes per key, so `listKeys` pagesize limit of 1000 yield an ~80kb payload
-        if key.len() >= 80 {
-            return Err(make_error("key must be less than 80 characters"));
+        if key.len() >= 256 {
+            return Err(make_error("key must be less than 256 bytes"));
         }
         Ok(())
     }
@@ -152,7 +152,8 @@ impl GuestBucket for Bucket {
             DbMode::NonTransactional => "non-trx",
             DbMode::Transactional => "trx",
         };
-        let bucket_id = format!("{}:{}:{}", mode, service_account, identifier);
+        let chain_id = get_chain_id();
+        let bucket_id = format!("{}:{}:{}:{}", chain_id, mode, service_account, identifier);
         Self { bucket_id, db }
     }
 
