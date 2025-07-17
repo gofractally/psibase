@@ -199,6 +199,12 @@ interface store {
         /// not exist in the store, it returns `Ok(false)`.
         exists: func(key: string) -> result<bool, error>;
     }
+
+    /// Flushes the databases with the specified mode to the host.
+    /// Ephemeral databases are never flushed.
+    ///
+    /// This method can only be called by the transact plugin.
+    flush: func(mode: db-mode); 
 }
 
 world imports {

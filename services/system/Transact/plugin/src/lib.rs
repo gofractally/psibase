@@ -17,7 +17,8 @@ use transact::plugin::hook_handlers::*;
 // Other plugins
 use host::common::{
     self as Host, server as Server,
-    types::{self as CommonTypes},
+    store::{self as Store, DbMode},
+    types::{self as CommonTypes, BodyTypes},
 };
 
 // Exported interfaces/types
@@ -30,8 +31,6 @@ use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
 use serde::Deserialize;
 use serde_json::from_str;
-
-use crate::bindings::host::common::types::BodyTypes;
 
 // The transaction construction cycle, including hooks, is as follows:
 //
@@ -168,7 +167,10 @@ impl Admin for TransactPlugin {
         ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
+
+        Store::flush(DbMode::NonTransactional);
         if actions.len() == 0 {
+            Store::flush(DbMode::Transactional);
             return Ok(());
         }
 
@@ -203,6 +205,7 @@ impl Admin for TransactPlugin {
             Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");
+                Store::flush(DbMode::Transactional);
                 Ok(())
             }
         }
