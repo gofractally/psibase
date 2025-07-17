@@ -7,6 +7,12 @@ export const useFractals = () =>
     useQuery({
         queryKey: QueryKey.fractals(),
         queryFn: async () => {
-            return getFractals();
+            try {
+                return getFractals();
+            } catch (error) {
+                const message = "Error getting fractals";
+                console.error(message, error);
+                throw new Error(message);
+            }
         },
     });

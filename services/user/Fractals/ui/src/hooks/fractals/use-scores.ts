@@ -11,6 +11,14 @@ export const useScores = () => {
     return useQuery({
         queryKey: QueryKey.scores(currentFractal),
         enabled: !!currentFractal,
-        queryFn: async () => getScores(zAccount.parse(currentFractal)),
+        queryFn: async () => {
+            try {
+                return getScores(zAccount.parse(currentFractal));
+            } catch (error) {
+                const message = "Error getting scores";
+                console.error(message, error);
+                throw new Error(message);
+            }
+        },
     });
 };

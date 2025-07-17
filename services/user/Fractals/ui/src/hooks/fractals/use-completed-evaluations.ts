@@ -14,7 +14,13 @@ export const useCompletedEvaluation = () => {
     return useQuery<CompletedEvaluation[]>({
         queryKey: QueryKey.completedEvaluations(),
         queryFn: async () => {
-            return getCompletedEvaluations(fractalAccount!);
+            try {
+                return getCompletedEvaluations(fractalAccount!);
+            } catch (error) {
+                const message = "Error getting completed evaluations";
+                console.error(message, error);
+                throw new Error(message);
+            }
         },
         enabled: !!fractalAccount,
     });

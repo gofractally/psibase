@@ -7,5 +7,13 @@ export const useMemberships = (user: OptionalAccount) =>
     useQuery({
         queryKey: QueryKey.memberships(user),
         enabled: !!user,
-        queryFn: async () => getMemberships(user!),
+        queryFn: async () => {
+            try {
+                return getMemberships(user!);
+            } catch (error) {
+                const message = "Error getting memberships";
+                console.error(message, error);
+                throw new Error(message);
+            }
+        },
     });

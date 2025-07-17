@@ -67,11 +67,8 @@ export const useSetSchedule = () =>
             toast.success("Schedule updated");
         },
         onError: (error) => {
-            if (error instanceof Error) {
-                toast.error(error.message);
-            } else {
-                toast.error("Unrecognized error, check the logs for details.");
-                console.error(error);
-            }
+            const message = "Error setting schedule";
+            console.error(message, error);
+            toast.error(message);
         },
     });

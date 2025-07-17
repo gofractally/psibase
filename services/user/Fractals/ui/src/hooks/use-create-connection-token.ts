@@ -25,4 +25,8 @@ export const useCreateConnectionToken = () =>
                 },
             );
         },
+        onError: (error) => {
+            const message = "Error creating connection token";
+            console.error(message, error);
+        },
     });

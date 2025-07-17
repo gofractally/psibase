@@ -47,7 +47,6 @@ export const useEvaluationStatus = (
 
     if (isLoading) return undefined;
     if (usersAndGroupsError || fractalError) {
-        console.error(usersAndGroupsError || fractalError);
         return undefined;
     }
 

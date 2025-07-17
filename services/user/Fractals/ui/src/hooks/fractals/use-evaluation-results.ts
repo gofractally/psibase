@@ -8,6 +8,12 @@ export const useEvaluationResults = (evaluationId: OptionalNumber) =>
         queryKey: QueryKey.evaluationResults(evaluationId),
         enabled: !!evaluationId,
         queryFn: async () => {
-            return getEvaluationResults(evaluationId!);
+            try {
+                return getEvaluationResults(evaluationId!);
+            } catch (error) {
+                const message = "Error getting evaluation results";
+                console.error(message, error);
+                throw new Error(message);
+            }
         },
     });

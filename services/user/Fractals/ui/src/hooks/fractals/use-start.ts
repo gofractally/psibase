@@ -22,5 +22,9 @@ export const useStart = () => {
                 intf: "admin",
             });
         },
+        onError: (error) => {
+            const message = "Error starting evaluation";
+            console.error(message, error);
+        },
     });
 };

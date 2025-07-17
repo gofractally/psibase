@@ -10,7 +10,13 @@ export const useEvaluation = (evaluationId: number | undefined | null) =>
     useQuery<Evaluation>({
         queryKey: QueryKey.evaluation(evaluationId),
         queryFn: async () => {
-            return getEvaluation(evaluationId!);
+            try {
+                return getEvaluation(evaluationId!);
+            } catch (error) {
+                const message = "Error getting evaluation";
+                console.error(message, error);
+                throw new Error(message);
+            }
         },
         enabled: !!evaluationId,
     });
