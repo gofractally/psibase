@@ -345,7 +345,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts
-    VERSION ${PSIBASE_VERSION}.0
+    VERSION ${PSIBASE_VERSION}.1
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
