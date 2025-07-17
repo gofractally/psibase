@@ -176,7 +176,7 @@ impl Admin for TransactPlugin {
 
         let actions = transform_actions(actions)?;
 
-        let tx = make_transaction(actions, 10);
+        let tx = make_transaction(actions, 3);
 
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
@@ -238,7 +238,7 @@ impl Login for TransactPlugin {
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
-        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
             expiration: expiration,
             refBlockSuffix: 0,
