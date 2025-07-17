@@ -341,7 +341,7 @@ pub mod service {
         memo.validate();
         let creditor = get_sender();
 
-        SharedBalance::get_or_new(creditor, debitor, token_id).uncredit(amount);
+        SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
 
         Wrapper::emit()
             .history()
