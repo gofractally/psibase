@@ -1,12 +1,10 @@
 use crate::exports::host::common::{
-    client::Guest as Client,
     store::{Database, DbMode, GuestBucket, StorageDuration},
     types::Error,
 };
 use crate::make_error;
 use crate::supervisor::bridge::database as HostDb;
 use crate::supervisor::bridge::intf::get_chain_id;
-use crate::HostCommon;
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -147,7 +145,7 @@ impl Bucket {
 impl GuestBucket for Bucket {
     fn new(db: Database, identifier: String) -> Self {
         Self::validate_identifier(&identifier).unwrap();
-        let service_account = HostCommon::get_sender_app().app.unwrap();
+        let service_account = crate::caller();
         let mode = match db.mode {
             DbMode::NonTransactional => "non-trx",
             DbMode::Transactional => "trx",
