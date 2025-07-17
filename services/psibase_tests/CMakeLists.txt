@@ -21,6 +21,7 @@ function(add suffix)
     service(EmitEvents "${suffix}" src/EmitEvents.cpp)
     service(RemoveCode "${suffix}" src/RemoveCode.cpp)
     service(SubjectiveDb "${suffix}" src/SubjectiveDb.cpp)
+    service(NotifyService "${suffix}" src/NotifyService.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" src/MockCpuLimit.cpp)
