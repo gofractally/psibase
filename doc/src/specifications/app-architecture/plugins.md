@@ -124,15 +124,15 @@ Note: This imposes a major restriction on the amount of local data storage avail
 
 ### API
 
-The current API for key-value operations allows one to select one of multiple different databases for reading/writing. There are two database modes: Non-Transactional and Transactional.
+The current API for key-value operations allows one to select one of multiple different databases for reading/writing. There are two persistence modes: Non-Transactional and Transactional.
 
-- Non-Transactional - A Non-Transactional database is independent of the currently running transaction, and any writes will be persisted regardless of the success/failure of the current plugin function or any consequent server-side actions.
-- Transactional - Writes to the Transactional database are dependent on the success of the currently running transaction. If an action fails (or a consequent server-side transaction), then any writes to the Transactional database will be rolled back.
+- Non-Transactional - Writes to a Non-Transactional database are independent of any other operations. They are immediately persisted.
+- Transactional - Writes to a Transactional database are dependent on the success of the current operation, including the success of any scheduled server-side actions. If anything fails, then writes to the Transactional database will be rolled back.
 
 There are three different settings for data-duration that may be used:
 
 - Ephemeral - Data stored into an ephemeral database will be wiped at the end of the currently executing transaction context. The database mode does not matter for the Ephemeral db, as it not persisted in either case.
-- Session - Data stored into the session database will be wiped at the end of the current session. A session is defined by the host implementation.
+- Session - Data stored into the session database will be wiped at the end of the current client session. A session is defined by the host implementation.
 - Persistent - Data stored into a persistent database will persist until explicitly deleted.
 
 | Data Duration | Non-Transactional | Transactional |
