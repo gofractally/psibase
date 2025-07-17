@@ -14,13 +14,12 @@ export const useGroupUsers = (
         queryKey: QueryKey.groupUsers(evaluationId, groupNumber),
         enabled: !!(evaluationId && groupNumber),
         queryFn: async () => {
-            return zAccount.array().parse(
-                await supervisor.functionCall({
-                    method: "getGroupUsers",
-                    params: [evaluationId, groupNumber],
-                    service: fractalsService,
-                    intf: "user",
-                }),
-            );
+            const res = await supervisor.functionCall({
+                method: "getGroupUsers",
+                params: [evaluationId, groupNumber],
+                service: fractalsService,
+                intf: "user",
+            });
+            return zAccount.array().parse(res);
         },
     });

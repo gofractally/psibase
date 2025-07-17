@@ -17,6 +17,7 @@ import { Account } from "@/lib/zod/Account";
 
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -42,10 +43,11 @@ const useRanking = () => {
 
     const groupUsers = groupUsersData || [];
 
-    const { data: currentProposal, refetch: refetchProposal } = useProposal(
-        Number(evaluationId),
-        Number(groupNumber),
-    );
+    const {
+        data: currentProposal,
+        isPending: isProposalPending,
+        refetch: refetchProposal,
+    } = useProposal(Number(evaluationId), Number(groupNumber));
     const proposal = currentProposal ?? [];
 
     const { cancel, maybeExecute: refreshProposal } = useAsyncDebouncer(
@@ -103,6 +105,7 @@ const useRanking = () => {
         onSortEnd,
         add,
         remove,
+        isLoading: isProposalPending,
     };
 };
 
@@ -153,8 +156,14 @@ const GroupStatus = () => {
 };
 
 export const EvaluationDeliberation = () => {
-    const { add, remove, onSortEnd, rankedAccounts, unrankedAccounts } =
-        useRanking();
+    const {
+        add,
+        remove,
+        onSortEnd,
+        rankedAccounts,
+        unrankedAccounts,
+        isLoading,
+    } = useRanking();
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -203,25 +212,29 @@ export const EvaluationDeliberation = () => {
                     <div>
                         <h2 className="text-base font-semibold">Unranked</h2>
                     </div>
-                    <div className="flex w-full gap-2">
-                        {unrankedAccounts.length > 0 ? (
-                            unrankedAccounts.map((account) => (
-                                <Button
-                                    key={account}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => add(account)}
-                                >
-                                    <div>{account}</div>
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            ))
-                        ) : (
-                            <div className="text-muted-foreground text-sm italic">
-                                All participants are ranked
-                            </div>
-                        )}
-                    </div>
+                    {isLoading ? (
+                        <Skeleton className="h-10 w-full" />
+                    ) : (
+                        <div className="flex w-full gap-2">
+                            {unrankedAccounts.length > 0 ? (
+                                unrankedAccounts.map((account) => (
+                                    <Button
+                                        key={account}
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => add(account)}
+                                    >
+                                        <div>{account}</div>
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                ))
+                            ) : (
+                                <div className="text-muted-foreground text-sm italic">
+                                    All participants are ranked
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
