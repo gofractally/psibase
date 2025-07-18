@@ -3,14 +3,14 @@ import time
 
 class Tokens(Service):
     service = 'tokens'
-    def credit(self, sender, receiver, token, amount, memo):
-        self.push_action(sender, 'credit', {"tokenId":token,"receiver":receiver,"amount":{"value":amount}, "memo":memo})
+    def credit(self, sender, debitor, token, amount, memo):
+        self.push_action(sender, 'credit', {"tokenId":token,"debitor":debitor,"amount":{"value":amount}, "memo":memo})
     def balance(self, account, token):
         balances = self.graphql('query { userBalances(user: "%s") { edges { node { tokenId balance } } } }' % account)
         for edge in balances['userBalances']['edges']:
             node = edge['node']
             if node['tokenId'] == token:
-                return int(node['balance'])
+                return int(node['balance'].replace('.', '')) 
 
 class Transact(Service):
     service = 'transact'

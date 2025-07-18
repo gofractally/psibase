@@ -20,7 +20,7 @@ class TestTransactionQueue(unittest.TestCase):
         old_balance = tokens.balance('alice', token=1)
 
         txqueue = Transact(a)
-        txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"})
+        txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())
         new_balance = tokens.balance('alice', token=1)
@@ -31,11 +31,11 @@ class TestTransactionQueue(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
 
         with self.assertRaises(TransactionError, msg='Transaction expired'):
-            txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":100000000}, "memo":"fail"}, timeout=4)
+            txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":100000000}, "memo":"fail"}, timeout=4)
 
         with self.assertRaises(TransactionError, msg="Transaction expired"):
             inc = Action('alice', 's-counter', 'inc', {"key":"","id":0})
-            fail = Action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":100000000}, "memo":"fail"})
+            fail = Action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":100000000}, "memo":"fail"})
             txqueue.push_transaction(Transaction(a.get_tapos(timeout=4), [inc, fail], []), wait_for="final")
         with a.get('/value', 's-counter') as response:
             response.raise_for_status()
@@ -66,7 +66,7 @@ class TestTransactionQueue(unittest.TestCase):
         old_balance = tokens.balance('alice', token=1)
 
         txqueue = Transact(prods[2])
-        txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"})
+        txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())
         new_balance = tokens.balance('alice', token=1)
@@ -86,7 +86,7 @@ class TestTransactionQueue(unittest.TestCase):
         a.wait(new_block())
 
         txqueue = Transact(c)
-        txqueue.push_action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"}, keys=[key])
+        txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"}, keys=[key])
         pred = new_block()
         a.wait(pred)
         a_balance = Tokens(a).balance('alice', token=1)
@@ -113,7 +113,7 @@ class TestTransactionQueue(unittest.TestCase):
         # Make sure that transactions submitted to b can't reach the producer 
         b.disconnect(a)
 
-        tx = b.pack_signed_transaction(Transaction(b.get_tapos(), actions=[Action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":10000}, "memo":"test"})], claims=[]))
+        tx = b.pack_signed_transaction(Transaction(b.get_tapos(), actions=[Action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})], claims=[]))
 
         # This should not return, because b is not getting new blocks
         def run_delayed():
@@ -133,7 +133,7 @@ class TestTransactionQueue(unittest.TestCase):
         delayed.join()
 
         # Submit another transaction to b
-        tx2 = b.pack_signed_transaction(Transaction(b.get_tapos(), actions=[Action('bob', 'tokens', 'credit', {"tokenId":1,"receiver":"alice","amount":{"value":10000}, "memo":"back"})], claims=[]))
+        tx2 = b.pack_signed_transaction(Transaction(b.get_tapos(), actions=[Action('bob', 'tokens', 'credit', {"token_id":1,"debitor":"alice","amount":{"value":10000}, "memo":"back"})], claims=[]))
         traces = []
         t2thread = Thread(target=lambda: traces.append(b.push_transaction(tx2)))
         t2thread.start()

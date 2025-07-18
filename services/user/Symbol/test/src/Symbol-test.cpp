@@ -15,9 +15,9 @@ using namespace UserService::Errors;
 
 namespace
 {
-   const Memo     memo{"memo"};
-   const TID      sysToken{Tokens::sysToken};
-   constexpr auto untradeable = "untradeable"_m;
+   const Memo    memo{"memo"};
+   const TID     sysToken{Tokens::sysToken};
+   const uint8_t untradeable = 0;
 
    using Quantity_t = Quantity::Quantity_t;
 
@@ -29,7 +29,7 @@ namespace
       const int  targetNrSymbolsPerDay = 24;
    }  // namespace SymbolPricing
 
-   auto q = [](Quantity_t amt, Precision p) { return Quantity{amt * std::pow(10, p.value)}; };
+   auto q = [](Quantity_t amt, uint8_t p) { return Quantity{amt * std::pow(10, p)}; };
 
 }  // namespace
 
@@ -48,9 +48,12 @@ SCENARIO("Buying a symbol")
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
       sysIssuer.setTokenConf(sysToken, untradeable, false);
-      sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      CHECK(issuance.succeeded());
+
       sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
-      sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      auto lastCredit = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      CHECK(lastCredit.succeeded());
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
@@ -113,7 +116,7 @@ SCENARIO("Buying a symbol")
          {
             auto getSharedBalance = alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service);
             CHECK(getSharedBalance.succeeded());
-            CHECK(getSharedBalance.returnVal().balance == 0);
+            CHECK(getSharedBalance.returnVal().value == 0);
          }
 
          AND_THEN("Alice cannot create the same symbol again")
@@ -210,7 +213,7 @@ SCENARIO("Measuring price increases")
             CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
             a.create(SID{"bcd"}, quantity);
             auto balance =
-                alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().balance;
+                alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().value;
             CHECK(balance == 0);
          }
       }
@@ -354,7 +357,7 @@ SCENARIO("Buying and selling symbols")
       // Map system symbol to system token
       auto sysSymbolNft = alice.to<Symbol>().getSymbol(sysSymbol).returnVal().ownerNft;
       alice.to<Nft>().credit(sysSymbolNft, Tokens::service, memo);
-      alice.to<Tokens>().mapSymbol(sysToken, sysSymbol);
+      alice.to<Tokens>().map_symbol(sysToken, sysSymbol);
 
       WHEN("Alice creates a symbol")
       {
@@ -395,7 +398,7 @@ SCENARIO("Buying and selling symbols")
             alice.to<Tokens>().mint(newToken, userBalance, memo);
             auto newTokenId = alice.to<Tokens>().getToken(newToken).returnVal().id;
 
-            alice.to<Tokens>().mapSymbol(newTokenId, symbol);
+            alice.to<Tokens>().map_symbol(newTokenId, symbol);
             THEN("The symbol cannot be sold")
             {
                CHECK(alice.to<Symbol>()
