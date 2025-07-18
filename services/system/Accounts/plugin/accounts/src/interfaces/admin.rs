@@ -3,7 +3,7 @@ use crate::plugin::AccountsPlugin;
 use crate::bindings::accounts::account_tokens::api::*;
 use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Admin};
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
-use crate::bindings::host::common::client::{self as Client, OriginationData};
+use crate::bindings::host::common::client as Client;
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
@@ -37,7 +37,7 @@ impl Admin for AccountsPlugin {
         assert_valid_account(&user);
 
         let query_token =
-            TransactAuthApi::get_query_token(&get_accounts_app().app.unwrap(), &user).unwrap();
+            TransactAuthApi::get_query_token(&Client::my_service_account(), &user).unwrap();
 
         let app = app.app.unwrap();
         AppsTable::new(&app).login(&user);
