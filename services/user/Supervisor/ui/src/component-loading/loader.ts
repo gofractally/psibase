@@ -1,5 +1,5 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
-import { rollup } from "@rollup/browser";
+import { rollup, type WarningHandlerWithDefault } from "@rollup/browser";
 
 import { HostInterface } from "../hostInterface.js";
 import { assert } from "../utils.js";
@@ -8,8 +8,6 @@ import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 import { plugin } from "./index.js";
 import privilegedShimCode from "./privileged-api.js?raw";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
-
-const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -64,6 +62,54 @@ function getProxiedImports({
     return mergeImports(imports);
 }
 
+// These are shims for wasi interfaces that have not yet been standardized
+// Since the interface is not standard, the shim is not provided by BCA.
+async function getNonstandardWasiImports(): Promise<ImportDetails> {
+    const shimName = "./wasi-keyvalue.js";
+    const nameMapping: Array<[PkgId, FilePath]> = [
+        ["wasi:keyvalue/*", `${shimName}#*`],
+    ];
+    // If the transpiled library contains bizarre inputs, such as:
+    //    import {  as _, } from './shim.js';
+    // It is very likely an issue with an invalid import mapping.
+    const shimUrl = new URL("./shims/wasi-keyvalue.js", import.meta.url);
+    const shimCode = await fetch(shimUrl).then((r) => r.text());
+    const shimFile: [FilePath, Code] = [shimName, shimCode];
+    return {
+        importMap: nameMapping,
+        files: [shimFile],
+    };
+}
+
+async function generateWasiShimCode(): Promise<string> {
+    try {
+        const preview2Shim = await import('@bytecodealliance/preview2-shim') as {
+            cli: unknown;
+            clocks: unknown;
+            filesystem: unknown;
+            io: unknown;
+            random: unknown;
+        };
+        
+        const { cli, clocks, filesystem, io, random } = preview2Shim;
+        
+        if (!cli || !clocks || !filesystem || !io || !random) {
+            throw new Error('Missing required shim modules');
+        }
+        
+        // Import the JCO wrapper code from external file
+        const shimCode = await import('./shims/jcoWrapper.js?raw').then(m => m.default);
+        
+        // Set up the global reference for runtime access
+        (globalThis as Record<string, unknown>).__jcoShims = { cli, clocks, filesystem, io, random };
+        
+        return shimCode;
+    } catch {
+        throw new Error("Failed to load WASI shim code from JCO");
+    }
+}
+
+
 async function getWasiImports(): Promise<ImportDetails> {
     /*
       I'm taking a whitelisting approach, as opposed to providing all wasi imports by default.
@@ -100,7 +146,7 @@ async function getWasiImports(): Promise<ImportDetails> {
     //    import {  as _, } from './shim.js';
     // It is very likely an issue with an invalid import mapping.
 
-    const wasi_shimCode = await fetch(wasiShimURL).then((r) => r.text());
+    const wasi_shimCode = await generateWasiShimCode();
     const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
     return {
         importMap: wasi_nameMapping,
@@ -175,7 +221,7 @@ async function loadWasmComponent(
 
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
 
-    const onwarn = (warning: any, warn: (warning: any) => void) => {
+    const onwarn: WarningHandlerWithDefault = (warning, warn) => {
         if (warning.code !== "CIRCULAR_DEPENDENCY") {
             warn(warning);
         }
