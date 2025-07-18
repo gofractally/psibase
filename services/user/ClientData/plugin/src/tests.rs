@@ -1,11 +1,4 @@
-use crate::{Database, DbMode, Error, KvStore, StorageDuration};
-
-pub fn err<'a>(test_name: &'a str) -> impl Fn(Error) -> Error + 'a {
-    move |e: Error| {
-        eprintln!("[{}] Failed", test_name);
-        e
-    }
-}
+use crate::{Database, DbMode, KvStore, StorageDuration};
 
 pub fn get_all_buckets() -> Vec<KvStore::Bucket> {
     let nontx_persistent = KvStore::Bucket::new(
@@ -60,24 +53,22 @@ pub fn get_all_buckets() -> Vec<KvStore::Bucket> {
     ]
 }
 
-pub fn standard_test_suite(b: &KvStore::Bucket) -> Result<(), Error> {
-    test_set(&b, "1")?;
-    test_get(&b, "1")?;
-    test_exists(&b, "1")?;
-    test_dne(&b, "2")?;
-    test_delete(&b, "1")?;
-    test_dne(&b, "1")?;
-    Ok(())
+pub fn standard_test_suite(b: &KvStore::Bucket) {
+    test_set(&b, "1");
+    test_get(&b, "1");
+    test_exists(&b, "1");
+    test_dne(&b, "2");
+    test_delete(&b, "1");
+    test_dne(&b, "1");
 }
 
-pub fn test_set(b: &KvStore::Bucket, key: &str) -> Result<(), Error> {
-    b.set(key, "test value".as_bytes()).map_err(err("set"))?;
+pub fn test_set(b: &KvStore::Bucket, key: &str) {
+    b.set(key, "test value".as_bytes());
     println!("[set] Success. Inserted (\"testkey\", \"test value\")");
-    Ok(())
 }
 
-pub fn test_get(b: &KvStore::Bucket, key: &str) -> Result<(), Error> {
-    let value = b.get(key).map_err(err("get"))?;
+pub fn test_get(b: &KvStore::Bucket, key: &str) {
+    let value = b.get(key);
     assert!(
         value.is_some(),
         "[get] Failed. Value missing for key <\"{}\">",
@@ -90,36 +81,29 @@ pub fn test_get(b: &KvStore::Bucket, key: &str) -> Result<(), Error> {
         "[get] Failed. Incorrect string returned."
     );
     println!("[get] Success. [\"{}\"]=\"{}\"", key, str_value);
-
-    Ok(())
 }
 
-pub fn test_exists(b: &KvStore::Bucket, key: &str) -> Result<(), Error> {
-    let exists = b.exists(key).map_err(err("exists"))?;
+pub fn test_exists(b: &KvStore::Bucket, key: &str) {
     assert!(
-        exists,
+        b.exists(key),
         "[exists] Failed. Key \"{}\" does not exist, but it should.",
         key
     );
     println!("[exists] Success. Key \"{}\" exists.", key);
-    Ok(())
 }
 
-pub fn test_dne(b: &KvStore::Bucket, key: &str) -> Result<(), Error> {
-    let exists = b.exists(key).map_err(err("dne"))?;
+pub fn test_dne(b: &KvStore::Bucket, key: &str) {
     assert!(
-        !exists,
+        !b.exists(key),
         "[dne] Failed. Key \"{}\" exists, but it should not.",
         key
     );
     println!("[dne] Success. Key \"{}\" does not exist.", key);
-    Ok(())
 }
 
-pub fn test_delete(b: &KvStore::Bucket, key: &str) -> Result<(), Error> {
-    b.delete(key).map_err(err("delete"))?;
+pub fn test_delete(b: &KvStore::Bucket, key: &str) {
+    b.delete(key);
     println!("[delete] Success. Key \"{}\" deleted.", key);
-    Ok(())
 }
 
 pub fn test_make_failed_tx() {
