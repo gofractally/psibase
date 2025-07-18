@@ -34,14 +34,14 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
     const fileHashes = new Map();
     
     if (fs.existsSync(dir)) {
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
-        const filePath = path.join(dir, file);
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const filePath = path.join(dir, item);
         const stat = fs.statSync(filePath);
         
         if (stat.isDirectory()) {
           // Skip target and dist directories as they are build outputs
-          if (file === 'target' || file === 'dist' || file === '.vite-cache' || file === '.svelte-kit' || file === '.tsbuildinfo') continue;
+          if (item === 'target' || item === '.tmp' || item === 'dist' || item === '.vite-cache' || item === '.svelte-kit') continue;
           const subHashes = calculateFileHashes(filePath);
           for (const [subPath, hash] of subHashes) {
             fileHashes.set(subPath, hash);

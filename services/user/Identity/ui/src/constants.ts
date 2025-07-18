@@ -11,7 +11,7 @@ export const SELECTOR = {
     LINK: ".link",
     BACK_LINK: ".back-link",
     ACCOUNT_CREATION_LINK: ".account-creation-link",
-}
+};
 
 const defaultAttestationLinkColor: string = "#00FF00";
 const defaultAttestationBacklinkColor: string = "#965B09";
@@ -27,8 +27,8 @@ export const defaultUiOptions = {
     checkAccountCreations: true,
     checkCouncilDistance: false,
     colors: {
-      [SELECTOR.LINK]: defaultAttestationLinkColor,
-      [SELECTOR.BACK_LINK]: defaultAttestationBacklinkColor,
-      [SELECTOR.ACCOUNT_CREATION_LINK]: defaultAccountCreationLinkColor,
+        [SELECTOR.LINK]: defaultAttestationLinkColor,
+        [SELECTOR.BACK_LINK]: defaultAttestationBacklinkColor,
+        [SELECTOR.ACCOUNT_CREATION_LINK]: defaultAccountCreationLinkColor,
     },
-  }
+};

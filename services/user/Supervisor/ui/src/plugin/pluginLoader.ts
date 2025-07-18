@@ -1,4 +1,5 @@
-import { isEqual, QualifiedPluginId } from "@psibase/common-lib";
+import { QualifiedPluginId, isEqual } from "@psibase/common-lib";
+
 import { Plugins } from "./plugins";
 
 class PluginIdSet {
@@ -71,7 +72,7 @@ export class PluginLoader {
         // Plugins at these namespace are built into the supervisor host itself and
         //  are not pulled from the chain.
         this.currentPlugins = this.currentPlugins.filter(
-            (id) => id.service !== "wasi" && id.service !== "host",
+            (id) => id.service !== "wasi" && id.service !== "supervisor",
         );
     }
 

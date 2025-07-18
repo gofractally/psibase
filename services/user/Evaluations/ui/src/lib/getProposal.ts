@@ -1,5 +1,6 @@
-import { getSupervisor } from "@psibase/common-lib";
 import { z } from "zod";
+
+import { getSupervisor } from "@psibase/common-lib";
 
 export const getProposal = async (
     owner: string,

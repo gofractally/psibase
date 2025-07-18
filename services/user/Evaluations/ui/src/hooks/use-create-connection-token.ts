@@ -1,10 +1,11 @@
-import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "@shared/shadcn/ui/sonner";
+import { z } from "zod";
 
-import { siblingUrl, getSupervisor } from "@psibase/common-lib";
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
 import { modifyUrlParams } from "@/lib/utils";
+
+import { toast } from "@shared/shadcn/ui/sonner";
 
 const supervisor = getSupervisor();
 

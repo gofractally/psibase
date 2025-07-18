@@ -21,6 +21,17 @@ export {
 } from "./FunctionCallRequest";
 
 export {
+    type ResourceCallArgs,
+    type QualifiedResourceCallArgs,
+    toQualifiedFunctionCallArgs,
+    getResourceCallArgs,
+} from "./ResourceFunctionCallRequest";
+
+export {
+    type QualifiedDynCallArgs,
+} from "./DynamicFunctionCallRequest";
+
+export {
     type PreLoadPluginsRequest,
     isPreLoadPluginsRequest,
 } from "./PreLoadPluginsRequest";

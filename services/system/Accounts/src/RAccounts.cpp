@@ -17,13 +17,24 @@ namespace SystemService
 {
    struct AccountsQuery
    {
-      auto getAccount(AccountNumber account) const
+      auto getAccount(AccountNumber accountName) const
       {
          Accounts::Tables tables{Accounts::service};
-         return tables.open<AccountTable>().get(account);
+         return tables.open<AccountTable>().get(accountName);
+      }
+
+      auto getAccounts(std::vector<AccountNumber> accountNames) const
+      {
+         std::vector<std::optional<Account>> result;
+         for (auto account : accountNames)
+         {
+            Accounts::Tables tables{Accounts::service};
+            result.push_back(tables.open<AccountTable>().get(account));
+         }
+         return result;
       }
    };
-   PSIO_REFLECT(AccountsQuery, method(getAccount, account));
+   PSIO_REFLECT(AccountsQuery, method(getAccount, accountName), method(getAccounts, accountNames));
 
    std::optional<HttpReply> RAccounts::serveSys(HttpRequest request)
    {

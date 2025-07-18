@@ -1,3 +1,4 @@
+import { CircleCheck } from "lucide-react";
 import ConfettiExplosion from "react-confetti-explosion";
 
 import {
@@ -6,7 +7,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { CircleCheck } from "lucide-react";
 
 export const InviteResponse = () => {
     return (

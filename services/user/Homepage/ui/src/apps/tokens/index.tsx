@@ -1,12 +1,13 @@
-import { Account } from "@/lib/zod/Account"
-import { Coins } from "lucide-react"
-import { TokensPage } from "./page"
-import { AppConfigType } from "@/configuredApps"
+import { AppConfigType } from "@/configuredApps";
+import { Coins } from "lucide-react";
 
+import { Account } from "@/lib/zod/Account";
+
+import { TokensPage } from "./page";
 
 export const tokensConfig: AppConfigType = {
-    service: Account.parse('tokens'),
-    name: 'Tokens',
+    service: Account.parse("tokens"),
+    name: "Tokens",
     description: "Create, burn and send tokens.",
     icon: <Coins className="h-6 w-6" />,
     isMore: false,
@@ -14,19 +15,19 @@ export const tokensConfig: AppConfigType = {
     showLoginLoadingSpinner: true,
     children: [
         {
-            path: '',
+            path: "",
             element: <TokensPage />,
-            name: 'Home'
+            name: "Home",
         },
         {
-            path: 'transfer',
+            path: "transfer",
             element: <div>Transfer page!!!!!!!!!!!!!</div>,
-            name: 'Transfer'
+            name: "Transfer",
         },
         {
-            path: 'history',
+            path: "history",
             element: <div>History page</div>,
-            name: 'History'
-        }
-    ]
-}
+            name: "History",
+        },
+    ],
+};

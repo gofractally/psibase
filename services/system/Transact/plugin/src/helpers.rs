@@ -1,12 +1,14 @@
 use crate::bindings::accounts::plugin::api::get_account;
 use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::host::common as Host;
+use crate::bindings::host::common::types::BodyTypes;
 use crate::bindings::transact::plugin::hook_handlers::*;
 use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
 use crate::{ActionAuthPlugins, ActionClaims, ActionMetadata, ActionSenderHook, TxTransformLabel};
 use psibase::fracpack::Pack;
 use psibase::{AccountNumber, Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
+use serde::Serialize;
 use Host::{client as Client, server as Server, types::PluginRef};
 
 use regex::Regex;
@@ -22,7 +24,7 @@ pub fn validate_action_name(action_name: &str) -> Result<(), Host::types::Error>
 
 pub fn assert_from_supervisor() {
     let sender_app = Client::get_sender_app().app.expect("Sender app not set");
-    assert!(sender_app == "supervisor", "Unauthorized");
+    assert!(sender_app == "supervisor", "Unauthorized: {}", sender_app);
 }
 
 pub fn get_sender_app() -> String {
@@ -196,6 +198,51 @@ pub fn get_proofs_for_user(
         .collect())
 }
 
+#[derive(Serialize)]
+struct SimpleAction {
+    sender: String,
+    service: String,
+    method: String,
+}
+
+impl From<psibase::Action> for SimpleAction {
+    fn from(action: psibase::Action) -> Self {
+        SimpleAction {
+            sender: action.sender.to_string(),
+            service: action.service.to_string(),
+            method: action.method.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SimpleClaim {
+    service: String,
+}
+
+impl From<psibase::Claim> for SimpleClaim {
+    fn from(claim: psibase::Claim) -> Self {
+        SimpleClaim {
+            service: claim.service.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SimpleTx {
+    actions: Vec<SimpleAction>,
+    claims: Vec<SimpleClaim>,
+}
+
+impl From<Transaction> for SimpleTx {
+    fn from(tx: Transaction) -> Self {
+        SimpleTx {
+            actions: tx.actions.into_iter().map(Into::into).collect(),
+            claims: tx.claims.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transaction {
     let claims = get_claims(&actions, true).expect("Failed to retrieve claims from auth plugin");
     let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
@@ -211,19 +258,22 @@ pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transa
         actions,
         claims,
     };
+
+    let simple_tx: SimpleTx = t.clone().into();
+
     println!(
         "Publishing transaction: \n{}",
-        serde_json::to_string_pretty(&t).unwrap()
+        serde_json::to_string_pretty(&simple_tx).unwrap()
     );
     t
 }
 
 pub trait Publish {
-    fn publish(self) -> Result<String, Host::types::Error>;
+    fn publish(self) -> Result<BodyTypes, Host::types::Error>;
 }
 
 impl Publish for SignedTransaction {
-    fn publish(self) -> Result<String, Host::types::Error> {
+    fn publish(self) -> Result<BodyTypes, Host::types::Error> {
         Ok(Server::post(&Host::types::PostRequest {
             endpoint: "/push_transaction".to_string(),
             body: Host::types::BodyTypes::Bytes(self.packed()),

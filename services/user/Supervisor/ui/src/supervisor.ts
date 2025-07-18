@@ -1,27 +1,36 @@
 import {
-    QualifiedPluginId,
     QualifiedFunctionCallArgs,
-    siblingUrl,
-    buildFunctionCallResponse,
+    QualifiedPluginId,
     assertTruthy,
+    buildFunctionCallResponse,
+    postGraphQLGetJson,
+    siblingUrl,
 } from "@psibase/common-lib";
-
-import { AppInterface } from "./appInterace";
-import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
-import { CallContext } from "./callContext";
-import { isRecoverableError } from "./plugin/errors";
+import {
+    PluginErrorObject,
+    QualifiedDynCallArgs,
+    QualifiedResourceCallArgs,
+    RedirectErrorObject,
+    getResourceCallArgs,
+    toQualifiedFunctionCallArgs,
+} from "@psibase/common-lib/messaging";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { pluginId } from "@psibase/common-lib/messaging/PluginId";
-import { Plugins } from "./plugin/plugins";
-import { PluginLoader } from "./plugin/pluginLoader";
-import { PluginErrorObject, RedirectErrorObject } from "@psibase/common-lib/messaging";
+
+import { AppInterface } from "./appInterace";
+import { CallContext } from "./callContext";
 import { REDIRECT_ERROR_CODE } from "./constants";
+import { isRecoverableError } from "./plugin/errors";
+import { PluginLoader } from "./plugin/pluginLoader";
+import { Plugins } from "./plugin/plugins";
+import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
     app: serviceFromOrigin(supervisorDomain),
     origin: supervisorDomain,
 };
+const rootDomain = siblingUrl(null, null, null, true);
 
 // System plugins are always loaded, even if they are not used
 //   in a given call context.
@@ -30,10 +39,14 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
 ];
-interface Account {
-    accountNum: string;
+interface AuthService {
     authService: string;
-    resourceBalance?: number;
+}
+
+interface GetAccountsResponse {
+    data: {
+        getAccounts: (AuthService | null)[];
+    };
 }
 
 // The supervisor facilitates all communication
@@ -55,7 +68,7 @@ export class Supervisor implements AppInterface {
             "Redundant setting parent origination",
         );
 
-        if (callerOrigin === siblingUrl(null, null, null, true)) {
+        if (callerOrigin === rootDomain) {
             this.parentOrigination = {
                 app: "homepage",
                 origin: callerOrigin,
@@ -84,22 +97,40 @@ export class Supervisor implements AppInterface {
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: Loads plugins needed by the current user
-        let user = this.getCurrentUser();
-        if (!user) return;
+        // Phase 2: Load the auth services for all connected accounts
+        const connectedAccounts = this.supervisorCall(
+            getCallArgs(
+                "accounts",
+                "plugin",
+                "activeApp",
+                "getConnectedAccounts",
+                [],
+            ),
+        );
+        if (!connectedAccounts) return;
+        const gql_endpoint = siblingUrl(null, "accounts", "/graphql", true);
+        const accounts = connectedAccounts
+            .map((a: string) => `"${a}"`)
+            .join(",");
+        const { data } = await postGraphQLGetJson<GetAccountsResponse>(
+            gql_endpoint,
+            `{
+                getAccounts(accountNames: [${accounts}]) {
+                    authService
+                }
+            }`,
+        );
+        const auth_services: (AuthService | null)[] = data?.getAccounts || [];
 
-        const account = this.getAccount(user);
-        if (account === undefined) {
-            console.warn(
-                `Invalid user account '${user}' detected. Automatically logging out.`,
-            );
-            this.logout();
-            // Consider deleting the user from the accounts plugin db
-            return;
+        const addtl_plugins: QualifiedPluginId[] = [];
+        for (const service of auth_services) {
+            if (!service) continue;
+
+            // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
+            addtl_plugins.push(pluginId(service.authService, "plugin"));
         }
+        this.loader.trackPlugins(addtl_plugins);
 
-        // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
-        this.loader.trackPlugins([pluginId(account.authService, "plugin")]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
     }
@@ -131,45 +162,23 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    private getCurrentUser(): string | undefined {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+    private supervisorResourceCall(callArgs: QualifiedResourceCallArgs): any {
+        let newContext = false;
+        if (!this.context) {
+            newContext = true;
+            this.context = new CallContext();
+        }
 
-        let getCurrentUser = getCallArgs(
-            "accounts",
-            "plugin",
-            "api",
-            "getCurrentUser",
-            [],
-        );
-        return this.supervisorCall(getCurrentUser);
-    }
+        let ret: any;
+        try {
+            ret = this.callResource(supervisorOrigination, callArgs);
+        } finally {
+            if (newContext) {
+                this.context = undefined;
+            }
+        }
 
-    private getAccount(user: string): Account | undefined {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        const getAccount = getCallArgs(
-            "accounts",
-            "plugin",
-            "api",
-            "getAccount",
-            [user],
-        );
-        let account: Account | undefined = this.supervisorCall(getAccount);
-        return account;
-    }
-
-    private logout() {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        const logout = getCallArgs(
-            "accounts",
-            "plugin",
-            "activeApp",
-            "logout",
-            [],
-        );
-
-        this.supervisorCall(logout);
+        return ret;
     }
 
     constructor() {
@@ -184,30 +193,40 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(
             sender.app,
-            "[supervisor:getActiveApp] Unauthorized - only callable by privileged plugins",
+            "[supervisor:getActiveApp] Unauthorized - only callable by host",
         );
         assert(
-            sender.app === "accounts" || sender.app === "staged-tx",
-            "[supervisor:getActiveApp] Unauthorized - Only callable by privileged plugins",
+            sender.app === "host",
+            "[supervisor:getActiveApp] Unauthorized - Only callable by host",
         );
 
         return this.parentOrigination;
     }
 
-    // Called by the current plugin looking to identify its caller
-    getCaller(currentPlugin: OriginationData): OriginationData {
+    getRootDomain(): string {
+        return rootDomain;
+    }
+
+    getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
 
         const frame = this.context.stack.peek(0);
         assertTruthy(
             frame,
-            "`getCaller` invalid outside plugin call resolution",
+            "`getCallstack` invalid outside plugin call resolution",
         );
-        assert(
-            frame.args.service === currentPlugin.app,
-            "Only active plugin can ask for its caller",
+
+        const bottomFrame = this.context.stack.peekBottom(0);
+        assertTruthy(bottomFrame, "Invalid callstack");
+        const topLevelApp = bottomFrame.caller.app;
+        assertTruthy(
+            topLevelApp,
+            "Top-level app must be mappable to a psibase service",
         );
-        return frame.caller;
+        return [
+            topLevelApp,
+            ...this.context.stack.export().map((p) => p.service),
+        ];
     }
 
     // Manages callstack and calls plugins
@@ -230,7 +249,6 @@ export class Supervisor implements AppInterface {
             );
         }
 
-        // Load the plugin
         const { service, plugin, intf, method, params } = args;
         const p = this.plugins.getPlugin({ service, plugin });
         assert(
@@ -243,6 +261,92 @@ export class Supervisor implements AppInterface {
         let ret: any;
         try {
             ret = p.plugin.call(intf, method, params);
+        } finally {
+            this.context.stack.pop();
+        }
+
+        return ret;
+    }
+
+    callDyn(sender: OriginationData, args: QualifiedDynCallArgs): any {
+        const service = this.supervisorResourceCall(
+            getResourceCallArgs(
+                "host",
+                "common",
+                "api",
+                "PluginRef",
+                args.handle,
+                "getService",
+                [],
+            ),
+        );
+        const plugin = this.supervisorResourceCall(
+            getResourceCallArgs(
+                "host",
+                "common",
+                "api",
+                "PluginRef",
+                args.handle,
+                "getPlugin",
+                [],
+            ),
+        );
+        const intf = this.supervisorResourceCall(
+            getResourceCallArgs(
+                "host",
+                "common",
+                "api",
+                "PluginRef",
+                args.handle,
+                "getIntf",
+                [],
+            ),
+        );
+
+        let callArgs = getCallArgs(
+            service,
+            plugin,
+            intf,
+            args.method,
+            args.params,
+        );
+        return this.call(sender, callArgs);
+    }
+
+    callResource(
+        sender: OriginationData,
+        args: QualifiedResourceCallArgs,
+    ): any {
+        assertTruthy(this.context, "Uninitialized call context");
+        assertTruthy(this.parentOrigination, "Uninitialized call origination");
+
+        if (this.context.stack.isEmpty()) {
+            assert(
+                sender.origin === this.parentOrigination.origin ||
+                    sender.origin === supervisorDomain,
+                "Invalid call origination",
+            );
+        } else {
+            assertTruthy(sender.app, "Cannot determine caller service");
+            assert(
+                sender.app === this.context.stack.peek(0)!.args.service ||
+                    sender.app === "supervisor",
+                "Invalid sync call sender",
+            );
+        }
+
+        const { service, plugin, intf, type, handle, method, params } = args;
+        const p = this.plugins.getPlugin({ service, plugin });
+        assert(
+            p.new === false,
+            `Tried to call plugin ${service}:${plugin} before initialization`,
+        );
+
+        // Manage the callstack and call the plugin
+        this.context.stack.push(sender, toQualifiedFunctionCallArgs(args));
+        let ret: any;
+        try {
+            ret = p.plugin.resourceCall(intf, type, handle, method, params);
         } finally {
             this.context.stack.pop();
         }
@@ -334,14 +438,17 @@ export class Supervisor implements AppInterface {
                 //   converted to a PluginError to be handled by the client.
                 let newError;
                 if (e.payload.code === REDIRECT_ERROR_CODE) {
-                    newError = new RedirectErrorObject(e.payload.producer, e.payload.message);
+                    newError = new RedirectErrorObject(
+                        e.payload.producer,
+                        e.payload.message,
+                    );
                 } else {
-                    newError = new PluginErrorObject(e.payload.producer, e.payload.message);
+                    newError = new PluginErrorObject(
+                        e.payload.producer,
+                        e.payload.message,
+                    );
                 }
-                this.replyToParent(
-                    id,
-                    newError
-                );
+                this.replyToParent(id, newError);
             } else {
                 this.replyToParent(id, e);
             }

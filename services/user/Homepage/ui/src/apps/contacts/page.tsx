@@ -1,18 +1,18 @@
 import { Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "@shared/shadcn/ui/sonner";
 import { useMediaQuery } from "usehooks-ts";
+
+import { TwoColumnSelect } from "@/components/two-column-select";
+
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogTrigger } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { TooltipContent, TooltipTrigger } from "@shared/shadcn/ui/tooltip";
 import { Tooltip } from "@shared/shadcn/ui/tooltip";
-
-import { TwoColumnSelect } from "@/components/two-column-select";
-
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { ContactDetails } from "./components/contact-details";
 import { ContactListSection } from "./components/contact-list-section";
@@ -132,7 +132,7 @@ export const ContactsPage = () => {
     return (
         <TwoColumnSelect
             left={
-                <ScrollArea className="h-full w-full bg-sidebar/60">
+                <ScrollArea className="bg-sidebar/60 h-full w-full">
                     <div className="relative flex items-center px-4 py-2">
                         <Input
                             placeholder="Search contacts..."
@@ -140,7 +140,7 @@ export const ContactsPage = () => {
                             onChange={(e) => updateSearch(e.target.value)}
                             className="pl-10"
                         />
-                        <Search className="absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="text-muted-foreground absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2" />
                     </div>
                     {!contactsData || contactsData.length === 0 ? (
                         <div className="flex h-full items-center justify-center">

@@ -79,6 +79,11 @@ function KeyImport() {
     const [searchParams] = useSearchParams();
 
     const key = searchParams.get("key");
+
+    if (!key) {
+        throw new Error("No key was found in the URL");
+    }
+
     const { data: extractedPrivateKey } = useDecodeB64(key);
     const { data: publicKey } = usePrivateToPublicKey(
         extractedPrivateKey || "",

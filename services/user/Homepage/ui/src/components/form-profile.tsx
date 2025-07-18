@@ -58,7 +58,7 @@ export const FormProfile = ({
                 className="space-y-6"
             >
                 {form.formState.errors.root && (
-                    <p className="text-sm text-destructive">
+                    <p className="text-destructive text-sm">
                         {form.formState.errors.root.message}
                     </p>
                 )}

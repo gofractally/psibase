@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
-psibase = { version = "0.18.0", path = "../../../../rust/psibase" }
+psibase = { version = "0.19.0", path = "../../../../rust/psibase" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -19,7 +19,7 @@ world = "impl"
 [package.metadata.component.dependencies]
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../AuthSig/plugin/wit/world.wit" }
 "staged-tx:plugin" = { path = "../../StagedTx/plugin/wit/world.wit" }

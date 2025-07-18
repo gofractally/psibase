@@ -1,9 +1,9 @@
 import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
+import { formatDistanceToNow } from "@/apps/chainmail/utils";
+
 import { Avatar } from "@shared/shadcn/ui/avatar";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
-
-import { formatDistanceToNow } from "@/apps/chainmail/utils";
 
 import { EmptyBox, LoadingBox } from "./empty-states";
 
@@ -41,7 +41,7 @@ export function MailList({
                     .map((message) => (
                         <div
                             key={message.id}
-                            className={`flex cursor-pointer gap-4 p-4 transition-colors hover:bg-muted ${
+                            className={`hover:bg-muted flex cursor-pointer gap-4 p-4 transition-colors ${
                                 selectedMessage?.id === message.id
                                     ? "bg-muted"
                                     : ""
@@ -50,7 +50,7 @@ export function MailList({
                         >
                             {mailbox !== "sent" && !!message.from ? (
                                 <Avatar className="h-10 w-10 flex-shrink-0">
-                                    <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground">
+                                    <div className="bg-primary text-primary-foreground flex h-full w-full items-center justify-center">
                                         {message.from.charAt(0)}
                                     </div>
                                 </Avatar>
@@ -62,14 +62,14 @@ export function MailList({
                                             ? message.from
                                             : `To: ${message.to}`}
                                     </p>
-                                    <span className="ml-2 whitespace-nowrap text-xs text-muted-foreground">
+                                    <span className="text-muted-foreground ml-2 whitespace-nowrap text-xs">
                                         {formatDistanceToNow(message.datetime)}
                                     </span>
                                 </div>
                                 <p className="truncate text-sm font-medium">
                                     {message.subject}
                                 </p>
-                                <p className="line-clamp-2 text-sm text-muted-foreground">
+                                <p className="text-muted-foreground line-clamp-2 text-sm">
                                     {message.body.substring(0, 300)}
                                 </p>
                             </div>

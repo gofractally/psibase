@@ -34,7 +34,7 @@ namespace SystemService
          std::string serviceName;
 
          // Path reserved across all subdomains
-         if (req.target.starts_with("/common"))
+         if (req.target.starts_with(HttpServer::commonApiPrefix))
             serviceName = HttpServer::commonApiService.str();
 
          // subdomain

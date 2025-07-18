@@ -1,8 +1,12 @@
-import { Code, FilePath, ImportDetails, PkgId } from "../importDetails";
 import { FuncShape } from "../../witExtraction";
+import { Code, FilePath, ImportDetails, PkgId } from "../importDetails";
 
 const col = (col: number): string => {
     return " ".repeat(col * 4);
+};
+
+const toPascalCase = (str: string): string => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
 class Func {
@@ -19,15 +23,7 @@ class Func {
         name: string,
         isDynamic: boolean,
     ) {
-        // Name might look like `[constructor]classname` or `[method]classname.func-name`
-        if (name.includes("[method]")) {
-            this.name = name.split("]")[1].split(".")[1];
-        } else if (name.includes("[constructor]")) {
-            this.name = "constructor";
-        } else {
-            this.name = name;
-        }
-
+        this.name = name;
         this.service = service;
         this.plugin = plugin;
         this.intfName = intfName;
@@ -35,15 +31,21 @@ class Func {
     }
 
     private proxy = (): string => {
+        if (this.isDynamic) {
+            let handle = `plugin_ref.handle`;
+            return [
+                `${col(2)}return host.syncCallDyn({`,
+                `${col(3)}handle: ${handle},`,
+                `${col(3)}method: "${this.name}",`,
+                `${col(3)}params: args`,
+                `${col(2)}});`,
+                ``,
+            ].join("\n");
+        }
+
         let service = `"${this.service}"`;
         let plugin = `"${this.plugin}"`;
         let intf = `"${this.intfName}"`;
-        if (this.isDynamic) {
-            service = `plugin_ref.service`;
-            plugin = `plugin_ref.plugin`;
-            intf = `plugin_ref.intf`;
-        }
-
         return [
             `${col(2)}return host.syncCall({`,
             `${col(3)}service: ${service},`,
@@ -64,7 +66,7 @@ class Func {
     };
 
     private post = (): string => {
-        return `    },\n`;
+        return `${col(1)}},\n`;
     };
 
     code = (): string => {
@@ -72,9 +74,162 @@ class Func {
     };
 }
 
+// ResourceFunc must be separate from Func because unfortunately there are minor differences
+// in the syntax for the bindings. (e.g. the methods don't end with a comma)
+class ResourceFunc {
+    type: string;
+    name: string;
+    service: string;
+    plugin: string;
+    intfName: string;
+    isDynamic: boolean;
+
+    constructor(
+        service: string,
+        plugin: string,
+        intfName: string,
+        type: string,
+        name: string,
+        isDynamic: boolean,
+    ) {
+        // For resources, the name might look like
+        // `[constructor]classname`, `[method]classname.func-name`, or `[static]classname.func-name`
+        if (name.includes("[method]")) {
+            this.name = name.split("]")[1].split(".")[1];
+        } else if (name.includes("[constructor]")) {
+            this.name = "constructor";
+        } else if (name.includes("[static]")) {
+            this.name = "static " + name.split("]")[1].split(".")[1];
+        } else {
+            throw new Error(`Invalid resource method name: ${name}`);
+        }
+
+        if (isDynamic) {
+            throw new Error(`Dynamic resource methods are not supported`);
+        }
+
+        this.service = service;
+        this.plugin = plugin;
+        this.intfName = intfName;
+        this.type = type;
+        this.isDynamic = isDynamic;
+    }
+
+    private proxy = (): string => {
+        let service = `"${this.service}"`;
+        let plugin = `"${this.plugin}"`;
+        let intf = `"${this.intfName}"`;
+        let type = `"${this.type}"`;
+        let method = `"${this.name}"`;
+
+        const syncCallResource = [
+            `host.syncCallResource({`,
+            `${col(4)}service: ${service},`,
+            `${col(4)}plugin: ${plugin},`,
+            `${col(4)}intf: ${intf},`,
+            `${col(4)}type: ${type},`,
+            `${col(4)}handle: this.handle,`,
+            `${col(4)}method: ${method},`,
+            `${col(4)}params: args`,
+            `${col(3)}})`,
+        ].join("\n");
+
+        if (this.name === "constructor") {
+            return [
+                `${col(3)}return (this.handle = ${syncCallResource}, this);`,
+                ``,
+            ].join("\n");
+        } else {
+            return [`${col(3)}return ${syncCallResource};`, ``].join("\n");
+        }
+    };
+
+    private pre = (): string => {
+        return `${col(2)}${this.name}(...args) {\n`;
+    };
+
+    private post = (): string => {
+        return `${col(2)}}\n`;
+    };
+
+    code = (): string => {
+        return this.pre() + this.proxy() + this.post();
+    };
+}
+
+class Resource {
+    name: string;
+    funcs: ResourceFunc[];
+
+    constructor(name: string, funcs: ResourceFunc[]) {
+        this.name = name;
+        this.funcs = funcs;
+    }
+
+    static isResourceMethod(f: FuncShape) {
+        return (
+            f.name.includes("[constructor]") ||
+            f.name.includes("[method]") ||
+            f.name.includes("[static]")
+        );
+    }
+
+    static resourceName(fname: string) {
+        const bracketIndex = fname.indexOf("]");
+        const dotIndex = fname.indexOf(".", bracketIndex);
+
+        return dotIndex !== -1
+            ? fname.substring(bracketIndex + 1, dotIndex)
+            : fname.substring(bracketIndex + 1);
+    }
+
+    public get(name: string) {
+        return this.funcs.find((f) => f.name === name);
+    }
+
+    public addFunc(f: ResourceFunc) {
+        this.funcs.push(f);
+    }
+
+    private pre = (): string => {
+        return `${col(1)}${this.name}: class {\n`;
+    };
+
+    private post = (): string => {
+        return `${col(1)}},\n`;
+    };
+
+    public code(): string {
+        const functions: string[] = this.funcs.map((f) => f.code());
+        return this.pre() + functions.join("\n") + this.post();
+    }
+}
+
+class Resources {
+    resources: Resource[];
+
+    constructor() {
+        this.resources = [];
+    }
+
+    public get(name: string): Resource {
+        let resource = this.resources.find((r) => r.name === name);
+        if (!resource) {
+            resource = new Resource(name, []);
+            this.resources.push(resource);
+        }
+        return resource;
+    }
+
+    public code(): string[] {
+        return this.resources.map((r) => r.code());
+    }
+}
+
 class Intf {
     name: string;
-    funcs: Func[];
+    funcs: Func[] = [];
+    resources: Resources = new Resources();
 
     constructor(
         service: string,
@@ -82,14 +237,30 @@ class Intf {
         intfName: string,
         funcs: FuncShape[],
     ) {
-        // Todo (Resource support): Split funcs array into subsets if there are resources
-        //   with grouped methods.
-        // Functions that are directly part of an interface can be added as normal,
-        //   but resource methods should be added in their own resource object.
         this.name = intfName;
-        this.funcs = funcs.map(
-            (f) => new Func(service, plugin, intfName, f.name, f.dynamicLink),
-        );
+        funcs.forEach((f) => {
+            if (Resource.isResourceMethod(f)) {
+                const resourceName = toPascalCase(
+                    Resource.resourceName(f.name),
+                );
+                this.resources
+                    .get(resourceName)
+                    .addFunc(
+                        new ResourceFunc(
+                            service,
+                            plugin,
+                            intfName,
+                            resourceName,
+                            f.name,
+                            f.dynamicLink,
+                        ),
+                    );
+            } else {
+                this.funcs.push(
+                    new Func(service, plugin, intfName, f.name, f.dynamicLink),
+                );
+            }
+        });
     }
 
     private pre = (): string => {
@@ -102,7 +273,13 @@ class Intf {
 
     code = (): string => {
         const functions: string[] = this.funcs.map((f) => f.code());
-        return this.pre() + functions.join("\n") + this.post();
+        const resourceFuncs: string[] = this.resources.code();
+        return (
+            this.pre() +
+            resourceFuncs.join("\n") +
+            functions.join("\n") +
+            this.post()
+        );
     };
 }
 

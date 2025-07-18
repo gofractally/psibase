@@ -11,11 +11,11 @@ members = [
     "user/Aes/plugin",
     "user/Base64/plugin",
     "user/ClientData/plugin",
+    "user/Host/plugin/common",
     "user/Invite/plugin",
     "user/Invite/plugin_AuthInvite",
     "user/Kdf/plugin",
     "user/Sites/plugin",
-    "user/Supervisor/plugin",
     "user/Packages/plugin",
     "user/Permissions/plugin",
     "user/Tokens/plugin",
@@ -38,7 +38,7 @@ strip = true
 lto = true
 
 [workspace.package]
-version = "0.18.0"
+version = "0.19.0"
 edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"

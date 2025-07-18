@@ -67,9 +67,17 @@ interface intf {
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 }
 
+interface auth {
+    use host:common/types.{error};
+
+    /// Gets a bearer token for user to make authenticated queries
+    get-query-token: func(app: string, user: string) -> result<string, error>;
+}
+
 // Include this world to import the most common transact:plugin imports
 world imports {
     import intf;
+    import auth;
 }
 
 //      HOOK WORLDS

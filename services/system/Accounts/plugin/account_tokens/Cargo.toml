@@ -19,7 +19,7 @@ world = "impl"
 [package.metadata.component.dependencies]
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../../../user/Host/plugin/common/wit/world.wit" }
 "base64:plugin" = { path = "../../../../user/Base64/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]

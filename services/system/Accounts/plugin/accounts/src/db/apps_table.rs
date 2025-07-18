@@ -51,8 +51,7 @@ impl AppsTable {
     }
 
     pub fn login(&self, user: &str) {
-        Keyvalue::set(&self.prefixed_key(DbKeys::LOGGED_IN), user.as_bytes())
-            .expect("Failed to set logged-in user");
+        Keyvalue::set(&self.prefixed_key(DbKeys::LOGGED_IN), user.as_bytes());
 
         self.connect(user);
     }
@@ -67,8 +66,7 @@ impl AppsTable {
         Keyvalue::set(
             &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),
             &connected_accounts.packed(),
-        )
-        .expect("Failed to set connected accounts");
+        );
     }
 
     pub fn logout(&self) {

@@ -2,6 +2,13 @@ import dayjs from "dayjs";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { EmptyBlock } from "@/components/empty-block";
+import { useAppForm } from "@/components/form/app-form";
+
+import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
+import { useCurrentFractal } from "@/hooks/use-current-fractal";
+import { zEvalType } from "@/lib/zod/EvaluationType";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -9,13 +16,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-
-import { EmptyBlock } from "@/components/empty-block";
-import { useAppForm } from "@/components/form/app-form";
-
-import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { zEvalType } from "@/lib/zod/EvaluationType";
 
 export const Proposed = () => {
     const { mutateAsync: setSchedule } = useSetSchedule();
