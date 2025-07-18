@@ -141,6 +141,14 @@ There are three different settings for data-duration that may be used:
 | Session       | Valid             | Valid         |
 | Persistent    | Valid             | Valid         |
 
+#### Record prefixes
+
+The key in a key/value record written to the database is prefixed with the identifier of the table. For example, in a bucket of key/value records called "animal-noises", you may insert key/values such as ["dog/bark", "cat/meow"]. The table identifier is added as a prefix for every key, so the record: "dog/bark" would be represented as `animal-noises:dog/bark` in the database.
+
+The table identifier is not the only prefix. All databases also prefix keys with the chain-id of the network and the account name of the service that owns the plugin. Adding the chain-id ensures that two different psibase networks would not use conflicting keyspace. Adding the service account name ensures that plugins from different services store data in different namespaces. Lastly, all Transactional databases also include the account name of the currently logged in user in the prefix, so different users of the same app (on the same device) have different keyspaces.
+
+Since the Non-Transactional database does not include the logged-in user, it is able to store device-wide data or any data that is unrelated to the current user.
+
 ### Persistence
 
 When a plugin writes private user data, it is immediately persisted.
