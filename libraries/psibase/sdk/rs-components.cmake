@@ -137,34 +137,25 @@ function(add_rs_component_workspace_filtered TARGET_TUPLE)
     # Get only plugin workspace members
     filter_plugin_workspace_members(${PATH} PLUGIN_MEMBERS)
     
-    # Create a temporary workspace manifest that only includes plugin packages
-    set(TEMP_WORKSPACE_DIR "${CMAKE_CURRENT_BINARY_DIR}/temp_plugin_workspace")
-    set(TEMP_CARGO_TOML "${TEMP_WORKSPACE_DIR}/Cargo.toml")
-    
-    file(MAKE_DIRECTORY ${TEMP_WORKSPACE_DIR})
-    
-    # Read the original workspace Cargo.toml to get workspace-level settings
-    set(ORIGINAL_CARGO_TOML "${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml")
-    file(READ ${ORIGINAL_CARGO_TOML} ORIGINAL_CONTENT)
-    
-    # Create a minimal workspace with only plugin members
-    set(FILTERED_CONTENT "[workspace]\nmembers = [\n")
-    
+    # Read plugin package names from their Cargo.toml files
+    set(PLUGIN_PACKAGES "")
     foreach(PLUGIN_MEMBER ${PLUGIN_MEMBERS})
-        string(APPEND FILTERED_CONTENT "    \"${PLUGIN_MEMBER}\",\n")
+        set(PLUGIN_CARGO_TOML "${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/${PLUGIN_MEMBER}/Cargo.toml")
+        if(EXISTS ${PLUGIN_CARGO_TOML})
+            file(READ ${PLUGIN_CARGO_TOML} PLUGIN_CARGO_CONTENT)
+            string(REGEX MATCH "name\\s*=\\s*\"([^\"]+)\"" PACKAGE_NAME_MATCH ${PLUGIN_CARGO_CONTENT})
+            if(CMAKE_MATCH_1)
+                list(APPEND PLUGIN_PACKAGES ${CMAKE_MATCH_1})
+            endif()
+        endif()
     endforeach()
     
-    string(APPEND FILTERED_CONTENT "]\nresolver = \"2\"\n\n")
+    # Build package arguments for targeted build
+    set(PACKAGE_ARGS "")
+    foreach(PACKAGE_NAME ${PLUGIN_PACKAGES})
+        list(APPEND PACKAGE_ARGS --package ${PACKAGE_NAME})
+    endforeach()
     
-    # Copy workspace-level settings (profile, dependencies, etc.)
-    string(REGEX MATCH "\\[workspace\\][^\\[]*members\\s*=\\s*\\[[^\\]]+\\]\\s*resolver\\s*=\\s*\"[^\"]+\"\\s*(.*)" REST_MATCH ${ORIGINAL_CONTENT})
-    if(CMAKE_MATCH_1)
-        string(APPEND FILTERED_CONTENT ${CMAKE_MATCH_1})
-    endif()
-    
-    # Write the filtered workspace manifest
-    file(WRITE ${TEMP_CARGO_TOML} ${FILTERED_CONTENT})
-
     set(OUTPUT_FILEPATHS "")
     set(OUTPUT_FILES "")
     foreach(FILENAME ${ARGN})
@@ -191,14 +182,23 @@ function(add_rs_component_workspace_filtered TARGET_TUPLE)
         )
     endforeach()
 
+    # Build each plugin individually to avoid workspace dependency issues
+    set(BUILD_COMMANDS "")
+    foreach(PLUGIN_MEMBER ${PLUGIN_MEMBERS})
+        set(PLUGIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/${PLUGIN_MEMBER}")
+        list(APPEND BUILD_COMMANDS 
+            COMMAND cargo component build -r
+                --target ${TARGET_ARCH}
+                --manifest-path ${PLUGIN_DIR}/Cargo.toml
+                --target-dir ${TARGET_DIR}
+        )
+    endforeach()
+    
     ExternalProject_Add(${TARGET_NAME}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATHS}
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND cargo component build -r
-            --target ${TARGET_ARCH}
-            --manifest-path ${TEMP_CARGO_TOML}
-            --target-dir ${TARGET_DIR}
+        BUILD_COMMAND ${BUILD_COMMANDS}
         ${COPY_COMMANDS}
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
