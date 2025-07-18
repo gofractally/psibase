@@ -1298,15 +1298,52 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
     let transactions = builder.finish()?;
     let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
 
-    push_transactions(
-        &args.node_args.api,
-        client,
-        transactions,
-        args.tx_args.trace,
-        args.tx_args.console,
-        &progress,
-    )
-    .await?;
+    let mut running = Vec::new();
+    progress.set_message("Publishing packages");
+    let mut n = 0;
+    for (label, transactions, carry) in &transactions {
+        if !transactions.is_empty() {
+            let mut group = Vec::new();
+            for trx in transactions {
+                let prev = n;
+                let progress = &progress;
+                let client = client.clone();
+                n = 0;
+                group.push(async move {
+                    push_transaction(
+                        &args.node_args.api,
+                        client,
+                        trx.packed(),
+                        args.tx_args.trace,
+                        args.tx_args.console,
+                        Some(progress),
+                    )
+                    .await
+                    .with_context(|| label.to_string())?;
+                    progress.inc(prev);
+                    Ok::<(), anyhow::Error>(())
+                });
+            }
+            // The groups can be merged, but not split.
+            debug_assert!(!carry);
+            debug_assert!(transactions.len() == 1);
+            running.push(async {
+                try_join_all(group).await?;
+                progress.inc(1);
+                Ok(())
+            })
+        } else {
+            n += 1;
+        }
+    }
+    let result: Result<_, anyhow::Error> = try_join_all(running).await;
+    if result.is_ok() {
+        progress.finish_and_clear();
+    } else {
+        progress.abandon();
+    }
+    result?;
+
     finish_progress(&args.sig_args, progress, num_transactions);
     Ok(())
 }
