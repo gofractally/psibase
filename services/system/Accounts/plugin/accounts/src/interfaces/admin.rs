@@ -10,11 +10,10 @@ use crate::db::user_table::*;
 use crate::helpers::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
-fn get_assert_caller_admin(context: &str) -> OriginationData {
+fn get_assert_caller_admin(context: &str) -> String {
     let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
     assert!(
-        caller.origin == Client::my_service_origin()
-            || (caller.app.is_some() && caller.app.as_ref().unwrap() == "x-admin"),
+        caller == Client::my_service_account() || caller == "x-admin",
         "{} only callable by `accounts` or `x-admin`",
         context
     );
@@ -23,13 +22,6 @@ fn get_assert_caller_admin(context: &str) -> OriginationData {
 
 fn assert_caller_admin(context: &str) {
     let _ = get_assert_caller_admin(context);
-}
-
-fn get_accounts_app() -> OriginationData {
-    OriginationData {
-        app: Some(Client::my_service_account()),
-        origin: Client::my_service_origin(),
-    }
 }
 
 fn assert_valid_account(account: &str) {
@@ -47,6 +39,7 @@ impl Admin for AccountsPlugin {
         let query_token =
             TransactAuthApi::get_query_token(&get_accounts_app().app.unwrap(), &user).unwrap();
 
+        let app = app.app.unwrap();
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
 
@@ -69,7 +62,7 @@ impl Admin for AccountsPlugin {
     fn get_connected_apps(user: String) -> Vec<String> {
         let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
         assert!(
-            caller.app.is_some() && caller.app.unwrap() == "homepage",
+            caller == "homepage",
             "get_connected_apps only callable by `homepage`"
         );
         UserTable::new(&user).get_connected_apps()
@@ -78,11 +71,11 @@ impl Admin for AccountsPlugin {
     fn import_account(account: String) {
         assert_caller_admin("import_account");
         assert_valid_account(&account);
-        AppsTable::new(&get_accounts_app()).connect(&account);
+        AppsTable::new(&Client::my_service_account()).connect(&account);
     }
 
     fn get_all_accounts() -> Vec<String> {
         assert_caller_admin("get_all_accounts");
-        AppsTable::new(&get_accounts_app()).get_connected_accounts()
+        AppsTable::new(&Client::my_service_account()).get_connected_accounts()
     }
 }

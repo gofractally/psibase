@@ -214,7 +214,7 @@ impl HookTxTransform for StagedTxPlugin {
             }
         }
 
-        let Ok(Some(sender)) = accounts::plugin::api::get_current_user() else {
+        let Some(sender) = accounts::plugin::api::get_current_user() else {
             return Err(ErrorType::NoCurrentUser.into());
         };
 
