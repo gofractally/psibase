@@ -3,6 +3,7 @@ import {
     QualifiedPluginId,
     assertTruthy,
     buildFunctionCallResponse,
+    getJson,
     postGraphQLGetJson,
     siblingUrl,
 } from "@psibase/common-lib";
@@ -58,6 +59,8 @@ export class Supervisor implements AppInterface {
     private context: CallContext | undefined;
 
     parser: Promise<any>;
+
+    chainId: string;
 
     parentOrigination: OriginationData | undefined;
 
@@ -187,6 +190,11 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
+
+        this.chainId = "";
+        getJson("/common/chainid").then((chainId) => {
+            this.chainId = chainId;
+        });
     }
 
     getRootDomain(): string {

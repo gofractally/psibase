@@ -98,11 +98,11 @@ For example, in a traditional Web3 context, a smart contract API update could br
 
 In general, this plugin architecture allows for unprecedented collaboration between Web3 apps. With psibase apps, a website or application can access resources or execute code hosted by other apps on behalf of a user.
 
-For example, if a user has provided her address or credit card information in one application, other applications can simply make use this data without requiring the user to re-enter the same information. And all of this information can remain client-side, protecting user privacy.
+For example, if a user has provided her address or credit card information in one application, other applications can make use of this data without requiring the user to re-enter the same information. And all of this information can remain client-side, protecting user privacy.
 
 ### Simplicity
 
-Interactions with smart-contracts can get complex. It often requires specialized knowledge from the development team to know how to correctly integrate with it. For apps on a psibase network, the development team will have created a plugin that abstracts the complexity of the interactions with the service into a streamlined user-facing API that can be used to much more easily integrate with the service.
+Interactions with services can get complex. It often requires the specialized knowledge of the development team to know how to correctly integrate with it. For apps on a psibase network, the development team will have created a plugin that abstracts the complexity of the interactions with the service into a streamlined user-facing API that can be used to much more easily integrate with the service.
 
 For example, consider an application that requires the user to submit a custom zero-knowledge proof in order to call a particular service action. This would ordinarily likely require the use of complicated cryptographic libraries to generate a proof of the correct type and format expected by the service. In the case of a psibase app, the zero-knowledge app would have a plugin used by their own UI that does the proof generation. This plugin would automatically be available for use by other third-party applications to exercise the same functionality for simpler integration.
 
@@ -112,27 +112,34 @@ Blockchains typically only have public data. If private client-side data is coll
 
 ## Local data storage
 
-### Access to database operations
+### Access to client-side data
 
-The psibase plugin host provides a `wasi:keyvalue` interface for plugins to use. However, the wasi-keyvalue interface [proposal](https://github.com/WebAssembly/wasi-keyvalue) is still early in the standardization process, and therefore the implementation provided by the host is subject to change.
+The psibase plugin host provides a key-value interface for plugins to use for read/write operations to manage client-side storage. Every plugin has its own independent key space, and can only directly read/write its own data. Data may be shared between plugins only if explicilty exposed through the plugin's API.
 
-For more stable interactions with the database, a plugin should import the `clientdata` plugin, which is a wrapper around the host's `wasi:keyvalue` interface.
+### Host-dependent data backing
 
-This `clientdata` plugin provides a high level key/value API for plugins.
-
-```
-    get: func(key: string) -> option<list<u8>>;
-    set: func(key: string, value: list<u8>) -> result<_, error>;
-    delete: func(key: string);
-```
-
-Every plugin has its own independent key space, and can only directly read/write its own data. Data may be shared between plugins only if explicilty exposed through the plugin's API.
-
-### Data backing
-
-The `wasi-keyvalue` implementation currently uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
+It is up to the host platform to determine how to implement the key-value interface. For example, in the current implementation of the host:plugin for the web platform, the key-value implementation uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
 
 Note: This imposes a major restriction on the amount of local data storage available for psibase plugins: Currently there is [a hard limit](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria#web_storage) for the total amount of data stored in LocalStorage across all psibase apps in a given browser, since storage across all apps is managed by a single domain. This restriction will be lifted in a future implementation of plugin storage that uses a different data backing layer such as IndexedDB.
+
+### API
+
+The current API for key-value operations allows one to select one of multiple different databases for reading/writing. There are two persistence modes: Non-Transactional and Transactional.
+
+- Non-Transactional - Writes to a Non-Transactional database are independent of any other operations. They are immediately persisted.
+- Transactional - Writes to a Transactional database are dependent on the success of the current operation, including the success of any scheduled server-side actions. If anything fails, then writes to the Transactional database will be rolled back.
+
+There are three different settings for data-duration that may be used:
+
+- Ephemeral - An ephemeral database is wiped at the start of every new execution context. This data never persists longer than the currently executing callstack.
+- Session - Data stored into a session database will persist until the end of the current session. A session is defined by the host implementation.
+- Persistent - Data stored into a persistent database will persist until explicitly deleted.
+
+| Data Duration | Non-Transactional | Transactional |
+| ------------- | ----------------- | ------------- |
+| Ephemeral     | N/A               | N/A           |
+| Session       | Valid             | Valid         |
+| Persistent    | Valid             | Valid         |
 
 ### Persistence
 

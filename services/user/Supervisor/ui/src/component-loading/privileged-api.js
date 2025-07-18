@@ -10,4 +10,20 @@ export const intf = {
     getRootDomain() {
         return host.getRootDomain();
     },
+
+    getChainId() {
+        return host.getChainId();
+    },
+};
+
+export const database = {
+    get(...args) {
+        return host.dbGet(...args);
+    },
+    set(...args) {
+        return host.dbSet(...args);
+    },
+    remove(...args) {
+        return host.dbRemove(...args);
+    },
 };

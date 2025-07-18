@@ -1,13 +1,17 @@
 package clientdata:plugin;
 
 interface tests {
-    use wasi:keyvalue/store@0.2.0-draft.{error};
-    kv-test: func() -> result<_, error>;
+    use host:common/types.{error};
+    kv-test-step1: func() -> result<_, error>;
+    kv-test-step2: func() -> result<_, error>;
+    kv-test-step3-shouldfail: func() -> result<_, error>;
+    kv-test-step4: func() -> result<_, error>;
 }
 
 world impl {
     include host:common/imports;
-    include wasi:keyvalue/imports@0.2.0-draft;
+    include setcode:plugin/imports;
+    include chainmail:plugin/imports;
 
     export keyvalue;
     export tests;
