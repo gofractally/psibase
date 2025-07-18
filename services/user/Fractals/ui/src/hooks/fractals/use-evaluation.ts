@@ -11,7 +11,7 @@ export const useEvaluation = (evaluationId: number | undefined | null) =>
         queryKey: QueryKey.evaluation(evaluationId),
         queryFn: async () => {
             try {
-                return getEvaluation(evaluationId!);
+                return await getEvaluation(evaluationId!);
             } catch (error) {
                 const message = "Error getting evaluation";
                 console.error(message, error);

@@ -15,7 +15,7 @@ export const useCompletedEvaluation = () => {
         queryKey: QueryKey.completedEvaluations(),
         queryFn: async () => {
             try {
-                return getCompletedEvaluations(fractalAccount!);
+                return await getCompletedEvaluations(fractalAccount!);
             } catch (error) {
                 const message = "Error getting completed evaluations";
                 console.error(message, error);

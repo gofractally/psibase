@@ -15,7 +15,7 @@ export const useMembers = (accountParam?: OptionalAccount) => {
         enabled: !!account,
         queryFn: async () => {
             try {
-                return getMembers(zAccount.parse(account));
+                return await getMembers(zAccount.parse(account));
             } catch (error) {
                 const message = "Error getting members";
                 console.error(message, error);

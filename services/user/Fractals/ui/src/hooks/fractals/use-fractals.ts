@@ -8,7 +8,7 @@ export const useFractals = () =>
         queryKey: QueryKey.fractals(),
         queryFn: async () => {
             try {
-                return getFractals();
+                return await getFractals();
             } catch (error) {
                 const message = "Error getting fractals";
                 console.error(message, error);

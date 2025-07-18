@@ -25,7 +25,7 @@ export const useCreateFractal = () =>
             const { account, mission, name } = zParams.parse(params);
             await supervisor.functionCall({
                 method: "createFractal",
-                params: [zAccount.parse(account), name, mission],
+                params: [account, name, mission],
                 service: fractalsService,
                 intf: "admin",
             });

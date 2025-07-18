@@ -9,7 +9,7 @@ export const useEvaluationResults = (evaluationId: OptionalNumber) =>
         enabled: !!evaluationId,
         queryFn: async () => {
             try {
-                return getEvaluationResults(evaluationId!);
+                return await getEvaluationResults(evaluationId!);
             } catch (error) {
                 const message = "Error getting evaluation results";
                 console.error(message, error);

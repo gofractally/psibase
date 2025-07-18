@@ -9,7 +9,7 @@ export const useMemberships = (user: OptionalAccount) =>
         enabled: !!user,
         queryFn: async () => {
             try {
-                return getMemberships(user!);
+                return await getMemberships(user!);
             } catch (error) {
                 const message = "Error getting memberships";
                 console.error(message, error);

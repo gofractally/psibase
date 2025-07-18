@@ -13,7 +13,7 @@ export const useScores = () => {
         enabled: !!currentFractal,
         queryFn: async () => {
             try {
-                return getScores(zAccount.parse(currentFractal));
+                return await getScores(zAccount.parse(currentFractal));
             } catch (error) {
                 const message = "Error getting scores";
                 console.error(message, error);
