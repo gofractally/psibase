@@ -123,20 +123,14 @@ impl Bucket {
         format!("{}:{}", self.bucket_id, key)
     }
 
-    fn validate_key_size(&self, key: &str) -> Result<(), Error> {
-        if key.len() >= 256 {
-            return Err(make_error("key must be <= 256 bytes"));
-        }
-        Ok(())
+    fn validate_key_size(&self, key: &str) {
+        assert!(key.len() < 256, "key must be less than 256 bytes");
     }
 
-    fn validate_value_size(&self, value: &[u8]) -> Result<(), Error> {
+    fn validate_value_size(&self, value: &[u8]) {
         // 100kb
         const MAX_SIZE: usize = 100 * 1024;
-        if value.len() >= MAX_SIZE {
-            return Err(make_error("value must be less than 100KB"));
-        }
-        Ok(())
+        assert!(value.len() < MAX_SIZE, "value must be less than 100KB");
     }
 
     fn validate_identifier(identifier: &str) -> Result<(), Error> {
@@ -165,26 +159,26 @@ impl GuestBucket for Bucket {
         Self { bucket_id, db }
     }
 
-    fn get(&self, key: String) -> Result<Option<Vec<u8>>, Error> {
-        self.validate_key_size(&key)?;
+    fn get(&self, key: String) -> Option<Vec<u8>> {
+        self.validate_key_size(&key);
         let prefixed_key = self.get_key(&key);
 
         match (self.db.duration, self.db.mode) {
-            (StorageDuration::Ephemeral, _) => Ok(host_buffer::get(&self.db, &prefixed_key)),
-            (_, DbMode::NonTransactional) => Ok(HostDb::get(self.db.duration as u8, &prefixed_key)),
+            (StorageDuration::Ephemeral, _) => host_buffer::get(&self.db, &prefixed_key),
+            (_, DbMode::NonTransactional) => HostDb::get(self.db.duration as u8, &prefixed_key),
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
-                    Ok(host_buffer::get(&self.db, &prefixed_key))
+                    host_buffer::get(&self.db, &prefixed_key)
                 } else {
-                    Ok(HostDb::get(self.db.duration as u8, &prefixed_key))
+                    HostDb::get(self.db.duration as u8, &prefixed_key)
                 }
             }
         }
     }
 
-    fn set(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
-        self.validate_key_size(&key)?;
-        self.validate_value_size(&value)?;
+    fn set(&self, key: String, value: Vec<u8>) {
+        self.validate_key_size(&key);
+        self.validate_value_size(&value);
 
         match (self.db.duration, self.db.mode) {
             (StorageDuration::Ephemeral, _) => {
@@ -197,11 +191,10 @@ impl GuestBucket for Bucket {
                 host_buffer::set(&self.db, &self.get_key(&key), &value);
             }
         }
-        Ok(())
     }
 
-    fn delete(&self, key: String) -> Result<(), Error> {
-        self.validate_key_size(&key)?;
+    fn delete(&self, key: String) {
+        self.validate_key_size(&key);
 
         match (self.db.duration, self.db.mode) {
             (StorageDuration::Ephemeral, _) => {
@@ -214,29 +207,28 @@ impl GuestBucket for Bucket {
                 host_buffer::remove(&self.db, &self.get_key(&key));
             }
         }
-        Ok(())
     }
 
-    fn exists(&self, key: String) -> Result<bool, Error> {
-        self.validate_key_size(&key)?;
+    fn exists(&self, key: String) -> bool {
+        self.validate_key_size(&key);
         let prefixed_key = self.get_key(&key);
 
         match (self.db.duration, self.db.mode) {
             (StorageDuration::Ephemeral, _) => {
                 // Doesn't matter if the key dne, or if it does but is a delete OP
-                Ok(host_buffer::get(&self.db, &prefixed_key).is_some())
+                host_buffer::get(&self.db, &prefixed_key).is_some()
             }
             (_, DbMode::NonTransactional) => {
-                Ok(HostDb::get(self.db.duration as u8, &prefixed_key).is_some())
+                HostDb::get(self.db.duration as u8, &prefixed_key).is_some()
             }
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
                     match host_buffer::get(&self.db, &prefixed_key) {
-                        Some(_) => Ok(true),
-                        None => Ok(false), // Key was deleted
+                        Some(_) => true,
+                        None => false, // Key was deleted
                     }
                 } else {
-                    Ok(HostDb::get(self.db.duration as u8, &prefixed_key).is_some())
+                    HostDb::get(self.db.duration as u8, &prefixed_key).is_some()
                 }
             }
         }
