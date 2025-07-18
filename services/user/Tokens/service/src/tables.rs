@@ -28,6 +28,7 @@ pub mod tables {
         pub nft_id: NID,
         #[graphql(skip)]
         pub settings_value: u8,
+        #[graphql(skip)]
         pub precision: u8,
         #[graphql(skip)]
         pub issued_supply: Quantity,
@@ -179,6 +180,10 @@ pub mod tables {
     impl Token {
         pub async fn owner(&self) -> AccountNumber {
             self.nft_holder()
+        }
+
+        pub async fn precision(&self) -> Precision {
+            self.precision.try_into().unwrap()
         }
 
         pub async fn current_supply(&self) -> Decimal {
@@ -344,8 +349,8 @@ pub mod tables {
             Token::get_assert(self.token_id).symbol
         }
 
-        pub async fn precision(&self) -> u8 {
-            Token::get_assert(self.token_id).precision
+        pub async fn precision(&self) -> Precision {
+            Token::get_assert(self.token_id).precision.try_into().unwrap()
         }
     }
 
