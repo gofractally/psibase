@@ -802,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "fractals"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "async-graphql",
  "evaluations",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "fractals-pkg"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "fractals",
  "plugin",
@@ -1668,7 +1668,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "fractals",
  "fractals-pkg",
@@ -1846,7 +1846,7 @@ checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
 
 [[package]]
 name = "r-fractals"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "async-graphql",
  "fractals",
