@@ -1,5 +1,5 @@
 # A function that can be used to add a new target that builds a wasm component from rust
-set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
+set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugins)
 
 # Helper function to determine the correct shared cache directory
 function(get_shared_cache_dir OUTPUT_VAR SOURCE_PATH)

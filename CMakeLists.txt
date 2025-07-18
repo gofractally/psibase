@@ -282,7 +282,7 @@ add_rs_component_workspace_filtered(services/:Plugins
     packages
     permissions
     sites
-    test
+    supervisor_plugin
     tokens
     transact
     workshop
@@ -317,7 +317,39 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/package
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)
 
-set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
+# Organized build directory structure
+set(BUILD_NATIVE_DIR ${CMAKE_CURRENT_BINARY_DIR}/native)
+set(BUILD_PLUGINS_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugins)
+set(BUILD_SERVICES_DIR ${CMAKE_CURRENT_BINARY_DIR}/services)
+set(BUILD_PACKAGES_DIR ${CMAKE_CURRENT_BINARY_DIR}/packages)
+set(BUILD_UI_DIR ${CMAKE_CURRENT_BINARY_DIR}/ui)
+
+# Legacy compatibility - final packages directory
+set(SERVICE_DIR ${BUILD_PACKAGES_DIR})
+
+# Create build directories
+file(MAKE_DIRECTORY ${BUILD_NATIVE_DIR})
+file(MAKE_DIRECTORY ${BUILD_NATIVE_DIR}/wasm)
+file(MAKE_DIRECTORY ${BUILD_NATIVE_DIR}/schemas)
+file(MAKE_DIRECTORY ${BUILD_PLUGINS_DIR})
+file(MAKE_DIRECTORY ${BUILD_SERVICES_DIR})
+file(MAKE_DIRECTORY ${BUILD_SERVICES_DIR}/lib)
+file(MAKE_DIRECTORY ${BUILD_SERVICES_DIR}/packages)
+file(MAKE_DIRECTORY ${BUILD_PACKAGES_DIR})
+file(MAKE_DIRECTORY ${BUILD_UI_DIR})
+
+# Add custom target to copy Rust service libraries to organized directory
+add_custom_target(organize_rust_services
+    COMMAND find ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared/wasm32-wasip1/release/ -name "*.rlib" -exec cp {} ${BUILD_SERVICES_DIR}/lib/ "\;"
+    COMMENT "Organizing Rust service libraries"
+)
+
+# Add custom target to copy C++ outputs to organized directory
+add_custom_target(organize_native_outputs
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/*.wasm ${BUILD_NATIVE_DIR}/wasm/ 2>/dev/null || true
+    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/*-schema.json ${BUILD_NATIVE_DIR}/schemas/ 2>/dev/null || true
+    COMMENT "Organizing C++ native outputs"
+)
 
 set(PSIBASE_VERSION 0.19)
 
@@ -767,16 +799,6 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
-    NAME SupervisorTests
-    DESCRIPTION "Plugin functions for testing Supervisor functionality"
-    VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Supervisor(^${PSIBASE_VERSION}.0)"
-    SERVICE sup-test
-        DATA ${Plugins_OUTPUT_FILE_test} /test.wasm
-    DEPENDS ${Plugins_DEP}
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
@@ -957,7 +979,6 @@ install(
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
-          ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/Tokens.psi

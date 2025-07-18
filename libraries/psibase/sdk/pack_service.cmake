@@ -337,6 +337,9 @@ function(cargo_psibase_package)
     # Use hardcoded shared cache directory for services workspace
     # All services now use the shared cache at /root/psibase/.caches/target-shared
     set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    
+    # Also copy intermediate service artifacts to organized build directory
+    set(SERVICES_PACKAGE_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/services/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext
@@ -354,6 +357,7 @@ function(cargo_psibase_package)
     add_custom_command(
         OUTPUT ${ARG_OUTPUT}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${SERVICES_PACKAGE_OUTPUT}
         DEPENDS ${PACKAGE_OUTPUT}
         DEPENDS ${TARGET_NAME}_ext
         VERBATIM
