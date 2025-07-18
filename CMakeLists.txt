@@ -991,7 +991,7 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/Workshop.psi
-        ${SERVICE_DIR}/Config.psi
+          ${SERVICE_DIR}/Config.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 
