@@ -345,6 +345,7 @@ function(cargo_psibase_package)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
+            --target-dir ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
         DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
