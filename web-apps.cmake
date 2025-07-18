@@ -21,6 +21,8 @@ ExternalProject_Add(CommonApiCommonLib_js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/index.d.ts
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/auth-cookie.html
+        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/auth-cookie.js
     INSTALL_COMMAND ""
     BUILD_ALWAYS 1
 )
