@@ -60,7 +60,7 @@ export const AccountSelection = () => {
 
     const { data: account } = useAccountLookup(selectedAccount);
     const { data: privateKey } = usePublicToPrivate(account?.pubkey);
-    const url = modifyUrlParams(siblingUrl("", "accounts"), {
+    const url = modifyUrlParams(siblingUrl("", "accounts", "key"), {
         key: privateKey || "",
     });
 

@@ -32,10 +32,10 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 ### Login
 
-`POST /login` takes a packed transaction with a single action of the form `user => service::loginSys(root host)`. The transaction must have the `do_not_broadcast_flag` set. The action will not be executed and does not need to exist on the target service. The response is JSON containing a bearer token that can be used for requests to the specified service.
+`POST /login` takes a packed transaction with a single action of the form `user => service::loginSys(root host)`. The transaction must have the `do_not_broadcast_flag` set. The action will not be executed and does not need to exist on the target service. The response is JSON containing a bearer token that can be used for query requests.
 
 | Field        | Type   | Notes     |
-|--------------|--------|-----------|
+| ------------ | ------ | --------- |
 | access_token | String | The token |
 | token_type   | String | "bearer"  |
 

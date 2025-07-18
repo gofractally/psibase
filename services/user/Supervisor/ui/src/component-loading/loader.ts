@@ -191,7 +191,6 @@ export async function loadPlugin(
             getWasiImports(),
             privileged ? getPrivilegedImports() : new ImportDetails([], []),
             getProxiedImports(api.importedFuncs),
-            getNonstandardWasiImports(),
         ]),
     );
     const pluginModule = await load(wasmBytes, imports, `${service}.plugin.js`);

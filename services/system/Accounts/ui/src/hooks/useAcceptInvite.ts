@@ -9,8 +9,8 @@ const AcceptInviteParams = z.object({
     app: z.string(),
 });
 
-export const useAcceptInvite = () =>
-    useMutation<void, string, z.infer<typeof AcceptInviteParams>>({
+export const useAcceptInvite = () => {
+    return useMutation<void, string, z.infer<typeof AcceptInviteParams>>({
         mutationFn: async (params) => {
             const { accountName, app, origin, token } =
                 AcceptInviteParams.parse(params);
@@ -29,7 +29,7 @@ export const useAcceptInvite = () =>
                 intf: "invitee",
             }));
 
-            void (await supervisor.functionCall({
+            const queryToken = await supervisor.functionCall({
                 method: "loginDirect",
                 params: [
                     {
@@ -40,14 +40,8 @@ export const useAcceptInvite = () =>
                 ],
                 service: "accounts",
                 intf: "admin",
-            }));
-
-            if (window.location && window.location.href) {
-                window.location.href = origin;
-            } else {
-                throw new Error(
-                    `Failed to redirect window to origin ${origin}`,
-                );
-            }
+            });
+            console.log("queryToken:", queryToken);
         },
     });
+};

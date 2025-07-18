@@ -4,6 +4,7 @@ use crate::bindings::accounts::account_tokens::api::*;
 use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Admin};
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::client::{self as Client, OriginationData};
+use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
@@ -38,13 +39,18 @@ fn assert_valid_account(account: &str) {
 }
 
 impl Admin for AccountsPlugin {
-    fn login_direct(app: AppDetails, user: String) {
+    fn login_direct(app: AppDetails, user: String) -> Option<String> {
         assert_caller_admin("login_direct");
 
         assert_valid_account(&user);
 
+        let query_token =
+            TransactAuthApi::get_query_token(&get_accounts_app().app.unwrap(), &user).unwrap();
+
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
+
+        Some(query_token)
     }
 
     fn decode_connection_token(token: String) -> Option<AppDetails> {

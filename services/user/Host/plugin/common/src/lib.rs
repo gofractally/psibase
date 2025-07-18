@@ -4,6 +4,7 @@ use bindings::*;
 
 mod helpers;
 use helpers::*;
+mod bucket;
 mod plugin_ref;
 
 mod types;
@@ -11,9 +12,11 @@ use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
+    store::Guest as Store,
     types::Guest as Types,
     types::{BodyTypes, Error, OriginationData, PostRequest},
 };
+use helpers::make_error;
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
@@ -156,6 +159,10 @@ impl Client for HostCommon {
 
 impl Types for HostCommon {
     type PluginRef = plugin_ref::PluginRef;
+}
+
+impl Store for HostCommon {
+    type Bucket = bucket::Bucket;
 }
 
 bindings::export!(HostCommon with_types_in bindings);

@@ -345,7 +345,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts
-    VERSION ${PSIBASE_VERSION}.0
+    VERSION ${PSIBASE_VERSION}.1
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
@@ -354,7 +354,7 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
-        INIT
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
@@ -517,6 +517,8 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CommonApi-schema.json
         SERVER common-api
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/auth-cookie.html common/auth-cookie.html
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/auth-cookie.js common/auth-cookie.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
         DATA GLOB ${THIRD_FILES}                                              common
