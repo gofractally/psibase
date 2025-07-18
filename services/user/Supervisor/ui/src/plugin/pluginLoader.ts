@@ -56,7 +56,7 @@ export class PluginLoader {
         );
 
         // Flatten and deduplicate
-        let dependencies = imports
+        const dependencies = imports
             .flat()
             .reduce((acc: QualifiedPluginId[], current: QualifiedPluginId) => {
                 if (!acc.some((obj) => isEqual(obj, current))) {

@@ -34,12 +34,17 @@ export default defineConfig(({ command }) => ({
             external: ["hash.js", "elliptic"],
             input: {
                 main: path.resolve(serviceDir, "index.html"),
-                oauth: path.resolve(serviceDir, "oauth.html"),
+                prompt: path.resolve(serviceDir, "prompt.html"),
             },
             output: {
                 entryFileNames: "assets/[name].js",
                 chunkFileNames: "assets/[name].js",
-                assetFileNames: "assets/[name].[ext]",
+                assetFileNames: (assetInfo) => {
+                    if (assetInfo.name === "prompt.html") {
+                        return "prompt.html";
+                    }
+                    return "assets/[name].[ext]";
+                },
             },
         },
     },

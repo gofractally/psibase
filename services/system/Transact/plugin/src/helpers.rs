@@ -43,7 +43,7 @@ pub fn get_action_sender(service: &str, method: &str) -> Result<String, Host::ty
             return Ok(s);
         }
     }
-    if let Some(sender) = get_current_user()? {
+    if let Some(sender) = get_current_user() {
         return Ok(sender);
     }
 
@@ -114,7 +114,7 @@ pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Hos
     let mut claims = vec![];
 
     // Add claims for the logged-in user if there are any
-    if let Some(user) = get_current_user()? {
+    if let Some(user) = get_current_user() {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
         let plugin_ref =
             Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
@@ -150,7 +150,7 @@ pub fn get_proofs(
 ) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
     let mut proofs = vec![];
 
-    if let Some(user) = get_current_user()? {
+    if let Some(user) = get_current_user() {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
         let plugin_ref =
             Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");

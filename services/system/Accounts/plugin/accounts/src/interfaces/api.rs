@@ -25,7 +25,9 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
-        AppsTable::new(&Privileged::get_active_app()).get_logged_in_user().is_some()
+        let active_app =Privileged::get_active_app();
+        let active_app = active_app.app.expect("Active app unknown");
+        AppsTable::new(&active_app).get_logged_in_user().is_some()
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {
@@ -72,8 +74,9 @@ impl API for AccountsPlugin {
         Ok(())
     }
 
-    fn get_current_user() -> Result<Option<String>, Error> {
+    fn get_current_user() -> Option<String> {
         let app = Privileged::get_active_app();
-        Ok(AppsTable::new(&app).get_logged_in_user())
+        let app = app.app.expect("Active app unknown");
+        AppsTable::new(&app).get_logged_in_user()
     }
 }

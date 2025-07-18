@@ -283,6 +283,7 @@ add_rs_component_workspace(services/:Plugins
     permissions
     sites
     host-common
+    host-prompt
     tokens
     transact
     workshop
@@ -413,8 +414,10 @@ psibase_package(
     NAME Host
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
+    ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )

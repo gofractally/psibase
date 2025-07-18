@@ -414,7 +414,7 @@ impl PrivateApi for PackagesPlugin {
         // exist have the right owner.
         get_accounts_to_create(&get_package_accounts(&packages)?, sender)?;
 
-        let user = Accounts::get_current_user()?.ok_or(ErrorType::NoLoggedInUser)?;
+        let user = Accounts::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
         let uploader = StagedUpload::new(id, user.parse().unwrap());
 
         let mut upload_builder = TransactionBuilder::new(

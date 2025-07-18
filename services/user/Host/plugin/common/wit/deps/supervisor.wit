@@ -45,8 +45,6 @@ interface types {
 interface intf {
     use types.{http-request, http-response, origination-data, error, plugin-id};
 
-    get-active-app: func() -> origination-data;
-
     send-request: func(req: http-request) -> result<http-response, error>;
 
     // The last items in the list are the most recent services in the callstack

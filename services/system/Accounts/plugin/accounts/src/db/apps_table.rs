@@ -1,6 +1,4 @@
-use crate::bindings::{
-    accounts::plugin::types::AppDetails, clientdata::plugin::keyvalue as Keyvalue,
-};
+use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use psibase::fracpack::{Pack, Unpack};
 
 use crate::db::keys::DbKeys;
@@ -22,10 +20,10 @@ impl ConnectedAccounts {
 
 // A database with a separate namespace for each app within the `accounts` namespace
 pub struct AppsTable {
-    app: AppDetails,
+    app: String,
 }
 impl AppsTable {
-    pub fn new(app: &AppDetails) -> Self {
+    pub fn new(app: &String) -> Self {
         Self { app: app.clone() }
     }
 
@@ -35,11 +33,7 @@ impl AppsTable {
         //  e.g. https supervisor will load https plugins and store
         //  https data.
 
-        // Only allow storing data for recognized psibase apps, for now
-        self.app
-            .app
-            .clone()
-            .expect("Only psibase apps may have entries in accounts table")
+        self.app.clone()
     }
 
     fn prefixed_key(&self, key: &str) -> String {

@@ -22,12 +22,18 @@ import {
     isRedirectErrorObject,
 } from "./messaging";
 import { assertTruthy } from "./utils";
+import { handlePluginUserPrompt } from "./prompts";
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
 
 interface Options {
     supervisorSrc?: string;
 }
+
+type AutoRedirectConfig = {
+    enabled: boolean;
+    returnPath: string;
+};
 
 const setupSupervisorIFrame = (src: string) => {
     const iframe = document.createElement("iframe");
@@ -84,6 +90,7 @@ export class Supervisor {
     private pendingRequests: {
         id: string;
         details: string;
+        autoRedirectConfig: AutoRedirectConfig;
         resolve: (result: unknown) => void;
         reject: (result: unknown) => void;
     }[] = [];
@@ -109,10 +116,6 @@ export class Supervisor {
             messageEvent.origin !== myOrigin &&
             messageEvent.origin !== this.supervisorSrc
         ) {
-            console.log(
-                "Received unauthorized message. Ignoring.",
-                messageEvent,
-            );
             return;
         }
 
@@ -154,8 +157,11 @@ export class Supervisor {
         assertTruthy(resolved, "Resolved pending request");
 
         if (isRedirectErrorObject(result)) {
-            console.warn("Redirect directive:", result);
-            pendingRequest.reject(result);
+            if (pendingRequest.autoRedirectConfig.enabled) {
+                handlePluginUserPrompt(result, pendingRequest.autoRedirectConfig.returnPath);
+            } else {
+                pendingRequest.reject(result);
+            }
             return;
         }
         if (isPluginErrorObject(result)) {
@@ -191,7 +197,7 @@ export class Supervisor {
         return iframe;
     }
 
-    private async sendRequest(description: string, request: any): Promise<any> {
+    private async sendRequest(description: string, autoRedirectConfig: AutoRedirectConfig, request: any): Promise<any> {
         await this.onLoaded();
         const iframe = this.getSupervisorIframe();
 
@@ -199,6 +205,7 @@ export class Supervisor {
             this.pendingRequests.push({
                 id: request.id,
                 details: description,
+                autoRedirectConfig,
                 resolve,
                 reject,
             });
@@ -210,14 +217,15 @@ export class Supervisor {
         });
     }
 
-    public functionCall(args: FunctionCallArgs) {
+    public functionCall(args: FunctionCallArgs, autoRedirectConfig: AutoRedirectConfig = { enabled: true, returnPath: "/" }) {
         const request = buildFunctionCallRequest(args);
-        return this.sendRequest(toString(args), request);
+        return this.sendRequest(toString(args), autoRedirectConfig, request);
     }
 
     public getJson(plugin: QualifiedPluginId) {
         const request = buildGetJsonRequest(plugin);
-        return this.sendRequest(`Get JSON: ${pluginString(plugin)}`, request);
+        const autoRedirectConfig: AutoRedirectConfig = { enabled: true, returnPath: "/" };
+        return this.sendRequest(`Get JSON: ${pluginString(plugin)}`, autoRedirectConfig, request);
     }
 
     public async onLoaded() {

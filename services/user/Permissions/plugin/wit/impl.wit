@@ -1,21 +1,30 @@
 package permissions:plugin;
 
 interface admin {
+    use types.{prompt-context};
     use host:common/types.{error};
-    /// @description Save a permission granting a `caller` access to the privileged methods of `callee` for user `user`.
-    /// @param user The user, requesting access
-    /// @param caller The caller, requesting access
-    /// @param callee The callee, with the privileged methods
-    save-perm: func(user: string, caller: string, callee: string) -> result<_, error>; // only option in v1 is fullAccess
-    /// @description Delete permission granting a `caller` access to the privileged methods of `callee` for user `user`.
-    /// @param user The user, requesting access
-    /// @param caller The caller, requesting access
-    /// @param callee The callee, with the privileged methods
-    del-perm: func(user: string, caller: string, callee: string) -> result<_, error>; // only option in v1 is fullAccess
+
+    /// Save a permission granting a `caller` app permission on the `callee` app
+    /// 
+    /// Params:
+    /// `user` - The user granting access
+    /// `caller` - The app requesting access to use `callee` on behalf of `user`
+    /// `callee` - The app on whom functionality or data is being requested
+    save-perm: func(user: string, caller: string, callee: string);
+
+    /// Gets the context of a particular user-prompt
+    get-context: func(context-id: string) -> prompt-context;
+
+    /// Approve a prompt for permissions
+    approve: func(context-id: string);
+
+    /// Deny a prompt for permissions
+    deny: func(context-id: string);
 }
 
 world impl {
     include host:common/imports;
+    include host:prompt/imports;
     include clientdata:plugin/imports;
     include accounts:plugin/imports;
 

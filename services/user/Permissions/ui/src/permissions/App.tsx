@@ -1,129 +1,84 @@
 import { useEffect, useState } from "react";
 
-import { getSupervisor, siblingUrl } from "@psibase/common-lib";
+import { getSupervisor, prompt } from "@psibase/common-lib";
 
 import { Button } from "@shared/shadcn/ui/button";
 
-import { ActivePermsOauthRequest, type PermsOauthRequest } from "./db";
-
 const supervisor = getSupervisor();
 
+interface PermissionRequest {
+    user: string;
+    caller: string;
+    callee: string;
+}
+
 export const App = () => {
-    const thisServiceName = "permissions";
-    const [isLoading, setIsLoading] = useState(true);
-    const [validPermRequest, setValidPermRequest] =
-        useState<PermsOauthRequest | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const initApp = async () => {
-        let permReqPayload;
-        try {
-            permReqPayload = await ActivePermsOauthRequest.get();
-        } catch (e) {
-            setError("Permissions request error: " + e);
-            setIsLoading(false);
-            return;
-        }
-
-        const qps = getQueryParams();
-        if (qps.id && qps.id != permReqPayload.id) {
-            setError("Forged request detected.");
-            setIsLoading(false);
-            return;
-        }
-
-        if (
-            !permReqPayload.user ||
-            !permReqPayload.caller ||
-            !permReqPayload.callee
-        ) {
-            setError("Invalid permissions request payload: missing fields.");
-            setIsLoading(false);
-            return;
-        }
-
-        setValidPermRequest(permReqPayload);
-        setIsLoading(false);
-    };
+    const [contextId, setContextId] = useState<string | null>(null);
+    const [permissionRequest, setPermissionRequest] =
+        useState<PermissionRequest | null>(null);
 
     useEffect(() => {
+        const handleError = (error: string) => {
+            setError("Permissions request error: " + error);
+        };
+
+        const initApp = async () => {
+            const cid = prompt.getContextId();
+            if (!cid) {
+                return handleError("No context id provided");
+            }
+            setContextId(cid);
+
+            try {
+                setPermissionRequest(
+                    (await supervisor.functionCall({
+                        service: "permissions",
+                        intf: "admin",
+                        method: "getContext",
+                        params: [cid],
+                    })) as PermissionRequest,
+                );
+            } catch {
+                return handleError("Failed to get context");
+            }
+        };
+
         initApp();
     }, []);
 
-    const followReturnRedirect = async () => {
-        const qps = getQueryParams();
-        if (window.top) {
-            window.top.location.href = siblingUrl(
-                null,
-                validPermRequest?.caller,
-                qps.returnUrlPath,
-                true,
-            );
-        }
+    const approve = async () => {
+        await supervisor.functionCall({
+            service: "permissions",
+            intf: "admin",
+            method: "approve",
+            params: [contextId],
+        });
+        prompt.finished();
     };
 
-    const approve = async () => {
-        try {
-            await supervisor.functionCall({
-                service: thisServiceName,
-                intf: "admin",
-                method: "savePerm",
-                params: [
-                    validPermRequest?.user,
-                    validPermRequest?.caller,
-                    validPermRequest?.callee,
-                ],
-            });
-            await ActivePermsOauthRequest.delete();
-        } catch (e) {
-            if (e instanceof Error) {
-                setError(e.message);
-            } else {
-                setError("Unknown error saving permission");
-            }
-            throw e;
-        }
-        followReturnRedirect();
-    };
     const deny = async () => {
-        try {
-            await supervisor.functionCall({
-                service: thisServiceName,
-                intf: "admin",
-                method: "delPerm",
-                params: [
-                    validPermRequest?.user,
-                    validPermRequest?.caller,
-                    validPermRequest?.callee,
-                ],
-            });
-            await ActivePermsOauthRequest.delete();
-        } catch (e) {
-            if (e instanceof Error) {
-                setError(e.message);
-            } else {
-                setError("Unknown error deleting permission");
-            }
-            throw e;
-        }
-        followReturnRedirect();
-    };
-    const getQueryParams = () => {
-        const queryString = window.location.search;
-        const urlParams = new URLSearchParams(queryString);
-        return Object.fromEntries(urlParams.entries());
+        await supervisor.functionCall({
+            service: "permissions",
+            intf: "admin",
+            method: "deny",
+            params: [contextId],
+        });
+        prompt.finished();
     };
 
     if (error) {
         return <div>{error}</div>;
-    } else if (isLoading) {
+    } else if (!permissionRequest) {
         return <div>Loading...</div>;
     }
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <h2 style={{ textAlign: "center" }}>Grant access?</h2>
+            <h2 style={{ textAlign: "center" }}>Permissions</h2>
+            <h3>{`Hi ${permissionRequest.user},`}</h3>
             <p>
-                {`"${validPermRequest?.caller}" is requesting full access to "${validPermRequest?.callee}".`}
+                {`The "${permissionRequest.caller}" app is requesting full access to use "${permissionRequest.callee}" on your behalf.`}
             </p>
             {!!error && <div>ERROR: {error}</div>}
             <div className="flex justify-center gap-4">
