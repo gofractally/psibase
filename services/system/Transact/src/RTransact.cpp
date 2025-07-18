@@ -713,20 +713,20 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    {
       if (!trace.error().has_value())
       {
-         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessRecord{
+         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessView{
              .id       = id,
              .blockNum = to<Transact>().currentBlock().blockNum,
-             .trace    = trace.unpack(),
+             .trace    = trace,
          });
       }
       else
       {
          PSIBASE_SUBJECTIVE_TX
          {
-            Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+            Subjective{}.open<TxFailedTable>().put(TxFailedView{
                 .id         = id,
                 .expiration = row->expiration,
-                .trace      = trace.unpack(),
+                .trace      = trace,
             });
          }
       }
@@ -736,6 +736,9 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    {
       sendReply(id, trace, WaitFor::isApplied);
    }
+#ifdef __wasm32__
+   printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
+#endif
 }
 
 void RTransact::onBlock()
@@ -884,10 +887,10 @@ void RTransact::onVerify(std::uint64_t                      id,
                {
                   if (std::ranges::any_of(client->clients, WaitFor::isFinal))
                   {
-                     Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+                     Subjective{}.open<TxFailedTable>().put(TxFailedView{
                          .id         = tx->id,
                          .expiration = tx->expiration,
-                         .trace      = trace.unpack(),
+                         .trace      = trace,
                      });
                   }
                   if (std::ranges::any_of(client->clients, WaitFor::isApplied))

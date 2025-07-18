@@ -197,6 +197,14 @@ namespace SystemService
        psibase::Table<TxSuccessRecord, &TxSuccessRecord::id, TxSuccessRecord::ByBlockNum{}>;
    PSIO_REFLECT_TYPENAME(TxSuccessTable)
 
+   struct TxSuccessView
+   {
+      psibase::Checksum256                        id;
+      psibase::BlockNum                           blockNum;
+      psio::view<const psibase::TransactionTrace> trace;
+   };
+   PSIO_REFLECT(TxSuccessView, id, blockNum, trace)
+
    struct TxFailedRecord
    {
       psibase::Checksum256      id;
@@ -209,6 +217,14 @@ namespace SystemService
    using TxFailedTable =
        psibase::Table<TxFailedRecord, &TxFailedRecord::id, TxFailedRecord::ByExpiration{}>;
    PSIO_REFLECT_TYPENAME(TxFailedTable)
+
+   struct TxFailedView
+   {
+      psibase::Checksum256                        id;
+      psibase::TimePointSec                       expiration;
+      psio::view<const psibase::TransactionTrace> trace;
+   };
+   PSIO_REFLECT(TxFailedView, id, expiration, trace)
 
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification

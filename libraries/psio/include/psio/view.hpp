@@ -703,6 +703,22 @@ namespace psio
          return *this;
       }
 
+      friend bool operator==(const view<T>& lhs, const view<T>& rhs)
+         requires std::equality_comparable<T>
+      {
+         return lhs.unpack() == rhs.unpack();
+      }
+      friend bool operator==(const view<T>& lhs, const T& rhs)
+         requires std::equality_comparable<T> && (!std::is_arithmetic_v<T>)
+      {
+         return lhs.unpack() == rhs;
+      }
+      friend bool operator==(const T& lhs, const view<T>& rhs)
+         requires std::equality_comparable<T> && (!std::is_arithmetic_v<T>)
+      {
+         return lhs == rhs.unpack();
+      }
+
      private:
       view& operator=(const view&) = delete;
    };
@@ -721,6 +737,114 @@ namespace psio
    {
       to_key(v.unpack(), stream);
    }
+
+   template <typename T>
+   struct is_packable<view<T>> : base_packable_impl<view<T>, is_packable<view<T>>>
+   {
+      using base                                = base_packable_impl<view<T>, is_packable<view<T>>>;
+      using is_p                                = is_packable<std::remove_cv_t<T>>;
+      static constexpr std::uint32_t fixed_size = is_p::fixed_size;
+      static constexpr bool          is_variable_size  = is_p::is_variable_size;
+      static constexpr bool          is_optional       = is_p::is_optional;
+      static constexpr bool          supports_0_offset = is_p::supports_0_offset;
+      static_assert(!is_optional);
+
+      static bool is_empty_container(const view<T>& value)
+      {
+         return is_empty_container(psio::get_view_data(value), 0, 4);
+      }
+
+      static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
+      {
+         if constexpr (supports_0_offset)
+         {
+            uint32_t fixed_size = 0;
+            if (!unpack_numeric<true>(&fixed_size, src, pos, end_pos))
+               return false;
+            return fixed_size == 0;
+         }
+         else
+         {
+            return false;
+         }
+      }
+
+      template <typename S>
+      static void pack(const view<T>& value, S& stream)
+      {
+         const char*   start       = psio::get_view_data(value);
+         bool          has_unknown = false;
+         bool          known_end;
+         std::uint32_t pos = 0;
+         if (!is_p::template unpack<false, true>(nullptr, has_unknown, known_end, start, pos,
+                                                 0xffffffffu))
+         {
+            psio::check(false, "Invalid view");
+         }
+         if (has_unknown)
+            is_p::pack(value.unpack(), stream);
+         else
+            stream.write(start, pos);
+      }
+   };
+
+   template <typename T>
+      requires(is_std_optional<std::remove_cv_t<T>>::value)
+   struct is_packable<view<T>> : base_packable_impl<view<T>, is_packable<view<T>>>
+   {
+      using base   = base_packable_impl<view<T>, is_packable<view<T>>>;
+      using nested = is_packable<view<typename is_std_optional<T>::value_type>>;
+
+      using is_p                                       = is_packable<std::remove_cv<T>>;
+      static constexpr std::uint32_t fixed_size        = is_p::fixed_size;
+      static constexpr bool          is_variable_size  = is_p::is_variable_size;
+      static constexpr bool          is_optional       = is_p::is_optional;
+      static constexpr bool          supports_0_offset = is_p::supports_0_offset;
+
+      template <typename S>
+      static void pack(const view<T>& value, S& stream)
+      {
+         uint32_t fixed_pos = stream.written();
+         embedded_fixed_pack(value, stream);
+         uint32_t heap_pos = stream.written();
+         embedded_fixed_repack(value, fixed_pos, heap_pos, stream);
+         embedded_variable_pack(value, stream);
+      }
+      template <typename S>
+      static void embedded_fixed_pack(const view<T>& value, S& stream)
+      {
+         if (!nested::is_optional && nested::is_variable_size && value.has_value())
+            nested::embedded_fixed_pack(*value, stream);
+         else
+            stream.write_raw(uint32_t(1));
+      }
+
+      template <typename S>
+      static void embedded_fixed_repack(const view<T>& value,
+                                        uint32_t       fixed_pos,
+                                        uint32_t       heap_pos,
+                                        S&             stream)
+      {
+         if (value.has_value())
+         {
+            using nested = is_packable<view<typename is_std_optional<T>::value_type>>;
+            if (!nested::is_optional && nested::is_variable_size)
+               nested::embedded_fixed_repack(*value, fixed_pos, heap_pos, stream);
+            else
+               stream.rewrite_raw(fixed_pos, heap_pos - fixed_pos);
+         }
+      }
+      template <typename S>
+      static void embedded_variable_pack(const std::optional<T>& value, S& stream)
+      {
+         if (value.has_value() && !nested::is_empty_container(*value))
+            nested::pack(*value, stream);
+      }
+   };
+
+   template <typename T, typename U>
+   constexpr bool packable_as_impl<view<T>, U> = PackableAs<T, U>;
+
 }  // namespace psio
 
 namespace std
