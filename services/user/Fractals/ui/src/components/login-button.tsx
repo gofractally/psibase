@@ -1,3 +1,5 @@
+import { Loader2Icon } from "lucide-react";
+
 import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
@@ -12,9 +14,14 @@ import {
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
 
-export const LoginButton = () => {
-    const { mutate: login, isPending } = useCreateConnectionToken();
-    const { data: connectedAccounts } = useConnectedAccounts();
+export const LoginButton = ({
+    isPendingCurrentUser,
+}: {
+    isPendingCurrentUser: boolean;
+}) => {
+    const { mutate: login } = useCreateConnectionToken();
+    const { data: connectedAccounts, isPending: isPendingConnectedAccounts } =
+        useConnectedAccounts();
 
     const isNoOptions = connectedAccounts && connectedAccounts.length == 0;
 
@@ -23,19 +30,22 @@ export const LoginButton = () => {
 
     const { data: chainId } = useChainId();
 
+    const isLoading = isPendingCurrentUser || isPendingConnectedAccounts;
+
     return isNoOptions ? (
         <Button
-            disabled={isPending}
+            disabled={isLoading}
             onClick={() => {
                 login();
             }}
         >
-            Login
+            {isLoading && <Loader2Icon className="animate-spin" />}
+            {isLoading ? "Please wait" : "Log in"}
         </Button>
     ) : (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button>Login</Button>
+                <Button>Log in</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
                 {connectedAccounts
