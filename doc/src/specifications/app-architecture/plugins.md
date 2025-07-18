@@ -131,8 +131,8 @@ The current API for key-value operations allows one to select one of multiple di
 
 There are three different settings for data-duration that may be used:
 
-- Ephemeral - Data stored into an ephemeral database will be wiped at the end of the currently executing transaction context. The database mode does not matter for the Ephemeral db, as it not persisted in either case.
-- Session - Data stored into the session database will be wiped at the end of the current client session. A session is defined by the host implementation.
+- Ephemeral - An ephemeral database is wiped at the start of every new execution context. This data never persists longer than the currently executing callstack.
+- Session - Data stored into a session database will persist until the end of the current session. A session is defined by the host implementation.
 - Persistent - Data stored into a persistent database will persist until explicitly deleted.
 
 | Data Duration | Non-Transactional | Transactional |
