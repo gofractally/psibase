@@ -70,6 +70,10 @@ namespace psibase
 
       /// Removes a cookie
       void removeCookie(std::string_view name);
+
+      /// Checks if the request origin indicates a development chain
+      /// by looking for "localhost" in the origin header domain
+      bool isDevChainOrigin() const;
    };
 
    struct URIPath

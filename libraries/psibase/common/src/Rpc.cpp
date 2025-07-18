@@ -141,4 +141,64 @@ namespace psibase
          ++iter;
       }
    }
+
+   bool HttpRequest::isDevChainOrigin() const
+   {
+      // Check the host field first (always present)
+      if (host.find("localhost") != std::string::npos)
+      {
+         return true;
+      }
+      
+      // Also check origin header if present (for cross-origin requests)
+      for (const auto& header : headers)
+      {
+         if (std::ranges::equal(header.name, std::string_view{"origin"}, {}, ::tolower))
+         {
+            for (auto part : header.value | std::views::split(','))
+            {
+               std::string_view value = split2sv(part);
+               
+               // Trim whitespace
+               auto leading = value.find_first_not_of(" \t");
+               auto trailing = value.find_last_not_of(" \t");
+               if (leading != std::string_view::npos)
+               {
+                  value = value.substr(leading, trailing - leading + 1);
+               }
+               else
+               {
+                  continue;
+               }
+
+               // Find position of scheme separator
+               size_t pos = value.find("://");
+               if (pos == std::string_view::npos)
+               {
+                  continue;  // No scheme found
+               }
+
+               // Create a string view starting after "://"
+               std::string_view domain = value.substr(pos + 3);
+
+               // Find the end of the domain name (either at first colon or slash, or end of string)
+               size_t domainEndPos = domain.find(':');
+               if (domainEndPos == std::string_view::npos)
+               {
+                  domainEndPos = domain.find('/');
+               }
+               if (domainEndPos != std::string_view::npos)
+               {
+                  domain = domain.substr(0, domainEndPos);
+               }
+
+               if (domain.find("localhost") != std::string_view::npos)
+               {
+                  return true;
+               }
+            }
+         }
+      }
+      return false;
+   }
 }  // namespace psibase

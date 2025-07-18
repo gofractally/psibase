@@ -379,8 +379,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-       -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id,
+                         const ClientFilter&         clientFilter) -> ClaimedSockets
    {
       {
          auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
@@ -1421,6 +1421,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
+   bool                         isDevChain = request.isDevChainOrigin();
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
@@ -1443,12 +1444,23 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
             return result;
       }
    }
-   if (auto token = request.getCookie("__Host-SESSION"))
+
+   std::string cookieName = "__Host-SESSION";
+   if (isDevChain)
+   {
+      cookieName = "authed-query";
+   }
+
+   if (auto token = request.getCookie(cookieName))
    {
       auto decoded = decodeJWT<LoginTokenData>(key, *token);
+
       if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+      {
          return decoded.sub;
+      }
    }
+
    return {};
 }
 
