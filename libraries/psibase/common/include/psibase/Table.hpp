@@ -750,55 +750,28 @@ namespace psibase
       /// object replaces it. If the object has any secondary keys which
       /// have the same value as another object, but not the one it's replacing,
       /// then `put` aborts the transaction.
-      void put(const T& value)
+
+      template <typename U = T>
+      void put(const U& value)
       {
-         auto pk = serialize_key(0, detail::invoke(Primary, value));
-         if constexpr (sizeof...(Secondary) > 0)
+         if constexpr (std::is_same_v<U, T>)
          {
-            int               sz         = raw::kvGet(db, pk.data(), pk.size());
-            std::vector<char> key_buffer = prefix;
-            key_buffer.push_back(0);
-            if (sz != -1)
-            {
-               std::vector<char> buffer(sz);
-               raw::getResult(buffer.data(), buffer.size(), 0);
-               auto data              = psio::from_frac<T>(psio::prevalidated{std::move(buffer)});
-               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
-               {
-                  auto old_key = detail::invoke(decltype(wrapped)::value, data);
-                  auto new_key = detail::invoke(decltype(wrapped)::value, value);
-                  if (old_key != new_key)
-                  {
-                     key_buffer.back() = idx;
-                     psio::convert_to_key(old_key, key_buffer);
-                     raw::kvRemove(db, key_buffer.data(), key_buffer.size());
-                     key_buffer.resize(prefix.size() + 1);
-                     psio::convert_to_key(new_key, key_buffer);
-                     kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
-                     key_buffer.resize(prefix.size() + 1);
-                  }
-                  ++idx;
-               };
-               uint8_t idx = 1;
-               (replace_secondary(idx, wrap<Secondary>()), ...);
-            }
-            else
-            {
-               auto write_secondary = [&](uint8_t& idx, auto wrapped)
-               {
-                  auto key          = detail::invoke(decltype(wrapped)::value, value);
-                  key_buffer.back() = idx;
-                  psio::convert_to_key(key, key_buffer);
-                  kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
-                  key_buffer.resize(prefix.size() + 1);
-                  ++idx;
-               };
-               std::uint8_t idx = 1;
-               (write_secondary(idx, wrap<Secondary>()), ...);
-            }
+            auto serialized = psio::convert_to_frac(value);
+            putImpl<false, T>(value, serialized);
          }
-         auto serialized = psio::convert_to_frac(value);
-         raw::kvPut(db, pk.data(), pk.size(), serialized.data(), serialized.size());
+         else if constexpr (std::is_same_v<U, psio::shared_view_ptr<T>> ||
+                            std::is_same_v<U, psio::shared_view_ptr<const T>>)
+         {
+            putImpl<true, psio::view<const T>>(*value, value.data_without_size_prefix());
+         }
+         else if constexpr (psio::PackableAs<U, T>)
+         {
+            put(psio::shared_view_ptr<T>::from_compatible(value));
+         }
+         else
+         {
+            put<T>(value);
+         }
       }
 
       /// Remove `key` from table
@@ -867,6 +840,57 @@ namespace psibase
       }
 
      private:
+      template <bool View, typename U>
+      void putImpl(const U& value, std::span<const char> serialized)
+      {
+         auto pk = serialize_key(0, detail::invoke(Primary, value));
+         if constexpr (sizeof...(Secondary) > 0)
+         {
+            int               sz         = raw::kvGet(db, pk.data(), pk.size());
+            std::vector<char> key_buffer = prefix;
+            key_buffer.push_back(0);
+            if (sz != -1)
+            {
+               std::vector<char> buffer(sz);
+               raw::getResult(buffer.data(), buffer.size(), 0);
+               auto data              = psio::from_frac<T>(psio::prevalidated{std::move(buffer)});
+               auto replace_secondary = [&](uint8_t& idx, auto wrapped)
+               {
+                  auto old_key = detail::invoke(decltype(wrapped)::value, data);
+                  auto new_key = detail::invoke(decltype(wrapped)::value, value);
+                  if (old_key != new_key)
+                  {
+                     key_buffer.back() = idx;
+                     psio::convert_to_key(old_key, key_buffer);
+                     raw::kvRemove(db, key_buffer.data(), key_buffer.size());
+                     key_buffer.resize(prefix.size() + 1);
+                     psio::convert_to_key(new_key, key_buffer);
+                     kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
+                     key_buffer.resize(prefix.size() + 1);
+                  }
+                  ++idx;
+               };
+               uint8_t idx = 1;
+               (replace_secondary(idx, wrap<Secondary>()), ...);
+            }
+            else
+            {
+               auto write_secondary = [&](uint8_t& idx, auto wrapped)
+               {
+                  auto key          = detail::invoke(decltype(wrapped)::value, value);
+                  key_buffer.back() = idx;
+                  psio::convert_to_key(key, key_buffer);
+                  kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
+                  key_buffer.resize(prefix.size() + 1);
+                  ++idx;
+               };
+               std::uint8_t idx = 1;
+               (write_secondary(idx, wrap<Secondary>()), ...);
+            }
+         }
+         raw::kvPut(db, pk.data(), pk.size(), serialized.data(), serialized.size());
+      }
+
       void removeImpl(const auto& oldValue)
       {
          std::vector<char> key_buffer = prefix;
