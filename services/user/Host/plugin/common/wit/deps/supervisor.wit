@@ -53,6 +53,8 @@ interface intf {
     service-stack: func() -> list<string>;
 
     get-root-domain: func() -> string;
+
+    get-chain-id: func() -> string;
 }
 
 interface database {
