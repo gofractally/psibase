@@ -11,7 +11,7 @@ export const PubKeyPem = z
         message: "Invalid PEM key format",
     });
 
-const PubKeyAuthClaim = z.object({
+export const PubKeyAuthClaim = z.object({
     tag: z.literal("pubkey-pem"),
     val: PubKeyPem,
 });

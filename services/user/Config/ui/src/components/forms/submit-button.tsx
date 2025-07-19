@@ -13,10 +13,17 @@ export const SubmitButton = ({
 
     return (
         <form.Subscribe
-            selector={(state) => [state.isValid, state.isSubmitting]}
+            selector={(state) => [
+                state.isValid,
+                state.isSubmitting,
+                state.isDirty,
+            ]}
         >
-            {([isValid, isSubmitting]) => (
-                <Button type="submit" disabled={!isValid || isSubmitting}>
+            {([isValid, isSubmitting, isDirty]) => (
+                <Button
+                    type="submit"
+                    disabled={!isValid || isSubmitting || !isDirty}
+                >
                     {isSubmitting ? submittingLabel : label}
                 </Button>
             )}

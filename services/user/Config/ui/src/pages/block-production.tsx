@@ -20,6 +20,7 @@ import { FieldErrors } from "@/components/forms/field-errors";
 
 import {
     Params,
+    PubKeyAuthClaim,
     SetProducerParams,
     useSetProducers,
 } from "@/hooks/useSetProducers";
@@ -177,6 +178,9 @@ export const BlockProduction = () => {
                                 <form.Field
                                     key={index}
                                     name={`prods[${index}].authClaim`}
+                                    validators={{
+                                        onChange: PubKeyAuthClaim,
+                                    }}
                                 >
                                     {(subfield) => (
                                         <>

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Skeleton } from "../ui/skeleton";
 import { useFieldContext } from "./app-form";
 import { FieldErrors } from "./field-errors";
 
@@ -12,11 +13,13 @@ export const TextField = ({
     placeholder,
     description,
     rightLabel,
+    isLoading = false,
     type = "text",
     required,
     disabled,
 }: {
     label?: string;
+    isLoading?: boolean;
     rightLabel?: ReactNode;
     placeholder?: string;
     type?: InputHTMLAttributes<HTMLInputElement>["type"];
@@ -40,20 +43,25 @@ export const TextField = ({
                 {rightLabel && rightLabel}
             </div>
 
-            <Input
-                value={field.state.value}
-                name={field.name}
-                required={required}
-                placeholder={placeholder}
-                onChange={(e) => {
-                    field.handleChange(e.target.value);
-                }}
-                onBlur={field.handleBlur}
-                type={type}
-                disabled={disabled}
-            />
+            {isLoading ? (
+                <Skeleton className="h-10 w-full rounded-sm" />
+            ) : (
+                <Input
+                    value={field.state.value}
+                    name={field.name}
+                    required={required}
+                    placeholder={placeholder}
+                    onChange={(e) => {
+                        field.handleChange(e.target.value);
+                    }}
+                    onBlur={field.handleBlur}
+                    type={type}
+                    disabled={disabled}
+                />
+            )}
+
             {description && (
-                <p className="text-sm text-muted-foreground">{description}</p>
+                <p className="text-muted-foreground text-sm">{description}</p>
             )}
             <FieldErrors meta={field.state.meta} />
         </div>
