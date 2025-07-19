@@ -28,7 +28,6 @@ export const getScores = async (fractalAccount: Account) => {
     }`,
     );
 
-    console.log({ member });
     return z
         .object({
             scores: z.object({

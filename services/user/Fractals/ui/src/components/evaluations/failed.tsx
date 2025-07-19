@@ -14,33 +14,31 @@ export const Failed = () => {
 
     const { hasPassed, label } = useFormatRelative(evaluation?.finishBy);
 
+    if (!hasPassed) {
+        return (
+            <div>
+                Fractal failed to commence the evaluation, closable in {label}
+            </div>
+        );
+    }
+
     return (
         <div>
-            {!hasPassed ? (
-                <div>
-                    Fractal failed to commence the evaluation, closable in{" "}
-                    {label}
-                </div>
-            ) : (
-                <div>
-                    <div>
-                        Fractal failed to commence the evaluation, please close
-                        to schedule.
-                    </div>
-                    <div>
-                        <Button
-                            onClick={() => {
-                                closeEvaluation({
-                                    evaluationId:
-                                        evaluationInstance!.evaluationId,
-                                });
-                            }}
-                        >
-                            Close
-                        </Button>
-                    </div>
-                </div>
-            )}
+            <div>
+                Fractal failed to commence the evaluation, please close to
+                schedule.
+            </div>
+            <div>
+                <Button
+                    onClick={() => {
+                        closeEvaluation({
+                            evaluationId: evaluationInstance!.evaluationId,
+                        });
+                    }}
+                >
+                    Close
+                </Button>
+            </div>
         </div>
     );
 };

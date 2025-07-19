@@ -31,9 +31,10 @@ export const useAttest = () => {
                     params: [params.evaluationId, params.groupNumber],
                 }),
                 {
-                    loading: "Sending attest...",
-                    success: "Attested",
-                    error: (error) => error.message,
+                    error: (error) => {
+                        console.log("Attest error:", error);
+                        return "Unable to attest";
+                    },
                 },
             );
 

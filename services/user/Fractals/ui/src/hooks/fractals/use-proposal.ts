@@ -1,5 +1,6 @@
 import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
@@ -14,14 +15,20 @@ export const useProposal = (
     useQuery({
         queryKey: QueryKey.proposal(evaluationId, groupNumber),
         queryFn: async () => {
-            const res = await supervisor.functionCall({
-                method: "getProposal",
-                params: [evaluationId, groupNumber],
-                service: fractalsService,
-                intf: "user",
-            });
+            try {
+                const res = await supervisor.functionCall({
+                    method: "getProposal",
+                    params: [evaluationId, groupNumber],
+                    service: fractalsService,
+                    intf: "user",
+                });
 
-            return zAccount.array().parse(res);
+                return z.optional(zAccount.array()).parse(res);
+            } catch (error) {
+                const message = "Error getting proposal";
+                console.error(message, error);
+                throw new Error(message);
+            }
         },
     });
 

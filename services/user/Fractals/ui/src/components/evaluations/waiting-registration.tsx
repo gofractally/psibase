@@ -9,11 +9,13 @@ export const WaitingRegistration = ({
     status: WaitingRegistrationPhase;
 }) => {
     const { label } = useFormatRelative(status.registrationStart);
-    const date = dayjs.unix(status.registrationStart).format("MMMM D HH:mm");
+    const date = dayjs
+        .unix(status.registrationStart)
+        .format("MMMM D [at] h:mm A z");
 
     return (
         <div>
-            Next evaluation registration starts at {date} ({label}) ⏳
+            ⏳ Registration for the next evaluation opens {date} (in {label})
         </div>
     );
 };

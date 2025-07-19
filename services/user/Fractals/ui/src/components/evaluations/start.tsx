@@ -23,32 +23,32 @@ export const Start = ({ status }: { status: WaitingStart }) => {
 
     const isUnableToGroupUsers = checkUnableToGroupUsers(startError);
     console.log({ isUnableToGroupUsers });
+
     if (!fractal) return null;
 
     if (startError) {
         return <ErrorCard error={startError!} />;
     }
 
-    return status.isOwner ? (
-        <div>
-            <div className="text-lg font-semibold">Ready to start!</div>
-            {status.isOwner && (
-                <div>
-                    <Button
-                        disabled={isStarting}
-                        onClick={() => {
-                            startEvaluation({
-                                fractal: fractal.fractal!.account,
-                                evaluationType: zEvalType.enum.Reputation,
-                            });
-                        }}
-                    >
-                        Start evaluation
-                    </Button>
-                </div>
-            )}
-        </div>
-    ) : (
-        <div>Awaiting the fractal to start evaluation...</div>
-    );
+    if (status.isOwner) {
+        return (
+            <div className="flex items-center gap-2">
+                <Button
+                    size="sm"
+                    disabled={isStarting}
+                    onClick={() => {
+                        startEvaluation({
+                            fractal: fractal.fractal!.account,
+                            evaluationType: zEvalType.enum.Reputation,
+                        });
+                    }}
+                >
+                    Start evaluation
+                </Button>
+                <div>Ready to start!</div>
+            </div>
+        );
+    }
+
+    return <div>Evaluation will start momentarily...</div>;
 };
