@@ -14,9 +14,10 @@ const zAwaiting = z.object({
     txId: z.string(),
 });
 
-const zTxStatus = z.discriminatedUnion("type", [zExecuted, zAwaiting]);
+export const zTxStatus = z.discriminatedUnion("type", [zExecuted, zAwaiting]);
+export type TxStatus = z.infer<typeof zTxStatus>;
 
-export const checkStaging = async (): Promise<z.infer<typeof zTxStatus>> => {
+export const checkLastTx = async (): Promise<z.infer<typeof zTxStatus>> => {
     const currentUser = getCurrentUser()!;
 
     const actorHistory = await getActorHistory(currentUser);
