@@ -3,15 +3,27 @@ package config:plugin;
 
 
 interface app {
-    use sites:plugin/types.{file};
-    use host:common/types.{error};
+  use host:common/types.{error};
+  use sites:plugin/types.{file};
+  use producers:plugin/types.{producer};
 
+  upload-network-logo: func(logo: list<u8>) -> result<_, error>;
+  remove-network-logo: func() -> result<_, error>;
+  set-network-name: func(name: string) -> result<_, error>;
+  
+  /// Set the producers for CFT consensus.
+  /// This also changes the current consensus mode to CFT (crash fault tolerant).
+  /// The keys used in the specified auth claims must 
+  set-cft-consensus: func(prods: list<producer>) -> result<_, error>;
+  
+  /// Set the producers for BFT consensus.
+  /// This also changes the current consensus mode to BFT (byzantine fault tolerant).
+  set-bft-consensus: func(prods: list<producer>) -> result<_, error>;
+  
+  /// Set the producers for the current consensus mode.
+  set-producers: func(prods: list<producer>) -> result<_, error>;
 
-    upload-network-logo: func(logo: list<u8>) -> result<_, error>;
-    remove-network-logo: func() -> result<_, error>;
-    set-network-name: func(name: string) -> result<_, error>;
-
-  }
+}
 
 
 world imports {

@@ -50,7 +50,7 @@ export const useSetProducers = () =>
             const parsedParams = Params.parse(params);
 
             void (await supervisor.functionCall({
-                service: "producers",
+                service: "config",
                 method:
                     params.mode === "existing"
                         ? "setProducers"
@@ -58,7 +58,7 @@ export const useSetProducers = () =>
                           ? "setCftConsensus"
                           : "setBftConsensus",
                 params: [parsedParams.prods],
-                intf: "api",
+                intf: "app",
             }));
         },
     });

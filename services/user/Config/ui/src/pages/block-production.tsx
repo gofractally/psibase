@@ -27,9 +27,7 @@ import {
 import { isAccountAvailable } from "@/lib/isAccountAvailable";
 
 export const BlockProduction = () => {
-    const { mutateAsync, error } = useSetProducers();
-
-    console.log({ error }, "big");
+    const { mutateAsync } = useSetProducers();
 
     const form = useAppForm({
         defaultValues: {

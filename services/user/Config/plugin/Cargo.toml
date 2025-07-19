@@ -23,8 +23,10 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"producers:plugin" = { path = "../../../system/Producers/plugin/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
