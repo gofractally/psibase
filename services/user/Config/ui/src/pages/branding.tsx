@@ -43,7 +43,7 @@ export const Branding = () => {
     const { mutateAsync: setLogo } = useSetLogo();
 
     const uploadLogo = async (bytes: Uint8Array) => {
-        await setLogo(bytes);
+        await setLogo([bytes]);
         setPreview("");
         setLogoBytes(new Uint8Array());
     };
@@ -57,7 +57,7 @@ export const Branding = () => {
             networkName: networkName || "",
         },
         onSubmit: async (data) => {
-            await setNetworkName(data.value.networkName);
+            await setNetworkName([data.value.networkName]);
             form.reset(data.value);
             setLogoBytes(new Uint8Array());
             setPreview("");

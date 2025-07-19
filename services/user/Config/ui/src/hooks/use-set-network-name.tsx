@@ -1,15 +1,16 @@
 import { queryClient } from "@/queryClient";
 
 import QueryKey from "@/lib/queryKeys";
+import { CONFIG } from "@/lib/services";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 
 export const useSetNetworkName = () =>
-    usePluginMutation<string>(
+    usePluginMutation<[string]>(
         {
-            service: "config",
-            intf: "app",
+            service: CONFIG,
             method: "setNetworkName",
+            intf: "app",
         },
         {
             error: "Failed setting network name",

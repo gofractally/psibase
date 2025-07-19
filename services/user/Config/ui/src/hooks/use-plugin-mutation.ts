@@ -23,11 +23,11 @@ type Meta<T> = {
 } & (
     | {
           isStagable?: false | undefined;
-          onSuccess: (params: T) => void;
+          onSuccess?: (params: T) => void;
       }
     | {
           isStagable: true;
-          onSuccess: (params: T, status: TxStatus) => void;
+          onSuccess?: (params: T, status: TxStatus) => void;
       }
 );
 
@@ -45,11 +45,11 @@ export const usePluginMutation = <T>(
                 service,
                 intf,
                 method,
-                params: paramsArray as any[],
+                params: z.any().array().parse(paramsArray),
             });
         },
-        onError: (errorObj, _, id) => {
-            console.error("useSetworkName:", error);
+        onError: (errorObj, params, id) => {
+            console.error({ service, intf, method, params }, error);
             toast.error(error, {
                 description: errorObj.message,
                 id,
@@ -58,16 +58,18 @@ export const usePluginMutation = <T>(
         onSuccess: async (_, networkName, id) => {
             if (isStagable) {
                 const lastTx = await checkLastTx();
-                onSuccess(networkName, lastTx);
+                if (onSuccess) {
+                    onSuccess(networkName, lastTx);
+                }
                 if (lastTx.type == "executed") {
                     toast.success(success, {
                         id,
-                        description: "Executed successfully.",
+                        description: "Change is live.",
                     });
                 } else {
                     toast.success(success, {
                         id,
-                        description: "Proposal is awaiting approval.",
+                        description: "Change is proposed.",
                         action: {
                             label: "View",
                             onClick: () => {
@@ -81,7 +83,7 @@ export const usePluginMutation = <T>(
             } else {
                 toast.success(success, {
                     id,
-                    description: "Executed successfully.",
+                    description: "Change is live.",
                 });
             }
         },

@@ -1,24 +1,17 @@
-import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { CONFIG } from "@/lib/services";
 
-import { supervisor } from "@/supervisor";
+import { usePluginMutation } from "./use-plugin-mutation";
 
 export const useSetLogo = () =>
-    useMutation<void, Error, Uint8Array<ArrayBufferLike>, string>({
-        mutationKey: ["setLogo"],
-        onMutate: () => toast.loading("Uploading icon...") as string,
-        mutationFn: async (logoBytes: Uint8Array<ArrayBufferLike>) => {
-            await supervisor.functionCall({
-                service: "config",
-                intf: "app",
-                method: "uploadNetworkLogo",
-                params: [logoBytes],
-            });
+    usePluginMutation<[Uint8Array]>(
+        {
+            intf: "app",
+            service: CONFIG,
+            method: "uploadNetworkLogo",
         },
-        onSuccess: (_, __, id) => {
-            toast.success("Set icon", { id });
+        {
+            error: "Failed uploading icon",
+            loading: "Uploading icon",
+            success: "Uploaded icon",
         },
-        onError: (error, _, id) => {
-            toast.error(error.message, { id });
-        },
-    });
+    );
