@@ -38,13 +38,13 @@ export const Branding = () => {
 
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
     const [iconPreview, setPreview] = useState<string>("");
-    const isDrafting = Boolean(iconPreview);
+    const [isDirty, setIsDirty] = useState(false);
 
     const { mutateAsync: setLogo } = useSetLogo();
 
     const uploadLogo = async (bytes: Uint8Array) => {
         await setLogo([bytes]);
-        setPreview("");
+        setIsDirty(false);
         setLogoBytes(new Uint8Array());
     };
 
@@ -59,8 +59,6 @@ export const Branding = () => {
         onSubmit: async (data) => {
             await setNetworkName([data.value.networkName]);
             form.reset(data.value);
-            setLogoBytes(new Uint8Array());
-            setPreview("");
         },
     });
 
@@ -88,6 +86,7 @@ export const Branding = () => {
         const base64Icon = await fileToBase64(file);
         const iconSrc = `data:${mimeType};base64,${base64Icon}`;
         setPreview(iconSrc);
+        setIsDirty(true);
 
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
@@ -136,7 +135,7 @@ export const Branding = () => {
                                     htmlFor="icon-upload"
                                     className="cursor-pointer"
                                 >
-                                    <div className="flex h-10 w-full items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                    <div className="flex h-10 w-full items-center justify-center rounded-md  border px-4 py-2 text-sm  font-medium shadow-sm focus:outline-none ">
                                         <Upload className=" h-4 w-4" />
                                     </div>
                                 </label>
@@ -152,7 +151,7 @@ export const Branding = () => {
                             </div>
                             <Button
                                 type="button"
-                                disabled={!isDrafting}
+                                disabled={!isDirty}
                                 onClick={() => {
                                     uploadLogo(logoBytes);
                                 }}
@@ -166,8 +165,9 @@ export const Branding = () => {
                                 onClick={() => {
                                     setPreview("");
                                     setLogoBytes(new Uint8Array());
+                                    setIsDirty(false);
                                 }}
-                                disabled={!isDrafting}
+                                disabled={!isDirty}
                                 variant="outline"
                                 size="icon"
                             >
