@@ -1,4 +1,3 @@
-import { useStore } from "@tanstack/react-form";
 import { Trash2 } from "lucide-react";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -18,16 +17,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppForm } from "@/components/forms/app-form";
 import { FieldErrors } from "@/components/forms/field-errors";
 
-import {
-    Params,
-    PubKeyAuthClaim,
-    SetProducerParams,
-    useSetProducers,
-} from "@/hooks/useSetProducers";
+import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 import { isAccountAvailable } from "@/lib/isAccountAvailable";
+import { Params, PubKeyAuthClaim, SetProducerParams } from "@/lib/producers";
+import { CONFIG } from "@/lib/services";
+
+const useProducersPlugin = (method: string) =>
+    usePluginMutation(
+        {
+            intf: "producers",
+            service: CONFIG,
+            method,
+        },
+        {
+            error: "Failed setting producers",
+            loading: "Setting producers",
+            success: "Set producers",
+            isStagable: true,
+        },
+    );
 
 export const BlockProduction = () => {
-    const { mutateAsync } = useSetProducers();
+    const { mutateAsync: setBft } = useProducersPlugin("setBftConsensus");
+    const { mutateAsync: setCurrent } = useProducersPlugin("setProducers");
+    const { mutateAsync: setCft } = useProducersPlugin("setCftConsensus");
 
     const form = useAppForm({
         defaultValues: {
@@ -37,15 +50,19 @@ export const BlockProduction = () => {
         validators: {
             onChange: Params,
         },
-        onSubmit: async (data) => {
-            console.log(data.value, "microwave");
-            await mutateAsync(data.value);
+        onSubmit: async ({ value: { mode, prods } }) => {
+            if (mode == "existing") {
+                setCurrent([prods]);
+            } else if (mode == "bft") {
+                setBft([prods]);
+            } else if (mode == "cft") {
+                setCft([prods]);
+            } else {
+                throw new Error("Unrecognised mode");
+            }
         },
     });
 
-    const store = useStore(form.store, (state) => state);
-
-    console.log(store);
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6">
             <div>

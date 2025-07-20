@@ -1,7 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-
-import { supervisor } from "@/supervisor";
 
 import { zAccount } from "@/lib/zod/Account";
 
@@ -43,22 +40,3 @@ export const Params = z.object({
 
 export type SetProducerParams = z.infer<typeof Params>;
 type Producer = z.infer<typeof Producer>;
-
-export const useSetProducers = () =>
-    useMutation({
-        mutationFn: async (params: SetProducerParams) => {
-            const parsedParams = Params.parse(params);
-
-            void (await supervisor.functionCall({
-                service: "config",
-                method:
-                    params.mode === "existing"
-                        ? "setProducers"
-                        : params.mode === "cft"
-                          ? "setCftConsensus"
-                          : "setBftConsensus",
-                params: [parsedParams.prods],
-                intf: "producers",
-            }));
-        },
-    });
