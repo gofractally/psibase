@@ -6,9 +6,6 @@ use exports::config::plugin::app::Guest as App;
 use host::common::types::Error;
 
 use crate::bindings::exports::config::plugin::app::Producer;
-use psibase::fracpack::Pack;
-use psibase::services::producers::action_structs as Actions;
-use psibase::AccountNumber;
 use staged_tx::plugin::proposer::set_propose_latch;
 
 struct ProposeLatch;
@@ -28,17 +25,6 @@ impl Drop for ProposeLatch {
 
 struct ConfigPlugin;
 
-impl ConfigPlugin {
-    fn set_consensus_internal(consensus_data: psibase::ConsensusData) -> Result<(), Error> {
-        let set_consensus = Actions::setConsensus {
-            prods: consensus_data,
-        };
-
-        let _latch = ProposeLatch::new(&psibase::services::producers::SERVICE.to_string());
-        Ok(())
-    }
-}
-
 impl App for ConfigPlugin {
     fn upload_network_logo(logo: Vec<u8>) -> Result<(), Error> {
         let _latch = ProposeLatch::new("branding");
@@ -51,12 +37,6 @@ impl App for ConfigPlugin {
         let _latch = ProposeLatch::new("branding");
 
         branding::plugin::api::set_network_name(&name);
-        Ok(())
-    }
-
-    fn remove_network_logo() -> Result<(), Error> {
-        let _latch = ProposeLatch::new("branding");
-
         Ok(())
     }
 

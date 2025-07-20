@@ -8,7 +8,6 @@ interface app {
   use producers:plugin/types.{producer};
 
   upload-network-logo: func(logo: list<u8>) -> result<_, error>;
-  remove-network-logo: func() -> result<_, error>;
   set-network-name: func(name: string) -> result<_, error>;
   
   /// Set the producers for CFT consensus.
