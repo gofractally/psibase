@@ -5,7 +5,7 @@ import { usePluginMutation } from "./use-plugin-mutation";
 export const useSetLogo = () =>
     usePluginMutation<[Uint8Array]>(
         {
-            intf: "app",
+            intf: "branding",
             service: CONFIG,
             method: "uploadNetworkLogo",
         },

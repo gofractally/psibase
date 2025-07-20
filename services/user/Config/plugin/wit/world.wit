@@ -2,7 +2,7 @@ package config:plugin;
 
 
 
-interface app {
+interface branding {
   use host:common/types.{error};
   use sites:plugin/types.{file};
   use producers:plugin/types.{producer};
@@ -10,6 +10,16 @@ interface app {
   upload-network-logo: func(logo: list<u8>) -> result<_, error>;
   set-network-name: func(name: string) -> result<_, error>;
   
+
+
+}
+
+
+interface producers {
+  use host:common/types.{error};
+  use sites:plugin/types.{file};
+  use producers:plugin/types.{producer};
+
   /// Set the producers for CFT consensus.
   /// This also changes the current consensus mode to CFT (crash fault tolerant).
   /// The keys used in the specified auth claims must 
@@ -26,5 +36,6 @@ interface app {
 
 
 world imports {
-    import app;
+    import producers;
+    import branding;
 }

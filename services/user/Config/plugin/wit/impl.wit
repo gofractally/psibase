@@ -11,6 +11,7 @@ world impl {
     include branding:plugin/imports;
     include transact:plugin/imports;
 
-    export app;
+    export branding;
+    export producers;
 
 }

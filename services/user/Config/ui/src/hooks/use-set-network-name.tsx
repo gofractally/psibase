@@ -10,7 +10,7 @@ export const useSetNetworkName = () =>
         {
             service: CONFIG,
             method: "setNetworkName",
-            intf: "app",
+            intf: "branding",
         },
         {
             error: "Failed setting network name",

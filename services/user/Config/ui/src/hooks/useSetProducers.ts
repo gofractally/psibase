@@ -58,7 +58,7 @@ export const useSetProducers = () =>
                           ? "setCftConsensus"
                           : "setBftConsensus",
                 params: [parsedParams.prods],
-                intf: "app",
+                intf: "producers",
             }));
         },
     });
