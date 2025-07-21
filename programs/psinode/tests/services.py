@@ -1,4 +1,5 @@
 from psinode import Action, PrivateKey, Transaction, TransactionError, Service
+from decimal import Decimal
 import time
 
 class Tokens(Service):
@@ -10,7 +11,7 @@ class Tokens(Service):
         for edge in balances['userBalances']['edges']:
             node = edge['node']
             if node['tokenId'] == token:
-                return int(node['balance'].replace('.', '')) 
+                return Decimal(node['balance']) 
 
 class Transact(Service):
     service = 'transact'
