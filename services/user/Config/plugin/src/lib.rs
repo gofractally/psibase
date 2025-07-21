@@ -10,11 +10,13 @@ use host::common::types::Error;
 use crate::bindings::exports::config::plugin::producers::Producer;
 use staged_tx::plugin::proposer::set_propose_latch;
 
+use psibase::services::producers::SERVICE as PRODUCERS_SERVICE;
+
 struct ProposeLatch;
 
 impl ProposeLatch {
-    fn new(app: &str) -> Self {
-        set_propose_latch(Some(app)).unwrap();
+    fn new(app: psibase::AccountNumber) -> Self {
+        set_propose_latch(Some(&app.to_string())).unwrap();
         Self
     }
 }
@@ -29,31 +31,31 @@ struct ConfigPlugin;
 
 impl Producers for ConfigPlugin {
     fn set_cft_consensus(prods: Vec<Producer>) -> Result<(), Error> {
-        let _latch = ProposeLatch::new(&psibase::services::producers::SERVICE.to_string());
+        let _latch = ProposeLatch::new(PRODUCERS_SERVICE);
         producers::plugin::api::set_cft_consensus(&prods[..])
     }
 
     fn set_bft_consensus(prods: Vec<Producer>) -> Result<(), Error> {
-        let _latch = ProposeLatch::new(&psibase::services::producers::SERVICE.to_string());
+        let _latch = ProposeLatch::new(PRODUCERS_SERVICE);
         producers::plugin::api::set_bft_consensus(&prods[..])
     }
 
     fn set_producers(prods: Vec<Producer>) -> Result<(), Error> {
-        let _latch = ProposeLatch::new(&psibase::services::producers::SERVICE.to_string());
+        let _latch = ProposeLatch::new(PRODUCERS_SERVICE);
         producers::plugin::api::set_producers(&prods[..])
     }
 }
 
 impl Branding for ConfigPlugin {
     fn upload_network_logo(logo: Vec<u8>) -> Result<(), Error> {
-        let _latch = ProposeLatch::new("branding");
+        let _latch = ProposeLatch::new("branding".into());
 
         branding::plugin::api::set_logo(&logo);
         Ok(())
     }
 
     fn set_network_name(name: String) -> Result<(), Error> {
-        let _latch = ProposeLatch::new("branding");
+        let _latch = ProposeLatch::new("branding".into());
 
         branding::plugin::api::set_network_name(&name);
         Ok(())
