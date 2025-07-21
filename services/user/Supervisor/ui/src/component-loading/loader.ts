@@ -1,5 +1,7 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
 import { rollup, type WarningHandlerWithDefault } from "@rollup/browser";
+import { cli, clocks, filesystem, io, random } from '@bytecodealliance/preview2-shim';
+import shimCode from './shims/shimWrapper.js?raw';
 
 import { HostInterface } from "../hostInterface.js";
 import { assert } from "../utils.js";
@@ -8,6 +10,9 @@ import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 import { plugin } from "./index.js";
 import privilegedShimCode from "./privileged-api.js?raw";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
+
+// Set up the global reference for runtime access
+(globalThis as Record<string, unknown>).__preview2Shims = { cli, clocks, filesystem, io, random };
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -63,31 +68,7 @@ function getProxiedImports({
 }
 
 async function generateWasiShimCode(): Promise<string> {
-    try {
-        const preview2Shim = await import('@bytecodealliance/preview2-shim') as {
-            cli: unknown;
-            clocks: unknown;
-            filesystem: unknown;
-            io: unknown;
-            random: unknown;
-        };
-        
-        const { cli, clocks, filesystem, io, random } = preview2Shim;
-        
-        if (!cli || !clocks || !filesystem || !io || !random) {
-            throw new Error('Missing required shim modules');
-        }
-        
-        // Import the JCO wrapper code from external file
-        const shimCode = await import('./shims/jcoWrapper.js?raw').then(m => m.default);
-        
-        // Set up the global reference for runtime access
-        (globalThis as Record<string, unknown>).__jcoShims = { cli, clocks, filesystem, io, random };
-        
-        return shimCode;
-    } catch {
-        throw new Error("Failed to load WASI shim code from JCO");
-    }
+    return shimCode;
 }
 
 
