@@ -1059,10 +1059,18 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         package_registry.push(files)?;
         packages
     };
+    
+    // Get package sources from config if none provided via command line
+    let package_sources = if args.package_source.is_empty() {
+        psibase::cli::config::read_package_sources().unwrap_or_default()
+    } else {
+        args.package_source.clone()
+    };
+    
     add_package_registry(
         &args.node_args.api,
         None,
-        &args.package_source,
+        &package_sources,
         client.clone(),
         &mut package_registry,
     )

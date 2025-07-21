@@ -21,6 +21,7 @@ ExternalProject_Add(CommonApiCommonLib_js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/index.d.ts
+    TIMEOUT ${EXTERNAL_PROJECT_TIMEOUT}
     INSTALL_COMMAND ""
     BUILD_ALWAYS 1
 )
@@ -57,6 +58,7 @@ foreach(UI ${UI_PROJECTS})
         CONFIGURE_COMMAND ""
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATH} ${CMAKE_CURRENT_SOURCE_DIR}/services/${PATH}/dist
         DEPENDS CommonApiCommonLib_js YarnInstall
+        TIMEOUT ${EXTERNAL_PROJECT_TIMEOUT}
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
     )

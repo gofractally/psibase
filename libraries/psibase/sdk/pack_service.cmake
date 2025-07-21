@@ -334,11 +334,10 @@ function(cargo_psibase_package)
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
     
-    # Use hardcoded shared cache directory for services workspace
-    # All services now use the shared cache at /root/psibase/.caches/target-shared
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    # Use target directory in build/ for services workspace
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust-target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
     
-    # Also copy intermediate service artifacts to organized build directory
+    # Organize service artifacts with symlinks to build directory
     set(SERVICES_PACKAGE_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/services/packages/${PACKAGE_NAME})
 
     # Build the package if needed
@@ -348,7 +347,8 @@ function(cargo_psibase_package)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
-            --target-dir ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared
+            --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust-target
+        TIMEOUT ${EXTERNAL_PROJECT_TIMEOUT}
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
         DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
@@ -356,8 +356,8 @@ function(cargo_psibase_package)
 
     add_custom_command(
         OUTPUT ${ARG_OUTPUT}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${SERVICES_PACKAGE_OUTPUT}
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${PACKAGE_OUTPUT} ${SERVICES_PACKAGE_OUTPUT}
         DEPENDS ${PACKAGE_OUTPUT}
         DEPENDS ${TARGET_NAME}_ext
         VERBATIM

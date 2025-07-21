@@ -4,7 +4,7 @@
     "version": "0.0.0",
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../if-build-needed.mjs wasm:wasm-transpiled 'cd ./wasm && cargo-component build --release && cd .. && jco transpile ../../../../.caches/target-shared/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && tsc -b --noEmit && vite build'",
+        "build": "node ../../../if-build-needed.mjs wasm:wasm-transpiled 'cd ./wasm && CARGO_TARGET_DIR=./target cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && tsc -b --noEmit && vite build'",
         "lint": "eslint .",
         "preview": "vite preview"
     },

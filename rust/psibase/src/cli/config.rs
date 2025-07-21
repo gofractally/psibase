@@ -13,7 +13,7 @@ pub enum ConfigCommand {
 
     /// Set a config value
     Set {
-        /// Config key to set. Example: hosts.dev, hosts.prod, etc.
+        /// Config key to set. Example: hosts.dev, hosts.prod, packages.sources, etc.
         key: String,
 
         /// Config value to set on the provided key. Example: https://prod.my-psibase-app.io
@@ -22,12 +22,12 @@ pub enum ConfigCommand {
 
     /// Get a config section or value
     Get {
-        /// Config key to get. Example: hosts.dev, hosts.prod or hosts (to get the full section).
+        /// Config key to get. Example: hosts.dev, hosts.prod, packages.sources, or hosts (to get the full section).
         key: String,
     },
 
     Unset {
-        /// Config key to unset (removed). Example: hosts.dev, hosts.prod, etc.
+        /// Config key to unset (removed). Example: hosts.dev, hosts.prod, packages.sources, etc.
         key: String,
     },
 }
@@ -35,6 +35,8 @@ pub enum ConfigCommand {
 pub enum ConfigKey {
     Hosts(String),
     HostsSection,
+    PackagesSources,
+    PackagesSection,
 }
 
 impl FromStr for ConfigKey {
@@ -44,11 +46,19 @@ impl FromStr for ConfigKey {
         if let Some((section, key)) = s.split_once('.') {
             if section == "hosts" {
                 Ok(ConfigKey::Hosts(key.to_string()))
+            } else if section == "packages" {
+                if key == "sources" {
+                    Ok(ConfigKey::PackagesSources)
+                } else {
+                    Err(anyhow!("Unknown packages config key: {}", key))
+                }
             } else {
                 Err(anyhow!("Unknown config section: {}", section))
             }
         } else if s == "hosts" {
             Ok(ConfigKey::HostsSection)
+        } else if s == "packages" {
+            Ok(ConfigKey::PackagesSection)
         } else {
             Err(anyhow!("Invalid config key format. Expected 'section.key'"))
         }
@@ -71,6 +81,12 @@ qa1 = "https://qa1.example.com""#;
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct PsibaseConfig {
     pub hosts: HashMap<String, String>,
+    pub packages: Option<PackagesConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PackagesConfig {
+    pub sources: Option<Vec<String>>,
 }
 
 pub fn handle_cli_config_cmd(config: &ConfigCommand) -> Result<(), anyhow::Error> {
@@ -88,6 +104,8 @@ pub fn cmd_set(key: &str, value: &str) -> Result<(), Error> {
     match ConfigKey::from_str(key)? {
         ConfigKey::Hosts(key) => cmd_host_set(&key, value),
         ConfigKey::HostsSection => Err(anyhow!("It's not allowed to set the entire hosts section")),
+        ConfigKey::PackagesSources => cmd_packages_sources_set(value),
+        ConfigKey::PackagesSection => Err(anyhow!("It's not allowed to set the entire packages section")),
     }
 }
 
@@ -95,6 +113,8 @@ pub fn cmd_get(key: &str) -> Result<(), Error> {
     match ConfigKey::from_str(key)? {
         ConfigKey::Hosts(key) => cmd_host_get(&key),
         ConfigKey::HostsSection => cmd_host_list_section(),
+        ConfigKey::PackagesSources => cmd_packages_sources_get(),
+        ConfigKey::PackagesSection => cmd_packages_list_section(),
     }
 }
 
@@ -103,6 +123,10 @@ pub fn cmd_unset(key: &str) -> Result<(), Error> {
         ConfigKey::Hosts(key) => cmd_host_unset(&key),
         ConfigKey::HostsSection => Err(anyhow!(
             "It's not allowed to unset the entire hosts section"
+        )),
+        ConfigKey::PackagesSources => cmd_packages_sources_unset(),
+        ConfigKey::PackagesSection => Err(anyhow!(
+            "It's not allowed to unset the entire packages section"
         )),
     }
 }
@@ -182,4 +206,82 @@ fn write_psibase_config(config: PsibaseConfig) -> Result<(), Error> {
     let config_str = toml::to_string(&config)?;
     std::fs::write(path, config_str)?;
     Ok(())
+}
+
+fn cmd_packages_sources_set(sources_str: &str) -> Result<(), Error> {
+    // Parse comma-separated list of sources
+    let sources: Vec<String> = sources_str
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    
+    if sources.is_empty() {
+        return Err(anyhow!("Package sources cannot be empty"));
+    }
+    
+    let mut config = read_psibase_config().unwrap_or_default();
+    if config.packages.is_none() {
+        config.packages = Some(PackagesConfig { sources: None });
+    }
+    
+    config.packages.as_mut().unwrap().sources = Some(sources);
+    write_psibase_config(config)?;
+    println!("Package sources set successfully");
+    Ok(())
+}
+
+fn cmd_packages_sources_get() -> Result<(), Error> {
+    let config = read_psibase_config().unwrap_or_default();
+    if let Some(packages) = &config.packages {
+        if let Some(sources) = &packages.sources {
+            println!("{}", sources.join(", "));
+        } else {
+            println!("No package sources configured");
+        }
+    } else {
+        println!("No package sources configured");
+    }
+    Ok(())
+}
+
+fn cmd_packages_sources_unset() -> Result<(), Error> {
+    let mut config = read_psibase_config()?;
+    if let Some(packages) = &mut config.packages {
+        if packages.sources.take().is_some() {
+            // If packages section becomes empty, remove it entirely
+            if packages.sources.is_none() {
+                config.packages = None;
+            }
+            write_psibase_config(config)?;
+            println!("Package sources removed successfully");
+            Ok(())
+        } else {
+            Err(anyhow!("Package sources not found in ~/.psibase.toml"))
+        }
+    } else {
+        Err(anyhow!("Package sources not found in ~/.psibase.toml"))
+    }
+}
+
+fn cmd_packages_list_section() -> Result<(), Error> {
+    let config = get_psibase_config_str()?;
+    let toml_value = toml::from_str::<toml::Value>(&config)?;
+    if let Some(packages) = toml_value.get("packages") {
+        println!("{}", toml::to_string_pretty(packages)?);
+    } else {
+        println!("No packages section configured");
+    }
+    Ok(())
+}
+
+pub fn read_package_sources() -> Result<Vec<String>, Error> {
+    let psibase_config = read_psibase_config()?;
+    if let Some(packages) = &psibase_config.packages {
+        if let Some(sources) = &packages.sources {
+            return Ok(sources.clone());
+        }
+    }
+    // Return empty vec if no sources configured
+    Ok(vec![])
 }

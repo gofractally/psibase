@@ -1,10 +1,10 @@
 # A function that can be used to add a new target that builds a wasm component from rust
 set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugins)
 
-# Helper function to determine the correct shared cache directory
-function(get_shared_cache_dir OUTPUT_VAR SOURCE_PATH)
-    # All services now use the shared cache directory (nested workspaces eliminated)
-    set(${OUTPUT_VAR} "${CMAKE_SOURCE_DIR}/.caches/target-shared" PARENT_SCOPE)
+# Helper function to determine the correct target directory
+function(get_rust_target_dir OUTPUT_VAR SOURCE_PATH)
+    # All services now use the shared target directory in build/
+    set(${OUTPUT_VAR} "${CMAKE_CURRENT_BINARY_DIR}/rust-target" PARENT_SCOPE)
 endfunction()
 
 function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
@@ -14,8 +14,8 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
 
-    # Get the appropriate shared cache directory
-    get_shared_cache_dir(TARGET_DIR ${PATH})
+    # Get the appropriate target directory
+    get_rust_target_dir(TARGET_DIR ${PATH})
 
     ExternalProject_Add(${TARGET_NAME}
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
@@ -26,6 +26,7 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml
             --target-dir ${TARGET_DIR}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TARGET_DIR}/${TARGET_ARCH}/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        TIMEOUT ${EXTERNAL_PROJECT_TIMEOUT}
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
     )
@@ -57,8 +58,8 @@ function(add_rs_component_workspace TARGET_TUPLE)
         list(APPEND OUTPUT_FILES ${FILENAME})
     endforeach()
 
-    # Get the appropriate shared cache directory
-    get_shared_cache_dir(TARGET_DIR ${PATH})
+    # Get the appropriate target directory
+    get_rust_target_dir(TARGET_DIR ${PATH})
     set(TARGET_ARCH wasm32-wasip1)
 
     set(COPY_COMMANDS "")
@@ -79,6 +80,7 @@ function(add_rs_component_workspace TARGET_TUPLE)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml
             --target-dir ${TARGET_DIR}
         ${COPY_COMMANDS}
+        TIMEOUT ${EXTERNAL_PROJECT_TIMEOUT}
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
     )
@@ -113,10 +115,10 @@ function(filter_plugin_workspace_members WORKSPACE_PATH OUTPUT_VAR)
         endif()
     endforeach()
     
-    # Filter to only include paths ending with /plugin or /plugin/
+    # Filter to only include paths ending with /plugin, /plugin/, or /plugin_*/
     set(PLUGIN_MEMBERS "")
     foreach(MEMBER ${MEMBERS_LIST})
-        if(MEMBER MATCHES ".*/plugin/?$")
+        if(MEMBER MATCHES ".*/plugin/?$" OR MEMBER MATCHES ".*/plugin_[^/]+/?$")
             list(APPEND PLUGIN_MEMBERS ${MEMBER})
         endif()
     endforeach()
@@ -160,12 +162,19 @@ function(add_rs_component_workspace_filtered TARGET_TUPLE)
         list(APPEND OUTPUT_FILES ${FILENAME})
     endforeach()
 
-    # Get the appropriate shared cache directory
-    get_shared_cache_dir(TARGET_DIR ${PATH})
+    # Get the appropriate target directory
+    get_rust_target_dir(TARGET_DIR ${PATH})
     set(TARGET_ARCH wasm32-wasip1)
 
-    # Skip copy commands for now - just focus on getting the build working
-    set(COPY_COMMANDS "")
+    # Create symlinks to organize plugin outputs instead of copying
+    set(SYMLINK_COMMANDS "")
+    foreach(FILENAME ${OUTPUT_FILES})
+        set(SOURCE_FILE ${TARGET_DIR}/${TARGET_ARCH}/release/${FILENAME})
+        set(DEST_FILE ${COMPONENT_BIN_DIR}/${FILENAME})
+        list(APPEND SYMLINK_COMMANDS
+            COMMAND ${CMAKE_COMMAND} -E create_symlink ${SOURCE_FILE} ${DEST_FILE}
+        )
+    endforeach()
 
     # Build each plugin individually to avoid workspace dependency issues
     set(BUILD_COMMANDS "")
@@ -184,9 +193,9 @@ function(add_rs_component_workspace_filtered TARGET_TUPLE)
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATHS}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ${BUILD_COMMANDS}
-        ${COPY_COMMANDS}
+        TIMEOUT ${EXTERNAL_PROJECT_TIMEOUT}
         BUILD_ALWAYS 1
-        INSTALL_COMMAND ""
+        INSTALL_COMMAND ${SYMLINK_COMMANDS}
     )
 
     # Expose the target name to the caller of this function

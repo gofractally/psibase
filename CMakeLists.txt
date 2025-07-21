@@ -15,6 +15,10 @@ if(NOT DEFINED ICU_LIBRARY_DIR )
     set(ICU_LIBRARY_DIR $ENV{ICU_LIBRARY_DIR})
 endif()
 
+# Centralized timeout for external project builds (in seconds)
+# Increase this value if builds are timing out
+set(EXTERNAL_PROJECT_TIMEOUT 1800 CACHE STRING "Timeout in seconds for external project builds")
+
 option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
 if (${FORCE_COLORED_OUTPUT})
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -186,6 +190,7 @@ ExternalProject_Add(
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    TIMEOUT             ${EXTERNAL_PROJECT_TIMEOUT}
     INSTALL_COMMAND     ""
 )
 ExternalProject_Add(
@@ -193,6 +198,7 @@ ExternalProject_Add(
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    TIMEOUT             ${EXTERNAL_PROJECT_TIMEOUT}
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
@@ -251,6 +257,7 @@ ExternalProject_Add(
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    TIMEOUT             ${EXTERNAL_PROJECT_TIMEOUT}
     BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
@@ -269,13 +276,13 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 add_rs_component_workspace_filtered(services/:Plugins 
     accounts
     account-tokens
-    aes
-    auth-any
+    aes-plugin
+    authany-plugin
     auth-delegate
     auth-invite
     auth-sig
     base64
-    kdf
+    kdf-plugin
     setcode
     clientdata
     invite
@@ -338,17 +345,17 @@ file(MAKE_DIRECTORY ${BUILD_SERVICES_DIR}/packages)
 file(MAKE_DIRECTORY ${BUILD_PACKAGES_DIR})
 file(MAKE_DIRECTORY ${BUILD_UI_DIR})
 
-# Add custom target to copy Rust service libraries to organized directory
+# Add custom target to organize Rust service libraries with symlinks
 add_custom_target(organize_rust_services
-    COMMAND find ${CMAKE_CURRENT_SOURCE_DIR}/.caches/target-shared/wasm32-wasip1/release/ -name "*.rlib" -exec cp {} ${BUILD_SERVICES_DIR}/lib/ "\;"
-    COMMENT "Organizing Rust service libraries"
+    COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/rust-target/wasm32-wasip1/release/ -name "*.rlib" -exec ln -sf {} ${BUILD_SERVICES_DIR}/lib/ "\;"
+    COMMENT "Organizing Rust service libraries with symlinks"
 )
 
-# Add custom target to copy C++ outputs to organized directory
+# Add custom target to organize C++ outputs with symlinks
 add_custom_target(organize_native_outputs
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/*.wasm ${BUILD_NATIVE_DIR}/wasm/ 2>/dev/null || true
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/*-schema.json ${BUILD_NATIVE_DIR}/schemas/ 2>/dev/null || true
-    COMMENT "Organizing C++ native outputs"
+    COMMAND find ${CMAKE_CURRENT_BINARY_DIR} -maxdepth 1 -name "*.wasm" -exec ln -sf {} ${BUILD_NATIVE_DIR}/wasm/ "\;" 2>/dev/null || true
+    COMMAND find ${CMAKE_CURRENT_BINARY_DIR} -maxdepth 1 -name "*-schema.json" -exec ln -sf {} ${BUILD_NATIVE_DIR}/schemas/ "\;" 2>/dev/null || true
+    COMMENT "Organizing C++ native outputs with symlinks"
 )
 
 set(PSIBASE_VERSION 0.19)
@@ -414,7 +421,7 @@ psibase_package(
     DESCRIPTION "Key Derivation Function"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE kdf
-        DATA ${Plugins_OUTPUT_FILE_kdf} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_kdf_plugin} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
 
@@ -425,7 +432,7 @@ psibase_package(
     DESCRIPTION "AES encryption"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE aes
-        DATA ${Plugins_OUTPUT_FILE_aes} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_aes_plugin} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
 
@@ -576,7 +583,7 @@ psibase_package(
     SERVICE auth-any
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthAny-schema.json
-        DATA ${Plugins_OUTPUT_FILE_auth_any} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_authany_plugin} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)"
@@ -1079,6 +1086,7 @@ ExternalProject_Add(
     BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
     CONFIGURE_COMMAND ""
     BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    TIMEOUT             ${EXTERNAL_PROJECT_TIMEOUT}
     BUILD_ALWAYS 1
     INSTALL_COMMAND ""
 )

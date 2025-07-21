@@ -3,6 +3,8 @@ mod action_template;
 mod actions;
 mod block;
 mod boot;
+#[cfg(not(target_family = "wasm"))]
+pub mod cli;
 mod crypto;
 mod db;
 mod depgraph;
