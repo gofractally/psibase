@@ -5,9 +5,6 @@ import { ProtectedRoute } from "./components/protected-route";
 import { Loader } from "./pages/Loader";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";
-import { Packages } from "./pages/packages";
-import { PendingTransactions } from "./pages/pending-transactions";
-import { TransactionDetail } from "./pages/transaction-detail";
 
 export const router = createBrowserRouter([
     {
@@ -31,30 +28,6 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <Branding />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "packages",
-                element: (
-                    <ProtectedRoute>
-                        <Packages />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "pending-transactions",
-                element: (
-                    <ProtectedRoute>
-                        <PendingTransactions />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "pending-transactions/:id",
-                element: (
-                    <ProtectedRoute>
-                        <TransactionDetail />
                     </ProtectedRoute>
                 ),
             },
