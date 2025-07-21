@@ -1,7 +1,6 @@
 import {
     CalendarCheck,
     CalendarClock,
-    CalendarPlus2,
     Contact,
     Search,
     Users,
@@ -58,11 +57,6 @@ export const fractalMenus = [
                 title: "Active & upcoming",
                 icon: CalendarClock,
                 path: "",
-            },
-            {
-                title: "Proposed",
-                icon: CalendarPlus2,
-                path: "proposed",
             },
             {
                 title: "Completed",

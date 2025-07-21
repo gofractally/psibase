@@ -20,32 +20,17 @@ export const CurrentEvaluationCard = () => {
     useWatchClose(status);
 
     return (
-        <div className="w-full rounded-sm border p-4">
+        <div className="w-full rounded-md border p-4">
             {status?.type == "waitingRegistration" && (
                 <WaitingRegistration status={status} />
             )}
             {status?.type == "failed" && <Failed />}
-            {status?.type == "registration" && (
-                <div>
-                    ✍️
-                    <Register status={status} />
-                </div>
-            )}
-            {status?.type == "waitingStart" && (
-                <div>
-                    🕒
-                    <Start status={status} />
-                </div>
-            )}
-            {status?.type == "deliberation" && (
-                <div>
-                    📤
-                    <Deliberation status={status} />
-                </div>
-            )}
+            {status?.type == "registration" && <Register status={status} />}
+            {status?.type == "waitingStart" && <Start status={status} />}
+            {status?.type == "deliberation" && <Deliberation status={status} />}
             {status?.type == "submission" && <Submission status={status} />}
             {status?.type == "finished" && (
-                <div>Evaluation finished! ✅ Awaiting to be closed</div>
+                <div>✅ Evaluation finished! Waiting to be closed.</div>
             )}
         </div>
     );

@@ -118,7 +118,7 @@ namespace triedent
       void          start_new_region(header::data* old, header::data* next, std::shared_ptr<void>&);
       void          double_region_size(header::data* old_data, header::data* new_data);
       static void   copy_header_data(header::data* old, header::data* next);
-      std::uint64_t evacuate_region(queue_item& item);
+      std::uint64_t evacuate_region(queue_item& item, char* base);
 
       static bool is_used(const queue_item& item);
       //

@@ -17,7 +17,7 @@ import { CreateFractalModal } from "../components/create-fractal-modal";
 import { LoginButton } from "../components/login-button";
 
 export const Loader = () => {
-    const { data: currentUser } = useCurrentUser();
+    const { data: currentUser, isPending } = useCurrentUser();
 
     const isLoggedIn = typeof currentUser === "string";
 
@@ -50,7 +50,7 @@ export const Loader = () => {
                 <CardDescription>
                     {isLoggedIn
                         ? "Add a fractal to continue"
-                        : "Login to continue"}
+                        : "Log in to continue"}
                 </CardDescription>
                 <CardFooter className="flex justify-end">
                     {isLoggedIn ? (
@@ -62,7 +62,7 @@ export const Loader = () => {
                             Add fractal
                         </Button>
                     ) : (
-                        <LoginButton />
+                        <LoginButton isPendingCurrentUser={isPending} />
                     )}
                 </CardFooter>
             </CardHeader>

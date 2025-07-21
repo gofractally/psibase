@@ -92,10 +92,10 @@ namespace triedent
       size_type next(size_type pos);
       // requires _queue_mutex to be locked
       void pop_some(std::vector<std::shared_ptr<void>>& out, size_type start, size_type end);
-      // If any session is locking start, sets _waiting and ensures
+      // If block is true and any session is locking start, sets _waiting and ensures
       //   that there is a session that will notify _queue_cond.
       // returns the lowest sequence that is locked
-      size_type start_wait(size_type start, size_type end);
+      size_type start_wait(size_type start, size_type end, bool block);
       // Indicates an unlocked session
       static constexpr size_type npos = ~size_type(0);
       // At most one locked session has its wait_bit set.

@@ -1,0 +1,14 @@
+[
+    {
+        "sender": "accounts",
+        "service": "accounts",
+        "method": "init",
+        "data": {}
+    },
+    {
+        "sender": "accounts",
+        "service": "sites",
+        "method": "enablespa",
+        "data": { "enable": true }
+    }
+]

@@ -125,7 +125,7 @@ class TestPsibase(unittest.TestCase):
 
         a.wait(new_block())
         for account in ['a1', 'a2', 'a3']:
-            res = a.graphql('accounts', 'query { getAccount(account: "%s") { authService } }' % account)
+            res = a.graphql('accounts', 'query { getAccount(accountName: "%s") { authService } }' % account)
             self.assertEqual(res['getAccount']['authService'], 'auth-any')
 
     @testutil.psinode_test

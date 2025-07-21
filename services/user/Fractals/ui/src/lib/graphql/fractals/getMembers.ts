@@ -27,7 +27,6 @@ export const getMembers = async (fractalAccount: Account) => {
     }`,
     );
 
-    console.log({ member });
     return z
         .object({
             members: z.object({

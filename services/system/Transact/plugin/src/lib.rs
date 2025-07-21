@@ -23,7 +23,7 @@ use host::common::{
 
 // Exported interfaces/types
 use exports::transact::plugin::{
-    admin::Guest as Admin, hooks::Guest as Hooks, intf::Guest as Intf, login::Guest as Login,
+    admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
 };
 
 // Third-party crates
@@ -219,8 +219,8 @@ struct LoginReply {
     token_type: String,
 }
 
-impl Login for TransactPlugin {
-    fn login(app: String, user: String) -> Result<String, CommonTypes::Error> {
+impl Auth for TransactPlugin {
+    fn get_query_token(app: String, user: String) -> Result<String, CommonTypes::Error> {
         assert!(get_sender_app() == "accounts");
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
