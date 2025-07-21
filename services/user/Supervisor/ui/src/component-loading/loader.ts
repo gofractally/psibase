@@ -67,9 +67,6 @@ function getProxiedImports({
     return mergeImports(imports);
 }
 
-async function generateWasiShimCode(): Promise<string> {
-    return shimCode;
-}
 
 
 async function getWasiImports(): Promise<ImportDetails> {
@@ -108,7 +105,7 @@ async function getWasiImports(): Promise<ImportDetails> {
     //    import {  as _, } from './shim.js';
     // It is very likely an issue with an invalid import mapping.
 
-    const wasi_shimCode = await generateWasiShimCode();
+    const wasi_shimCode = shimCode;
     const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
     return {
         importMap: wasi_nameMapping,
