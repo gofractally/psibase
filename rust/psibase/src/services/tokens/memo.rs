@@ -61,6 +61,7 @@ impl<'a> Unpack<'a> for Memo {
             .get(*pos as usize..(*pos + len) as usize)
             .ok_or(Error::ReadPastEnd)?;
         *pos += len;
+        assert!(bytes.len() <= 80, "memo must be 80 bytes or less");
         std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
         Ok(())
     }
