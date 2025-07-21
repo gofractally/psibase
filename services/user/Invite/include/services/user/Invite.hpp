@@ -30,6 +30,8 @@ namespace UserService
          /// "invited-sys"
          static constexpr auto payerAccount = psibase::AccountNumber("invited-sys");
 
+         uint8_t untransferable = 0;
+
          /// Constructor prevents actions from being called until after init() has
          /// been called
          Invite(psio::shared_view_ptr<psibase::Action> action);
