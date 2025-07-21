@@ -1,4 +1,4 @@
-import { FolderUp, Pickaxe, Settings, Upload } from "lucide-react";
+import { FolderUp, Pickaxe } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import {
