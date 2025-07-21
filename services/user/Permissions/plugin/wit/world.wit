@@ -5,35 +5,33 @@ interface types {
         user: string,
         caller: string,
         callee: string,
+        risk-level: u8,
+        description: string,
+    }
+
+    record risk {
+        level: u8,
+        description: string,
     }
 }
 
 interface api {
     use host:common/types.{error};
+    use types.{risk};
 
-    /// The caller of this function (the "callee") wants to check if the specified `caller` has the user's
-    ///     permission to use callee's plugin on the user's behalf. If no permission has yet been given, 
-    ///     this function will cause the user to be prompted to respond to the request.
+    /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller`
+    ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
+    ///     permission, this function will cause the user to be prompted to consider the request.
     /// 
     /// Parameters: 
     /// * `caller` - The app requesting permission
-    prompt-auth: func(caller: string) -> result<_, error>;
-
-    /// The caller of this function (the "callee") wants to check if the specified `caller` has the user's
-    ///     permission to use callee's plugin on the user's behalf. This function simply returns whether or
-    ///     not permission has been granted, and will *not* trigger any user interaction.
-    /// 
-    /// Parameters:
-    /// * `caller` - The app requesting permission
-    is-auth: func(caller: string) -> result<bool, error>;
-
-    /// Delete a previously added permission
-    ///
-    /// Parameters:
-    /// `user` - The user granting access
-    /// `caller` - The app requesting access to use `callee` on behalf of `user`
-    /// `callee` - The app on whom functionality or data is being requested
-    del-perm: func(user: string, caller: string, callee: string);
+    /// * `risk`   - Valid values [0,1,2,3,4,5,6].
+    ///              0: Allows any caller app access on the user's behalf
+    ///              1-5: 1 is the least risk, 5 is the most risk.
+    ///              6: Allows no one (except the callee app itself) access on the user's behalf.
+    ///              The risk level of operation for the user. The higher the risk, the more the user should
+    ///              trust the caller app. This is just a hint to help the user make a decision.
+    authorize: func(caller: string, risk: risk) -> result<bool, error>;
 }
 
 world imports {
