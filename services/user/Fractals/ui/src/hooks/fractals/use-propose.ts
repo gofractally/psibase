@@ -24,8 +24,11 @@ export const usePropose = () =>
                 intf: "user",
                 params: [evaluationId, groupNumber, proposal],
             };
-            console.log("Proposing...", pars);
 
             void (await getSupervisor().functionCall(pars));
+        },
+        onError: (error) => {
+            const message = "Error proposing:";
+            console.error(message, error);
         },
     });

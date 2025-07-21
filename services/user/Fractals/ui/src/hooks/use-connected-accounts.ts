@@ -9,16 +9,23 @@ export const useConnectedAccounts = () =>
     useQuery({
         queryKey: QueryKey.connectedAccounts(),
         initialData: [],
-        queryFn: async () =>
-            z
-                .string()
-                .array()
-                .parse(
-                    await supervisor.functionCall({
-                        method: "getConnectedAccounts",
-                        params: [],
-                        service: "accounts",
-                        intf: "activeApp",
-                    }),
-                ),
+        queryFn: async () => {
+            try {
+                return z
+                    .string()
+                    .array()
+                    .parse(
+                        await supervisor.functionCall({
+                            method: "getConnectedAccounts",
+                            params: [],
+                            service: "accounts",
+                            intf: "activeApp",
+                        }),
+                    );
+            } catch (error) {
+                const message = "Error getting connected accounts";
+                console.error(message, error);
+                throw error;
+            }
+        },
     });

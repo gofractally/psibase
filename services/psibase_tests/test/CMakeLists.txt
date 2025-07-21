@@ -1,9 +1,9 @@
 enable_testing()
 
 function(add suffix)
-    add_executable(psibase-tests${suffix} test.cpp test-sig.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp testKvMerkle.cpp test_rpc.cpp test_verify_services.cpp)
+    add_executable(psibase-tests${suffix} test.cpp test-sig.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp testKvMerkle.cpp test_rpc.cpp test_verify_services.cpp test_notify.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC ../include)
-    target_link_libraries(psibase-tests${suffix} services_system${suffix} psitestlib${suffix} catch2)
+    target_link_libraries(psibase-tests${suffix} services_system${suffix} services_user${suffix} psitestlib${suffix} catch2)
     set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 

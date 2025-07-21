@@ -13,6 +13,14 @@ export const useMembers = (accountParam?: OptionalAccount) => {
     return useQuery({
         queryKey: QueryKey.members(account),
         enabled: !!account,
-        queryFn: async () => getMembers(zAccount.parse(account)),
+        queryFn: async () => {
+            try {
+                return await getMembers(zAccount.parse(account));
+            } catch (error) {
+                const message = "Error getting members";
+                console.error(message, error);
+                throw new Error(message);
+            }
+        },
     });
 };

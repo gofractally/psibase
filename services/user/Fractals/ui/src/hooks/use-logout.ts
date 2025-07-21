@@ -23,5 +23,9 @@ export const useLogout = () => {
             setExpectCurrentUser(false);
             queryClient.setQueryData(QueryKey.currentUser(), null);
         },
+        onError: (error) => {
+            const message = "Error logging out";
+            console.error(message, error);
+        },
     });
 };

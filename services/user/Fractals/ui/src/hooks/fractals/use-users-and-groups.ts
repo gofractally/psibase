@@ -24,23 +24,32 @@ export const useUsersAndGroups = (
         enabled: !!evaluationId,
         refetchInterval: interval,
         queryFn: async () => {
-            const res = await getUsersAndGroups(fractalsService, evaluationId!);
+            try {
+                const res = await getUsersAndGroups(
+                    fractalsService,
+                    evaluationId!,
+                );
 
-            if (evaluationId === attestedEvaluationId) {
-                const pretendAttestation = [1, 2, 3];
-                return {
-                    ...res,
-                    users: updateArray(
-                        res.users,
-                        (user) => user.user === assertUser(),
-                        (user) => ({
-                            ...user,
-                            attestation: pretendAttestation,
-                        }),
-                    ),
-                };
-            } else {
-                return res;
+                if (evaluationId === attestedEvaluationId) {
+                    const pretendAttestation = [1, 2, 3];
+                    return {
+                        ...res,
+                        users: updateArray(
+                            res.users,
+                            (user) => user.user === assertUser(),
+                            (user) => ({
+                                ...user,
+                                attestation: pretendAttestation,
+                            }),
+                        ),
+                    };
+                } else {
+                    return res;
+                }
+            } catch (error) {
+                const message = "Error getting users and groups";
+                console.error(message, error);
+                throw new Error(message);
             }
         },
     });

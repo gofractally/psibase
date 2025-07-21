@@ -1,6 +1,7 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::transact::plugin::types::{Action, Claim};
 use psibase::fracpack::{Pack, Unpack};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::thread_local;
 
@@ -26,7 +27,7 @@ impl ActionAuthPlugins {
     }
 }
 
-#[derive(Pack, Unpack, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ActionMetadata {
     pub action: Action,
     pub label: Option<String>,
@@ -55,7 +56,7 @@ impl CurrentActions {
     }
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Serialize, Deserialize)]
 pub struct Claims {
     pub claimant: String,
     pub claims: Vec<Claim>,
@@ -67,7 +68,7 @@ impl ActionClaims {
 
     pub fn get_all() -> Vec<Claims> {
         Keyvalue::get(Self::KEY_CLAIMS)
-            .map(|a| <Vec<Claims>>::unpacked(&a).expect("Failed to unpack claims"))
+            .map(|a| serde_json::from_slice(&a).expect("Failed to unpack claims"))
             .unwrap_or_default()
     }
 
@@ -87,7 +88,10 @@ impl ActionClaims {
             });
         }
 
-        Keyvalue::set(Self::KEY_CLAIMS, &all_claims.packed());
+        Keyvalue::set(
+            Self::KEY_CLAIMS,
+            &serde_json::to_vec(&all_claims).expect("Failed to pack claims"),
+        );
     }
 
     pub fn clear() {

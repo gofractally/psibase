@@ -9,12 +9,18 @@ export const useBranding = () =>
     useQuery({
         queryKey: QueryKey.branding(),
         queryFn: async () => {
-            const res = await supervisor.functionCall({
-                service: "branding",
-                intf: "queries",
-                method: "getNetworkName",
-                params: [],
-            });
-            return z.string().parse(res);
+            try {
+                const res = await supervisor.functionCall({
+                    service: "branding",
+                    intf: "queries",
+                    method: "getNetworkName",
+                    params: [],
+                });
+                return z.string().parse(res);
+            } catch (error) {
+                const message = "Error getting network branding";
+                console.error(message, error);
+                throw error;
+            }
         },
     });
