@@ -1,4 +1,4 @@
-import { FolderUp, Pickaxe, Settings } from "lucide-react";
+import { FolderUp, Pickaxe, Settings, Upload } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import {
@@ -21,6 +21,11 @@ export const appMenus = [
         title: "Branding",
         icon: FolderUp,
         path: "branding",
+    },
+    {
+        title: "Packages",
+        icon: Upload,
+        path: "packages",
     },
     {
         title: "Pending Transactions",
