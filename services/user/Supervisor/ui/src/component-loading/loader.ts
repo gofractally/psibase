@@ -62,25 +62,6 @@ function getProxiedImports({
     return mergeImports(imports);
 }
 
-// These are shims for wasi interfaces that have not yet been standardized
-// Since the interface is not standard, the shim is not provided by BCA.
-async function getNonstandardWasiImports(): Promise<ImportDetails> {
-    const shimName = "./wasi-keyvalue.js";
-    const nameMapping: Array<[PkgId, FilePath]> = [
-        ["wasi:keyvalue/*", `${shimName}#*`],
-    ];
-    // If the transpiled library contains bizarre inputs, such as:
-    //    import {  as _, } from './shim.js';
-    // It is very likely an issue with an invalid import mapping.
-    const shimUrl = new URL("./shims/wasi-keyvalue.js", import.meta.url);
-    const shimCode = await fetch(shimUrl).then((r) => r.text());
-    const shimFile: [FilePath, Code] = [shimName, shimCode];
-    return {
-        importMap: nameMapping,
-        files: [shimFile],
-    };
-}
-
 async function generateWasiShimCode(): Promise<string> {
     try {
         const preview2Shim = await import('@bytecodealliance/preview2-shim') as {
