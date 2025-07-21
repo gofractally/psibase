@@ -11,7 +11,13 @@ import {
 
 import { cn } from "@/lib/utils";
 
-export const appMenus = [
+interface Menu {
+    title: string;
+    icon: any;
+    path: string;
+}
+
+export const appMenus: Menu[] = [
     {
         title: "Block production",
         icon: Pickaxe,
@@ -21,16 +27,6 @@ export const appMenus = [
         title: "Branding",
         icon: FolderUp,
         path: "branding",
-    },
-    {
-        title: "Packages",
-        icon: Upload,
-        path: "packages",
-    },
-    {
-        title: "Pending Transactions",
-        icon: Settings,
-        path: "pending-transactions",
     },
 ];
 
