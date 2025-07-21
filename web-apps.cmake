@@ -29,8 +29,6 @@ ExternalProject_Add(CommonApiCommonLib_js
 set(UI_PROJECTS
     system/Accounts/ui:Accounts_js
     system/AuthSig/ui:AuthSig_js
-    system/Producers/ui:Producers_js
-    user/Branding/ui:Branding_js
     user/Evaluations/ui:Evaluations_js
     user/Fractals/ui:Fractals_js
     user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js

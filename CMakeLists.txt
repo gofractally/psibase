@@ -446,7 +446,6 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH services/user/Branding
-    DEPENDS ${Branding_js_DEP}
 )
 
 cargo_psibase_package(
@@ -642,14 +641,12 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-producers
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/ui/dist/* /
     SERVICE r-producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RProducers-schema.json
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
-    DEPENDS ${Producers_js_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
