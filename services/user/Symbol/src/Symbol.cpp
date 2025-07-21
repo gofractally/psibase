@@ -107,7 +107,7 @@ void Symbol::init()
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
    to<Nft>().credit(symbolOwnerNft.ownerNft, Tokens::service, "System token symbol ownership nft");
-   recurse().to<Tokens>().map_symbol(Tokens::sysToken, sysTokenSymbol);
+   recurse().to<Tokens>().mapSymbol(Tokens::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);

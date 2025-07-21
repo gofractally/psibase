@@ -108,15 +108,12 @@ impl Intf for TokensPlugin {
     fn map_symbol(token_id: Wit::TokenId, symbol: Wit::AccountNumber) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
 
-        let packed_args = tokens::action_structs::map_symbol {
+        let packed_args = tokens::action_structs::mapSymbol {
             token_id,
             symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
         }
         .packed();
-        add_action_to_transaction(
-            tokens::action_structs::map_symbol::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(tokens::action_structs::mapSymbol::ACTION_NAME, &packed_args)
     }
 
     fn mint(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {

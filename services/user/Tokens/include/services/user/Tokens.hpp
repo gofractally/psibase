@@ -157,7 +157,7 @@ namespace UserService
       /// # Arguments
       /// * `token_id` - Unique token identifier.
       /// * `symbol` - Symbol e.g. "BTC"
-      void map_symbol(TID tokenId, SID symbolId);
+      void mapSymbol(TID tokenId, SID symbol);
 
       // Read-only interface:
 
@@ -282,7 +282,7 @@ namespace UserService
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),
       method(getTokenConf, tokenId, index),
-      method(map_symbol, symbolId, tokenId),
+      method(mapSymbol, tokenId, symbol),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,

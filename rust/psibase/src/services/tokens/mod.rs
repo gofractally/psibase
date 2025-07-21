@@ -220,7 +220,8 @@ mod service {
     /// * `token_id` - Unique token identifier.
     /// * `symbol` - Symbol e.g. "BTC"
     #[action]
-    fn map_symbol(token_id: TID, symbol: AccountNumber) {
+    #[allow(non_snake_case)]
+    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
         unimplemented!()
     }
 
