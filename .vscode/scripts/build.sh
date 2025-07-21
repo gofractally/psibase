@@ -12,5 +12,5 @@ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
       -DCMAKE_C_COMPILER_LAUNCHER=ccache \
       -DCMAKE_INSTALL_PREFIX="psidk" "$PROJECT_ROOT"
 
-JOBS=$(( $(nproc) / 1 ))
+JOBS=$(( $(nproc) / 3 ))
 make install -j "$JOBS"
