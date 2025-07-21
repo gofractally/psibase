@@ -44,15 +44,7 @@ impl<'a> Unpack<'a> for Memo {
     const VARIABLE_SIZE: bool = true;
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Memo> {
-        let len = u32::unpack(src, pos)?;
-        let bytes = src
-            .get(*pos as usize..(*pos + len) as usize)
-            .ok_or(Error::ReadPastEnd)?;
-        *pos += len;
-
-        Ok(Self::new(
-            String::from_utf8(bytes.to_vec()).or(Err(Error::BadUTF8))?,
-        ))
+        Ok(Self::new(String::unpack(src, pos)?))
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
