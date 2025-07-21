@@ -120,17 +120,17 @@ mod tests {
 
     #[test]
     fn test_precision_7() {
-        assert_eq!(create_asset(4000000, 6).to_string(), "4.000000");
-        assert_eq!(create_asset(1, 6).to_string(), "0.000001");
-        assert_eq!(create_asset(123456, 6).to_string(), "0.123456");
+        assert_eq!(create_asset(4000000, 7).to_string(), "0.4000000");
+        assert_eq!(create_asset(1, 7).to_string(), "0.0000001");
+        assert_eq!(create_asset(123456, 7).to_string(), "0.0123456");
         assert_eq!(create_asset(0, 7).to_string(), "0.0000000");
     }
 
     #[test]
     fn test_precision_8() {
-        assert_eq!(create_asset(4000000, 6).to_string(), "4.000000");
-        assert_eq!(create_asset(1, 6).to_string(), "0.000001");
-        assert_eq!(create_asset(123456, 6).to_string(), "0.123456");
+        assert_eq!(create_asset(4000000, 8).to_string(), "0.04000000");
+        assert_eq!(create_asset(1, 8).to_string(), "0.00000001");
+        assert_eq!(create_asset(123456, 8).to_string(), "0.00123456");
         assert_eq!(create_asset(0, 8).to_string(), "0.00000000");
     }
 
