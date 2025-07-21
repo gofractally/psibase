@@ -1,4 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import advancedFormat from "dayjs/plugin/advancedFormat";
+import duration from "dayjs/plugin/duration";
+import timezone from "dayjs/plugin/timezone";
 import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -10,6 +14,10 @@ import { Toaster } from "@shared/shadcn/ui/sonner";
 
 import { queryClient } from "./queryClient";
 import { router } from "./router";
+
+dayjs.extend(advancedFormat);
+dayjs.extend(timezone);
+dayjs.extend(duration);
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>

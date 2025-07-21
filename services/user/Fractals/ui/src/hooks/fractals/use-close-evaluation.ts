@@ -32,6 +32,8 @@ export const useCloseEvaluation = () => {
                 // Here we assume that not finding the evaluation means
                 // someone else beat us to it, so we will treat this as success
                 if (!error.message.includes("not found")) {
+                    const message = "Error closing evaluation:";
+                    console.error(message, e);
                     throw e;
                 }
             }

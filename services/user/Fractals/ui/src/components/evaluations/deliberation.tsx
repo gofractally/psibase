@@ -16,10 +16,9 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
     if (!fractal || !evaluationInstance) return null;
 
     return status.groupNumber && status.isParticipant ? (
-        <div>
-            Evaluation is in progress. You are part of group{" "}
-            {status.groupNumber}
+        <div className="flex items-center gap-2">
             <Button
+                size="sm"
                 onClick={() => {
                     navigate(
                         paths.fractal.evaluationGroup(
@@ -32,8 +31,12 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
             >
                 Join group
             </Button>
+            <div>
+                Evaluation is in progress. You are part of group{" "}
+                {status.groupNumber}
+            </div>
         </div>
     ) : (
-        <div>Evaluation in progress. 📤</div>
+        <div>⏳ Evaluation in progress</div>
     );
 };

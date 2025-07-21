@@ -18,10 +18,15 @@ export const useCreateConnectionToken = () =>
                 }),
             ),
         onSuccess: (token) => {
-            window.open(
-                modifyUrlParams(siblingUrl(undefined, "accounts"), {
+            window.location.href = modifyUrlParams(
+                siblingUrl(undefined, "accounts"),
+                {
                     token,
-                }),
+                },
             );
+        },
+        onError: (error) => {
+            const message = "Error creating connection token";
+            console.error(message, error);
         },
     });

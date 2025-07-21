@@ -1,4 +1,5 @@
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
+import dayjs from "dayjs";
 import { AlignJustify, Info, Plus, X } from "lucide-react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
@@ -14,7 +15,9 @@ import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
 import { Account } from "@/lib/zod/Account";
 
+import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -40,10 +43,11 @@ const useRanking = () => {
 
     const groupUsers = groupUsersData || [];
 
-    const { data: currentProposal, refetch: refetchProposal } = useProposal(
-        Number(evaluationId),
-        Number(groupNumber),
-    );
+    const {
+        data: currentProposal,
+        isPending: isProposalPending,
+        refetch: refetchProposal,
+    } = useProposal(Number(evaluationId), Number(groupNumber));
     const proposal = currentProposal ?? [];
 
     const { cancel, maybeExecute: refreshProposal } = useAsyncDebouncer(
@@ -101,6 +105,7 @@ const useRanking = () => {
         onSortEnd,
         add,
         remove,
+        isLoading: isProposalPending,
     };
 };
 
@@ -114,101 +119,120 @@ const GroupStatus = () => {
     const isClosing = useWatchClose(status);
 
     let description = "";
+    let variant: "default" | "destructive" | "secondary" | "outline" =
+        "default";
 
     if (status?.type == "deliberation") {
         const secondsUntilDeliberation = status.deliberationDeadline - now;
-        description = `Finishes in ${humanize(secondsUntilDeliberation)}`;
+        if (secondsUntilDeliberation <= 5400) {
+            description = dayjs
+                .duration(secondsUntilDeliberation * 1000)
+                .format("m:ss");
+        } else {
+            description = humanize(secondsUntilDeliberation);
+        }
+        if (secondsUntilDeliberation <= 90) {
+            variant = "destructive";
+        }
     } else if (status?.type == "submission") {
         if (status.mustSubmit) {
-            description = isAttesting
-                ? "Submitting group results..."
-                : "you should submit!";
+            description = isAttesting ? "Submitting..." : "Submit!";
+            if (!isAttesting) variant = "destructive";
         } else {
-            description = "you dont need to submit";
+            description = "You do not need to submit.";
         }
     } else if (isClosing) {
-        description = "Closing evaluation...";
+        description = "Closing..";
     }
 
     return (
-        <div className="flex justify-between">
-            <div>Group #{groupNumber}</div>
-            <div>{description}</div>
+        <div className="flex h-9 items-center justify-between">
+            <h1 className="text-lg font-semibold">Group #{groupNumber}</h1>
+            <Badge variant={variant} className="min-w-[52px]">
+                {description}
+            </Badge>
         </div>
     );
 };
 
 export const EvaluationDeliberation = () => {
-    const { add, remove, onSortEnd, rankedAccounts, unrankedAccounts } =
-        useRanking();
+    const {
+        add,
+        remove,
+        onSortEnd,
+        rankedAccounts,
+        unrankedAccounts,
+        isLoading,
+    } = useRanking();
 
     return (
-        <div className="mx-auto flex w-full max-w-screen-lg flex-col gap-4">
+        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <GroupStatus />
-
-            <div>
-                <div>Ranked numbers</div>
-                <div className="text-muted-foreground text-sm">
-                    Sort from highest to lowest in value.
-                </div>
-                <SortableList
-                    className="jss30 flex w-full flex-col gap-2 border p-4"
-                    draggedItemClassName="jss32"
-                    onSortEnd={onSortEnd}
-                >
-                    {rankedAccounts.length > 0 ? (
-                        rankedAccounts.map((account: string) => (
-                            <SortableItem key={account}>
-                                <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
-                                    <div className="flex-1 text-lg">
-                                        {account}
-                                    </div>
-                                    <SortableKnob>
-                                        <AlignJustify className="h-6 w-6" />
-                                    </SortableKnob>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => remove(account)}
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </SortableItem>
-                        ))
-                    ) : (
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
-                            <Info className="h-4 w-4" />
-                            Select the numbers below to rank them.
-                        </div>
-                    )}
-                </SortableList>
-            </div>
-
-            <div className="flex flex-col gap-2">
+            <div className="mt-3">
                 <div>
-                    <div>Unranked numbers</div>
+                    <h2 className="text-base font-semibold">Ranked</h2>
                     <div className="text-muted-foreground text-sm">
-                        Numbers you consider should not be ranked in the
-                        evaluation.
+                        With those more highly ranked towards the top:
                     </div>
+                    <SortableList
+                        className="jss30 mb-4 mt-2 flex w-full flex-col gap-2 border p-2"
+                        draggedItemClassName="jss32"
+                        onSortEnd={onSortEnd}
+                    >
+                        {rankedAccounts.length > 0 ? (
+                            rankedAccounts.map((account: string) => (
+                                <SortableItem key={account}>
+                                    <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
+                                        <div className="flex-1 text-lg">
+                                            {account}
+                                        </div>
+                                        <SortableKnob>
+                                            <AlignJustify className="h-6 w-6" />
+                                        </SortableKnob>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => remove(account)}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </SortableItem>
+                            ))
+                        ) : (
+                            <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
+                                <Info className="h-4 w-4" />
+                                Select participants below to rank them
+                            </div>
+                        )}
+                    </SortableList>
                 </div>
-                <div className="flex w-full gap-2">
-                    {unrankedAccounts.length > 0 ? (
-                        unrankedAccounts.map((account) => (
-                            <Button
-                                key={account}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => add(account)}
-                            >
-                                <div>{account}</div>
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                        ))
+
+                <div className="flex flex-col gap-2">
+                    <div>
+                        <h2 className="text-base font-semibold">Unranked</h2>
+                    </div>
+                    {isLoading ? (
+                        <Skeleton className="h-10 w-full" />
                     ) : (
-                        <div className="text-muted-foreground text-sm italic">
-                            All users are ranked.
+                        <div className="flex w-full gap-2">
+                            {unrankedAccounts.length > 0 ? (
+                                unrankedAccounts.map((account) => (
+                                    <Button
+                                        key={account}
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => add(account)}
+                                    >
+                                        <div>{account}</div>
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                ))
+                            ) : (
+                                <div className="text-muted-foreground text-sm italic">
+                                    All participants are ranked
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

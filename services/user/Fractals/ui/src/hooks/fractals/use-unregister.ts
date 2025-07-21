@@ -30,7 +30,9 @@ export const useUnregister = () =>
         },
         onError: (error, params) => {
             updateParticipants(params.evaluationId, assertUser(), true);
-            toast.error(error.message);
+            const message = "Error unregistering";
+            console.error(message, error);
+            toast.error(message);
             queryClient.invalidateQueries({
                 queryKey: QueryKey.usersAndGroups(params.evaluationId),
             });
