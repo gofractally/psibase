@@ -43,6 +43,7 @@ function(add suffix)
         Events/include
         Invite/include
         Nft/include
+        Nop/include
         Packages/include
         Sites/include
         Symbol/include

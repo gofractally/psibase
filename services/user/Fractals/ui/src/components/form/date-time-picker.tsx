@@ -52,8 +52,8 @@ export function DateTimePicker24h({
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
-            <div className="flex items-center">
-                <div className="w-64">{label}</div>
+            <div className="w-full space-y-2">
+                <div>{label}</div>
                 <PopoverTrigger asChild>
                     <Button
                         variant="outline"

@@ -197,7 +197,9 @@ namespace psibase
 
          try
          {
+            auto session = db.startWrite(writer);
             tc.execNonTrxAction(0, action, atrace);
+            session.commit();
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
             PSIBASE_LOG(trxLogger, debug) << "onBlock succeeded";
          }
@@ -249,7 +251,9 @@ namespace psibase
 
          try
          {
+            auto session = db.startWrite(writer);
             tc.execNonTrxAction(0, action, atrace);
+            session.commit();
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
             PSIBASE_LOG(trxLogger, debug) << "onTransaction succeeded";
          }
@@ -331,7 +335,9 @@ namespace psibase
 
          try
          {
+            auto session = db.startWrite(writer);
             tc.execNonTrxAction(0, action, atrace);
+            session.commit();
 
             std::optional<SignedTransaction> result;
             if (!psio::from_frac(result, atrace.rawRetval))
@@ -399,7 +405,9 @@ namespace psibase
 
          try
          {
+            auto session = db.startWrite(writer);
             tc.execNonTrxAction(0, action, atrace);
+            session.commit();
 
             std::optional<std::vector<std::optional<RunToken>>> result;
             if (!psio::from_frac(result, atrace.rawRetval))

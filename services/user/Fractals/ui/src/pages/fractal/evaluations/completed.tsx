@@ -44,7 +44,7 @@ export const Completed = () => {
                                 >
                                     <TableCell>
                                         {dayjs(evaluation.deliberation).format(
-                                            "MMMM D, YYYY [at] h:mm A",
+                                            "MMMM D, YYYY [at] h:mm A z",
                                         )}
                                     </TableCell>
                                 </TableRow>

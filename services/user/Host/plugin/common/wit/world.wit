@@ -129,10 +129,83 @@ interface admin {
     post: func(app: string, request: post-request) -> result<option<body-types>, error>;
 }
 
+/// A keyvalue interface that provides key-value operations.
+/// 
+/// Once a write operation completes, all subsequent read operations will return the value that 
+/// was written. Another client running in a different context may or may not immediately see the 
+/// result.
+interface store {
+    use types.{error};
+
+    /// Database mode - Related to the conditions under which database writes will or will not succeed
+    enum db-mode {
+        /// Writes to a non-transactional database will persist regardless of the success or failure
+        ///    of the current action. When you write, the database is immediately updated.
+        non-transactional,
+
+        /// Writes to a transactional database will automatically roll-back if the current action
+        ///    fails for any reason (including the failure of a scheduled server-side transaction).
+        /// NOTE: This `db-mode` is not yet supported!
+        transactional
+    }
+
+    /// Database type - Related to the duration of the data in storage
+    enum storage-duration {
+        /// Persistent storage will last until deleted
+        persistent,
+        /// Session storage will be deleted at the close of a session. The duration
+        ///    of a session is defined by the host platform.
+        /// NOTE: `session` duration is not yet supported!
+        session,
+        /// Ephemeral storage will be deleted at the close of the current transaction
+        ///    context.
+        /// NOTE: `ephemeral` duration is not yet supported!
+        ephemeral
+    }
+
+    /// Data sufficient to specify a particular database
+    record database {
+        mode: db-mode,
+        duration: storage-duration,
+    }
+
+    /// A bucket is a collection of key-value pairs.
+    resource bucket {
+
+        /// Get a bucket from the specified database with the specified identifier
+        constructor(db: database, identifier: string);
+
+        /// Get the value associated with the specified `key`
+        ///
+        /// The value is returned as an option. If the key-value pair exists in the
+        /// store, it returns `Ok(value)`. If the key does not exist in the
+        /// store, it returns `Ok(none)`. 
+        get: func(key: string) -> result<option<list<u8>>, error>;
+
+        /// Set the value associated with the key in the store. If the key already
+        /// exists in the store, it overwrites the value.
+        ///
+        /// If the key does not exist in the store, it creates a new key-value pair.
+        set: func(key: string, value: list<u8>) -> result<_, error>;
+
+        /// Delete the key-value pair associated with the key in the store.
+        /// 
+        /// If the key does not exist in the store, it does nothing.
+        delete: func(key: string) -> result<_, error>;
+
+        /// Check if the key exists in the store.
+        /// 
+        /// If the key exists in the store, it returns `Ok(true)`. If the key does
+        /// not exist in the store, it returns `Ok(false)`.
+        exists: func(key: string) -> result<bool, error>;
+    }
+}
+
 world imports {
     import types;
     import server;
     import client;
+    import store;
 }
 
 world privileged {

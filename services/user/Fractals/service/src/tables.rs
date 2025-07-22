@@ -18,6 +18,7 @@ pub mod tables {
 
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Fractal {
         pub account: AccountNumber,
         pub created_at: TimePointSec,
@@ -89,6 +90,13 @@ pub mod tables {
                 finish_by,
                 interval_seconds,
             )
+        }
+    }
+
+    #[ComplexObject]
+    impl Fractal {
+        pub async fn council(&self) -> Vec<AccountNumber> {
+            vec![psibase::services::auth_delegate::Wrapper::call().getOwner(self.account)]
         }
     }
 

@@ -90,6 +90,11 @@ void psibase::raw::kvPut(DbId        db,
                                valueLen);
 }
 
+void psibase::raw::kvRemove(DbId db, const char* key, uint32_t keyLen)
+{
+   psibase::tester::raw::kvRemove(psibase::tester::raw::getSelectedChain(), db, key, keyLen);
+}
+
 std::int32_t psibase::raw::socketSend(std::int32_t fd, const void* data, std::size_t size)
 {
    psibase::abortMessage("Tester does not support socketSend");

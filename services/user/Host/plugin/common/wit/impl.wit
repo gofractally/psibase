@@ -7,4 +7,5 @@ world impl {
     export client;
     export types;
     export admin;
+    export store;
 }
