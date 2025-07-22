@@ -15,6 +15,11 @@ mod service {
     }
 
     #[action]
+    fn getOwner(account: AccountNumber) -> AccountNumber {
+        unimplemented!()
+    }
+
+    #[action]
     fn canAuthUserSys(user: AccountNumber) {
         unimplemented!()
     }

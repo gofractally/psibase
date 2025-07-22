@@ -53,10 +53,7 @@ impl Admin for HostCommon {
             "get-active-app@host:common/admin",
         );
 
-        let stack = get_callstack();
-        assert!(stack.len() > 0);
-        let active = stack[0].clone();
-
+        let active = Supervisor::get_active_app();
         OriginationData {
             app: Some(active.clone()),
             origin: HostCommon::get_app_url(active),

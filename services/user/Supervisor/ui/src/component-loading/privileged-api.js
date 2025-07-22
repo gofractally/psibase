@@ -14,6 +14,10 @@ export const intf = {
     getChainId() {
         return host.getChainId();
     },
+
+    getActiveApp() {
+        return host.getActiveApp();
+    },
 };
 
 export const database = {

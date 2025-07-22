@@ -2,7 +2,6 @@ import { createBrowserRouter, redirect } from "react-router-dom";
 
 import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
 import { Completed } from "@/pages/fractal/evaluations/completed";
-import { Proposed } from "@/pages/fractal/evaluations/proposed";
 import { AllMembers } from "@/pages/fractal/membership/all-members";
 import { MyMembership } from "@/pages/fractal/membership/my-membership";
 import { Loader } from "@/pages/loader";
@@ -37,7 +36,7 @@ export const router = createBrowserRouter([
             {
                 path: ":fractalName",
                 index: true,
-                loader: () => redirect("evaluations/"),
+                loader: () => redirect("membership"),
             },
             {
                 path: ":fractalName/membership",
@@ -65,16 +64,6 @@ export const router = createBrowserRouter([
                     <ProtectedRoute>
                         <AppExists>
                             <ActiveAndUpcoming />
-                        </AppExists>
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: ":fractalName/evaluations/proposed",
-                element: (
-                    <ProtectedRoute>
-                        <AppExists>
-                            <Proposed />
                         </AppExists>
                     </ProtectedRoute>
                 ),

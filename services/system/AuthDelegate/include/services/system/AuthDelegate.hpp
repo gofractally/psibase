@@ -94,9 +94,10 @@ namespace SystemService
       /// Create a new account with the specified name, owned by the specified `owner` account.
       void newAccount(psibase::AccountNumber name, psibase::AccountNumber owner);
 
+      psibase::AccountNumber getOwner(psibase::AccountNumber account);
+
      private:
       Tables                        db{psibase::getReceiver()};
-      psibase::AccountNumber        getOwner(psibase::AccountNumber account);
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
    PSIO_REFLECT(AuthDelegate,  //
@@ -105,7 +106,8 @@ namespace SystemService
                 method(isAuthSys, sender, authorizers, authSet),
                 method(isRejectSys, sender, rejecters, authSet),
                 method(setOwner, owner),
-                method(newAccount, name, owner)
+                method(newAccount, name, owner),
+                method(getOwner, owner)
                 //
    )
    PSIBASE_REFLECT_TABLES(AuthDelegate, AuthDelegate::Tables)

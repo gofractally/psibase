@@ -30,7 +30,9 @@ export const useRegister = () => {
         },
         onError: (error, params) => {
             updateParticipants(params.evaluationId, assertUser(), false);
-            toast.error(error.message);
+            const message = "Error registering";
+            console.error(message, error);
+            toast.error(message);
             queryClient.invalidateQueries({
                 queryKey: QueryKey.usersAndGroups(params.evaluationId),
             });
