@@ -892,3 +892,7 @@ where
     let unpacked = T::unpack(bytes, &mut 0).unwrap();
     assert_eq!(*src_struct, unpacked);
 }
+
+test_fracpack_macros::include_tests!(
+    "${CARGO_MANIFEST_DIR}/../../libraries/psio/tests/fracpack-tests.json"
+);

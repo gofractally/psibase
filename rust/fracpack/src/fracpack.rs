@@ -56,6 +56,9 @@ use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 mod schema;
 pub use schema::*;
 
+mod nested;
+pub use nested::*;
+
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
@@ -928,17 +931,33 @@ macro_rules! tuple_impls {
 
                 #[allow(non_snake_case)]
                 fn pack(&self, dest: &mut Vec<u8>) {
-                    let heap: u32 = $($name::FIXED_SIZE +)* 0;
-                    assert!(heap as u16 as u32 == heap); // TODO: return error
-                    (heap as u16).pack(dest);
+                    let _trailing_empty_index = [
+                        $({!<$name as Pack>::is_empty_optional(&self.$n)}),*
+                    ].iter().rposition(|is_non_empty: &bool| *is_non_empty).map_or(0, |idx| idx + 1);
+
+                    let mut _heap: u32 = 0;
+                    $({
+                        if $n < _trailing_empty_index {
+                            _heap += <$name as Pack>::FIXED_SIZE;
+                        }
+                    })*
+                    assert!(_heap as u16 as u32 == _heap); // TODO: return error
+                    (_heap as u16).pack(dest);
+
+
+
                     $(
                         let $name = dest.len() as u32;
-                        self.$n.embedded_fixed_pack(dest);
+                        if $n < _trailing_empty_index {
+                            self.$n.embedded_fixed_pack(dest);
+                        }
                     )*
                     $(
-                        let heap_pos = dest.len() as u32;
-                        self.$n.embedded_fixed_repack($name, heap_pos, dest);
-                        self.$n.embedded_variable_pack(dest);
+                        if $n < _trailing_empty_index {
+                            let heap_pos = dest.len() as u32;
+                            self.$n.embedded_fixed_repack($name, heap_pos, dest);
+                            self.$n.embedded_variable_pack(dest);
+                        }
                     )*
                 }
             }
@@ -955,8 +974,10 @@ macro_rules! tuple_impls {
                     if heap_pos < *pos {
                         return Err(Error::BadOffset);
                     }
+                    let _initial_pos = *pos;
+                    let _trailing_optional_index = [$(<$name as Unpack>::IS_OPTIONAL,)*].iter().rposition(|is_optional: &bool| !is_optional).map_or(0, |idx| idx + 1);
                     $(
-                        let $name = $name::embedded_unpack(src, pos, &mut heap_pos)?;
+                        let $name = $name::check_opt_embedded_unpack(src, pos, &mut heap_pos, $n < _trailing_optional_index, *pos - _initial_pos < fixed_size as u32)?;
                     )*
                     *pos = heap_pos;
                     Ok(($($name,)*))

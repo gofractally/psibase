@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::str::FromStr;
 use syn::{
-    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed,
-    LitStr,
+    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed,
+    FieldsUnnamed, LitStr,
 };
 
 /// Fracpack struct level options
@@ -358,7 +358,7 @@ fn process_struct(
         .enumerate()
         .map(|(i, field)| {
             let ty = &field.ty;
-            quote! { if last_non_empty_index >= #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
+            quote! { if trailing_empty_index > #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
 
@@ -396,7 +396,7 @@ fn process_struct(
             };
             quote! {
                 #pos_quote
-                if last_non_empty_index >= #i {
+                if trailing_empty_index > #i {
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
                 }
             }
@@ -412,7 +412,7 @@ fn process_struct(
             let ty = &field.ty;
             let pos = &positions[i];
             quote! {
-                if last_non_empty_index >= #i {
+                if trailing_empty_index > #i {
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
                     <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
                 }
@@ -431,7 +431,7 @@ fn process_struct(
             quote! {
                 let #name = <#ty as #fracpack_mod::Unpack>::check_opt_embedded_unpack(
                     src, pos, &mut heap_pos,
-                    #is_def_wont_change || #i <= last_non_optional_index,
+                    #is_def_wont_change || #i < trailing_optional_index,
                     *pos - initial_pos < fixed_size as u32)?;
             }
         })
@@ -462,7 +462,7 @@ fn process_struct(
             // let name = &field.name;
             if !opts.definition_will_not_change {
                 quote! {
-                    if !<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || #i <= last_non_optional_index || *pos - initial_pos < fixed_size as u32 {
+                    if !<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || #i < trailing_optional_index || *pos - initial_pos < fixed_size as u32 {
                         <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
                     }
                 }
@@ -484,7 +484,7 @@ fn process_struct(
                     let non_empty_fields = vec![
                         #(#check_optional_fields),*
                     ];
-                    let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(usize::MAX);
+                    let trailing_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).map_or(0, |idx| idx + 1);
 
                     let heap = #fixed_data_size;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
@@ -504,7 +504,7 @@ fn process_struct(
         let optional_fields: Vec<bool> = vec![
             #(#optional_fields),*
         ];
-        let last_non_optional_index = optional_fields.iter().rposition(|&is_optional| !is_optional).unwrap_or(usize::MAX);
+        let trailing_optional_index = optional_fields.iter().rposition(|&is_optional| !is_optional).map_or(0, |idx| idx + 1);
     };
 
     let unpack_impl = if impl_unpack {

@@ -24,6 +24,22 @@ impl Schema {
     }
 }
 
+impl IntoIterator for Schema {
+    type Item = <IndexMap<String, AnyType> as IntoIterator>::Item;
+    type IntoIter = <IndexMap<String, AnyType> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Schema {
+    type Item = <&'a IndexMap<String, AnyType> as IntoIterator>::Item;
+    type IntoIter = <&'a IndexMap<String, AnyType> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "crate")]
 pub enum AnyType {
