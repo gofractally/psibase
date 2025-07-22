@@ -51,6 +51,8 @@ export interface HostInterface {
         req: HttpRequest,
     ) => Result<HttpResponse, RecoverableErrorPayload>;
 
+    getActiveApp(): string;
+
     getServiceStack(): string[];
 
     getRootDomain(): string;

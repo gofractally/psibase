@@ -10,6 +10,10 @@ export const intf = {
     getRootDomain() {
         return host.getRootDomain();
     },
+
+    getActiveApp() {
+        return host.getActiveApp();
+    },
 };
 
 export const database = {

@@ -193,6 +193,10 @@ export class PluginHost implements HostInterface {
         return this.supervisor.callResource(this.self, kebabToCamel(args));
     }
 
+    getActiveApp(): string {
+        return this.supervisor.getActiveApp();
+    }
+
     getServiceStack(): string[] {
         return this.supervisor.getServiceStack();
     }
