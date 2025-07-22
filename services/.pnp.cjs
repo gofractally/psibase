@@ -2943,7 +2943,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/XAdmin/ui", {\
         "packageLocation": "./user/XAdmin/ui/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco", "npm:1.11.2"],\
+          ["@bytecodealliance/jco", "npm:1.10.2"],\
           ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
           ["@hookform/resolvers", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.1.1"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\

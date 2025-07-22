@@ -1,6 +1,10 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
 import { rollup, type WarningHandlerWithDefault } from "@rollup/browser";
-import { cli, clocks, filesystem, io, random } from '@bytecodealliance/preview2-shim';
+import * as cli from '@bytecodealliance/preview2-shim/cli';
+import * as clocks from '@bytecodealliance/preview2-shim/clocks';
+import * as filesystem from '@bytecodealliance/preview2-shim/filesystem';
+import * as io from '@bytecodealliance/preview2-shim/io';
+import * as random from '@bytecodealliance/preview2-shim/random';
 import shimCode from './shims/shimWrapper.js?raw';
 
 import { HostInterface } from "../hostInterface.js";
