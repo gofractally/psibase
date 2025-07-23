@@ -1,4 +1,5 @@
 import { Save, Trash, Upload } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import React, { ReactNode, useRef, useState } from "react";
 import z from "zod";
 
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 
 import { useAppForm } from "@/components/forms/app-form";
 
+import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
 import { useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
 import { useBranding } from "@/hooks/useBranding";
@@ -24,7 +26,7 @@ const Section = ({
     description: ReactNode;
     children: ReactNode;
 }) => (
-    <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+    <div className="flex flex-col items-center justify-between gap-2 rounded-lg border p-4 sm:flex-row">
         <div className="space-y-0.5">
             <Label className="text-base">{title}</Label>
             <div className="text-muted-foreground text-sm">{description}</div>
@@ -35,6 +37,8 @@ const Section = ({
 
 export const Branding = () => {
     const { data: networkName, isLoading: isBrandingLoading } = useBranding();
+
+    const { data: isLogoUploaded } = useLogoUploaded();
 
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
     const [iconPreview, setPreview] = useState<string>("");
@@ -94,7 +98,7 @@ export const Branding = () => {
     };
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6">
+        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
             <div>
                 <h2 className="text-lg font-medium">Branding</h2>
                 <p className="text-muted-foreground text-sm">
@@ -106,7 +110,9 @@ export const Branding = () => {
                 title="Icon"
                 description={
                     <div>
-                        <div>Displays on the homepage and other places</div>
+                        <div className="mb-1">
+                            Displays on the homepage and other places
+                        </div>
                         <div className="text-muted-foreground text-sm">
                             Recommended size: 512x512px
                         </div>{" "}
@@ -115,18 +121,25 @@ export const Branding = () => {
             >
                 <div className="flex flex-col gap-2">
                     <div className="mx-auto ">
-                        <img
-                            src={
-                                iconPreview ||
-                                siblingUrl(
-                                    null,
-                                    "branding",
-                                    "/network_logo.svg",
-                                )
-                            }
-                            alt="Icon preview"
-                            className="h-20 w-20 rounded-lg object-cover"
-                        />
+                        {iconPreview || isLogoUploaded ? (
+                            <img
+                                src={
+                                    iconPreview ||
+                                    siblingUrl(
+                                        null,
+                                        "branding",
+                                        "/network_logo.svg",
+                                    )
+                                }
+                                alt="Icon preview"
+                                className="h-20 w-20 rounded-lg object-cover"
+                            />
+                        ) : (
+                            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                                <CircleAlert />
+                                No logo uploaded.
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center space-x-4">
                         <div className="flex space-x-1">
