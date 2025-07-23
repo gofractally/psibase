@@ -151,4 +151,29 @@ namespace psibase
       }
    }
 
+   bool isDevChain(const HttpRequest& request)
+   {
+      // Check the host field first (always present)
+      if (isFromLocalhost(request.host))
+      {
+         return true;
+      }
+      
+      // Also check origin header if present (for cross-origin requests)
+      if (auto originHeader = request.getHeader("origin"))
+      {
+         for (auto part : *originHeader | std::views::split(','))
+         {
+            std::string_view value = split2sv(part);
+            std::string valueStr{value};
+            
+            if (isFromLocalhost(valueStr))
+            {
+               return true;
+            }
+         }
+      }
+      return false;
+   }
+
 }  // namespace psibase
