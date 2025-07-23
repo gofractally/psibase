@@ -325,7 +325,7 @@ set(PSIBASE_VERSION 0.19)
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
     NAME Transact
-    VERSION ${PSIBASE_VERSION}.0
+    VERSION ${PSIBASE_VERSION}.1
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
