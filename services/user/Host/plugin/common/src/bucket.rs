@@ -125,7 +125,7 @@ impl Bucket {
 
     fn validate_key_size(&self, key: &str) -> Result<(), Error> {
         if key.len() >= 256 {
-            return Err(make_error("key must be less than 256 bytes"));
+            return Err(make_error("key must be <= 256 bytes"));
         }
         Ok(())
     }
