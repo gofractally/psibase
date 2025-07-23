@@ -20,7 +20,7 @@ pub mod tables {
     }
 
     #[table(name = "TokenTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Token {
         #[primary_key]
@@ -28,8 +28,7 @@ pub mod tables {
         pub nft_id: NID,
         #[graphql(skip)]
         pub settings_value: u8,
-        #[graphql(skip)]
-        pub precision: u8,
+        pub precision: Precision,
         #[graphql(skip)]
         pub issued_supply: Quantity,
         #[graphql(skip)]
@@ -81,7 +80,7 @@ pub mod tables {
             self.save();
         }
 
-        pub fn add(precision: u8, max_issued_supply: Quantity) -> Self {
+        pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
             let init_table = InitTable::new();
             let mut init_row = init_table.get_index_pk().get(&()).unwrap();
             let new_id = init_row.last_used_id.checked_add(1).unwrap();
@@ -95,7 +94,7 @@ pub mod tables {
                 issued_supply: 0.into(),
                 burned_supply: 0.into(),
                 max_issued_supply,
-                precision: Precision::try_from(precision).unwrap().value,
+                precision,
                 settings_value: 0,
                 symbol: None,
             };
@@ -180,10 +179,6 @@ pub mod tables {
     impl Token {
         pub async fn owner(&self) -> AccountNumber {
             self.nft_holder()
-        }
-
-        pub async fn precision(&self) -> Precision {
-            self.precision.try_into().unwrap()
         }
 
         pub async fn current_supply(&self) -> Decimal {

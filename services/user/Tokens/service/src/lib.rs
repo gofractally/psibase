@@ -6,7 +6,7 @@ pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
-    use psibase::services::tokens::{Memo, Quantity};
+    use psibase::services::tokens::{Memo, Precision, Quantity};
     use psibase::AccountNumber;
 
     use psibase::*;
@@ -40,7 +40,7 @@ pub mod service {
     ///
     /// # Returns the unique token identifier aka TID (u32)
     #[action]
-    fn create(precision: u8, max_issued_supply: Quantity) -> TID {
+    fn create(precision: Precision, max_issued_supply: Quantity) -> TID {
         check(
             max_issued_supply.value > 0,
             "Max issued supply must be greater than 0",
@@ -400,7 +400,7 @@ pub mod service {
     pub fn created(
         token_id: TID,
         sender: AccountNumber,
-        precision: u8,
+        precision: Precision,
         max_issued_supply: Quantity,
     ) {
     }

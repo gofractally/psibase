@@ -16,7 +16,7 @@ namespace UserService
       TID                id;
       NID                nft_id;
       uint8_t            settings_value;
-      uint8_t            precision;
+      Precision          precision;
       Quantity           issued_supply;
       Quantity           burned_supply;
       Quantity           max_issued_supply;

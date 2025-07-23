@@ -102,7 +102,7 @@ mod tests {
 
         // Alice can create a new token
         let token_id = Wrapper::push_from(&chain, alice)
-            .create(4.into(), 80000.into())
+            .create(4.try_into().unwrap(), 80000.into())
             .get()?;
 
         // Alice can mint a portion of the token supply;

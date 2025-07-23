@@ -28,7 +28,7 @@ namespace
       const int  targetNrSymbolsPerDay = 24;
    }  // namespace SymbolPricing
 
-   auto q = [](Quantity_t amt, uint8_t p) { return Quantity{amt * std::pow(10, p)}; };
+   auto q = [](Quantity_t amt, Precision p) { return Quantity{amt * std::pow(10, p.value)}; };
 
 }  // namespace
 
@@ -44,7 +44,7 @@ SCENARIO("Buying a symbol")
       auto b     = bob.to<Symbol>();
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
-      auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
+      auto precision = Precision{sysIssuer.getToken(sysToken).returnVal().precision};
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);

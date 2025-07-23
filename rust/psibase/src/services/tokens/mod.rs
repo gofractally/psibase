@@ -74,7 +74,7 @@ pub struct Balance {
 mod service {
 
     use super::{Memo, Quantity, TokenRecord, TID};
-    use crate::AccountNumber;
+    use crate::{services::tokens::Precision, AccountNumber};
 
     #[action]
     fn init() {
@@ -138,7 +138,7 @@ mod service {
     ///
     /// # Returns the unique token identifier aka TID (u32)
     #[action]
-    fn create(precision: u8, max_supply: Quantity) -> TID {
+    fn create(precision: Precision, max_supply: Quantity) -> TID {
         unimplemented!()
     }
 

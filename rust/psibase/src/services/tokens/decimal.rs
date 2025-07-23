@@ -19,18 +19,18 @@ impl Decimal {
 
 impl std::fmt::Display for Decimal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.precision.value == 0 {
+        if self.precision.0 == 0 {
             return write!(f, "{}", self.quantity.value.to_string());
         }
-        let integer_part = self.quantity.value / 10u64.pow(self.precision.value as u32);
-        let fractional_part = self.quantity.value % 10u64.pow(self.precision.value as u32);
+        let integer_part = self.quantity.value / 10u64.pow(self.precision.0 as u32);
+        let fractional_part = self.quantity.value % 10u64.pow(self.precision.0 as u32);
 
         write!(
             f,
             "{}.{:0width$}",
             integer_part,
             fractional_part,
-            width = self.precision.value as usize
+            width = self.precision.0 as usize
         )
     }
 }

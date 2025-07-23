@@ -61,8 +61,8 @@ void Symbol::init()
    to<Tokens>().setUserConf(Tokens::untransferable, true);
 
    // Create system token
-   constexpr uint8_t precision = 4;
-   auto              tid       = to<Tokens>().create(precision, Quantity{1'000'000'000e4});
+   constexpr auto precision = Precision{4};
+   auto           tid       = to<Tokens>().create(precision, Quantity{1'000'000'000e4});
    check(tid == Tokens::sysToken, wrongSysTokenId);
    auto tNft = to<Tokens>().getToken(tid).nft_id;
    to<Nft>().debit(tNft, "Taking ownership of system token");
@@ -81,7 +81,7 @@ void Symbol::init()
    };
 
    auto getQuantity = [precision](Quantity_t q)
-   { return (Quantity_t)(q * std::pow(10, precision)); };
+   { return (Quantity_t)(q * std::pow(10, precision.value)); };
    auto symLengthTable = Tables().open<SymbolLengthTable>();
 
    Quantity_t initialPrice = getQuantity(1000);

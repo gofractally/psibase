@@ -36,7 +36,7 @@ namespace UserService
       /// * `max_issued_supply` - The permanent max issued supply of the token.
       ///
       /// # Returns the unique token identifier aka TID (u32)
-      TID create(uint8_t precision, Quantity maxIssuedSupply);
+      TID create(Precision precision, Quantity maxIssuedSupply);
 
       /// Mint tokens.
       ///

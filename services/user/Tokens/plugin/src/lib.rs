@@ -60,7 +60,7 @@ impl Intf for TokensPlugin {
 
         let packed_args = tokens::action_structs::create {
             max_issued_supply,
-            precision,
+            precision: precision.try_into().unwrap(),
         }
         .packed();
 
@@ -283,7 +283,7 @@ impl Queries for TokensPlugin {
                 .symbol
                 .map(|symbol| symbol.to_string())
                 .unwrap_or("".to_string()),
-            precision: token.precision.value,
+            precision: token.precision.0,
             current_supply: token.current_supply.to_string(),
             max_issued_supply: token.max_issued_supply.to_string(),
         })
