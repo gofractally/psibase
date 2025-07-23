@@ -53,10 +53,10 @@ impl Admin for HostCommon {
             "get-active-app@host:common/admin",
         );
 
-        let active_app = Supervisor::get_active_app();
+        let active = Supervisor::get_active_app();
         OriginationData {
-            app: active_app.app,
-            origin: active_app.origin,
+            app: Some(active.clone()),
+            origin: HostCommon::get_app_url(active),
         }
     }
 
@@ -135,13 +135,6 @@ impl Client for HostCommon {
 
     fn my_service_origin() -> String {
         Self::get_app_url(caller())
-    }
-
-    fn prompt_user(
-        _subpath: Option<String>,
-        _payload_json_str: Option<String>,
-    ) -> Result<(), Error> {
-        unimplemented!()
     }
 
     fn get_app_url(app: String) -> String {

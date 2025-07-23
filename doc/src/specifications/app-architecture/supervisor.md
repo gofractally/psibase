@@ -1,16 +1,16 @@
 # Supervisor
 
-WebAssembly modules, like [plugins](./plugins.md), always run in some host environment. For psibase app plugins executing in the browser, that host is called the supervisor. The supervisor is a core piece of infrastructure served by the psibase network that mediates all interactions between user interfaces and plugins. Furthermore, it is reponsible for fetching and dynamically linking all of a plugin's dependencies before the plugin is executed. 
+WebAssembly modules, like [plugins](./plugins.md), always run in some host environment. For psibase app plugins executing in the browser, that host is called the supervisor. The supervisor is a core piece of infrastructure served by the psibase network that mediates all interactions between user interfaces and plugins. Furthermore, it is reponsible for fetching and dynamically linking all of a plugin's dependencies before the plugin is executed.
 
 ## Host-provided capabilities
 
-The supervisor gives plugins their capabilities. These capabilities could include, but are not limited to:
+Except for plugins hosted from the `host` service, plugins do not interact directly with the supervisor. Instead, plugins use the interfaces exposed by the `host` plugins (e.g. `host:common`, `host:prompt`, etc.) to access an allowed subset of the functionality of the platform on which they're running (e.g. browser functionality).
 
-- [Synchronous calls between plugins](./plugins.md#synchronous-calls) - For modularizing app functionality
-- Event subscription feeds - Allowing UIs to respond to server-side [events](./events.md)
-- Facilitating user authentication for various tasks
-- Facilitating authenticated sharing of private user data between plugins
-- Client side peering - For exchange of data over WebRTC
+The host plugins provide plugins the ability to discover information about the current plugin execution context, such as the account name of the app responsible for making the current call.
+
+Plugins are also able to make `get` and `post` requests to their own backend http servers. The interfaces exposed to plugins do not allow them to make generic web requests, so there is no risk of covert data exports to private servers. Requests can only be made to the plugin's own http server running on the same psibase network from which it was served.
+
+Additionally, plugins can initiate direct interactions with the user through the `host:prompt` plugin. See the plugin documentation for details.
 
 ## Architecture
 
@@ -58,11 +58,3 @@ Then the supervisor bundles the transpiled component and its libaries into an ES
 ### Initialization
 
 Finally, the supervisor initializes each imported module with an object that defines various callbacks that can be used by the module to call back out into the host libraries, which is the final step in the preparation of each plugin. After this step, plugin functions are available to be called by apps or other plugins.
-
-## Facilitating user interactions
-
-There are various cases where it is necessary for a plugin to explicitly interact with the user.
-
-When a plugin asks the supervisor to open a UI for user interaction, it provides a path relative to its own domain at which the UI can be retrieved. The supervisor then initiates opening this URL in another browser tab on behalf of the plugin.
-
-> Note on user experience: Since modern browser do not allow pages to arbitrarily open new pages/tabs outside of handling a direct user interaction, the first time the supervisor requests to open a new window a user will need to explicitly enable popups from the supervisor in their browser. Due to the design of the supervisor running in its own domain, this is a one-time authorization by each user per device.

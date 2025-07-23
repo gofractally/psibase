@@ -1,6 +1,4 @@
-use crate::bindings::{
-    accounts::plugin::types::AppDetails, clientdata::plugin::keyvalue as Keyvalue,
-};
+use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use psibase::fracpack::{Pack, Unpack};
 
 use crate::db::keys::DbKeys;
@@ -11,20 +9,13 @@ struct ConnectedApps {
 }
 
 impl ConnectedApps {
-    pub fn add(&mut self, app: &AppDetails) {
-        let app = app.app.as_ref();
-
-        if app.is_none() {
+    pub fn add(&mut self, app: &str) {
+        let app = app.to_string();
+        if self.apps.contains(&app) {
             return;
         }
 
-        let app = app.unwrap();
-
-        if self.apps.contains(app) {
-            return;
-        }
-
-        self.apps.push(app.clone());
+        self.apps.push(app);
     }
 }
 
@@ -43,7 +34,7 @@ impl UserTable {
         self.user.to_string() + "." + key
     }
 
-    pub fn add_connected_app(&self, app: &AppDetails) {
+    pub fn add_connected_app(&self, app: &str) {
         let connected_apps = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_APPS));
         let mut connected_apps = connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())

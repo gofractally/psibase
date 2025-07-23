@@ -54,7 +54,7 @@ interface api {
 
     /// Gets the account name of the user logged into the active application.
     /// May also return None if no user is logged in.
-    get-current-user: func() -> result<option<string>, error>;
+    get-current-user: func() -> option<string>;
 }
 
 world imports {

@@ -29,7 +29,7 @@ vite.config.ts.timestamp-*.mjs
 .env
 psinode_db
 psinode_db_secure
-db
+/db
 db_secure
 __pycache__
 ccache.conf
