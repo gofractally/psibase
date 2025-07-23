@@ -56,7 +56,7 @@ fn get_risk_levels() -> HashMap<&'static str, u8> {
     map.insert("pub_from_priv", 0);
     map.insert("priv_from_pub", 5);
     map.insert("to_der", 0);
-    map.insert("sign", 5);
+    map.insert("sign", 0); // Takes private key as input
     map.insert("import_key", 2);
     map.insert("set_key", 5);
     map
@@ -73,9 +73,13 @@ fn check_authorization(fn_name: &str) -> Result<(), Error> {
         level: *level,
         description,
     };
-    let result = authorize(&get_sender_app().app.unwrap(), &r)?;
+    let sender = get_sender_app().app.unwrap();
+    let result = authorize(&sender, &r).map_err(|e| {
+        let msg = format!("[{} called {}] {}", sender, fn_name, e.to_string());
+        Unauthorized(msg)
+    })?;
     if !result {
-        return Err(Unauthorized("authorize").into());
+        return Err(Unauthorized("authorize".to_string()).into());
     }
     Ok(())
 }
@@ -83,7 +87,7 @@ fn check_authorization(fn_name: &str) -> Result<(), Error> {
 impl HookUserAuth for AuthSig {
     fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
         if !from_transact() {
-            return Err(Unauthorized("on_user_auth_claim").into());
+            return Err(Unauthorized("on_user_auth_claim".to_string()).into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
@@ -102,7 +106,7 @@ impl HookUserAuth for AuthSig {
         transaction_hash: Vec<u8>,
     ) -> Result<Option<Proof>, Error> {
         if !from_transact() {
-            return Err(Unauthorized("get_proofs").into());
+            return Err(Unauthorized("get_proofs".to_string()).into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
@@ -114,7 +118,9 @@ impl HookUserAuth for AuthSig {
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        check_authorization("generate_keypair")?;
+        if get_sender_app().app.unwrap() != "invite" {
+            check_authorization("generate_keypair")?;
+        }
         let keypair = AuthSig::generate_unmanaged_keypair()?;
         ManagedKeys::add(&keypair.public_key, &AuthSig::to_der(keypair.private_key)?);
         Ok(keypair.public_key)

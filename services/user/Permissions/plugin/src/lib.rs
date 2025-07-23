@@ -92,17 +92,23 @@ fn is_authorized(user: &str, caller: &str, callee: &str, risk: u8) -> bool {
 impl Api for PermissionsPlugin {
     fn authorize(caller: String, risk: Risk) -> Result<bool, Error> {
         risk.validate()?;
-        let user = Accounts::get_current_user().ok_or_else(|| ErrorType::LoggedInUserDNE())?;
 
         if risk.level == 0 {
+            // Anyone can call risk 0
             return Ok(true);
         }
-
         let callee = HostClient::get_sender_app().app.unwrap();
+        if caller == callee {
+            // Callee is always authorized to call itself
+            return Ok(true);
+        }
         if risk.level == 6 {
+            // Only the app itself can call risk 6
+            // TODO incorporate security groups
             return Ok(caller == callee);
         }
 
+        let user = Accounts::get_current_user().ok_or_else(|| ErrorType::LoggedInUserDNE())?;
         if is_authorized(&user, &caller, &callee, risk.level) {
             return Ok(true);
         }
