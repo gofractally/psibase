@@ -131,7 +131,7 @@ The current API for key-value operations allows one to select one of multiple di
 
 There are three different settings for data-duration that may be used:
 
-- Ephemeral - An ephemeral database is wiped at the start of every new execution context. This data never persists longer than the currently executing callstack.
+- Ephemeral - An ephemeral database never persists longer than the currently executing callstack.
 - Session - Data stored into a session database will persist until the end of the current session. A session is defined by the host implementation.
 - Persistent - Data stored into a persistent database will persist until explicitly deleted.
 
