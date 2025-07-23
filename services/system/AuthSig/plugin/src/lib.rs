@@ -13,7 +13,7 @@ use risks::*;
 
 // Other plugins
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::host::common::client::{get_sender_app, my_service_account};
+use bindings::host::common::client::get_sender_app;
 use bindings::host::common::types as CommonTypes;
 use bindings::permissions::plugin::api::authorize;
 use bindings::transact::plugin::intf as Transact;
@@ -35,15 +35,7 @@ struct AuthSig;
 
 fn check_authorization(fn_name: &str) -> Result<(), Error> {
     let sender = get_sender_app().app.unwrap();
-    if !authorize(&sender, &Risks::get_risk(fn_name), fn_name)? {
-        return Err(Unauthorized(format!(
-            "[{} -> {}] - {}",
-            get_sender_app().app.unwrap(),
-            my_service_account(),
-            fn_name
-        ))
-        .into());
-    }
+    authorize(&sender, &Risks::get_risk(fn_name), fn_name)?;
     Ok(())
 }
 
