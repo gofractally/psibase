@@ -8,12 +8,14 @@ mod db;
 use db::*;
 mod types;
 use types::*;
+mod risks;
+use risks::*;
 
 // Other plugins
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::host::common::client::get_sender_app;
+use bindings::host::common::client::{get_sender_app, my_service_account};
 use bindings::host::common::types as CommonTypes;
-use bindings::permissions::plugin::{api::authorize, types::Risk};
+use bindings::permissions::plugin::api::authorize;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -28,58 +30,19 @@ use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, Verif
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use psibase::fracpack::Pack;
 use rand_core::OsRng;
-use std::collections::HashMap;
 
 struct AuthSig;
 
-fn get_risk_description(level: u8) -> &'static str {
-    match level {
-        2 => indoc::indoc! {"
-            - Create new keypairs
-            - Import existing keypairs
-            - Consume account resources
-        "},
-        5 => indoc::indoc! {"
-            - Set the public key for your account
-            - Sign transactions on your behalf
-            - Extract your private key from your public key
-            - Consume account resources
-        "},
-        _ => "",
-    }
-}
-
-fn get_risk_levels() -> HashMap<&'static str, u8> {
-    let mut map = HashMap::new();
-    map.insert("generate_keypair", 2);
-    map.insert("generate_unmanaged_keypair", 0);
-    map.insert("pub_from_priv", 0);
-    map.insert("priv_from_pub", 5);
-    map.insert("to_der", 0);
-    map.insert("sign", 0); // Takes private key as input
-    map.insert("import_key", 2);
-    map.insert("set_key", 5);
-    map
-}
-
-lazy_static::lazy_static! {
-    static ref RISK_LEVELS: HashMap<&'static str, u8> = get_risk_levels();
-}
-
 fn check_authorization(fn_name: &str) -> Result<(), Error> {
-    let level = RISK_LEVELS.get(fn_name).unwrap_or(&6);
-    let description = get_risk_description(*level).to_string();
-    let r = Risk {
-        level: *level,
-        description,
-    };
     let sender = get_sender_app().app.unwrap();
-    let result = authorize(&sender, &r).map_err(|e| {
-        let msg = format!("[{} called {}] {}", sender, fn_name, e.to_string());
-        Unauthorized(msg)
-    })?;
-    if !result {
-        return Err(Unauthorized("authorize".to_string()).into());
+    if !authorize(&sender, &Risks::get_risk(fn_name), fn_name)? {
+        return Err(Unauthorized(format!(
+            "[{} -> {}] - {}",
+            get_sender_app().app.unwrap(),
+            my_service_account(),
+            fn_name
+        ))
+        .into());
     }
     Ok(())
 }
