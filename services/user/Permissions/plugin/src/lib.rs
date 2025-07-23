@@ -81,7 +81,12 @@ fn is_authorized(user: &str, caller: &str, callee: &str, risk: u8) -> bool {
 }
 
 impl Api for PermissionsPlugin {
-    fn authorize(caller: String, risk: Risk, debug_label: String) -> Result<bool, Error> {
+    fn authorize(
+        caller: String,
+        risk: Risk,
+        debug_label: String,
+        whitelist: Vec<String>,
+    ) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
         if !(0..=6).contains(&risk.level) {
             return Err(ErrorType::InvalidRiskLevel(
@@ -94,6 +99,10 @@ impl Api for PermissionsPlugin {
 
         if risk.level == 0 {
             // Anyone can call risk 0
+            return Ok(true);
+        }
+        if whitelist.contains(&caller) {
+            // Whitelisted accounts are authorized
             return Ok(true);
         }
         if caller == callee {
