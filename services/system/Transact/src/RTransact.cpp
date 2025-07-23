@@ -122,6 +122,17 @@ namespace
       return to<Transact>().checkFirstAuth(id, *trx.transaction);
    }
 
+   bool isBooted()
+   {
+      auto status =
+          Transact::Tables(Transact::service).open<TransactStatusTable>().get(std::tuple{});
+      if (!status)
+         return false;
+      if (!status->bootTransactions)
+         return false;
+      return status->bootTransactions->empty();
+   }
+
 }  // namespace
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
@@ -781,15 +792,18 @@ void RTransact::onBlock()
       }
    }
 
-   PSIBASE_SUBJECTIVE_TX
+   if (isBooted())
    {
-      // Get all expired transactions
-      for (auto pendingTx : pendingTxTable.getIndex<3>())
+      PSIBASE_SUBJECTIVE_TX
       {
-         if (pendingTx.expiration > finalized->time)
-            break;
+         // Get all expired transactions
+         for (auto pendingTx : pendingTxTable.getIndex<3>())
+         {
+            if (pendingTx.expiration > finalized->time)
+               break;
 
-         txids.push_back(pendingTx.id);
+            txids.push_back(pendingTx.id);
+         }
       }
    }
 
@@ -1473,7 +1487,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       {
          auto clients = Subjective{}.open<TraceClientTable>();
          auto row     = clients.get(id).value_or(
-             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+                 TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
          row.clients.push_back({*socket, json, query.flag()});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
