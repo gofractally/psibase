@@ -58,7 +58,7 @@ void Symbol::init()
 
    // Configure manualDebit for self on Token and NFT
    to<Nft>().setUserConf("manualDebit"_m, true);
-   to<Tokens>().setUserConf(untransferable, true);
+   to<Tokens>().setUserConf(Tokens::untransferable, true);
 
    // Create system token
    constexpr uint8_t precision = 4;
@@ -68,7 +68,7 @@ void Symbol::init()
    to<Nft>().debit(tNft, "Taking ownership of system token");
 
    // Make system token default untradeable
-   to<Tokens>().setTokenConf(tid, untransferable, true);
+   to<Tokens>().setTokenConf(tid, Tokens::untransferable, true);
 
    // Configure default symbol length records to establish initial prices
    auto nextSym = [](SymbolLengthRecord& s)

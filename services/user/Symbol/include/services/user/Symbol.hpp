@@ -18,9 +18,6 @@ namespace UserService
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
-      uint8_t untransferable = 0;
-      
-
       Symbol(psio::shared_view_ptr<psibase::Action> action);
 
       //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);

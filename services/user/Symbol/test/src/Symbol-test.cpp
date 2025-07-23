@@ -15,9 +15,8 @@ using namespace UserService::Errors;
 
 namespace
 {
-   const Memo    memo{"memo"};
-   const TID     sysToken{Tokens::sysToken};
-   const uint8_t untradeable = 0;
+   const Memo memo{"memo"};
+   const TID  sysToken{Tokens::sysToken};
 
    using Quantity_t = Quantity::Quantity_t;
 
@@ -47,7 +46,7 @@ SCENARIO("Buying a symbol")
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);
       CHECK(issuance.succeeded());
 
@@ -172,7 +171,7 @@ SCENARIO("Measuring price increases")
 
       auto aliceBalance = q(1'000'000, precision);
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, aliceBalance, memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
@@ -289,7 +288,7 @@ SCENARIO("Using symbol ownership NFT")
       auto precision    = sysIssuer.getToken(sysToken).returnVal().precision;
       auto aliceBalance = q(1'000'000, precision);
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, q(20'000, precision), memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
@@ -342,7 +341,7 @@ SCENARIO("Buying and selling symbols")
       auto precision   = sysIssuer.getToken(sysToken).returnVal().precision;
       auto userBalance = q(1'000'000, precision);
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, 2 * userBalance.value, memo);
       sysIssuer.credit(sysToken, alice, userBalance, memo);
       sysIssuer.credit(sysToken, bob, userBalance, memo);

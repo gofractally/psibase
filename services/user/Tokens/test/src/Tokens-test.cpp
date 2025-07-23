@@ -22,10 +22,6 @@ namespace
 
    const psibase::Memo memo{"memo"};
 
-   constexpr uint8_t untradeable  = 0;
-   constexpr uint8_t unrecallable = 1;
-   constexpr uint8_t manualDebit  = 0;
-
 }  // namespace
 
 SCENARIO("Using system token")
@@ -46,7 +42,7 @@ SCENARIO("Using system token")
 
       THEN("The system token is untradeable by default")
       {
-         auto isUntradeable = a.getTokenConf(sysToken, untradeable);
+         auto isUntradeable = a.getTokenConf(sysToken, Tokens::untransferable);
          CHECK(isUntradeable.succeeded());
          CHECK(isUntradeable.returnVal() == true);
       }
@@ -63,7 +59,7 @@ SCENARIO("Using system token")
 
       THEN("The issuer is able to make the token tradeable")
       {
-         CHECK(sysIssuer.setTokenConf(sysToken, untradeable, false).succeeded());
+         CHECK(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
 
          AND_THEN("Alice may credit system tokens to anyone")
          {
@@ -212,7 +208,7 @@ SCENARIO("Recalling tokens")
 
       THEN("The token is recallable by default")
       {
-         CHECK(a.getTokenConf(tokenId, unrecallable).returnVal() == false);
+         CHECK(a.getTokenConf(tokenId, Tokens::unrecallable).returnVal() == false);
       }
       THEN("Alice can recall Bob's tokens")
       {
@@ -230,9 +226,9 @@ SCENARIO("Recalling tokens")
       }
       THEN("The token issuer may turn off recallability")
       {
-         CHECK(a.setTokenConf(tokenId, unrecallable, true).succeeded());
+         CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, true).succeeded());
 
-         CHECK(a.getTokenConf(tokenId, unrecallable).returnVal());
+         CHECK(a.getTokenConf(tokenId, Tokens::unrecallable).returnVal());
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
@@ -240,7 +236,7 @@ SCENARIO("Recalling tokens")
          }
          AND_THEN("The token issuer may not re-enable recallability")
          {
-            CHECK(a.setTokenConf(tokenId, unrecallable, false).failed(invalidConfigUpdate));
+            CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, false).failed(invalidConfigUpdate));
          }
       }
    }
@@ -327,7 +323,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not update the token recallability")
          {
-            CHECK(a.setTokenConf(tokenId, unrecallable, true).failed(nftDNE));
+            CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, true).failed(nftDNE));
          }
       }
    }
@@ -425,50 +421,50 @@ SCENARIO("Toggling manual-debit")
 
       THEN("Alice and Bob both have manualDebit disabled")
       {
-         auto isManualDebit1 = a.getUserConf(alice, manualDebit);
+         auto isManualDebit1 = a.getUserConf(alice, Tokens::manualDebit);
          REQUIRE(isManualDebit1.succeeded());
          CHECK(isManualDebit1.returnVal() == false);
 
-         auto isManualDebit2 = a.getUserConf(bob, manualDebit);
+         auto isManualDebit2 = a.getUserConf(bob, Tokens::manualDebit);
          REQUIRE(isManualDebit2.succeeded());
          CHECK(isManualDebit2.returnVal() == false);
       }
       THEN("Alice may enable manual-debit")
       {  //
-         CHECK(a.setUserConf(manualDebit, true).succeeded());
+         CHECK(a.setUserConf(Tokens::manualDebit, true).succeeded());
       }
       WHEN("Alice enabled manual-debit")
       {
-         a.setUserConf(manualDebit, true);
+         a.setUserConf(Tokens::manualDebit, true);
 
          THEN("Alice has manual-debit enabled")
          {  //
-            CHECK(a.getUserConf(alice, manualDebit).returnVal() == true);
+            CHECK(a.getUserConf(alice, Tokens::manualDebit).returnVal() == true);
          }
          THEN("Bob still has manual-debit disabled")
          {  //
-            CHECK(a.getUserConf(bob, manualDebit).returnVal() == false);
+            CHECK(a.getUserConf(bob, Tokens::manualDebit).returnVal() == false);
          }
          THEN("Alice may enable manual-debit again. Idempotent.")
          {
-            CHECK(a.setUserConf(manualDebit, true).succeeded());
+            CHECK(a.setUserConf(Tokens::manualDebit, true).succeeded());
 
             AND_THEN("But Bob may enable manual-debit")
             {  //
-               CHECK(b.setUserConf(manualDebit, true).succeeded());
+               CHECK(b.setUserConf(Tokens::manualDebit, true).succeeded());
             }
          }
          THEN("Alice may disable manual-debit")
          {  //
-            CHECK(a.setUserConf(manualDebit, false).succeeded());
+            CHECK(a.setUserConf(Tokens::manualDebit, false).succeeded());
 
             AND_THEN("Alice has manual-debit disabled")
             {  //
-               CHECK(a.getUserConf(alice, manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(alice, Tokens::manualDebit).returnVal() == false);
             }
             AND_THEN("Bob still has manual-debit disabled")
             {
-               CHECK(a.getUserConf(bob, manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(bob, Tokens::manualDebit).returnVal() == false);
             }
          }
       }
@@ -563,7 +559,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
       AND_GIVEN("Alice turns on manual-debit")
       {
-         a.setUserConf(manualDebit, true);
+         a.setUserConf(Tokens::manualDebit, true);
 
          THEN("Alice may credit Bob 50 tokens")
          {
@@ -689,7 +685,7 @@ SCENARIO("Mapping a symbol to a token")
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
       auto sysToken    = Tokens::sysToken;
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, userBalance, memo);
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
@@ -813,7 +809,7 @@ TEST_CASE("GraphQL Queries")
    sysIssuer.mint(sysToken, userBalance, memo);
 
    REQUIRE(sysIssuer.credit(sysToken, alice, userBalance, memo).succeeded());
-   REQUIRE(sysIssuer.setTokenConf(sysToken, untradeable, false).succeeded());
+   REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
    t.finishBlock();
 
    auto userBalaces = t.post(
@@ -824,7 +820,7 @@ TEST_CASE("GraphQL Queries")
        std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":"4","balance":"1000000.0000"}}]}}})");
 
-   REQUIRE(bob.to<Tokens>().setUserConf(manualDebit, true).succeeded());
+   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
    auto userCredits = t.post(
        Tokens::service, "/graphql",

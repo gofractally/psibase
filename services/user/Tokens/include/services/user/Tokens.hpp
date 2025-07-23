@@ -21,6 +21,10 @@ namespace UserService
       static constexpr auto service  = psibase::AccountNumber("tokens");
       static constexpr auto sysToken = TID{1};
 
+      static constexpr uint8_t untransferable = 0;
+      static constexpr uint8_t unrecallable   = 1;
+      static constexpr uint8_t manualDebit    = 0;
+
       Tokens(psio::shared_view_ptr<psibase::Action> action);
 
       void init();
