@@ -92,7 +92,7 @@ namespace SystemService
 
             std::vector<HttpHeader> headers;
             bool                    isDevChain = psibase::isDevChain(request);
-            std::string             cookieName = "__Host-SESSION=";
+            std::string             cookieName = "__Host-SESSION";
             std::string             cookieAttribs =
                 "Path=/; HttpOnly; Secure; SameSite=None; Domain=" + request.host;
             if (isDevChain)
