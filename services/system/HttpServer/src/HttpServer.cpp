@@ -93,7 +93,8 @@ namespace SystemService
       constexpr std::string_view allowedHeaders[] = {"Cache-Control",            //
                                                      "Content-Encoding",         //
                                                      "Content-Security-Policy",  //
-                                                     "ETag"};
+                                                     "ETag",                     //
+                                                     "Set-Cookie"};
 
       void sendReplyImpl(AccountNumber           service,
                          std::int32_t            socket,
@@ -102,18 +103,6 @@ namespace SystemService
       {
          for (const auto& header : result.headers)
          {
-            // Special case: Allow Set-Cookie header only for /common/set-cookie endpoint
-            if (header.name == "Set-Cookie")
-            {
-               if (requestTarget != "/common/set-cookie")
-               {
-                  abortMessage("service " + service.str() +
-                               " attempted to set Set-Cookie header on unauthorized endpoint " +
-                               std::string(requestTarget));
-               }
-               continue;  // Allow Set-Cookie for the authorized endpoint
-            }
-
             // Check standard allowed headers
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
