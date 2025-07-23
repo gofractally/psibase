@@ -31,7 +31,9 @@ interface api {
     ///              6: Allows no one (except the callee app itself) access on the user's behalf.
     ///              The risk level of operation for the user. The higher the risk, the more the user should
     ///              trust the caller app. This is just a hint to help the user make a decision.
-    authorize: func(caller: string, risk: risk) -> result<bool, error>;
+    /// * `debug-label` - If an unexpected error occurs, this label will be printed with the error
+    ///                   message to help you track down the root cause.
+    authorize: func(caller: string, risk: risk, debug-label: string) -> result<bool, error>;
 }
 
 world imports {

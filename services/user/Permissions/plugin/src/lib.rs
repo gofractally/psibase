@@ -45,15 +45,6 @@ impl From<PackablePromptContext> for PromptContext {
     }
 }
 
-impl Risk {
-    fn validate(&self) -> Result<(), Error> {
-        if !(0..=6).contains(&self.level) {
-            return Err(ErrorType::InvalidRiskLevel(self.level).into());
-        }
-        Ok(())
-    }
-}
-
 struct PermissionsPlugin;
 
 fn assert_admin() {
@@ -90,14 +81,21 @@ fn is_authorized(user: &str, caller: &str, callee: &str, risk: u8) -> bool {
 }
 
 impl Api for PermissionsPlugin {
-    fn authorize(caller: String, risk: Risk) -> Result<bool, Error> {
-        risk.validate()?;
+    fn authorize(caller: String, risk: Risk, debug_label: String) -> Result<bool, Error> {
+        let callee = HostClient::get_sender_app().app.unwrap();
+        if !(0..=6).contains(&risk.level) {
+            return Err(ErrorType::InvalidRiskLevel(
+                callee.clone(),
+                risk.level,
+                debug_label.clone(),
+            )
+            .into());
+        }
 
         if risk.level == 0 {
             // Anyone can call risk 0
             return Ok(true);
         }
-        let callee = HostClient::get_sender_app().app.unwrap();
         if caller == callee {
             // Callee is always authorized to call itself
             return Ok(true);
@@ -108,7 +106,9 @@ impl Api for PermissionsPlugin {
             return Ok(caller == callee);
         }
 
-        let user = Accounts::get_current_user().ok_or_else(|| ErrorType::LoggedInUserDNE())?;
+        let user = Accounts::get_current_user().ok_or_else(|| {
+            ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())
+        })?;
         if is_authorized(&user, &caller, &callee, risk.level) {
             return Ok(true);
         }

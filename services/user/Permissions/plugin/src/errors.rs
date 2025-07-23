@@ -2,8 +2,6 @@ use psibase::plugin_error;
 
 plugin_error! {
     pub ErrorType
-    QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
-    InvalidRequester() => "Disallowed third-party requester while saving permission",
-    LoggedInUserDNE() => "User must be logged in to perform this action",
-    InvalidRiskLevel(level: u8) => "Invalid risk level: {level}. Must be between 1 and 5 inclusive.",
+    LoggedInUserDNE(caller: String, callee: String, debug_label: String) => "[{caller} -> {callee}] - {debug_label} - User must be logged in to perform this action",
+    InvalidRiskLevel(callee: String, level: u8, debug_label: String) => "[{callee}] - {debug_label} - Invalid risk level: {level}. Must be between 1 and 5 inclusive.",
 }
