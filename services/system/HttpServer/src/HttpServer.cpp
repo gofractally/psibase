@@ -95,10 +95,10 @@ namespace SystemService
                                                      "Content-Security-Policy",  //
                                                      "ETag"};
 
-      void sendReplyImpl(AccountNumber      service,
-                         std::int32_t       socket,
-                         const HttpReply&   result,
-                         const std::string& requestTarget = "")
+      void sendReplyImpl(AccountNumber           service,
+                         std::int32_t            socket,
+                         const HttpReply&        result,
+                         const std::string_view& requestTarget = "")
       {
          for (const auto& header : result.headers)
          {
@@ -109,7 +109,7 @@ namespace SystemService
                {
                   abortMessage("service " + service.str() +
                                " attempted to set Set-Cookie header on unauthorized endpoint " +
-                               requestTarget);
+                               std::string(requestTarget));
                }
                continue;  // Allow Set-Cookie for the authorized endpoint
             }

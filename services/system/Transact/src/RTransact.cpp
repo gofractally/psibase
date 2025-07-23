@@ -1445,10 +1445,10 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
       }
    }
 
-   std::string cookieName = "__Host-SESSION";
+   std::string_view cookieName = "__Host-SESSION";
    if (isDevChain)
    {
-      cookieName = "authed-query";
+      cookieName = "SESSION";
    }
 
    if (auto token = request.getCookie(cookieName))

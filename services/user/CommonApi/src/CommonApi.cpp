@@ -96,7 +96,7 @@ namespace SystemService
             std::string             cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict";
             if (isDevChain)
             {
-               cookieName    = "authed-query=";
+               cookieName    = "SESSION";
                cookieAttribs = "Path=/";
             }
             std::string cookieValue = cookieName + params.accessToken + "; " + cookieAttribs;
