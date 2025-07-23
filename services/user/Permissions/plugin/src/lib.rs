@@ -4,10 +4,10 @@ use bindings::*;
 
 use accounts::plugin::api as Accounts;
 use exports::permissions::plugin::{
-    admin::{ApprovalDuration, Guest as PermsAdmin},
+    admin::{ApprovalDuration, Guest as PermsAdmin, PromptContext},
     api::Guest as Api,
 };
-use permissions::plugin::types::{PromptContext, Risk};
+use permissions::plugin::types::Risk;
 use psibase::fracpack::{Pack, Unpack};
 
 use host::common::{

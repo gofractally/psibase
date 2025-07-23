@@ -1,8 +1,15 @@
 package permissions:plugin;
 
 interface admin {
-    use types.{prompt-context};
     use host:common/types.{error};
+
+    record prompt-context {
+        user: string,
+        caller: string,
+        callee: string,
+        risk-level: u8,
+        description: string,
+    }
 
     /// The duration for which an approval is granted.
     enum approval-duration {
