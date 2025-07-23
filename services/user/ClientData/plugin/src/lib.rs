@@ -61,7 +61,7 @@ impl KeyValue for ClientData {
 }
 
 impl Tests for ClientData {
-    fn kv_test_step1() -> Result<(), Error> {
+    fn kv_test_step1_tx_fails() -> Result<(), Error> {
         let buckets = get_all_buckets();
         let [nontx_persistent, nontx_session, nontx_ephemeral, tx_persistent, tx_session, tx_ephemeral] =
             buckets.try_into().unwrap();
@@ -123,7 +123,7 @@ impl Tests for ClientData {
         Ok(())
     }
 
-    fn kv_test_step3_shouldfail() -> Result<(), Error> {
+    fn kv_test_step3_call_fails() -> Result<(), Error> {
         let buckets = get_all_buckets();
         let [nontx_persistent, nontx_session, nontx_ephemeral, tx_persistent, tx_session, tx_ephemeral] =
             buckets.try_into().unwrap();
