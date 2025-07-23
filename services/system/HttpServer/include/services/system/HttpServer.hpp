@@ -84,3 +84,13 @@ namespace SystemService
 
    PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Subjective)
 }  // namespace SystemService
+
+namespace psibase
+{
+   /// Helper function to check if a URL contains localhost
+   bool isLocalhost(const std::string& url);
+
+   /// Checks if the request origin indicates a development chain
+   /// by looking for "localhost" in the origin header domain
+   bool isDevChain(const HttpRequest& request);
+}  // namespace psibase

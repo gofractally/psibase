@@ -84,23 +84,23 @@ namespace SystemService
                 .body        = psio::convert_to_frac(trx),
             };
          }
-         if (request.target == "/common/set-cookie")
+         if (request.target == "/common/set-auth-cookie")
          {
             request.body.push_back(0);
             psio::json_token_stream jstream{request.body.data()};
             auto                    params = psio::from_json<cookie_data>(jstream);
 
             std::vector<HttpHeader> headers;
-            bool                    isDevChain = request.isDevChainOrigin();
+            bool                    isDevChain = psibase::isDevChain(request);
             std::string             cookieName = "__Host-SESSION=";
             std::string             cookieAttribs =
                 "Path=/; HttpOnly; Secure; SameSite=None; Domain=" + request.host;
             if (isDevChain)
             {
                cookieName    = "SESSION";
-               cookieAttribs = "Path=/";
+               cookieAttribs = "Path=/; Domain=" + request.host;
             }
-            std::string cookieValue = cookieName + params.accessToken + "; " + cookieAttribs;
+            std::string cookieValue = cookieName + "=" + params.accessToken + "; " + cookieAttribs;
             headers.push_back({"Set-Cookie", cookieValue});
 
             return HttpReply{.status      = HttpStatus::ok,

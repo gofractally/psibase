@@ -1421,7 +1421,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
-   bool                         isDevChain = request.isDevChainOrigin();
+   bool                         isDevChain = psibase::isDevChain(request);
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
