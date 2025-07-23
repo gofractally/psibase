@@ -1,8 +1,4 @@
 export const intf = {
-    getActiveApp() {
-        return host.getActiveApp();
-    },
-
     sendRequest(req) {
         return host.sendRequest(req);
     },
@@ -17,6 +13,10 @@ export const intf = {
 
     getChainId() {
         return host.getChainId();
+    },
+
+    getActiveApp() {
+        return host.getActiveApp();
     },
 };
 

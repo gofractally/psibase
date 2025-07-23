@@ -1,0 +1,14 @@
+package host:prompt;
+
+/// Calls that are tied to the web platform
+interface web {
+    use host:common/types.{error};
+
+    /// Initiates a procedure that intends to display the content at the specified subpath (on
+    ///    the caller's subdomain) to the current user.
+    prompt-user: func(subpath: option<string>, context-id: option<u32>) -> result<_, error>;
+}
+
+world imports {
+    import web;
+}
