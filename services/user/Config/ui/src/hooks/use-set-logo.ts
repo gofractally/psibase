@@ -13,5 +13,6 @@ export const useSetLogo = () =>
             error: "Failed uploading icon",
             loading: "Uploading icon",
             success: "Uploaded icon",
+            isStagable: true,
         },
     );

@@ -1,6 +1,6 @@
 import { Save, Trash, Upload } from "lucide-react";
 import { CircleAlert } from "lucide-react";
-import React, { ReactNode, useRef, useState } from "react";
+import { ReactNode } from "react";
 import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -11,11 +11,11 @@ import { Label } from "@/components/ui/label";
 
 import { useAppForm } from "@/components/forms/app-form";
 
+import { useDraftLogo } from "@/hooks/use-draft-logo";
 import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
 import { useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
 import { useBranding } from "@/hooks/useBranding";
-import { fileToBase64 } from "@/lib/fileToBase64";
 
 const Section = ({
     title = "Saluton, Mondo!",
@@ -40,11 +40,18 @@ export const Branding = () => {
 
     const { data: isLogoUploaded } = useLogoUploaded();
 
-    const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
-    const [iconPreview, setPreview] = useState<string>("");
-    const [isDirty, setIsDirty] = useState(false);
-
     const { mutateAsync: setLogo } = useSetLogo();
+
+    const {
+        setIsDirty,
+        setLogoBytes,
+        iconPreview,
+        fileInputRef,
+        logoBytes,
+        isDirty,
+        setPreview,
+        handleFileChange,
+    } = useDraftLogo();
 
     const uploadLogo = async (bytes: Uint8Array) => {
         await setLogo([bytes]);
@@ -53,8 +60,6 @@ export const Branding = () => {
     };
 
     const { mutateAsync: setNetworkName } = useSetNetworkName();
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const form = useAppForm({
         defaultValues: {
@@ -65,37 +70,6 @@ export const Branding = () => {
             form.reset(data.value);
         },
     });
-
-    const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (
-        event,
-    ) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        if (file.type != "image/svg+xml") {
-            alert("Only SVGs are supported.");
-            return;
-        }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            if (!reader.result) {
-                console.error("no image selected");
-                return;
-            }
-            const bytes = new Uint8Array(reader.result as ArrayBuffer);
-            setLogoBytes(bytes);
-        };
-        reader.readAsArrayBuffer(file);
-
-        const mimeType = file.type;
-        const base64Icon = await fileToBase64(file);
-        const iconSrc = `data:${mimeType};base64,${base64Icon}`;
-        setPreview(iconSrc);
-        setIsDirty(true);
-
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-    };
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">

@@ -39,7 +39,10 @@ export const usePluginMutation = <T>(
 
     return useMutation<void, Error, T, string | number>({
         mutationKey: [service, intf, method],
-        onMutate: () => toast.loading(loading),
+        onMutate: () => {
+            const res = toast.loading(loading);
+            return res;
+        },
         mutationFn: async (paramsArray) => {
             await supervisor.functionCall({
                 service,
