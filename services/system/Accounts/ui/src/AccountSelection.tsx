@@ -4,7 +4,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import debounce from "debounce";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { useAcceptInvite } from "@/hooks/useAcceptInvite";
@@ -59,7 +59,12 @@ const formSchema = z.object({
 
 export const AccountSelection = () => {
     const [searchParams] = useSearchParams();
-    const token: string = z.string().parse(searchParams.get("token"));
+
+    const token = searchParams.get("token");
+
+    if (!token) {
+        throw new Error("No token was found in the URL");
+    }
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -67,15 +72,6 @@ export const AccountSelection = () => {
             username: "",
         },
     });
-
-    const key = searchParams.get("key");
-
-    const navigate = useNavigate();
-
-    // Auto nav if the key param is present,
-    if (key) {
-        navigate(`/key?key=${key}`);
-    }
 
     const [isModalOpen, setIsModalOpen] = useState(false);
 

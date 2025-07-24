@@ -1478,8 +1478,8 @@ namespace psio
    template <typename T>
    prevalidated(T&&) -> prevalidated<T>;
    template <typename T, typename U>
-   prevalidated(T&& t,
-                U&& u) -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
+   prevalidated(T&& t, U&& u)
+       -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
    struct input_stream;
    prevalidated(input_stream) -> prevalidated<std::span<const char>>;
 
@@ -1568,7 +1568,7 @@ namespace psio
    constexpr bool packable_as_impl = std::is_same_v<T, U>;
 
    template <typename T, typename U>
-   concept PackableAs = packable_as_impl<std::remove_cvref_t<T>, U>;
+   concept PackableAs = std::is_same_v<T, U> || packable_as_impl<std::remove_cvref_t<T>, U>;
 
    template <typename... T, typename... U>
       requires(sizeof...(T) == sizeof...(U))

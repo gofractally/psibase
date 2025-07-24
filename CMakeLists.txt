@@ -283,6 +283,7 @@ add_rs_component_workspace(services/:Plugins
     permissions
     sites
     host-common
+    host-prompt
     transact
     workshop
     producers
@@ -323,7 +324,7 @@ set(PSIBASE_VERSION 0.19)
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
     NAME Transact
-    VERSION ${PSIBASE_VERSION}.0
+    VERSION ${PSIBASE_VERSION}.1
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
@@ -344,7 +345,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts
-    VERSION ${PSIBASE_VERSION}.0
+    VERSION ${PSIBASE_VERSION}.1
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
@@ -353,7 +354,7 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
-        INIT
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
@@ -412,8 +413,10 @@ psibase_package(
     NAME Host
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
+    ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )

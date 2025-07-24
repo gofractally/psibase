@@ -32,8 +32,6 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
         }
     `);
 
-    console.log({ res });
-
     return z
         .object({
             memberships: z.object({

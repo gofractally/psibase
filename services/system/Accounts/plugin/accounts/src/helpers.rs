@@ -1,4 +1,3 @@
-use crate::bindings::accounts::plugin::types::AppDetails;
 use crate::bindings::host::common::admin as Privileged;
 use crate::bindings::host::common::{client as Client, types as CommonTypes};
 use crate::errors::ErrorType::*;
@@ -9,7 +8,7 @@ use crate::errors::ErrorType::*;
 pub fn get_assert_top_level_app(
     context: &str,
     privileged_apps: &[&str],
-) -> Result<AppDetails, CommonTypes::Error> {
+) -> Result<String, CommonTypes::Error> {
     let sender = Client::get_sender_app();
     let top_level_app = Privileged::get_active_app();
 
@@ -17,13 +16,13 @@ pub fn get_assert_top_level_app(
         let sender_app_name = sender.app.as_ref().unwrap().as_str();
         let is_privileged = privileged_apps.contains(&sender_app_name);
 
+        let top_level_app_name = top_level_app.app.as_ref().unwrap().as_str();
         if is_privileged {
-            return Ok(top_level_app);
+            return Ok(top_level_app_name.to_string());
         }
 
-        let top_level_app_name = top_level_app.app.as_ref().unwrap().as_str();
         if sender_app_name == top_level_app_name {
-            return Ok(top_level_app);
+            return Ok(top_level_app_name.to_string());
         }
     } else {
         return Err(Unauthorized(&format!(

@@ -12,6 +12,7 @@ export const zFractal = z
         createdAt: zDateTime,
         name: z.string(),
         mission: z.string(),
+        council: z.array(zAccount),
     })
     .or(z.null());
 
@@ -40,6 +41,7 @@ export const getFractal = async (owner: Account) => {
             createdAt
             name
             mission
+            council
         }
         evaluations(fractal: "${owner}") {
             fractal

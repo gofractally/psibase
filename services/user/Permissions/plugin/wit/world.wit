@@ -1,16 +1,42 @@
 package permissions:plugin;
 
+interface types {
+    record prompt-context {
+        user: string,
+        caller: string,
+        callee: string,
+    }
+}
+
 interface api {
     use host:common/types.{error};
-    /// @description Prompt user to request caller have access to `callee`'s privileged methods.
-    /// prompt_auth() throws an object with redirect info for the calling app, which must do the actual redirect.
-    /// @param caller The caller, requesting access
+
+    /// The caller of this function (the "callee") wants to check if the specified `caller` has the user's
+    ///     permission to use callee's plugin on the user's behalf. If no permission has yet been given, 
+    ///     this function will cause the user to be prompted to respond to the request.
+    /// 
+    /// Parameters: 
+    /// * `caller` - The app requesting permission
     prompt-auth: func(caller: string) -> result<_, error>;
-    /// @description is caller authenticated to access `callee`'s privileged methods
-    /// @param caller The caller, requesting access
+
+    /// The caller of this function (the "callee") wants to check if the specified `caller` has the user's
+    ///     permission to use callee's plugin on the user's behalf. This function simply returns whether or
+    ///     not permission has been granted, and will *not* trigger any user interaction.
+    /// 
+    /// Parameters:
+    /// * `caller` - The app requesting permission
     is-auth: func(caller: string) -> result<bool, error>;
+
+    /// Delete a previously added permission
+    ///
+    /// Parameters:
+    /// `user` - The user granting access
+    /// `caller` - The app requesting access to use `callee` on behalf of `user`
+    /// `callee` - The app on whom functionality or data is being requested
+    del-perm: func(user: string, caller: string, callee: string);
 }
 
 world imports {
     import api;
+    import types;
 }

@@ -4,6 +4,7 @@ use bindings::*;
 
 mod helpers;
 use helpers::*;
+mod bucket;
 mod plugin_ref;
 
 mod types;
@@ -11,9 +12,11 @@ use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
+    store::Guest as Store,
     types::Guest as Types,
     types::{BodyTypes, Error, OriginationData, PostRequest},
 };
+use helpers::make_error;
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
@@ -50,10 +53,10 @@ impl Admin for HostCommon {
             "get-active-app@host:common/admin",
         );
 
-        let active_app = Supervisor::get_active_app();
+        let active = Supervisor::get_active_app();
         OriginationData {
-            app: active_app.app,
-            origin: active_app.origin,
+            app: Some(active.clone()),
+            origin: HostCommon::get_app_url(active),
         }
     }
 
@@ -134,13 +137,6 @@ impl Client for HostCommon {
         Self::get_app_url(caller())
     }
 
-    fn prompt_user(
-        _subpath: Option<String>,
-        _payload_json_str: Option<String>,
-    ) -> Result<(), Error> {
-        unimplemented!()
-    }
-
     fn get_app_url(app: String) -> String {
         let root = Supervisor::get_root_domain();
         if app == "homepage" {
@@ -156,6 +152,10 @@ impl Client for HostCommon {
 
 impl Types for HostCommon {
     type PluginRef = plugin_ref::PluginRef;
+}
+
+impl Store for HostCommon {
+    type Bucket = bucket::Bucket;
 }
 
 bindings::export!(HostCommon with_types_in bindings);

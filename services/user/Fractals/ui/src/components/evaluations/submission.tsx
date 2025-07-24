@@ -17,9 +17,10 @@ export const Submission = ({ status }: { status: SubmissionPhase }) => {
 
     if (status.canCloseEarly) {
         return (
-            <div>
-                All groups have deliberated.{" "}
+            <div className="flex items-center gap-2">
+                <div className="flex-1">All groups have deliberated.</div>
                 <Button
+                    size="sm"
                     onClick={() => {
                         closeEvaluation({
                             evaluationId: evaluationInstance!.evaluationId,
@@ -33,7 +34,7 @@ export const Submission = ({ status }: { status: SubmissionPhase }) => {
     } else {
         return (
             <div>
-                Evaluation closes at {date} ({label}) ⏳
+                ⏳ Evaluation closes at {date} ({label})
             </div>
         );
     }

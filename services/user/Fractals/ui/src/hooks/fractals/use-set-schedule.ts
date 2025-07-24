@@ -40,26 +40,21 @@ export const useSetSchedule = () =>
                 evalType,
             } = zParams.parse(params);
 
-            toast.promise(
-                async () => {
-                    void (await supervisor.functionCall({
-                        method: "setSchedule",
-                        params: [
-                            evalType,
-                            fractal,
-                            registration,
-                            deliberation,
-                            submission,
-                            finishBy,
-                            intervalSeconds,
-                            forceDelete,
-                        ],
-                        service: fractalsService,
-                        intf: "admin",
-                    }));
-                },
-                { description: "Scheduled evaluation" },
-            );
+            await supervisor.functionCall({
+                method: "setSchedule",
+                params: [
+                    evalType,
+                    fractal,
+                    registration,
+                    deliberation,
+                    submission,
+                    finishBy,
+                    intervalSeconds,
+                    forceDelete,
+                ],
+                service: fractalsService,
+                intf: "admin",
+            });
         },
         onSuccess: (_, params) => {
             const { fractal } = zParams.parse(params);
@@ -68,5 +63,12 @@ export const useSetSchedule = () =>
             queryClient.refetchQueries({
                 queryKey: QueryKey.fractal(fractal),
             });
+
+            toast.success("Schedule updated");
+        },
+        onError: (error) => {
+            const message = "Error setting schedule";
+            console.error(message, error);
+            toast.error(message);
         },
     });
