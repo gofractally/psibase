@@ -125,13 +125,13 @@ impl Bucket {
     }
 
     fn validate_key_size(&self, key: &str) {
-        assert!(key.len() < 256, "key must be less than 256 bytes");
+        assert!(key.len() <= 256, "key must be <= 256 bytes");
     }
 
     fn validate_value_size(&self, value: &[u8]) {
         // 100kb
         const MAX_SIZE: usize = 100 * 1024;
-        assert!(value.len() < MAX_SIZE, "value must be less than 100KB");
+        assert!(value.len() <= MAX_SIZE, "value must be less <= 100KB");
     }
 
     fn validate_identifier(identifier: &str) -> Result<(), Error> {
@@ -235,10 +235,7 @@ impl GuestBucket for Bucket {
             }
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
-                    match host_buffer::get(&self.db, &prefixed_key) {
-                        Some(_) => true,
-                        None => false, // Key was deleted
-                    }
+                    host_buffer::get(&self.db, &prefixed_key).is_some()
                 } else {
                     HostDb::get(self.db.duration as u8, &prefixed_key).is_some()
                 }
