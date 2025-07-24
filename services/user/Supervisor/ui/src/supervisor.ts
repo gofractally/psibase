@@ -26,7 +26,7 @@ import { Plugins } from "./plugin/plugins";
 import {
     OriginationData,
     assert,
-    getChainId,
+    chainIdPromise,
     parser,
     serviceFromOrigin,
 } from "./utils";
@@ -88,7 +88,7 @@ export class Supervisor implements AppInterface {
     }
 
     private async preload(plugins: QualifiedPluginId[]) {
-        await getChainId();
+        await chainIdPromise;
 
         if (plugins.length === 0) {
             return;
@@ -195,8 +195,6 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
-
-        getChainId();
     }
 
     getActiveApp(): string {
