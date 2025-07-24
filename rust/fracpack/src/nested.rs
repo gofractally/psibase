@@ -1,4 +1,4 @@
-use crate::{Pack, Result, Unpack, UnpackOwned};
+use crate::{FracInputStream, Pack, Result, Unpack, UnpackOwned};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::marker::PhantomData;
 
@@ -39,13 +39,13 @@ impl<'a, T: Unpack<'a>> Unpack<'a> for Nested<T> {
         Ok(Self::new(data.to_vec()))
     }
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let data = <&[u8]>::unpack(src, pos)?;
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+        let data = <&[u8]>::unpack(src)?;
         T::verify_no_extra(&data)?;
         Ok(Self::new(data.to_owned()))
     }
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let data = <&[u8]>::unpack(src, pos)?;
+    fn verify(src: &mut FracInputStream) -> Result<()> {
+        let data = <&[u8]>::unpack(src)?;
         T::verify_no_extra(data)
     }
 }

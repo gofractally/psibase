@@ -328,9 +328,10 @@ impl DeclBuilder {
                 LitByteStr::new(&hex::decode(&test.fracpack).unwrap(), Span::call_site());
             let json = serde_json::to_string(expected).unwrap();
             let ty = self.generate_name(Some(test.type_.clone()));
-            quote! {
+            let basic = quote! {
                 println!("Running test: {}", #json_test);
                 let bin = #fracpack;
+                <#ty as fracpack::Unpack>::verify_no_extra(bin).unwrap();
                 let fracpack_value = <#ty as fracpack::Unpack>::unpacked(bin).unwrap();
                 let json_value: #ty = serde_json::from_str(#json).unwrap();
                 let packed1 = <#ty as fracpack::Pack>::packed(&fracpack_value);
@@ -339,6 +340,20 @@ impl DeclBuilder {
                 assert_eq!(format!("{fracpack_value:?}"), format!("{json_value:?}"));
                 assert_eq!(packed1, bin);
                 assert_eq!(packed2, bin);
+            };
+            if let Some(compat) = &test.compat {
+                let compat = LitByteStr::new(&hex::decode(compat).unwrap(), Span::call_site());
+                quote! {
+                    #basic
+                    let compat = #compat;
+                    <#ty as fracpack::Unpack>::verify_no_extra(compat).unwrap();
+                    let compat_value = <#ty as fracpack::Unpack>::unpacked(compat).unwrap();
+                    assert_eq!(format!("{fracpack_value:?}"), format!("{compat_value:?}"));
+                    let packed3 = <#ty as fracpack::Pack>::packed(&compat_value);
+                    assert_eq!(packed3, bin);
+                }
+            } else {
+                basic
             }
         } else {
             quote! {}

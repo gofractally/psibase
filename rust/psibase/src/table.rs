@@ -310,7 +310,7 @@ impl<Key: ToKey, Record: TableRecord> TableIndex<Key, Record> {
         if self.is_secondary {
             kv_get(self.db_id, &RawKey::new(bytes)).unwrap()
         } else {
-            Some(Record::unpack(&bytes[..], &mut 0).unwrap())
+            Some(Record::unpacked(&bytes[..]).unwrap())
         }
     }
 }

@@ -280,7 +280,7 @@ fn round_trip_field<T: Pack + UnpackOwned + PartialEq + std::fmt::Debug>(
 
     T::verify_no_extra(&packed[..]).unwrap();
 
-    let unpacked = T::unpack(&packed[..], &mut 0).unwrap();
+    let unpacked = T::unpacked(&packed[..]).unwrap();
     assert_eq!(*field, unpacked);
     test_fracpack::bridge::ffi::round_trip_outer_struct_field(index, field_name, &packed[..]);
     unpacked
@@ -337,8 +337,8 @@ fn t1() -> Result<()> {
         round_trip_fields(i, t);
         let mut packed = Vec::<u8>::new();
         t.pack(&mut packed);
-        OuterStruct::verify(&packed[..], &mut 0)?;
-        let unpacked = OuterStruct::unpack(&packed[..], &mut 0)?;
+        OuterStruct::verify_no_extra(&packed[..])?;
+        let unpacked = OuterStruct::unpacked(&packed[..])?;
         assert_eq!(*t, unpacked);
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
@@ -888,8 +888,8 @@ where
     T: PartialEq<T>,
     T: std::fmt::Debug,
 {
-    T::verify(bytes, &mut 0).unwrap();
-    let unpacked = T::unpack(bytes, &mut 0).unwrap();
+    T::verify_no_extra(bytes).unwrap();
+    let unpacked = T::unpacked(bytes).unwrap();
     assert_eq!(*src_struct, unpacked);
 }
 
