@@ -134,11 +134,11 @@ mod service {
     ///
     /// # Arguments
     /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
-    /// * `max_supply` - The permanent max supply of the token.
+    /// * `max_issued_supply` - The permanent max issued supply of the token.
     ///
     /// # Returns the unique token identifier aka TID (u32)
     #[action]
-    fn create(precision: Precision, max_supply: Quantity) -> TID {
+    fn create(precision: Precision, max_issued_supply: Quantity) -> TID {
         unimplemented!()
     }
 
