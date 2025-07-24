@@ -2,11 +2,24 @@ package clientdata:plugin;
 
 interface tests {
     use host:common/types.{error};
-    kv-test: func() -> result<_, error>;
+
+    // Should all succeed until the last `setcode` action, which should fail.
+    kv-test-step1-tx-fails: func() -> result<_, error>;
+
+    // Should fully succeed
+    kv-test-step2: func() -> result<_, error>;
+
+    // Plugin call should fail
+    kv-test-step3-call-fails: func() -> result<_, error>;
+
+    // Should fully succeed
+    kv-test-step4: func() -> result<_, error>;
 }
 
 world impl {
     include host:common/imports;
+    include setcode:plugin/imports;
+    include chainmail:plugin/imports;
 
     export keyvalue;
     export tests;
