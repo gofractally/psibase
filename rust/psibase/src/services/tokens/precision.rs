@@ -32,11 +32,11 @@ impl<'a> Unpack<'a> for Precision {
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        assert!(
-            Self::unpack(src, pos).unwrap().0 <= 8,
-            "precision must be 8 or less"
-        );
-        Ok(())
+        if Self::unpack(src, pos).unwrap().0 <= 8 {
+            Ok(())
+        } else {
+            Err(fracpack::Error::BadScalar)
+        }
     }
 }
 
