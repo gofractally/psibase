@@ -1,7 +1,5 @@
 package config:plugin;
 
-
-
 interface branding {
     use host:common/types.{error};
     use sites:plugin/types.{file};
@@ -10,7 +8,6 @@ interface branding {
     upload-network-logo: func(logo: list<u8>) -> result<_, error>;
     set-network-name: func(name: string) -> result<_, error>;
 }
-
 
 interface producers {
     use host:common/types.{error};
@@ -28,9 +25,7 @@ interface producers {
 
     /// Set the producers for the current consensus mode.
     set-producers: func(prods: list<producer>) -> result<_, error>;
-
 }
-
 
 world imports {
     import producers;
