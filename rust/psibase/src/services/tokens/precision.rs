@@ -26,13 +26,13 @@ impl<'a> Unpack<'a> for Precision {
     const VARIABLE_SIZE: bool = false;
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-        let precision = u8::unpack(src, pos)?;
-        Self::verify(src, pos)?;
-        Ok(Self(precision))
+        Ok(Self(u8::unpack(src, pos)?))
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        if Self::unpack(src, pos).unwrap().0 <= 8 {
+        let precision = u8::unpack(src, pos)?;
+
+        if precision <= 8 {
             Ok(())
         } else {
             Err(fracpack::Error::BadScalar)
