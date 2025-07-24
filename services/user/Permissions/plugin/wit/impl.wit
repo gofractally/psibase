@@ -7,7 +7,7 @@ interface admin {
         user: string,
         caller: string,
         callee: string,
-        risk-level: u8,
+        trust-level: u8,
         description: string,
     }
 
