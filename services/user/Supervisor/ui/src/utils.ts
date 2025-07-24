@@ -1,4 +1,4 @@
-import { siblingUrl } from "@psibase/common-lib";
+import { getJson, siblingUrl } from "@psibase/common-lib";
 
 import { loadBasic } from "./component-loading";
 import { DownloadFailed } from "./errors";
@@ -54,6 +54,17 @@ export const parser = (): Promise<any> => {
         );
     }
     return modulePromise;
+};
+
+export let chainId: string | undefined;
+export const getChainId = (): Promise<string> => {
+    if (!chainId) {
+        return getJson("/common/chainid").then((id: string) => {
+            chainId = id;
+            return id;
+        });
+    }
+    return Promise.resolve(chainId);
 };
 
 export const isString = (value: any): value is string => {
