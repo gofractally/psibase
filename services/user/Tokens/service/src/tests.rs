@@ -141,38 +141,6 @@ mod tests {
             "service 'tokens' aborted with message: over max issued supply",
         );
 
-        Wrapper::push_from(&chain, alice)
-            .mint(token_id, 67655.into(), "memo".to_string().into())
-            .get()?;
-
-        let token_detail = Wrapper::push_from(&chain, alice).getToken(token_id).get()?;
-
-        // assert!(
-        //     token_detail.issued_supply - token_detail.burned_supply == token_detail.max_issued_supply,
-        //     "expected the current supply to be the max issued supply",
-        // );
-
-        // assert_balance(&chain, bob, token_id, 12345.into());
-
-        // // Bob can burn some of his balance
-        // Wrapper::push_from(&chain, bob)
-        //     .burn(token_id, 3.into(), format!("").into())
-        //     .get()?;
-
-        // let supply_delta = token_detail.current_supply
-        //     - Wrapper::push_from(&chain, alice)
-        //         .getToken(token_id)
-        //         .get()?
-        //         .current_supply;
-        // assert_eq!(supply_delta, 3.into());
-
-        // // Alice can burn some of Bobs balance
-        // Wrapper::push_from(&chain, alice)
-        //     .recall(token_id, bob, 6.into(), format!("").into())
-        //     .get()?;
-
-        // assert_balance(&chain, bob, token_id, 12336.into());
-
         Ok(())
     }
 }
