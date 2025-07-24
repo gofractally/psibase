@@ -1,8 +1,7 @@
-import { FolderUp, Pickaxe } from "lucide-react";
+import { FolderUp, type LucideIcon, Pickaxe } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
-import { cn } from "@/lib/utils";
-
+import { cn } from "@shared/lib/utils";
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -13,7 +12,7 @@ import {
 
 interface Menu {
     title: string;
-    icon: any;
+    icon: LucideIcon;
     path: string;
 }
 

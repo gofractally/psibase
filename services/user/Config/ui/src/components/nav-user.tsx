@@ -16,8 +16,8 @@ import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLogout } from "@/hooks/useLogout";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
-import { cn } from "@/lib/utils";
 
+import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import {
     DropdownMenu,

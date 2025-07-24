@@ -1,5 +1,4 @@
-import { cn } from "@/lib/utils";
-
+import { cn } from "@shared/lib/utils";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 

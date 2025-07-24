@@ -1,6 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import z from "zod";
 
 import { supervisor } from "@/supervisor";
@@ -8,7 +7,9 @@ import { supervisor } from "@/supervisor";
 import { TxStatus, checkLastTx } from "@/lib/checkStaging";
 import { zAccount } from "@/lib/zod/Account";
 
-const zParams = z.object({
+import { toast } from "@shared/shadcn/ui/sonner";
+
+export const zParams = z.object({
     intf: zAccount,
     service: zAccount,
     method: z.string(),

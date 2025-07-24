@@ -1,5 +1,5 @@
 type QueryKeyGenerator<Prefix extends string = string> = (
-    ...args: any[]
+    ...args: unknown[]
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
 const QueryKey = {
