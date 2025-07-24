@@ -27,6 +27,7 @@ impl<'a> Unpack<'a> for Precision {
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
         let precision = u8::unpack(src, pos)?;
+        Self::verify(src, pos)?;
         Ok(Self(precision))
     }
 
