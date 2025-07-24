@@ -223,10 +223,7 @@ impl GuestBucket for Bucket {
             }
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
-                    match host_buffer::get(&self.db, &prefixed_key) {
-                        Some(_) => true,
-                        None => false, // Key was deleted
-                    }
+                    host_buffer::get(&self.db, &prefixed_key).is_some()
                 } else {
                     HostDb::get(self.db.duration as u8, &prefixed_key).is_some()
                 }
