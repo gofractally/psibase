@@ -85,7 +85,7 @@ SCENARIO("Creating a token")
 
       THEN("Alice may create a token")
       {
-         auto create = a.create(4, 1'000'000'000e4);
+         auto create = a.create(Precision{4}, 1'000'000'000e4);
          CHECK(create.succeeded());
 
          AND_THEN("The token exists")
@@ -100,7 +100,7 @@ SCENARIO("Creating a token")
       }
       THEN("Alice may not create a token with invalid quantity")
       {
-         uint8_t  p = 4;
+         auto     p = Precision{4};
          Quantity q0{0e4};
          Quantity q1{1e4};
          Quantity q2{std::numeric_limits<Quantity::Quantity_t>::max()};
@@ -110,12 +110,12 @@ SCENARIO("Creating a token")
       }
       WHEN("Alice creates a token")
       {
-         auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+         auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
          auto token1  = a.getToken(tokenId).returnVal();
 
          THEN("Alice may create a second token")
          {
-            auto create = a.create(4, 1'000'000'000e4);
+            auto create = a.create(Precision{4}, 1'000'000'000e4);
             CHECK(create.succeeded());
 
             auto tokenId   = create.returnVal();
@@ -144,7 +144,7 @@ SCENARIO("Minting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+      auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
 
       THEN("Bob may not mint them")
       {
@@ -201,7 +201,7 @@ SCENARIO("Recalling tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+      auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e4, memo);
       a.credit(tokenId, bob, 1'000e4, memo);
@@ -253,7 +253,7 @@ SCENARIO("Interactions with the Issuer NFT")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+      auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal();
 
@@ -340,7 +340,7 @@ SCENARIO("Burning tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+      auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
       a.credit(tokenId, bob, 100e4, memo);
@@ -482,7 +482,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+      auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
       a.credit(tokenId, bob, 100e4, memo);
@@ -551,7 +551,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      auto tokenId = a.create(4, 1'000'000'000e4).returnVal();
+      auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
 
       a.mint(tokenId, 200e4, memo);
@@ -690,7 +690,7 @@ SCENARIO("Mapping a symbol to a token")
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
-      auto newToken = a.create(4, userBalance).returnVal();
+      auto newToken = a.create(Precision{4}, userBalance).returnVal();
       a.mint(newToken, userBalance, memo);
 
       // Purchase the symbol and claim the owner NFT
