@@ -3,7 +3,6 @@ import {
     QualifiedPluginId,
     assertTruthy,
     buildFunctionCallResponse,
-    getJson,
     postGraphQLGetJson,
     siblingUrl,
 } from "@psibase/common-lib";
@@ -24,7 +23,13 @@ import { REDIRECT_ERROR_CODE } from "./constants";
 import { isRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/pluginLoader";
 import { Plugins } from "./plugin/plugins";
-import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
+import {
+    OriginationData,
+    assert,
+    getChainId,
+    parser,
+    serviceFromOrigin,
+} from "./utils";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -60,8 +65,6 @@ export class Supervisor implements AppInterface {
 
     parser: Promise<any>;
 
-    chainId: string;
-
     parentOrigination: OriginationData | undefined;
 
     private setParentOrigination(callerOrigin: string) {
@@ -85,6 +88,8 @@ export class Supervisor implements AppInterface {
     }
 
     private async preload(plugins: QualifiedPluginId[]) {
+        await getChainId();
+
         if (plugins.length === 0) {
             return;
         }
@@ -191,10 +196,7 @@ export class Supervisor implements AppInterface {
 
         this.loader = new PluginLoader(this.plugins);
 
-        this.chainId = "";
-        getJson("/common/chainid").then((chainId) => {
-            this.chainId = chainId;
-        });
+        getChainId();
     }
 
     getActiveApp(): string {
