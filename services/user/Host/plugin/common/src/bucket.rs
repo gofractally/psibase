@@ -124,13 +124,13 @@ impl Bucket {
     }
 
     fn validate_key_size(&self, key: &str) {
-        assert!(key.len() < 256, "key must be less than 256 bytes");
+        assert!(key.len() <= 256, "key must be <= 256 bytes");
     }
 
     fn validate_value_size(&self, value: &[u8]) {
         // 100kb
         const MAX_SIZE: usize = 100 * 1024;
-        assert!(value.len() < MAX_SIZE, "value must be less than 100KB");
+        assert!(value.len() <= MAX_SIZE, "value must be less <= 100KB");
     }
 
     fn validate_identifier(identifier: &str) -> Result<(), Error> {
