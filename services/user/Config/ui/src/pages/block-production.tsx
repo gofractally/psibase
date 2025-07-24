@@ -2,18 +2,6 @@ import { Trash2 } from "lucide-react";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-
 import { useAppForm } from "@/components/forms/app-form";
 import { FieldErrors } from "@/components/forms/field-errors";
 
@@ -21,6 +9,18 @@ import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 import { isAccountAvailable } from "@/lib/isAccountAvailable";
 import { Params, PubKeyAuthClaim, SetProducerParams } from "@/lib/producers";
 import { CONFIG } from "@/lib/services";
+
+import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@shared/shadcn/ui/select";
+import { Textarea } from "@shared/shadcn/ui/textarea";
 
 const useProducersPlugin = (method: string) =>
     usePluginMutation(
@@ -38,8 +38,8 @@ const useProducersPlugin = (method: string) =>
     );
 
 export const BlockProduction = () => {
-    const { mutateAsync: setBft } = useProducersPlugin("setBftConsensus");
     const { mutateAsync: setCurrent } = useProducersPlugin("setProducers");
+    const { mutateAsync: setBft } = useProducersPlugin("setBftConsensus");
     const { mutateAsync: setCft } = useProducersPlugin("setCftConsensus");
 
     const form = useAppForm({

@@ -1,15 +1,15 @@
 import { FolderUp, Pickaxe } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
+import { cn } from "@/lib/utils";
+
 import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar";
-
-import { cn } from "@/lib/utils";
+} from "@shared/shadcn/ui/sidebar";
 
 interface Menu {
     title: string;

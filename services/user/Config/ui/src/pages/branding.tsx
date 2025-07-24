@@ -5,10 +5,6 @@ import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
 import { useAppForm } from "@/components/forms/app-form";
 
 import { useDraftLogo } from "@/hooks/use-draft-logo";
@@ -16,6 +12,10 @@ import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
 import { useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
 import { useBranding } from "@/hooks/useBranding";
+
+import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 
 const Section = ({
     title = "Saluton, Mondo!",

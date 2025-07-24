@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+
 import { useFieldContext } from "./app-form";
 import { FieldErrors } from "./field-errors";
 
@@ -41,7 +42,7 @@ export const NumberField = ({
                 disabled={disabled}
             />
             {description && (
-                <p className="text-sm text-muted-foreground">{description}</p>
+                <p className="text-muted-foreground text-sm">{description}</p>
             )}
             <FieldErrors meta={state.meta} />
         </div>
