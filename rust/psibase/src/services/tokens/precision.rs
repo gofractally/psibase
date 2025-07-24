@@ -26,7 +26,9 @@ impl<'a> Unpack<'a> for Precision {
     const VARIABLE_SIZE: bool = false;
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-        Ok(Self(u8::unpack(src, pos)?))
+        u8::unpack(src, pos)?
+            .try_into()
+            .map_err(|_| fracpack::Error::BadScalar)
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
