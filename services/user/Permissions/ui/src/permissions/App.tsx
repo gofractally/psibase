@@ -10,7 +10,7 @@ interface PermissionRequest {
     user: string;
     caller: string;
     callee: string;
-    riskLevel: number;
+    trustLevel: number;
     description: string;
 }
 
@@ -90,7 +90,7 @@ export const App = () => {
                 </div>
             )}
 
-            {/* risk level widget */}
+            {/* trust level widget */}
             <div className="my-4">
                 <p className="mb-2 font-medium">Trust Level:</p>
                 <div className="flex gap-2">
@@ -98,7 +98,7 @@ export const App = () => {
                         <div
                             key={level}
                             className={`flex h-8 w-8 items-center justify-center rounded border text-sm font-medium ${
-                                level === permissionRequest.riskLevel
+                                level === permissionRequest.trustLevel
                                     ? "border-blue-500 bg-blue-100 text-blue-700"
                                     : "border-gray-300 text-gray-500"
                             }`}
@@ -116,7 +116,7 @@ export const App = () => {
                             3: "high",
                             4: "very high",
                             5: "extremely high",
-                        }[permissionRequest.riskLevel]
+                        }[permissionRequest.trustLevel]
                     }{" "}
                     trust in <b>{permissionRequest.caller}</b>.
                 </p>

@@ -1,16 +1,16 @@
 package permissions:plugin;
 
 interface types {
-    /// This represents the risk posed by allowing a third-party application the ability to
+    /// This represents the trust threshold for a third-party application to
     /// perform an action on the user's behalf. It's just a hint to help guide the user.
-    record risk {
-        /// Valid values: 0-6
-        /// 0: Anyone can call
-        /// 6: No one can call (except the callee app itself)
-        /// 1-5: Buckets that correspond to how risky the user should consider the request. Higher number = higher risk
+    record trust {
+        /// Valid values: `0`-`6`
+        /// * `0`: Anyone can call
+        /// * `1`-`5`: Higher number = higher required trust
+        /// * `6`: No one can call (except the callee app itself)
         level: u8,
 
-        /// A descriptiont that will be placed on the UI shown to the user, following the text,
+        /// A description that will be placed on the UI shown to the user, following the text,
         /// "By authorizing, you trust <caller> with these abilities:"
         ///
         /// The description should naturally follow that preface. For example:
@@ -22,7 +22,7 @@ interface types {
 
 interface api {
     use host:common/types.{error};
-    use types.{risk};
+    use types.{trust};
 
     /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller`
     ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
@@ -30,18 +30,15 @@ interface api {
     /// 
     /// Parameters: 
     /// * `caller`      - The app requesting permission
-    /// * `risk`        - Valid values [0,1,2,3,4,5,6].
-    ///                   0: Allows any caller app access on the user's behalf
-    ///                   1-5: 1 is the least risk, 5 is the most risk.
-    ///                   6: Allows no one (except the callee app itself) access on the user's behalf.
-    ///                   The risk level of operation for the user. The higher the risk, the more the user should
-    ///                   trust the caller app. This is just a hint to help the user make a decision.
-    /// * `debug-label` - If an unexpected error occurs, this label will be printed with the error
-    ///                   message to help you track down the root cause.
+    /// * `trust`       - The level of trust needed for a third-party application to perform this action on the user's 
+    ///                   behalf. Riskier operations (Operations that could be misused to greater user detriment) should
+    ///                   require more trust. This is just a hint to help the user decide whether to allow an operation.
+    /// * `debug-label` - If an unexpected error occurs, this label will be printed with the error message to help you
+    ///                   track down the root cause.
     /// * `whitelist`   - A list of accounts who are pre-authorized to perform this action. Whitelisted
-    ///                   accounts will not be generally authorized for the specified `risk` level, they will simply
+    ///                   accounts will not be generally authorized for the specified `trust` level, they will simply
     ///                   be considered authorized for the purposes of this authorization check.
-    authorize: func(caller: string, risk: risk, debug-label: string, whitelist: list<string>) -> result<bool, error>;
+    authorize: func(caller: string, trust: trust, debug-label: string, whitelist: list<string>) -> result<bool, error>;
 }
 
 world imports {

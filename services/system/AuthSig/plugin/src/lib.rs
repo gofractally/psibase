@@ -36,7 +36,7 @@ struct AuthSig;
 fn check_authorization(fn_name: &str, whitelist: Option<Vec<String>>) -> Result<(), Error> {
     let sender = get_sender();
     let whitelist = whitelist.unwrap_or(vec![]);
-    authorize(&sender, &Risks::get_risk(fn_name), fn_name, &whitelist)?;
+    authorize(&sender, &Risks::get_trust_req(fn_name), fn_name, &whitelist)?;
     Ok(())
 }
 

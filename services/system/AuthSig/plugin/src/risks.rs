@@ -1,14 +1,14 @@
-use crate::bindings::permissions::plugin::types::Risk;
+use crate::bindings::permissions::plugin::types::Trust;
 use std::collections::HashMap;
 
 lazy_static::lazy_static! {
-    static ref RISK_LEVELS: HashMap<&'static str, u8> = Risks::get_risk_levels();
+    static ref TRUST_LEVELS: HashMap<&'static str, u8> = Risks::get_trust_levels();
 }
 
 pub struct Risks;
 
 impl Risks {
-    fn get_risk_levels() -> HashMap<&'static str, u8> {
+    fn get_trust_levels() -> HashMap<&'static str, u8> {
         let mut map = HashMap::new();
         map.insert("generate_keypair", 2);
         map.insert("generate_unmanaged_keypair", 0);
@@ -40,12 +40,12 @@ impl Risks {
     }
 
     fn get_level(fn_name: &str) -> u8 {
-        *RISK_LEVELS.get(fn_name).unwrap_or(&6)
+        *TRUST_LEVELS.get(fn_name).unwrap_or(&6)
     }
 
-    pub fn get_risk(fn_name: &str) -> Risk {
+    pub fn get_trust_req(fn_name: &str) -> Trust {
         let level = Risks::get_level(fn_name);
-        Risk {
+        Trust {
             level,
             description: Risks::get_description(level),
         }
