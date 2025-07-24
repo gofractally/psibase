@@ -44,7 +44,7 @@ SCENARIO("Buying a symbol")
       auto b     = bob.to<Symbol>();
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
-      auto precision = Precision{sysIssuer.getToken(sysToken).returnVal().precision};
+      auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);

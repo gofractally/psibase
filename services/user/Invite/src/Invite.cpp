@@ -46,7 +46,7 @@ void Invite::init()
    // Configure manual debit for self on Token and NFT
    auto manualDebit = psibase::EnumElement{"manualDebit"};
    to<Nft>().setUserConf(manualDebit, true);
-   to<Tokens>().setUserConf(untransferable, true);
+   to<Tokens>().setUserConf(Tokens::untransferable, true);
 
    // Create the invite payer account and set its auth contract
    to<Accounts>().newAccount(payerAccount, AuthInvite::service, false);

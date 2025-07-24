@@ -254,7 +254,7 @@ namespace UserService
             void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             // TODO: time is redundant with which block the event was written in
-            void transferred(TID tmanualDebitokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, Memo memo) {}
+            void transferred(TID tokenId, psibase::BlockTime time, Account sender, Account receiver, Quantity amount, Memo memo) {}
             void recalled(TID tokenId, psibase::BlockTime time, Account from, Quantity amount, Memo memo) {}
          };
 
