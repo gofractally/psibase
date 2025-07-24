@@ -13,7 +13,7 @@ use risks::*;
 
 // Other plugins
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::host::common::client::get_sender_app;
+use bindings::host::common::client::get_sender;
 use bindings::host::common::types as CommonTypes;
 use bindings::permissions::plugin::api::authorize;
 use bindings::transact::plugin::intf as Transact;
@@ -34,7 +34,7 @@ use rand_core::OsRng;
 struct AuthSig;
 
 fn check_authorization(fn_name: &str, whitelist: Option<Vec<String>>) -> Result<(), Error> {
-    let sender = get_sender_app().app.unwrap();
+    let sender = get_sender();
     let whitelist = whitelist.unwrap_or(vec![]);
     authorize(&sender, &Risks::get_risk(fn_name), fn_name, &whitelist)?;
     Ok(())

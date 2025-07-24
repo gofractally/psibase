@@ -37,17 +37,6 @@ interface types {
         plugin: string,
     }
 
-    /// Data related to the origination of the current call
-    record origination-data {
-
-        /// The account name of the psibase app responsible for the call.
-        /// May be empty if the call comes from an external web app.
-        app: option<string>,
-
-        /// The domain origin responsible for the call.
-        origin: string
-    }
-
     variant body-types {
         bytes(list<u8>),
         json(string),
@@ -97,28 +86,24 @@ interface server {
 
 /// Common calls related to client interactions
 interface client {
-    use types.{origination-data, error};
+    use types.{error};
 
-    /// Gets details about the app responsible for the call
-    get-sender-app: func() -> origination-data;
+    /// Gets the account name of the caller app
+    get-sender: func() -> string;
 
-    /// Gets the account name of the service from which the currently running
-    /// plugin was fetched.
-    my-service-account: func() -> string;
-
-    /// Gets the full domain origin of the service from which the
-    /// currently running plugin was fetched.
-    my-service-origin: func() -> string;
+    /// Gets the account name of the receiver of the current call (the account name
+    ///   of the currently running app).
+    get-receiver: func() -> string;
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;
 }
 
 interface admin {
-    use types.{origination-data, post-request, body-types, error};
+    use types.{post-request, body-types, error};
     
-    /// Get active app (the top level app with which the user is interacting)
-    get-active-app: func() -> origination-data;
+    /// Get account name of the active app (the top level app with which the user is interacting)
+    get-active-app: func() -> string;
 
     /// Make a post request
     post: func(app: string, request: post-request) -> result<option<body-types>, error>;

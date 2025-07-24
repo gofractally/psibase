@@ -89,7 +89,6 @@ export const AccountSelection = () => {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
                 await createAccount(values.username);
                 void (await acceptInvite({
-                    origin,
                     app,
                     accountName: values.username,
                     token: z.string().parse(token),
@@ -101,7 +100,7 @@ export const AccountSelection = () => {
                     throw new Error("Invalid connectionToken");
                 }
                 // Now we need to login and set auth cookie
-                await handleLogin(values.username, app, origin);
+                await handleLogin(values.username, app);
             }
 
             window.location.href = origin;
@@ -171,11 +170,7 @@ export const AccountSelection = () => {
             }
 
             try {
-                void (await handleLogin(
-                    accountId,
-                    connectionToken.app,
-                    connectionToken.origin,
-                ));
+                void (await handleLogin(accountId, connectionToken.app));
                 window.location.href = connectionToken.origin;
             } catch (error) {
                 console.error("❌ Error logging in:", error);
@@ -219,18 +214,13 @@ export const AccountSelection = () => {
         useLoginDirect();
     const { mutateAsync: logout } = useLogout();
 
-    const handleLogin = async (
-        accountName: string,
-        app: string,
-        origin: string,
-    ) => {
+    const handleLogin = async (accountName: string, app: string) => {
         if (!connectionToken) {
             throw new Error(`Expected connection token for a login`);
         }
         await loginDirect({
             accountName,
             app,
-            origin,
         });
     };
 
@@ -264,7 +254,6 @@ export const AccountSelection = () => {
                 token: z.string().parse(token),
                 accountName: z.string().parse(selectedAccount?.account),
                 app: inviteToken.app,
-                origin: inviteToken.appDomain,
             });
         } else {
             // This is dead code; no handled by the click event on an account
@@ -274,7 +263,6 @@ export const AccountSelection = () => {
             }
             loginDirect({
                 app: connectionToken.app,
-                origin: connectionToken.origin,
                 accountName: selectedAccount!.account,
             });
         }

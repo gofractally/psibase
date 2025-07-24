@@ -23,14 +23,8 @@ pub fn validate_action_name(action_name: &str) -> Result<(), Host::types::Error>
 }
 
 pub fn assert_from_supervisor() {
-    let sender_app = Client::get_sender_app().app.expect("Sender app not set");
-    assert!(sender_app == "supervisor", "Unauthorized: {}", sender_app);
-}
-
-pub fn get_sender_app() -> String {
-    return Host::client::get_sender_app()
-        .app
-        .expect("[transact] Sender app not set");
+    let sender = Client::get_sender();
+    assert!(sender == "supervisor", "Unauthorized: {}", sender);
 }
 
 pub fn get_action_sender(service: &str, method: &str) -> Result<String, Host::types::Error> {

@@ -12,7 +12,7 @@ use psibase::fracpack::{Pack, Unpack};
 
 use host::common::{
     client as HostClient,
-    client::{get_sender_app, my_service_account},
+    client::{get_receiver, get_sender},
     store::StorageDuration,
     types::Error,
 };
@@ -48,7 +48,7 @@ impl From<PackablePromptContext> for PromptContext {
 struct PermissionsPlugin;
 
 fn assert_admin() {
-    assert_eq!(get_sender_app().app.unwrap(), my_service_account())
+    assert_eq!(get_sender(), get_receiver())
 }
 
 impl PermsAdmin for PermissionsPlugin {
@@ -87,7 +87,7 @@ impl Api for PermissionsPlugin {
         debug_label: String,
         whitelist: Vec<String>,
     ) -> Result<bool, Error> {
-        let callee = HostClient::get_sender_app().app.unwrap();
+        let callee = HostClient::get_sender();
         if !(0..=6).contains(&risk.level) {
             return Err(ErrorType::InvalidRiskLevel(
                 callee.clone(),
