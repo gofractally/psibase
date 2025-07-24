@@ -14,7 +14,7 @@ struct SchemaTestCase {
     #[serde(rename = "type")]
     type_: String,
     #[serde(default)]
-    json: Option<serde_json::Value>,
+    json: serde_json::Value,
     fracpack: String,
     #[serde(default)]
     error: bool,
@@ -323,11 +323,10 @@ impl DeclBuilder {
 
     fn emit_test(&mut self, test: &SchemaTestCase) -> TokenStream {
         let json_test = serde_json::to_string(test).unwrap();
-        if let Some(expected) = &test.json {
-            let fracpack =
-                LitByteStr::new(&hex::decode(&test.fracpack).unwrap(), Span::call_site());
-            let json = serde_json::to_string(expected).unwrap();
-            let ty = self.generate_name(Some(test.type_.clone()));
+        let fracpack = LitByteStr::new(&hex::decode(&test.fracpack).unwrap(), Span::call_site());
+        let ty = self.generate_name(Some(test.type_.clone()));
+        if !test.error {
+            let json = serde_json::to_string(&test.json).unwrap();
             let basic = quote! {
                 println!("Running test: {}", #json_test);
                 let bin = #fracpack;
@@ -356,7 +355,12 @@ impl DeclBuilder {
                 basic
             }
         } else {
-            quote! {}
+            quote! {
+                println!("Running test: {}", #json_test);
+                let bin = #fracpack;
+                <#ty as fracpack::Unpack>::verify_no_extra(bin).expect_err("expected error");
+                <#ty as fracpack::Unpack>::unpacked(bin).expect_err("expected error");
+            }
         }
     }
 }

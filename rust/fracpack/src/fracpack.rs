@@ -432,6 +432,11 @@ pub trait Unpack<'a>: Sized {
             return Err(Error::ReadPastEnd);
         };
         src.set_pos(new_pos)?;
+        if Self::new_empty_container().is_ok() {
+            if src.unpack_at::<u32>(&mut src.pos.clone())? == 0 {
+                return Err(Error::PtrEmptyList);
+            }
+        }
         Self::verify(src)
     }
 
