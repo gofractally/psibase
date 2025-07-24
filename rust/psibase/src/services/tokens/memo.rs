@@ -1,29 +1,20 @@
-use async_graphql::scalar;
-use fracpack::{Error, Pack, Result, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
+use fracpack::{Pack, ToSchema, Unpack};
 use std::fmt;
+use std::str::FromStr;
 
-#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Default, Pack)]
+use crate::{serialize_as_str, services::tokens::TokensError};
+
+#[derive(Debug, Clone, ToSchema, Default, Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Memo(String);
 
-scalar!(Memo);
-
 impl Memo {
-    pub fn new(contents: String) -> Self {
-        assert!(
-            contents.len() <= 80,
-            "memo must be equal to or less than 80 bytes"
-        );
-
-        Self(contents)
-    }
-
-    pub fn validate(&self) {
-        assert!(
-            self.0.len() <= 80,
-            "memo must be equal to or less than 80 bytes"
-        );
+    pub fn new(value: String) -> Result<Self, TokensError> {
+        if value.len() <= 80 {
+            Ok(Self(value))
+        } else {
+            Err(TokensError::MemoTooLarge)
+        }
     }
 }
 
@@ -33,9 +24,19 @@ impl fmt::Display for Memo {
     }
 }
 
-impl From<String> for Memo {
-    fn from(value: String) -> Self {
+impl TryFrom<String> for Memo {
+    type Error = TokensError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
+    }
+}
+
+impl FromStr for Memo {
+    type Err = TokensError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.to_string())
     }
 }
 
@@ -43,22 +44,14 @@ impl<'a> Unpack<'a> for Memo {
     const FIXED_SIZE: u32 = 4;
     const VARIABLE_SIZE: bool = true;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Memo> {
-        Ok(Self::new(String::unpack(src, pos)?))
+    fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
+        Ok(Self::new(String::unpack(src, pos)?).map_err(|_| fracpack::Error::ExtraData)?)
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let len = u32::unpack(src, pos)?;
-        let bytes = src
-            .get(*pos as usize..(*pos + len) as usize)
-            .ok_or(Error::ReadPastEnd)?;
-        *pos += len;
-        assert!(bytes.len() <= 80, "memo must be 80 bytes or less");
-        std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
+    fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
+        Self::unpack(src, pos)?;
         Ok(())
     }
-
-    fn new_empty_container() -> Result<Self> {
-        Ok(Default::default())
-    }
 }
+
+serialize_as_str!(Memo, "memo");

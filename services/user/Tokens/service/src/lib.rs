@@ -259,7 +259,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
-        memo.validate();
         Token::get_assert(token_id).recall(amount, from);
 
         Wrapper::emit()
@@ -278,7 +277,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn burn(token_id: TID, amount: Quantity, memo: Memo) {
-        memo.validate();
         Token::get_assert(token_id).burn(amount);
 
         Wrapper::emit()
@@ -298,7 +296,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn mint(token_id: TID, amount: Quantity, memo: Memo) {
-        memo.validate();
         Token::get_assert(token_id).mint(amount);
 
         Wrapper::emit().history().minted(token_id, amount, memo);
@@ -317,7 +314,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn credit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
-        memo.validate();
         let creditor = get_sender();
         SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
 
@@ -339,7 +335,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
-        memo.validate();
         let creditor = get_sender();
 
         SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
@@ -363,7 +358,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
-        memo.validate();
         SharedBalance::get_assert(creditor, get_sender(), token_id).debit(amount, memo);
     }
 
@@ -379,7 +373,6 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        memo.validate();
         SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
     }
 

@@ -17,7 +17,7 @@ mod tests {
             token_id,
             debitor,
             amount,
-            "memo".to_string().into(),
+            "memo".to_string().try_into().unwrap(),
         )
     }
 
@@ -32,7 +32,7 @@ mod tests {
             token_id,
             creditor,
             amount,
-            "debit".to_string().into(),
+            "debit".to_string().try_into().unwrap(),
         )
     }
 
@@ -96,7 +96,11 @@ mod tests {
 
         // Alice cannot mint a token that does not yet exist.
         assert_error(
-            Wrapper::push_from(&chain, alice).mint(2, 12345.into(), "memo".to_string().into()),
+            Wrapper::push_from(&chain, alice).mint(
+                2,
+                12345.into(),
+                "memo".to_string().try_into().unwrap(),
+            ),
             "service 'tokens' aborted with message: failed to find token",
         );
 
@@ -108,7 +112,7 @@ mod tests {
         // Alice can mint a portion of the token supply;
         assert_balance(&chain, alice, token_id, 0.into());
         Wrapper::push_from(&chain, alice)
-            .mint(token_id, 12345.into(), format!("").into())
+            .mint(token_id, 12345.into(), format!("").try_into().unwrap())
             .get()?;
         assert_balance(&chain, alice, token_id, 12345.into());
 
@@ -136,7 +140,7 @@ mod tests {
             Wrapper::push_from(&chain, alice).mint(
                 token_id,
                 67656.into(),
-                "memo".to_string().into(),
+                "memo".to_string().try_into().unwrap(),
             ),
             "service 'tokens' aborted with message: over max issued supply",
         );

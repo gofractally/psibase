@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::serialize_as_str;
-use crate::services::tokens::{ConversionError, Precision, Quantity};
+use crate::services::tokens::{TokensError, Precision, Quantity};
 
 pub struct Decimal {
     quantity: Quantity,
@@ -36,10 +36,10 @@ impl std::fmt::Display for Decimal {
 }
 
 impl FromStr for Decimal {
-    type Err = ConversionError;
+    type Err = TokensError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.chars().filter(|&c| c != '.').all(|c| c.is_ascii_digit()) {
-            return Err(ConversionError::InvalidNumber);
+            return Err(TokensError::InvalidNumber);
         }
 
         let precision: u8 = match s.split_once('.') {

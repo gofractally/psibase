@@ -3,7 +3,7 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
-use crate::services::tokens::{ConversionError, Precision};
+use crate::services::tokens::{TokensError, Precision};
 
 #[derive(
     Debug,
@@ -39,42 +39,42 @@ impl Quantity {
         Self { value }
     }
 
-    pub fn from_str(amount: &str, precision: Precision) -> Result<Self, ConversionError> {
+    pub fn from_str(amount: &str, precision: Precision) -> Result<Self, TokensError> {
         if !amount.chars().all(|c| c == '.' || c.is_ascii_digit()) {
-            return Err(ConversionError::InvalidNumber);
+            return Err(TokensError::InvalidNumber);
         }
         let value = match amount.split_once('.') {
             Some((integer_part, fraction_part)) => {
                 let integer_value: u64 = integer_part
                     .parse()
-                    .map_err(|_| ConversionError::InvalidNumber)?;
+                    .map_err(|_| TokensError::InvalidNumber)?;
 
                 let integer_value = integer_value
                     .checked_mul(10u64.pow(precision.0 as u32))
-                    .ok_or(ConversionError::Overflow)?;
+                    .ok_or(TokensError::Overflow)?;
 
                 let fraction_len = fraction_part.len() as u8;
 
                 if fraction_len > precision.0 {
-                    return Err(ConversionError::PrecisionOverflow);
+                    return Err(TokensError::PrecisionOverflow);
                 }
                 let remaining_pow = precision.0 - fraction_len;
 
                 let fraction_value: u64 = fraction_part
                     .parse()
-                    .map_err(|_| ConversionError::InvalidNumber)?;
+                    .map_err(|_| TokensError::InvalidNumber)?;
 
                 let fraction_value = fraction_value
                     .checked_mul(10u64.pow(remaining_pow as u32))
-                    .ok_or(ConversionError::Overflow)?;
+                    .ok_or(TokensError::Overflow)?;
 
                 integer_value + fraction_value
             }
             None => {
-                let num_value: u64 = amount.parse().map_err(|_| ConversionError::InvalidNumber)?;
+                let num_value: u64 = amount.parse().map_err(|_| TokensError::InvalidNumber)?;
                 num_value
                     .checked_mul(10u64.pow(precision.0 as u32))
-                    .ok_or(ConversionError::Overflow)?
+                    .ok_or(TokensError::Overflow)?
             }
         };
 

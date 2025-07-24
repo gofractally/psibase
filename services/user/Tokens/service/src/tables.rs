@@ -345,7 +345,10 @@ pub mod tables {
         }
 
         pub async fn precision(&self) -> Precision {
-            Token::get_assert(self.token_id).precision.try_into().unwrap()
+            Token::get_assert(self.token_id)
+                .precision
+                .try_into()
+                .unwrap()
         }
     }
 
@@ -411,7 +414,7 @@ pub mod tables {
                 );
 
             if !is_manual_debit {
-                self.debit(quantity, "Autodebit".to_string().into());
+                self.debit(quantity, Memo::new("Autodebit".to_string().unwrap());
             }
         }
 
