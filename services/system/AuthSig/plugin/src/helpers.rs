@@ -20,9 +20,3 @@ pub fn from_transact() -> bool {
         app == psibase::services::transact::SERVICE.to_string()
     })
 }
-
-pub fn from_auth_sig_ui() -> bool {
-    Client::get_sender_app().app.map_or(false, |app| {
-        app == psibase::services::auth_sig::SERVICE.to_string()
-    })
-}

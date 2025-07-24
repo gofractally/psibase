@@ -53,6 +53,7 @@ export function ExecutionTabs({
                     camelCase(selectedFunction.name),
                     parseParams(),
                 ),
+                { enabled: true, returnPath: "/common/plugin-tester" },
             );
             setResponseText(
                 response === undefined

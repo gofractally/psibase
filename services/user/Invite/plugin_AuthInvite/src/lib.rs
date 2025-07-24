@@ -40,9 +40,7 @@ impl Intf for AuthInvite {
             }
         }
 
-        let inv_keys = deserialize(&token).map_err(|_| DecodeInviteError("notify"))?;
-
-        InviteKeys::add(&inv_keys);
+        InviteKeys::add(&deserialize(&token)?);
 
         hook_action_auth();
 
