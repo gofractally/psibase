@@ -1,5 +1,4 @@
 from psinode import Action, PrivateKey, Transaction, TransactionError, Service
-from decimal import Decimal
 import time
 
 class Tokens(Service):
