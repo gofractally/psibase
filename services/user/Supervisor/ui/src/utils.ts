@@ -57,7 +57,7 @@ export const parser = (): Promise<any> => {
 };
 
 export let chainId: string | undefined;
-export const getChainId = (): Promise<string> => {
+const getChainId = (): Promise<string> => {
     if (!chainId) {
         return getJson("/common/chainid").then((id: string) => {
             chainId = id;
@@ -66,6 +66,7 @@ export const getChainId = (): Promise<string> => {
     }
     return Promise.resolve(chainId);
 };
+export const chainIdPromise: Promise<string> = getChainId();
 
 export const isString = (value: any): value is string => {
     return typeof value === "string";
