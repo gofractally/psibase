@@ -1118,7 +1118,7 @@ impl PackageRegistry for FileSetRegistry {
 pub struct HTTPRegistry {
     index_url: reqwest::Url,
     client: reqwest::Client,
-    index: HashMap<String, PackageInfo>,
+    index: Vec<PackageInfo>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -1149,12 +1149,7 @@ impl HTTPRegistry {
             .unwrap()
             .pop_if_empty()
             .push("index.json");
-        let mut index = HashMap::new();
-        for package in crate::as_json::<Vec<PackageInfo>>(client.get(index_url.clone())).await? {
-            if let Some(prev) = index.insert(package.name.clone(), package) {
-                Err(Error::DuplicatePackage { package: prev.name })?
-            }
-        }
+        let index = crate::as_json::<Vec<PackageInfo>>(client.get(index_url.clone())).await?;
         Ok(HTTPRegistry {
             index_url,
             client,
@@ -1166,7 +1161,7 @@ impl HTTPRegistry {
         owner: AccountNumber,
         mut client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
-        let mut index = HashMap::new();
+        let mut index = Vec::new();
 
         let mut end_cursor: Option<String> = None;
         loop {
@@ -1181,10 +1176,7 @@ impl HTTPRegistry {
                 ))
                 .await.with_context(|| "Failed to list packages")?;
             for edge in data.packages.edges {
-                let package = edge.node;
-                if let Some(prev) = index.insert(package.name.clone(), package) {
-                    Err(Error::DuplicatePackage { package: prev.name })?
-                }
+                index.push(edge.node);
             }
             if !data.packages.pageInfo.hasNextPage {
                 break;
@@ -1236,11 +1228,7 @@ impl HTTPRegistry {
 impl PackageRegistry for HTTPRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
-        let mut result = Vec::new();
-        for (_k, v) in &self.index {
-            result.push(v.clone());
-        }
-        Ok(result)
+        Ok(self.index.clone())
     }
     async fn get_by_info(
         &self,
