@@ -18,23 +18,6 @@ pub mod service {
 
     use crate::utils::increment_last_char;
 
-    pub enum AppStatus {
-        Draft = 0,
-        Published = 1,
-        Unpublished = 2,
-    }
-
-    impl From<u32> for AppStatus {
-        fn from(status: u32) -> Self {
-            match status {
-                0 => AppStatus::Draft,
-                1 => AppStatus::Published,
-                2 => AppStatus::Unpublished,
-                _ => abort_message("Invalid app status"),
-            }
-        }
-    }
-
     /// Holds metadata for a registered app
     #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
     pub struct AppMetadataWithTags {
@@ -81,7 +64,7 @@ pub mod service {
         let is_new_app = metadata.account_id.value == 0;
 
         let status: u32 = if is_new_app {
-            AppStatus::Draft as u32
+            app_status::DRAFT
         } else {
             metadata.status
         };
@@ -137,10 +120,10 @@ pub mod service {
             "Only app owners can unpublish the app",
         );
         check(
-            metadata.status != AppStatus::Published as u32,
+            metadata.status != app_status::PUBLISHED,
             "App is already published",
         );
-        metadata.status = AppStatus::Published as u32;
+        metadata.status = app_status::PUBLISHED;
         metadata.check_valid();
         app_metadata_table.put(&metadata).unwrap();
 
@@ -159,10 +142,10 @@ pub mod service {
             "Only app owners can unpublish the app",
         );
         check(
-            metadata.status == AppStatus::Published as u32,
+            metadata.status == app_status::PUBLISHED,
             "App is not published",
         );
-        metadata.status = AppStatus::Unpublished as u32;
+        metadata.status = app_status::UNPUBLISHED;
         app_metadata_table.put(&metadata).unwrap();
 
         Wrapper::emit()

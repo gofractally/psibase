@@ -4,3 +4,9 @@ pub const MAX_TAG_LENGTH: usize = 30;
 pub const MAX_APP_NAME_LENGTH: usize = 30;
 pub const MAX_APP_SHORT_DESCRIPTION_LENGTH: usize = 100;
 pub const MAX_APP_LONG_DESCRIPTION_LENGTH: usize = 1000;
+
+pub mod app_status {
+    pub const DRAFT: u32 = 0;
+    pub const PUBLISHED: u32 = 1;
+    pub const UNPUBLISHED: u32 = 2;
+}

@@ -8,8 +8,6 @@ pub mod tables {
 
     use crate::constants::*;
 
-    use crate::service::AppStatus;
-
     /// Holds tags
     #[table(name = "TagsTable", index = 0)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, PartialEq)]
@@ -168,7 +166,7 @@ pub mod tables {
                 );
             }
 
-            if self.status == AppStatus::Published as u32 {
+            if self.status == app_status::PUBLISHED as u32 {
                 let publishing_required_fields = [
                     ("account_id", &self.account_id.to_string()),
                     ("name", &self.name),
