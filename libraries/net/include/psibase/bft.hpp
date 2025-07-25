@@ -926,7 +926,7 @@ namespace psibase::net
       {
          for (std::size_t group : {0, 1})
          {
-            if (active_producers[group])
+            if (active_producers[group] && !producer_views[group].empty())
             {
                if (auto idx = active_producers[group]->getIndex(self))
                {
