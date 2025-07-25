@@ -8,7 +8,7 @@ pub mod tables {
 
     use crate::constants::*;
 
-    use crate::service::{AppStatus, AppStatusU32};
+    use crate::service::AppStatus;
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
@@ -91,7 +91,7 @@ pub mod tables {
         pub app_homepage_subpage: String,
 
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
-        pub status: AppStatusU32,
+        pub status: u32,
 
         /// The timestamp of when the app was created
         pub created_at: psibase::BlockTime,
@@ -176,7 +176,7 @@ pub mod tables {
                 );
             }
 
-            if self.status == AppStatus::Published as AppStatusU32 {
+            if self.status == AppStatus::Published as u32 {
                 let publishing_required_fields = [
                     ("account_id", &self.account_id.to_string()),
                     ("name", &self.name),

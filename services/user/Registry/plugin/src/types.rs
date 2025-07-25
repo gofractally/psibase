@@ -1,11 +1,9 @@
-use registry::service::AppStatusU32 as ServiceAppStatusU32;
-
 use crate::bindings::registry::plugin::types::{AppMetadata, AppStatus};
 
 use registry as RegistryService;
 
-impl From<ServiceAppStatusU32> for AppStatus {
-    fn from(status: ServiceAppStatusU32) -> Self {
+impl From<u32> for AppStatus {
+    fn from(status: u32) -> Self {
         match status {
             0 => AppStatus::Draft,
             1 => AppStatus::Published,

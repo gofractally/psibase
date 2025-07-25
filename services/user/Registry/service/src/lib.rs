@@ -18,16 +18,14 @@ pub mod service {
 
     use crate::utils::increment_last_char;
 
-    pub type AppStatusU32 = u32;
-
     pub enum AppStatus {
         Draft = 0,
         Published = 1,
         Unpublished = 2,
     }
 
-    impl From<AppStatusU32> for AppStatus {
-        fn from(status: AppStatusU32) -> Self {
+    impl From<u32> for AppStatus {
+        fn from(status: u32) -> Self {
             match status {
                 0 => AppStatus::Draft,
                 1 => AppStatus::Published,
@@ -90,8 +88,8 @@ pub mod service {
 
         let is_new_app = metadata.account_id.value == 0;
 
-        let status: AppStatusU32 = if is_new_app {
-            AppStatus::Draft as AppStatusU32
+        let status: u32 = if is_new_app {
+            AppStatus::Draft as u32
         } else {
             metadata.status
         };
@@ -147,10 +145,10 @@ pub mod service {
             "Only app owners can unpublish the app",
         );
         check(
-            metadata.status != AppStatus::Published as AppStatusU32,
+            metadata.status != AppStatus::Published as u32,
             "App is already published",
         );
-        metadata.status = AppStatus::Published as AppStatusU32;
+        metadata.status = AppStatus::Published as u32;
         metadata.check_valid();
         app_metadata_table.put(&metadata).unwrap();
 
@@ -169,10 +167,10 @@ pub mod service {
             "Only app owners can unpublish the app",
         );
         check(
-            metadata.status == AppStatus::Published as AppStatusU32,
+            metadata.status == AppStatus::Published as u32,
             "App is not published",
         );
-        metadata.status = AppStatus::Unpublished as AppStatusU32;
+        metadata.status = AppStatus::Unpublished as u32;
         app_metadata_table.put(&metadata).unwrap();
 
         Wrapper::emit()
@@ -227,7 +225,7 @@ pub mod service {
     }
 
     #[event(history)]
-    fn appStatusChanged(app_account_id: AccountNumber, status: AppStatusU32) {}
+    fn appStatusChanged(app_account_id: AccountNumber, status: u32) {}
 }
 
 #[cfg(test)]

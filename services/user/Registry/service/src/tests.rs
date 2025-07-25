@@ -3,12 +3,12 @@ mod tests {
     use crate::*;
     use constants::MAX_APP_NAME_LENGTH;
     use psibase::{account, AccountNumber, ChainEmptyResult, TimePointUSec};
-    use service::{AppMetadata, AppStatus, AppStatusU32, TagRecord};
+    use service::{AppMetadata, AppStatus, TagRecord};
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
             account_id: AccountNumber::new(0),
-            status: AppStatus::Draft as AppStatusU32,
+            status: AppStatus::Draft as u32,
             created_at: TimePointUSec::from(0),
             redirect_uris: vec!["http://localhost:3000/callback".to_string()],
             owners: vec![account!("alice"), account!("bob")],
@@ -75,7 +75,7 @@ mod tests {
         assert_eq!(metadata.privacy_policy_subpage, "/privacy-policy");
         assert_eq!(metadata.app_homepage_subpage, "/");
         assert_eq!(metadata.status, 0);
-        assert_eq!(metadata.status, AppStatus::Draft as AppStatusU32);
+        assert_eq!(metadata.status, AppStatus::Draft as u32);
 
         assert_eq!(tags.len(), 3);
         assert!(tags.contains(&TagRecord {
