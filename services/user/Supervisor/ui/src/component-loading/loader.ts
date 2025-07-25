@@ -1,11 +1,10 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
-import { rollup, type WarningHandlerWithDefault } from "@rollup/browser";
-import * as cli from '@bytecodealliance/preview2-shim/cli';
-import * as clocks from '@bytecodealliance/preview2-shim/clocks';
-import * as filesystem from '@bytecodealliance/preview2-shim/filesystem';
-import * as io from '@bytecodealliance/preview2-shim/io';
-import * as random from '@bytecodealliance/preview2-shim/random';
-import shimCode from './shims/shimWrapper.js?raw';
+import * as cli from "@bytecodealliance/preview2-shim/cli";
+import * as clocks from "@bytecodealliance/preview2-shim/clocks";
+import * as filesystem from "@bytecodealliance/preview2-shim/filesystem";
+import * as io from "@bytecodealliance/preview2-shim/io";
+import * as random from "@bytecodealliance/preview2-shim/random";
+import { type WarningHandlerWithDefault, rollup } from "@rollup/browser";
 
 import { HostInterface } from "../hostInterface.js";
 import { assert } from "../utils.js";
@@ -14,9 +13,16 @@ import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 import { plugin } from "./index.js";
 import privilegedShimCode from "./privileged-api.js?raw";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
+import shimCode from "./shims/shimWrapper.js?raw";
 
 // Set up the global reference for runtime access
-(globalThis as Record<string, unknown>).__preview2Shims = { cli, clocks, filesystem, io, random };
+(globalThis as Record<string, unknown>).__preview2Shims = {
+    cli,
+    clocks,
+    filesystem,
+    io,
+    random,
+};
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -70,8 +76,6 @@ function getProxiedImports({
     const imports: ImportDetails[] = packages.map((p) => p.getImportDetails());
     return mergeImports(imports);
 }
-
-
 
 async function getWasiImports(): Promise<ImportDetails> {
     /*
