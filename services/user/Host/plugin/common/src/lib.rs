@@ -12,7 +12,7 @@ use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
-    store::Guest as Store,
+    store::{DbMode, Guest as Store},
     types::Guest as Types,
     types::{BodyTypes, Error, OriginationData, PostRequest},
 };
@@ -156,6 +156,32 @@ impl Types for HostCommon {
 
 impl Store for HostCommon {
     type Bucket = bucket::Bucket;
+
+    fn clear_buffers() {
+        use crate::bucket::host_buffer;
+
+        check_caller(&["transact"], "clear-buffers@host:common/store");
+        host_buffer::clear_all();
+    }
+
+    fn flush_transactional_data() {
+        use crate::bucket::host_buffer;
+        use crate::supervisor::bridge::database as HostDb;
+
+        check_caller(&["transact"], "flush@host:common/store");
+
+        let buffer_data = host_buffer::drain_all(DbMode::Transactional);
+
+        for (db, entries) in buffer_data {
+            for (key, op) in entries {
+                if let Some(value) = op.0 {
+                    HostDb::set(db.duration as u8, &key, &value);
+                } else {
+                    HostDb::remove(db.duration as u8, &key);
+                }
+            }
+        }
+    }
 }
 
 bindings::export!(HostCommon with_types_in bindings);

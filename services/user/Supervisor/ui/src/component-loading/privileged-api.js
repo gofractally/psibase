@@ -11,6 +11,10 @@ export const intf = {
         return host.getRootDomain();
     },
 
+    getChainId() {
+        return host.getChainId();
+    },
+
     getActiveApp() {
         return host.getActiveApp();
     },

@@ -17,7 +17,8 @@ use transact::plugin::hook_handlers::*;
 // Other plugins
 use host::common::{
     self as Host, server as Server,
-    types::{self as CommonTypes},
+    store::{self as Store},
+    types::{self as CommonTypes, BodyTypes},
 };
 
 // Exported interfaces/types
@@ -30,8 +31,6 @@ use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
 use serde::Deserialize;
 use serde_json::from_str;
-
-use crate::bindings::host::common::types::BodyTypes;
 
 // The transaction construction cycle, including hooks, is as follows:
 //
@@ -140,6 +139,7 @@ impl Intf for TransactPlugin {
 
 impl Admin for TransactPlugin {
     fn start_tx() {
+        Store::clear_buffers();
         assert_from_supervisor();
         if CurrentActions::has_actions() {
             println!("[Warning] Transaction should already have been cleared.");
@@ -168,13 +168,15 @@ impl Admin for TransactPlugin {
         ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
+
         if actions.len() == 0 {
+            Store::flush_transactional_data();
             return Ok(());
         }
 
         let actions = transform_actions(actions)?;
 
-        let tx = make_transaction(actions, 10);
+        let tx = make_transaction(actions, 3);
 
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
@@ -203,6 +205,7 @@ impl Admin for TransactPlugin {
             Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");
+                Store::flush_transactional_data();
                 Ok(())
             }
         }
@@ -235,7 +238,7 @@ impl Auth for TransactPlugin {
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
-        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
             expiration: expiration,
             refBlockSuffix: 0,

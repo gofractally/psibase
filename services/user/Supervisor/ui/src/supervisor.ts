@@ -23,7 +23,13 @@ import { REDIRECT_ERROR_CODE } from "./constants";
 import { isRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/pluginLoader";
 import { Plugins } from "./plugin/plugins";
-import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
+import {
+    OriginationData,
+    assert,
+    chainIdPromise,
+    parser,
+    serviceFromOrigin,
+} from "./utils";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -82,6 +88,8 @@ export class Supervisor implements AppInterface {
     }
 
     private async preload(plugins: QualifiedPluginId[]) {
+        await chainIdPromise;
+
         if (plugins.length === 0) {
             return;
         }
