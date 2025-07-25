@@ -10,16 +10,8 @@ pub mod tables {
 
     use crate::service::AppStatus;
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
     /// Holds tags
-    #[table(name = "TagsTable", index = 1)]
+    #[table(name = "TagsTable", index = 0)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, PartialEq)]
     pub struct TagRecord {
         /// The unique identifier for the tag
@@ -58,7 +50,7 @@ pub mod tables {
             );
         }
     }
-    #[table(name = "AppMetadataTable", index = 2)]
+    #[table(name = "AppMetadataTable", index = 1)]
     #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     #[serde(rename_all = "camelCase")]
     pub struct AppMetadata {
@@ -199,7 +191,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "AppTagsTable", index = 3)]
+    #[table(name = "AppTagsTable", index = 2)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AppTag {
         /// The unique identifier for the app

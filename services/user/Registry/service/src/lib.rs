@@ -49,15 +49,7 @@ pub mod service {
 
     #[action]
     fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-
-        EventsSvc::call().addIndex(
-            DbId::HistoryEvent,
-            SERVICE,
-            MethodNumber::from("appStatusChanged"),
-            0,
-        );
+        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, method!("appStatusChanged"), 0);
     }
 
     #[action]
