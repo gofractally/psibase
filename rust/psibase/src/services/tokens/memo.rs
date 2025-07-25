@@ -52,6 +52,10 @@ impl<'a> Unpack<'a> for Memo {
         Self::unpack(src, pos)?;
         Ok(())
     }
+
+    fn new_empty_container() -> fracpack::Result<Self> {
+        Ok(Default::default())
+    }
 }
 
 serialize_as_str!(Memo, "memo");

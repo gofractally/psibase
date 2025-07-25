@@ -414,7 +414,7 @@ pub mod tables {
                 );
 
             if !is_manual_debit {
-                self.debit(quantity, Memo::new("Autodebit".to_string().unwrap());
+                self.debit(quantity, Memo::new("Autodebit".to_string()).unwrap());
             }
         }
 
