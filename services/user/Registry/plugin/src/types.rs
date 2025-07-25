@@ -15,12 +15,6 @@ impl From<u32> for AppStatus {
 
 impl From<AppMetadata> for RegistryService::action_structs::setMetadata {
     fn from(metadata: AppMetadata) -> Self {
-        let owners_vec = metadata
-            .owners
-            .iter()
-            .map(|owner| owner.parse().unwrap())
-            .collect();
-
         Self {
             name: metadata.name,
             short_description: metadata.short_description,
@@ -32,7 +26,6 @@ impl From<AppMetadata> for RegistryService::action_structs::setMetadata {
             app_homepage_subpage: metadata.app_homepage_subpage,
             tags: metadata.tags,
             redirect_uris: metadata.redirect_uris,
-            owners: owners_vec,
         }
     }
 }

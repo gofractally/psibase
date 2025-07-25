@@ -85,7 +85,6 @@ pub fn query_app_metadata(
                     appHomepageSubpage,
                     status,
                     redirectUris,
-                    owners,
                     createdAt
                 }}
                 tags {{

@@ -52,7 +52,6 @@ pub mod service {
         app_homepage_subpage: String,
         tags: Vec<String>,
         redirect_uris: Vec<String>,
-        owners: Vec<AccountNumber>,
     ) {
         let app_metadata_table = AppMetadataTable::new();
         let account_id = get_sender();
@@ -80,7 +79,6 @@ pub mod service {
         metadata.app_homepage_subpage = app_homepage_subpage;
         metadata.status = status;
         metadata.redirect_uris = redirect_uris;
-        metadata.owners = owners;
 
         // If the app is new, set the created_at to the current time
         if is_new_app {
@@ -114,11 +112,7 @@ pub mod service {
     fn publish(account_id: AccountNumber) {
         let app_metadata_table = AppMetadataTable::new();
         let mut metadata = app_metadata_table.get_index_pk().get(&account_id).unwrap();
-        let sender = get_sender();
-        check(
-            account_id == sender || metadata.owners.contains(&sender),
-            "Only app owners can unpublish the app",
-        );
+        check(account_id == get_sender(), "Unauthorized");
         check(
             metadata.status != app_status::PUBLISHED,
             "App is already published",
@@ -137,10 +131,7 @@ pub mod service {
         let app_metadata_table = AppMetadataTable::new();
         let mut metadata = app_metadata_table.get_index_pk().get(&account_id).unwrap();
         let sender = get_sender();
-        check(
-            account_id == sender || metadata.owners.contains(&sender),
-            "Only app owners can unpublish the app",
-        );
+        check(account_id == sender, "Unauthorized");
         check(
             metadata.status == app_status::PUBLISHED,
             "App is not published",

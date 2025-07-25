@@ -3,16 +3,15 @@ mod tests {
     use crate::*;
     use constants::app_status;
     use constants::MAX_APP_NAME_LENGTH;
-    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointUSec};
+    use psibase::{account, ChainEmptyResult, TimePointUSec};
     use service::{AppMetadata, TagRecord};
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
-            account_id: AccountNumber::new(0),
+            account_id: account!("cooking"),
             status: app_status::DRAFT,
             created_at: TimePointUSec::from(0),
             redirect_uris: vec!["http://localhost:3000/callback".to_string()],
-            owners: vec![account!("alice"), account!("bob")],
             name: "Super Cooking App".to_string(),
             short_description: "Alice's Cooking App".to_string(),
             long_description: "Super cooking app".to_string(),
@@ -48,7 +47,6 @@ mod tests {
             metadata.app_homepage_subpage,
             tags,
             metadata.redirect_uris,
-            metadata.owners,
         )
     }
 

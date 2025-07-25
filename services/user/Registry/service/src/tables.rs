@@ -1,7 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::*;
-    use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::{check, AccountNumber, Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
     use url::Url;
@@ -88,9 +87,6 @@ pub mod tables {
 
         /// The redirect URIs for the app
         pub redirect_uris: Vec<String>,
-
-        /// The owners of the app
-        pub owners: Vec<AccountNumber>,
     }
 
     impl AppMetadata {
@@ -156,13 +152,6 @@ pub mod tables {
                 check(
                     Url::parse(uri).is_ok(),
                     format!("Invalid redirect URI format: {}", uri).as_str(),
-                );
-            }
-
-            for owner in &self.owners {
-                check(
-                    AccountsSvc::call().exists(*owner),
-                    format!("Owner account does not exist: {}", owner).as_str(),
                 );
             }
 

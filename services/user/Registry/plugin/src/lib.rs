@@ -62,12 +62,6 @@ impl Consumer for RegistryPlugin {
 
         let metadata = app_metadata_response.metadata;
 
-        let owners = metadata
-            .owners
-            .iter()
-            .map(|owner| owner.to_string())
-            .collect();
-
         let created_at = DateTime::from(metadata.created_at).to_string();
 
         let status = metadata.status.into();
@@ -83,7 +77,6 @@ impl Consumer for RegistryPlugin {
                 privacy_policy_subpage: metadata.privacy_policy_subpage,
                 app_homepage_subpage: metadata.app_homepage_subpage,
                 redirect_uris: metadata.redirect_uris,
-                owners,
                 tags,
             },
             extra_metadata: ExtraMetadata { created_at, status },

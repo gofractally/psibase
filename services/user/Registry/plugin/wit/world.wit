@@ -20,7 +20,6 @@ interface types {
         privacy-policy-subpage: string,
         app-homepage-subpage: string,
         redirect-uris: list<string>,
-        owners: list<account-id>,
         tags: list<string>,
     }
 
@@ -57,7 +56,6 @@ interface developer {
     /// * `long-description` must be between 1 and 1000 characters
     /// * `icon-mime-type` must be a valid MIME type for an icon (e.g. png, jpeg, svg, x-icon, vnd.microsoft.icon)
     /// * subpages must start with "/"
-    /// * owners must exist
     /// * only three tags are allowed, and they must be lowercase alphanumeric with dashes
     /// * all the fields are optional if the app is not published
     set-app-metadata: func(metadata: app-metadata) -> result<_, error>;
@@ -66,7 +64,6 @@ interface developer {
     /// 
     /// All of the metadata fields are validated, all fields are required, except for the icon.
     /// 
-    /// * Only the owners can publish an app
     /// * If the app is already published, the transaction will fail
     publish-app: func(account: account-id) -> result<_, error>;
 
@@ -74,7 +71,6 @@ interface developer {
     /// 
     /// No fields are validated.
     /// 
-    /// * Only the owners can unpublish an app
     /// * If the app is not published, the transaction will fail
     unpublish-app: func(account: account-id) -> result<_, error>;
 }
