@@ -1,3 +1,5 @@
+#include <iomanip>
+
 #include "services/system/CommonApi.hpp"
 
 #include <psibase/dispatch.hpp>
@@ -17,6 +19,25 @@ namespace SystemService
       std::string accessToken;
    };
    PSIO_REFLECT(cookie_data, accessToken);
+
+   std::string getCookieExpiration()
+   {
+      static constexpr int EXPIRATION_IN_DAYS = 30;
+      
+      // Get current chain time and add EXPIRATION_IN_DAYS days
+      auto in30Days =
+          std::chrono::time_point_cast<psibase::Seconds>(to<Transact>().currentBlock().time) +
+          std::chrono::duration_cast<psibase::Seconds>(std::chrono::days(EXPIRATION_IN_DAYS));
+      
+      // Convert to time_t for gmtime
+      auto  timeT = std::chrono::system_clock::to_time_t(in30Days);
+      auto* gmt   = std::gmtime(&timeT);
+      
+      // Format as RFC 1123 GMT string
+      std::ostringstream oss;
+      oss << std::put_time(gmt, "%a, %d %b %Y %H:%M:%S GMT");
+      return oss.str();
+   }
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
@@ -91,9 +112,11 @@ namespace SystemService
             auto                    params = psio::from_json<cookie_data>(jstream);
 
             std::vector<HttpHeader> headers;
-            bool                    isDevChain    = psibase::isDevChain(request);
-            std::string             cookieName    = "__Host-SESSION";
-            std::string             cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict";
+            bool                    isDevChain = psibase::isDevChain(request);
+            std::string             cookieName = "__Host-SESSION";
+            
+            std::string cookieAttribs =
+                "Path=/; HttpOnly; Secure; SameSite=Strict; Expires=" + getCookieExpiration();
             if (isDevChain)
                cookieName = "SESSION";
 
