@@ -9,7 +9,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@bytecodealliance/jco": "^1.9.1",
+        "@bytecodealliance/jco": "1.10.2",
         "@bytecodealliance/preview2-shim": "^0.17.2",
         "@hookform/resolvers": "^5.1.1",
         "@psibase/common-lib": "workspace:*",
