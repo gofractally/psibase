@@ -31,6 +31,9 @@ export const useIsProducer = () => {
     return producers.includes(config.producer);
 };
 
+/**
+ * If the node is a producer, returns the producer object that represents itself. Otherwise, returns undefined.
+ */
 export const useMyProducer = () => {
     const { data } = useProducers();
     const { data: config } = useConfig();
