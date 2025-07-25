@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "{{project-name}}-pkg"   # Crate name
+name = "{{project-name}}-pkg"                      # Crate name
 description = "{{description}}"
 version.workspace = true
 rust-version.workspace = true
@@ -30,6 +30,7 @@ services = ["{{project-name}}"]
 [package.metadata.psibase.dependencies]
 HttpServer = "{{version}}"
 Sites = "{{version}}"
+Permissions = "{{version}}"
 
 [lib]
 crate-type = ["rlib"]
