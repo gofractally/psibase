@@ -1311,6 +1311,7 @@ namespace psibase::net
       }
       void     cancel() {}
       void     validate_message() {}
+      void     on_key_update() {}
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
                             const psio::shared_view_ptr<SignedBlock>& block)

@@ -1914,7 +1914,7 @@ void run(const std::string&              db_path,
                            });
       };
 
-      http_config->new_key = [&chainContext, &prover, &db_path, &runResult, getPKCS11Slot](
+      http_config->new_key = [&chainContext, &node, &prover, &db_path, &runResult, getPKCS11Slot](
                                  std::vector<char> json, auto callback)
       {
          json.push_back('\0');
@@ -1926,7 +1926,7 @@ void run(const std::string&              db_path,
          }
          boost::asio::post(
              chainContext,
-             [&prover, &db_path, &runResult, getPKCS11Slot, callback = std::move(callback),
+             [&node, &prover, &db_path, &runResult, getPKCS11Slot, callback = std::move(callback),
               key = std::move(key)]() mutable
              {
                 try
@@ -1948,6 +1948,7 @@ void run(const std::string&              db_path,
                          result = std::make_shared<PKCS11Prover>(pos->second.session, key.service);
                       }
                       pos->second.sessionProver->add(result);
+                      node.on_key_update();
                       storeConfig = false;
                    }
                    else if (key.service == AccountNumber{"verify-sig"})
@@ -2003,6 +2004,7 @@ void run(const std::string&              db_path,
                          std::ofstream out(path);
                          file.write(out, true);
                       }
+                      node.on_key_update();
                       runResult.keysChanged = true;
                    }
                    callback(
@@ -2021,14 +2023,14 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->unlock_keyring =
-          [&chainContext, loadSessionKeys, getPKCS11Slot](std::vector<char> json, auto callback)
+      http_config->unlock_keyring = [&chainContext, &node, loadSessionKeys, getPKCS11Slot](
+                                        std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    pin = psio::from_json<UnlockKeyringRequest>(stream);
          boost::asio::post(chainContext,
-                           [getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
+                           [&node, getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
                             pin = std::move(pin)]() mutable
                            {
                               try
@@ -2037,6 +2039,7 @@ void run(const std::string&              db_path,
                                  auto pos = sessions->try_emplace(slot, lib, slot).first;
                                  pos->second->Login(pin.pin);
                                  loadSessionKeys(pos->second);
+                                 node.on_key_update();
                                  callback(std::nullopt);
                               }
                               catch (std::exception& e)

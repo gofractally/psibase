@@ -322,9 +322,11 @@ namespace psibase::net
       TermNum                   _ready_term    = -1;
       std::chrono::milliseconds _timeout       = std::chrono::seconds(10);
       std::chrono::milliseconds _timeout_delta = std::chrono::seconds(5);
+      Timer                     _sync_term_timer;
 
       template <typename ExecutionContext>
-      explicit basic_bft_consensus(ExecutionContext& ctx) : Base(ctx), _new_term_timer(ctx)
+      explicit basic_bft_consensus(ExecutionContext& ctx)
+          : Base(ctx), _new_term_timer(ctx), _sync_term_timer(ctx)
       {
       }
 
@@ -900,6 +902,51 @@ namespace psibase::net
                    PSIBASE_LOG(logger, warning) << "Failed to send update view: " << e.what();
                 }
              });
+         if (is_view_outdated())
+         {
+            _sync_term_timer.expires_after(std::chrono::seconds(30));
+            _sync_term_timer.async_wait(
+                [this](const std::error_code& ec)
+                {
+                   if (!ec)
+                   {
+                      PSIBASE_LOG(logger, info) << "Trying to sync current term";
+                      if (is_view_outdated())
+                      {
+                         sync_current_term();
+                      }
+                   }
+                });
+         }
+      }
+
+      // If we were unable to sign for a view change, producer_views
+      // might not match current_term.
+      bool is_view_outdated()
+      {
+         for (std::size_t group : {0, 1})
+         {
+            if (active_producers[group] && !producer_views[group].empty())
+            {
+               if (auto idx = active_producers[group]->getIndex(self))
+               {
+                  if (producer_views[group][*idx].term != current_term)
+                  {
+                     return true;
+                  }
+               }
+            }
+         }
+         return false;
+      }
+
+      void on_key_update()
+      {
+         Base::on_key_update();
+         if (is_view_outdated())
+         {
+            sync_current_term();
+         }
       }
 
       // Skip terms whose leaders have already advanced to a later view
