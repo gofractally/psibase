@@ -904,7 +904,7 @@ namespace psibase::net
              });
          if (is_view_outdated())
          {
-            _sync_term_timer.expires_from_now(std::chrono::seconds(30));
+            _sync_term_timer.expires_after(std::chrono::seconds(30));
             _sync_term_timer.async_wait(
                 [this](const std::error_code& ec)
                 {
