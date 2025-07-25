@@ -6,6 +6,9 @@
 ///
 /// The `trust` module also exports a variable for each named function.
 ///
+/// To use this macro, you must also link your plugin to `permissions:plugin` and add its imports
+/// to your plugin's target world.
+///
 /// Example usage:
 /// ```rust,ignore
 /// define_trust! {
@@ -51,7 +54,7 @@ macro_rules! define_trust {
         use crate::bindings::permissions::plugin::types::Trust;
         use std::collections::HashMap;
 
-        lazy_static::lazy_static! {
+        $crate::lazy_static::lazy_static! {
             static ref TRUST_LEVELS: HashMap<&'static str, u8> = TrustRequirement::get_trust_levels();
         }
 
@@ -71,7 +74,7 @@ macro_rules! define_trust {
             fn get_description(level: u8) -> String {
                 match level {
                     $(
-                        $desc_level => indoc::indoc! { $desc },
+                        $desc_level => $crate::indoc::indoc! { $desc },
                     )*
                     _ => "",
                 }
