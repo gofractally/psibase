@@ -16,16 +16,16 @@ rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
-[package.metadata.psibase]
-package-name = "Registry"
-services = ["registry"]
-
 [profile.release]
 codegen-units = 1
 opt-level = "s"
 debug = false
 strip = true
 lto = true
+
+[package.metadata.psibase]
+package-name = "Registry"
+services = ["registry"]
 
 [lib]
 crate-type = ["rlib"]
