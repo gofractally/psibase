@@ -11,7 +11,7 @@ pub fn process_dispatch_body(
     let name_str = name.to_string();
 
     let args_unpacking = if !invoke_struct_args.is_empty() {
-        quote! { let args = <super::action_structs::#name as #psibase_mod::fracpack::Unpack>::unpack(&act.rawData, &mut 0)?; }
+        quote! { let args = <super::action_structs::#name as #psibase_mod::fracpack::Unpack>::unpacked(&act.rawData)?; }
     } else {
         quote! {}
     };

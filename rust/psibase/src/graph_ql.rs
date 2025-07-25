@@ -225,7 +225,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
         if self.index.is_secondary {
             kv_get(self.index.db_id, &RawKey::new(bytes)).unwrap()
         } else {
-            Some(Record::unpack(&bytes[..], &mut 0).unwrap())
+            Some(Record::unpacked(&bytes[..]).unwrap())
         }
     }
 

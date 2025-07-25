@@ -1,4 +1,4 @@
-use fracpack::{Pack, ToSchema, Unpack};
+use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
 /// Identify database to operate on
@@ -165,8 +165,8 @@ impl<'a> Unpack<'a> for DbId {
 
     const VARIABLE_SIZE: bool = false;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-        let u32_form = u32::unpack(src, pos)?;
+    fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
+        let u32_form = u32::unpack(src)?;
         if u32_form >= DbId::NumChainDatabases as u32
             && !(BEGIN_INDEPENDENT..(DbId::EndIndependent as u32)).contains(&u32_form)
         {
@@ -175,8 +175,8 @@ impl<'a> Unpack<'a> for DbId {
         Ok(unsafe { std::mem::transmute(u32_form) })
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        DbId::unpack(src, pos)?;
+    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
+        DbId::unpack(src)?;
         Ok(())
     }
 }

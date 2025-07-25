@@ -1,4 +1,4 @@
-use crate::{Error, Pack, Unpack};
+use crate::{consume_trailing_optional, Error, FracInputStream, Pack, Unpack};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,22 @@ pub struct Schema(IndexMap<String, AnyType>);
 impl Schema {
     pub fn get(&self, name: &str) -> Option<&AnyType> {
         self.0.get(name)
+    }
+}
+
+impl IntoIterator for Schema {
+    type Item = <IndexMap<String, AnyType> as IntoIterator>::Item;
+    type IntoIter = <IndexMap<String, AnyType> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Schema {
+    type Item = <&'a IndexMap<String, AnyType> as IntoIterator>::Item;
+    type IntoIter = <&'a IndexMap<String, AnyType> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
     }
 }
 
@@ -526,78 +542,14 @@ tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
 
-#[derive(Debug)]
-struct FracInputStream<'a> {
-    data: &'a [u8],
-    pos: u32,
-    has_unknown: bool,
-    known_end: bool,
-}
-
-impl<'a> FracInputStream<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        FracInputStream {
-            data,
-            pos: 0,
-            has_unknown: false,
-            known_end: true,
-        }
-    }
-    fn read_fixed(&mut self, len: u32) -> Result<Self, Error> {
-        assert!(self.known_end);
-        let Some(pos) = self.pos.checked_add(len) else {
-            return Err(Error::ReadPastEnd);
-        };
-        if pos as usize > self.data.len() {
-            return Err(Error::ReadPastEnd);
-        }
-        let result = FracInputStream {
-            data: &self.data[0..pos as usize],
-            pos: self.pos,
-            has_unknown: false,
-            known_end: true,
-        };
-        self.pos = pos;
-        Ok(result)
-    }
-    fn set_pos(&mut self, pos: u32) -> Result<(), Error> {
-        if self.known_end {
-            if self.pos != pos {
-                return Err(Error::BadOffset);
-            }
-        } else {
-            if self.pos > pos {
-                return Err(Error::BadOffset);
-            }
-            if pos > self.data.len() as u32 {
-                return Err(Error::BadOffset);
-            }
-            self.pos = pos;
-            self.known_end = true;
-        }
-        Ok(())
-    }
-    fn remaining(&self) -> u32 {
-        self.data.len() as u32 - self.pos
-    }
-    fn finish(&self) -> Result<(), Error> {
-        if self.known_end {
-            if self.pos != self.data.len() as u32 {
-                return Err(Error::ExtraData);
-            }
-        }
-        Ok(())
-    }
-}
-
 pub trait CustomHandler {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool;
     fn frac2json(
         &self,
         schema: &CompiledSchema,
         ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error>;
     fn json2frac(
         &self,
@@ -635,10 +587,10 @@ impl<'a> CustomTypes<'a> {
         id: usize,
         schema: &CompiledSchema,
         ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
-        self.handlers[id].frac2json(schema, ty, src, pos)
+        self.handlers[id].frac2json(schema, ty, src, allow_empty_container)
     }
     fn json2frac(
         &self,
@@ -671,10 +623,10 @@ impl CustomHandler for CustomBool {
         &self,
         _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
-        Ok(bool::unpack(src, pos)?.into())
+        Ok(bool::unpack(src)?.into())
     }
     fn json2frac(
         &self,
@@ -705,10 +657,15 @@ impl CustomHandler for CustomString {
         &self,
         _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
-        Ok(String::unpack(src, pos)?.into())
+        let result = String::unpack(src)?;
+        if !allow_empty_container && result.is_empty() {
+            Err(Error::PtrEmptyList)
+        } else {
+            Ok(result.into())
+        }
     }
     fn json2frac(
         &self,
@@ -739,18 +696,20 @@ impl CustomHandler for CustomHex {
         &self,
         _schema: &CompiledSchema,
         ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
         let len = if ty.is_variable_size() {
-            u32::unpack(src, pos)?
+            u32::unpack(src)?
         } else {
             ty.fixed_size()
         };
-        let start = *pos;
-        let end = *pos + len;
-        *pos = end;
-        Ok(hex::encode_upper(&src[start as usize..end as usize]).into())
+        if !allow_empty_container && len == 0 && ty.is_variable_size() {
+            return Err(Error::PtrEmptyList);
+        }
+        let start = src.advance(len)?;
+        let end = src.pos;
+        Ok(hex::encode_upper(&src.data[start as usize..end as usize]).into())
     }
     fn json2frac(
         &self,
@@ -801,13 +760,10 @@ impl CustomHandler for CustomMap {
         &self,
         schema: &CompiledSchema,
         ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
-        let mut stream = FracInputStream::new(src);
-        stream.pos = *pos;
-        let mut result = frac2json_impl(schema, ty, &mut stream, true)?;
-        *pos = stream.pos;
+        let mut result = frac2json_impl(schema, ty, src, allow_empty_container)?;
         use serde_json::{
             Map, Value,
             Value::{Array, Object},
@@ -1358,16 +1314,13 @@ impl CompiledType {
         match self {
             List(_) => Ok(serde_json::Value::Array(Vec::new())),
             FracPack(nested) => frac2json(schema, schema.get_by_id(*nested), &[]),
-            Custom { repr, id, .. } => {
-                let mut pos = 0;
-                schema.custom.frac2json(
-                    *id,
-                    schema,
-                    schema.get_by_id(*repr),
-                    &[0, 0, 0, 0],
-                    &mut pos,
-                )
-            }
+            Custom { repr, id, .. } => schema.custom.frac2json(
+                *id,
+                schema,
+                schema.get_by_id(*repr),
+                &mut FracInputStream::new(&[0, 0, 0, 0]),
+                true,
+            ),
             _ => Err(Error::BadOffset),
         }
     }
@@ -1414,7 +1367,7 @@ fn frac2json_embedded(
     match ty {
         CompiledType::Option(t) => {
             let orig_pos = fixed_stream.pos;
-            let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+            let offset = u32::unpack(fixed_stream)?;
             if offset == 1 {
                 *empty_optional = true;
                 return Ok(serde_json::Value::Null);
@@ -1424,37 +1377,13 @@ fn frac2json_embedded(
         _ => {
             if ty.is_variable_size() {
                 let orig_pos = fixed_stream.pos;
-                let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+                let offset = u32::unpack(fixed_stream)?;
                 frac2json_pointer(schema, ty, stream, orig_pos, offset)
             } else {
                 frac2json_impl(schema, ty, fixed_stream, true)
             }
         }
     }
-}
-
-fn consume_trailing_optional(
-    fixed_stream: &mut FracInputStream,
-    stream: &mut FracInputStream,
-    mut last_empty: bool,
-) -> Result<(), Error> {
-    while fixed_stream.remaining() > 0 {
-        let orig_pos = fixed_stream.pos;
-        let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
-        last_empty = offset == 1;
-        if offset > 1 {
-            let Some(new_pos) = orig_pos.checked_add(offset) else {
-                return Err(Error::ReadPastEnd);
-            };
-            stream.set_pos(new_pos)?;
-            stream.known_end = false;
-        }
-        stream.has_unknown = true;
-    }
-    if last_empty {
-        return Err(Error::ExtraEmptyOptional);
-    }
-    Ok(())
 }
 
 fn frac2json(
@@ -1500,7 +1429,7 @@ fn frac2json_impl(
         }
         Object { children, .. } => {
             let mut result = serde_json::Map::with_capacity(children.len());
-            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let fixed_size = u16::unpack(stream)? as u32;
             let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut at_end = false;
             let mut last_empty = false;
@@ -1551,7 +1480,7 @@ fn frac2json_impl(
             Ok(result.into())
         }
         List(child) => {
-            let fixed_size = u32::unpack(stream.data, &mut stream.pos)?;
+            let fixed_size = u32::unpack(stream)?;
             if fixed_size == 0 && !allow_empty_container {
                 return Err(Error::PtrEmptyList);
             }
@@ -1581,8 +1510,8 @@ fn frac2json_impl(
             frac2json_embedded(schema, ty, &mut fixed_stream, stream, &mut last_empty)
         }
         Variant(alternatives) => {
-            let index = u8::unpack(stream.data, &mut stream.pos)?;
-            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            let index = u8::unpack(stream)?;
+            let len = u32::unpack(stream)?;
             if index as usize >= alternatives.len() {
                 return Err(Error::BadEnumIndex);
             }
@@ -1601,7 +1530,7 @@ fn frac2json_impl(
         }
         Tuple(children) => {
             let mut result = Vec::with_capacity(children.len());
-            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let fixed_size = u16::unpack(stream)? as u32;
             let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut at_end = false;
             let mut last_empty = false;
@@ -1634,7 +1563,7 @@ fn frac2json_impl(
             bits: 1,
             is_signed: false,
         } => {
-            let result = u8::unpack(stream.data, &mut stream.pos)?;
+            let result = u8::unpack(stream)?;
             if result != 0 && result != 1 {
                 Err(Error::BadScalar)?
             }
@@ -1644,7 +1573,7 @@ fn frac2json_impl(
             bits: 1,
             is_signed: true,
         } => {
-            let result = i8::unpack(stream.data, &mut stream.pos)?;
+            let result = i8::unpack(stream)?;
             if result != 0 && result != -1 {
                 Err(Error::BadScalar)?
             }
@@ -1653,40 +1582,40 @@ fn frac2json_impl(
         Int {
             bits: 8,
             is_signed: false,
-        } => Ok(u8::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(u8::unpack(stream)?.into()),
         Int {
             bits: 8,
             is_signed: true,
-        } => Ok(i8::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(i8::unpack(stream)?.into()),
         Int {
             bits: 16,
             is_signed: false,
-        } => Ok(u16::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(u16::unpack(stream)?.into()),
         Int {
             bits: 16,
             is_signed: true,
-        } => Ok(i16::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(i16::unpack(stream)?.into()),
         Int {
             bits: 32,
             is_signed: false,
-        } => Ok(u32::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(u32::unpack(stream)?.into()),
         Int {
             bits: 32,
             is_signed: true,
-        } => Ok(i32::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(i32::unpack(stream)?.into()),
         Int {
             bits: 64,
             is_signed: false,
-        } => Ok(u64::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(u64::unpack(stream)?.into()),
         Int {
             bits: 64,
             is_signed: true,
-        } => Ok(i64::unpack(stream.data, &mut stream.pos)?.into()),
+        } => Ok(i64::unpack(stream)?.into()),
         Float {
             exp: 8,
             mantissa: 24,
         } => {
-            let result = f32::unpack(stream.data, &mut stream.pos)?;
+            let result = f32::unpack(stream)?;
             if result.is_finite() {
                 Ok(result.into())
             } else {
@@ -1697,7 +1626,7 @@ fn frac2json_impl(
             exp: 11,
             mantissa: 53,
         } => {
-            let result = f64::unpack(stream.data, &mut stream.pos)?;
+            let result = f64::unpack(stream)?;
             if result.is_finite() {
                 Ok(result.into())
             } else {
@@ -1705,7 +1634,7 @@ fn frac2json_impl(
             }
         }
         FracPack(nested) => {
-            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            let len = u32::unpack(stream)?;
             if len == 0 && !allow_empty_container {
                 return Err(Error::PtrEmptyList);
             }
@@ -1718,12 +1647,11 @@ fn frac2json_impl(
         }
         Custom { id, repr, .. } => {
             let repr = schema.get_by_id(*repr);
-            let mut pos = stream.pos;
             // Use the underlying type for verification
-            fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
+            //fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
             schema
                 .custom
-                .frac2json(*id, schema, repr, stream.data, &mut pos)
+                .frac2json(*id, schema, repr, stream, allow_empty_container)
         }
         _ => {
             unimplemented!();
@@ -2136,7 +2064,7 @@ fn fracpack_verify_embedded(
     match ty {
         CompiledType::Option(t) => {
             let orig_pos = fixed_stream.pos;
-            let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+            let offset = u32::unpack(fixed_stream)?;
             if offset == 1 {
                 *empty_optional = true;
                 return Ok(());
@@ -2146,7 +2074,7 @@ fn fracpack_verify_embedded(
         _ => {
             if ty.is_variable_size() {
                 let orig_pos = fixed_stream.pos;
-                let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+                let offset = u32::unpack(fixed_stream)?;
                 fracpack_verify_pointer(schema, ty, stream, orig_pos, offset)
             } else {
                 fracpack_verify_impl(schema, ty, fixed_stream, true)
@@ -2181,7 +2109,7 @@ fn fracpack_verify_impl(
             }
         }
         Object { children, .. } => {
-            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let fixed_size = u16::unpack(stream)? as u32;
             let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut at_end = false;
             let mut last_empty = false;
@@ -2218,7 +2146,7 @@ fn fracpack_verify_impl(
             }
         }
         List(child) => {
-            let fixed_size = u32::unpack(stream.data, &mut stream.pos)?;
+            let fixed_size = u32::unpack(stream)?;
             if fixed_size == 0 && !allow_empty_container {
                 return Err(Error::PtrEmptyList);
             }
@@ -2240,8 +2168,8 @@ fn fracpack_verify_impl(
             fracpack_verify_embedded(schema, ty, &mut fixed_stream, stream, &mut last_empty)?
         }
         Variant(alternatives) => {
-            let index = u8::unpack(stream.data, &mut stream.pos)?;
-            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            let index = u8::unpack(stream)?;
+            let len = u32::unpack(stream)?;
             if index as usize >= alternatives.len() {
                 return Err(Error::BadEnumIndex);
             }
@@ -2253,7 +2181,7 @@ fn fracpack_verify_impl(
             substream.finish()?;
         }
         Tuple(children) => {
-            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let fixed_size = u16::unpack(stream)? as u32;
             let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut at_end = false;
             let mut last_empty = false;
@@ -2283,7 +2211,7 @@ fn fracpack_verify_impl(
             bits: 1,
             is_signed: false,
         } => {
-            let result = u8::unpack(stream.data, &mut stream.pos)?;
+            let result = u8::unpack(stream)?;
             if result != 0 && result != 1 {
                 Err(Error::BadScalar)?
             }
@@ -2292,7 +2220,7 @@ fn fracpack_verify_impl(
             bits: 1,
             is_signed: true,
         } => {
-            let result = i8::unpack(stream.data, &mut stream.pos)?;
+            let result = i8::unpack(stream)?;
             if result != 0 && result != -1 {
                 Err(Error::BadScalar)?
             }
@@ -2300,45 +2228,45 @@ fn fracpack_verify_impl(
         Int {
             bits: 8,
             is_signed: false,
-        } => u8::verify(stream.data, &mut stream.pos)?,
+        } => u8::verify(stream)?,
         Int {
             bits: 8,
             is_signed: true,
-        } => i8::verify(stream.data, &mut stream.pos)?,
+        } => i8::verify(stream)?,
         Int {
             bits: 16,
             is_signed: false,
-        } => u16::verify(stream.data, &mut stream.pos)?,
+        } => u16::verify(stream)?,
         Int {
             bits: 16,
             is_signed: true,
-        } => i16::verify(stream.data, &mut stream.pos)?,
+        } => i16::verify(stream)?,
         Int {
             bits: 32,
             is_signed: false,
-        } => u32::verify(stream.data, &mut stream.pos)?,
+        } => u32::verify(stream)?,
         Int {
             bits: 32,
             is_signed: true,
-        } => i32::verify(stream.data, &mut stream.pos)?,
+        } => i32::verify(stream)?,
         Int {
             bits: 64,
             is_signed: false,
-        } => u64::verify(stream.data, &mut stream.pos)?,
+        } => u64::verify(stream)?,
         Int {
             bits: 64,
             is_signed: true,
-        } => i64::verify(stream.data, &mut stream.pos)?,
+        } => i64::verify(stream)?,
         Float {
             exp: 8,
             mantissa: 24,
-        } => f32::verify(stream.data, &mut stream.pos)?,
+        } => f32::verify(stream)?,
         Float {
             exp: 11,
             mantissa: 53,
-        } => f64::verify(stream.data, &mut stream.pos)?,
+        } => f64::verify(stream)?,
         FracPack(nested) => {
-            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            let len = u32::unpack(stream)?;
             if len == 0 && !allow_empty_container {
                 return Err(Error::PtrEmptyList);
             }
