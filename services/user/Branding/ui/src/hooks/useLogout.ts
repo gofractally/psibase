@@ -11,12 +11,12 @@ export const useLogout = () => {
     return useMutation({
         mutationKey: ["logout"],
         mutationFn: async () => {
-            await supervisor.functionCall({
+            void (await supervisor.functionCall({
                 method: "logout",
                 params: [],
                 service: "accounts",
                 intf: "activeApp",
-            });
+            }));
         },
         onSuccess: () => {
             setExpectCurrentUser(false);

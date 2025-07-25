@@ -83,21 +83,30 @@ namespace psibase
 
    std::optional<std::string_view> HttpRequest::getCookie(std::string_view name) const
    {
+      if (auto cookieHeader = getHeader("cookie"))
+      {
+         for (auto kvrange : *cookieHeader | std::views::split(';'))
+         {
+            std::string_view kv  = split2sv(kvrange);
+            auto             pos = kv.find('=');
+            check(pos != std::string_view::npos, "Invalid cookie");
+            auto leading = kv.find_first_not_of(" \t");
+            auto key     = kv.substr(leading, pos - leading);
+            auto value   = kv.substr(pos + 1);
+            if (key == name)
+               return value;
+         }
+      }
+      return {};
+   }
+
+   std::optional<std::string_view> HttpRequest::getHeader(std::string_view name) const
+   {
       for (const auto& header : headers)
       {
-         if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
+         if (header.matches(name))
          {
-            for (auto kvrange : header.value | std::views::split(';'))
-            {
-               std::string_view kv  = split2sv(kvrange);
-               auto             pos = kv.find('=');
-               check(pos != std::string_view::npos, "Invalid cookie");
-               auto leading = kv.find_first_not_of(" \t");
-               auto key     = kv.substr(leading, pos - leading);
-               auto value   = kv.substr(pos + 1);
-               if (key == name)
-                  return value;
-            }
+            return header.value;
          }
       }
       return {};
@@ -140,5 +149,58 @@ namespace psibase
          }
          ++iter;
       }
+   }
+
+   bool isDevChain(const HttpRequest& request)
+   {
+      std::string_view value = request.host;
+
+      auto leading  = value.find_first_not_of(" \t");
+      auto trailing = value.find_last_not_of(" \t");
+      if (leading != std::string_view::npos)
+      {
+         value = value.substr(leading, trailing - leading + 1);
+      }
+      else
+      {
+         return false;
+      }
+
+      // scheme separator
+      size_t           pos = value.find("://");
+      std::string_view domain;
+
+      if (pos != std::string_view::npos)
+      {
+         domain = value.substr(pos + 3);
+      }
+      else
+      {
+         // No scheme
+         domain = value;
+      }
+
+      // Find the end of the domain name (either at first colon or slash, or end of string)
+      size_t domainEndPos = domain.find(':');
+      if (domainEndPos == std::string_view::npos)
+      {
+         domainEndPos = domain.find('/');
+      }
+      if (domainEndPos != std::string_view::npos)
+      {
+         domain = domain.substr(0, domainEndPos);
+      }
+
+      if (domain == "localhost")
+      {
+         return true;
+      }
+
+      if (domain.size() > 10 && domain.ends_with(".localhost"))
+      {
+         return true;
+      }
+
+      return false;
    }
 }  // namespace psibase

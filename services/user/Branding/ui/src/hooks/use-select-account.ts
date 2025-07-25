@@ -30,6 +30,9 @@ export const useSelectAccount = () => {
         },
         onSuccess: (_, accountName) => {
             queryClient.setQueryData(["loggedInUser"], () => accountName);
+            setTimeout(() => {
+                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+            }, 2000);
         },
         onError: (error) => {
             if (error instanceof Error) {

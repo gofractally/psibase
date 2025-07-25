@@ -93,7 +93,7 @@ namespace SystemService
       constexpr std::string_view allowedHeaders[] = {"Cache-Control",            //
                                                      "Content-Encoding",         //
                                                      "Content-Security-Policy",  //
-                                                     "ETag"};
+                                                     "ETag", "Set-Cookie"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
       {
