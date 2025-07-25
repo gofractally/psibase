@@ -1,57 +1,62 @@
 #[allow(warnings)]
 mod bindings;
+use bindings::*;
 
 mod errors;
 mod queries;
 mod types;
 
-use chrono::DateTime;
-
-use psibase::fracpack::Pack;
-use registry as RegistryService;
-
-use bindings::exports::registry::plugin::consumer::Guest as Consumer;
-use bindings::exports::registry::plugin::developer::Guest as Developer;
-use bindings::host::common::types as CommonTypes;
+use ::registry::action_structs::*;
 use bindings::registry::plugin::types::{AccountId, AppMetadata, ExtraMetadata, FullAppMetadata};
-use bindings::transact::plugin::intf as Transact;
+use exports::registry::plugin::{consumer::Guest as Consumer, developer::Guest as Developer};
+use host::common::types::Error;
+use psibase::{fracpack::Pack, AccountNumber};
+use transact::plugin::intf as Transact;
+
+use chrono::DateTime;
 
 struct RegistryPlugin;
 
 impl Developer for RegistryPlugin {
-    fn create_app(account: AccountId) -> Result<(), CommonTypes::Error> {
-        let action_create_input = RegistryService::action_structs::createApp {
-            account: account.parse().unwrap(),
-        };
-        Transact::add_action_to_transaction("createApp", &action_create_input.packed())?;
+    fn create_app(account: AccountId) -> Result<(), Error> {
+        let account = account.parse().unwrap();
+        Transact::add_action_to_transaction(
+            createApp::ACTION_NAME,
+            &createApp { account }.packed(),
+        )
+        .unwrap();
         Ok(())
     }
 
-    fn set_app_metadata(metadata: AppMetadata) -> Result<(), CommonTypes::Error> {
-        let action_metadata_input = RegistryService::action_structs::setMetadata::from(metadata);
-        Transact::add_action_to_transaction("setMetadata", &action_metadata_input.packed())?;
+    fn set_app_metadata(metadata: AppMetadata) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            setMetadata::ACTION_NAME,
+            &setMetadata::from(metadata).packed(),
+        )
+        .unwrap();
         Ok(())
     }
 
-    fn publish_app(account: AccountId) -> Result<(), CommonTypes::Error> {
-        let action_publish_input = RegistryService::action_structs::publish {
-            account_id: account.parse().unwrap(),
-        };
-        Transact::add_action_to_transaction("publish", &action_publish_input.packed())?;
+    fn publish_app(account: AccountId) -> Result<(), Error> {
+        let account_id: AccountNumber = account.parse().unwrap();
+        Transact::add_action_to_transaction(publish::ACTION_NAME, &publish { account_id }.packed())
+            .unwrap();
         Ok(())
     }
 
-    fn unpublish_app(account: AccountId) -> Result<(), CommonTypes::Error> {
-        let action_unpublish_input = RegistryService::action_structs::unpublish {
-            account_id: account.parse().unwrap(),
-        };
-        Transact::add_action_to_transaction("unpublish", &action_unpublish_input.packed())?;
+    fn unpublish_app(account: AccountId) -> Result<(), Error> {
+        let account_id: AccountNumber = account.parse().unwrap();
+        Transact::add_action_to_transaction(
+            unpublish::ACTION_NAME,
+            &unpublish { account_id }.packed(),
+        )
+        .unwrap();
         Ok(())
     }
 }
 
 impl Consumer for RegistryPlugin {
-    fn get_app_metadata(account: AccountId) -> Result<FullAppMetadata, CommonTypes::Error> {
+    fn get_app_metadata(account: AccountId) -> Result<FullAppMetadata, Error> {
         let app_metadata_response = queries::query_app_metadata(account)?;
 
         let tags: Vec<String> = app_metadata_response
@@ -84,7 +89,7 @@ impl Consumer for RegistryPlugin {
         Ok(res)
     }
 
-    fn get_related_tags(tag: String) -> Result<Vec<String>, CommonTypes::Error> {
+    fn get_related_tags(tag: String) -> Result<Vec<String>, Error> {
         let response = queries::query_all_related_tags(tag)?;
         Ok(response.tags)
     }
