@@ -34,6 +34,7 @@ mod to_bin;
 mod to_key;
 mod trace;
 mod transaction_builder;
+mod trust;
 mod web_services;
 
 pub use account_number::*;
