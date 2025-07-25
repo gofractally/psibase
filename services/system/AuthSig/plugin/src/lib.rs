@@ -8,14 +8,10 @@ mod db;
 use db::*;
 mod types;
 use types::*;
-mod risks;
-use risks::*;
 
 // Other plugins
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::host::common::client::get_sender;
 use bindings::host::common::types as CommonTypes;
-use bindings::permissions::plugin::api::authorize;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -28,17 +24,35 @@ use psibase::services::auth_sig::action_structs as MyService;
 // Third-party crates
 use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
+use psibase::define_trust;
 use psibase::fracpack::Pack;
 use rand_core::OsRng;
 
-struct AuthSig;
-
-fn check_authorization(fn_name: &str, whitelist: Option<Vec<String>>) -> Result<(), Error> {
-    let sender = get_sender();
-    let whitelist = whitelist.unwrap_or(vec![]);
-    authorize(&sender, &Risks::get_trust_req(fn_name), fn_name, &whitelist)?;
-    Ok(())
+define_trust! {
+    descriptions {
+        2 => "
+        Level 2 trust grants these abilities:
+            - Create new keypairs
+            - Import existing keypairs
+            - Consume account resources
+        ",
+        5 => "
+        Level 5 trust grants these abilities:
+            - Set the public key for your account
+            - Sign transactions on your behalf
+            - Extract your private key from your public key
+            - Consume account resources
+        ",
+    }
+    functions {
+        0 => [generate_unmanaged_keypair, pub_from_priv, to_der, sign],
+        2 => [generate_keypair, import_key],
+        5 => [priv_from_pub, set_key],
+    }
 }
+use trust::authorize;
+
+struct AuthSig;
 
 impl HookUserAuth for AuthSig {
     fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
@@ -74,7 +88,7 @@ impl HookUserAuth for AuthSig {
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        check_authorization("generate_keypair", Some(vec!["invite".into()]))?;
+        authorize(trust::generate_keypair, Some(vec!["invite".into()]))?;
 
         let keypair = AuthSig::generate_unmanaged_keypair()?;
         ManagedKeys::add(&keypair.public_key, &AuthSig::to_der(keypair.private_key)?);
@@ -82,7 +96,7 @@ impl KeyVault for AuthSig {
     }
 
     fn generate_unmanaged_keypair() -> Result<Keypair, CommonTypes::Error> {
-        check_authorization("generate_unmanaged_keypair", None)?;
+        authorize(trust::generate_unmanaged_keypair, None)?;
 
         let signing_key = SigningKey::random(&mut OsRng);
         let verifying_key: &VerifyingKey = signing_key.verifying_key();
@@ -102,7 +116,7 @@ impl KeyVault for AuthSig {
     }
 
     fn pub_from_priv(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        check_authorization("pub_from_priv", None)?;
+        authorize(trust::pub_from_priv, None)?;
 
         let pem = pem::Pem::try_from_pem_str(&private_key)?;
         let signing_key =
@@ -115,7 +129,7 @@ impl KeyVault for AuthSig {
     }
 
     fn priv_from_pub(public_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        check_authorization("priv_from_pub", None)?;
+        authorize(trust::priv_from_pub, None)?;
 
         let private_key = ManagedKeys::get(&public_key);
         Ok(SigningKey::from_pkcs8_der(&private_key)
@@ -126,14 +140,14 @@ impl KeyVault for AuthSig {
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
-        check_authorization("to_der", None)?;
+        authorize(trust::to_der, None)?;
 
         let pem = pem::Pem::try_from_pem_str(&key)?;
         Ok(pem.contents().to_vec())
     }
 
     fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
-        check_authorization("sign", None)?;
+        authorize(trust::sign, None)?;
 
         let signing_key =
             SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
@@ -144,7 +158,7 @@ impl KeyVault for AuthSig {
     }
 
     fn import_key(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        check_authorization("import_key", None)?;
+        authorize(trust::import_key, None)?;
 
         let public_key = AuthSig::pub_from_priv(private_key.clone())?;
         ManagedKeys::add(&public_key, &AuthSig::to_der(private_key)?);
@@ -154,7 +168,7 @@ impl KeyVault for AuthSig {
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
-        check_authorization("set_key", None)?;
+        authorize(trust::set_key, None)?;
 
         Transact::add_action_to_transaction(
             MyService::setKey::ACTION_NAME,
