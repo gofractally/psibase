@@ -54,7 +54,6 @@ impl<'a> Unpack<'a> for Memo {
             .try_into()
             .map_err(|_| fracpack::Error::ExtraData)?;
 
-        *pos += len;
         if len > 80 {
             Err(fracpack::Error::ExtraData)
         } else {
