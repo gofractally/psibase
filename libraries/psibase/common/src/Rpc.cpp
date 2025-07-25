@@ -104,7 +104,7 @@ namespace psibase
    {
       for (const auto& header : headers)
       {
-         if (std::ranges::equal(header.name, name, {}, ::tolower))
+         if (header.matches(name))
          {
             return header.value;
          }
@@ -151,12 +151,11 @@ namespace psibase
       }
    }
 
-   bool isFromLocalhost(const std::string& url)
+   bool isDevChain(const HttpRequest& request)
    {
-      std::string_view value = url;
-      
-      // Trim whitespace
-      auto leading = value.find_first_not_of(" \t");
+      std::string_view value = request.host;
+
+      auto leading  = value.find_first_not_of(" \t");
       auto trailing = value.find_last_not_of(" \t");
       if (leading != std::string_view::npos)
       {
@@ -167,18 +166,17 @@ namespace psibase
          return false;
       }
 
-      // Find position of scheme separator
-      size_t pos = value.find("://");
+      // scheme separator
+      size_t           pos = value.find("://");
       std::string_view domain;
-      
+
       if (pos != std::string_view::npos)
       {
-         // Create a string view starting after "://"
          domain = value.substr(pos + 3);
       }
       else
       {
-         // No scheme found, treat entire value as domain
+         // No scheme
          domain = value;
       }
 
@@ -193,32 +191,16 @@ namespace psibase
          domain = domain.substr(0, domainEndPos);
       }
 
-      return domain.find("localhost") != std::string_view::npos;
-   }
-
-   bool isDevChain(const HttpRequest& request)
-   {
-      // Check the host field first (always present)
-      if (isFromLocalhost(request.host))
+      if (domain == "localhost")
       {
          return true;
       }
-      
-      // Also check origin header if present (for cross-origin requests)
-      if (auto originHeader = request.getHeader("origin"))
+
+      if (domain.size() > 10 && domain.ends_with(".localhost"))
       {
-         for (auto part : *originHeader | std::views::split(','))
-         {
-            std::string_view value = split2sv(part);
-            std::string valueStr{value};
-            
-            if (isFromLocalhost(valueStr))
-            {
-               return true;
-            }
-         }
+         return true;
       }
+
       return false;
    }
-
 }  // namespace psibase

@@ -8,7 +8,6 @@
 #include "services/system/Accounts.hpp"
 
 #include <algorithm>
-#include <ranges>
 
 static constexpr bool enable_print = false;
 
@@ -94,17 +93,12 @@ namespace SystemService
       constexpr std::string_view allowedHeaders[] = {"Cache-Control",            //
                                                      "Content-Encoding",         //
                                                      "Content-Security-Policy",  //
-                                                     "ETag",                     //
-                                                     "Set-Cookie"};
+                                                     "ETag", "Set-Cookie"};
 
-      void sendReplyImpl(AccountNumber           service,
-                         std::int32_t            socket,
-                         const HttpReply&        result,
-                         const std::string_view& requestTarget = "")
+      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
       {
          for (const auto& header : result.headers)
          {
-            // Check standard allowed headers
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
                abortMessage("service " + service.str() + " attempted to set http header " +
@@ -193,7 +187,7 @@ namespace SystemService
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
-      sendReplyImpl(sender, socket, result, "");
+      sendReplyImpl(sender, socket, result);
    }
 
    extern "C" [[clang::export_name("serve")]] void serve()
@@ -242,7 +236,7 @@ namespace SystemService
       {
          if (result)
          {
-            sendReplyImpl(server, sock, std::move(*result), req.target);
+            sendReplyImpl(server, sock, std::move(*result));
          }
          else
          {
@@ -250,8 +244,7 @@ namespace SystemService
             sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
-                           .body        = std::vector(msg.begin(), msg.end())},
-                          req.target);
+                           .body        = std::vector(msg.begin(), msg.end())});
          }
       }
    }  // serve()

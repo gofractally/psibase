@@ -91,15 +91,12 @@ namespace SystemService
             auto                    params = psio::from_json<cookie_data>(jstream);
 
             std::vector<HttpHeader> headers;
-            bool                    isDevChain = psibase::isDevChain(request);
-            std::string             cookieName = "__Host-SESSION";
-            std::string             cookieAttribs =
-                "Path=/; HttpOnly; Secure; SameSite=None; Domain=" + request.host;
+            bool                    isDevChain    = psibase::isDevChain(request);
+            std::string             cookieName    = "__Host-SESSION";
+            std::string             cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict";
             if (isDevChain)
-            {
-               cookieName    = "SESSION";
-               cookieAttribs = "Path=/; Domain=" + request.host;
-            }
+               cookieName = "SESSION";
+
             std::string cookieValue = cookieName + "=" + params.accessToken + "; " + cookieAttribs;
             headers.push_back({"Set-Cookie", cookieValue});
 

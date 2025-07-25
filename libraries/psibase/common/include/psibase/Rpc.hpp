@@ -75,11 +75,7 @@ namespace psibase
 
       /// Removes a cookie
       void removeCookie(std::string_view name);
-
    };
-
-   /// Helper function to check if a URL contains localhost
-   bool isFromLocalhost(const std::string& url);
 
    /// Checks if the request origin indicates a development chain
    /// by looking for "localhost" in the origin header domain
