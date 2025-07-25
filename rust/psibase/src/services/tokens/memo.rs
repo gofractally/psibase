@@ -49,10 +49,7 @@ impl<'a> Unpack<'a> for Memo {
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        let len: u32 = <&str>::unpack(src, pos)?
-            .len()
-            .try_into()
-            .map_err(|_| fracpack::Error::ExtraData)?;
+        let len = <&str>::unpack(src, pos)?.len();
 
         if len > 80 {
             Err(fracpack::Error::ExtraData)
