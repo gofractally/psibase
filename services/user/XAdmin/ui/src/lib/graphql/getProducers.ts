@@ -4,6 +4,16 @@ import { zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../graphql";
 
+const zProducer = z.object({
+    name: zAccount,
+    auth: z.object({
+        service: z.string(),
+        rawData: z.string(),
+    }),
+});
+
+export type Producer = z.infer<typeof zProducer>;
+
 export const getProducers = async () => {
     const producers = await graphql(
         `
@@ -23,18 +33,10 @@ export const getProducers = async () => {
     const response = z
         .object({
             data: z.object({
-                producers: z.array(
-                    z.object({
-                        name: zAccount,
-                        auth: z.object({
-                            service: z.string(),
-                            rawData: z.string(),
-                        }),
-                    }),
-                ),
+                producers: z.array(zProducer),
             }),
         })
         .parse(producers);
 
-    return response.data.producers.map((producer) => producer.name);
+    return response.data.producers;
 };
