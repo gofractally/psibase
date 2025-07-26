@@ -21,6 +21,7 @@ members = [
     "user/Permissions/plugin",
     "user/Tokens/plugin",
     "user/Workshop/plugin",
+    "user/Config/plugin",
 ]
 resolver = "2"
 

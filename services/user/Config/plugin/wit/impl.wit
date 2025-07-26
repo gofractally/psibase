@@ -1,0 +1,14 @@
+package config:plugin;
+
+world impl {
+    include host:common/imports;
+    include sites:plugin/imports;
+    include staged-tx:plugin/imports;
+    include producers:plugin/imports;
+    include branding:plugin/imports;
+    include transact:plugin/imports;
+
+    export branding;
+    export producers;
+
+}
