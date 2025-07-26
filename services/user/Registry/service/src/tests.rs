@@ -2,7 +2,7 @@
 mod tests {
     use crate::*;
     use constants::app_status;
-    use constants::MAX_APP_NAME_LENGTH;
+    use constants::MAX_NAME_SIZE;
     use psibase::services::http_server;
     use psibase::{account, ChainEmptyResult, TimePointUSec};
     use serde_json::{json, Value};
@@ -15,8 +15,8 @@ mod tests {
             created_at: TimePointUSec::from(0),
             redirect_uris: vec!["http://localhost:3000/callback".to_string()],
             name: "Super Cooking App".to_string(),
-            short_description: "Alice's Cooking App".to_string(),
-            long_description: "Super cooking app".to_string(),
+            short_desc: "Alice's Cooking App".to_string(),
+            long_desc: "Super cooking app".to_string(),
             icon: "icon-as-base64".to_string(),
             icon_mime_type: "image/png".to_string(),
             tos_subpage: "/tos".to_string(),
@@ -40,8 +40,8 @@ mod tests {
     ) -> ChainEmptyResult {
         let res = Wrapper::push_from(chain, account!("alice")).setMetadata(
             metadata.name,
-            metadata.short_description,
-            metadata.long_description,
+            metadata.short_desc,
+            metadata.long_desc,
             metadata.icon,
             metadata.icon_mime_type,
             metadata.tos_subpage,
@@ -69,8 +69,8 @@ mod tests {
                     appMetadata(accountId: "{account}") {{
                         accountId,
                         name,
-                        shortDescription,
-                        longDescription,
+                        shortDesc,
+                        longDesc,
                         icon,
                         iconMimeType,
                         tosSubpage,
@@ -92,8 +92,8 @@ mod tests {
                 "appMetadata": {
                     "accountId": "alice",
                     "name": "Super Cooking App",
-                    "shortDescription": "Alice's Cooking App",
-                    "longDescription": "Super cooking app",
+                    "shortDesc": "Alice's Cooking App",
+                    "longDesc": "Super cooking app",
                     "icon": "icon-as-base64",
                     "iconMimeType": "image/png",
                     "tosSubpage": "/tos",
@@ -126,11 +126,7 @@ mod tests {
             .trace
             .error
             .unwrap();
-        assert!(
-            error.contains("App can only have up to 3 tags"),
-            "error = {}",
-            error
-        );
+        assert!(error.contains("Max 3 tags per app"), "error = {}", error);
 
         Ok(())
     }
@@ -141,7 +137,7 @@ mod tests {
         chain.new_account(account!("bob"))?;
 
         let mut metadata = default_metadata();
-        metadata.name = "a".repeat(MAX_APP_NAME_LENGTH + 1);
+        metadata.name = "a".repeat(MAX_NAME_SIZE + 1);
 
         let error = push_set_metadata(&chain, metadata, default_tags())
             .trace
@@ -151,7 +147,7 @@ mod tests {
             error.contains(
                 format!(
                     "App name can only be up to {} characters long",
-                    MAX_APP_NAME_LENGTH
+                    MAX_NAME_SIZE
                 )
                 .as_str()
             ),

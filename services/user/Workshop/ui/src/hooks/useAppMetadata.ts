@@ -13,8 +13,8 @@ export const MetadataResponse = z.object({
         .object({
             accountId: z.string(),
             name: z.string(),
-            shortDescription: z.string(),
-            longDescription: z.string(),
+            shortDesc: z.string(),
+            longDesc: z.string(),
             icon: z.string(),
             iconMimeType: z.string(),
             tosSubpage: z.string(),
@@ -42,8 +42,8 @@ export const fetchMetadata = async (account: string) => {
           appMetadata(accountId: "${appName}") {
             accountId
             name
-            shortDescription
-            longDescription
+            shortDesc
+            longDesc
             icon
             iconMimeType
             tosSubpage

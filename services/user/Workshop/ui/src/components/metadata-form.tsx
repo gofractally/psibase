@@ -33,8 +33,8 @@ import { Textarea } from "@shared/shadcn/ui/textarea";
 
 const formSchema = z.object({
     name: z.string(),
-    shortDescription: z.string(),
-    longDescription: z.string(),
+    shortDesc: z.string(),
+    longDesc: z.string(),
     icon: z.string(),
     iconMimeType: z.string(), // MIME type of the icon
     tosSubpage: z.string(),
@@ -53,8 +53,8 @@ interface Props {
 
 const blankDefaultValues = formSchema.parse({
     name: "",
-    shortDescription: "",
-    longDescription: "",
+    shortDesc: "",
+    longDescr: "",
     icon: "",
     iconMimeType: "",
     tosSubpage: "",
@@ -163,7 +163,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
                         <div className="grid gap-4 md:grid-cols-2">
                             <FormField
                                 control={form.control}
-                                name="shortDescription"
+                                name="shortDesc"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Tagline</FormLabel>
@@ -252,7 +252,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
                         </div>
                         <FormField
                             control={form.control}
-                            name="longDescription"
+                            name="longDesc"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Long Description</FormLabel>

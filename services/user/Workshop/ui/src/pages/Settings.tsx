@@ -56,9 +56,9 @@ export const Settings = () => {
                             metadata
                                 ? {
                                       name: metadata.name,
-                                      shortDescription:
-                                          metadata.shortDescription,
-                                      longDescription: metadata.longDescription,
+                                      shortDesc:
+                                          metadata.shortDesc,
+                                      longDesc: metadata.longDesc,
                                       icon: metadata.icon,
                                       iconMimeType: metadata.iconMimeType,
                                       tosSubpage: metadata.tosSubpage,
