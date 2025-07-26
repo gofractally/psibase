@@ -29,29 +29,19 @@ pub mod service {
     use crate::tables::{ExampleThing, ExampleThingTable, InitRow, InitTable};
     use psibase::*;
 
+    pub type SID = psibase::AccountNumber;
+
     #[action]
     fn init() {
         let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
 
-        // Initial service configuration
-        let thing_table = ExampleThingTable::new();
-        if thing_table.get_index_pk().get(&()).is_none() {
-            thing_table
-                .put(&ExampleThing {
-                    thing: String::from("default thing"),
-                })
-                .unwrap();
-        }
+        if table.get_index_pk().get(&()).is_none() {}
     }
 
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
+        check_some(table.get_index_pk().get(&()), "service not inited");
     }
 
     #[action]
