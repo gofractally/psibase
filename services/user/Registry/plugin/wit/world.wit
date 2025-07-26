@@ -4,12 +4,6 @@ interface types {
     type account-id = string;
     type base64-str = string;
 
-    enum app-status {
-        draft,
-        published,
-        unpublished,
-    }
-
     record app-metadata {
         name: string,
         short-description: string,
@@ -21,16 +15,6 @@ interface types {
         app-homepage-subpage: string,
         redirect-uris: list<string>,
         tags: list<string>,
-    }
-
-    record extra-metadata {
-        status: app-status,
-        created-at: string,
-    }
-
-    record full-app-metadata {
-        app-metadata: app-metadata,
-        extra-metadata: extra-metadata,
     }
 }
 
@@ -75,21 +59,7 @@ interface developer {
     unpublish-app: func(account: account-id) -> result<_, error>;
 }
 
-interface consumer {
-    use host:common/types.{error};
-    use types.{account-id, full-app-metadata};
-
-    /// Retrieve the full metadata for an app
-    get-app-metadata: func(account: account-id) -> result<full-app-metadata, error>;
-
-    /// Retrieve a list of tags that contain the given substring
-    /// 
-    /// This function returns up to 10 tags that contain the given substring.
-    get-related-tags: func(tag-substr: string) -> result<list<string>, error>;
-}
-
 world imports {
     import types;
     import developer;
-    import consumer;
 }

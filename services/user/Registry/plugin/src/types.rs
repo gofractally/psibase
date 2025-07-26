@@ -1,19 +1,7 @@
-use crate::bindings::registry::plugin::types::{AppMetadata, AppStatus};
+use crate::bindings::registry::plugin::types::AppMetadata;
+use registry::action_structs::setMetadata;
 
-use registry as RegistryService;
-
-impl From<u32> for AppStatus {
-    fn from(status: u32) -> Self {
-        match status {
-            0 => AppStatus::Draft,
-            1 => AppStatus::Published,
-            2 => AppStatus::Unpublished,
-            _ => panic!("Invalid app status"),
-        }
-    }
-}
-
-impl From<AppMetadata> for RegistryService::action_structs::setMetadata {
+impl From<AppMetadata> for setMetadata {
     fn from(metadata: AppMetadata) -> Self {
         Self {
             name: metadata.name,
