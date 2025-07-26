@@ -11,14 +11,8 @@ pub mod service {
     use async_graphql::*;
     use psibase::services::transact;
     use psibase::*;
-    use serde::{Deserialize, Serialize};
     use services::events::Wrapper as EventsSvc;
     use std::collections::HashSet;
-
-    #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
-    pub struct RelatedTags {
-        pub tags: Vec<String>,
-    }
 
     #[action]
     fn init() {
