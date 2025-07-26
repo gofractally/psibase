@@ -5,6 +5,7 @@ export const queryKeys = {
     importKey: ["importKey"] as const,
     packages: ["packages"] as const,
     peers: ["peers"] as const,
+    producers: ["producers"] as const,
     statuses: ["statuses"] as const,
     branding: ["branding"] as const,
 
