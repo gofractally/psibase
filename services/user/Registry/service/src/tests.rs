@@ -3,8 +3,10 @@ mod tests {
     use crate::*;
     use constants::app_status;
     use constants::MAX_APP_NAME_LENGTH;
+    use psibase::services::http_server;
     use psibase::{account, ChainEmptyResult, TimePointUSec};
-    use service::{AppMetadata, TagRecord};
+    use serde_json::{json, Value};
+    use service::AppMetadata;
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
@@ -36,7 +38,7 @@ mod tests {
         metadata: AppMetadata,
         tags: Vec<String>,
     ) -> ChainEmptyResult {
-        Wrapper::push_from(chain, account!("alice")).setMetadata(
+        let res = Wrapper::push_from(chain, account!("alice")).setMetadata(
             metadata.name,
             metadata.short_description,
             metadata.long_description,
@@ -47,48 +49,67 @@ mod tests {
             metadata.app_homepage_subpage,
             tags,
             metadata.redirect_uris,
-        )
+        );
+        chain.finish_block();
+        res
     }
 
     #[psibase::test_case(packages("Registry"))]
     fn test_set_metadata_simple(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(account!("alice"))?;
         chain.new_account(account!("bob"))?;
+        http_server::Wrapper::push_from(&chain, SERVICE).registerServer(account!("r-registry"));
 
         push_set_metadata(&chain, default_metadata(), default_tags()).get()?;
 
-        let app_metadata_with_tags = Wrapper::push(&chain)
-            .getMetadata(account!("alice"))
-            .get()?
-            .unwrap();
+        let reply: Value = chain.graphql(
+            SERVICE,
+            &format!(
+                r#"query {{
+                    appMetadata(accountId: "{account}") {{
+                        accountId,
+                        name,
+                        shortDescription,
+                        longDescription,
+                        icon,
+                        iconMimeType,
+                        tosSubpage,
+                        privacyPolicySubpage,
+                        appHomepageSubpage,
+                        status,
+                        redirectUris,
+                        createdAt,
+                        tags
+                    }}
+                }}"#,
+                account = "alice"
+            ),
+        )?;
 
-        let metadata = app_metadata_with_tags.metadata;
-        let tags = app_metadata_with_tags.tags;
-
-        assert_eq!(metadata.name, "Super Cooking App");
-        assert_eq!(metadata.short_description, "Alice's Cooking App");
-        assert_eq!(metadata.long_description, "Super cooking app");
-        assert_eq!(metadata.icon, "icon-as-base64");
-        assert_eq!(metadata.icon_mime_type, "image/png");
-        assert_eq!(metadata.tos_subpage, "/tos");
-        assert_eq!(metadata.privacy_policy_subpage, "/privacy-policy");
-        assert_eq!(metadata.app_homepage_subpage, "/");
-        assert_eq!(metadata.status, 0);
-        assert_eq!(metadata.status, app_status::DRAFT);
-
-        assert_eq!(tags.len(), 3);
-        assert!(tags.contains(&TagRecord {
-            id: 1,
-            tag: "cozy".to_string(),
-        }));
-        assert!(tags.contains(&TagRecord {
-            id: 2,
-            tag: "cuisine".to_string(),
-        }));
-        assert!(tags.contains(&TagRecord {
-            id: 3,
-            tag: "cooking".to_string(),
-        }));
+        assert_eq!(
+            reply,
+            json!({ "data": {
+                "appMetadata": {
+                    "accountId": "alice",
+                    "name": "Super Cooking App",
+                    "shortDescription": "Alice's Cooking App",
+                    "longDescription": "Super cooking app",
+                    "icon": "icon-as-base64",
+                    "iconMimeType": "image/png",
+                    "tosSubpage": "/tos",
+                    "privacyPolicySubpage": "/privacy-policy",
+                    "appHomepageSubpage": "/",
+                    "status": 0,
+                    "redirectUris": ["http://localhost:3000/callback"],
+                    "createdAt": "1970-01-01T00:00:04+00:00",
+                    "tags": [
+                        "cozy",
+                        "cuisine",
+                        "cooking"
+                    ]
+                }
+            }})
+        );
 
         Ok(())
     }

@@ -1,7 +1,6 @@
 mod constants;
 mod tables;
 mod tags;
-mod utils;
 
 #[psibase::service(name = "registry", tables = "tables::tables")]
 #[allow(non_snake_case)]
@@ -15,15 +14,6 @@ pub mod service {
     use serde::{Deserialize, Serialize};
     use services::events::Wrapper as EventsSvc;
     use std::collections::HashSet;
-
-    use crate::utils::increment_last_char;
-
-    /// Holds metadata for a registered app
-    #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
-    pub struct AppMetadataWithTags {
-        pub metadata: crate::tables::tables::AppMetadata,
-        pub tags: Vec<TagRecord>,
-    }
 
     #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
     pub struct RelatedTags {
@@ -142,52 +132,6 @@ pub mod service {
         Wrapper::emit()
             .history()
             .appStatusChanged(account_id, metadata.status);
-    }
-
-    #[action]
-    fn getMetadata(account_id: AccountNumber) -> Option<AppMetadataWithTags> {
-        let app_metadata_table = AppMetadataTable::new();
-        let app_tags_table = AppTagsTable::new();
-        let tags_table = TagsTable::new();
-        let metadata = app_metadata_table.get_index_pk().get(&account_id)?;
-
-        // Get the app tag IDs
-        let tags: Vec<TagRecord> = app_tags_table
-            .get_index_pk()
-            .range((account_id, 0)..(account_id, u32::MAX))
-            .map(|app_tag| {
-                let tag_id = app_tag.tag_id;
-                tags_table.get_index_pk().get(&tag_id).unwrap()
-            })
-            .collect();
-
-        Some(AppMetadataWithTags {
-            metadata: metadata,
-            tags,
-        })
-    }
-
-    #[action]
-    fn getTag(tag_id: u32) -> Option<TagRecord> {
-        let tags_table = TagsTable::new();
-        tags_table.get_index_pk().get(&tag_id)
-    }
-
-    #[action]
-    fn getRelatedTags(partial_tag: String) -> RelatedTags {
-        let table = TagsTable::new();
-        let idx = table.get_index_by_tags();
-
-        let from = partial_tag.to_lowercase();
-        let excluded_to = increment_last_char(from.clone());
-
-        let tags: Vec<String> = idx
-            .range(from..excluded_to)
-            .take(10)
-            .map(|tag_row| tag_row.tag)
-            .collect();
-
-        RelatedTags { tags }
     }
 
     #[event(history)]

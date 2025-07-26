@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
-    use async_graphql::*;
-    use psibase::{check, AccountNumber, Fracpack, ToSchema};
+    use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::{check, AccountNumber, Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
     use url::Url;
 
@@ -48,8 +48,9 @@ pub mod tables {
         }
     }
     #[table(name = "AppMetadataTable", index = 1)]
-    #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, SimpleObject, Deserialize)]
     #[serde(rename_all = "camelCase")]
+    #[graphql(complex)]
     pub struct AppMetadata {
         /// The unique identifier for the app: it's own account id
         #[primary_key]
@@ -87,6 +88,23 @@ pub mod tables {
 
         /// The redirect URIs for the app
         pub redirect_uris: Vec<String>,
+    }
+
+    #[ComplexObject]
+    impl AppMetadata {
+        async fn tags(&self) -> Vec<String> {
+            let app_tags_table = AppTagsTable::new();
+            let tags_table = TagsTable::new();
+
+            app_tags_table
+                .get_index_pk()
+                .range((self.account_id, 0)..(self.account_id, u32::MAX))
+                .map(|app_tag| {
+                    let tag_id = app_tag.tag_id;
+                    tags_table.get_index_pk().get(&tag_id).unwrap().tag
+                })
+                .collect()
+        }
     }
 
     impl AppMetadata {
