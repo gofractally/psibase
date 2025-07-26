@@ -30,10 +30,21 @@ pub struct SymbolRecord {
     pub saleDetails: SaleDetails,
 }
 
+#[derive(
+    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct SymbolLengthRecord {
+    pub symbolLength: u8,
+    pub targetCreatedPerDay: u8,
+    pub floorPrice: Quantity,
+    pub activePrice: Quantity,
+}
+
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod Service {
-    use crate::services::symbol::SymbolRecord;
+    use crate::services::symbol::{SymbolLengthRecord, SymbolRecord};
     use crate::{services::tokens::Quantity, AccountNumber};
 
     #[action]
@@ -63,6 +74,16 @@ pub mod Service {
 
     #[action]
     fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getSymbolType(numChars: u8) -> SymbolLengthRecord {
+        unimplemented!()
+    }
+
+    #[action]
+    fn updatePrices() {
         unimplemented!()
     }
 }

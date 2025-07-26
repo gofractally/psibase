@@ -25,6 +25,11 @@ custom_error! { pub TokensError
 
 pub type TID = u32;
 
+pub const SYS_TOKEN: u32 = 1;
+pub const UNTRANSFERABLE: u8 = 0;
+pub const UNRECALLABLE: u8 = 1;
+pub const MANUAL_DEBIT: u8 = 0;
+
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]

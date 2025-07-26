@@ -15,10 +15,7 @@ use errors::ErrorType;
 struct SymbolPlugin;
 
 impl Api for SymbolPlugin {
-    fn set_example_thing(thing: String) {
-        let packed_example_thing_args = symbol::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
-    }
+    fn set_example_thing(thing: String) {}
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -40,8 +37,8 @@ impl Queries for SymbolPlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val = examplething_val
-            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        let examplething_val =
+            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
     }

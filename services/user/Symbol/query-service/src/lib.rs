@@ -17,7 +17,7 @@ mod service {
     impl Query {
         /// This query gets the current value of the Example Thing.
         async fn example_thing(&self) -> String {
-            symbol::Wrapper::call().getExampleThing()
+            "symbol::Wrapper::call().getExampleThing()".into()
         }
 
         /// This query gets paginated historical updates of the Example Thing.
@@ -40,9 +40,8 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-            // Services graphql queries
+        // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query))
-
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
     }
