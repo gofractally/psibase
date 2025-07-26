@@ -5,6 +5,7 @@
 #include <psibase/Bitset.hpp>
 #include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
+#include <psio/view.hpp>
 
 namespace UserService
 {
@@ -32,12 +33,37 @@ namespace UserService
       }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;
+      PSIO_REFLECT(Precision, value);
    };
-   PSIO_REFLECT(Precision, value);
+
+   inline uint8_t& clio_unwrap_packable(Precision& s)
+   {
+      return s.value;
+   }
+   inline const uint8_t& clio_unwrap_packable(const Precision& s)
+   {
+      return s.value;
+   }
 
    inline bool clio_validate_packable(const Precision& p)
    {
       return Precision::validate(p.value);
+   }
+
+   inline bool clio_validate_packable(psio::view<const Precision> p)
+   {
+      return Precision::validate(p.value());
+   }
+
+   void from_json(Precision& p, auto& stream)
+   {
+      from_json(p.value, stream);
+      Precision::validate(p.value);
+   }
+
+   void to_json(const Precision& p, auto& stream)
+   {
+      to_json(p.value, stream);
    }
 
    struct Quantity
