@@ -25,20 +25,23 @@ import { CspForm } from "./csp-form";
 import { ServiceUpload } from "./service-upload";
 
 const setStatus = (
-    metadata: z.infer<typeof MetadataResponse>,
+    metadata: z.infer<typeof MetadataResponse>["appMetadata"],
     published: boolean,
-): z.infer<typeof MetadataResponse> => ({
-    ...metadata,
-    extraMetadata: {
-        ...metadata.extraMetadata,
-        status: published ? Status.Enum.published : Status.Enum.unpublished,
-    },
-});
+): z.infer<typeof MetadataResponse>["appMetadata"] =>
+    metadata
+        ? {
+              ...metadata,
+              status: published
+                  ? Status.Enum.published
+                  : Status.Enum.unpublished,
+          }
+        : null;
 
 const setCacheData = (appName: string, checked: boolean) => {
     queryClient.setQueryData(appMetadataQueryKey(appName), (data: unknown) => {
         if (data) {
-            return setStatus(MetadataResponse.parse(data), checked);
+            const metadata = MetadataResponse.shape.appMetadata.parse(data);
+            return setStatus(metadata, checked);
         }
     });
 };
@@ -112,7 +115,7 @@ export const ControlPanel = () => {
     };
 
     const isAppPublished = metadata
-        ? metadata.extraMetadata.status == Status.Enum.published
+        ? metadata.status == Status.Enum.published
         : false;
 
     const { mutateAsync: setCsp } = useSetCsp();

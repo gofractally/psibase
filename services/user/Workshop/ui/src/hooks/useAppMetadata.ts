@@ -1,18 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
+import { graphql } from "@/lib/graphql";
+import { Account } from "@/lib/zodTypes";
 
-import { Account, Metadata } from "@/lib/zodTypes";
+import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
 export const Status = z.enum(["draft", "published", "unpublished"]);
 
 export const MetadataResponse = z.object({
-    appMetadata: Metadata,
-    extraMetadata: z.object({
-        createdAt: z.string(),
-        status: Status,
-    }),
+    appMetadata: z
+        .object({
+            accountId: z.string(),
+            name: z.string(),
+            shortDescription: z.string(),
+            longDescription: z.string(),
+            icon: z.string(),
+            iconMimeType: z.string(),
+            tosSubpage: z.string(),
+            privacyPolicySubpage: z.string(),
+            appHomepageSubpage: z.string(),
+            status: z.string(),
+            createdAt: z.string(),
+            redirectUris: z.array(z.string()),
+            tags: z.array(z.string()),
+        })
+        .or(z.null()),
 });
 
 export const appMetadataQueryKey = (appName: string | undefined | null) => [
@@ -23,13 +36,31 @@ export const appMetadataQueryKey = (appName: string | undefined | null) => [
 export const fetchMetadata = async (account: string) => {
     const appName = Account.parse(account);
     try {
-        const res = await supervisor.functionCall({
-            method: "getAppMetadata",
-            params: [appName],
-            service: "registry",
-            intf: "consumer",
-        });
-        return MetadataResponse.parse(res);
+        const res = await graphql(
+            `
+        {
+          appMetadata(accountId: "${appName}") {
+            accountId
+            name
+            shortDescription
+            longDescription
+            icon
+            iconMimeType
+            tosSubpage
+            privacyPolicySubpage
+            appHomepageSubpage
+            status
+            createdAt
+            redirectUris
+            tags
+          }
+        }
+      `,
+            siblingUrl(null, "registry", "graphql"),
+        );
+
+        const parsed = MetadataResponse.parse(res);
+        return parsed.appMetadata;
     } catch (e) {
         if (e instanceof Error) {
             if (e.message.includes("App metadata not found")) {
