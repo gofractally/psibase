@@ -99,7 +99,7 @@ mod tests {
                     "tosSubpage": "/tos",
                     "privacyPolicySubpage": "/privacy-policy",
                     "appHomepageSubpage": "/",
-                    "status": 0,
+                    "status": "Draft",
                     "redirectUris": ["http://localhost:3000/callback"],
                     "createdAt": "1970-01-01T00:00:04+00:00",
                     "tags": [

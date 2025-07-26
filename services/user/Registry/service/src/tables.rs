@@ -81,6 +81,7 @@ pub mod tables {
         pub app_homepage_subpage: String,
 
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
+        #[graphql(skip)]
         pub status: u32,
 
         /// The timestamp of when the app was created
@@ -104,6 +105,15 @@ pub mod tables {
                     tags_table.get_index_pk().get(&tag_id).unwrap().tag
                 })
                 .collect()
+        }
+
+        async fn status(&self) -> String {
+            match self.status {
+                app_status::DRAFT => "Draft".to_string(),
+                app_status::PUBLISHED => "Published".to_string(),
+                app_status::UNPUBLISHED => "Unpublished".to_string(),
+                _ => "Unknown".to_string(),
+            }
         }
     }
 
