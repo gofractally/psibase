@@ -20,11 +20,6 @@ pub mod service {
     }
 
     #[action]
-    fn createApp(account: AccountNumber) {
-        psibase::services::auth_delegate::Wrapper::call().newAccount(account, get_sender());
-    }
-
-    #[action]
     fn setMetadata(
         name: String,
         short_description: String,

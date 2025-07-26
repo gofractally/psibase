@@ -22,11 +22,6 @@ interface developer {
     use host:common/types.{error};
     use types.{account-id, app-metadata};
 
-    /// Create a new app with the specified account name
-    /// This creates a new account on the server whose owner is automatically set to the currently
-    /// logged-in user.
-    create-app: func(account: account-id) -> result<_, error>;
-
     /// Set the metadata for an app
     /// 
     /// Initially the app is set to draft status, but if the app is already published,

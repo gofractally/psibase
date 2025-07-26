@@ -14,16 +14,6 @@ use transact::plugin::intf as Transact;
 struct RegistryPlugin;
 
 impl Developer for RegistryPlugin {
-    fn create_app(account: AccountId) -> Result<(), Error> {
-        let account = account.parse().unwrap();
-        Transact::add_action_to_transaction(
-            createApp::ACTION_NAME,
-            &createApp { account }.packed(),
-        )
-        .unwrap();
-        Ok(())
-    }
-
     fn set_app_metadata(metadata: AppMetadata) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             setMetadata::ACTION_NAME,
