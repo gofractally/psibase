@@ -86,8 +86,7 @@ namespace SystemService
          abortMessage("circular ownership");
       }
 
-      auto authTable = db.open<AuthDelegateTable>();
-      authTable.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
+      table.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
    }
 
    psibase::AccountNumber AuthDelegate::getOwner(psibase::AccountNumber account)
@@ -104,9 +103,17 @@ namespace SystemService
 
    void AuthDelegate::newAccount(psibase::AccountNumber name, psibase::AccountNumber owner)
    {
+      auto table  = db.open<AuthDelegateTable>();
+      auto record = table.getIndex<0>().get(name);
+      if (record && record->owner == owner)
+      {
+         // idempotent if the new account already exists & is owned
+         //   by the same owner
+         return;
+      }
+
       check(to<Accounts>().exists(owner), "owner account does not exist");
       to<Accounts>().newAccount(name, AuthAny::service, true);
-
       Action setOwner{
           .sender  = name,
           .service = service,
