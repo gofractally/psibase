@@ -1,0 +1,9 @@
+package web-registry:plugin;
+
+interface api {
+    set-example-thing: func(thing: string);
+}
+
+world imports {
+    import api;
+}

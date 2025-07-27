@@ -13,6 +13,7 @@ postinstall = [{ sender = "registry", service = "registry", method = "init" }]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.19.0"
 Sites = "0.19.0"
+AuthDelegate = "0.19.0"
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase", version = "0.19.0" }

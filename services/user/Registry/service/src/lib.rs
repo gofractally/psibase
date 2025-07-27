@@ -6,12 +6,33 @@ mod tables;
 pub mod service {
     pub use crate::tables::tables::*;
     use async_graphql::*;
+    use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+    use psibase::services::nft::Wrapper as Nft;
     use psibase::*;
-    use services::events::Wrapper as EventsSvc;
+    use services::events::Wrapper as Events;
 
     #[action]
     fn init() {
-        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, method!("appStatusChanged"), 0);
+        Events::call().addIndex(DbId::HistoryEvent, SERVICE, method!("appStatusChanged"), 0);
+
+        // Reserve some accounts for known future platforms
+        AuthDelegate::call().newAccount(account!("cli"), SERVICE);
+    }
+
+    /// This creates a new platform. The sender is the owner of the platform.
+    /// The name does not need to be an account (AccountNumber is used for a
+    /// fixed-size string).
+    #[action]
+    fn new_platform(name: AccountNumber) {
+        let owner = get_sender();
+        let owner_id = Nft::call().mint();
+        Nft::call().debit(owner_id, "".to_string());
+        Nft::call().credit(
+            owner_id,
+            owner,
+            "new registry platform owner NFT".to_string(),
+        );
+        Platform::upsert(name, owner_id, owner);
     }
 
     #[action]

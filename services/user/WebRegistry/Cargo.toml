@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "0.19.0"
+rust-version = "1.64"
+edition = "2021"
+publish = false
+
+[package]
+name = "web-registry-pkg"                                        # Crate name
+description = "A registry for pmanaging publication of web apps"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[package.metadata.psibase]
+package-name = "WebRegistry"
+services = ["web-registry"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.19.0"
+Sites = "0.19.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+web-registry = { path = "service", version = "0.19.0" }
+r-web-reg = { path = "query-service", version = "0.19.0" }
+plugin = { path = "plugin", version = "0.19.0" }

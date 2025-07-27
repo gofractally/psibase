@@ -145,6 +145,20 @@ pub mod tables {
             (self.tag_id, self.app_id)
         }
     }
+
+    #[table(name = "PlatformTable", index = 4)]
+    #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    pub struct Platform {
+        /// The name of the platform
+        #[primary_key]
+        pub name: AccountNumber,
+
+        /// The owner of this NFT can administer the platform
+        pub owner_nft: u32,
+
+        /// The service that will receive hooks for this platform
+        pub hook_service: AccountNumber,
+    }
 }
 
 pub mod impls {
@@ -155,6 +169,19 @@ pub mod impls {
     use psibase::services::transact;
     use psibase::*;
     use url::Url;
+
+    impl Platform {
+        pub fn upsert(name: AccountNumber, owner_nft: u32, hook_service: AccountNumber) {
+            let platform_table = PlatformTable::new();
+            platform_table
+                .put(&Platform {
+                    name,
+                    owner_nft,
+                    hook_service,
+                })
+                .unwrap();
+        }
+    }
 
     impl NextId {
         pub fn get() -> u32 {
