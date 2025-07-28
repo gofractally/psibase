@@ -137,7 +137,7 @@ class TestCrash(unittest.TestCase):
 
     @testutil.psinode_test
     def test_unlock_bft(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(4), softhsm='libsofthsm2.so')
+        prods = cluster.complete(*testutil.generate_names(4), softhsm=testutil.libsofthsm2())
         (a, b, c, d) = prods
         keys = []
         for p in prods:

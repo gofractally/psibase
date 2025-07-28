@@ -31,10 +31,16 @@ set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_
 
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
+    find_library(LIBSOFTHSM2 libsofthsm2.so)
+    if(LIBSOFTHSM2)
+        set(LIBSOFTHSM2_ARG --libsofthsm2=${LIBSOFTHSM2})
+    else()
+        set(LIBSOFTHSM2_ARG)
+    endif()
     function(add_psinode_test name)
         add_test(
             NAME psinode_${name}
-            COMMAND ${Python_EXECUTABLE} ${name}.py --psinode=$<TARGET_FILE:psinode>
+            COMMAND ${Python_EXECUTABLE} ${name}.py --psinode=$<TARGET_FILE:psinode> ${ARGN}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     endfunction()
     add_test(
@@ -51,7 +57,7 @@ if(Python_Interpreter_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     add_psinode_test(test_routing)
     set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)
-    add_psinode_test(test_crash)
+    add_psinode_test(test_crash ${LIBSOFTHSM2_ARG})
     set_tests_properties(psinode_test_crash PROPERTIES PROCESSORS 4)
     add_psinode_test(test_psibase)
     add_psinode_test(test_subjective)
