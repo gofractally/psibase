@@ -1445,19 +1445,19 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
       }
    }
 
-   std::string_view cookieName = "__Host-SESSION";
-   if (isDevChain)
-   {
-      cookieName = "SESSION";
-   }
+   std::string_view cookieName = isDevChain ? "SESSION" : "__Host-SESSION";
 
-   if (auto token = request.getCookie(cookieName))
+   auto tokens = request.getCookie(cookieName);
+   if (!tokens.empty())
    {
-      auto decoded = decodeJWT<LoginTokenData>(key, *token);
-
-      if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+      for (const auto& token : tokens)
       {
-         return decoded.sub;
+         auto decoded = decodeJWT<LoginTokenData>(key, token);
+
+         if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+         {
+            return decoded.sub;
+         }
       }
    }
 

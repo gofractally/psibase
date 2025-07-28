@@ -66,7 +66,7 @@ namespace psibase
       /// Searches for a cookie by name
       ///
       /// The value returned is not validated or decoded
-      std::optional<std::string_view> getCookie(std::string_view name) const;
+      std::vector<std::string_view> getCookie(std::string_view name) const;
 
       /// Searches for a header by name (case-insensitive)
       ///

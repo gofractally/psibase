@@ -81,10 +81,11 @@ namespace psibase
       return decode_pct(std::string_view(target).substr(0, target.find('?')));
    }
 
-   std::optional<std::string_view> HttpRequest::getCookie(std::string_view name) const
+   std::vector<std::string_view> HttpRequest::getCookie(std::string_view name) const
    {
       if (auto cookieHeader = getHeader("cookie"))
       {
+         std::vector<std::string_view> values;
          for (auto kvrange : *cookieHeader | std::views::split(';'))
          {
             std::string_view kv  = split2sv(kvrange);
@@ -94,8 +95,9 @@ namespace psibase
             auto key     = kv.substr(leading, pos - leading);
             auto value   = kv.substr(pos + 1);
             if (key == name)
-               return value;
+               values.push_back(value);
          }
+         return values;
       }
       return {};
    }
@@ -154,31 +156,8 @@ namespace psibase
    bool isDevChain(const HttpRequest& request)
    {
       std::string_view value = request.host;
-
-      auto leading  = value.find_first_not_of(" \t");
-      auto trailing = value.find_last_not_of(" \t");
-      if (leading != std::string_view::npos)
-      {
-         value = value.substr(leading, trailing - leading + 1);
-      }
-      else
-      {
-         return false;
-      }
-
-      // scheme separator
-      size_t           pos = value.find("://");
       std::string_view domain;
-
-      if (pos != std::string_view::npos)
-      {
-         domain = value.substr(pos + 3);
-      }
-      else
-      {
-         // No scheme
-         domain = value;
-      }
+      domain = request.host;
 
       // Find the end of the domain name (either at first colon or slash, or end of string)
       size_t domainEndPos = domain.find(':');
