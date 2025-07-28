@@ -289,7 +289,9 @@ SCENARIO("Using symbol ownership NFT")
       auto aliceBalance = q(1'000'000, precision);
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, q(20'000, precision), memo);
+
+      CHECK(sysIssuer.getBalance(sysToken, Symbol::service).returnVal().value == 0);
+      sysIssuer.mint(sysToken, aliceBalance, memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
       // Create the symbol and claim the owner NFT
