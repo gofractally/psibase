@@ -599,6 +599,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.19.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.38.0",
+]
+
+[[package]]
 name = "console"
 version = "0.15.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1215,6 +1225,17 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+ "wit-bindgen-rt 0.28.0",
+]
+
+[[package]]
+name = "host-prompt"
+version = "0.19.0"
+dependencies = [
+ "chrono",
+ "psibase",
+ "rand",
+ "urlencoding",
  "wit-bindgen-rt 0.28.0",
 ]
 

@@ -15,6 +15,9 @@ package = "clientdata:plugin"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
+# Needed for some manually-run unit tests
+"setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
+"chainmail:plugin" = { path = "../../../user/Chainmail/plugin/wit/world.wit" }
 
 [package.metadata.component.target]
 world = "impl"

@@ -109,11 +109,6 @@ interface client {
     /// Gets the full domain origin of the service from which the
     /// currently running plugin was fetched.
     my-service-origin: func() -> string;
-    
-    /// `prompt-user` prompts the user for input. `prompt-user` will display the content at `subpath`, supplying an arbitrary payload `payload-json-str`
-    /// * `subpath`: Optional: the subpath to visit on the caller's subdomain to access the prompting
-    /// * `payload-json-str`: Optional: any data payload that the prompt page may need as a serialized JSON string
-    prompt-user: func(subpath: option<string>, payload-json-str: option<string>) -> result<_, error>;
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;
@@ -135,8 +130,6 @@ interface admin {
 /// was written. Another client running in a different context may or may not immediately see the 
 /// result.
 interface store {
-    use types.{error};
-
     /// Database mode - Related to the conditions under which database writes will or will not succeed
     enum db-mode {
         /// Writes to a non-transactional database will persist regardless of the success or failure
@@ -180,25 +173,37 @@ interface store {
         /// The value is returned as an option. If the key-value pair exists in the
         /// store, it returns `Ok(value)`. If the key does not exist in the
         /// store, it returns `Ok(none)`. 
-        get: func(key: string) -> result<option<list<u8>>, error>;
+        get: func(key: string) -> option<list<u8>>;
 
         /// Set the value associated with the key in the store. If the key already
         /// exists in the store, it overwrites the value.
         ///
         /// If the key does not exist in the store, it creates a new key-value pair.
-        set: func(key: string, value: list<u8>) -> result<_, error>;
+        set: func(key: string, value: list<u8>);
 
         /// Delete the key-value pair associated with the key in the store.
         /// 
         /// If the key does not exist in the store, it does nothing.
-        delete: func(key: string) -> result<_, error>;
+        delete: func(key: string);
 
         /// Check if the key exists in the store.
         /// 
         /// If the key exists in the store, it returns `Ok(true)`. If the key does
         /// not exist in the store, it returns `Ok(false)`.
-        exists: func(key: string) -> result<bool, error>;
+        exists: func(key: string) -> bool;
     }
+
+    /// Flushes the transactional data to the host.
+    /// Ephemeral and Non-Transactional databases are never flushed.
+    ///
+    /// This method can only be called by the transact plugin.
+    flush-transactional-data: func(); 
+
+    /// Clears all data from all buffers.
+    /// Should be called at the start of every plugin execution context.
+    ///
+    /// This method can only be called by the transact plugin.
+    clear-buffers: func();
 }
 
 world imports {

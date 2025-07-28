@@ -42,7 +42,7 @@ fn check_account_exists(account: &str) -> Result<(), Error> {
 }
 
 fn user() -> Result<String, Error> {
-    get_current_user()?.ok_or(ErrorType::NoUserLoggedIn().into())
+    get_current_user().ok_or(ErrorType::NoUserLoggedIn().into())
 }
 
 impl Contacts for ProfilesPlugin {

@@ -283,9 +283,11 @@ add_rs_component_workspace(services/:Plugins
     permissions
     sites
     host-common
+    host-prompt
     tokens
     transact
     workshop
+    config
     producers
 )
 
@@ -324,7 +326,7 @@ set(PSIBASE_VERSION 0.19)
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
     NAME Transact
-    VERSION ${PSIBASE_VERSION}.0
+    VERSION ${PSIBASE_VERSION}.1
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
@@ -413,8 +415,10 @@ psibase_package(
     NAME Host
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
+    ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
@@ -445,7 +449,6 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH services/user/Branding
-    DEPENDS ${Branding_js_DEP}
 )
 
 cargo_psibase_package(
@@ -641,14 +644,12 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-producers
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/ui/dist/* /
     SERVICE r-producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RProducers-schema.json
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
-    DEPENDS ${Producers_js_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
@@ -837,6 +838,30 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Config.psi
+    NAME Config
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "A dashboard for developers to create and manage apps"
+    PACKAGE_DEPENDS 
+        "HttpServer(^${PSIBASE_VERSION})" 
+        "Sites(^${PSIBASE_VERSION})" 
+        "Accounts(^${PSIBASE_VERSION})" 
+        "CommonApi(^${PSIBASE_VERSION})" 
+        "Registry(^${PSIBASE_VERSION})" 
+        "StagedTx(^${PSIBASE_VERSION})" 
+        "Transact(^${PSIBASE_VERSION})"
+        "SetCode(^${PSIBASE_VERSION})"
+        "Chainmail(^${PSIBASE_VERSION})"
+        "ClientData(^${PSIBASE_VERSION})"
+    SERVICE config
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Config/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_config} /plugin.wasm
+    DEPENDS ${Config_js_DEP}
+    DEPENDS ${Plugins_DEP}
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Config/postinstall.json
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
@@ -871,7 +896,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Evaluations Events Fractals Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop Config
 )
 
 psibase_package(
@@ -881,7 +906,7 @@ psibase_package(
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop Config
 )
 
 
@@ -918,7 +943,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop Config)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -966,6 +991,7 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/Workshop.psi
+          ${SERVICE_DIR}/Config.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

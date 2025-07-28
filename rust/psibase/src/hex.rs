@@ -1,6 +1,6 @@
 use crate::ToKey;
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
-use fracpack::{AnyType, SchemaBuilder, ToSchema};
+use fracpack::{AnyType, FracInputStream, SchemaBuilder, ToSchema};
 use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -151,46 +151,41 @@ where
     const FIXED_SIZE: u32 = <T as crate::fracpack::Unpack>::FIXED_SIZE;
     const VARIABLE_SIZE: bool = <T as crate::fracpack::Unpack>::VARIABLE_SIZE;
     const IS_OPTIONAL: bool = <T as crate::fracpack::Unpack>::IS_OPTIONAL;
-    fn unpack(src: &'a [u8], pos: &mut u32) -> crate::fracpack::Result<Self> {
-        let value = <T as crate::fracpack::Unpack>::unpack(src, pos)?;
+    fn unpack(src: &mut FracInputStream<'a>) -> crate::fracpack::Result<Self> {
+        let value = <T as crate::fracpack::Unpack>::unpack(src)?;
         Ok(Self(value))
     }
-    fn verify(src: &'a [u8], pos: &mut u32) -> crate::fracpack::Result<()> {
-        <T as crate::fracpack::Unpack>::verify(src, pos)
+    fn verify(src: &mut FracInputStream) -> crate::fracpack::Result<()> {
+        <T as crate::fracpack::Unpack>::verify(src)
     }
     fn new_empty_container() -> crate::fracpack::Result<Self> {
         Ok(Self(<T as crate::fracpack::Unpack>::new_empty_container()?))
     }
     fn embedded_variable_unpack(
-        src: &'a [u8],
+        src: &mut FracInputStream<'a>,
         fixed_pos: &mut u32,
-        heap_pos: &mut u32,
     ) -> crate::fracpack::Result<Self> {
-        let value =
-            <T as crate::fracpack::Unpack>::embedded_variable_unpack(src, fixed_pos, heap_pos)?;
+        let value = <T as crate::fracpack::Unpack>::embedded_variable_unpack(src, fixed_pos)?;
         Ok(Self(value))
     }
     fn embedded_unpack(
-        src: &'a [u8],
+        src: &mut FracInputStream<'a>,
         fixed_pos: &mut u32,
-        heap_pos: &mut u32,
     ) -> crate::fracpack::Result<Self> {
-        let value = <T as crate::fracpack::Unpack>::embedded_unpack(src, fixed_pos, heap_pos)?;
+        let value = <T as crate::fracpack::Unpack>::embedded_unpack(src, fixed_pos)?;
         Ok(Self(value))
     }
     fn embedded_variable_verify(
-        src: &'a [u8],
+        src: &mut FracInputStream,
         fixed_pos: &mut u32,
-        heap_pos: &mut u32,
     ) -> crate::fracpack::Result<()> {
-        <T as crate::fracpack::Unpack>::embedded_variable_verify(src, fixed_pos, heap_pos)
+        <T as crate::fracpack::Unpack>::embedded_variable_verify(src, fixed_pos)
     }
     fn embedded_verify(
-        src: &'a [u8],
+        src: &mut FracInputStream,
         fixed_pos: &mut u32,
-        heap_pos: &mut u32,
     ) -> crate::fracpack::Result<()> {
-        <T as crate::fracpack::Unpack>::embedded_verify(src, fixed_pos, heap_pos)
+        <T as crate::fracpack::Unpack>::embedded_verify(src, fixed_pos)
     }
 }
 

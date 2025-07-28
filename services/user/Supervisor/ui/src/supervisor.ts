@@ -23,7 +23,13 @@ import { REDIRECT_ERROR_CODE } from "./constants";
 import { isRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/pluginLoader";
 import { Plugins } from "./plugin/plugins";
-import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
+import {
+    OriginationData,
+    assert,
+    chainIdPromise,
+    parser,
+    serviceFromOrigin,
+} from "./utils";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -82,6 +88,8 @@ export class Supervisor implements AppInterface {
     }
 
     private async preload(plugins: QualifiedPluginId[]) {
+        await chainIdPromise;
+
         if (plugins.length === 0) {
             return;
         }
@@ -143,7 +151,7 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    public supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
+    private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         let newContext = false;
         if (!this.context) {
             newContext = true;
@@ -189,18 +197,10 @@ export class Supervisor implements AppInterface {
         this.loader = new PluginLoader(this.plugins);
     }
 
-    getActiveApp(sender: OriginationData): OriginationData {
+    getActiveApp(): string {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        assertTruthy(
-            sender.app,
-            "[supervisor:getActiveApp] Unauthorized - only callable by host",
-        );
-        assert(
-            sender.app === "host",
-            "[supervisor:getActiveApp] Unauthorized - Only callable by host",
-        );
-
-        return this.parentOrigination;
+        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
+        return this.parentOrigination.app;
     }
 
     getRootDomain(): string {
@@ -303,14 +303,10 @@ export class Supervisor implements AppInterface {
             ),
         );
 
-        let callArgs = getCallArgs(
-            service,
-            plugin,
-            intf,
-            args.method,
-            args.params,
+        return this.call(
+            sender,
+            getCallArgs(service, plugin, intf, args.method, args.params),
         );
-        return this.call(sender, callArgs);
     }
 
     callResource(
