@@ -14,7 +14,7 @@ TEST_CASE("getCookie")
    HttpRequest request{.headers = {{"CooKiE", "foo=10; bar=27; session=xxx"}}};
    auto        value = request.getCookie("bar")[0];
    CHECK(!value.empty());
-   CHECK(*value == "27");
+   CHECK(value == "27");
 }
 
 TEST_CASE("removeCookie")
