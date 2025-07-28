@@ -1839,6 +1839,7 @@ __metadata:
   resolution: "@psibase/supervisor-ui@workspace:user/Supervisor/ui"
   dependencies:
     "@bytecodealliance/jco": "npm:1.10.2"
+    "@bytecodealliance/preview2-shim": "npm:^0.17.2"
     "@psibase/common-lib": "workspace:*"
     "@rollup/browser": "npm:^4.9.0"
     "@tanstack/react-query": "npm:^5.52.0"
@@ -1888,7 +1889,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/xadmin-ui@workspace:user/XAdmin/ui"
   dependencies:
-    "@bytecodealliance/jco": "npm:^1.9.1"
+    "@bytecodealliance/jco": "npm:1.10.2"
     "@bytecodealliance/preview2-shim": "npm:^0.17.2"
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
