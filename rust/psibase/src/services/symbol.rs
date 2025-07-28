@@ -53,21 +53,6 @@ pub mod Service {
     }
 
     #[action]
-    fn listSymbol(symbol: AccountNumber, price: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn buySymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn unlistSymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
     fn exists(symbol: AccountNumber) -> bool {
         unimplemented!()
     }
@@ -78,7 +63,7 @@ pub mod Service {
     }
 
     #[action]
-    fn getSymbolType(numChars: u8) -> SymbolLengthRecord {
+    fn getSymType(numChars: u8) -> SymbolLengthRecord {
         unimplemented!()
     }
 

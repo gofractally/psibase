@@ -221,12 +221,12 @@ SCENARIO("Measuring price increases")
          t.startBlock(secondsInDay + 10'000);  // Start a new day (price will drop once)
          auto cost{decrementPrice(q(SymbolPricing::initialPrice, precision))};
 
-         auto symbolDetails = a.getSymbolType(3).returnVal();
-         CHECK(symbolDetails.createCounter == 0);
-         CHECK(symbolDetails.activePrice.value == cost);
+         auto symbolDetails = a.getSymType(3).returnVal();
+         CHECK(symbolDetails.create_counter == 0);
+         CHECK(symbolDetails.active_price.value == cost);
 
          // If per day target is updated, unit test needs to be updated
-         CHECK(SymbolPricing::targetNrSymbolsPerDay == symbolDetails.targetCreatedPerDay);
+         CHECK(SymbolPricing::targetNrSymbolsPerDay == symbolDetails.target_created_per_day);
 
          alice.to<Tokens>().credit(sysToken, Symbol::service, 24 * cost, memo);
 
@@ -238,17 +238,17 @@ SCENARIO("Measuring price increases")
             costConstant = (a.getPrice(3).returnVal() == cost);
          }
          CHECK(costConstant);
-         CHECK(numSymbols == a.getSymbolType(3).returnVal().createCounter);
+         CHECK(numSymbols == a.getSymType(3).returnVal().create_counter);
 
          AND_THEN("The price for the first create that exceeds the desired rate is higher")
          {
             alice.to<Tokens>().credit(sysToken, Symbol::service, cost, memo);
 
             // Create the 25th symbol within 24 hours, causing the price to increase
-            CHECK(a.getSymbolType(3).returnVal().createCounter == 24);
+            CHECK(a.getSymType(3).returnVal().create_counter == 24);
             auto create = a.create(tickers[24], cost);
             CHECK(create.succeeded());
-            CHECK(a.getSymbolType(3).returnVal().createCounter == 0);
+            CHECK(a.getSymType(3).returnVal().create_counter == 0);
 
             auto nextPrice = incrementPrice(cost);
             CHECK(a.getPrice(3).returnVal() == nextPrice);
@@ -321,148 +321,6 @@ SCENARIO("Using symbol ownership NFT")
          {
             auto symbolRecord2 = a.getSymbol(symbolId).returnVal();
             CHECK(symbolRecord2 == symbolRecord);
-         }
-      }
-   }
-}
-
-SCENARIO("Buying and selling symbols")
-{
-   GIVEN("A chain with a system token")
-   {
-      DefaultTestChain t;
-
-      // Add a couple accounts
-      auto alice = t.from(t.addAccount("alice"_a));
-      auto bob   = t.from(t.addAccount("bob"_a));
-
-      // Fund Alice and Bob with the system token
-      auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
-      auto precision   = sysIssuer.getToken(sysToken).returnVal().precision;
-      auto userBalance = q(1'000'000, precision);
-
-      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, 2 * userBalance.value, memo);
-      sysIssuer.credit(sysToken, alice, userBalance, memo);
-      sysIssuer.credit(sysToken, bob, userBalance, memo);
-
-      // Create system symbol
-      auto sysSymbol  = SID{"sys"};
-      auto numChars   = sysSymbol.str().size();
-      auto symbolCost = alice.to<Symbol>().getPrice(numChars).returnVal();
-      alice.to<Tokens>().credit(sysToken, Symbol::service, symbolCost, memo);
-      alice.to<Symbol>().create(sysSymbol, symbolCost);
-
-      // Map system symbol to system token
-      auto sysSymbolNft = alice.to<Symbol>().getSymbol(sysSymbol).returnVal().ownerNft;
-      alice.to<Nft>().credit(sysSymbolNft, Tokens::service, memo);
-      alice.to<Tokens>().mapSymbol(sysToken, sysSymbol);
-
-      WHEN("Alice creates a symbol")
-      {
-         auto symbol = SID{"abc"};
-         alice.to<Tokens>().credit(sysToken, Symbol::service, symbolCost, memo);
-         alice.to<Symbol>().create(symbol, symbolCost);
-
-         auto symbolNft        = alice.to<Symbol>().getSymbol(symbol).returnVal().ownerNft;
-         auto initialNftRecord = alice.to<Nft>().getNft(symbolNft).returnVal();
-
-         THEN("Alice can list it for sale")
-         {
-            alice.to<Nft>().credit(symbolNft, Symbol::service, memo);
-            CHECK(alice.to<Symbol>().listSymbol(symbol, q(1'000, precision)).succeeded());
-
-            AND_THEN("Alice no longer owns the symbol")
-            {
-               auto newNftRecord = alice.to<Nft>().getNft(symbolNft).returnVal();
-               CHECK(newNftRecord != initialNftRecord);
-
-               // Make sure only owner changed
-               newNftRecord.owner = alice.id;
-               CHECK((newNftRecord.id == initialNftRecord.id &&          //
-                      newNftRecord.issuer == initialNftRecord.issuer &&  //
-                      newNftRecord.owner == initialNftRecord.owner));
-               //CHECK(newNftRecord == initialNftRecord);
-               // Todo - Use simple comparison if/when eventHeadId is removed from the Nft Record.
-            }
-         }
-         THEN("Alice cannot list it below the floor price")
-         {
-            auto listPrice = q(0, precision);
-            CHECK(alice.to<Symbol>().listSymbol(symbol, listPrice).failed(priceTooLow));
-         }
-         WHEN("The symbol is mapped to a token")
-         {
-            auto newToken = alice.to<Tokens>().create(8, userBalance).returnVal();
-            alice.to<Tokens>().mint(newToken, userBalance, memo);
-            auto newTokenId = alice.to<Tokens>().getToken(newToken).returnVal().id;
-
-            alice.to<Tokens>().mapSymbol(newTokenId, symbol);
-            THEN("The symbol cannot be sold")
-            {
-               CHECK(alice.to<Symbol>()
-                         .listSymbol(symbol, q(1'000, precision))
-                         .failed(creditSymbolRequired));
-            }
-         }
-         WHEN("The symbol is for sale")
-         {
-            auto listPrice = q(1'000, precision);
-            alice.to<Nft>().credit(symbolNft, Symbol::service, memo);
-            alice.to<Symbol>().listSymbol(symbol, listPrice);
-
-            THEN("Alice cannot buy the symbol")
-            {
-               CHECK(alice.to<Symbol>().buySymbol(symbol).failed(buyerIsSeller));
-            }
-
-            THEN("Bob cannot unlist the symbol")
-            {
-               CHECK(bob.to<Symbol>().unlistSymbol(symbol).failed(missingRequiredAuth));
-            }
-            THEN("Alice can unlist the symbol")
-            {
-               CHECK(alice.to<Symbol>().unlistSymbol(symbol).succeeded());
-            }
-            THEN("Bob cannot buy the symbol for less than the list price")
-            {
-               bob.to<Tokens>().credit(sysToken, Symbol::service, listPrice.value / 2, memo);
-               auto buySymbol = bob.to<Symbol>().buySymbol(symbol);
-               CHECK(buySymbol.failed(insufficientBalance));
-            }
-            THEN("Bob can buy the symbol")
-            {
-               bob.to<Tokens>().credit(sysToken, Symbol::service, listPrice, memo);
-               CHECK(bob.to<Symbol>().buySymbol(symbol).succeeded());
-            }
-            AND_WHEN("Bob buys the symbol")
-            {
-               bob.to<Tokens>().credit(sysToken, Symbol::service, listPrice, memo);
-               bob.to<Symbol>().buySymbol(symbol);
-
-               THEN("Bob owns the symbol")
-               {
-                  auto newNftRecord = bob.to<Nft>().getNft(symbolNft).returnVal();
-                  CHECK(newNftRecord.owner == bob.id);
-
-                  newNftRecord.owner = initialNftRecord.owner;
-                  CHECK((newNftRecord.id == initialNftRecord.id &&          //
-                         newNftRecord.issuer == initialNftRecord.issuer &&  //
-                         newNftRecord.owner == initialNftRecord.owner));
-                  //CHECK(newNftRecord == initialNftRecord);
-                  // Todo - Use simple comparison if/when eventHeadId is removed from the Nft Record.
-               }
-               THEN("The symbol is no longer for sale")
-               {
-                  auto symbolRecord = alice.to<Symbol>().getSymbol(symbol).returnVal();
-                  CHECK(symbolRecord.saleDetails.salePrice == q(0, precision));
-               }
-               THEN("Bob can reslist the symbol")
-               {
-                  bob.to<Nft>().credit(symbolNft, Symbol::service, memo);
-                  bob.to<Symbol>().listSymbol(symbol, listPrice);
-               }
-            }
          }
       }
    }

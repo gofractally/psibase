@@ -239,25 +239,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn create(new_symbol: AccountNumber, max_debit: Quantity) {
-        Symbol::add(new_symbol, max_debit)
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn listSymbol(symbol: AccountNumber, price: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn buySymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn unlistSymbol(symbol: AccountNumber) {
-        unimplemented!()
+        Symbol::add(new_symbol, max_debit);
     }
 
     #[action]
