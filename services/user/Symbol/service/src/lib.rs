@@ -2,7 +2,6 @@
 pub mod tables {
     use async_graphql::SimpleObject;
 
-    use psibase::services;
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::transact::Wrapper as TransactSvc;
@@ -58,7 +57,7 @@ pub mod tables {
         pub active_price: Quantity,
 
         pub create_counter: u16,
-        pub price_updated: TimePointSec,
+        pub last_price_update_time: TimePointSec,
     }
 
     impl SymbolLength {
@@ -72,23 +71,34 @@ pub mod tables {
 
         pub fn update_price(&mut self) {
             let now = TransactSvc::call().currentBlock().time.seconds();
-            let seconds_elasped = (now.seconds - self.price_updated.seconds) as u32;
+            let seconds_elasped = (now.seconds - self.last_price_update_time.seconds) as u32;
 
             let days_elasped = seconds_elasped / 86400;
-            let seconds_remainder = seconds_elasped % 86400;
 
-            // Either decrease the price due to time + lack of demand;
             if days_elasped > 0 {
+                let seconds_remainder = seconds_elasped % 86400;
                 self.create_counter = 0;
-                self.price_updated = (now.seconds - seconds_remainder as i64).into();
+                self.last_price_update_time = (now.seconds - seconds_remainder as i64).into();
 
                 let below_target = self.create_counter < self.target_created_per_day;
                 if below_target {
-                    let decrease_percent = ConfigRow::populate_default();
+                    let percent = (100 - ConfigRow::get_assert().decrease_percent) as u64;
+                    let mut new_price = self.active_price.value;
+                    for _ in 0..days_elasped {
+                        new_price = new_price * percent / (100 as u64)
+                    }
+                    self.active_price = new_price.into();
                 }
             }
 
-            // Increase the price due to demand;
+            if self.create_counter > self.target_created_per_day {
+                let percent = (100 + ConfigRow::get_assert().increase_percent) as u64;
+                self.active_price = (self.active_price.value * percent / 100).into();
+                self.create_counter = 0;
+                self.last_price_update_time = now;
+            }
+
+            self.save();
         }
 
         pub fn populate_default() {
@@ -97,23 +107,14 @@ pub mod tables {
             for symbol_length in 3u8..7 {
                 let symbol = Self {
                     symbol_length,
-                    active_price: 1000000.into(),
-                    floor_price: 100000.into(),
-                    target_created_per_day: (symbol_length * 5) as u16,
+                    active_price: 10000000.into(),
+                    floor_price: 1000000.into(),
+                    target_created_per_day: 24,
                     create_counter: 0,
-                    price_updated: now,
+                    last_price_update_time: now,
                 };
                 symbol.save();
             }
-        }
-
-        pub fn new_purchase(&mut self) {
-            // handle the new purchase
-
-            self.create_counter = self.create_counter + 1;
-            self.price_updated = TransactSvc::call().currentBlock().time.seconds();
-            // increase the counter of the symbol record
-            // set the last price update record
         }
 
         fn save(&self) {
@@ -135,7 +136,7 @@ pub mod tables {
         }
 
         pub fn get_assert(symbol: AccountNumber) -> Self {
-            check_some(Self::get(symbol), "symbol does not exist")
+            check_some(Self::get(symbol), "Symbol does not exist")
         }
 
         pub fn length(&self) -> SymbolLength {
@@ -147,24 +148,42 @@ pub mod tables {
         }
 
         pub fn add(symbol: AccountNumber, max_debit: Quantity) {
-            check_none(Symbol::get(symbol), "symbol already exists");
+            check_none(Symbol::get(symbol), "Symbol already exists");
+            let symbol_length = symbol.to_string().chars().count();
+            check(
+                symbol_length >= 3
+                    && symbol_length <= 7
+                    && symbol.to_string().chars().all(|c| c.is_alphabetic()),
+                "Symbol may only contain 3 to 7 lowercase alphabetic characters",
+            );
 
             let symbol_record = Self {
                 symbol,
-                nft_id: Nft::call_from(SERVICE).mint(),
+                nft_id: Nft::call().mint(),
             };
             SymbolTable::new().put(&symbol_record).unwrap();
 
             let mut symbol_length = symbol_record.length();
-            symbol_length.new_purchase();
+            symbol_length.create_counter = symbol_length.create_counter + 1;
+            symbol_length.save();
 
             let sender = get_sender();
-            let is_self = sender != SERVICE;
-            if !is_self {
+            let is_self = sender == SERVICE;
+            if is_self {
+                crate::Wrapper::emit()
+                    .history()
+                    .symCreated(symbol, sender, 0.into());
+            } else {
                 let cost = symbol_length.active_price;
-                check(cost <= max_debit, "Insufficient balance");
-                Tokens::call_from(SERVICE).debit(
-                    services::tokens::SYS_TOKEN,
+                check(
+                    cost <= max_debit,
+                    &format!(
+                        "Insufficient balance, the sender is {}, the service is {}",
+                        sender, SERVICE
+                    ),
+                );
+                Tokens::call().debit(
+                    psibase::services::tokens::SYS_TOKEN,
                     sender,
                     cost,
                     format!("Purchase of {}", symbol_record.symbol)
@@ -172,14 +191,15 @@ pub mod tables {
                         .unwrap(),
                 );
 
-                Nft::call_from(SERVICE).credit(
+                Nft::call().credit(
                     symbol_record.nft_id,
                     sender,
                     format!("Symbol owner NFT: {}", symbol_record.symbol),
-                )
+                );
+                crate::Wrapper::emit()
+                    .history()
+                    .symCreated(symbol, sender, cost);
             }
-
-            // make the symbol_created event
         }
     }
 }
@@ -187,6 +207,7 @@ pub mod tables {
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
     use crate::tables::{ConfigRow, Symbol, SymbolLength};
+    use psibase::services::symbol::SymbolLengthRecord;
     use psibase::*;
 
     use services::tokens::Quantity;
@@ -228,7 +249,7 @@ pub mod service {
         // Populate default settings for each token symbol length
         SymbolLength::populate_default();
 
-        Wrapper::call().create("psi".into(), 1.into())
+        Symbol::add("psi".into(), 0.into());
     }
 
     #[pre_action(exclude(init))]
@@ -245,29 +266,39 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn exists(symbol: AccountNumber) -> bool {
-        unimplemented!()
+        Symbol::get(symbol).is_some()
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn getSymbol(symbol: AccountNumber) -> Symbol {
-        unimplemented!()
+        Symbol::get_assert(symbol)
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn getSymbolType(numChars: u8) -> SymbolLength {
-        unimplemented!()
+    fn getPrice(numChars: u8) -> Quantity {
+        updatePrices();
+        SymbolLength::get_assert(numChars).active_price
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSymType(numChars: u8) -> SymbolLength {
+        updatePrices();
+        SymbolLength::get_assert(numChars)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn updatePrices() {
-        unimplemented!()
+        for num in 3u8..7 {
+            SymbolLength::get_assert(num).update_price();
+        }
     }
 
     #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
+    fn symCreated(symbol: AccountNumber, owner: AccountNumber, cost: Quantity) {}
 }
 
 #[cfg(test)]
