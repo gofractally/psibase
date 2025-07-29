@@ -237,8 +237,11 @@ pub mod service {
             "expected matching ID",
         );
 
+        let system_token_nft_id = Tokens::call_from(Wrapper::SERVICE)
+            .getToken(system_token_id)
+            .nft_id;
         Nft::call_from(Wrapper::SERVICE).debit(
-            Tokens::call().getToken(system_token_id).nft_id,
+            system_token_nft_id,
             "Taking ownership of system token".into(),
         );
 
