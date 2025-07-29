@@ -24,10 +24,12 @@ pub struct SymbolRecord {
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolLengthRecord {
-    pub symbolLength: u8,
-    pub targetCreatedPerDay: u8,
-    pub floorPrice: Quantity,
-    pub activePrice: Quantity,
+    pub symbol_length: u8,
+    pub target_created_per_day: u8,
+    pub floor_price: Quantity,
+    pub active_price: Quantity,
+    pub create_counter: u16,
+    pub last_price_update_time: crate::TimePointSec,
 }
 
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
