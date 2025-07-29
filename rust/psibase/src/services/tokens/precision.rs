@@ -6,7 +6,7 @@ use crate::{serialize_as_str, services::tokens::TokensError};
 
 #[derive(PartialEq, Debug, Copy, Clone, Pack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct Precision(pub u8);
+pub struct Precision(u8);
 
 impl Precision {
     pub fn new(value: u8) -> Result<Self, TokensError> {
