@@ -147,7 +147,7 @@ pub mod tables {
             )
         }
 
-        pub fn add(symbol: AccountNumber, max_debit: Quantity) {
+        pub fn add(symbol: AccountNumber, max_debit: Quantity) -> SymbolRecord {
             check_none(SymbolRecord::get(symbol), "Symbol already exists");
             let symbol_length = symbol.to_string().chars().count();
             check(
@@ -200,11 +200,12 @@ pub mod tables {
                     .history()
                     .symCreated(symbol, sender, cost);
             }
+            symbol_record
         }
     }
 }
 
-#[psibase::service(name = "symbol", tables = "tables")]
+#[psibase::service(name = "symbol", tables = "tables", recursive = true)]
 pub mod service {
     use crate::tables::{ConfigRow, SymbolLengthRecord, SymbolRecord};
     use psibase::*;
@@ -222,7 +223,7 @@ pub mod service {
         }
         ConfigRow::populate_default();
 
-        // Configure manual debit
+        // Enable manual debit on Tokens and NFT
         Tokens::call_from(Wrapper::SERVICE).setUserConf(services::tokens::MANUAL_DEBIT, true);
         Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
 
@@ -235,8 +236,11 @@ pub mod service {
             system_token_id == services::tokens::SYS_TOKEN,
             "expected matching ID",
         );
-        let nft_id = Tokens::call().getToken(system_token_id).nft_id;
-        Nft::call_from(Wrapper::SERVICE).debit(nft_id, "Taking ownership of system token".into());
+
+        Nft::call_from(Wrapper::SERVICE).debit(
+            Tokens::call().getToken(system_token_id).nft_id,
+            "Taking ownership of system token".into(),
+        );
 
         // Make system token untransferable
         Tokens::call_from(Wrapper::SERVICE).setTokenConf(
@@ -248,7 +252,15 @@ pub mod service {
         // Populate default settings for each token symbol length
         SymbolLengthRecord::populate_default();
 
-        SymbolRecord::add("psi".into(), 0.into());
+        // Map PSI as the system token symbol
+        let symbol = "psi".into();
+        let symbol_record = SymbolRecord::add(symbol, 0.into());
+        Nft::call_from(Wrapper::SERVICE).credit(
+            symbol_record.nft_id,
+            psibase::services::tokens::SERVICE,
+            "System token symbol ownership nft".into(),
+        );
+        Tokens::call_from(Wrapper::SERVICE).mapSymbol(system_token_id, symbol)
     }
 
     #[pre_action(exclude(init))]
