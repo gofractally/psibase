@@ -58,7 +58,7 @@ void Symbol::init()
 
    // Configure manualDebit for self on Token and NFT
    to<Nft>().setUserConf("manualDebit"_m, true);
-   to<Tokens>().setUserConf(Tokens::untransferable, true);
+   to<Tokens>().setUserConf(Tokens::manualDebit, true);
 
    // Create system token
    constexpr auto precision = Precision{4};
