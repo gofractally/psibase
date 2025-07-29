@@ -3,7 +3,7 @@ use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
-use crate::services::tokens::{TokensError, Precision};
+use crate::services::tokens::{Precision, TokensError};
 
 #[derive(
     Debug,
@@ -50,15 +50,15 @@ impl Quantity {
                     .map_err(|_| TokensError::InvalidNumber)?;
 
                 let integer_value = integer_value
-                    .checked_mul(10u64.pow(precision.0 as u32))
+                    .checked_mul(10u64.pow(precision.value() as u32))
                     .ok_or(TokensError::Overflow)?;
 
                 let fraction_len = fraction_part.len() as u8;
 
-                if fraction_len > precision.0 {
+                if fraction_len > precision.value() {
                     return Err(TokensError::PrecisionOverflow);
                 }
-                let remaining_pow = precision.0 - fraction_len;
+                let remaining_pow = precision.value() - fraction_len;
 
                 let fraction_value: u64 = fraction_part
                     .parse()
@@ -73,7 +73,7 @@ impl Quantity {
             None => {
                 let num_value: u64 = amount.parse().map_err(|_| TokensError::InvalidNumber)?;
                 num_value
-                    .checked_mul(10u64.pow(precision.0 as u32))
+                    .checked_mul(10u64.pow(precision.value() as u32))
                     .ok_or(TokensError::Overflow)?
             }
         };

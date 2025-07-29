@@ -1,10 +1,12 @@
 use std::str::FromStr;
 
 use fracpack::{Pack, ToSchema, Unpack};
+use serde::{Deserialize, Serialize};
 
-use crate::{serialize_as_str, services::tokens::TokensError};
+use crate::services::tokens::TokensError;
+use async_graphql::scalar;
 
-#[derive(PartialEq, Debug, Copy, Clone, Pack, ToSchema)]
+#[derive(PartialEq, Debug, Copy, Clone, Pack, ToSchema, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Precision(u8);
 
@@ -15,6 +17,10 @@ impl Precision {
         } else {
             Err(TokensError::PrecisionOverflow)
         }
+    }
+
+    pub fn value(&self) -> u8 {
+        self.0
     }
 }
 
@@ -57,4 +63,14 @@ impl<'a> Unpack<'a> for Precision {
     }
 }
 
-serialize_as_str!(Precision, "precision");
+impl<'de> Deserialize<'de> for Precision {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let number: u8 = Deserialize::deserialize(deserializer)?;
+        Precision::new(number).map_err(|e| serde::de::Error::custom(e.to_string()))
+    }
+}
+
+scalar!(Precision);

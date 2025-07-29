@@ -285,7 +285,7 @@ impl Queries for TokensPlugin {
                 .symbol
                 .map(|symbol| symbol.to_string())
                 .unwrap_or("".to_string()),
-            precision: token.precision.0,
+            precision: token.precision.value(),
             current_supply: token.current_supply.to_string(),
             max_issued_supply: token.max_issued_supply.to_string(),
         })

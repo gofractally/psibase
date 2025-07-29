@@ -818,7 +818,7 @@ TEST_CASE("GraphQL Queries")
            R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"});
    CHECK(
        std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
-       R"({"data":{"userBalances":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":"4","balance":"1000000.0000"}}]}}})");
+       R"({"data":{"userBalances":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
@@ -828,7 +828,7 @@ TEST_CASE("GraphQL Queries")
            R"( query { userCredits(user: "alice") { edges { node { symbol tokenId precision balance debitor } } } } )"});
    CHECK(
        std::string(userCredits.body.begin(), userCredits.body.end()) ==
-       R"({"data":{"userCredits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":"4","balance":"1000.0000","debitor":"bob"}}]}}})");
+       R"({"data":{"userCredits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","debitor":"bob"}}]}}})");
 
    auto userDebits = t.post(
        Tokens::service, "/graphql",
@@ -836,7 +836,7 @@ TEST_CASE("GraphQL Queries")
            R"( query { userDebits(user: "bob") { edges { node { symbol tokenId precision balance creditor } } } } )"});
    CHECK(
        std::string(userDebits.body.begin(), userDebits.body.end()) ==
-       R"({"data":{"userDebits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":"4","balance":"1000.0000","creditor":"alice"}}]}}})");
+       R"({"data":{"userDebits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice"}}]}}})");
 
    auto userTokens = t.post(
        Tokens::service, "/graphql",
@@ -844,5 +844,5 @@ TEST_CASE("GraphQL Queries")
            R"( query { userTokens(user: "symbol") { id precision issuedSupply maxIssuedSupply symbol } } )"});
    CHECK(
        std::string(userTokens.body.begin(), userTokens.body.end()) ==
-       R"({"data":{"userTokens":[{"id":1,"precision":"4","issuedSupply":"1000000.0000","maxIssuedSupply":"1000000000.0000","symbol":"psi"}]}})");
+       R"({"data":{"userTokens":[{"id":1,"precision":4,"issuedSupply":"1000000.0000","maxIssuedSupply":"1000000000.0000","symbol":"psi"}]}})");
 }
