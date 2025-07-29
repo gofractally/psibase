@@ -49,7 +49,9 @@ fn identify_token_type(token_id: String) -> Result<TokenType, Error> {
 fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, Error> {
     match identify_token_type(token_id)? {
         TokenType::Number(number) => Ok(number),
-        TokenType::Symbol(_str) => Ok(1),
+        TokenType::Symbol(_str) => {
+            Err(ErrorType::NotImplemented("Symbol to token number not ready".into()).into())
+        }
     }
 }
 
@@ -283,7 +285,7 @@ impl Queries for TokensPlugin {
                 .symbol
                 .map(|symbol| symbol.to_string())
                 .unwrap_or("".to_string()),
-            precision: token.precision.0,
+            precision: token.precision.value(),
             current_supply: token.current_supply.to_string(),
             max_issued_supply: token.max_issued_supply.to_string(),
         })
