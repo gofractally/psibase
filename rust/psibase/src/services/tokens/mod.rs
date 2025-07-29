@@ -39,10 +39,10 @@ pub struct TokenRecord {
     pub nft_id: u32,
     pub settings_value: u8,
     pub precision: Precision,
-    pub current_supply: Quantity,
+    pub issued_supply: Quantity,
     pub burned_supply: Quantity,
     pub max_issued_supply: Quantity,
-    pub symbol: AccountNumber,
+    pub symbol: Option<AccountNumber>,
 }
 
 #[derive(
