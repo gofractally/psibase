@@ -14,20 +14,9 @@ pub type SID = AccountNumber;
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct SaleDetails {
-    pub salePrice: Quantity,
-
-    pub seller: AccountNumber,
-}
-
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolRecord {
     pub symbolId: SID,
     pub ownerNft: NID,
-    pub saleDetails: SaleDetails,
 }
 
 #[derive(

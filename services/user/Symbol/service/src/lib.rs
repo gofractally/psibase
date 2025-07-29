@@ -73,9 +73,9 @@ pub mod tables {
             let now = TransactSvc::call().currentBlock().time.seconds();
             let seconds_elasped = (now.seconds - self.last_price_update_time.seconds) as u32;
 
-            let days_elasped = seconds_elasped / 86400;
+            let days_elapsed = seconds_elasped / 86400;
 
-            if days_elasped > 0 {
+            if days_elapsed > 0 {
                 let seconds_remainder = seconds_elasped % 86400;
                 self.create_counter = 0;
                 self.last_price_update_time = (now.seconds - seconds_remainder as i64).into();
@@ -83,10 +83,10 @@ pub mod tables {
                 let below_target = self.create_counter < self.target_created_per_day;
                 if below_target {
                     let percent = (100 - ConfigRow::get_assert().decrease_percent) as u64;
-                    let mut new_price = self.active_price.value;
-                    for _ in 0..days_elasped {
-                        new_price = new_price * percent / (100 as u64)
-                    }
+                    let new_price = self.active_price.value * percent.pow(days_elapsed)
+                        / 100u64.pow(days_elapsed);
+                    let new_price = new_price.max(self.floor_price.value);
+
                     self.active_price = new_price.into();
                 }
             }
@@ -207,7 +207,6 @@ pub mod tables {
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
     use crate::tables::{ConfigRow, Symbol, SymbolLength};
-    use psibase::services::symbol::SymbolLengthRecord;
     use psibase::*;
 
     use services::tokens::Quantity;
@@ -260,6 +259,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn create(new_symbol: AccountNumber, max_debit: Quantity) {
+        updatePrices();
         Symbol::add(new_symbol, max_debit);
     }
 

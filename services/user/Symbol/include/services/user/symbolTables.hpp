@@ -37,22 +37,13 @@ namespace UserService
    struct PriceAdjustmentRecord
    {
       uint8_t key;
-      uint8_t increasePct;
-      uint8_t decreasePct;
+      uint8_t increase_percent;
+      uint8_t decrease_percent;
    };
-   PSIO_REFLECT(PriceAdjustmentRecord, key, increasePct, decreasePct);
+   PSIO_REFLECT(PriceAdjustmentRecord, key, increase_percent, decrease_percent);
    using PriceAdjustmentSingleton =
        psibase::Table<PriceAdjustmentRecord, &PriceAdjustmentRecord::key>;
    PSIO_REFLECT_TYPENAME(PriceAdjustmentSingleton)
-
-   struct SaleDetails
-   {
-      Quantity               salePrice;  // 0 == NFS
-      psibase::AccountNumber seller;
-
-      friend std::strong_ordering operator<=>(const SaleDetails&, const SaleDetails&) = default;
-   };
-   PSIO_REFLECT(SaleDetails, salePrice, seller);
 
    struct SymbolRecord
    {
