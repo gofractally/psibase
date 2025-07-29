@@ -36,9 +36,7 @@ impl FromStr for Precision {
     type Err = TokensError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(
-            s.parse::<u8>().map_err(|_| TokensError::InvalidNumber)?,
-        ))
+        Self::new(s.parse::<u8>().map_err(|_| TokensError::InvalidNumber)?)
     }
 }
 
