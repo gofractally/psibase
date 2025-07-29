@@ -31,7 +31,7 @@ set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_
 
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
-    find_library(LIBSOFTHSM2 libsofthsm2.so)
+    find_library(LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
     if(LIBSOFTHSM2)
         set(LIBSOFTHSM2_ARG --libsofthsm2=${LIBSOFTHSM2})
     else()
