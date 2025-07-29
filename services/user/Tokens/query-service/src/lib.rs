@@ -7,12 +7,23 @@ mod service {
 
     use psibase::*;
     use tokens::{
-        helpers::token_id_to_number,
+        helpers::{identify_token_type, TokenType},
         tables::tables::{
             Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
             UserConfig, UserConfigTable,
         },
     };
+
+    pub fn token_id_to_number(token_id: String) -> u32 {
+        match identify_token_type(token_id) {
+            TokenType::Number(num) => num,
+            TokenType::Symbol(account) => {
+                Token::get_by_symbol(account)
+                    .expect("token by symbol not found")
+                    .id
+            }
+        }
+    }
 
     struct Query;
 

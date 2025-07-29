@@ -17,6 +17,7 @@ mod errors;
 use errors::ErrorType;
 use psibase::services::tokens::quantity::Quantity;
 use psibase::AccountNumber;
+use tokens::helpers::{identify_token_type, TokenType};
 
 pub mod query {
     pub mod fetch_token;
@@ -24,30 +25,8 @@ pub mod query {
 
 struct TokensPlugin;
 
-enum TokenType {
-    Number(u32),
-    Symbol(AccountNumber),
-}
-
-fn identify_token_type(token_id: String) -> Result<TokenType, Error> {
-    use TokenType::{Number, Symbol};
-
-    let first_char = token_id
-        .chars()
-        .next()
-        .ok_or(ErrorType::InvalidTokenId("token id is empty".to_string()))?;
-
-    Ok(if first_char.is_ascii_digit() {
-        Number(token_id.parse::<u32>().map_err(|_| {
-            ErrorType::InvalidTokenId("failed to parse token_id to u32".to_string())
-        })?)
-    } else {
-        Symbol(AccountNumber::from_str(token_id.as_str()).unwrap())
-    })
-}
-
 fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, Error> {
-    match identify_token_type(token_id)? {
+    match identify_token_type(token_id) {
         TokenType::Number(number) => Ok(number),
         TokenType::Symbol(_str) => {
             Err(ErrorType::NotImplemented("Symbol to token number not ready".into()).into())

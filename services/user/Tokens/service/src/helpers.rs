@@ -5,17 +5,6 @@ pub enum TokenType {
     Symbol(AccountNumber),
 }
 
-pub fn token_id_to_number(token_id: String) -> u32 {
-    match identify_token_type(token_id) {
-        TokenType::Number(num) => num,
-        TokenType::Symbol(account) => {
-            crate::tables::tables::Token::get_by_symbol(account)
-                .expect("token by symbol not found")
-                .id
-        }
-    }
-}
-
 pub fn identify_token_type(token_id: String) -> TokenType {
     let first_char = token_id.chars().next().unwrap();
 
