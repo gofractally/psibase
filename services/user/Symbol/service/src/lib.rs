@@ -47,9 +47,9 @@ pub mod tables {
         }
     }
 
-    #[table(name = "SymbolLengthTable", index = 1)]
+    #[table(name = "SymbolLengthRecordTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct SymbolLength {
+    pub struct SymbolLengthRecord {
         #[primary_key]
         pub symbol_length: u8,
         pub target_created_per_day: u16,
@@ -60,9 +60,9 @@ pub mod tables {
         pub last_price_update_time: TimePointSec,
     }
 
-    impl SymbolLength {
+    impl SymbolLengthRecord {
         pub fn get(length: u8) -> Option<Self> {
-            SymbolLengthTable::new().get_index_pk().get(&length)
+            SymbolLengthRecordTable::new().get_index_pk().get(&length)
         }
 
         pub fn get_assert(length: u8) -> Self {
@@ -118,19 +118,19 @@ pub mod tables {
         }
 
         fn save(&self) {
-            SymbolLengthTable::new().put(&self).unwrap();
+            SymbolLengthRecordTable::new().put(&self).unwrap();
         }
     }
 
     #[table(name = "SymbolTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Symbol {
+    pub struct SymbolRecord {
         #[primary_key]
         pub symbol: psibase::AccountNumber,
         pub nft_id: NID,
     }
 
-    impl Symbol {
+    impl SymbolRecord {
         pub fn get(symbol: AccountNumber) -> Option<Self> {
             SymbolTable::new().get_index_pk().get(&symbol)
         }
@@ -139,16 +139,16 @@ pub mod tables {
             check_some(Self::get(symbol), "Symbol does not exist")
         }
 
-        pub fn length(&self) -> SymbolLength {
+        pub fn length(&self) -> SymbolLengthRecord {
             let length = self.symbol.to_string().chars().count();
             check_some(
-                SymbolLength::get(length.try_into().unwrap()),
+                SymbolLengthRecord::get(length.try_into().unwrap()),
                 "symbol of this length not for sale",
             )
         }
 
         pub fn add(symbol: AccountNumber, max_debit: Quantity) {
-            check_none(Symbol::get(symbol), "Symbol already exists");
+            check_none(SymbolRecord::get(symbol), "Symbol already exists");
             let symbol_length = symbol.to_string().chars().count();
             check(
                 symbol_length >= 3
@@ -206,7 +206,7 @@ pub mod tables {
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{ConfigRow, Symbol, SymbolLength};
+    use crate::tables::{ConfigRow, SymbolLengthRecord, SymbolRecord};
     use psibase::*;
 
     use services::tokens::Quantity;
@@ -246,9 +246,9 @@ pub mod service {
         );
 
         // Populate default settings for each token symbol length
-        SymbolLength::populate_default();
+        SymbolLengthRecord::populate_default();
 
-        Symbol::add("psi".into(), 0.into());
+        SymbolRecord::add("psi".into(), 0.into());
     }
 
     #[pre_action(exclude(init))]
@@ -260,40 +260,40 @@ pub mod service {
     #[allow(non_snake_case)]
     fn create(new_symbol: AccountNumber, max_debit: Quantity) {
         updatePrices();
-        Symbol::add(new_symbol, max_debit);
+        SymbolRecord::add(new_symbol, max_debit);
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn exists(symbol: AccountNumber) -> bool {
-        Symbol::get(symbol).is_some()
+        SymbolRecord::get(symbol).is_some()
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn getSymbol(symbol: AccountNumber) -> Symbol {
-        Symbol::get_assert(symbol)
+    fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
+        SymbolRecord::get_assert(symbol)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn getPrice(numChars: u8) -> Quantity {
         updatePrices();
-        SymbolLength::get_assert(numChars).active_price
+        SymbolLengthRecord::get_assert(numChars).active_price
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn getSymType(numChars: u8) -> SymbolLength {
+    fn getSymType(numChars: u8) -> SymbolLengthRecord {
         updatePrices();
-        SymbolLength::get_assert(numChars)
+        SymbolLengthRecord::get_assert(numChars)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn updatePrices() {
         for num in 3u8..7 {
-            SymbolLength::get_assert(num).update_price();
+            SymbolLengthRecord::get_assert(num).update_price();
         }
     }
 
