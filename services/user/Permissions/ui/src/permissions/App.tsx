@@ -82,9 +82,6 @@ export const App = () => {
             {permissionRequest.description && (
                 <div className="my-4 rounded border border-yellow-200 bg-yellow-50 p-3">
                     <p className="whitespace-pre-line text-yellow-700">
-                        By authorizing, you trust{" "}
-                        <b>{permissionRequest.caller}</b> with these abilities:
-                        <br />
                         {permissionRequest.description}
                     </p>
                 </div>

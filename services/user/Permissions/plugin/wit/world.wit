@@ -10,12 +10,9 @@ interface types {
         /// * `6`: No one can call (except the callee app itself)
         level: u8,
 
-        /// A description that will be placed on the UI shown to the user, following the text,
-        /// "By authorizing, you trust <caller> with these abilities:"
-        ///
-        /// The description should naturally follow that preface. For example:
-        /// Good description: "- Bake a cake"
-        /// Bad description: "This will allow the caller to bake a cake."
+        /// A description that will be placed on the UI shown to the user. Intended to provide
+        ///   context that may help the user determine if they sufficiently trust the 
+        ///   requesting app. 
         description: string,
     }
 }
