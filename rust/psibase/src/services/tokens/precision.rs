@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use fracpack::{Pack, ToSchema, Unpack};
+use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
 use crate::services::tokens::TokensError;
@@ -51,14 +51,14 @@ impl<'a> Unpack<'a> for Precision {
 
     const VARIABLE_SIZE: bool = false;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-        u8::unpack(src, pos)?
+    fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
+        u8::unpack(src)?
             .try_into()
             .map_err(|_| fracpack::Error::BadScalar)
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        Self::unpack(src, pos)?;
+    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
+        Self::unpack(src)?;
         Ok(())
     }
 }

@@ -20,6 +20,7 @@ members = [
     "user/Packages/plugin",
     "user/Permissions/plugin",
     "user/Workshop/plugin",
+    "user/Config/plugin",
 ]
 resolver = "2"
 
