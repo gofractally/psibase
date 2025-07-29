@@ -1,4 +1,4 @@
-use fracpack::{Pack, ToSchema, Unpack};
+use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
 use std::fmt;
 use std::str::FromStr;
 
@@ -44,12 +44,12 @@ impl<'a> Unpack<'a> for Memo {
     const FIXED_SIZE: u32 = 4;
     const VARIABLE_SIZE: bool = true;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
-        Ok(Self::new(String::unpack(src, pos)?).map_err(|_| fracpack::Error::ExtraData)?)
+    fn unpack(src: &mut FracInputStream) -> fracpack::Result<Self> {
+        Ok(Self::new(String::unpack(src)?).map_err(|_| fracpack::Error::ExtraData)?)
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        let len = <&str>::unpack(src, pos)?.len();
+    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
+        let len = <&str>::unpack(src)?.len();
 
         if len <= 80 {
             Ok(())
