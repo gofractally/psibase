@@ -1,3 +1,4 @@
+pub mod helpers;
 pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
