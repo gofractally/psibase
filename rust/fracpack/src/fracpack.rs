@@ -56,6 +56,9 @@ use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 mod schema;
 pub use schema::*;
 
+mod nested;
+pub use nested::*;
+
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
@@ -71,6 +74,139 @@ custom_error! {pub Error
     ExpectedStringKey   = "Map keys must be strings",
 }
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Debug)]
+pub struct FracInputStream<'a> {
+    pub data: &'a [u8],
+    pub pos: u32,
+    pub has_unknown: bool,
+    pub known_end: bool,
+}
+
+impl<'a> FracInputStream<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        FracInputStream {
+            data,
+            pos: 0,
+            has_unknown: false,
+            known_end: true,
+        }
+    }
+
+    pub fn consume_trailing_optional(
+        &mut self,
+        fixed_pos: u32,
+        heap_pos: u32,
+        last_empty: bool,
+    ) -> Result<()> {
+        let mut fixed_stream = FracInputStream {
+            data: &self.data[0..heap_pos as usize],
+            pos: fixed_pos,
+            has_unknown: false,
+            known_end: true,
+        };
+        consume_trailing_optional(&mut fixed_stream, self, last_empty)
+    }
+
+    fn unpack_at<T: Unpack<'a>>(&self, pos: &mut u32) -> Result<T> {
+        assert!(!T::VARIABLE_SIZE);
+        let mut tmp = FracInputStream {
+            data: self.data,
+            pos: *pos,
+            has_unknown: false,
+            known_end: true,
+        };
+        let result = T::unpack(&mut tmp)?;
+        *pos = tmp.pos;
+        Ok(result)
+    }
+    fn verify_at<'b, T: Unpack<'b>>(&self, pos: &mut u32) -> Result<()> {
+        assert!(!T::VARIABLE_SIZE);
+        let mut tmp = FracInputStream {
+            data: self.data,
+            pos: *pos,
+            has_unknown: false,
+            known_end: true,
+        };
+        T::verify(&mut tmp)?;
+        *pos = tmp.pos;
+        Ok(())
+    }
+    pub fn advance(&mut self, len: u32) -> Result<u32> {
+        assert!(self.known_end);
+        let old_pos = self.pos;
+        let Some(pos) = self.pos.checked_add(len) else {
+            return Err(Error::ReadPastEnd);
+        };
+        if pos as usize > self.data.len() {
+            return Err(Error::ReadPastEnd);
+        }
+        self.pos = pos;
+        Ok(old_pos)
+    }
+    pub fn read_fixed(&mut self, len: u32) -> Result<Self> {
+        let old_pos = self.advance(len)?;
+        let result = FracInputStream {
+            data: &self.data[0..self.pos as usize],
+            pos: old_pos,
+            has_unknown: false,
+            known_end: true,
+        };
+        Ok(result)
+    }
+    pub(crate) fn set_pos(&mut self, pos: u32) -> Result<()> {
+        if self.known_end {
+            if self.pos != pos {
+                return Err(Error::BadOffset);
+            }
+        } else {
+            if self.pos > pos {
+                return Err(Error::BadOffset);
+            }
+            if pos > self.data.len() as u32 {
+                return Err(Error::BadOffset);
+            }
+            self.pos = pos;
+            self.known_end = true;
+        }
+        Ok(())
+    }
+    pub(crate) fn remaining(&self) -> u32 {
+        self.data.len() as u32 - self.pos
+    }
+    pub fn finish(&self) -> Result<()> {
+        if self.known_end {
+            if self.pos != self.data.len() as u32 {
+                return Err(Error::ExtraData);
+            }
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn consume_trailing_optional(
+    fixed_stream: &mut FracInputStream,
+    stream: &mut FracInputStream,
+    mut last_empty: bool,
+) -> Result<()> {
+    while fixed_stream.remaining() > 0 {
+        let orig_pos = fixed_stream.pos;
+        let offset = u32::unpack(fixed_stream)?;
+        last_empty = offset == 1;
+        if offset > 1 {
+            let Some(new_pos) = orig_pos.checked_add(offset) else {
+                return Err(Error::ReadPastEnd);
+            };
+            stream.set_pos(new_pos)?;
+            stream.known_end = false;
+        }
+        stream.has_unknown = true;
+    }
+    if last_empty {
+        return Err(Error::ExtraEmptyOptional);
+    }
+    Ok(())
+}
 
 /// Use this trait on generic functions instead of [Unpack] when
 /// the deserialized data may only be owned instead of borrowed from
@@ -203,7 +339,7 @@ pub trait Unpack<'a>: Sized {
     /// ```
     ///
     /// See [Pack::unpacked], which is often more convenient.
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self>;
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self>;
 
     /// Convert from fracpack format. Also verifies the integrity of the data.
     ///
@@ -219,22 +355,22 @@ pub trait Unpack<'a>: Sized {
     /// }
     /// ```
     fn unpacked(src: &'a [u8]) -> Result<Self> {
-        let mut pos = 0;
-        Self::unpack(src, &mut pos)
+        let mut stream = FracInputStream::new(src);
+        let result = Self::unpack(&mut stream)?;
+        stream.finish()?;
+        Ok(result)
     }
 
     /// Verify the integrity of fracpack data. You don't need to call this if
     /// using [Pack::unpack] since it verifies integrity during unpack.
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()>;
+    fn verify(src: &mut FracInputStream) -> Result<()>;
 
     /// Verify the integrity of fracpack data, plus make sure there is no
     /// leftover data after it.
-    fn verify_no_extra(src: &'a [u8]) -> Result<()> {
-        let mut pos = 0;
-        Self::verify(src, &mut pos)?;
-        if pos as usize != src.len() {
-            return Err(Error::ExtraData);
-        }
+    fn verify_no_extra(src: &[u8]) -> Result<()> {
+        let mut stream = FracInputStream::new(src);
+        Self::verify(&mut stream)?;
+        stream.finish()?;
         Ok(())
     }
 
@@ -244,66 +380,72 @@ pub trait Unpack<'a>: Sized {
     }
 
     #[doc(hidden)]
+    fn new_empty_optional() -> Result<Self> {
+        panic!("new_empty_optional must be implemented when IS_OPTIONAL == true");
+    }
+
+    #[doc(hidden)]
     fn embedded_variable_unpack(
-        src: &'a [u8],
+        src: &mut FracInputStream<'a>,
         fixed_pos: &mut u32,
-        heap_pos: &mut u32,
     ) -> Result<Self> {
         let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
+        let offset = src.unpack_at::<u32>(fixed_pos)?;
         if offset == 0 {
             return Self::new_empty_container();
         }
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
+        let Some(new_pos) = orig_pos.checked_add(offset) else {
+            return Err(Error::ReadPastEnd);
+        };
+        src.set_pos(new_pos)?;
+        if Self::new_empty_container().is_ok() {
+            if src.unpack_at::<u32>(&mut src.pos.clone())? == 0 {
+                return Err(Error::PtrEmptyList);
+            }
         }
-        Self::unpack(src, heap_pos)
+        Self::unpack(src)
     }
 
     #[doc(hidden)]
-    fn check_opt_embedded_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-        _not_trailing: bool,
-        _has_opt_bytes: bool,
-    ) -> Result<Self> {
-        Self::embedded_unpack(src, fixed_pos, heap_pos)
+    fn is_empty_optional(src: &FracInputStream, fixed_pos: &mut u32) -> Result<bool> {
+        Ok(Self::IS_OPTIONAL && src.unpack_at::<u32>(fixed_pos)? == 1)
     }
 
     #[doc(hidden)]
-    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
+    fn embedded_unpack(src: &mut FracInputStream<'a>, fixed_pos: &mut u32) -> Result<Self> {
         if Self::VARIABLE_SIZE {
-            Self::embedded_variable_unpack(src, fixed_pos, heap_pos)
+            Self::embedded_variable_unpack(src, fixed_pos)
         } else {
-            Self::unpack(src, fixed_pos)
+            src.unpack_at::<Self>(fixed_pos)
         }
     }
 
     #[doc(hidden)]
-    fn embedded_variable_verify(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-    ) -> Result<()> {
+    fn embedded_variable_verify(src: &mut FracInputStream, fixed_pos: &mut u32) -> Result<()> {
         let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
+        let offset = src.unpack_at::<u32>(fixed_pos)?;
         if offset == 0 {
-            let _ = Self::new_empty_container();
+            Self::new_empty_container()?;
             return Ok(());
         }
-        if *heap_pos as u64 != orig_pos as u64 + offset as u64 {
-            return Err(Error::BadOffset);
+        let Some(new_pos) = orig_pos.checked_add(offset) else {
+            return Err(Error::ReadPastEnd);
+        };
+        src.set_pos(new_pos)?;
+        if Self::new_empty_container().is_ok() {
+            if src.unpack_at::<u32>(&mut src.pos.clone())? == 0 {
+                return Err(Error::PtrEmptyList);
+            }
         }
-        Self::verify(src, heap_pos)
+        Self::verify(src)
     }
 
     #[doc(hidden)]
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
+    fn embedded_verify(src: &mut FracInputStream, fixed_pos: &mut u32) -> Result<()> {
         if Self::VARIABLE_SIZE {
-            Self::embedded_variable_verify(src, fixed_pos, heap_pos)
+            Self::embedded_variable_verify(src, fixed_pos)
         } else {
-            Self::verify(src, fixed_pos)
+            src.verify_at::<Self>(fixed_pos)
         }
     }
 }
@@ -355,15 +497,15 @@ impl Pack for bool {
 impl<'a> Unpack<'a> for bool {
     const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
     const VARIABLE_SIZE: bool = false;
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        match u8::unpack(src, pos)? {
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+        match u8::unpack(src)? {
             0 => Ok(false),
             1 => Ok(true),
             _ => Err(Error::BadScalar),
         }
     }
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        Self::unpack(src, pos)?;
+    fn verify(src: &mut FracInputStream) -> Result<()> {
+        Self::unpack(src)?;
         Ok(())
     }
 }
@@ -380,14 +522,16 @@ macro_rules! scalar_impl {
         impl<'a> Unpack<'a> for $t {
             const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
             const VARIABLE_SIZE: bool = false;
-            fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-                Ok(Self::from_le_bytes(read_u8_arr(src, pos)?.into()))
+            fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+                Ok(Self::from_le_bytes(
+                    read_u8_arr(src.data, &mut src.pos)?.into(),
+                ))
             }
-            fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                if (*pos as u64 + <Self as Unpack>::FIXED_SIZE as u64 > src.len() as u64) {
+            fn verify(src: &mut FracInputStream) -> Result<()> {
+                if (src.pos as u64 + <Self as Unpack>::FIXED_SIZE as u64 > src.data.len() as u64) {
                     Err(Error::ReadPastEnd)
                 } else {
-                    *pos += <Self as Unpack>::FIXED_SIZE;
+                    src.pos += <Self as Unpack>::FIXED_SIZE;
                     Ok(())
                 }
             }
@@ -444,50 +588,42 @@ macro_rules! unpack_ptr {
             const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
             const IS_OPTIONAL: bool = T::IS_OPTIONAL;
 
-            fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-                Ok(Self::new(<T>::unpack(src, pos)?))
+            fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+                Ok(Self::new(<T>::unpack(src)?))
             }
 
-            fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                <T>::verify(src, pos)
+            fn verify(src: &mut FracInputStream) -> Result<()> {
+                <T>::verify(src)
             }
 
             fn new_empty_container() -> Result<Self> {
                 Ok(Self::new(<T>::new_empty_container()?))
             }
 
-            fn embedded_variable_unpack(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: &mut u32,
-            ) -> Result<Self> {
-                Ok(Self::new(<T>::embedded_variable_unpack(
-                    src, fixed_pos, heap_pos,
-                )?))
+            fn new_empty_optional() -> Result<Self> {
+                Ok(Self::new(<T>::new_empty_optional()?))
             }
 
-            fn embedded_unpack(
-                src: &'a [u8],
+            fn embedded_variable_unpack(
+                src: &mut FracInputStream<'a>,
                 fixed_pos: &mut u32,
-                heap_pos: &mut u32,
             ) -> Result<Self> {
-                Ok(Self::new(<T>::embedded_unpack(src, fixed_pos, heap_pos)?))
+                Ok(Self::new(<T>::embedded_variable_unpack(src, fixed_pos)?))
+            }
+
+            fn embedded_unpack(src: &mut FracInputStream<'a>, fixed_pos: &mut u32) -> Result<Self> {
+                Ok(Self::new(<T>::embedded_unpack(src, fixed_pos)?))
             }
 
             fn embedded_variable_verify(
-                src: &'a [u8],
+                src: &mut FracInputStream,
                 fixed_pos: &mut u32,
-                heap_pos: &mut u32,
             ) -> Result<()> {
-                <T>::embedded_variable_verify(src, fixed_pos, heap_pos)
+                <T>::embedded_variable_verify(src, fixed_pos)
             }
 
-            fn embedded_verify(
-                src: &'a [u8],
-                fixed_pos: &mut u32,
-                heap_pos: &mut u32,
-            ) -> Result<()> {
-                <T>::embedded_verify(src, fixed_pos, heap_pos)
+            fn embedded_verify(src: &mut FracInputStream, fixed_pos: &mut u32) -> Result<()> {
+                <T>::embedded_verify(src, fixed_pos)
             }
         }
     };
@@ -556,63 +692,47 @@ impl<'a, T: Unpack<'a>> Unpack<'a> for Option<T> {
     const VARIABLE_SIZE: bool = true;
     const IS_OPTIONAL: bool = true;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let mut fixed_pos = *pos;
-        *pos += 4;
-        Self::embedded_unpack(src, &mut fixed_pos, pos)
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+        let mut fixed_pos = src.advance(Self::FIXED_SIZE)?;
+        Self::embedded_unpack(src, &mut fixed_pos)
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let mut fixed_pos = *pos;
-        *pos += 4;
-        Self::embedded_verify(src, &mut fixed_pos, pos)
+    fn verify(src: &mut FracInputStream) -> Result<()> {
+        let mut fixed_pos = src.advance(Self::FIXED_SIZE)?;
+        Self::embedded_verify(src, &mut fixed_pos)
     }
 
-    fn check_opt_embedded_unpack(
-        src: &'a [u8],
-        fixed_pos: &mut u32,
-        heap_pos: &mut u32,
-        not_trailing: bool,
-        has_opt_bytes: bool,
-    ) -> Result<Self> {
-        if not_trailing || has_opt_bytes {
-            Self::embedded_unpack(src, fixed_pos, heap_pos)
-        } else {
-            Ok(None)
-        }
+    fn new_empty_optional() -> Result<Self> {
+        Ok(None)
     }
 
-    fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
-        let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 1 {
+    fn embedded_unpack(src: &mut FracInputStream<'a>, fixed_pos: &mut u32) -> Result<Self> {
+        let mut tmp_pos = *fixed_pos;
+        if Self::is_empty_optional(src, &mut tmp_pos)? {
+            *fixed_pos = tmp_pos;
             return Ok(None);
         }
-        *fixed_pos = orig_pos;
-        Ok(Some(<T>::embedded_variable_unpack(
-            src, fixed_pos, heap_pos,
-        )?))
+        Ok(Some(<T>::embedded_variable_unpack(src, fixed_pos)?))
     }
 
-    fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<()> {
-        let orig_pos = *fixed_pos;
-        let offset = u32::unpack(src, fixed_pos)?;
-        if offset == 1 {
+    fn embedded_verify(src: &mut FracInputStream, fixed_pos: &mut u32) -> Result<()> {
+        let mut tmp_pos = *fixed_pos;
+        if Self::is_empty_optional(src, &mut tmp_pos)? {
+            *fixed_pos = tmp_pos;
             return Ok(());
         }
-        *fixed_pos = orig_pos;
-        T::embedded_variable_verify(src, fixed_pos, heap_pos)
+        T::embedded_variable_verify(src, fixed_pos)
     }
 }
 
 trait BytesConversion<'a>: Sized {
-    fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()>;
+    fn fracpack_verify_if_str(bytes: &[u8]) -> Result<()>;
     fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self>;
     fn fracpack_as_bytes(&'a self) -> &'a [u8];
 }
 
 impl<'a> BytesConversion<'a> for String {
-    fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()> {
+    fn fracpack_verify_if_str(bytes: &[u8]) -> Result<()> {
         std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
         Ok(())
     }
@@ -625,7 +745,7 @@ impl<'a> BytesConversion<'a> for String {
 }
 
 impl<'a> BytesConversion<'a> for &'a str {
-    fn fracpack_verify_if_str(bytes: &'a [u8]) -> Result<()> {
+    fn fracpack_verify_if_str(bytes: &[u8]) -> Result<()> {
         std::str::from_utf8(bytes).or(Err(Error::BadUTF8))?;
         Ok(())
     }
@@ -638,7 +758,7 @@ impl<'a> BytesConversion<'a> for &'a str {
 }
 
 impl<'a> BytesConversion<'a> for &'a [u8] {
-    fn fracpack_verify_if_str(_bytes: &'a [u8]) -> Result<()> {
+    fn fracpack_verify_if_str(_bytes: &[u8]) -> Result<()> {
         Ok(())
     }
     fn fracpack_from_bytes(bytes: &'a [u8]) -> Result<Self> {
@@ -669,21 +789,23 @@ macro_rules! bytes_impl {
             const FIXED_SIZE: u32 = 4;
             const VARIABLE_SIZE: bool = true;
 
-            fn unpack(src: &'a [u8], pos: &mut u32) -> Result<$t> {
-                let len = u32::unpack(src, pos)?;
+            fn unpack(src: &mut FracInputStream<'a>) -> Result<$t> {
+                let len = u32::unpack(src)?;
                 let bytes = src
-                    .get(*pos as usize..(*pos + len) as usize)
+                    .data
+                    .get(src.pos as usize..(src.pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
-                *pos += len;
+                src.pos += len;
                 <$t>::fracpack_from_bytes(bytes)
             }
 
-            fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                let len = u32::unpack(src, pos)?;
+            fn verify(src: &mut FracInputStream) -> Result<()> {
+                let len = u32::unpack(src)?;
                 let bytes = src
-                    .get(*pos as usize..(*pos + len) as usize)
+                    .data
+                    .get(src.pos as usize..(src.pos + len) as usize)
                     .ok_or(Error::ReadPastEnd)?;
-                *pos += len;
+                src.pos += len;
                 <$t>::fracpack_verify_if_str(bytes)?;
                 Ok(())
             }
@@ -729,40 +851,30 @@ impl<'a, T: Unpack<'a>> Unpack<'a> for Vec<T> {
     const VARIABLE_SIZE: bool = true;
 
     // TODO: optimize scalar
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let num_bytes = u32::unpack(src, pos)?;
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+        let num_bytes = u32::unpack(src)?;
         if num_bytes % T::FIXED_SIZE != 0 {
             return Err(Error::BadSize);
         }
-        let hp = *pos as u64 + num_bytes as u64;
-        let mut heap_pos = hp as u32;
-        if heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
         let len = (num_bytes / T::FIXED_SIZE) as usize;
+        let mut fixed_pos = src.advance(num_bytes)?;
         let mut result = Self::with_capacity(len);
         for _ in 0..len {
-            result.push(T::embedded_unpack(src, pos, &mut heap_pos)?);
+            result.push(T::embedded_unpack(src, &mut fixed_pos)?);
         }
-        *pos = heap_pos;
         Ok(result)
     }
 
     // TODO: optimize scalar
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let num_bytes = u32::unpack(src, pos)?;
+    fn verify(src: &mut FracInputStream) -> Result<()> {
+        let num_bytes = u32::unpack(src)?;
         if num_bytes % T::FIXED_SIZE != 0 {
             return Err(Error::BadSize);
         }
-        let hp = *pos as u64 + num_bytes as u64;
-        let mut heap_pos = hp as u32;
-        if heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
+        let mut fixed_pos = src.advance(num_bytes)?;
         for _ in 0..num_bytes / T::FIXED_SIZE {
-            T::embedded_verify(src, pos, &mut heap_pos)?;
+            T::embedded_verify(src, &mut fixed_pos)?;
         }
-        *pos = heap_pos;
         Ok(())
     }
 
@@ -800,16 +912,13 @@ impl<'a, T: Unpack<'a>, const N: usize> Unpack<'a> for [T; N] {
         T::FIXED_SIZE * N as u32
     };
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let hp = *pos as u64 + T::FIXED_SIZE as u64 * N as u64;
-        let mut heap_pos = hp as u32;
-        if heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+        let total_size: u32 = T::FIXED_SIZE * N as u32;
+        let mut fixed_pos = src.advance(total_size)?;
 
         let mut items: Vec<T> = Vec::with_capacity(N);
         for _ in 0..N {
-            items.push(T::embedded_unpack(src, pos, &mut heap_pos)?);
+            items.push(T::embedded_unpack(src, &mut fixed_pos)?);
         }
 
         let result: [T; N] = items.try_into().unwrap_or_else(|v: Vec<T>| {
@@ -819,20 +928,15 @@ impl<'a, T: Unpack<'a>, const N: usize> Unpack<'a> for [T; N] {
                 v.len()
             )
         });
-        *pos = heap_pos;
         Ok(result)
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let hp = *pos as u64 + T::FIXED_SIZE as u64 * N as u64;
-        let mut heap_pos = hp as u32;
-        if heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
+    fn verify(src: &mut FracInputStream) -> Result<()> {
+        let total_size: u32 = T::FIXED_SIZE * N as u32;
+        let mut fixed_pos = src.advance(total_size)?;
         for _ in 0..N {
-            T::embedded_verify(src, pos, &mut heap_pos)?;
+            T::embedded_verify(src, &mut fixed_pos)?;
         }
-        *pos = heap_pos;
         Ok(())
     }
 }
@@ -869,43 +973,27 @@ impl<'a, $($n: Unpack<'a>),+> Unpack<'a> for $t $(where $($w)*)? {
     const FIXED_SIZE: u32 = 4;
     const VARIABLE_SIZE: bool = true;
 
-    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-        let num_bytes = u32::unpack(src, pos)?;
+    fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+        let num_bytes = u32::unpack(src)?;
         if num_bytes % <$t as IntoIterator>::Item::FIXED_SIZE != 0 {
             return Err(Error::BadSize);
-        }
-        let hp = *pos as u64 + num_bytes as u64;
-        let mut heap_pos = hp as u32;
-        if heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
         }
         let len = (num_bytes / <$t as IntoIterator>::Item::FIXED_SIZE) as usize;
-        let mut err = Ok(());
-        let result = (0..len).map_while(|_| {
-            match <$t as IntoIterator>::Item::embedded_unpack(src, pos, &mut heap_pos) {
-                Ok(item) => { Some(item) },
-                Err(e) => { err = Err(e); None }
-            }
-        }).collect();
-        err?;
-        *pos = heap_pos;
-        Ok(result)
+        let mut fixed_pos = src.advance(num_bytes)?;
+        (0..len).map(|_| {
+            <$t as IntoIterator>::Item::embedded_unpack(src, &mut fixed_pos)
+        }).collect()
     }
 
-    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-        let num_bytes = u32::unpack(src, pos)?;
+    fn verify(src: &mut FracInputStream) -> Result<()> {
+        let num_bytes = u32::unpack(src)?;
         if num_bytes % <$t as IntoIterator>::Item::FIXED_SIZE != 0 {
             return Err(Error::BadSize);
         }
-        let hp = *pos as u64 + num_bytes as u64;
-        let mut heap_pos = hp as u32;
-        if heap_pos as u64 != hp {
-            return Err(Error::ReadPastEnd);
-        }
+        let mut fixed_pos = src.advance(num_bytes)?;
         for _ in 0..num_bytes / <$t as IntoIterator>::Item::FIXED_SIZE {
-            <$t as IntoIterator>::Item::embedded_verify(src, pos, &mut heap_pos)?;
+            <$t as IntoIterator>::Item::embedded_verify(src, &mut fixed_pos)?;
         }
-        *pos = heap_pos;
         Ok(())
     }
 
@@ -928,17 +1016,33 @@ macro_rules! tuple_impls {
 
                 #[allow(non_snake_case)]
                 fn pack(&self, dest: &mut Vec<u8>) {
-                    let heap: u32 = $($name::FIXED_SIZE +)* 0;
-                    assert!(heap as u16 as u32 == heap); // TODO: return error
-                    (heap as u16).pack(dest);
+                    let _trailing_empty_index = [
+                        $({!<$name as Pack>::is_empty_optional(&self.$n)}),*
+                    ].iter().rposition(|is_non_empty: &bool| *is_non_empty).map_or(0, |idx| idx + 1);
+
+                    let mut _heap: u32 = 0;
+                    $({
+                        if $n < _trailing_empty_index {
+                            _heap += <$name as Pack>::FIXED_SIZE;
+                        }
+                    })*
+                    assert!(_heap as u16 as u32 == _heap); // TODO: return error
+                    (_heap as u16).pack(dest);
+
+
+
                     $(
                         let $name = dest.len() as u32;
-                        self.$n.embedded_fixed_pack(dest);
+                        if $n < _trailing_empty_index {
+                            self.$n.embedded_fixed_pack(dest);
+                        }
                     )*
                     $(
-                        let heap_pos = dest.len() as u32;
-                        self.$n.embedded_fixed_repack($name, heap_pos, dest);
-                        self.$n.embedded_variable_pack(dest);
+                        if $n < _trailing_empty_index {
+                            let heap_pos = dest.len() as u32;
+                            self.$n.embedded_fixed_repack($name, heap_pos, dest);
+                            self.$n.embedded_variable_pack(dest);
+                        }
                     )*
                 }
             }
@@ -949,30 +1053,38 @@ macro_rules! tuple_impls {
                 const FIXED_SIZE: u32 = 4;
 
                 #[allow(non_snake_case,unused_mut)]
-                fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
-                    let fixed_size = u16::unpack(src, pos)?;
-                    let mut heap_pos = *pos + fixed_size as u32;
-                    if heap_pos < *pos {
-                        return Err(Error::BadOffset);
-                    }
+                fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
+                    let fixed_size = u16::unpack(src)?;
+                    let mut fixed_pos = src.advance(fixed_size as u32)?;
+                    let heap_pos = src.pos;
+                    let mut last_empty = false;
+                    let _trailing_optional_index = [$(<$name as Unpack>::IS_OPTIONAL,)*].iter().rposition(|is_optional: &bool| !is_optional).map_or(0, |idx| idx + 1);
                     $(
-                        let $name = $name::embedded_unpack(src, pos, &mut heap_pos)?;
+                        let $name = if $n < _trailing_optional_index || fixed_pos < heap_pos {
+                            last_empty = <$name as Unpack>::is_empty_optional(src, &mut fixed_pos.clone())?;
+                            $name::embedded_unpack(src, &mut fixed_pos)?
+                        } else {
+                            $name::new_empty_optional()?
+                        };
                     )*
-                    *pos = heap_pos;
+                    src.consume_trailing_optional(fixed_pos, heap_pos, last_empty)?;
                     Ok(($($name,)*))
                 }
 
                 #[allow(unused_mut)]
-                fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
-                    let fixed_size = u16::unpack(src, pos)?;
-                    let mut heap_pos = *pos + fixed_size as u32;
-                    if heap_pos < *pos {
-                        return Err(Error::BadOffset);
-                    }
+                fn verify(src: &mut FracInputStream) -> Result<()> {
+                    let fixed_size = u16::unpack(src)?;
+                    let mut fixed_pos = src.advance(fixed_size as u32)?;
+                    let heap_pos = src.pos;
+                    let mut last_empty = false;
+                    let _trailing_optional_index = [$(<$name as Unpack>::IS_OPTIONAL,)*].iter().rposition(|is_optional: &bool| !is_optional).map_or(0, |idx| idx + 1);
                     $(
-                        $name::embedded_unpack(src, pos, &mut heap_pos)?;
+                        if $n < _trailing_optional_index || fixed_pos < heap_pos {
+                            last_empty = <$name as Unpack>::is_empty_optional(src, &mut fixed_pos.clone())?;
+                            $name::embedded_verify(src, &mut fixed_pos)?;
+                        }
                     )*
-                    *pos = heap_pos;
+                    src.consume_trailing_optional(fixed_pos, heap_pos, last_empty)?;
                     Ok(())
                 }
             }
