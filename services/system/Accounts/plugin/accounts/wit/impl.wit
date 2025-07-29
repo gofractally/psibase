@@ -6,7 +6,7 @@ interface admin {
 
     /// Logs the specified user into the specified app without any user interaction.
     /// This function is only callable by the accounts app itself.
-    login-direct: func(app: app-details, user: string) -> option<string>;
+    login-direct: func(app: app-details, user: string);
 
     /// Gets app details
     decode-connection-token: func(token: string) -> option<app-details>;
