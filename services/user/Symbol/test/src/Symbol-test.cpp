@@ -15,9 +15,8 @@ using namespace UserService::Errors;
 
 namespace
 {
-   const Memo     memo{"memo"};
-   const TID      sysToken{Tokens::sysToken};
-   constexpr auto untradeable = "untradeable"_m;
+   const Memo memo{"memo"};
+   const TID  sysToken{Tokens::sysToken};
 
    using Quantity_t = Quantity::Quantity_t;
 
@@ -47,10 +46,13 @@ SCENARIO("Buying a symbol")
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
-      sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
+      auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      CHECK(issuance.succeeded());
+
       sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
-      sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      auto lastCredit = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
+      CHECK(lastCredit.succeeded());
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
@@ -113,7 +115,7 @@ SCENARIO("Buying a symbol")
          {
             auto getSharedBalance = alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service);
             CHECK(getSharedBalance.succeeded());
-            CHECK(getSharedBalance.returnVal().balance == 0);
+            CHECK(getSharedBalance.returnVal().value == 0);
          }
 
          AND_THEN("Alice cannot create the same symbol again")
@@ -169,7 +171,7 @@ SCENARIO("Measuring price increases")
 
       auto aliceBalance = q(1'000'000, precision);
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, aliceBalance, memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
@@ -210,7 +212,7 @@ SCENARIO("Measuring price increases")
             CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
             a.create(SID{"bcd"}, quantity);
             auto balance =
-                alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().balance;
+                alice.to<Tokens>().getSharedBal(sysToken, alice, Nft::service).returnVal().value;
             CHECK(balance == 0);
          }
       }
@@ -286,7 +288,7 @@ SCENARIO("Using symbol ownership NFT")
       auto precision    = sysIssuer.getToken(sysToken).returnVal().precision;
       auto aliceBalance = q(1'000'000, precision);
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, q(20'000, precision), memo);
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
@@ -339,7 +341,7 @@ SCENARIO("Buying and selling symbols")
       auto precision   = sysIssuer.getToken(sysToken).returnVal().precision;
       auto userBalance = q(1'000'000, precision);
 
-      sysIssuer.setTokenConf(sysToken, untradeable, false);
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       sysIssuer.mint(sysToken, 2 * userBalance.value, memo);
       sysIssuer.credit(sysToken, alice, userBalance, memo);
       sysIssuer.credit(sysToken, bob, userBalance, memo);

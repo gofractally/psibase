@@ -134,7 +134,7 @@ class TestPsibase(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer'])
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
+        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
 
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
@@ -371,13 +371,13 @@ class TestPsibase(unittest.TestCase):
 
         # This should fail because the transaction was only proposed
         with self.assertRaises(requests.HTTPError):
-            a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
+            a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
 
         for tx in staged_tx.get_staged(proposer='b'):
             staged_tx.accept('a', tx, keys=[key])
 
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
+        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()

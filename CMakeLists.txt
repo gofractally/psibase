@@ -134,8 +134,8 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTokens RTransact SetCode Symbol
-        Tokens Transact VerifySig XAdmin
+        RHttpServer RSetCode RTransact SetCode Symbol
+        Transact VerifySig XAdmin
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService SocketListService)
     set(WASM_BYPRODUCTS)
@@ -284,7 +284,6 @@ add_rs_component_workspace(services/:Plugins
     sites
     host-common
     host-prompt
-    tokens
     transact
     workshop
     config
@@ -437,6 +436,11 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH services/user/Evaluations
     DEPENDS ${Evaluations_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Tokens.psi
+    PATH services/user/Tokens
 )
 
 cargo_psibase_package(
@@ -779,25 +783,6 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /
     DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
-)
-
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Tokens.psi
-    NAME Tokens
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Token service"
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
-    SERVICE tokens
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Tokens-schema.json
-        DATA ${Plugins_OUTPUT_FILE_tokens} /plugin.wasm
-        SERVER r-tokens
-        INIT
-    SERVICE r-tokens
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTokens-schema.json
-    DEPENDS ${Plugins_DEP}
-    DEPENDS wasm
 )
 
 psibase_package(
