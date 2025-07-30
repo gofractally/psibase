@@ -88,7 +88,7 @@ impl Api for PermissionsPlugin {
         whitelist: Vec<String>,
     ) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
-        if !(0..=6).contains(&trust.level) {
+        if !(0..=4).contains(&trust.level) {
             return Err(ErrorType::InvalidTrustLevel(
                 callee.clone(),
                 trust.level,
@@ -109,7 +109,7 @@ impl Api for PermissionsPlugin {
             // Callee is always authorized to call itself
             return Ok(true);
         }
-        // TODO incorporate security groups for trust level 6
+        // TODO incorporate security groups for trust level 4
 
         let user = Accounts::get_current_user().ok_or_else(|| {
             ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())

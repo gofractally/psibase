@@ -4,10 +4,10 @@ interface types {
     /// This represents the trust threshold for a third-party application to
     /// perform an action on the user's behalf. It's just a hint to help guide the user.
     record trust {
-        /// Valid values: `0`-`6`
+        /// Valid values: `0`-`4`
         /// * `0`: Anyone can call
-        /// * `1`-`5`: Higher number = higher required trust
-        /// * `6`: No one can call (except the callee app itself)
+        /// * `1`-`3`: Higher number = higher required trust
+        /// * `4`: No one can call (except the callee app itself)
         level: u8,
 
         /// A description that will be placed on the UI shown to the user. Intended to provide
