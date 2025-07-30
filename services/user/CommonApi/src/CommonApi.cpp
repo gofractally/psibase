@@ -1,5 +1,3 @@
-#include <iomanip>
-
 #include "services/system/CommonApi.hpp"
 
 #include <psibase/dispatch.hpp>
@@ -102,8 +100,8 @@ namespace SystemService
             bool                    isLocalhost = psibase::isLocalhost(request);
             std::string             cookieName  = "__Host-SESSION";
 
-            std::string cookieAttribs =
-                "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + getCookieMaxAge();
+            std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" +
+                                        std::to_string(getCookieMaxAge());
             if (isLocalhost)
                cookieName = "SESSION";
 
