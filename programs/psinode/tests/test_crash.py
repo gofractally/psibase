@@ -135,5 +135,40 @@ class TestCrash(unittest.TestCase):
                 self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
 
+    @testutil.psinode_test
+    def test_unlock_bft(self, cluster):
+        prods = cluster.complete(*testutil.generate_names(4), softhsm=testutil.libsofthsm2())
+        (a, b, c, d) = prods
+        keys = []
+        for p in prods:
+            device = p.unlock_softhsm()
+            with p.post('/native/admin/keys', service='x-admin', json={'service':'verify-sig', 'device': device}) as reply:
+                reply.raise_for_status()
+                keys.append({'name': p.producer, 'auth': reply.json()[0]})
+
+        print(keys)
+        print("booting chain")
+        a.boot(packages=['Minimal', 'Explorer'])
+        print("setting producers")
+        a.set_producers(keys, 'bft')
+        p.wait(producers_are(prods))
+
+        print('stopping nodes')
+        c.shutdown()
+        d.shutdown()
+        a.wait(no_new_blocks())
+        print('restarting nodes')
+        c.start()
+        d.start()
+        c.connect(a)
+        d.connect(a)
+        with self.assertRaises(TimeoutError):
+            a.wait(new_block())
+
+        c.unlock_softhsm()
+        d.unlock_softhsm()
+
+        a.wait(new_block())
+
 if __name__ == '__main__':
     testutil.main()
