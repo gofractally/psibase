@@ -126,7 +126,8 @@ namespace SystemService
       check(!!status, "Missing status row");
       check(!status->consensus.next || status->consensus.next->blockNum == status->current.blockNum,
             "Consensus update pending");
-      status->consensus.next = {{std::move(consensus), status->consensus.current.services},
+      status->consensus.next = {{std::move(consensus), status->consensus.current.services,
+                                 status->consensus.current.wasmConfig},
                                 status->current.blockNum};
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
@@ -140,15 +141,16 @@ namespace SystemService
       check(!!status, "Missing status row");
       check(!status->consensus.next || status->consensus.next->blockNum == status->current.blockNum,
             "Consensus update pending");
-      status->consensus.next = {{std::visit(
-                                     [&](auto old)
-                                     {
-                                        old.producers = std::move(prods);
-                                        return ConsensusData{std::move(old)};
-                                     },
-                                     status->consensus.current.data),
-                                 status->consensus.current.services},
-                                status->current.blockNum};
+      status->consensus.next = {
+          {std::visit(
+               [&](auto old)
+               {
+                  old.producers = std::move(prods);
+                  return ConsensusData{std::move(old)};
+               },
+               status->consensus.current.data),
+           status->consensus.current.services, status->consensus.current.wasmConfig},
+          status->current.blockNum};
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 

@@ -4,6 +4,13 @@ from psinode import Cluster
 from predicates import *
 import testutil
 import unittest
+import subprocess
+
+def has_file(node):
+    with node.get('/file.txt', service='alice') as reply:
+        if reply.status_code == 200:
+            return reply.text == 'Lorem ipsum dolor sit amet'
+        return False
 
 class TestBlockSigning(unittest.TestCase):
     @testutil.psinode_test
@@ -28,6 +35,25 @@ class TestBlockSigning(unittest.TestCase):
 
         prods[3].wait(producers_are(prods))
         prods[3].wait(new_block(), timeout=20)
+
+    @testutil.psinode_test
+    def test_verify_wasm_config_pass(self, cluster):
+        a = cluster.make_node('a', start=False)
+        subprocess.run(["./psitest", "./generate_verify_with_call.wasm", a.dir, '32', '33'], check=True)
+        b = cluster.make_node('b')
+        a.start()
+        b.connect(a)
+        b.wait(has_file)
+
+    @testutil.psinode_test
+    def test_verify_wasm_config_fail(self, cluster):
+        a = cluster.make_node('a', start=False)
+        subprocess.run(["./psitest", "./generate_verify_with_call.wasm", a.dir, '16', '16'], check=True)
+        b = cluster.make_node('b')
+        a.start()
+        b.connect(a)
+        with self.assertRaises(TimeoutError):
+            b.wait(has_file)
 
 if __name__ == '__main__':
     testutil.main()

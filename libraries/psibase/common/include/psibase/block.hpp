@@ -142,6 +142,43 @@ namespace psibase
       PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
    };
 
+   // The existing eos-vm implementation limits are:
+   // - branch offsets, and stack offsets must fit in a signed 32-bit int
+   // - The total compiled module size must be < 1 GB (note that this
+   //   implies that 32-bit branches are okay.) The maximum amplification
+   //   factor is currently 79, if we round up to 128, that means that
+   //   wasms up to 8 MB are safe, which is coincidentally the db maxValueSize.
+   //
+   struct VMOptions
+   {
+      // This is a safe value that is larger than any reasonable stack size
+      static constexpr std::uint32_t max_func_local_bytes = 128 * 1024 * 1024;
+      static constexpr bool          enable_simd          = true;
+      static constexpr bool          enable_bulk_memory   = true;
+      static constexpr std::uint32_t stack_usage_for_call = 4096;
+
+      std::uint32_t max_mutable_global_bytes = 1024;
+      std::uint32_t max_pages                = 512;  // 32 MiB
+      std::uint32_t max_table_elements       = 8192;
+      // This is the total across all modules
+      std::uint32_t max_stack_bytes = 1024 * 1024;
+
+      friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
+      PSIO_REFLECT(VMOptions,
+                   max_mutable_global_bytes,
+                   max_pages,
+                   max_table_elements,
+                   max_stack_bytes)
+   };
+
+   struct BlockHeaderWasmConfig
+   {
+      uint32_t    numExecutionMemories;
+      VMOptions   vmOptions;
+      friend bool operator==(const BlockHeaderWasmConfig&, const BlockHeaderWasmConfig&) = default;
+      PSIO_REFLECT(BlockHeaderWasmConfig, numExecutionMemories, vmOptions)
+   };
+
    struct Producer
    {
       AccountNumber name;
@@ -176,8 +213,9 @@ namespace psibase
    {
       ConsensusData                       data;
       std::vector<BlockHeaderAuthAccount> services;
+      BlockHeaderWasmConfig               wasmConfig;
       friend bool                         operator==(const Consensus&, const Consensus&) = default;
-      PSIO_REFLECT(Consensus, data, services)
+      PSIO_REFLECT(Consensus, data, services, wasmConfig)
    };
 
    struct BlockHeaderCode
