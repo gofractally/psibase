@@ -27,14 +27,12 @@ impl Risks {
             If authorized, you grant the requesting app the following abilities:
                 - Create new keypairs
                 - Import existing keypairs
-                - Consume account resources
             "},
             5 => indoc::indoc! {"
             If authorized, you grant the requesting app the following abilities:
                 - Set the public key for your account
                 - Sign transactions on your behalf
-                - Extract your private key from your public key
-                - Consume account resources
+                - Read the private key for a given public key
             "},
             _ => "",
         }
