@@ -441,7 +441,6 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH services/user/Tokens
-    DEPENDS ${Tokens_js_DEP}
 )
 
 cargo_psibase_package(
