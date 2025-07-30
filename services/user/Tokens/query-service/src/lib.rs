@@ -6,31 +6,15 @@ mod service {
     use psibase::services::nft::Wrapper as Nfts;
 
     use psibase::*;
-    use tokens::tables::tables::{
-        Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable, UserConfig,
-        UserConfigTable,
+    use tokens::{
+        helpers::{identify_token_type, TokenType},
+        tables::tables::{
+            Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
+            UserConfig, UserConfigTable,
+        },
     };
 
-    struct Query;
-
-    enum TokenType {
-        Number(u32),
-        Symbol(AccountNumber),
-    }
-
-    fn identify_token_type(token_id: String) -> TokenType {
-        use TokenType::{Number, Symbol};
-
-        let first_char = token_id.chars().next().unwrap();
-
-        if first_char.is_ascii_digit() {
-            Number(token_id.parse::<u32>().unwrap())
-        } else {
-            Symbol(AccountNumber::from(token_id.as_str()))
-        }
-    }
-
-    fn token_id_to_number(token_id: String) -> u32 {
+    pub fn token_id_to_number(token_id: String) -> u32 {
         match identify_token_type(token_id) {
             TokenType::Number(num) => num,
             TokenType::Symbol(account) => {
@@ -40,6 +24,8 @@ mod service {
             }
         }
     }
+
+    struct Query;
 
     #[Object]
     impl Query {

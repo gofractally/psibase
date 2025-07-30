@@ -1,3 +1,4 @@
+pub mod helpers;
 pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
@@ -22,7 +23,8 @@ pub mod service {
             table.put(&init_instance).unwrap();
 
             Nfts::call_from(Wrapper::SERVICE)
-                .setUserConf(psibase::NamedBit::from("manualDebit"), true)
+                .setUserConf(psibase::NamedBit::from("manualDebit"), true);
+            UserConfig::get_or_new(Wrapper::SERVICE).set_flag(BalanceFlags::MANUAL_DEBIT, true);
         }
     }
 

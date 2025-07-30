@@ -22,17 +22,6 @@ namespace UserService
       Quantity           max_issued_supply;
       std::optional<SID> symbol;
 
-      static bool isValidKey(TID tokenId)
-      {
-         /*
-          * The final of the 32 bits is reserved such that there are only 31 bits used for token ID.
-          * This is simply an attempt to future proof the token record, so we have a spare bit to
-          *   separately namespace tokens should the need arise.
-          */
-
-         return tokenId > 0 && tokenId <= std::numeric_limits<uint32_t>::max() / 2;
-      }
-
       auto operator<=>(const TokenRecord&) const = default;
    };
    PSIO_REFLECT(TokenRecord,
