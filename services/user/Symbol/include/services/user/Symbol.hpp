@@ -26,16 +26,13 @@ namespace UserService
       void init();
 
       void create(SID newSymbol, Quantity maxDebit);
-      void listSymbol(SID symbol, Quantity price);
-      void buySymbol(SID symbol);
-      void unlistSymbol(SID symbol);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
       SymbolRecord       getSymbol(SID symbol);
       bool               exists(SID symbol);
       Quantity           getPrice(uint8_t numChars);
-      SymbolLengthRecord getSymbolType(uint8_t numChars);
+      SymbolLengthRecord getSymType(uint8_t numChars);
       void               updatePrices();
 
       // clang-format off
@@ -45,7 +42,6 @@ namespace UserService
          struct History
          {
             void symCreated(SID symbol, Account owner, Quantity cost) {}
-            void symSold(SID symbol, Account buyer, Account seller, Quantity cost) {}
          };
          struct Ui{};
          struct Merkle{};
@@ -57,21 +53,17 @@ namespace UserService
    PSIO_REFLECT(Symbol,
       method(init),
       method(create, newSymbol, maxDebit),
-      method(listSymbol, symbol, price),
-      method(buySymbol, symbol),
-      method(unlistSymbol, symbol),
       method(serveSys, request),
 
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),
-      method(getSymbolType, numChars),
+      method(getSymType, numChars),
       method(updatePrices)
    );
    PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
       method(symCreated, symbol, owner, cost),
-      method(symSold, symbol, buyer, seller, cost),
    );
    PSIBASE_REFLECT_UI_EVENTS(Symbol);
    PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);

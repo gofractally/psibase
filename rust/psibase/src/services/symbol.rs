@@ -14,45 +14,32 @@ pub type SID = AccountNumber;
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct SaleDetails {
-    pub salePrice: Quantity,
-
-    pub seller: AccountNumber,
+pub struct SymbolRecord {
+    pub symbolId: SID,
+    pub ownerNft: NID,
 }
 
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct SymbolRecord {
-    pub symbolId: SID,
-    pub ownerNft: NID,
-    pub saleDetails: SaleDetails,
+pub struct SymbolLengthRecord {
+    pub symbol_length: u8,
+    pub target_created_per_day: u8,
+    pub floor_price: Quantity,
+    pub active_price: Quantity,
+    pub create_counter: u16,
+    pub last_price_update_time: crate::TimePointSec,
 }
 
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod Service {
-    use crate::services::symbol::SymbolRecord;
+    use crate::services::symbol::{SymbolLengthRecord, SymbolRecord};
     use crate::{services::tokens::Quantity, AccountNumber};
 
     #[action]
     fn create(new_symbol: AccountNumber, max_debit: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn listSymbol(symbol: AccountNumber, price: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn buySymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn unlistSymbol(symbol: AccountNumber) {
         unimplemented!()
     }
 
@@ -63,6 +50,16 @@ pub mod Service {
 
     #[action]
     fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getSymType(numChars: u8) -> SymbolLengthRecord {
+        unimplemented!()
+    }
+
+    #[action]
+    fn updatePrices() {
         unimplemented!()
     }
 }
