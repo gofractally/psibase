@@ -15,7 +15,6 @@ export const useLoginDirect = () =>
     useMutation<void, Error, z.infer<typeof LoginParams>>({
         mutationFn: async (params) => {
             const { accountName, app, origin } = LoginParams.parse(params);
-            console.log("useLoginDirect().origin:", origin);
 
             const queryToken = await supervisor.functionCall({
                 method: "loginDirect",

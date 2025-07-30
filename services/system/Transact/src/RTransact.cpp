@@ -1454,13 +1454,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    for (const auto& token : tokens)
    {
       auto decoded = decodeJWT<LoginTokenData>(key, token);
-
       if (decoded.aud == request.rootHost && checkExp(decoded.exp))
-      {
          return decoded.sub;
-      }
    }
-
    return {};
 }
 
