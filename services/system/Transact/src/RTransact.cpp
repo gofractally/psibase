@@ -1424,7 +1424,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
-   bool                         isDevChain = psibase::isDevChain(request);
+   bool                         isLocalhost = psibase::isLocalhost(request);
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
@@ -1448,19 +1448,16 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
       }
    }
 
-   std::string_view cookieName = isDevChain ? "SESSION" : "__Host-SESSION";
+   std::string_view cookieName = isLocalhost ? "SESSION" : "__Host-SESSION";
 
    auto tokens = request.getCookie(cookieName);
-   if (!tokens.empty())
+   for (const auto& token : tokens)
    {
-      for (const auto& token : tokens)
-      {
-         auto decoded = decodeJWT<LoginTokenData>(key, token);
+      auto decoded = decodeJWT<LoginTokenData>(key, token);
 
-         if (decoded.aud == request.rootHost && checkExp(decoded.exp))
-         {
-            return decoded.sub;
-         }
+      if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+      {
+         return decoded.sub;
       }
    }
 

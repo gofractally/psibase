@@ -2,7 +2,6 @@
 import path from "path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 const serviceDir = path.resolve(__dirname);
 
@@ -19,10 +18,5 @@ export default defineConfig({
     },
     plugins: [
         dts(),
-        viteStaticCopy({
-            targets: [
-              { src: 'src/auth-cookie.html', dest: '.' }
-            ],
-        })
     ],
 });

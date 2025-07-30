@@ -153,18 +153,12 @@ namespace psibase
       }
    }
 
-   bool isDevChain(const HttpRequest& request)
+   bool isLocalhost(const HttpRequest& request)
    {
-      std::string_view value = request.host;
-      std::string_view domain;
-      domain = request.host;
+      std::string_view domain = request.host;
 
-      // Find the end of the domain name (either at first colon or slash, or end of string)
+      // Find the end of the domain name (either at first colon or end of string)
       size_t domainEndPos = domain.find(':');
-      if (domainEndPos == std::string_view::npos)
-      {
-         domainEndPos = domain.find('/');
-      }
       if (domainEndPos != std::string_view::npos)
       {
          domain = domain.substr(0, domainEndPos);

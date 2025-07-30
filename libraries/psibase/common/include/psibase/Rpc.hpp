@@ -65,7 +65,7 @@ namespace psibase
 
       /// Searches for a cookie by name
       ///
-      /// The value returned is not validated or decoded
+      /// The values returned are not validated or decoded
       std::vector<std::string_view> getCookie(std::string_view name) const;
 
       /// Searches for a header by name (case-insensitive)
@@ -77,9 +77,9 @@ namespace psibase
       void removeCookie(std::string_view name);
    };
 
-   /// Checks if the request origin indicates a development chain
-   /// by looking for "localhost" in the origin header domain
-   bool isDevChain(const HttpRequest& request);
+   /// Checks if the host indicates a development chain
+   /// by looking for "localhost" in the host header
+   bool isLocalhost(const HttpRequest& request);
 
    struct URIPath
    {
