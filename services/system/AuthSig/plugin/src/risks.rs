@@ -10,29 +10,29 @@ pub struct Risks;
 impl Risks {
     fn get_trust_levels() -> HashMap<&'static str, u8> {
         let mut map = HashMap::new();
-        map.insert("generate_keypair", 2);
+        map.insert("generate_keypair", 1);
         map.insert("generate_unmanaged_keypair", 0);
         map.insert("pub_from_priv", 0);
-        map.insert("priv_from_pub", 5);
+        map.insert("priv_from_pub", 3);
         map.insert("to_der", 0);
         map.insert("sign", 0); // Takes private key as input
-        map.insert("import_key", 2);
-        map.insert("set_key", 5);
+        map.insert("import_key", 1);
+        map.insert("set_key", 3);
         map
     }
 
     fn get_description(level: u8) -> String {
         match level {
-            2 => indoc::indoc! {"
+            1 => indoc::indoc! {"
+            If authorized, you grant the requesting app the following abilities:
                 - Create new keypairs
                 - Import existing keypairs
-                - Consume account resources
             "},
-            5 => indoc::indoc! {"
+            3 => indoc::indoc! {"
+            If authorized, you grant the requesting app the following abilities:
                 - Set the public key for your account
                 - Sign transactions on your behalf
-                - Extract your private key from your public key
-                - Consume account resources
+                - Read the private key for a given public key
             "},
             _ => "",
         }
