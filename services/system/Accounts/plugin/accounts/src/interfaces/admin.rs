@@ -1,7 +1,7 @@
 use crate::plugin::AccountsPlugin;
 
-use crate::bindings::accounts::account_tokens::api::*;
-use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Admin};
+use crate::bindings::accounts::account_tokens::{api::*, types::ConnectionToken};
+use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
@@ -13,7 +13,7 @@ use crate::helpers::*;
 fn get_assert_caller_admin(context: &str) -> String {
     let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
     assert!(
-        caller == Client::my_service_account() || caller == "x-admin",
+        caller == Client::get_receiver() || caller == "x-admin",
         "{} only callable by `accounts` or `x-admin`",
         context
     );
@@ -31,22 +31,20 @@ fn assert_valid_account(account: &str) {
 }
 
 impl Admin for AccountsPlugin {
-    fn login_direct(app: AppDetails, user: String) -> Option<String> {
+    fn login_direct(app: String, user: String) -> Option<String> {
         assert_caller_admin("login_direct");
 
         assert_valid_account(&user);
 
-        let query_token =
-            TransactAuthApi::get_query_token(&Client::my_service_account(), &user).unwrap();
+        let query_token = TransactAuthApi::get_query_token(&Client::get_receiver(), &user).unwrap();
 
-        let app = app.app.unwrap();
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
 
         Some(query_token)
     }
 
-    fn decode_connection_token(token: String) -> Option<AppDetails> {
+    fn decode_connection_token(token: String) -> Option<ConnectionToken> {
         assert_caller_admin("decode_connection_token");
 
         if let Some(token) = deserialize_token(&token) {
@@ -71,11 +69,11 @@ impl Admin for AccountsPlugin {
     fn import_account(account: String) {
         assert_caller_admin("import_account");
         assert_valid_account(&account);
-        AppsTable::new(&Client::my_service_account()).connect(&account);
+        AppsTable::new(&Client::get_receiver()).connect(&account);
     }
 
     fn get_all_accounts() -> Vec<String> {
         assert_caller_admin("get_all_accounts");
-        AppsTable::new(&Client::my_service_account()).get_connected_accounts()
+        AppsTable::new(&Client::get_receiver()).get_connected_accounts()
     }
 }

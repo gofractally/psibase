@@ -205,14 +205,9 @@ impl Inviter for InvitePlugin {
             aes::with_password::encrypt(&seed, keypair.private_key.as_bytes(), &pub_b64);
         let encrypted_private_key_hex = hex::encode(&encrypted_private_key);
 
-        let sender_app = Client::get_sender_app();
-        let app = match sender_app.app {
-            Some(app_str) => match psibase::AccountNumber::from_exact(&app_str) {
-                Ok(account) => Some(account),
-                Err(_) => return Err(InvalidAccount(&app_str).into()),
-            },
-            None => None,
-        };
+        let sender = Client::get_sender();
+        let app =
+            psibase::AccountNumber::from_exact(&sender).map_err(|_| InvalidAccount(&sender))?;
 
         let id: u32 = rand::rng().random();
         Transact::add_action_to_transaction(
@@ -221,8 +216,8 @@ impl Inviter for InvitePlugin {
                 inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
                 secondaryId: Some(id),
                 secret: Some(encrypted_private_key_hex),
-                app,
-                appDomain: Some(sender_app.origin),
+                app: Some(app),
+                appDomain: Some(Client::get_app_url(&sender)),
             }
             .packed(),
         )?;

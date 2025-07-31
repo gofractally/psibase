@@ -5,7 +5,7 @@ use bindings::*;
 use exports::clientdata::plugin::keyvalue::Guest as KeyValue;
 use exports::clientdata::plugin::tests::Guest as Tests;
 use host::common::{
-    client as Client, store as KvStore, store::Database, store::DbMode, store::StorageDuration,
+    client::get_sender, store as KvStore, store::Database, store::DbMode, store::StorageDuration,
     types::Error,
 };
 
@@ -15,12 +15,6 @@ use tests::*;
 use crate::bindings::host::common::types::PluginId;
 
 struct ClientData;
-
-fn get_sender() -> String {
-    Client::get_sender_app()
-        .app
-        .expect("ClientData interface can only be used from plugins.")
-}
 
 impl KeyValue for ClientData {
     fn get(key: String) -> Option<Vec<u8>> {

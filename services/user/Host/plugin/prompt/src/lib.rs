@@ -10,7 +10,7 @@ use db::*;
 
 use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
-use host::common::client::{get_app_url, get_sender_app};
+use host::common::client::{get_app_url, get_sender};
 use host::common::types::{Error, PluginId};
 use psibase::fracpack::{Pack, Unpack};
 
@@ -39,7 +39,7 @@ impl Api for HostPrompt {
         id: String,
         return_payload: String,
     ) -> Result<TriggerDetails, Error> {
-        assert_eq!(get_sender_app().app.unwrap(), "supervisor", "Unauthorized");
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
 
         let id = id.parse::<u32>().unwrap();
 
@@ -67,7 +67,7 @@ impl Api for HostPrompt {
     }
 
     fn get_return_details(id: String) -> Option<String> {
-        assert_eq!(get_sender_app().app.unwrap(), "supervisor", "Unauthorized");
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
 
         let val = KeyValue::get(ACTIVE_PROMPT_REQ).unwrap();
         let details = <ActivePrompt>::unpacked(&val).unwrap();
@@ -109,7 +109,7 @@ impl Web for HostPrompt {
             ACTIVE_PROMPT_REQ,
             &ActivePrompt {
                 id,
-                subdomain: get_sender_app().app.unwrap(),
+                subdomain: get_sender(),
                 payload: subpath.clone(),
                 expiry_timestamp: Utc::now().timestamp() as u32 + PROMPT_EXPIRATION_SEC,
                 context_id,

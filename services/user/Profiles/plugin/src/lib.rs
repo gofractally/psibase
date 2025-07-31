@@ -29,9 +29,10 @@ use contact_table::ContactTable;
 struct ProfilesPlugin;
 
 fn check_app_sender() -> Result<(), ErrorType> {
-    match Client::get_sender_app().app {
-        Some(app) if app == "homepage" => Ok(()),
-        _ => Err(ErrorType::UnauthorizedApp()),
+    if Client::get_sender() == "homepage" {
+        Ok(())
+    } else {
+        Err(ErrorType::UnauthorizedApp())
     }
 }
 

@@ -1,8 +1,6 @@
 package accounts:account-tokens;
 
 interface types {
-    use host:common/types.{origination-data};
-
     /// A token that contains the private "key" of an invite.
     /// The key is really a seed to generate an AES key to decrypt 
     ///   the secret stored in the invite.
@@ -11,7 +9,15 @@ interface types {
         id: u32,
     }
 
-    type connection-token = origination-data;
+    /// Data related to the origination of the current call
+    record connection-token {
+        /// The account name of the psibase app responsible for the call.
+        /// May be empty if the call comes from an external web app.
+        app: option<string>,
+
+        /// The domain origin responsible for the call.
+        origin: string
+    }
 
     variant token {
         invite-token(invite-token),

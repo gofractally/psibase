@@ -54,11 +54,11 @@ struct TransactPlugin {}
 
 impl Hooks for TransactPlugin {
     fn hook_action_auth() {
-        ActionAuthPlugins::set(get_sender_app());
+        ActionAuthPlugins::set(Host::client::get_sender());
     }
 
     fn hook_actions_sender() {
-        let sender_app = get_sender_app();
+        let sender_app = Host::client::get_sender();
 
         if let Some(hooked) = ActionSenderHook::get() {
             if hooked != sender_app {
@@ -71,19 +71,19 @@ impl Hooks for TransactPlugin {
             panic!("hook_actions_sender: {} is not whitelisted", sender_app);
         }
 
-        ActionSenderHook::set(get_sender_app());
+        ActionSenderHook::set(sender_app);
     }
 
     fn unhook_actions_sender() {
         if let Some(sender) = ActionSenderHook::get() {
-            if sender == get_sender_app() {
+            if sender == Host::client::get_sender() {
                 ActionSenderHook::clear();
             }
         }
     }
 
     fn hook_tx_transform_label(label: Option<String>) {
-        let transformer = get_sender_app();
+        let transformer = Host::client::get_sender();
 
         if let Some(existing) = TxTransformLabel::get_transformer_plugin() {
             if existing != transformer {
@@ -110,10 +110,7 @@ impl Intf for TransactPlugin {
     ) -> Result<(), CommonTypes::Error> {
         validate_action_name(&method_name)?;
 
-        let service = Host::client::get_sender_app()
-            .app
-            .ok_or_else(|| OnlyAvailableToPlugins("add_action_to_transaction"))?;
-
+        let service = Host::client::get_sender();
         let sender = get_action_sender(service.as_str(), method_name.as_str())?;
 
         let action = Action {
@@ -221,7 +218,7 @@ struct LoginReply {
 
 impl Auth for TransactPlugin {
     fn get_query_token(app: String, user: String) -> Result<String, CommonTypes::Error> {
-        assert!(get_sender_app() == "accounts");
+        assert!(Host::client::get_sender() == "accounts");
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");

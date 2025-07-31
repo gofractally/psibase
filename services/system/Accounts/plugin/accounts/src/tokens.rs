@@ -1,8 +1,7 @@
-use crate::bindings::accounts::account_tokens::api::*;
-use crate::bindings::accounts::plugin::types::OriginationData;
+use crate::bindings::accounts::account_tokens::{api::*, types::ConnectionToken};
 
 impl Token {
-    pub fn new_connection_token(sender: OriginationData) -> Self {
+    pub fn new_connection_token(sender: ConnectionToken) -> Self {
         Token::ConnectionToken(sender)
     }
 }

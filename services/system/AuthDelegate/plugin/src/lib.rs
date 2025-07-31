@@ -17,9 +17,8 @@ struct AuthDelegate;
 
 // TODO: User oauth when available
 fn assert_caller_admin(context: &str) {
-    let sender = Client::get_sender_app().app.unwrap();
     assert!(
-        sender == psibase::services::auth_delegate::SERVICE.to_string(),
+        Client::get_sender() == psibase::services::auth_delegate::SERVICE.to_string(),
         "'{}' only callable from 'auth-delegate' app",
         context
     );

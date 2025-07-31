@@ -1,15 +1,11 @@
 package accounts:plugin;
 
 interface types {
-    use host:common/types.{origination-data};
-
     record account {
         account-num: string,
         auth-service: string,
         resource-balance: option<u64>,
     }
-
-    type app-details = origination-data;
 }
 
 /// This interface is only available to the top-level app, or its plugin.

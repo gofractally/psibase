@@ -5,14 +5,13 @@ import { z } from "zod";
 const AcceptInviteParams = z.object({
     accountName: z.string(),
     token: z.string(),
-    origin: z.string(),
     app: z.string(),
 });
 
 export const useAcceptInvite = () => {
     return useMutation<void, string, z.infer<typeof AcceptInviteParams>>({
         mutationFn: async (params) => {
-            const { accountName, app, origin, token } =
+            const { accountName, app, token } =
                 AcceptInviteParams.parse(params);
 
             void (await supervisor.functionCall({
@@ -31,13 +30,7 @@ export const useAcceptInvite = () => {
 
             const queryToken = await supervisor.functionCall({
                 method: "loginDirect",
-                params: [
-                    {
-                        app,
-                        origin,
-                    },
-                    accountName,
-                ],
+                params: [app, accountName],
                 service: "accounts",
                 intf: "admin",
             });

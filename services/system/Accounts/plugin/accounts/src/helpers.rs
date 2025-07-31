@@ -9,27 +9,17 @@ pub fn get_assert_top_level_app(
     context: &str,
     privileged_apps: &[&str],
 ) -> Result<String, CommonTypes::Error> {
-    let sender = Client::get_sender_app();
+    let sender_app_name = Client::get_sender();
     let top_level_app = Privileged::get_active_app();
 
-    if sender.app.is_some() {
-        let sender_app_name = sender.app.as_ref().unwrap().as_str();
-        let is_privileged = privileged_apps.contains(&sender_app_name);
+    let is_privileged = privileged_apps.contains(&sender_app_name.as_str());
 
-        let top_level_app_name = top_level_app.app.as_ref().unwrap().as_str();
-        if is_privileged {
-            return Ok(top_level_app_name.to_string());
-        }
+    if is_privileged {
+        return Ok(top_level_app);
+    }
 
-        if sender_app_name == top_level_app_name {
-            return Ok(top_level_app_name.to_string());
-        }
-    } else {
-        return Err(Unauthorized(&format!(
-            "{} can only be called by the top-level app. \nSender app not recognized.",
-            context
-        ))
-        .into());
+    if sender_app_name == top_level_app {
+        return Ok(top_level_app);
     }
 
     return Err(Unauthorized(&format!(
