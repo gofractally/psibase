@@ -127,6 +127,15 @@ namespace psio
          return std::shared_ptr<char_t<T>[]>(std::move(_data), data());
       }
 
+      template <PackableAs<T> U>
+      static shared_view_ptr<T> from_compatible(const U& value)
+      {
+         shared_view_ptr<T> result(psio::size_tag{psio::fracpack_size(value)});
+         fast_buf_stream    stream(result.data(), result.size());
+         psio::to_frac(value, stream);
+         return result;
+      }
+
      private:
       static auto validate(const std::span<const char>& data)
       {
