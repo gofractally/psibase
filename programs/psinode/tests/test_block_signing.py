@@ -39,7 +39,7 @@ class TestBlockSigning(unittest.TestCase):
     @testutil.psinode_test
     def test_verify_wasm_config_pass(self, cluster):
         a = cluster.make_node('a', start=False)
-        subprocess.run(["./psitest", "./generate_verify_with_call.wasm", a.dir, '32', '33'], check=True)
+        testutil.run_test_wasm(["generate_verify_with_call.wasm", a.dir, '32', '33'])
         b = cluster.make_node('b')
         a.start()
         b.connect(a)
@@ -48,7 +48,7 @@ class TestBlockSigning(unittest.TestCase):
     @testutil.psinode_test
     def test_verify_wasm_config_fail(self, cluster):
         a = cluster.make_node('a', start=False)
-        subprocess.run(["./psitest", "./generate_verify_with_call.wasm", a.dir, '16', '16'], check=True)
+        testutil.run_test_wasm(["generate_verify_with_call.wasm", a.dir, '16', '16'])
         b = cluster.make_node('b')
         a.start()
         b.connect(a)
