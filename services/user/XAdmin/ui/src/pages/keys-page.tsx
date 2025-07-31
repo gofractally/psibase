@@ -1,13 +1,8 @@
 import {
     CircleAlert,
-    FileKey,
     FileKey2,
-    Fingerprint,
-    FolderKey,
-    Hexagon,
     Loader2,
     Lock,
-    MoreHorizontal,
     ShieldOff,
     SquarePlus,
     Unlock,
@@ -21,12 +16,8 @@ import { useToast } from "@/components/ui/use-toast";
 
 import { EmptyBlock } from "@/components/EmptyBlock";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
+import { KeysTable } from "@/components/keys-and-devices/keys-table";
 
-import {
-    calculateKeyFingerprint,
-    exportKeyToPEM,
-    hexDERPublicKeyToCryptoKey,
-} from "@/lib/keys";
 import { getErrorMessage } from "@/lib/utils";
 import { KeyDeviceSchema } from "@/types";
 
@@ -40,12 +31,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@shared/shadcn/ui/dropdown-menu";
 import {
     Table,
     TableBody,
@@ -62,22 +47,6 @@ import {
     useKeyDevices,
     useServerKeys,
 } from "../hooks/useKeyDevices";
-
-const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-};
-
-const downloadAsFile = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-};
 
 export const KeysPage = () => {
     const { toast } = useToast();
@@ -104,10 +73,6 @@ export const KeysPage = () => {
 
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
-    const [fingerprints, setFingerprints] = useState<Record<string, string>>(
-        {},
-    );
-
     useEffect(() => {
         if (!isErrorFetchingServerKeys) return;
         toast({
@@ -123,23 +88,12 @@ export const KeysPage = () => {
                 </ToastAction>
             ),
         });
-    }, [isErrorFetchingServerKeys, errorFetchingServerKeys]);
-
-    useEffect(() => {
-        if (!serverKeys || !window.isSecureContext) return;
-
-        const loadFingerprints = async () => {
-            const prints: Record<string, string> = {};
-            for (const key of serverKeys) {
-                prints[key.rawData] = await calculateKeyFingerprint(
-                    key.rawData,
-                );
-            }
-            setFingerprints(prints);
-        };
-
-        loadFingerprints();
-    }, [serverKeys, window.isSecureContext]);
+    }, [
+        isErrorFetchingServerKeys,
+        errorFetchingServerKeys,
+        refetchServerKeys,
+        toast,
+    ]);
 
     if (!window.isSecureContext) {
         return (
@@ -191,46 +145,6 @@ export const KeysPage = () => {
             refetchServerKeys();
             refetchKeyDevices();
         }, 1000);
-    };
-
-    const copyKeyAsPEM = async (derHex: string) => {
-        try {
-            const cryptoKey = await hexDERPublicKeyToCryptoKey(derHex);
-            const pemKey = await exportKeyToPEM(cryptoKey, "PUBLIC KEY");
-            await copyToClipboard(pemKey);
-            toast({
-                title: "Copied",
-                description: "The key has been copied to the clipboard.",
-            });
-        } catch (error) {
-            console.error("Failed to copy key as PEM:", error);
-            const message = getErrorMessage(error);
-            toast({
-                variant: "destructive",
-                title: "Error copying key",
-                description: `${message || "Unknown error"}. Please try again.`,
-            });
-        }
-    };
-
-    const downloadKeyAsPEM = async (derHex: string) => {
-        try {
-            const cryptoKey = await hexDERPublicKeyToCryptoKey(derHex);
-            const pemKey = await exportKeyToPEM(cryptoKey, "PUBLIC KEY");
-            downloadAsFile(pemKey, "publicKey.pem");
-            toast({
-                title: "Downloaded",
-                description: "The key has been downloaded.",
-            });
-        } catch (error) {
-            console.error("Failed to copy key as PEM:", error);
-            const message = getErrorMessage(error);
-            toast({
-                variant: "destructive",
-                title: "Error downloading key",
-                description: `${message || "Unknown error"}. Please try again.`,
-            });
-        }
     };
 
     if (isLoadingServerKeys || isKeyDevicesLoading) {
@@ -448,109 +362,7 @@ export const KeysPage = () => {
                                 />
                             </div>
                         ) : (
-                            <div className="rounded-md border">
-                                <Table className="table-fixed">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-32 text-center">
-                                                Auth service
-                                            </TableHead>
-                                            <TableHead className="w-full">
-                                                Key fingerprint
-                                            </TableHead>
-                                            <TableHead className="w-16 text-right"></TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {serverKeys?.map((key) => (
-                                            <TableRow key={key.rawData}>
-                                                <TableCell className="px-4 py-2 text-center font-mono font-medium">
-                                                    {key.service}
-                                                </TableCell>
-                                                <TableCell className="max-w-0 px-4 py-2">
-                                                    <div className="truncate font-mono">
-                                                        {fingerprints[
-                                                            key.rawData
-                                                        ]?.toUpperCase()}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="px-4 py-2 text-right">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger
-                                                            asChild
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                            >
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">
-                                                                    Open menu
-                                                                </span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem
-                                                                onClick={() => {
-                                                                    copyToClipboard(
-                                                                        fingerprints[
-                                                                            key
-                                                                                .rawData
-                                                                        ]?.toUpperCase(),
-                                                                    );
-                                                                    toast({
-                                                                        title: "Copied",
-                                                                        description:
-                                                                            "The key fingerprint has been copied to the clipboard.",
-                                                                    });
-                                                                }}
-                                                            >
-                                                                <Fingerprint className="mr-2 h-4 w-4" />
-                                                                Copy fingerprint
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() => {
-                                                                    copyToClipboard(
-                                                                        key.rawData,
-                                                                    );
-                                                                    toast({
-                                                                        title: "Copied",
-                                                                        description:
-                                                                            "The key has been copied to the clipboard.",
-                                                                    });
-                                                                }}
-                                                            >
-                                                                <Hexagon className="mr-2 h-4 w-4" />
-                                                                Copy hex DER
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    copyKeyAsPEM(
-                                                                        key.rawData,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <FileKey className="mr-2 h-4 w-4" />
-                                                                Copy PEM
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    downloadKeyAsPEM(
-                                                                        key.rawData,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <FolderKey className="mr-2 h-4 w-4" />
-                                                                Download PEM
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                            <KeysTable />
                         )}
                     </TabsContent>
                 </Tabs>

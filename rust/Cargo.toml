@@ -14,6 +14,7 @@ members = [
     "test_package/query",
     "test_package/service",
     "test_fracpack",
+    "test_fracpack_macros",
     "test_subjective",
     "test_psibase_macros",
 ]
@@ -27,6 +28,7 @@ default-members = [
     "psibase_macros",
     "psibase",
     "test_fracpack",
+    "test_fracpack_macros",
 ]
 
 [workspace.package]

@@ -36,6 +36,18 @@ def new_block():
         return datetime.fromisoformat(timestamp) + timedelta(seconds=1) > now
     return result
 
+def no_new_blocks():
+    print('waiting for block production to stop')
+    def result(node):
+        now = datetime.now(timezone.utc)
+        header = node.get_block_header()
+        timestamp = header['time']
+        print(timestamp)
+        if timestamp.endswith('Z'):
+            timestamp = timestamp[:-1] + '+00:00'
+        return datetime.fromisoformat(timestamp) + timedelta(seconds=2) < now
+    return result
+
 def irreversible(num):
     print("waiting for block %s to be committed" % num)
     def result(node):

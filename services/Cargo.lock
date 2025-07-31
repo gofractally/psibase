@@ -601,6 +601,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.19.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.38.0",
+]
+
+[[package]]
 name = "console"
 version = "0.15.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2079,6 +2089,7 @@ dependencies = [
  "indicatif",
  "jwt",
  "mime_guess",
+ "paste",
  "pem",
  "percent-encoding",
  "pkcs8",
@@ -2828,16 +2839,6 @@ checksum = "5d4f6d1145dcb577acf783d4e601bc1d76a13337bb54e6233add580b07344c8b"
 dependencies = [
  "displaydoc",
  "zerovec",
-]
-
-[[package]]
-name = "tokens"
-version = "0.19.0"
-dependencies = [
- "psibase",
- "serde",
- "serde_json",
- "wit-bindgen-rt 0.26.0",
 ]
 
 [[package]]
