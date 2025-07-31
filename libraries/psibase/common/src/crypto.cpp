@@ -68,7 +68,7 @@ namespace psibase
 
    Checksum256 Merkle::combine(const Checksum256& lhs, const Checksum256& rhs)
    {
-      char buf[1 + lhs.size() + rhs.size()];
+      char buf[1 + 2 * Checksum256{}.size()];
       buf[0]   = '\1';
       auto pos = buf + 1;
       std::memcpy(pos, lhs.data(), lhs.size());

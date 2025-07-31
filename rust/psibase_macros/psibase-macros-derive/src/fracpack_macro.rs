@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use std::str::FromStr;
 use syn::{
-    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed, FieldsUnnamed,
-    LitStr,
+    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed,
+    FieldsUnnamed, LitStr,
 };
 
 /// Fracpack struct level options
@@ -145,7 +145,7 @@ fn enum_named<'a>(
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
             quote! {
                 {
-                    let data = <#as_type as #fracpack_mod::Unpack>::unpack(src, pos)?;
+                    let data = <#as_type as #fracpack_mod::Unpack>::unpack(src)?;
                     #enum_name::#field_name{#init}
                 }
             }
@@ -168,7 +168,7 @@ fn enum_single<'a>(
         selector: quote! {(field_0)},
         pack: quote! {<#ty as #fracpack_mod::Pack>::pack(field_0, dest)},
         unpack: quote! {
-            #enum_name::#field_name(<#ty as #fracpack_mod::Unpack>::unpack(src, pos)?)
+            #enum_name::#field_name(<#ty as #fracpack_mod::Unpack>::unpack(src)?)
         },
     }
 }
@@ -243,7 +243,7 @@ fn enum_tuple<'a>(
                 .fold(quote! {}, |acc, new| quote! {#acc #new});
             quote! {
                 {
-                    let data = <#as_type as #fracpack_mod::Unpack>::unpack(src, pos)?;
+                    let data = <#as_type as #fracpack_mod::Unpack>::unpack(src)?;
                     #enum_name::#field_name(#numbered)
                 }
             }
@@ -358,7 +358,7 @@ fn process_struct(
         .enumerate()
         .map(|(i, field)| {
             let ty = &field.ty;
-            quote! { if last_non_empty_index >= #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
+            quote! { if trailing_empty_index > #i { <#ty as #fracpack_mod::Pack>::FIXED_SIZE } else { 0 } }
         })
         .fold(quote! {0}, |acc, new| quote! {#acc + #new});
 
@@ -377,7 +377,10 @@ fn process_struct(
         quote! {}
     };
     let unpack_heap_size = if !opts.definition_will_not_change {
-        quote! { let fixed_size = <u16 as #fracpack_mod::Unpack>::unpack(src, pos)?; }
+        quote! {
+            let fixed_size = <u16 as #fracpack_mod::Unpack>::unpack(src)?;
+            let mut last_empty = false;
+        }
     } else {
         quote! { let fixed_size = #fixed_size; }
     };
@@ -396,7 +399,7 @@ fn process_struct(
             };
             quote! {
                 #pos_quote
-                if last_non_empty_index >= #i {
+                if trailing_empty_index > #i {
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_pack(&self.#name, dest);
                 }
             }
@@ -412,7 +415,7 @@ fn process_struct(
             let ty = &field.ty;
             let pos = &positions[i];
             quote! {
-                if last_non_empty_index >= #i {
+                if trailing_empty_index > #i {
                     <#ty as #fracpack_mod::Pack>::embedded_fixed_repack(&self.#name, #pos, dest.len() as u32, dest);
                     <#ty as #fracpack_mod::Pack>::embedded_variable_pack(&self.#name, dest);
                 }
@@ -427,12 +430,19 @@ fn process_struct(
         .map(|(i, field)| {
             let name = &field.name;
             let ty = &field.ty;
-            let is_def_wont_change = opts.definition_will_not_change;
-            quote! {
-                let #name = <#ty as #fracpack_mod::Unpack>::check_opt_embedded_unpack(
-                    src, pos, &mut heap_pos,
-                    #is_def_wont_change || #i <= last_non_optional_index,
-                    *pos - initial_pos < fixed_size as u32)?;
+            if !opts.definition_will_not_change {
+                quote! {
+                    let #name = if #i < trailing_optional_index || fixed_pos < heap_pos {
+                        last_empty = <#ty as #fracpack_mod::Unpack>::is_empty_optional(src, &mut fixed_pos.clone())?;
+                        <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, &mut fixed_pos)?
+                    } else {
+                        <#ty as #fracpack_mod::Unpack>::new_empty_optional()?
+                    };
+                }
+            } else {
+                quote! {
+                    let #name = <#ty as #fracpack_mod::Unpack>::embedded_unpack(src, &mut fixed_pos)?;
+                }
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -462,13 +472,14 @@ fn process_struct(
             // let name = &field.name;
             if !opts.definition_will_not_change {
                 quote! {
-                    if !<#ty as #fracpack_mod::Pack>::IS_OPTIONAL || #i <= last_non_optional_index || *pos - initial_pos < fixed_size as u32 {
-                        <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+                    if #i < trailing_optional_index || fixed_pos < heap_pos as u32 {
+                        last_empty = <#ty as #fracpack_mod::Unpack>::is_empty_optional(src, &mut fixed_pos.clone())?;
+                        <#ty as #fracpack_mod::Unpack>::embedded_verify(src, &mut fixed_pos)?;
                     }
                 }
             } else {
                 quote! {
-                    <#ty as #fracpack_mod::Unpack>::embedded_verify(src, pos, &mut heap_pos)?;
+                    <#ty as #fracpack_mod::Unpack>::embedded_verify(src, &mut fixed_pos)?;
                 }
             }
         })
@@ -484,7 +495,7 @@ fn process_struct(
                     let non_empty_fields = vec![
                         #(#check_optional_fields),*
                     ];
-                    let last_non_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).unwrap_or(usize::MAX);
+                    let trailing_empty_index = non_empty_fields.iter().rposition(|&is_non_empty| is_non_empty).map_or(0, |idx| idx + 1);
 
                     let heap = #fixed_data_size;
                     assert!(heap as u16 as u32 == heap); // TODO: return error
@@ -504,44 +515,46 @@ fn process_struct(
         let optional_fields: Vec<bool> = vec![
             #(#optional_fields),*
         ];
-        let last_non_optional_index = optional_fields.iter().rposition(|&is_optional| !is_optional).unwrap_or(usize::MAX);
+        let trailing_optional_index = optional_fields.iter().rposition(|&is_optional| !is_optional).map_or(0, |idx| idx + 1);
     };
 
     let unpack_impl = if impl_unpack {
+        let end_object = if !opts.definition_will_not_change {
+            quote! {
+                src.consume_trailing_optional(fixed_pos, heap_pos, last_empty)?;
+            }
+        } else {
+            quote! {}
+        };
         quote! {
             impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
                 const VARIABLE_SIZE: bool = #use_heap;
                 const FIXED_SIZE: u32 =
                     if <Self as #fracpack_mod::Unpack>::VARIABLE_SIZE { 4 } else { #fixed_size };
-                fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
+                fn unpack(src: &mut #fracpack_mod::FracInputStream<'a>) -> #fracpack_mod::Result<Self> {
                     #unpack_heap_size
 
                     #unpack_last_non_optional_index
 
-                    let mut heap_pos = *pos + fixed_size as u32;
-                    if heap_pos < *pos {
-                        return Err(#fracpack_mod::Error::BadOffset);
-                    }
-                    let initial_pos = *pos;
+                    let mut fixed_pos = src.advance(fixed_size as u32)?;
+                    let heap_pos = src.pos;
                     #unpack
+                    #end_object
                     let result = Self {
                         #field_names_assignment
                     };
-                    *pos = heap_pos;
                     Ok(result)
                 }
-                fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
+                fn verify(src: &mut #fracpack_mod::FracInputStream) -> #fracpack_mod::Result<()> {
                     #unpack_heap_size
 
                     #unpack_last_non_optional_index
 
-                    let mut heap_pos = *pos + fixed_size as u32;
-                    if heap_pos < *pos {
-                        return Err(#fracpack_mod::Error::BadOffset);
-                    }
-                    let initial_pos = *pos;
+                    let mut fixed_pos = src.advance(fixed_size as u32)?;
+                    let heap_pos = src.pos;
                     #verify
-                    *pos = heap_pos;
+                    #end_object
+
                     Ok(())
                 }
             }
@@ -634,6 +647,9 @@ fn process_struct_unnamed(
                 fn new_empty_container() -> #fracpack_mod::Result<Self> {
                     Ok(Self(#ty::new_empty_container()?))
                 }
+                fn new_empty_optional() -> #fracpack_mod::Result<Self> {
+                    Ok(Self(#ty::new_empty_optional()?))
+                }
             },
         )
     } else {
@@ -681,41 +697,39 @@ fn process_struct_unnamed(
                 const VARIABLE_SIZE: bool = #ty::VARIABLE_SIZE;
                 const IS_OPTIONAL: bool = #ty::IS_OPTIONAL;
 
-                fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
-                    let value = #ty::unpack(src, pos)?;
+                fn unpack(src: &mut #fracpack_mod::FracInputStream<'a>) -> #fracpack_mod::Result<Self> {
+                    let value = #ty::unpack(src)?;
                     Ok(#from_value)
                 }
 
-                fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
-                    #ty::verify(src, pos)
+                fn verify(src: &mut #fracpack_mod::FracInputStream) -> #fracpack_mod::Result<()> {
+                    #ty::verify(src)
                 }
 
                 #new_empty_container
 
                 fn embedded_variable_unpack(
-                    src: &'a [u8],
+                    src: &mut #fracpack_mod::FracInputStream<'a>,
                     fixed_pos: &mut u32,
-                    heap_pos: &mut u32,
                 ) -> #fracpack_mod::Result<Self> {
-                    let value = #ty::embedded_variable_unpack(src, fixed_pos, heap_pos)?;
+                    let value = #ty::embedded_variable_unpack(src, fixed_pos)?;
                     Ok(#from_value)
                 }
 
-                fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> #fracpack_mod::Result<Self> {
-                    let value = #ty::embedded_unpack(src, fixed_pos, heap_pos)?;
+                fn embedded_unpack(src: &mut #fracpack_mod::FracInputStream<'a>, fixed_pos: &mut u32) -> #fracpack_mod::Result<Self> {
+                    let value = #ty::embedded_unpack(src, fixed_pos)?;
                     Ok(#from_value)
                 }
 
                 fn embedded_variable_verify(
-                    src: &'a [u8],
+                    src: &mut #fracpack_mod::FracInputStream,
                     fixed_pos: &mut u32,
-                    heap_pos: &mut u32,
                 ) -> #fracpack_mod::Result<()> {
-                    #ty::embedded_variable_verify(src, fixed_pos, heap_pos)
+                    #ty::embedded_variable_verify(src, fixed_pos)
                 }
 
-                fn embedded_verify(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> #fracpack_mod::Result<()> {
-                    #ty::embedded_verify(src, fixed_pos, heap_pos)
+                fn embedded_verify(src: &mut #fracpack_mod::FracInputStream, fixed_pos: &mut u32) -> #fracpack_mod::Result<()> {
+                    #ty::embedded_verify(src, fixed_pos)
                 }
             }
         }
@@ -776,7 +790,7 @@ fn process_enum(
             let index = i as u8;
             let as_type = &field.as_type;
             quote! {
-                #index => <#as_type as #fracpack_mod::Unpack>::verify(src, pos)?,
+                #index => <#as_type as #fracpack_mod::Unpack>::verify(src)?,
             }
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
@@ -805,34 +819,35 @@ fn process_enum(
             impl<'a> #fracpack_mod::Unpack<'a> for #name #generics {
                 const FIXED_SIZE: u32 = 4;
                 const VARIABLE_SIZE: bool = true;
-                fn unpack(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<Self> {
-                    let index = <u8 as #fracpack_mod::Unpack>::unpack(src, pos)?;
-                    let size_pos = *pos;
-                    let size = <u32 as #fracpack_mod::Unpack>::unpack(src, pos)?;
+                fn unpack(outer: &mut #fracpack_mod::FracInputStream<'a>) -> #fracpack_mod::Result<Self> {
+                    let index = <u8 as #fracpack_mod::Unpack>::unpack(outer)?;
+                    let size = <u32 as #fracpack_mod::Unpack>::unpack(outer)?;
+                    let mut inner = outer.read_fixed(size)?;
+                    let src = &mut inner;
                     let result = match index {
                         #unpack_items
                         _ => return Err(#fracpack_mod::Error::BadEnumIndex),
                     };
-                    if *pos != size_pos + 4 + size {
-                        return Err(#fracpack_mod::Error::BadSize);
+                    if src.has_unknown {
+                        outer.has_unknown = true;
                     }
+                    src.finish()?;
                     Ok(result)
                 }
                 // TODO: option to error on unknown index
-                fn verify(src: &'a [u8], pos: &mut u32) -> #fracpack_mod::Result<()> {
-                    let index = <u8 as #fracpack_mod::Unpack>::unpack(src, pos)?;
-                    let size_pos = *pos;
-                    let size = <u32 as #fracpack_mod::Unpack>::unpack(src, pos)?;
+                fn verify(outer: &mut #fracpack_mod::FracInputStream) -> #fracpack_mod::Result<()> {
+                    let index = <u8 as #fracpack_mod::Unpack>::unpack(outer)?;
+                    let size = <u32 as #fracpack_mod::Unpack>::unpack(outer)?;
+                    let mut inner = outer.read_fixed(size)?;
+                    let src = &mut inner;
                     match index {
                         #verify_items
-                        _ => {
-                            *pos = size_pos + 4 + size;
-                            return Ok(());
-                        }
+                        _ => return Err(#fracpack_mod::Error::BadEnumIndex),
                     }
-                    if *pos != size_pos + 4 + size {
-                        return Err(#fracpack_mod::Error::BadSize);
+                    if src.has_unknown {
+                        outer.has_unknown = true;
                     }
+                    src.finish()?;
                     Ok(())
                 }
             }

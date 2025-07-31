@@ -1,7 +1,7 @@
 use crate::{AccountNumber, DbId, MethodNumber};
 use fracpack::{
-    AnyType, CompiledSchema, CompiledType, CustomHandler, CustomTypes, FunctionType, Pack,
-    SchemaBuilder, ToSchema, Unpack, VisitTypes,
+    AnyType, CompiledSchema, CompiledType, CustomHandler, CustomTypes, FracInputStream,
+    FunctionType, Pack, SchemaBuilder, ToSchema, Unpack, VisitTypes,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -180,12 +180,10 @@ impl CustomHandler for CustomAccountNumber {
         &self,
         _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
-        Ok(AccountNumber::new(u64::unpack(src, pos)?)
-            .to_string()
-            .into())
+        Ok(AccountNumber::new(u64::unpack(src)?).to_string().into())
     }
     fn json2frac(
         &self,
@@ -217,10 +215,10 @@ impl CustomHandler for CustomMethodNumber {
         &self,
         _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &[u8],
-        pos: &mut u32,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
-        Ok(MethodNumber::new(u64::unpack(src, pos)?).to_string().into())
+        Ok(MethodNumber::new(u64::unpack(src)?).to_string().into())
     }
     fn json2frac(
         &self,

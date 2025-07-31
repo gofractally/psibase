@@ -1,182 +1,190 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::tokens::plugin::types as Wit;
-use bindings::exports::tokens::plugin::{
-    intf::Guest as Intf, queries::Guest as Queries, transfer::Guest as Transfer,
-};
-use bindings::host::common::types as CommonTypes;
-use bindings::transact::plugin::intf as Transact;
-use psibase::services::tokens as Wrapper;
-use psibase::AccountNumber;
-use query::token_detail::fetch_token;
+use std::str::FromStr;
 
-mod errors;
-use errors::ErrorType;
-struct Component;
+use bindings::exports::tokens::plugin::intf::Guest as Intf;
+use bindings::exports::tokens::plugin::queries::Guest as Queries;
+use bindings::exports::tokens::plugin::transfer::Guest as Transfer;
+use bindings::exports::tokens::plugin::types as Wit;
+
+use bindings::host::common::types::Error;
+use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 
-mod query {
-    pub mod token_detail;
+mod errors;
+use errors::ErrorType;
+use psibase::services::tokens::quantity::Quantity;
+use psibase::AccountNumber;
+use tokens::helpers::{identify_token_type, TokenType};
+
+pub mod query {
+    pub mod fetch_token;
 }
 
-enum TokenType {
-    Number(u32),
-    Symbol(String),
-}
+struct TokensPlugin;
 
-fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error> {
-    use TokenType::{Number, Symbol};
-
-    let first_char = token_id
-        .chars()
-        .next()
-        .ok_or(ErrorType::InvalidTokenId("token id is empty"))?;
-
-    Ok(if first_char.is_ascii_digit() {
-        Number(
-            token_id
-                .parse::<u32>()
-                .map_err(|_| ErrorType::InvalidTokenId("failed to parse token_id to u32"))?,
-        )
-    } else {
-        Symbol(token_id)
-    })
-}
-
-fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error> {
-    let parsed = identify_token_type(token_id)?;
-    match parsed {
+fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, Error> {
+    match identify_token_type(token_id) {
         TokenType::Number(number) => Ok(number),
         TokenType::Symbol(_str) => {
-            Err(ErrorType::NotImplemented("Symbol to token number not ready").into())
+            Err(ErrorType::NotImplemented("Symbol to token number not ready".into()).into())
         }
     }
 }
 
-impl Intf for Component {
-    fn create(
-        precision: Wit::Precision,
-        max_supply: Wit::Quantity,
-    ) -> Result<(), CommonTypes::Error> {
-        Transact::add_action_to_transaction(
-            "create",
-            &Wrapper::action_structs::create {
-                precision: Wrapper::Precision::from(precision),
-                maxSupply: Wrapper::Quantity::new(max_supply.as_str(), precision),
-            }
-            .packed(),
-        )
-    }
+impl Intf for TokensPlugin {
+    fn create(precision: u8, max_issued_supply: Wit::Quantity) -> Result<(), Error> {
+        let max_issued_supply =
+            Quantity::from_str(&max_issued_supply, precision.try_into().unwrap()).unwrap();
 
-    fn burn(
-        token_id: Wit::TokenId,
-        amount: Wit::Quantity,
-        memo: String,
-        account: Wit::AccountNumber,
-    ) -> Result<(), CommonTypes::Error> {
-        let token = fetch_token(token_id_to_number(token_id)?)?;
-
-        if (account.len() as u8) == 0 {
-            Transact::add_action_to_transaction(
-                "burn",
-                &Wrapper::action_structs::burn {
-                    tokenId: token.id,
-                    amount: Wrapper::Quantity::new(amount.as_str(), token.precision),
-                }
-                .packed(),
-            )
-        } else {
-            Transact::add_action_to_transaction(
-                "recall",
-                &Wrapper::action_structs::recall {
-                    tokenId: token.id,
-                    amount: Wrapper::Quantity::new(amount.as_str(), token.precision),
-                    from: AccountNumber::from(account.as_str()),
-                    memo,
-                }
-                .packed(),
-            )
+        let packed_args = tokens::action_structs::create {
+            max_issued_supply,
+            precision: precision.try_into().unwrap(),
         }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
     }
 
-    fn mint(
-        token_id: Wit::TokenId,
-        amount: Wit::Quantity,
-        memo: String,
-    ) -> Result<(), CommonTypes::Error> {
-        let token = fetch_token(token_id_to_number(token_id)?)?;
-
-        Transact::add_action_to_transaction(
-            "mint",
-            &Wrapper::action_structs::mint {
-                amount: Wrapper::Quantity::new(amount.as_str(), token.precision),
-                memo,
-                tokenId: token.id,
-            }
-            .packed(),
-        )
-    }
-}
-
-impl Queries for Component {
-    fn token_owner(token_id: Wit::TokenId) -> Result<Wit::TokenDetail, CommonTypes::Error> {
+    fn burn(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
         let token_id = token_id_to_number(token_id)?;
-        let res = fetch_token(token_id)?;
 
-        Ok(Wit::TokenDetail {
-            id: res.id,
-            owner: res.owner,
-            precision: res.precision,
-            symbol_id: res.symbol_id,
-        })
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
+
+        let packed_args = tokens::action_structs::burn {
+            amount,
+            memo: memo.try_into().unwrap(),
+            token_id: token.id,
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::burn::ACTION_NAME, &packed_args)
+    }
+
+    fn recall(
+        token_id: Wit::TokenId,
+        amount: Wit::Quantity,
+        memo: String,
+        from: Wit::AccountNumber,
+    ) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
+
+        let packed_args = tokens::action_structs::recall {
+            amount,
+            from: from.as_str().into(),
+            memo: memo.try_into().unwrap(),
+            token_id: token.id,
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
+    }
+
+    fn map_symbol(token_id: Wit::TokenId, symbol: Wit::AccountNumber) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let packed_args = tokens::action_structs::mapSymbol {
+            token_id,
+            symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::mapSymbol::ACTION_NAME, &packed_args)
+    }
+
+    fn mint(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
+
+        let packed_args = tokens::action_structs::mint {
+            amount,
+            memo: memo.try_into().unwrap(),
+            token_id: token.id,
+        }
+        .packed();
+        add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
+    }
+
+    fn set_balance_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let packed_args = tokens::action_structs::setBalConf {
+            enabled,
+            index,
+            token_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            tokens::action_structs::setBalConf::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn del_balance_config(token_id: Wit::TokenId) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let packed_args = tokens::action_structs::delBalConf { token_id }.packed();
+
+        add_action_to_transaction(
+            tokens::action_structs::delBalConf::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_token_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let packed_args = tokens::action_structs::setTokenConf {
+            enabled,
+            index,
+            token_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            tokens::action_structs::setTokenConf::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_user_config(index: u8, enabled: bool) -> Result<(), Error> {
+        let packed_args = tokens::action_structs::setUserConf { enabled, index }.packed();
+        add_action_to_transaction(
+            tokens::action_structs::setUserConf::ACTION_NAME,
+            &packed_args,
+        )
     }
 }
 
-impl Transfer for Component {
-    fn uncredit(
+impl Transfer for TokensPlugin {
+    fn credit(
         token_id: Wit::TokenId,
         debitor: Wit::AccountNumber,
         amount: Wit::Quantity,
         memo: String,
-    ) -> Result<(), CommonTypes::Error> {
-        let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
-        let quantity = Wrapper::Quantity::new(amount.as_str(), fetched_token.precision);
+    ) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
 
-        Transact::add_action_to_transaction(
-            "uncredit",
-            &Wrapper::action_structs::uncredit {
-                tokenId: fetched_token.id,
-                memo,
-                maxAmount: quantity,
-                receiver: AccountNumber::from(debitor.as_str()),
-            }
-            .packed(),
-        )
-        .expect("failed to add action to tx");
+        let token = query::fetch_token::fetch_token(token_id)?;
 
-        Ok(())
-    }
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
 
-    fn credit(
-        token_id: Wit::TokenId,
-        receiver: Wit::AccountNumber,
-        amount: Wit::Quantity,
-        memo: String,
-    ) -> Result<(), CommonTypes::Error> {
-        let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
+        let packed_args = tokens::action_structs::credit {
+            amount,
+            memo: memo.try_into().unwrap(),
+            debitor: debitor.as_str().into(),
+            token_id: token.id,
+        }
+        .packed();
 
-        Transact::add_action_to_transaction(
-            "credit",
-            &Wrapper::action_structs::credit {
-                amount: Wrapper::Quantity::new(amount.as_str(), fetched_token.precision),
-                receiver: AccountNumber::from(receiver.as_str()),
-                tokenId: fetched_token.id,
-                memo,
-            }
-            .packed(),
-        )
+        add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
     }
 
     fn debit(
@@ -184,20 +192,83 @@ impl Transfer for Component {
         creditor: Wit::AccountNumber,
         amount: Wit::Quantity,
         memo: String,
-    ) -> Result<(), CommonTypes::Error> {
-        let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
+    ) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
 
-        Transact::add_action_to_transaction(
-            "debit",
-            &Wrapper::action_structs::debit {
-                amount: Wrapper::Quantity::new(amount.as_str(), fetched_token.precision),
-                sender: AccountNumber::from(creditor.as_str()),
-                tokenId: fetched_token.id,
-                memo,
-            }
-            .packed(),
-        )
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
+
+        let packed_args = tokens::action_structs::debit {
+            amount,
+            creditor: creditor.as_str().into(),
+            memo: memo.try_into().unwrap(),
+            token_id: token.id,
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::debit::ACTION_NAME, &packed_args)
+    }
+
+    fn reject(
+        token_id: Wit::TokenId,
+        creditor: Wit::AccountNumber,
+        memo: String,
+    ) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let packed_args = tokens::action_structs::reject {
+            creditor: creditor.as_str().into(),
+            token_id: token.id,
+            memo: memo.try_into().unwrap(),
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::reject::ACTION_NAME, &packed_args)
+    }
+
+    fn uncredit(
+        token_id: Wit::TokenId,
+        debitor: Wit::AccountNumber,
+        amount: Wit::Quantity,
+        memo: String,
+    ) -> Result<(), Error> {
+        let token_id = token_id_to_number(token_id)?;
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        let amount = Quantity::from_str(&amount, token.precision).unwrap();
+
+        let packed_args = tokens::action_structs::uncredit {
+            amount,
+            memo: memo.try_into().unwrap(),
+            debitor: debitor.as_str().into(),
+            token_id: token.id,
+        }
+        .packed();
+
+        add_action_to_transaction(tokens::action_structs::uncredit::ACTION_NAME, &packed_args)
     }
 }
 
-bindings::export!(Component with_types_in bindings);
+impl Queries for TokensPlugin {
+    fn token_owner(token_id: Wit::TokenId) -> Result<Wit::TokenDetail, Error> {
+        let token_id = token_id_to_number(token_id)?;
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        Ok(Wit::TokenDetail {
+            id: token.id,
+            owner: token.owner.to_string(),
+            symbol_id: token
+                .symbol
+                .map(|symbol| symbol.to_string())
+                .unwrap_or("".to_string()),
+            precision: token.precision.value(),
+            current_supply: token.current_supply.to_string(),
+            max_issued_supply: token.max_issued_supply.to_string(),
+        })
+    }
+}
+
+bindings::export!(TokensPlugin with_types_in bindings);
