@@ -173,8 +173,8 @@ namespace psibase
 
    struct BlockHeaderWasmConfig
    {
-      uint32_t    numExecutionMemories;
-      VMOptions   vmOptions;
+      uint32_t    numExecutionMemories = 0;
+      VMOptions   vmOptions            = {0, 0, 0, 0};
       friend bool operator==(const BlockHeaderWasmConfig&, const BlockHeaderWasmConfig&) = default;
       PSIO_REFLECT(BlockHeaderWasmConfig, numExecutionMemories, vmOptions)
    };
