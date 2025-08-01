@@ -43,8 +43,7 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build' && yarn build:auth-cookie",
-        "build:auth-cookie": "vite build --config vite.auth-cookie.config.ts",
+        "build": "node ../../../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'",
         "preview": "vite preview",
         "format": "prettier --write 'src/**/*.ts'"
     },
@@ -55,8 +54,7 @@
         "prettier-plugin-tailwindcss": "^0.5.13",
         "typescript": "^5.7.3",
         "vite": "^5.4.1",
-        "vite-plugin-dts": "^4.5.0",
-        "vite-plugin-static-copy": "^3.0.2"
+        "vite-plugin-dts": "^4.5.0"
     },
     "dependencies": {
         "elliptic": "^6.5.4",

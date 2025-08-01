@@ -12,9 +12,8 @@ using namespace psibase;
 TEST_CASE("getCookie")
 {
    HttpRequest request{.headers = {{"CooKiE", "foo=10; bar=27; session=xxx"}}};
-   auto        value = request.getCookie("bar");
-   CHECK(!!value);
-   CHECK(*value == "27");
+   auto        values = request.getCookie("bar");
+   CHECK(values == std::vector<std::string_view>{"27"});
 }
 
 TEST_CASE("removeCookie")
