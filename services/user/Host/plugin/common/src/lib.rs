@@ -57,7 +57,7 @@ impl Admin for HostCommon {
     }
 
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
-        check_caller(&["accounts"], "post@host:common/admin");
+        check_caller(&["accounts", "host"], "post@host:common/admin");
 
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(app, endpoint, request.body)?;

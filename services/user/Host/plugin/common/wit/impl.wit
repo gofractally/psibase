@@ -8,5 +8,6 @@ world impl {
     export client;
     export types;
     export admin;
+    // export auth;
     export store;
 }

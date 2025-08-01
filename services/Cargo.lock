@@ -1219,6 +1219,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-auth"
+version = "0.19.0"
+dependencies = [
+ "chrono",
+ "psibase",
+ "rand",
+ "serde",
+ "serde_json",
+ "urlencoding",
+ "wit-bindgen-rt 0.28.0",
+]
+
+[[package]]
 name = "host-common"
 version = "0.19.0"
 dependencies = [
