@@ -1,0 +1,8 @@
+package host:auth;
+
+world impl {
+    include host:common/imports;
+    include host:common/privileged;
+
+    export api;
+}

@@ -1,0 +1,14 @@
+package host:auth;
+
+/// Calls that are tied to the web platform
+interface api {
+    /// Privileged apps can get the auth cookie to make calls on user's behalf
+    get-auth-cookie: func(app: string, user: string) -> option<string>;
+
+    /// Privileged apps can set/store an auth cookie to make calls on user's behalf
+    set-auth-cookie: func(query-token: string, for-app: string, user: string);
+}
+
+world imports {
+    import api;
+}
