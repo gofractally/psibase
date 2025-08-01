@@ -1,0 +1,27 @@
+[package]
+name = "host-auth"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+psibase = { version = "0.19.0", path = "../../../../../rust/psibase" }
+rand = "0.9.1"
+chrono = "0.4"
+urlencoding = "2.1.2"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "host:auth"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+# "supervisor:bridge" = { path = "../../../Host/plugin/common/wit/deps/supervisor.wit" }
+"accounts:plugin" = { path = "../../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"host:common" = { path = "../common/wit/world.wit" }
