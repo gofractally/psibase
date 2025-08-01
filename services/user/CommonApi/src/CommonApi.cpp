@@ -109,7 +109,7 @@ namespace SystemService
             headers.push_back({"Set-Cookie", cookieValue});
 
             return HttpReply{.status      = HttpStatus::ok,
-                             .contentType = "application/json",
+                             .contentType = "text/plain",
                              .body        = {},
                              .headers     = headers};
          }

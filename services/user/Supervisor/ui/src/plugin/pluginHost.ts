@@ -127,13 +127,16 @@ export class PluginHost implements HostInterface {
                 });
             const contentType = xhr.getResponseHeader("content-type") || "";
             const tag = this.getBodyTagFromContentType(contentType);
+
             return {
                 status: xhr.status,
                 headers: convertBack(headers),
-                body: {
-                    tag,
-                    val: body,
-                },
+                body: body
+                    ? {
+                          tag,
+                          val: body,
+                      }
+                    : null,
             };
         } catch (err: any) {
             if (

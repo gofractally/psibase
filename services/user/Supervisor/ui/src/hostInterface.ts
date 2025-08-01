@@ -18,7 +18,7 @@ export interface HttpRequest {
 export interface HttpResponse {
     status: number;
     headers: { key: string; value: string }[];
-    body: BodyType;
+    body: BodyType | null;
 }
 
 export interface BodyType {
