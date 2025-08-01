@@ -392,7 +392,7 @@ struct test_chain
       // These are not the correct values if we want the chain to actually
       // sync correctly, but it's sufficient for the tester to test services.
       auto term      = status ? status->current.term : 0;
-      auto commitNum = status ? status->current.blockNum : 0;
+      auto commitNum = status ? status->head.value().header.blockNum : 0;
 
       blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();

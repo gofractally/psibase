@@ -276,7 +276,6 @@ TEST_CASE("truncated fork switch", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
    //
-   auto state   = JointConsensus{.current = {.data = bft("a", "b", "c", "d")}};
    auto root    = node.headState();
    auto block1a = makeBlock(root, "b", 4);
    auto block1b = makeBlock(block1a, "b", 4);

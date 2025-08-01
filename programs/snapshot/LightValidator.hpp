@@ -128,13 +128,13 @@ namespace psibase
       {
          if (status)
          {
-            state     = status->consensus;
-            stateHash = sha256(state);
-            const auto& services =
-                state.next ? state.next->consensus.services : status->consensus.current.services;
+            state                 = status->consensus;
+            stateHash             = sha256(state);
+            const auto& consensus = state.next ? state.next->consensus : status->consensus.current;
             check(!!status->head, "Missing head");
             current = status->head->header;
-            psibase::copyServices(authServices.base(), handle, services);
+            psibase::copyServices(authServices.base(), handle, consensus.services,
+                                  consensus.wasmConfig);
          }
       }
       // Writes the current set of auth services to prevAuthServices.
@@ -269,7 +269,8 @@ namespace psibase
       }
       void updateVerifyState()
       {
-         updateServices(authServices.base(), state.current.services, state.next->consensus.services,
+         updateServices(authServices.base(), state.current.services, state.current.wasmConfig,
+                        state.next->consensus.services, state.next->consensus.wasmConfig,
                         pendingCode);
          pendingCode.clear();
       }

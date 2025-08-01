@@ -107,21 +107,35 @@ namespace psibase
    }
 
    template <typename Database>
+   void writeWasmConfig(Database& dest, const BlockHeaderWasmConfig& wasmConfig)
+   {
+      WasmConfigRow row{.numExecutionMemories = wasmConfig.numExecutionMemories,
+                        .vmOptions            = wasmConfig.vmOptions};
+      dest.kvPut(WasmConfigRow::db, row.key(proofWasmConfigTable), row);
+   }
+
+   template <typename Database>
    void copyServices(Database&                                  dest,
                      Database&                                  src,
-                     const std::vector<BlockHeaderAuthAccount>& services)
+                     const std::vector<BlockHeaderAuthAccount>& services,
+                     const BlockHeaderWasmConfig&               wasmConfig)
    {
       copyCodeByHash(dest, src, services);
       writeCode(dest, services);
+      writeWasmConfig(dest, wasmConfig);
    }
 
    template <typename Database>
    void updateServices(Database&                                  db,
                        const std::vector<BlockHeaderAuthAccount>& oldServices,
+                       const BlockHeaderWasmConfig&               oldWasmConfig,
                        const std::vector<BlockHeaderAuthAccount>& newServices,
+                       const BlockHeaderWasmConfig&               newWasmConfig,
                        const std::vector<BlockHeaderCode>&        authCode)
    {
       updateCodeByHash(db, oldServices, newServices, authCode);
       updateCode(db, oldServices, newServices);
+      if (oldWasmConfig != newWasmConfig)
+         writeWasmConfig(db, newWasmConfig);
    }
 }  // namespace psibase

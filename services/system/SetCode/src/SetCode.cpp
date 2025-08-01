@@ -1,5 +1,6 @@
 #include <psibase/dispatch.hpp>
 #include <services/system/SetCode.hpp>
+#include <services/system/Transact.hpp>
 
 using namespace psibase;
 
@@ -44,6 +45,9 @@ namespace SystemService
       {
          if (flags & CodeRow::isAuthService)
          {
+            auto status = getStatus();
+            if (status.consensus.next && status.consensus.next->blockNum != status.current.blockNum)
+               abortMessage("Cannot update verify services while a consensus update is pending");
             auto verifySeq = SetCode{}.open<VerifySequenceTable>();
             auto row       = verifySeq.get({}).value_or(VerifySequenceRow{});
             ++row.seq;

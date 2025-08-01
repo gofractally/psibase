@@ -233,6 +233,7 @@ namespace psibase
       bool                              isPublicChain;
 
       explicit TestChain(uint32_t chain_id, bool clone, bool pub = true);
+      void setSignature(BlockNum blockNum, std::vector<char> sig);
 
      public:
       // Clones the chain
@@ -307,6 +308,16 @@ namespace psibase
        * Finish the current pending block.  If no block is pending, creates an empty block.
        */
       void finishBlock();
+
+      template <typename F>
+      void finishBlock(F&& sign)
+      {
+         finishBlock();
+         auto               status = kvGet<StatusRow>(StatusRow::db, statusKey()).value();
+         const auto&        head   = status.head.value();
+         BlockSignatureInfo preimage{head};
+         setSignature(head.header.blockNum, sign(static_cast<std::span<const char>>(preimage)));
+      }
 
       /*
        * Set the reference block of the transaction to the head block.
@@ -496,6 +507,12 @@ namespace psibase
       };
 
       auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
+
+      template <typename Other>
+      auto to()
+      {
+         return ServiceUser<Other>(*this, Other::service, Other::service, KeyList{});
+      }
 
       std::uint32_t nativeHandle() const { return id; }
 

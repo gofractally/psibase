@@ -7,6 +7,7 @@ import time
 import math
 import os
 import shutil
+import subprocess
 import requests
 
 def psinode_test(f):
@@ -77,6 +78,20 @@ def libsofthsm2():
         result = 'libsofthsm2.so'
     return result
 
+def run_test_wasm(command):
+    dirname = os.path.dirname(args.psinode)
+    if dirname == '':
+        psitest = 'psitest'
+    elif os.path.exists(os.path.join(dirname, 'psitest')):
+        psitest = os.path.join(dirname, 'psitest')
+    else:
+        psitest = 'psitest'
+
+    test_wasms = args.test_wasms
+    if test_wasms is None:
+        test_wasms = dirname
+    return subprocess.run([psitest, os.path.join(test_wasms, command[0])] + command[1:], check=True)
+
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--psinode", default="psinode", help="The path to the psinode executable")
@@ -85,6 +100,7 @@ def main(argv=sys.argv):
     parser.add_argument('--print-logs', metavar='NODE', action='append', help="Nodes whose logs should be printed")
     parser.add_argument('--test-packages', metavar='DIRECTORY', help="Directory containing test packages")
     parser.add_argument('--libsofthsm2', metavar='PATH', help="Path to libsofthsm.so")
+    parser.add_argument('--test-wasms', metavar='PATH', help="Directory containing wasm programs used by the test suite")
     global args
     (args, remaining) = parser.parse_known_args(argv)
     unittest.main(argv=remaining)

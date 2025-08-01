@@ -232,8 +232,9 @@ TestBlock makeBlock(const BlockInfo&                   info,
          {
             using param_tuple =
                 psio::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
-            auto params                        = psio::view<const param_tuple>(act.rawData());
-            newBlock.block.header.newConsensus = Consensus{get<0>(params), {}};
+            auto params = psio::view<const param_tuple>(act.rawData());
+            newBlock.block.header.newConsensus =
+                Consensus{get<0>(params), newState.current.services, newState.current.wasmConfig};
             check(!newState.next, "Joint consensus is already running");
             newState.next = {*newBlock.block.header.newConsensus, newBlock.block.header.blockNum};
          }
