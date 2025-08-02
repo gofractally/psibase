@@ -1,25 +1,34 @@
 package permissions:plugin;
 
 interface admin {
-    use types.{prompt-context};
     use host:common/types.{error};
 
-    /// Save a permission granting a `caller` app permission on the `callee` app
-    /// 
-    /// Params:
-    /// `user` - The user granting access
-    /// `caller` - The app requesting access to use `callee` on behalf of `user`
-    /// `callee` - The app on whom functionality or data is being requested
-    save-perm: func(user: string, caller: string, callee: string);
+    record prompt-context {
+        user: string,
+        caller: string,
+        callee: string,
+        trust-level: u8,
+        description: string,
+    }
+
+    /// The duration for which an approval is granted.
+    enum approval-duration {
+
+        /// Only grant this permission for the current session
+        session,
+
+        /// Grant this permission permanently until updated or deleted
+        permanent, 
+    }
 
     /// Gets the context of a particular user-prompt
     get-context: func(context-id: string) -> prompt-context;
 
     /// Approve a prompt for permissions
-    approve: func(context-id: string);
+    approve: func(context-id: string, duration: approval-duration);
 
-    /// Deny a prompt for permissions
-    deny: func(context-id: string);
+    // Note: no need to implement any `deny` function. To deny a permissions 
+    //      popup is simpy to not approve it.
 }
 
 world impl {

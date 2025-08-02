@@ -7,7 +7,7 @@ interface api {
     record trigger-details {
         subdomain: string,
         payload: string,
-        context-id: option<u32>,
+        context-id: option<string>,
     }
 
     /// Used by the supervisor app to facilitate the interaction with the user

@@ -25,7 +25,7 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
-        AccountsPlugin::get_current_user().is_some()
+        Self::get_current_user().is_some()
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {

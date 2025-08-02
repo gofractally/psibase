@@ -5,6 +5,9 @@ use bindings::*;
 mod errors;
 use errors::ErrorType;
 
+mod db;
+use db::*;
+
 use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
 use host::common::client::{get_app_url, get_sender_app};
@@ -23,7 +26,7 @@ struct ActivePrompt {
     subdomain: String,
     payload: String, // e.g. subpath for web platform
     expiry_timestamp: u32,
-    context_id: Option<u32>,
+    context_id: Option<String>,
     return_payload: Option<String>, // e.g. subpath on subdomain for web platform
 }
 
@@ -91,7 +94,7 @@ impl Web for HostPrompt {
     // TODO: Rather than prompting with a subpath, the app must register a name for a
     //   prompt, and they specify it by name. When the host goes to frame the prompt, it will
     //   dynamically look up the subpath via the registered prompt name.
-    fn prompt_user(subpath: Option<String>, context_id: Option<u32>) -> Result<(), Error> {
+    fn prompt_user(subpath: Option<String>, context_id: Option<String>) -> Result<(), Error> {
         let mut subpath = subpath.unwrap_or("/".to_string());
         validate_subpath(&subpath)?;
 
@@ -126,6 +129,15 @@ impl Web for HostPrompt {
             },
             message: redirect_url,
         });
+    }
+
+    fn store_context(packed_context: Vec<u8>) -> String {
+        PromptContexts::get_id(packed_context)
+    }
+
+    fn get_context(context_id: String) -> Result<Vec<u8>, Error> {
+        Ok(PromptContexts::get(context_id.clone())
+            .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(context_id.clone())))?)
     }
 }
 

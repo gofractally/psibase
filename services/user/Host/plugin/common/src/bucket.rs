@@ -1,3 +1,4 @@
+use crate::accounts::plugin::api as Accounts;
 use crate::exports::host::common::{
     store::{Database, DbMode, GuestBucket, StorageDuration},
     types::Error,
@@ -155,7 +156,18 @@ impl GuestBucket for Bucket {
             DbMode::Transactional => "trx",
         };
         let chain_id = get_chain_id();
-        let bucket_id = format!("{}:{}:{}:{}", chain_id, mode, service_account, identifier);
+
+        let bucket_id = if db.mode == DbMode::Transactional {
+            // Transactional databases are additionally namespaced by the current user
+            let current_user = Accounts::get_current_user()
+                .expect("User must be logged in to use the transactional database");
+            format!(
+                "{}:{}:{}:{}:{}",
+                chain_id, mode, current_user, service_account, identifier
+            )
+        } else {
+            format!("{}:{}:{}:{}", chain_id, mode, service_account, identifier)
+        };
         Self { bucket_id, db }
     }
 

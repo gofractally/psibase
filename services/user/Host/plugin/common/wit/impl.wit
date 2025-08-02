@@ -2,6 +2,7 @@ package host:common;
 
 world impl {
     include supervisor:bridge/imports;
+    import accounts:plugin/api;
 
     export server;
     export client;
