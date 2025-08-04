@@ -22,5 +22,7 @@ export const useLoginDirect = () =>
                 intf: "admin",
             });
             console.log("returned queryToken:", queryToken);
+
+            window.location.href = origin;
         },
     });

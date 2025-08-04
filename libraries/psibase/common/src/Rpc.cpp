@@ -81,23 +81,34 @@ namespace psibase
       return decode_pct(std::string_view(target).substr(0, target.find('?')));
    }
 
-   std::optional<std::string_view> HttpRequest::getCookie(std::string_view name) const
+   std::vector<std::string_view> HttpRequest::getCookie(std::string_view name) const
+   {
+      if (auto cookieHeader = getHeader("cookie"))
+      {
+         std::vector<std::string_view> values;
+         for (auto kvrange : *cookieHeader | std::views::split(';'))
+         {
+            std::string_view kv  = split2sv(kvrange);
+            auto             pos = kv.find('=');
+            check(pos != std::string_view::npos, "Invalid cookie");
+            auto leading = kv.find_first_not_of(" \t");
+            auto key     = kv.substr(leading, pos - leading);
+            auto value   = kv.substr(pos + 1);
+            if (key == name)
+               values.push_back(value);
+         }
+         return values;
+      }
+      return {};
+   }
+
+   std::optional<std::string_view> HttpRequest::getHeader(std::string_view name) const
    {
       for (const auto& header : headers)
       {
-         if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
+         if (header.matches(name))
          {
-            for (auto kvrange : header.value | std::views::split(';'))
-            {
-               std::string_view kv  = split2sv(kvrange);
-               auto             pos = kv.find('=');
-               check(pos != std::string_view::npos, "Invalid cookie");
-               auto leading = kv.find_first_not_of(" \t");
-               auto key     = kv.substr(leading, pos - leading);
-               auto value   = kv.substr(pos + 1);
-               if (key == name)
-                  return value;
-            }
+            return header.value;
          }
       }
       return {};
@@ -140,5 +151,29 @@ namespace psibase
          }
          ++iter;
       }
+   }
+
+   bool isLocalhost(const HttpRequest& request)
+   {
+      std::string_view domain = request.host;
+
+      // Find the end of the domain name (either at first colon or end of string)
+      size_t domainEndPos = domain.find(':');
+      if (domainEndPos != std::string_view::npos)
+      {
+         domain = domain.substr(0, domainEndPos);
+      }
+
+      if (domain == "localhost")
+      {
+         return true;
+      }
+
+      if (domain.size() > 10 && domain.ends_with(".localhost"))
+      {
+         return true;
+      }
+
+      return false;
    }
 }  // namespace psibase

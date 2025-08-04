@@ -51,7 +51,7 @@ impl Queries for BrandingPlugin {
         let graphql_str = "query { networkName }";
 
         let netname_val = serde_json::from_str::<NetworkNameResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
+            &CommonServer::post_graphql_get_json(&graphql_str).map_err(|err| ErrorType::QueryAuthError(err.to_string()))?,
         );
 
         let netname_val =

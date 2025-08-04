@@ -33,6 +33,8 @@ impl Risks {
                 - Set the public key for your account
                 - Sign transactions on your behalf
                 - Read the private key for a given public key
+                - Create new keypairs
+                - Import existing keypairs
             "},
             _ => "",
         }
