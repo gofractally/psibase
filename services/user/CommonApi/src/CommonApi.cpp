@@ -12,6 +12,17 @@ using namespace psibase;
 
 namespace SystemService
 {
+   struct cookie_data
+   {
+      std::string accessToken;
+   };
+   PSIO_REFLECT(cookie_data, accessToken);
+
+   int getCookieMaxAge()
+   {
+      static constexpr int EXPIRATION_IN_DAYS = 30;
+      return EXPIRATION_IN_DAYS * 24 * 60 * 60;
+   }
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
@@ -78,6 +89,29 @@ namespace SystemService
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(trx),
             };
+         }
+         if (request.target == "/common/set-auth-cookie")
+         {
+            request.body.push_back(0);
+            psio::json_token_stream jstream{request.body.data()};
+            auto                    params = psio::from_json<cookie_data>(jstream);
+
+            std::vector<HttpHeader> headers;
+            bool                    isLocalhost = psibase::isLocalhost(request);
+            std::string             cookieName  = "__Host-SESSION";
+
+            std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" +
+                                        std::to_string(getCookieMaxAge());
+            if (isLocalhost)
+               cookieName = "SESSION";
+
+            std::string cookieValue = cookieName + "=" + params.accessToken + "; " + cookieAttribs;
+            headers.push_back({"Set-Cookie", cookieValue});
+
+            return HttpReply{.status      = HttpStatus::ok,
+                             .contentType = "application/json",
+                             .body        = {},
+                             .headers     = headers};
          }
       }
       return std::nullopt;

@@ -15,9 +15,9 @@ pub type NID = u32;
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
 pub struct NftRecord {
-    id: NID,
-    issuer: AccountNumber,
-    owner: AccountNumber,
+    pub id: NID,
+    pub issuer: AccountNumber,
+    pub owner: AccountNumber,
 }
 
 #[derive(

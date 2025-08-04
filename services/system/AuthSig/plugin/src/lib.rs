@@ -30,24 +30,25 @@ use rand_core::OsRng;
 
 define_trust! {
     descriptions {
-        2 => "
-        Level 2 trust grants these abilities:
+        1 => "
+        Level 1 trust grants these abilities:
             - Create new keypairs
             - Import existing keypairs
-            - Consume account resources
         ",
-        5 => "
-        Level 5 trust grants these abilities:
+        3 => "
+        Level 3 trust grants these abilities:
             - Set the public key for your account
             - Sign transactions on your behalf
-            - Extract your private key from your public key
-            - Consume account resources
+            - Read the private key for a given public key
+            - Create new keypairs
+            - Import existing keypairs
         ",
     }
+
     functions {
         0 => [generate_unmanaged_keypair, pub_from_priv, to_der, sign],
-        2 => [generate_keypair, import_key],
-        5 => [priv_from_pub, set_key],
+        1 => [generate_keypair, import_key],
+        3 => [priv_from_pub, set_key],
     }
 }
 use trust::authorize;

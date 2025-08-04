@@ -17,6 +17,7 @@
             "user/Branding/ui",
             "user/Explorer/ui",
             "user/Evaluations/ui",
+            "user/Config/ui",
             "user/Fractals/ui",
             "user/Homepage/ui",
             "user/Identity/ui",

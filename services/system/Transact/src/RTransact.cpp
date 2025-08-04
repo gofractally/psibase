@@ -379,8 +379,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-       -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id,
+                         const ClientFilter&         clientFilter) -> ClaimedSockets
    {
       {
          auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
@@ -713,20 +713,20 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    {
       if (!trace.error().has_value())
       {
-         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessRecord{
+         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessView{
              .id       = id,
              .blockNum = to<Transact>().currentBlock().blockNum,
-             .trace    = trace.unpack(),
+             .trace    = trace,
          });
       }
       else
       {
          PSIBASE_SUBJECTIVE_TX
          {
-            Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+            Subjective{}.open<TxFailedTable>().put(TxFailedView{
                 .id         = id,
                 .expiration = row->expiration,
-                .trace      = trace.unpack(),
+                .trace      = trace,
             });
          }
       }
@@ -736,6 +736,9 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    {
       sendReply(id, trace, WaitFor::isApplied);
    }
+#ifdef __wasm32__
+   printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
+#endif
 }
 
 void RTransact::onBlock()
@@ -884,10 +887,10 @@ void RTransact::onVerify(std::uint64_t                      id,
                {
                   if (std::ranges::any_of(client->clients, WaitFor::isFinal))
                   {
-                     Subjective{}.open<TxFailedTable>().put(TxFailedRecord{
+                     Subjective{}.open<TxFailedTable>().put(TxFailedView{
                          .id         = tx->id,
                          .expiration = tx->expiration,
-                         .trace      = trace.unpack(),
+                         .trace      = trace,
                      });
                   }
                   if (std::ranges::any_of(client->clients, WaitFor::isApplied))
@@ -1421,6 +1424,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
+   bool                         isLocalhost = psibase::isLocalhost(request);
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
@@ -1443,9 +1447,13 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
             return result;
       }
    }
-   if (auto token = request.getCookie("__Host-SESSION"))
+
+   std::string_view cookieName = isLocalhost ? "SESSION" : "__Host-SESSION";
+
+   auto tokens = request.getCookie(cookieName);
+   for (const auto& token : tokens)
    {
-      auto decoded = decodeJWT<LoginTokenData>(key, *token);
+      auto decoded = decodeJWT<LoginTokenData>(key, token);
       if (decoded.aud == request.rootHost && checkExp(decoded.exp))
          return decoded.sub;
    }

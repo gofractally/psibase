@@ -1986,6 +1986,7 @@ dependencies = [
  "jwt",
  "lazy_static",
  "mime_guess",
+ "paste",
  "pem",
  "percent-encoding",
  "pkcs8",

@@ -13,6 +13,8 @@ interface types {
         owner: string,
         precision: u8,
         symbol-id: string,
+        current-supply: quantity,
+        max-issued-supply: quantity,
     }
 
     record balance {
@@ -28,8 +30,18 @@ interface intf {
     use types.{precision, quantity, token-id, account-number};
     
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
-    burn: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+    burn: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+    recall: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
     mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+
+    map-symbol: func(token-id: token-id, symbol: account-number) -> result<_, error>;
+
+    set-balance-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
+    del-balance-config: func(token-id: token-id) -> result<_, error>;
+
+    set-token-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
+    set-user-config: func(index: u8, enabled: bool) -> result<_, error>;
+    
 }
 
 interface queries {
@@ -45,6 +57,8 @@ interface transfer {
     uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
     credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
     debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    reject: func(token-id: token-id, creditor: account-number, memo: string) -> result<_, error>;
+
 
 }
 

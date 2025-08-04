@@ -31,6 +31,7 @@ lazy_static = "1.4"
 indoc = "2.0"
 sha2 = "0.10"
 mime_guess = "2.0"
+paste = "1.0"
 pem = "3.0.4"
 percent-encoding = "2.3"
 psibase_macros = { version = "0.19.0", path = "../psibase_macros" }

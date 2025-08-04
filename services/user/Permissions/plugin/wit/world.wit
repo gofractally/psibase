@@ -4,18 +4,13 @@ interface types {
     /// This represents the trust threshold for a third-party application to
     /// perform an action on the user's behalf. It's just a hint to help guide the user.
     record trust {
-        /// Valid values: `0`-`6`
-        /// * `0`: Anyone can call
-        /// * `1`-`5`: Higher number = higher required trust
-        /// * `6`: No one can call (except the callee app itself)
+        /// Valid values: `0`-`4`. See description of standardized levels in the documentation 
+        /// for the `authorize` function.
         level: u8,
 
-        /// A description that will be placed on the UI shown to the user, following the text,
-        /// "By authorizing, you trust <caller> with these abilities:"
-        ///
-        /// The description should naturally follow that preface. For example:
-        /// Good description: "- Bake a cake"
-        /// Bad description: "This will allow the caller to bake a cake."
+        /// A description that will be placed on the UI shown to the user. Intended to provide
+        ///   context that may help the user determine if they sufficiently trust the 
+        ///   requesting app. 
         description: string,
     }
 }
@@ -28,16 +23,23 @@ interface api {
     ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
     ///     permission, this function will cause the user to be prompted to consider the request.
     /// 
-    /// Parameters: 
-    /// * `caller`      - The app requesting permission
-    /// * `trust`       - The level of trust needed for a third-party application to perform this action on the user's 
-    ///                   behalf. Riskier operations (Operations that could be misused to greater user detriment) should
-    ///                   require more trust. This is just a hint to help the user decide whether to allow an operation.
-    /// * `debug-label` - If an unexpected error occurs, this label will be printed with the error message to help you
-    ///                   track down the root cause.
-    /// * `whitelist`   - A list of accounts who are pre-authorized to perform this action. Whitelisted
-    ///                   accounts will not be generally authorized for the specified `trust` level, they will simply
-    ///                   be considered authorized for the purposes of this authorization check.
+    /// # Arguments
+    ///
+    /// - `caller`: The app requesting permission.
+    /// - `trust`: The level of trust needed for a third-party application to perform this action
+    ///   on the user's behalf. `trust.description` is text that will be shown to help guide the user in their decision.
+    ///   Valid `trust.level` values are from `0` to `4`, corresponding to:
+    ///   - `0`: No meaningful risk (e.g., read-only calls on public data).
+    ///   - `1`: Low risk — can consume client-side user resources or make some authenticated queries.
+    ///   - `2`: Medium risk — can consume server-side resources or modify app-local user data. If data is app-local, 
+    ///          that implies modifying it will not have any side-effects outside of your app.
+    ///   - `3`: High risk — access to data or functionality that can affect the user outside of your app
+    ///     or involves other users (e.g., sending messages, updating keys, reading private user-data).
+    ///   - `4`: Too risky for third-party apps; should only be called by your own app.
+    /// - `debug_label`: If an unexpected error occurs, this label will be printed with the error
+    ///   message to help track down the root cause.
+    /// - `whitelist`: A list of accounts who are pre-authorized to perform this action.
+    ///   These accounts are not generally authorized at the specified `trust` level but will pass this check.
     authorize: func(caller: string, trust: trust, debug-label: string, whitelist: list<string>) -> result<bool, error>;
 }
 

@@ -21,8 +21,6 @@ ExternalProject_Add(CommonApiCommonLib_js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
         ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/index.d.ts
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/auth-cookie.html
-        ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/auth-cookie.js
     INSTALL_COMMAND ""
     BUILD_ALWAYS 1
 )
@@ -31,8 +29,6 @@ ExternalProject_Add(CommonApiCommonLib_js
 set(UI_PROJECTS
     system/Accounts/ui:Accounts_js
     system/AuthSig/ui:AuthSig_js
-    system/Producers/ui:Producers_js
-    user/Branding/ui:Branding_js
     user/Evaluations/ui:Evaluations_js
     user/Fractals/ui:Fractals_js
     user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
@@ -43,6 +39,7 @@ set(UI_PROJECTS
     user/Permissions/ui:Permissions_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
+    user/Config/ui:Config_js
     user/XAdmin/ui:XAdmin_js
 )
 

@@ -13,23 +13,23 @@
 /// ```rust,ignore
 /// define_trust! {
 ///     descriptions {
-///         2 => "
-///             By authorizing, you are trusting the caller with these abilities:
+///         1 => "
+///             Level 1 trust grants these abilities:
 ///             - Create new keypairs
 ///             - Import existing keypairs
-///             - Consume account resources
 ///         ",
-///         5 => "
-///             By authorizing, you are trusting the caller with these abilities:
+///         3 => "
+///             Level 3 trust grants these abilities:
 ///             - Set the public key for your account
 ///             - Sign transactions on your behalf
-///             - Extract your private key from your public key
-///             - Consume account resources
+///             - Read the private key for a given public key
+///             - Create new keypairs
+///             - Import existing keypairs
 ///         ",
 ///     }
 ///     functions {
-///         2 => [generate_keypair, import_key],
-///         5 => [set_key],
+///         1 => [generate_keypair, import_key],
+///         3 => [set_key],
 ///     }
 /// }
 ///
@@ -82,7 +82,7 @@ macro_rules! define_trust {
             }
 
             fn get_level(fn_name: &str) -> u8 {
-                *TRUST_LEVELS.get(fn_name).unwrap_or(&6)
+                *TRUST_LEVELS.get(fn_name).unwrap_or(&4)
             }
         }
 
