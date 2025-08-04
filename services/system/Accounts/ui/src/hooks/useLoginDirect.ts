@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
 const LoginParams = z.object({
     app: z.string(),
@@ -23,6 +23,8 @@ export const useLoginDirect = () =>
             });
             console.log("returned queryToken:", queryToken);
 
-            window.location.href = origin;
+            window.location.href = siblingUrl(
+                app === "homepage" ? undefined : app,
+            );
         },
     });
