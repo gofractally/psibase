@@ -9,7 +9,7 @@ use exports::accounts::plugin::{
     active_app::{Guest as ActiveApp, *},
     api::Guest,
 };
-use host::common::{client::get_app_url, types::OriginationData};
+use host::common::client::get_app_url;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
@@ -50,7 +50,7 @@ impl ActiveApp for AccountsPlugin {
     fn create_connection_token() -> Result<String, Error> {
         let app = get_assert_top_level_app("create_connection_token", &vec![])?;
         let origin = get_app_url(&app);
-        Ok(Token::new_connection_token(OriginationData {
+        Ok(Token::new_connection_token(ConnectionToken {
             app: Some(app),
             origin,
         })

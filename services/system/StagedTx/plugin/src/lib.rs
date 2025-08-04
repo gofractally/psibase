@@ -31,9 +31,8 @@ fn validate_account(account: &str) -> Result<(), Error> {
 }
 
 fn get_assert_caller(context: &str, allowed_apps: &[&str]) -> Result<(), Error> {
-    let caller = Client::get_sender_app();
-    let caller_app = caller.app.as_ref().unwrap();
-    if caller.app.is_none() || !allowed_apps.contains(&caller_app.as_str()) {
+    let caller_app = Client::get_sender();
+    if !allowed_apps.contains(&caller_app.as_str()) {
         return Err(ErrorType::Unauthorized(context.to_string(), caller_app.to_string()).into());
     }
     Ok(())
@@ -111,15 +110,7 @@ struct StagedTxPlugin;
 
 impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
-        let sender = Client::get_sender_app()
-            .app
-            .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
-
-        let active_app = get_active_app()
-            .app
-            .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
-
-        if sender != active_app {
+        if Client::get_sender() != get_active_app() {
             return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
         }
 

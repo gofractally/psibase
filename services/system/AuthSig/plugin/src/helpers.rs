@@ -16,7 +16,5 @@ pub fn get_pubkey(account_name: &str) -> Result<Pem, CommonTypes::Error> {
 }
 
 pub fn from_transact() -> bool {
-    Client::get_sender_app().app.map_or(false, |app| {
-        app == psibase::services::transact::SERVICE.to_string()
-    })
+    Client::get_sender() == psibase::services::transact::SERVICE.to_string()
 }

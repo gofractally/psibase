@@ -452,10 +452,7 @@ impl PrivateApi for PackagesPlugin {
     }
     // Only callable by the UI
     fn push_data(tx: Vec<u8>) {
-        assert!(
-            Client::get_sender_app().app.expect("sender app not set")
-                == Client::my_service_account()
-        );
+        assert!(Client::get_sender() == Client::get_receiver());
 
         let tx = Transaction::unpacked(&tx).unwrap();
         for action in tx.actions {
@@ -484,10 +481,7 @@ impl PrivateApi for PackagesPlugin {
         }
     }
     fn propose_install(tx: Vec<u8>) -> Result<(), CommonTypes::Error> {
-        assert!(
-            Client::get_sender_app().app.expect("sender app not set")
-                == Client::my_service_account()
-        );
+        assert!(Client::get_sender() == Client::get_receiver());
 
         let tx = Transaction::unpacked(&tx).unwrap();
         StagedTx::propose(
