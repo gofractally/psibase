@@ -55,7 +55,16 @@ namespace psibase::net
       static constexpr unsigned type = 8;
       std::vector<std::string>  hosts;
 
-      std::string to_string() const { return std::format("hostnames: {}", hosts); }
+      std::string to_string() const
+      {
+         std::string result = "hostnames:";
+         for (const auto& host : hosts)
+         {
+            result += ' ';
+            result += host;
+         }
+         return result;
+      }
    };
    PSIO_REFLECT(HostnamesMessage, hosts)
 
