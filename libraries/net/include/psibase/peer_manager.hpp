@@ -271,7 +271,6 @@ namespace psibase::net
          clear_hosts(conn);
          if (conn->id)
          {
-            PSIBASE_LOG(conn->logger, info) << std::format("Hosts: {}", hosts);
             for (const auto& host : hosts)
             {
                peer_key key{.host = host, .id = *conn->id};
@@ -451,7 +450,6 @@ namespace psibase::net
                {
                   auto& other_conn = other_pos->second;
 
-                  PSIBASE_LOG(conn->logger, info) << std::format("id: {}", *conn->id);
                   if (conn->id && conn->id == other_conn->id && conn->host_intersects(*other_conn))
                   {
                      autoconnector->add_urls(other_conn, conn->urls);
