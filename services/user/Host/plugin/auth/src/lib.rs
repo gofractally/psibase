@@ -4,8 +4,8 @@ use bindings::*;
 
 mod errors;
 
-// mod helpers;
-// use helpers::*;
+mod helpers;
+use helpers::*;
 
 use exports::host::auth::api::Guest as Api;
 
@@ -33,6 +33,8 @@ fn get_auth_cookie_store_key(user: String) -> String {
 
 impl Api for HostAuth {
     fn get_query_token(app: String, user: String) -> Option<String> {
+        check_caller(&["supervisor"], "set-query-token@host:common/admin");
+
         let db = Database {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
@@ -48,7 +50,7 @@ impl Api for HostAuth {
     }
 
     fn set_query_token(query_token: String, app: String, user: String) {
-        // check_caller(&["accounts"], "set-auth-cookie@host:common/admin");
+        check_caller(&["host"], "set-query-token@host:common/admin");
 
         #[derive(Serialize, Debug)]
         #[allow(non_snake_case)]

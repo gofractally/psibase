@@ -26,7 +26,12 @@ use url::Url;
 
 struct HostCommon;
 
-fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
+fn do_post(
+    app: String,
+    user: String,
+    endpoint: String,
+    content: BodyTypes,
+) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
     let query_auth_token = HostAuth::get_query_token(&app, &user);
     let headers = if query_auth_token.is_none() {
@@ -46,7 +51,7 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
     .send()?)
 }
 
-fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
+fn do_get(app: String, user: String, endpoint: String) -> Result<HttpResponse, Error> {
     let query_auth_token = HostAuth::get_query_token(&app, &user);
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
@@ -68,7 +73,7 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
 impl Admin for HostCommon {
     fn get_active_app() -> String {
         check_caller(
-            &["accounts", "staged-tx"],
+            &["host", "accounts", "staged-tx"],
             "get-active-app@host:common/admin",
         );
 
@@ -76,7 +81,7 @@ impl Admin for HostCommon {
     }
 
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
-        check_caller(&["accounts", "host"], "post@host:common/admin");
+        check_caller(&["host"], "post@host:common/admin");
 
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(app, endpoint, request.body)?;
