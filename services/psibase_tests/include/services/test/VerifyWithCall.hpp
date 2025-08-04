@@ -13,5 +13,5 @@ namespace TestService
                                       psibase::Claim       claim,
                                       std::vector<char>    proof);
    };
-   PSIO_REFLECT(VerifyWithCall, method(verifySys, claim, proof))
+   PSIO_REFLECT(VerifyWithCall, method(verifySys, transactionHash, claim, proof))
 }  // namespace TestService
