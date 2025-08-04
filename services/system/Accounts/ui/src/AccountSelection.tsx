@@ -81,9 +81,6 @@ export const AccountSelection = () => {
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
-            const origin = inviteToken
-                ? inviteToken.appDomain
-                : connectionToken!.origin;
             const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
