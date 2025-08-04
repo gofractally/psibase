@@ -4875,7 +4875,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yarnpkg/sdks@npm:^3.2.2":
+"@yarnpkg/sdks@npm:^3.2.1":
   version: 3.2.2
   resolution: "@yarnpkg/sdks@npm:3.2.2"
   dependencies:
@@ -11044,7 +11044,7 @@ __metadata:
     "@typescript-eslint/eslint-plugin": "npm:^8.15.0"
     "@typescript-eslint/parser": "npm:^8.15.0"
     "@vitejs/plugin-react": "npm:^4.3.1"
-    "@yarnpkg/sdks": "npm:^3.2.2"
+    "@yarnpkg/sdks": "npm:^3.2.1"
     autoprefixer: "npm:^10.4.19"
     axios: "npm:^1.7.8"
     class-variance-authority: "npm:^0.7.1"

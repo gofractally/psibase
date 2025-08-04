@@ -39,7 +39,7 @@ impl Admin for AccountsPlugin {
 
         let query_token = TransactAuthApi::get_query_token(&Client::get_receiver(), &user).unwrap();
 
-        HostAuth::set_auth_cookie(&query_token, &app, &user);
+        HostAuth::set_query_token(&query_token, &app, &user);
 
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);

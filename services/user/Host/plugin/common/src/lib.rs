@@ -8,6 +8,7 @@ mod bucket;
 mod plugin_ref;
 
 mod types;
+use bindings::host::auth::api as HostAuth;
 use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
@@ -27,20 +28,38 @@ struct HostCommon;
 
 fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
+    let query_auth_token = HostAuth::get_query_token(&app, &user);
+    let headers = if query_auth_token.is_none() {
+        make_headers(&[("Content-Type", &ty)])
+    } else {
+        make_headers(&[
+            ("Content-Type", &ty),
+            ("Authorization", &query_auth_token.unwrap()),
+        ])
+    };
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "POST".to_string(),
-        headers: make_headers(&[("Content-Type", &ty)]),
+        headers,
         body: Some(content),
     }
     .send()?)
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
+    let query_auth_token = HostAuth::get_query_token(&app, &user);
+    let headers = if query_auth_token.is_none() {
+        make_headers(&[("Accept", "application/json")])
+    } else {
+        make_headers(&[
+            ("Accept", "application/json"),
+            ("Authorization", &query_auth_token.unwrap()),
+        ])
+    };
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "GET".to_string(),
-        headers: make_headers(&[("Accept", "application/json")]),
+        headers,
         body: None,
     }
     .send()?)

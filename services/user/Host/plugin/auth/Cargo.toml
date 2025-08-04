@@ -22,6 +22,5 @@ package = "host:auth"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-# "supervisor:bridge" = { path = "../../../Host/plugin/common/wit/deps/supervisor.wit" }
 "accounts:plugin" = { path = "../../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "host:common" = { path = "../common/wit/world.wit" }

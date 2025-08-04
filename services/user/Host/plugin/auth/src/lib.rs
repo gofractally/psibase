@@ -12,7 +12,6 @@ use exports::host::auth::api::Guest as Api;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Serialize;
 
-// use crate::bindings::host::common::admin as HostAdmin;
 use crate::bindings::host::common::{
     admin as HostAdmin, client as Client, store as KvStore,
     store::{Database, DbMode, StorageDuration},
@@ -33,8 +32,7 @@ fn get_auth_cookie_store_key(user: String) -> String {
 }
 
 impl Api for HostAuth {
-    fn get_auth_cookie(app: String, user: String) -> Option<String> {
-        // pull token out of localstorage
+    fn get_query_token(app: String, user: String) -> Option<String> {
         let db = Database {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
@@ -49,7 +47,7 @@ impl Api for HostAuth {
         None
     }
 
-    fn set_auth_cookie(query_token: String, app: String, user: String) {
+    fn set_query_token(query_token: String, app: String, user: String) {
         // check_caller(&["accounts"], "set-auth-cookie@host:common/admin");
 
         #[derive(Serialize, Debug)]
@@ -77,7 +75,6 @@ impl Api for HostAuth {
         };
         let bucket = KvStore::Bucket::new(db, &app);
 
-        // Set the value on the key
         bucket.set(
             &get_auth_cookie_store_key(user),
             &query_token.to_string().packed(),
