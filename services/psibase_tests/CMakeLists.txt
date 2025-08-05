@@ -22,6 +22,7 @@ function(add suffix)
     service(RemoveCode "${suffix}" src/RemoveCode.cpp)
     service(SubjectiveDb "${suffix}" src/SubjectiveDb.cpp)
     service(NotifyService "${suffix}" src/NotifyService.cpp)
+    service(SetWasmConfig "${suffix}" src/SetWasmConfig.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" src/MockCpuLimit.cpp)
@@ -31,6 +32,7 @@ function(add suffix)
     service(SubjectiveCounterService "${suffix}" src/SubjectiveCounterService.cpp)
     service(KeepSocketService "${suffix}" src/KeepSocketService.cpp)
     service(SocketListService "${suffix}" src/SocketListService.cpp)
+    service(VerifyWithCall "${suffix}" src/VerifyWithCall.cpp)
 endfunction(add)
 
 add_library(services_test INTERFACE)
@@ -41,5 +43,6 @@ if(DEFINED IS_WASM)
 endif()
 
 add_subdirectory(test)
+add_subdirectory(programs)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)

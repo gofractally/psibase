@@ -370,6 +370,7 @@ TEST_CASE("Test push_transaction")
                            CodeRow::canSetTimeLimit, (CodeRow::isSubjective | CodeRow::allowSocket),
                            (CodeRow::isSubjective | CodeRow::allowNativeSubjective)}));
       INFO("flags: " << std::hex << flags);
+      t.startBlock();
       auto verifyFlags = t.addService(AccountNumber{"verify-flags"}, "VerifyFlagsService.wasm",
                                       flags | CodeRow::isAuthService);
       t.startBlock();
