@@ -568,7 +568,7 @@ mod tests {
     #[test]
     fn test_version_match() -> Result<(), anyhow::Error> {
         let tests: Vec<SemverTest> = serde_json::from_str(include_str!(
-            "../../../services/psibase_tests/test/semver.json"
+            "../../../packages/psibase_tests/test/semver.json"
         ))?;
         for SemverTest {
             pattern,
