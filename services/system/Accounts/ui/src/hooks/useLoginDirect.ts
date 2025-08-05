@@ -15,13 +15,12 @@ export const useLoginDirect = () =>
         mutationFn: async (params) => {
             const { accountName, app } = LoginParams.parse(params);
 
-            const queryToken = await supervisor.functionCall({
+            await supervisor.functionCall({
                 method: "loginDirect",
                 params: [app, accountName],
                 service: "accounts",
                 intf: "admin",
             });
-            console.log("returned queryToken:", queryToken);
 
             window.location.href = siblingUrl(
                 null,
