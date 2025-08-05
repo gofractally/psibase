@@ -24,7 +24,8 @@ export const useLoginDirect = () =>
             console.log("returned queryToken:", queryToken);
 
             window.location.href = siblingUrl(
-                app === "homepage" ? undefined : app,
+                null,
+                app === "homepage" ? null : app,
             );
         },
     });
