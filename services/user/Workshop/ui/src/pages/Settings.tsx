@@ -75,7 +75,6 @@ export const Settings = () => {
                             await updateMetadata({
                                 metadata: {
                                     ...x,
-                                    owners: [],
                                 },
                                 account: Account.parse(currentApp),
                             });

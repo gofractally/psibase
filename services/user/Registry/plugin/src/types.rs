@@ -5,8 +5,8 @@ impl From<AppMetadata> for setMetadata {
     fn from(metadata: AppMetadata) -> Self {
         Self {
             name: metadata.name,
-            short_description: metadata.short_description,
-            long_description: metadata.long_description,
+            short_description: metadata.short_desc,
+            long_description: metadata.long_desc,
             icon: metadata.icon,
             icon_mime_type: metadata.icon_mime_type,
             tos_subpage: metadata.tos_subpage,

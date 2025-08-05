@@ -6,8 +6,8 @@ interface types {
 
     record app-metadata {
         name: string,
-        short-description: string,
-        long-description: string,
+        short-desc: string,
+        long-desc: string,
         icon: base64-str,
         icon-mime-type: string, 
         tos-subpage: string,
@@ -31,8 +31,8 @@ interface developer {
     /// 
     /// Validations:
     /// * `name` must be between 1 and 30 characters
-    /// * `short-description` must be between 1 and 100 characters
-    /// * `long-description` must be between 1 and 1000 characters
+    /// * `short-desc` must be between 1 and 100 characters
+    /// * `long-desc` must be between 1 and 1000 characters
     /// * `icon-mime-type` must be a valid MIME type for an icon (e.g. png, jpeg, svg, x-icon, vnd.microsoft.icon)
     /// * subpages must start with "/"
     /// * only three tags are allowed, and they must be lowercase alphanumeric with dashes

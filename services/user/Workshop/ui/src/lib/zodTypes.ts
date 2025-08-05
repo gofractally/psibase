@@ -34,7 +34,6 @@ export const Metadata = z.object({
         .string()
         .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
     redirectUris: z.string().array(),
-    owners: Account.array().default([]),
     tags: z.string().array().max(3),
 });
 
