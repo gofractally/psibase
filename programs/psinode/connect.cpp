@@ -85,7 +85,9 @@ std::function<void(const std::string& peer, connect_handler&&)> make_connect_one
       };
       auto do_connect = [&](auto&& conn)
       {
-         conn->url = peer;
+         conn->urls.push_back(peer);
+         conn->hosts.emplace_back(host);
+         conn->outgoing = true;
          async_connect(std::move(conn), resolver, host, service, std::move(on_connect));
       };
       if (proto == socket_type::local)
@@ -93,7 +95,10 @@ std::function<void(const std::string& peer, connect_handler&&)> make_connect_one
          auto conn = std::make_shared<
              websocket_connection<boost::beast::basic_stream<boost::asio::local::stream_protocol>>>(
              chainContext);
-         conn->url = peer;
+         conn->urls.push_back(peer);
+         conn->hosts.emplace_back(host);
+         conn->outgoing = true;
+         conn->local    = true;
          async_connect(std::move(conn), host, std::move(on_connect));
       }
       else if (proto == socket_type::tls)
@@ -107,6 +112,7 @@ std::function<void(const std::string& peer, connect_handler&&)> make_connect_one
              boost::asio::ssl::host_name_verification(std::string(host)));
          auto ssl_conn = conn->stream.next_layer().native_handle();
          SSL_set_tlsext_host_name(ssl_conn, std::string(host).c_str());
+         conn->secure = true;
          do_connect(std::move(conn));
 #else
          PSIBASE_LOG(psibase::loggers::generic::get(), warning)
