@@ -54,7 +54,7 @@ interface Props {
 const blankDefaultValues = formSchema.parse({
     name: "",
     shortDesc: "",
-    longDescr: "",
+    longDesc: "",
     icon: "",
     iconMimeType: "",
     tosSubpage: "",
