@@ -24,31 +24,28 @@ use psibase::services::auth_sig::action_structs as MyService;
 // Third-party crates
 use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
-use psibase::define_trust;
 use psibase::fracpack::Pack;
 use rand_core::OsRng;
 
-define_trust! {
+psibase::define_trust! {
     descriptions {
-        1 => "
-        Level 1 trust grants these abilities:
+        Low => "
+        Low trust grants these abilities:
             - Create new keypairs
             - Import existing keypairs
         ",
-        3 => "
-        Level 3 trust grants these abilities:
+        Medium => "",
+        High => "
+        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Set the public key for your account
             - Sign transactions on your behalf
             - Read the private key for a given public key
-            - Create new keypairs
-            - Import existing keypairs
         ",
     }
-
     functions {
-        0 => [generate_unmanaged_keypair, pub_from_priv, to_der, sign],
-        1 => [generate_keypair, import_key],
-        3 => [priv_from_pub, set_key],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign],
+        Low => [generate_keypair, import_key],
+        High => [priv_from_pub, set_key],
     }
 }
 use trust::authorize;
