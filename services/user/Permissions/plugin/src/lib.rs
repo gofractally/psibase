@@ -1,5 +1,9 @@
 #[allow(warnings)]
 mod bindings;
+
+mod types;
+use types::*;
+
 use bindings::*;
 
 use accounts::plugin::api as Accounts;
@@ -7,7 +11,7 @@ use exports::permissions::plugin::{
     admin::{ApprovalDuration, Guest as PermsAdmin, PromptContext},
     api::Guest as Api,
 };
-use permissions::plugin::types::Trust;
+use permissions::plugin::types::{Descriptions, TrustLevel};
 use psibase::fracpack::{Pack, Unpack};
 
 use host::common::{
@@ -23,27 +27,6 @@ use errors::*;
 
 mod db;
 use db::*;
-
-#[derive(Pack, Unpack)]
-struct PackablePromptContext {
-    user: String,
-    caller: String,
-    callee: String,
-    trust_level: u8,
-    description: String,
-}
-
-impl From<PackablePromptContext> for PromptContext {
-    fn from(context: PackablePromptContext) -> Self {
-        PromptContext {
-            user: context.user,
-            caller: context.caller,
-            callee: context.callee,
-            trust_level: context.trust_level,
-            description: context.description,
-        }
-    }
-}
 
 struct PermissionsPlugin;
 
@@ -67,7 +50,7 @@ impl PermsAdmin for PermissionsPlugin {
             &context.user,
             &context.caller,
             &context.callee,
-            context.trust_level,
+            context.level,
             match duration {
                 ApprovalDuration::Session => StorageDuration::Session,
                 ApprovalDuration::Permanent => StorageDuration::Persistent,
@@ -76,29 +59,22 @@ impl PermsAdmin for PermissionsPlugin {
     }
 }
 
-fn is_authorized(user: &str, caller: &str, callee: &str, trust: u8) -> bool {
+fn is_authorized(user: &str, caller: &str, callee: &str, trust: TrustLevel) -> bool {
     Permissions::get(user, caller, callee).map_or(false, |perm| perm >= trust)
 }
 
 impl Api for PermissionsPlugin {
     fn authorize(
         caller: String,
-        trust: Trust,
+        level: TrustLevel,
+        descriptions: Descriptions,
         debug_label: String,
         whitelist: Vec<String>,
     ) -> Result<bool, Error> {
         let callee = HostClient::get_sender();
-        if !(0..=4).contains(&trust.level) {
-            return Err(ErrorType::InvalidTrustLevel(
-                callee.clone(),
-                trust.level,
-                debug_label.clone(),
-            )
-            .into());
-        }
 
-        if trust.level == 0 {
-            // Everyone has trust level 0
+        if level == TrustLevel::None {
+            // Auto approve for trust level: none
             return Ok(true);
         }
         if whitelist.contains(&caller) {
@@ -109,12 +85,12 @@ impl Api for PermissionsPlugin {
             // Callee is always authorized to call itself
             return Ok(true);
         }
-        // TODO incorporate security groups for trust level 4
+        // TODO incorporate security groups for TrustLevel::Max
 
         let user = Accounts::get_current_user().ok_or_else(|| {
             ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())
         })?;
-        if is_authorized(&user, &caller, &callee, trust.level) {
+        if is_authorized(&user, &caller, &callee, level) {
             return Ok(true);
         }
 
@@ -122,8 +98,8 @@ impl Api for PermissionsPlugin {
             user: user.to_string(),
             caller: caller.to_string(),
             callee: callee.to_string(),
-            trust_level: trust.level,
-            description: trust.description.to_string(),
+            level,
+            descriptions,
         }
         .packed();
 
