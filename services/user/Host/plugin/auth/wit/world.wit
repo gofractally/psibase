@@ -2,11 +2,15 @@ package host:auth;
 
 /// Calls that are tied to the web platform
 interface api {
+
+    /// Notify of new logged in user
+    set-logged-in-user: func(user: string, app: string);
+
     /// Privileged apps can get the query token to make calls on user's behalf
     get-query-token: func(app: string, user: string) -> option<string>;
 
     /// Privileged apps can set/store an query token to make calls on user's behalf
-    set-query-token: func(query-token: string, for-app: string, user: string);
+    set-query-token: func(query-token: string, app: string, user: string);
 }
 
 world imports {

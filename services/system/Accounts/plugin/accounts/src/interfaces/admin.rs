@@ -5,7 +5,6 @@ use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
-use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
@@ -37,11 +36,8 @@ impl Admin for AccountsPlugin {
 
         assert_valid_account(&user);
 
-        let query_token = TransactAuthApi::get_query_token(&Client::get_receiver(), &user).unwrap();
-
-        HostAuth::set_query_token(&query_token, &app, &user);
-
         AppsTable::new(&app).login(&user);
+        HostAuth::set_logged_in_user(&user, &app);
         UserTable::new(&user).add_connected_app(&app);
     }
 

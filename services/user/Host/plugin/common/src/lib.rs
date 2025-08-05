@@ -5,35 +5,35 @@ use bindings::*;
 mod helpers;
 use helpers::*;
 mod bucket;
+use bucket::*;
 mod plugin_ref;
 
 mod types;
-use bindings::host::auth::api as HostAuth;
+
 use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
-    store::{DbMode, Guest as Store},
+    // store as KvStore,
+    store::{Database, DbMode, Guest as Store, StorageDuration},
     types::Guest as Types,
     types::{BodyTypes, Error, PostRequest},
 };
 use helpers::make_error;
+use psibase::fracpack::{Pack, Unpack};
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
 };
 use url::Url;
 
+use crate::bindings::exports::host::common::store::GuestBucket;
+
 struct HostCommon;
 
-fn do_post(
-    app: String,
-    user: String,
-    endpoint: String,
-    content: BodyTypes,
-) -> Result<HttpResponse, Error> {
+fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
-    let query_auth_token = HostAuth::get_query_token(&app, &user);
+    let query_auth_token = HostCommon::get_active_query_token(app.clone());
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
@@ -51,8 +51,8 @@ fn do_post(
     .send()?)
 }
 
-fn do_get(app: String, user: String, endpoint: String) -> Result<HttpResponse, Error> {
-    let query_auth_token = HostAuth::get_query_token(&app, &user);
+fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
+    let query_auth_token = HostCommon::get_active_query_token(app.clone());
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {
@@ -86,6 +86,44 @@ impl Admin for HostCommon {
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(app, endpoint, request.body)?;
         Ok(res.body.map(Into::into))
+    }
+
+    fn get_active_query_token(app: String) -> Option<String> {
+        check_caller(
+            &["transact", "host"],
+            "get-active-query-token@host:common/admin",
+        );
+
+        let db = Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        };
+        let bucket = Bucket::new(db, app.clone());
+
+        let query_token = bucket.get(format!("{}", app));
+        let query_token = if query_token.is_some() {
+            let query_token = query_token.unwrap();
+            Some(<String>::unpacked(&query_token).unwrap())
+        } else {
+            None
+        };
+        query_token
+    }
+
+    fn set_active_query_token(query_token: String, app: String) {
+        check_caller(
+            &["host", "accounts"],
+            "set-active-query-token@host:common/admin",
+        );
+
+        // TODO: save token to token mapping
+        let db = Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        };
+        let bucket = Bucket::new(db, app.clone());
+
+        bucket.set(format!("{}", app), query_token.packed());
     }
 }
 
