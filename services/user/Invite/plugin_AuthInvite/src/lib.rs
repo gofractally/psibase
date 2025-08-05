@@ -18,9 +18,11 @@ use bindings::exports::auth_invite::plugin::intf::Guest as Intf;
 use bindings::exports::transact_hook_action_auth::Guest as HookActionAuth;
 
 fn from_transact() -> bool {
-    Client::get_sender_app().app.map_or(false, |app| {
-        app == psibase::services::transact::SERVICE.to_string()
-    })
+    Client::get_sender() == psibase::services::transact::SERVICE.to_string()
+}
+
+fn from_invite() -> bool {
+    Client::get_sender() == psibase::services::invite::SERVICE.to_string()
 }
 
 fn is_valid_action(service: &str, method: &str) -> bool {
@@ -34,15 +36,11 @@ struct AuthInvite;
 
 impl Intf for AuthInvite {
     fn notify(token: InviteToken) -> Result<(), Error> {
-        if let Some(app) = Client::get_sender_app().app {
-            if app != psibase::services::invite::SERVICE.to_string() {
-                return Err(Unauthorized("notify").into());
-            }
+        if !from_invite() {
+            return Err(Unauthorized("notify").into());
         }
 
-        let inv_keys = deserialize(&token).map_err(|_| DecodeInviteError("notify"))?;
-
-        InviteKeys::add(&inv_keys);
+        InviteKeys::add(&deserialize(&token)?);
 
         hook_action_auth();
 

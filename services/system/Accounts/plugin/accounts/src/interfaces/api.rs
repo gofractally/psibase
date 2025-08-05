@@ -25,7 +25,7 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
-        AccountsPlugin::get_current_user().is_some()
+        Self::get_current_user().is_some()
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {
@@ -56,7 +56,7 @@ impl API for AccountsPlugin {
 
     fn set_auth_service(service_name: String) -> Result<(), Error> {
         // Restrict to "homepage" app for now
-        if Client::get_sender_app().app.is_none() || Client::get_sender_app().app.as_ref().unwrap() != "homepage" {
+        if Client::get_sender() != "homepage" {
             return Err(Unauthorized("set_auth_service can only be called by the homepage app").into());
         }
 
@@ -73,8 +73,6 @@ impl API for AccountsPlugin {
     }
 
     fn get_current_user() -> Option<String> {
-        let app = Privileged::get_active_app();
-        let app = app.app.expect("Active app unknown");
-        AppsTable::new(&app).get_logged_in_user()
+        AppsTable::new(&Privileged::get_active_app()).get_logged_in_user()
     }
 }

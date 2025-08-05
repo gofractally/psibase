@@ -2,14 +2,14 @@ package accounts:plugin;
 
 /// This interface is only callable by the accounts app itself.
 interface admin {
-    use types.{app-details};
+    use accounts:account-tokens/types.{connection-token};
 
     /// Logs the specified user into the specified app without any user interaction.
     /// This function is only callable by the accounts app itself.
-    login-direct: func(app: app-details, user: string);
+    login-direct: func(app: string, user: string);
 
-    /// Gets app details
-    decode-connection-token: func(token: string) -> option<app-details>;
+    /// Gets details of the connection token
+    decode-connection-token: func(token: string) -> option<connection-token>;
 
     /// Gets the names of all apps to which the user has connected
     get-connected-apps: func(user: string) -> list<string>;

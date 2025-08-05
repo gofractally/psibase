@@ -81,15 +81,11 @@ export const AccountSelection = () => {
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
-            const origin = inviteToken
-                ? inviteToken.appDomain
-                : connectionToken!.origin;
             const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
                 await createAccount(values.username);
                 void (await acceptInvite({
-                    origin,
                     app,
                     accountName: values.username,
                     token: z.string().parse(token),
@@ -101,7 +97,7 @@ export const AccountSelection = () => {
                     throw new Error("Invalid connectionToken");
                 }
                 // Login and set auth cookie
-                await handleLogin(values.username, app, origin);
+                await handleLogin(values.username, app);
             }
         } catch (error) {
             console.error("❌ Error in logging in:", error);
@@ -169,11 +165,7 @@ export const AccountSelection = () => {
             }
 
             try {
-                void (await handleLogin(
-                    accountId,
-                    connectionToken.app,
-                    connectionToken.origin,
-                ));
+                void (await handleLogin(accountId, connectionToken.app));
             } catch (error) {
                 console.error("❌ Error logging in:", error);
                 await logout();
@@ -216,18 +208,13 @@ export const AccountSelection = () => {
         useLoginDirect();
     const { mutateAsync: logout } = useLogout();
 
-    const handleLogin = async (
-        accountName: string,
-        app: string,
-        origin: string,
-    ) => {
+    const handleLogin = async (accountName: string, app: string) => {
         if (!connectionToken) {
             throw new Error(`Expected connection token for a login`);
         }
         await loginDirect({
             accountName,
             app,
-            origin,
         });
     };
 
@@ -261,7 +248,6 @@ export const AccountSelection = () => {
                 token: z.string().parse(token),
                 accountName: z.string().parse(selectedAccount?.account),
                 app: inviteToken.app,
-                origin: inviteToken.appDomain,
             });
             window.location.href = inviteToken?.appDomain;
         } else {
@@ -272,7 +258,6 @@ export const AccountSelection = () => {
             }
             loginDirect({
                 app: connectionToken.app,
-                origin: connectionToken.origin,
                 accountName: selectedAccount!.account,
             });
         }

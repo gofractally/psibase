@@ -5,9 +5,12 @@ use bindings::*;
 mod errors;
 use errors::ErrorType;
 
+mod db;
+use db::*;
+
 use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
-use host::common::client::{get_app_url, get_sender_app};
+use host::common::client::{get_app_url, get_sender};
 use host::common::types::{Error, PluginId};
 use psibase::fracpack::{Pack, Unpack};
 
@@ -23,7 +26,7 @@ struct ActivePrompt {
     subdomain: String,
     payload: String, // e.g. subpath for web platform
     expiry_timestamp: u32,
-    context_id: Option<u32>,
+    context_id: Option<String>,
     return_payload: Option<String>, // e.g. subpath on subdomain for web platform
 }
 
@@ -36,7 +39,7 @@ impl Api for HostPrompt {
         id: String,
         return_payload: String,
     ) -> Result<TriggerDetails, Error> {
-        assert_eq!(get_sender_app().app.unwrap(), "supervisor", "Unauthorized");
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
 
         let id = id.parse::<u32>().unwrap();
 
@@ -64,7 +67,7 @@ impl Api for HostPrompt {
     }
 
     fn get_return_details(id: String) -> Option<String> {
-        assert_eq!(get_sender_app().app.unwrap(), "supervisor", "Unauthorized");
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
 
         let val = KeyValue::get(ACTIVE_PROMPT_REQ).unwrap();
         let details = <ActivePrompt>::unpacked(&val).unwrap();
@@ -91,7 +94,7 @@ impl Web for HostPrompt {
     // TODO: Rather than prompting with a subpath, the app must register a name for a
     //   prompt, and they specify it by name. When the host goes to frame the prompt, it will
     //   dynamically look up the subpath via the registered prompt name.
-    fn prompt_user(subpath: Option<String>, context_id: Option<u32>) -> Result<(), Error> {
+    fn prompt_user(subpath: Option<String>, context_id: Option<String>) -> Result<(), Error> {
         let mut subpath = subpath.unwrap_or("/".to_string());
         validate_subpath(&subpath)?;
 
@@ -106,7 +109,7 @@ impl Web for HostPrompt {
             ACTIVE_PROMPT_REQ,
             &ActivePrompt {
                 id,
-                subdomain: get_sender_app().app.unwrap(),
+                subdomain: get_sender(),
                 payload: subpath.clone(),
                 expiry_timestamp: Utc::now().timestamp() as u32 + PROMPT_EXPIRATION_SEC,
                 context_id,
@@ -126,6 +129,15 @@ impl Web for HostPrompt {
             },
             message: redirect_url,
         });
+    }
+
+    fn store_context(packed_context: Vec<u8>) -> String {
+        PromptContexts::get_id(packed_context)
+    }
+
+    fn get_context(context_id: String) -> Result<Vec<u8>, Error> {
+        Ok(PromptContexts::get(context_id.clone())
+            .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(context_id.clone())))?)
     }
 }
 

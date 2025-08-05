@@ -1,87 +1,86 @@
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::host::common::store::{DbMode::*, StorageDuration::*, *};
+use psibase::fracpack::{Pack, Unpack};
 
-pub struct AccessGrants;
+mod tables {
+    use super::*;
 
-impl AccessGrants {
-    pub fn set(user: &str, caller: &str, callee: &str) {
-        let any_value = "1".as_bytes();
-        Keyvalue::set(&format!("{user}:{callee}<-{caller}"), &any_value);
-    }
-    pub fn get(user: &str, caller: &str, callee: &str) -> Option<Vec<u8>> {
-        Keyvalue::get(&format!("{user}:{callee}<-{caller}"))
-    }
-    pub fn delete(user: &str, caller: &str, callee: &str) {
-        Keyvalue::delete(&format!("{user}:{callee}<-{caller}"));
-    }
-}
-
-pub struct PromptId;
-impl PromptId {
-    pub fn get_next_id() -> u32 {
-        let key = "prompt-id";
-        let val = match Keyvalue::get(&key) {
-            Some(value) => {
-                let next_value = u32::from_le_bytes(value.try_into().unwrap()) + 1;
-                Keyvalue::set(&key, &next_value.to_le_bytes().to_vec());
-                next_value
-            }
-            None => {
-                let next_value: u32 = 1;
-                Keyvalue::set(&key, &next_value.to_le_bytes().to_vec());
-                next_value
-            }
-        };
-        val
+    pub fn permissions(duration: StorageDuration) -> Bucket {
+        Bucket::new(
+            Database {
+                mode: NonTransactional,
+                duration,
+            },
+            "user-app-permissions",
+        )
     }
 }
 
-pub struct PromptContexts;
-impl PromptContexts {
-    fn get_key(current_user: &str, caller: &str, callee: &str) -> String {
-        format!("Prompt:{current_user}:{caller}:{callee}")
+#[derive(Pack, Unpack, Default)]
+pub struct Permission {
+    pub caller: String,
+    pub trust_level: u8,
+}
+
+#[derive(Pack, Unpack, Default)]
+pub struct Permissions {
+    pub permissions: Vec<Permission>,
+}
+
+impl Permissions {
+    fn get_trust_level(&self, caller: &str) -> Option<u8> {
+        self.get_permission_index(caller)
+            .ok()
+            .map(|index| self.permissions[index].trust_level)
     }
 
-    pub fn add(current_user: &str, caller: &str, callee: &str) -> u32 {
-        let key = Self::get_key(current_user, caller, callee);
-        let val = match Keyvalue::get(&key) {
-            Some(value) => u32::from_le_bytes(value.try_into().unwrap()),
-            None => {
-                let next_value: u32 = PromptId::get_next_id();
-                Keyvalue::set(&key, &next_value.to_le_bytes().to_vec());
-
-                // Add secondary index by prompt ID, useful for lookup
-                Keyvalue::set(&next_value.to_string(), &key.as_bytes());
-                next_value
-            }
-        };
-        val
+    fn get_permission_index(&self, caller: &str) -> Result<usize, usize> {
+        self.permissions
+            .binary_search_by(|p| p.caller.as_str().cmp(caller))
     }
 
-    pub fn get(id: u32) -> Option<(String, String, String)> {
-        match Keyvalue::get(&id.to_string()) {
-            Some(value) => {
-                let key = String::from_utf8(value).unwrap();
-                let [_, current_user, caller, callee]: [&str; 4] =
-                    key.split(':').collect::<Vec<_>>().try_into().unwrap();
-                Some((
-                    current_user.to_string(),
-                    caller.to_string(),
-                    callee.to_string(),
-                ))
+    fn callee_permissions(bucket: &Bucket, key: &str) -> Option<Permissions> {
+        bucket
+            .get(&key)
+            .map(|p| <Permissions>::unpacked(&p).unwrap())
+    }
+
+    pub fn set(user: &str, caller: &str, callee: &str, trust_level: u8, duration: StorageDuration) {
+        let table = tables::permissions(duration);
+        let key = format!("{user}:{callee}");
+
+        let mut user_app_perms = Self::callee_permissions(&table, &key).unwrap_or_default();
+
+        match user_app_perms.get_permission_index(caller) {
+            Ok(index) => {
+                user_app_perms.permissions[index].trust_level = trust_level;
             }
-            None => None,
+            Err(index) => {
+                user_app_perms.permissions.insert(
+                    index,
+                    Permission {
+                        caller: caller.to_string(),
+                        trust_level: trust_level,
+                    },
+                );
+            }
         }
+
+        table.set(&key, &user_app_perms.packed());
     }
 
-    pub fn delete(id: u32) {
-        let value = Keyvalue::get(&id.to_string());
-        if let Some(value) = value {
-            let key = String::from_utf8(value).unwrap();
-            let [_, current_user, caller, callee]: [&str; 4] =
-                key.split(':').collect::<Vec<_>>().try_into().unwrap();
-            Keyvalue::delete(&Self::get_key(current_user, caller, callee));
-            // Delete the secondary index
-            Keyvalue::delete(&id.to_string());
+    pub fn get(user: &str, caller: &str, callee: &str) -> Option<u8> {
+        let key = format!("{user}:{callee}");
+
+        let session_trust = Self::callee_permissions(&tables::permissions(Session), &key)
+            .and_then(|perms| perms.get_trust_level(caller));
+        let persistent_trust = Self::callee_permissions(&tables::permissions(Persistent), &key)
+            .and_then(|perms| perms.get_trust_level(caller));
+
+        match (session_trust, persistent_trust) {
+            (Some(s), Some(p)) => Some(s.max(p)),
+            (Some(s), None) => Some(s),
+            (None, Some(p)) => Some(p),
+            (None, None) => None,
         }
     }
 }

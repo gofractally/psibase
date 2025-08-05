@@ -14,7 +14,7 @@ use exports::host::common::{
     server::Guest as Server,
     store::{DbMode, Guest as Store},
     types::Guest as Types,
-    types::{BodyTypes, Error, OriginationData, PostRequest},
+    types::{BodyTypes, Error, PostRequest},
 };
 use helpers::make_error;
 use supervisor::bridge::{
@@ -47,17 +47,13 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
 }
 
 impl Admin for HostCommon {
-    fn get_active_app() -> OriginationData {
+    fn get_active_app() -> String {
         check_caller(
             &["accounts", "staged-tx"],
             "get-active-app@host:common/admin",
         );
 
-        let active = Supervisor::get_active_app();
-        OriginationData {
-            app: Some(active.clone()),
-            origin: HostCommon::get_app_url(active),
-        }
+        Supervisor::get_active_app()
     }
 
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
@@ -116,25 +112,17 @@ impl Server for HostCommon {
 }
 
 impl Client for HostCommon {
-    fn get_sender_app() -> OriginationData {
+    fn get_sender() -> String {
         // This is exported for use by other plugins who want to know which app called *them*
         // So need to look back 2 frames in the callstack
         let frame = 2;
         let stack = get_callstack();
         assert!(stack.len() >= frame);
-        let service = stack[stack.len() - frame].clone();
-        OriginationData {
-            app: Some(service.clone()),
-            origin: Self::get_app_url(service),
-        }
+        stack[stack.len() - frame].clone()
     }
 
-    fn my_service_account() -> String {
+    fn get_receiver() -> String {
         caller()
-    }
-
-    fn my_service_origin() -> String {
-        Self::get_app_url(caller())
     }
 
     fn get_app_url(app: String) -> String {
