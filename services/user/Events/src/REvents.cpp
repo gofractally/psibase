@@ -1,5 +1,6 @@
 #include <services/user/REvents.hpp>
 
+#include <alloca.h>
 #include <sqlite3.h>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
@@ -607,7 +608,7 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
       }
    }
    int  best = std::ranges::min_element(constraints) - constraints.begin() - 1;
-   char buf[info->nConstraint + 1];
+   auto buf  = static_cast<char*>(alloca(info->nConstraint + 1));
    int  argc = 0;
    for (int i = 0; i < info->nConstraint; ++i)
    {

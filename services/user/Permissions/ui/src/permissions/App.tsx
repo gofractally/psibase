@@ -82,9 +82,6 @@ export const App = () => {
             {permissionRequest.description && (
                 <div className="my-4 rounded border border-yellow-200 bg-yellow-50 p-3">
                     <p className="whitespace-pre-line text-yellow-700">
-                        By authorizing, you trust{" "}
-                        <b>{permissionRequest.caller}</b> with these abilities:
-                        <br />
                         {permissionRequest.description}
                     </p>
                 </div>
@@ -94,7 +91,7 @@ export const App = () => {
             <div className="my-4">
                 <p className="mb-2 font-medium">Trust Level:</p>
                 <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((level) => (
+                    {[1, 2, 3].map((level) => (
                         <div
                             key={level}
                             className={`flex h-8 w-8 items-center justify-center rounded border text-sm font-medium ${
@@ -114,8 +111,6 @@ export const App = () => {
                             1: "low",
                             2: "medium",
                             3: "high",
-                            4: "very high",
-                            5: "extremely high",
                         }[permissionRequest.trustLevel]
                     }{" "}
                     trust in <b>{permissionRequest.caller}</b>.

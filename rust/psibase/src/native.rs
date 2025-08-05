@@ -125,7 +125,7 @@ pub fn get_current_action_bytes() -> Vec<u8> {
 /// Note: The above only applies if the contract uses [crate::native_raw::call].
 pub fn get_current_action() -> crate::Action {
     let bytes = get_current_action_bytes();
-    <crate::Action>::unpack(&bytes[..], &mut 0).unwrap() // unwrap won't panic
+    <crate::Action>::unpacked(&bytes[..]).unwrap() // unwrap won't panic
 }
 
 /// Get the currently-executing action and pass it to `f`.
@@ -141,7 +141,7 @@ pub fn get_current_action() -> crate::Action {
 /// Note: The above only applies if the contract uses [crate::native_raw::call].
 pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
     let bytes = get_current_action_bytes();
-    let act = <crate::SharedAction>::unpack(&bytes[..], &mut 0).unwrap(); // unwrap won't panic
+    let act = <crate::SharedAction>::unpacked(&bytes[..]).unwrap(); // unwrap won't panic
     f(act)
 }
 
@@ -249,7 +249,7 @@ pub fn kv_greater_equal<K: ToKey, V: UnpackOwned>(
     match_key_size: u32,
 ) -> Option<V> {
     let bytes = kv_greater_equal_bytes(db_id, &key.to_key(), match_key_size);
-    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
+    bytes.map(|v| V::unpacked(&v[..]).unwrap())
 }
 
 /// Get the key-value pair immediately-before provided key
@@ -274,7 +274,7 @@ pub fn kv_less_than<K: ToKey, V: UnpackOwned>(
     match_key_size: u32,
 ) -> Option<V> {
     let bytes = kv_less_than_bytes(db_id, &key.to_key(), match_key_size);
-    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
+    bytes.map(|v| V::unpacked(&v[..]).unwrap())
 }
 
 /// Get the maximum key-value pair which has key as a prefix
@@ -290,7 +290,7 @@ pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
 pub fn kv_max<K: ToKey, V: UnpackOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
-    bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
+    bytes.map(|v| V::unpacked(&v[..]).unwrap())
 }
 
 pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {

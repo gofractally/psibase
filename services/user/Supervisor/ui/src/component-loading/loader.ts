@@ -1,5 +1,10 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
-import { rollup } from "@rollup/browser";
+import * as cli from "@bytecodealliance/preview2-shim/cli";
+import * as clocks from "@bytecodealliance/preview2-shim/clocks";
+import * as filesystem from "@bytecodealliance/preview2-shim/filesystem";
+import * as io from "@bytecodealliance/preview2-shim/io";
+import * as random from "@bytecodealliance/preview2-shim/random";
+import { type WarningHandlerWithDefault, rollup } from "@rollup/browser";
 
 import { HostInterface } from "../hostInterface.js";
 import { assert } from "../utils.js";
@@ -8,8 +13,16 @@ import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 import { plugin } from "./index.js";
 import privilegedShimCode from "./privileged-api.js?raw";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
+import shimCode from "./shims/shimWrapper.js?raw";
 
-const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
+// Set up the global reference for runtime access
+(globalThis as Record<string, unknown>).__preview2Shims = {
+    cli,
+    clocks,
+    filesystem,
+    io,
+    random,
+};
 
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
@@ -100,7 +113,7 @@ async function getWasiImports(): Promise<ImportDetails> {
     //    import {  as _, } from './shim.js';
     // It is very likely an issue with an invalid import mapping.
 
-    const wasi_shimCode = await fetch(wasiShimURL).then((r) => r.text());
+    const wasi_shimCode = shimCode;
     const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
     return {
         importMap: wasi_nameMapping,
@@ -175,7 +188,7 @@ async function loadWasmComponent(
 
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
 
-    const onwarn = (warning: any, warn: (warning: any) => void) => {
+    const onwarn: WarningHandlerWithDefault = (warning, warn) => {
         if (warning.code !== "CIRCULAR_DEPENDENCY") {
             warn(warning);
         }

@@ -81,9 +81,6 @@ export const AccountSelection = () => {
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
-            const origin = inviteToken
-                ? inviteToken.appDomain
-                : connectionToken!.origin;
             const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
@@ -99,11 +96,9 @@ export const AccountSelection = () => {
                 if (!connectionToken) {
                     throw new Error("Invalid connectionToken");
                 }
-                // Now we need to login and set auth cookie
+                // Login and set auth cookie
                 await handleLogin(values.username, app);
             }
-
-            window.location.href = origin;
         } catch (error) {
             console.error("❌ Error in logging in:", error);
             await logout();
@@ -171,7 +166,6 @@ export const AccountSelection = () => {
 
             try {
                 void (await handleLogin(accountId, connectionToken.app));
-                window.location.href = connectionToken.origin;
             } catch (error) {
                 console.error("❌ Error logging in:", error);
                 await logout();
@@ -255,8 +249,9 @@ export const AccountSelection = () => {
                 accountName: z.string().parse(selectedAccount?.account),
                 app: inviteToken.app,
             });
+            window.location.href = inviteToken?.appDomain;
         } else {
-            // This is dead code; no handled by the click event on an account
+            // This is dead code; now handled by the click event on an account
             // Login
             if (!connectionToken) {
                 throw new Error(`Expected connection token for a login`);
@@ -266,10 +261,6 @@ export const AccountSelection = () => {
                 accountName: selectedAccount!.account,
             });
         }
-        const origin = isInvite
-            ? inviteToken?.appDomain
-            : connectionToken!.origin;
-        window.location.href = origin!;
     };
 
     return (

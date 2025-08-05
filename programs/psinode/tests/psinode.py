@@ -415,7 +415,7 @@ admin-authz = r:any
 admin-authz = rw:loopback
 
 http-timeout = 4
-
+%s
 [logger.stderr]
 type   = console
 filter = %s
@@ -424,18 +424,34 @@ format = %s
 _default_log_filter = 'Severity >= info'
 _default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
-def _write_config(dir, log_filter, log_format):
+def _write_config(dir, log_filter, log_format, softhsm):
     logfile = os.path.join(dir, 'config')
+    if softhsm:
+        extra = 'pkcs11-module = %s\n' % softhsm
+    else:
+        extra = ''
     if not os.path.exists(logfile):
         if log_filter is None:
             log_filter = _default_log_filter
         if log_format is None:
             log_format = _default_log_format
         with open(logfile, 'x') as f:
-            f.write(_default_config % (log_filter, log_format))
+            f.write(_default_config % (extra, log_filter, log_format))
+
+def _init_softhsm(dir, pin):
+    conf = os.path.join(dir, 'softhsm.conf')
+    tokens = os.path.join(dir, 'tokens')
+    os.makedirs(tokens, exist_ok=True)
+    with open(conf, 'w') as f:
+        f.write('directories.tokendir = %s\n' % tokens)
+    env = {'SOFTHSM2_CONF': conf}
+    full_env = dict(os.environ)
+    full_env.update(env)
+    subprocess.run(['softhsm2-util', '--init-token', '--slot', '0', '--label', 'psibase', '--pin', pin, '--so-pin', pin], env=full_env, check=True)
+    return env
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -450,11 +466,15 @@ class Node(API):
         self.producer = producer
         self.socketpath = os.path.join(self.dir, 'socket')
         self.logpath = os.path.join(self.dir, 'psinode.log')
+        self.env = {}
         session = requests.Session()
         session.mount('http://', _LocalAdapter(self.socketpath))
         super().__init__('http://%s/' % hostname, session)
         os.makedirs(self.dir, exist_ok=True)
-        _write_config(self.dir, log_filter, log_format)
+        if softhsm is not None:
+            self.softhsm_pin = 'Ch4ng#Me!'
+            self.env.update(_init_softhsm(os.path.join(self.dir, 'softhsm'), self.softhsm_pin))
+        _write_config(self.dir, log_filter, log_format, softhsm)
         if isinstance(listen, str):
             listen = [listen]
         self.listen = listen
@@ -476,8 +496,17 @@ class Node(API):
         if database_cache_size is not None:
             args.extend(['--database-cache-size', str(database_cache_size)])
         args.append(self.dir)
+        kw = {}
+        if len(self.env) != 0:
+            env = dict(os.environ)
+            for (k, v) in self.env.items():
+                if v is None:
+                    del env[k]
+                else:
+                    env[k] = v
+            kw['env'] = env
         with open(self.logpath, 'a') as logfile:
-            self.child = subprocess.Popen(args, stderr=logfile)
+            self.child = subprocess.Popen(args, stderr=logfile, **kw)
         self._wait_for_startup()
 
     def new_api(self):
@@ -585,6 +614,17 @@ class Node(API):
         self._find_psibase()
         result = subprocess.run([self.psibase] + args, check=check, **kw)
         return result
+    def unlock_softhsm(self):
+        with self.get('/native/admin/keys/devices', service='x-admin') as reply:
+            reply.raise_for_status()
+            for device in reply.json():
+                print(device)
+                if device["name"] == "psibase":
+                    device_id = device["id"]
+                    break
+        with self.post('/native/admin/keys/unlock', service='x-admin', json={"device": device_id, "pin": self.softhsm_pin}) as reply:
+            reply.raise_for_status()
+        return device_id
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):

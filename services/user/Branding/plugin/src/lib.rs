@@ -7,7 +7,6 @@ use exports::branding::plugin::queries::Guest as Queries;
 use host::common::server as CommonServer;
 use host::common::types::Error;
 use sites::plugin::api::{upload, File};
-use staged_tx::plugin::proposer::*;
 use transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
@@ -17,35 +16,17 @@ use errors::ErrorType;
 
 struct BrandingPlugin;
 
-struct Latch;
-
-impl Latch {
-    fn new() -> Self {
-        set_propose_latch(Some("branding")).unwrap();
-        Self
-    }
-}
-
-impl Drop for Latch {
-    fn drop(&mut self) {
-        set_propose_latch(None).unwrap();
-    }
-}
-
 impl Api for BrandingPlugin {
     fn set_network_name(name: String) {
-        let _latch = Latch::new();
-
         let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
-    fn set_logo(logo: Vec<u8>) {
-        let _latch = Latch::new();
 
+    fn set_logo(logo: Vec<u8>) {
         upload(
             &File {
-                path: String::from("/network_logo.svg"),
-                content_type: String::from("image/svg+xml"),
+                path: "/network_logo.svg".to_string(),
+                content_type: "image/svg+xml".to_string(),
                 content: logo,
             },
             11,
@@ -70,7 +51,7 @@ impl Queries for BrandingPlugin {
         let graphql_str = "query { networkName }";
 
         let netname_val = serde_json::from_str::<NetworkNameResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
+            &CommonServer::post_graphql_get_json(&graphql_str).map_err(|err| ErrorType::QueryAuthError(err.to_string()))?,
         );
 
         let netname_val =
