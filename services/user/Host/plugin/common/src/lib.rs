@@ -14,7 +14,6 @@ use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
-    // store as KvStore,
     store::{Database, DbMode, Guest as Store, StorageDuration},
     types::Guest as Types,
     types::{BodyTypes, Error, PostRequest},
@@ -90,7 +89,7 @@ impl Admin for HostCommon {
 
     fn get_active_query_token(app: String) -> Option<String> {
         check_caller(
-            &["transact", "host"],
+            &["host", "transact"],
             "get-active-query-token@host:common/admin",
         );
 
@@ -111,10 +110,7 @@ impl Admin for HostCommon {
     }
 
     fn set_active_query_token(query_token: String, app: String) {
-        check_caller(
-            &["host", "accounts"],
-            "set-active-query-token@host:common/admin",
-        );
+        check_caller(&["host"], "set-active-query-token@host:common/admin");
 
         // TODO: save token to token mapping
         let db = Database {

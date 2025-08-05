@@ -13,7 +13,7 @@ use psibase::fracpack::{Pack, Unpack};
 use serde::Serialize;
 
 use crate::bindings::host::common::{
-    admin as HostAdmin, client as Client, store as KvStore,
+    admin as HostAdmin, store as KvStore,
     store::{Database, DbMode, StorageDuration},
     types::{BodyTypes, PostRequest},
 };
@@ -40,7 +40,7 @@ impl Api for HostAuth {
 
         let query_token = if query_token.is_none() {
             println!("Getting fresh query_token...");
-            TransactAuthApi::get_query_token(&Client::get_receiver(), &user).unwrap()
+            TransactAuthApi::get_query_token(&app, &user).unwrap()
         } else {
             println!("Found cached");
             let query_token = query_token.unwrap();
@@ -54,7 +54,7 @@ impl Api for HostAuth {
     }
 
     fn get_query_token(app: String, user: String) -> Option<String> {
-        check_caller(&["supervisor"], "get-query-token@host:common/admin");
+        check_caller(&["host"], "get-query-token@host:common/admin");
 
         let db = Database {
             mode: DbMode::NonTransactional,
