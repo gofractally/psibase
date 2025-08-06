@@ -88,7 +88,18 @@ macro_rules! define_trust {
             use crate::bindings::host::common::types::Error;
             use crate::bindings::permissions::plugin::api as Permissions;
 
-            pub fn authorize(fn_name: &str, whitelist: Option<Vec<String>>) -> Result<(), Error> {
+            pub fn authorize(fn_name: &str) -> Result<(), Error> {
+                Permissions::authorize(
+                    &get_sender(),
+                    TrustRequirement::get_level(fn_name),
+                    &TrustRequirement::get_descriptions(),
+                    fn_name,
+                    &vec![],
+                )?;
+                Ok(())
+            }
+
+            pub fn authorize_with_whitelist(fn_name: &str, whitelist: Option<Vec<String>>) -> Result<(), Error> {
                 let whitelist = whitelist.unwrap_or_default();
                 Permissions::authorize(
                     &get_sender(),
