@@ -1534,6 +1534,7 @@ void run(const std::string&              db_path,
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
+   node.set_hostnames(hosts);
 
    // The callback is *not* posted to chainContext. It can run concurrently.
    node.chain().onChangeRunQueue([&] { runQueue.notify(); });
@@ -1702,16 +1703,19 @@ void run(const std::string&              db_path,
 
       http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
       {
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, callback = std::move(callback)]
-                           {
-                              http::get_peers_result result;
-                              for (const auto& [id, conn] : node.peers().connections())
-                              {
-                                 result.push_back({id, conn->endpoint(), conn->url});
-                              }
-                              callback(std::move(result));
-                           });
+         boost::asio::post(
+             chainContext,
+             [&chainContext, &node, callback = std::move(callback)]
+             {
+                http::get_peers_result result;
+                for (const auto& [id, conn] : node.peers().connections())
+                {
+                   result.push_back(
+                       {id, conn->endpoint(),
+                        conn->urls.empty() ? std::nullopt : std::optional{conn->urls.front()}});
+                }
+                callback(std::move(result));
+             });
       };
 
       http_config->connect = [&chainContext, &node, &resolver, &connect_one](
@@ -1805,6 +1809,7 @@ void run(const std::string&              db_path,
                 }
                 // All configuration errors should be detected before this point
                 node.set_producer_id(config.producer);
+                node.set_hostnames(config.hosts);
                 http_config->enable_p2p = config.p2p;
                 if (!http_config->status.load().shutdown)
                 {

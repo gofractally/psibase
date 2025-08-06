@@ -95,8 +95,10 @@ void connect(boost::asio::io_context& ctx, node_type& node1, node_type& node2)
    p2->logger.add_attribute("Host", boost::log::attributes::constant(node2.name));
    p1->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(node2.name));
    p2->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(node1.name));
-   p1->url = node2.name;
-   p2->url = node1.name;
+   p1->urls.push_back(node2.name);
+   p2->urls.push_back(node1.name);
+   p1->hosts.push_back(node2.name);
+   p2->hosts.push_back(node1.name);
 
    node1.peers().connect(node2.name,
                          [&node1, p1 = std::move(p1)](const std::string&, auto&& next) mutable
@@ -132,7 +134,7 @@ void disconnect(TestNode& node1, TestNode& node2)
 {
    for (const auto& [id, ptr] : node1.connections())
    {
-      if (ptr->url && *ptr->url == node2.name)
+      if (ptr->urls.size() == 1 && ptr->urls.front() == node2.name)
       {
          node1.peers().disconnect(id);
          break;

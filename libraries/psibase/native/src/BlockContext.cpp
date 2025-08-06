@@ -638,16 +638,32 @@ namespace psibase
       }
       // Copy any trailing elements
       std::copy_if(currentIter, currentEnd, std::back_inserter(modifiedAuthServices), hasCode);
+
+      auto& oldWasmConfig =
+          (status.consensus.next ? status.consensus.next->consensus : status.consensus.current)
+              .wasmConfig;
+      auto proofWasmConfig =
+          db.kvGet<WasmConfigRow>(WasmConfigRow::db, WasmConfigRow::key(proofWasmConfigTable))
+              .value_or(WasmConfigRow{});
+      auto newWasmConfig =
+          BlockHeaderWasmConfig{.numExecutionMemories = proofWasmConfig.numExecutionMemories,
+                                .vmOptions            = proofWasmConfig.vmOptions};
+
       // Check for changes and update the consensus field
-      if (modifiedAuthServices != currentAuthServices)
+      if (modifiedAuthServices != currentAuthServices || oldWasmConfig != newWasmConfig)
       {
          current.header.authCode = std::move(authCode);
          if (!status.consensus.next)
             status.consensus.next =
-                PendingConsensus{{status.consensus.current.data, std::move(modifiedAuthServices)},
+                PendingConsensus{{status.consensus.current.data, std::move(modifiedAuthServices),
+                                  std::move(newWasmConfig)},
                                  status.current.blockNum};
          else
-            status.consensus.next->consensus.services = std::move(modifiedAuthServices);
+         {
+            status.consensus.next->consensus.services   = std::move(modifiedAuthServices);
+            status.consensus.next->consensus.wasmConfig = newWasmConfig;
+            status.consensus.next->blockNum             = status.current.blockNum;
+         }
       }
    }
 

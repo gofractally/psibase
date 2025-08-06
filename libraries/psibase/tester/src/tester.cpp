@@ -264,6 +264,12 @@ void psibase::TestChain::finishBlock()
       runAll();
 }
 
+void psibase::TestChain::setSignature(BlockNum blockNum, std::vector<char> sig)
+{
+   kvPut(DbId::blockProof, blockNum, std::move(sig));
+   tester::raw::commitState(id);
+}
+
 void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
    ScopedSelectChain s{id};

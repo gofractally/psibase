@@ -4,9 +4,9 @@
     "**/.yarn": true,
     "**/.pnp.*": true
   },
-  "eslint.nodePath": "services/.yarn/sdks",
-  "prettier.prettierPath": "services/.yarn/sdks/prettier/index.cjs",
-  "typescript.tsdk": "services/.yarn/sdks/typescript/lib",
+  "eslint.nodePath": "packages/.yarn/sdks",
+  "prettier.prettierPath": "packages/.yarn/sdks/prettier/index.cjs",
+  "typescript.tsdk": "packages/.yarn/sdks/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "rust-analyzer.linkedProjects": ["rust/Cargo.toml"],
   "[markdown]": {
