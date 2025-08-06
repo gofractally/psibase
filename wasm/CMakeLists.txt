@@ -195,7 +195,7 @@ add_subdirectory(../external external)
 add_subdirectory(boost)
 add_subdirectory(sqlite3)
 add_subdirectory(../libraries libraries)
-add_subdirectory(../services services)
+add_subdirectory(../packages packages)
 add_subdirectory(../programs programs)
 
 install(FILES ${DEP_PREFIX}/lib/libcrypto.a ${DEP_PREFIX}/lib/libz.a TYPE LIB COMPONENT libpsibase)
