@@ -11,7 +11,7 @@ use host::common::admin::get_active_app;
 use host::common::{client as Client, server as Server, types::Error};
 use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
-use psibase::{AccountNumber, Checksum256, Hex, MethodNumber};
+use psibase::{AccountNumber, ActionMeta, Checksum256, Hex, MethodNumber};
 use staged_tx::action_structs::*;
 use transact::plugin::{hooks::*, intf::add_action_to_transaction};
 mod db;

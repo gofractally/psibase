@@ -4,11 +4,11 @@ use bindings::*;
 
 mod types;
 
-use ::registry::action_structs::*;
 use bindings::registry::plugin::types::{AccountId, AppMetadata};
 use exports::registry::plugin::developer::Guest as Developer;
 use host::common::types::Error;
-use psibase::{fracpack::Pack, AccountNumber};
+use psibase::services::registry::action_structs::{publish, setMetadata, unpublish};
+use psibase::{fracpack::Pack, AccountNumber, ActionMeta};
 use transact::plugin::intf as Transact;
 
 struct RegistryPlugin;

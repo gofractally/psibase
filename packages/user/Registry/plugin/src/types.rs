@@ -1,5 +1,5 @@
 use crate::bindings::registry::plugin::types::AppMetadata;
-use registry::action_structs::setMetadata;
+use psibase::services::registry::action_structs::setMetadata;
 
 impl From<AppMetadata> for setMetadata {
     fn from(metadata: AppMetadata) -> Self {
