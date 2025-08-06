@@ -51,27 +51,25 @@ macro_rules! define_trust {
             $($func_level:ident => [$($func_name:ident),* $(,)?],)*
         }
     ) => {
-        use crate::bindings::permissions::plugin::types::{Descriptions, TrustLevel};
-        use std::collections::HashMap;
 
         $crate::lazy_static::lazy_static! {
-            static ref TRUST_LEVELS: HashMap<&'static str, TrustLevel> = TrustRequirement::get_trust_levels();
+            static ref TRUST_LEVELS: std::collections::HashMap<&'static str, crate::bindings::permissions::plugin::types::TrustLevel> = TrustRequirement::get_trust_levels();
         }
 
         struct TrustRequirement;
 
         impl TrustRequirement {
-            fn get_trust_levels() -> HashMap<&'static str, TrustLevel> {
-                let mut map = HashMap::new();
+            fn get_trust_levels() -> std::collections::HashMap<&'static str, crate::bindings::permissions::plugin::types::TrustLevel> {
+                let mut map = std::collections::HashMap::new();
                 $(
                     $(
-                        map.insert(stringify!($func_name), TrustLevel::$func_level);
+                        map.insert(stringify!($func_name), crate::bindings::permissions::plugin::types::TrustLevel::$func_level);
                     )*
                 )*
                 map
             }
 
-            fn get_descriptions() -> Descriptions {
+            fn get_descriptions() -> crate::bindings::permissions::plugin::types::Descriptions {
                 (
                     $(
                         $crate::indoc::indoc! { $desc }.to_string(),
@@ -79,8 +77,8 @@ macro_rules! define_trust {
                 )
             }
 
-            fn get_level(fn_name: &str) -> TrustLevel {
-                *TRUST_LEVELS.get(fn_name).unwrap_or(&TrustLevel::Max)
+            fn get_level(fn_name: &str) -> crate::bindings::permissions::plugin::types::TrustLevel {
+                *TRUST_LEVELS.get(fn_name).unwrap_or(&crate::bindings::permissions::plugin::types::TrustLevel::Max)
             }
         }
 
