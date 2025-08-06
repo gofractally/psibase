@@ -26,13 +26,26 @@ use supervisor::bridge::{
 };
 use url::Url;
 
-use crate::bindings::exports::host::common::store::GuestBucket;
+use crate::bindings::{
+    exports::host::common::store::GuestBucket, supervisor::bridge::intf::get_active_app,
+};
+
+const QUERY_TOKEN_KEY: &str = "query-token-cookie";
+
+fn get_auth_cookie_store_key(app: String) -> String {
+    format!("{}-{}", QUERY_TOKEN_KEY, app)
+}
 
 struct HostCommon;
 
 fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
-    let query_auth_token = HostCommon::get_active_query_token(app.clone());
+    let active_app = get_active_app();
+    let query_auth_token = get_active_query_token(active_app.clone());
+    println!(
+        "host:common/do_post(app[{}], endpoint[{}]).query_auth_token: {:?}",
+        active_app, endpoint, query_auth_token
+    );
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
@@ -41,6 +54,7 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
             ("Authorization", &query_auth_token.unwrap()),
         ])
     };
+    println!("host:common/do_post().headers: {:?}", headers);
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "POST".to_string(),
@@ -51,7 +65,12 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
-    let query_auth_token = HostCommon::get_active_query_token(app.clone());
+    let active_app = get_active_app();
+    let query_auth_token = get_active_query_token(active_app.clone());
+    println!(
+        "host:common/do_get(app[{}], active_app[{}], endpoint[{}]).query_auth_token: {:?}",
+        app, active_app, endpoint, query_auth_token
+    );
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {
@@ -60,6 +79,7 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
             ("Authorization", &query_auth_token.unwrap()),
         ])
     };
+    println!("host:common/do_get().headers: {:?}", headers);
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "GET".to_string(),
@@ -67,6 +87,32 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
         body: None,
     }
     .send()?)
+}
+
+fn get_active_query_token(app: String) -> Option<String> {
+    let db = Database {
+        mode: DbMode::NonTransactional,
+        duration: StorageDuration::Persistent,
+    };
+    let bucket = Bucket::new(db, app.clone());
+
+    println!(
+        "host:common/GET_active_query_token().from bucket[{}], at key[{}]",
+        app,
+        get_auth_cookie_store_key(app.clone())
+    );
+    let query_token = bucket.get(get_auth_cookie_store_key(app));
+    let query_token = if query_token.is_some() {
+        let query_token = query_token.unwrap();
+        Some(<String>::unpacked(&query_token).unwrap())
+    } else {
+        None
+    };
+    println!(
+        "get_active_query_token() returning query_token [{:?}]",
+        query_token
+    );
+    query_token
 }
 
 impl Admin for HostCommon {
@@ -87,28 +133,6 @@ impl Admin for HostCommon {
         Ok(res.body.map(Into::into))
     }
 
-    fn get_active_query_token(app: String) -> Option<String> {
-        check_caller(
-            &["host", "transact"],
-            "get-active-query-token@host:common/admin",
-        );
-
-        let db = Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        };
-        let bucket = Bucket::new(db, app.clone());
-
-        let query_token = bucket.get(format!("{}", app));
-        let query_token = if query_token.is_some() {
-            let query_token = query_token.unwrap();
-            Some(<String>::unpacked(&query_token).unwrap())
-        } else {
-            None
-        };
-        query_token
-    }
-
     fn set_active_query_token(query_token: String, app: String) {
         check_caller(&["host"], "set-active-query-token@host:common/admin");
 
@@ -118,8 +142,12 @@ impl Admin for HostCommon {
             duration: StorageDuration::Persistent,
         };
         let bucket = Bucket::new(db, app.clone());
-
-        bucket.set(format!("{}", app), query_token.packed());
+        println!(
+            "host:common/set_active_query_token().from bucket[{}], at key[{}]",
+            app,
+            get_auth_cookie_store_key(app.clone())
+        );
+        bucket.set(get_auth_cookie_store_key(app), query_token.packed());
     }
 }
 

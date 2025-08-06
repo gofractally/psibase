@@ -104,7 +104,7 @@ interface admin {
 
     /// Set token to use for queries
     set-active-query-token: func(query-token: string, app: string);
-    get-active-query-token: func(app: string) -> option<string>;
+    // get-active-query-token: func(app: string) -> option<string>;
     
     /// Get account name of the active app (the top level app with which the user is interacting)
     get-active-app: func() -> string;

@@ -32,6 +32,7 @@ fn assert_valid_account(account: &str) {
 
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
+        println!("login_direct(app[{}], user[{}]", &app, &user);
         assert_caller_admin("login_direct");
 
         assert_valid_account(&user);

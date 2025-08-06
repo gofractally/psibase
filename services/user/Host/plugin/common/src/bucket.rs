@@ -1,4 +1,4 @@
-use crate::bindings::accounts::plugin::api as Accounts;
+use crate::accounts::plugin::api as Accounts;
 use crate::exports::host::common::{
     store::{Database, DbMode, GuestBucket, StorageDuration},
     types::Error,
