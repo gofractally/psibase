@@ -61,8 +61,8 @@ impl<'a> Unpack<'a> for TrustLevel {
         Ok(TrustLevel::from(u8::unpack(src)?))
     }
     fn verify(src: &mut FracInputStream) -> Result<()> {
-        let _ = TrustLevel::from(u8::unpack(src)?);
-        u8::verify(src)
+        let _ = Self::unpack(src)?;
+        Ok(())
     }
 }
 
