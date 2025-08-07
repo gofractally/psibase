@@ -2389,6 +2389,17 @@ impl<'a> SchemaMatcher<'a> {
             match ty {
                 Custom { type_, .. } => ty = type_,
                 Type(name) => ty = schema.get(name).unwrap(),
+                // Unwrap a single element struct containing a scalar
+                Struct(members) => {
+                    if members.len() == 1 {
+                        let unwrapped = Self::resolve_all(schema, members.values().next().unwrap());
+                        match unwrapped {
+                            Float { .. } | Int { .. } => return unwrapped,
+                            _ => {}
+                        }
+                    }
+                    return ty;
+                }
                 _ => return ty,
             }
         }
@@ -2553,6 +2564,7 @@ impl<'a> SchemaMatcher<'a> {
 
         self.on_stack.remove(&(prhs as *const AnyType));
         self.on_stack.remove(&(plhs as *const AnyType));
+
         result
     }
 }
