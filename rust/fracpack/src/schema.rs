@@ -4,7 +4,8 @@ use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
 use std::any::TypeId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not};
 
 use std::{
     cell::{Cell, RefCell},
@@ -2306,5 +2307,252 @@ fn fracpack_verify_strict(
         Err(Error::HasUnknown)
     } else {
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SchemaDifference(u8);
+
+impl SchemaDifference {
+    pub const EQUIVALENT: SchemaDifference = SchemaDifference(0);
+    pub const INCOMPATIBLE: SchemaDifference = SchemaDifference(1);
+    pub const ADD_FIELD: SchemaDifference = SchemaDifference(2);
+    pub const DROP_FIELD: SchemaDifference = SchemaDifference(4);
+    pub const ADD_ALTERNATIVE: SchemaDifference = SchemaDifference(8);
+    pub const DROP_ALTERNATIVE: SchemaDifference = SchemaDifference(16);
+}
+
+impl SchemaDifference {
+    fn includes(self, other: SchemaDifference) -> bool {
+        (self | other) == self
+    }
+}
+
+impl Not for SchemaDifference {
+    type Output = SchemaDifference;
+    fn not(self) -> SchemaDifference {
+        SchemaDifference(!self.0)
+    }
+}
+
+impl BitOr for SchemaDifference {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for SchemaDifference {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs
+    }
+}
+
+impl BitAnd for SchemaDifference {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl BitAndAssign for SchemaDifference {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = *self & rhs
+    }
+}
+
+pub struct SchemaMatcher<'a> {
+    schema1: &'a Schema,
+    schema2: &'a Schema,
+    on_stack: HashMap<*const AnyType, usize>,
+    known: HashSet<(*const AnyType, *const AnyType)>,
+    allowed_difference: SchemaDifference,
+}
+
+impl<'a> SchemaMatcher<'a> {
+    pub fn new(
+        schema1: &'a Schema,
+        schema2: &'a Schema,
+        allowed_difference: SchemaDifference,
+    ) -> Self {
+        Self {
+            schema1,
+            schema2,
+            on_stack: HashMap::new(),
+            known: HashSet::new(),
+            allowed_difference,
+        }
+    }
+    fn resolve_all<'b>(schema: &'b Schema, mut ty: &'b AnyType) -> &'b AnyType {
+        loop {
+            use AnyType::*;
+            match ty {
+                Custom { type_, .. } => ty = type_,
+                Type(name) => ty = schema.get(name).unwrap(),
+                _ => return ty,
+            }
+        }
+    }
+    fn is_optional(schema: &Schema, ty: &AnyType) -> bool {
+        matches!(Self::resolve_all(schema, ty), AnyType::Option(..))
+    }
+    fn compare_tuples<'b, I1: Iterator<Item = &'b AnyType>, I2: Iterator<Item = &'b AnyType>>(
+        &mut self,
+        mut liter: I1,
+        mut riter: I2,
+    ) -> bool {
+        loop {
+            match (liter.next(), riter.next()) {
+                (Some(l), Some(r)) => {
+                    if !self.compare(l, r) {
+                        break false;
+                    }
+                }
+                (Some(l), None) => {
+                    if !Self::is_optional(self.schema1, l)
+                        || liter.any(|l| !Self::is_optional(self.schema1, l))
+                    {
+                        break false;
+                    }
+                    break self
+                        .allowed_difference
+                        .includes(SchemaDifference::DROP_FIELD);
+                }
+                (None, Some(r)) => {
+                    if !Self::is_optional(self.schema2, r)
+                        || liter.any(|r| !Self::is_optional(self.schema2, r))
+                    {
+                        break false;
+                    }
+                    break self
+                        .allowed_difference
+                        .includes(SchemaDifference::ADD_FIELD);
+                }
+                (None, None) => break true,
+            }
+        }
+    }
+    pub fn compare(&mut self, lhs: &AnyType, rhs: &AnyType) -> bool {
+        let plhs = Self::resolve_all(self.schema1, lhs);
+        let prhs = Self::resolve_all(self.schema2, rhs);
+        let lhs_pos = self.on_stack.get(&(plhs as *const AnyType));
+        let rhs_pos = self.on_stack.get(&(prhs as *const AnyType));
+        if lhs_pos != rhs_pos {
+            return false;
+        }
+
+        if !self.known.insert((&*plhs, &*prhs)) {
+            return true;
+        }
+
+        let n = self.on_stack.len() / 2;
+        self.on_stack.insert(&*lhs, n);
+        self.on_stack.insert(&*rhs, n);
+
+        use AnyType::*;
+        let result = match (plhs, prhs) {
+            (Tuple(lmembers), Tuple(rmembers)) => {
+                self.compare_tuples(lmembers.iter(), rmembers.iter())
+            }
+            (Object(lmembers), Object(rmembers)) => {
+                self.compare_tuples(lmembers.values(), rmembers.values())
+            }
+            (Tuple(lmembers), Object(rmembers)) => {
+                self.compare_tuples(lmembers.iter(), rmembers.values())
+            }
+            (Object(lmembers), Tuple(rmembers)) => {
+                self.compare_tuples(lmembers.values(), rmembers.iter())
+            }
+            (Struct(lmembers), Struct(rmembers)) => {
+                let mut liter = lmembers.values();
+                let mut riter = rmembers.values();
+                loop {
+                    match (liter.next(), riter.next()) {
+                        (Some(l), Some(r)) => {
+                            if !self.compare(l, r) {
+                                break false;
+                            }
+                        }
+                        (None, None) => break true,
+                        _ => break false,
+                    }
+                }
+            }
+            (
+                Array {
+                    len: llen,
+                    type_: ltype,
+                },
+                Array {
+                    len: rlen,
+                    type_: rtype,
+                },
+            ) => llen == rlen && self.compare(ltype, rtype),
+            (List(litem), List(ritem)) => self.compare(litem, ritem),
+            (Option(litem), Option(ritem)) => self.compare(litem, ritem),
+            (Variant(lalternatives), Variant(ralternatives)) => {
+                let mut liter = lalternatives.values();
+                let mut riter = ralternatives.values();
+                loop {
+                    match (liter.next(), riter.next()) {
+                        (Some(l), Some(r)) => {
+                            if !self.compare(l, r) {
+                                break false;
+                            }
+                        }
+                        (Some(..), None) => {
+                            break self
+                                .allowed_difference
+                                .includes(SchemaDifference::DROP_ALTERNATIVE);
+                        }
+                        (None, Some(..)) => {
+                            break self
+                                .allowed_difference
+                                .includes(SchemaDifference::ADD_ALTERNATIVE);
+                        }
+                        (None, None) => break true,
+                    }
+                }
+            }
+            (
+                Float {
+                    exp: lexp,
+                    mantissa: lmantissa,
+                },
+                Float {
+                    exp: rexp,
+                    mantissa: rmantissa,
+                },
+            ) => lexp == rexp && lmantissa == rmantissa,
+            (
+                Int {
+                    bits: lbits,
+                    is_signed: lsign,
+                },
+                Int {
+                    bits: rbits,
+                    is_signed: rsign,
+                },
+            ) => {
+                // HACK: C++ uses char (which may be signed) as a byte type
+                lbits == rbits && (lsign == rsign || *lbits == 8)
+            }
+            (FracPack(ltype), FracPack(rtype)) => self.compare(ltype, rtype),
+            (FracPack(..), List(ritem)) => {
+                self.allowed_difference
+                    .includes(SchemaDifference::ADD_ALTERNATIVE)
+                    && matches!(Self::resolve_all(self.schema2, ritem), Int { bits: 8, .. })
+            }
+            (List(litem), FracPack(..)) => {
+                self.allowed_difference
+                    .includes(SchemaDifference::DROP_ALTERNATIVE)
+                    && matches!(Self::resolve_all(self.schema1, litem), Int { bits: 8, .. })
+            }
+            _ => false,
+        };
+
+        self.on_stack.remove(&(prhs as *const AnyType));
+        self.on_stack.remove(&(plhs as *const AnyType));
+        result
     }
 }

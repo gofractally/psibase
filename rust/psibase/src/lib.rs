@@ -46,7 +46,6 @@ pub use crypto::*;
 pub use db::*;
 pub use depgraph::*;
 pub use flags::*;
-pub use paste;
 pub use from_bin::*;
 pub use graph_ql::*;
 pub use hex::*;
@@ -57,6 +56,7 @@ pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;
 pub use package::*;
+pub use paste;
 #[cfg(not(target_family = "wasm"))]
 pub use rpc::*;
 pub use schema::*;

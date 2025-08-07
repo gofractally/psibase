@@ -28,6 +28,12 @@ impl Hash for MethodString {
     }
 }
 
+impl std::fmt::Display for MethodString {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        self.0.fmt(f)
+    }
+}
+
 type EventMap = IndexMap<MethodString, AnyType>;
 
 type ActionMap = IndexMap<MethodString, FunctionType>;
@@ -85,6 +91,133 @@ pub struct Schema {
     pub history: EventMap,
     pub merkle: EventMap,
     pub database: Option<IndexMap<String, Vec<TableInfo>>>,
+}
+
+#[cfg(test)]
+pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
+    let mut matcher = fracpack::SchemaMatcher::new(
+        &lhs.types,
+        &rhs.types,
+        fracpack::SchemaDifference::EQUIVALENT,
+    );
+    for (name, lty) in &lhs.actions {
+        if let Some(rty) = rhs.actions.get(name) {
+            if !matcher.compare(&lty.params, &rty.params) {
+                panic!("Parameter types for action {} do not match", name);
+            }
+            match (&lty.result, &rty.result) {
+                (Some(lres), Some(rres)) => {
+                    if !matcher.compare(lres, rres) {
+                        panic!("Return type for {} does not match", name);
+                    }
+                }
+                (None, None) => (),
+                (Some(..), None) => panic!("Missing return type for {}", name),
+                (None, Some(..)) => panic!("Extra return type for {}", name),
+            }
+        } else {
+            panic!("Missing action {}", name);
+        }
+    }
+    for name in rhs.actions.keys() {
+        if !lhs.actions.contains_key(name) {
+            panic!("Extra action {}", name);
+        }
+    }
+    for (levents, revents) in [
+        (&lhs.ui, &rhs.ui),
+        (&lhs.history, &rhs.history),
+        (&lhs.merkle, &rhs.merkle),
+    ] {
+        for (name, lty) in levents {
+            if let Some(rty) = revents.get(name) {
+                if !matcher.compare(lty, rty) {
+                    panic!("Type for event {} does not match", name);
+                }
+            } else {
+                panic!("Missing event {}", name)
+            }
+        }
+        for name in revents.keys() {
+            if !levents.contains_key(name) {
+                panic!("Extra event {}", name);
+            }
+        }
+    }
+    // Allow tables to be missing
+    if let Some(rdb) = &rhs.database {
+        for (db, rtables) in rdb {
+            let empty_tables = Vec::new();
+            let ltables = lhs
+                .database
+                .as_ref()
+                .and_then(|tables| tables.get(db))
+                .unwrap_or(&empty_tables);
+            if ltables.len() < rtables.len() {
+                panic!("Extra tables in {}", db);
+            }
+            for (ltab, rtab) in std::iter::zip(ltables, rtables) {
+                let table_name = ltab
+                    .name
+                    .as_ref()
+                    .or(rtab.name.as_ref())
+                    .map_or("<unnamed>", |n| n.as_str());
+                if !matcher.compare(&ltab.type_, &rtab.type_) {
+                    panic!("Type for table {}::{} does not match", db, table_name);
+                }
+                if ltab.indexes.len() < rtab.indexes.len() {
+                    panic!("Too many indexes for table {}::{}", db, table_name);
+                }
+                for (lindex, rindex) in std::iter::zip(&ltab.indexes, &rtab.indexes) {
+                    if lindex.len() != rindex.len() {
+                        panic!("Index does not match in {}::{}", db, table_name);
+                    }
+                    for (lfield, rfield) in std::iter::zip(lindex, rindex) {
+                        let tymatch = match (&lfield.type_, &rfield.type_) {
+                            (Some(lty), Some(rty)) => matcher.compare(lty, rty),
+                            (None, None) => true,
+                            _ => false,
+                        };
+                        if !tymatch
+                            || &lfield.path != &rfield.path
+                            || lfield.transform != rfield.transform
+                        {
+                            panic!("Index does not match in {}::{}", db, table_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
+    use crate::{DirectoryRegistry, PackageRegistry, SchemaMap};
+    use futures::executor::block_on;
+    use std::collections::HashSet;
+    use std::path::PathBuf;
+
+    let my_schema = Wrapper::schema();
+    let registry = DirectoryRegistry::new(
+        PathBuf::from(std::env::var("PSIBASE_DATADIR").unwrap()).join("packages"),
+    );
+    let info = registry
+        .index()
+        .unwrap()
+        .into_iter()
+        .find(|info| info.accounts.contains(&my_schema.service))
+        .expect(&format!(
+            "Cannot find package containing {}",
+            my_schema.service
+        ));
+    let package = block_on(registry.get_by_info(&info)).unwrap();
+    let mut accounts = HashSet::new();
+    accounts.insert(my_schema.service);
+    let mut schemas = SchemaMap::new();
+    package.get_schemas(&mut accounts, &mut schemas).unwrap();
+    let real_schema = schemas.get(&my_schema.service).unwrap();
+    assert_schemas_equivalent(real_schema, &my_schema);
 }
 
 impl ToSchema for Schema {
