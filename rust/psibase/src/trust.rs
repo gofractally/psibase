@@ -111,13 +111,7 @@ macro_rules! define_trust {
             }
 
             pub fn authorize(fn_name: FunctionName) -> Result<(), Error> {
-                Permissions::authorize(
-                    &get_sender(),
-                    TrustRequirement::get_level(fn_name),
-                    &TrustRequirement::get_descriptions(),
-                    fn_name.as_str(),
-                    &vec![],
-                )?;
+                authorize_with_whitelist(fn_name, vec![])?;
                 Ok(())
             }
 
