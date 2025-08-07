@@ -86,7 +86,7 @@ impl HookUserAuth for AuthSig {
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        authorize_with_whitelist(FunctionName::generate_keypair, Some(vec!["invite".into()]))?;
+        authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
 
         let keypair = AuthSig::generate_unmanaged_keypair()?;
         ManagedKeys::add(&keypair.public_key, &AuthSig::to_der(keypair.private_key)?);

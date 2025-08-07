@@ -36,7 +36,16 @@
 /// // ...
 ///
 /// fn generate_keypair() -> Result<String, CommonTypes::Error> {
-///     authorize(trust::generate_keypair, Some(vec!["invite".into()]))?;
+///     // Use `authorize_with_whitelist` to check that the caller has been given a sufficient trust level by the
+///     // user to call this function on their behalf, or that the caller is in the specified whitelist.
+///     authorize_with_whitelist(trust::FunctionName::generate_keypair, vec!["invite".into()])?;
+///     // ...
+/// }
+///
+/// fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
+///     // Use `authorize` to check that the caller has been given a sufficient trust level by the user to call this
+///     // function on their behalf.
+///     authorize(trust::FunctionName::sign)?;
 ///     // ...
 /// }
 ///
@@ -112,8 +121,7 @@ macro_rules! define_trust {
                 Ok(())
             }
 
-            pub fn authorize_with_whitelist(fn_name: FunctionName, whitelist: Option<Vec<String>>) -> Result<(), Error> {
-                let whitelist = whitelist.unwrap_or_default();
+            pub fn authorize_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<(), Error> {
                 Permissions::authorize(
                     &get_sender(),
                     TrustRequirement::get_level(fn_name),
