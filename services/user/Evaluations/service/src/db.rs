@@ -44,6 +44,7 @@ pub mod tables {
         pub group_number: Option<u32>,
         pub attestation: Option<Vec<u8>>,
         pub proposal: Option<Vec<u8>>,
+        pub sym_key: Option<Vec<u8>>,
     }
 
     #[table(name = "GroupTable", index = 3)]
@@ -53,6 +54,7 @@ pub mod tables {
         pub evaluation_id: u32,
         pub number: u32,
         pub key_submitter: Option<AccountNumber>,
+        pub key_hash: Option<String>,
     }
 
     #[table(name = "UserSettingsTable", index = 4)]
@@ -138,6 +140,7 @@ pub mod impls {
                 group_number: None,
                 attestation: None,
                 proposal: None,
+                sym_key: None,
             }
         }
 
@@ -163,6 +166,11 @@ pub mod impls {
 
         pub fn propose(&mut self, proposal: Vec<u8>) {
             self.proposal = Some(proposal);
+            self.save();
+        }
+
+        pub fn set_sym_key(&mut self, sym_key: &Vec<u8>) {
+            self.sym_key = Some(sym_key.clone());
             self.save();
         }
 
@@ -440,6 +448,7 @@ pub mod impls {
                 evaluation_id,
                 number,
                 key_submitter: None,
+                key_hash: None,
             }
         }
 
@@ -495,9 +504,27 @@ pub mod impls {
             );
         }
 
-        pub fn set_key_submitter(&mut self, submitter: AccountNumber) {
+        pub fn set_user_sym_keys(&mut self, keys: Vec<Vec<u8>>, hash: String) {
+            let mut users = self.get_users();
+            psibase::check(
+                users.len() == keys.len(),
+                "num of keys and users must match",
+            );
+
+            users.iter_mut().zip(keys.iter()).for_each(|(user, key)| {
+                user.set_sym_key(key);
+            });
+
+            let submitter = psibase::get_sender();
+            psibase::check(
+                users.iter().any(|user| user.user == submitter),
+                "submitter not part of group",
+            );
+
             psibase::check_none(self.key_submitter, "group key has already been submitted");
             self.key_submitter = Some(submitter);
+            self.key_hash = Some(hash);
+
             self.save();
         }
     }

@@ -5,20 +5,19 @@ use bindings::exports::evaluations::plugin::admin::Guest as Admin;
 use bindings::exports::evaluations::plugin::user::Guest as User;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
-
 use psibase::fracpack::Pack;
-use psibase::AccountNumber;
+use tables::{AsymKeysTable, EvaluationTable};
 
 pub mod consensus;
 mod errors;
 mod graphql;
 pub mod helpers;
-mod key_table;
+mod tables;
 pub mod types;
 
 use errors::ErrorType;
 use evaluations::action_structs as Actions;
-use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
+use helpers::{current_user, parse_account_number, parse_proposal};
 use std::collections::HashSet;
 
 struct EvaluationsPlugin;
@@ -47,11 +46,8 @@ impl Admin for EvaluationsPlugin {
     }
 
     fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-
         let packed_args = Actions::start {
-            owner: evaluation_owner,
+            owner: parse_account_number(&evaluation_owner)?,
             evaluation_id,
         }
         .packed();
@@ -59,10 +55,8 @@ impl Admin for EvaluationsPlugin {
     }
 
     fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
         let packed_args = Actions::close {
-            owner: evaluation_owner,
+            owner: parse_account_number(&evaluation_owner)?,
             evaluation_id,
         }
         .packed();
@@ -84,16 +78,10 @@ impl Admin for EvaluationsPlugin {
         evaluation_id: u32,
         registrant: String,
     ) -> Result<(), Error> {
-        let registrant =
-            AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
-
-        let owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-
         let packed_args = Actions::register {
-            owner,
+            owner: parse_account_number(&evaluation_owner)?,
             evaluation_id,
-            registrant,
+            registrant: parse_account_number(&registrant)?,
         }
         .packed();
         add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
@@ -104,15 +92,10 @@ impl Admin for EvaluationsPlugin {
         evaluation_id: u32,
         registrant: String,
     ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let registrant =
-            AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
-
         let packed_args = Actions::unregister {
-            owner: evaluation_owner,
+            owner: parse_account_number(&evaluation_owner)?,
             evaluation_id,
-            registrant,
+            registrant: parse_account_number(&registrant)?,
         }
         .packed();
         add_action_to_transaction(Actions::unregister::ACTION_NAME, &packed_args)
@@ -121,80 +104,40 @@ impl Admin for EvaluationsPlugin {
 
 impl User for EvaluationsPlugin {
     fn register(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let key = key_table::AsymKey::new();
-        let public_key_vectored = key.public_key()?.serialize().to_vec();
+        let owner = parse_account_number(&evaluation_owner)?;
 
-        let packed_args = Actions::set_key {
-            key: public_key_vectored,
-        }
-        .packed();
-        add_action_to_transaction(Actions::set_key::ACTION_NAME, &packed_args)
-            .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
-        key.save()?;
+        // Reset the user's asymmetric keypair used for message encryption
+        add_action_to_transaction(
+            Actions::set_key::ACTION_NAME,
+            &Actions::set_key {
+                key: AsymKeysTable::new()?.pubkey(),
+            }
+            .packed(),
+        )?;
 
-        let registrant = current_user().expect("not authenticated");
-        let owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-
-        let packed_args = Actions::register {
-            owner,
-            evaluation_id,
-            registrant,
-        }
-        .packed();
-        add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
+        EvaluationTable::new(owner, evaluation_id)?.register()
     }
 
     fn unregister(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-
-        let registrant = current_user().expect("not authenticated");
-
-        let packed_args = Actions::unregister {
-            owner: evaluation_owner,
-            evaluation_id,
-            registrant,
-        }
-        .packed();
-        add_action_to_transaction(Actions::unregister::ACTION_NAME, &packed_args)
+        let owner = parse_account_number(&evaluation_owner)?;
+        EvaluationTable::new(owner, evaluation_id)?.unregister()
     }
 
+    // TODO: `proposal` should be a `Vec<u8>`
     fn propose(
         evaluation_owner: String,
         evaluation_id: u32,
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let current_user = current_user()?;
+        let owner = parse_account_number(&evaluation_owner)?;
+        let parsed_proposal = parse_proposal(&proposal)?;
 
-        let symmetric_key =
-            get_symmetric_key(evaluation_owner, evaluation_id, group_number, current_user)?;
+        let mut evaluation = EvaluationTable::new(owner, evaluation_id)?;
+        let group = evaluation.get_group(group_number)?;
+        group.propose(&parsed_proposal);
 
-        let parsed_proposal = proposal
-            .iter()
-            .map(|p| {
-                p.parse::<u8>()
-                    .map_err(|_| ErrorType::InvalidProposal.into())
-            })
-            .collect::<Result<Vec<u8>, Error>>()?;
-
-        let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
-            &symmetric_key.key,
-            &parsed_proposal,
-            symmetric_key.salt_base_64().as_str(),
-        );
-
-        let packed_args = Actions::propose {
-            owner: evaluation_owner,
-            evaluation_id,
-            proposal: encrypted_proposal,
-        }
-        .packed();
-
-        add_action_to_transaction(Actions::propose::ACTION_NAME, &packed_args)
+        Ok(())
     }
 
     fn attest(
@@ -202,24 +145,14 @@ impl User for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
         let current_user = current_user()?;
 
-        let eval_data = graphql::fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
-        // TODO: Don't fetch_and_decode again inside get_decrypted_proposals, just call e.g. `decrypt(proposals)`
+        let mut evaluation = EvaluationTable::new(evaluation_owner, evaluation_id)?;
+        let group: &mut types::EvalGroup = evaluation.get_group(group_number)?;
+        let proposals = group.get_proposals()?;
 
-        let mut submissions =
-            get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
-
-        fractal_proposal_rules::prepare_submissions(
-            &mut submissions,
-            eval_data
-                .get_group_users
-                .expect("No group users found")
-                .nodes
-                .len(),
-        );
+        fractal_proposal_rules::clean_proposals(&mut submissions, group.users.len());
 
         let mut proposals = submissions
             .into_iter()
@@ -254,9 +187,9 @@ impl User for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<Option<Vec<u8>>, Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let evaluation_owner = parse_account_number(&evaluation_owner)?;
         let current_user = current_user()?;
+
         let submissions =
             get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
 
@@ -276,9 +209,9 @@ mod fractal_proposal_rules {
     use std::collections::HashSet;
     use std::hash::Hash;
 
-    /// Preparing the submissions for an attestation.
+    /// Cleans proposals before calculating the final result needed for attestation.
     ///
-    /// Main preparations:
+    /// Cleaning operations:
     /// 1. Remove any empty proposals
     /// 2. Remove any proposals that include their own account's index
     /// 3. Prune outliers from proposals, where an outlier is an element that is not present in at least 2/3rds of the proposals
@@ -290,7 +223,7 @@ mod fractal_proposal_rules {
     /// Parameters:
     /// * `submissions`: The submissions to the evaluation.
     /// * `group_size`: The size of the group.
-    pub fn prepare_submissions(
+    pub fn clean_proposals(
         submissions: &mut Vec<(AccountNumber, Option<Vec<u8>>)>,
         group_size: usize,
     ) {
@@ -370,7 +303,7 @@ mod fractal_proposal_rules {
 
     #[cfg(test)]
     mod tests {
-        use super::{prepare_submissions, prune_outliers};
+        use super::{clean_proposals, prune_outliers};
         use psibase::account;
 
         fn run_prune_outliers(lists: &mut Vec<Vec<u8>>) {
@@ -401,7 +334,7 @@ mod fractal_proposal_rules {
                 (account!("dan"), None),
             ];
             let group_size = 4;
-            prepare_submissions(&mut submissions, group_size);
+            clean_proposals(&mut submissions, group_size);
         }
 
         #[test]
@@ -414,7 +347,7 @@ mod fractal_proposal_rules {
                 (account!("dan"), Some(vec![0, 1, 2, 3])),   // 3 is dan's index
             ];
             let group_size = 3;
-            prepare_submissions(&mut submissions, group_size);
+            clean_proposals(&mut submissions, group_size);
 
             // Each submission should contain all indices except its own
             submissions

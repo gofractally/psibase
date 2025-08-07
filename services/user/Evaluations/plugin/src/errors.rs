@@ -2,13 +2,14 @@ use psibase::plugin_error;
 
 plugin_error! {
     pub ErrorType
-    QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
     KeyMismatch => "Reported key hash does not match your key provided",
     FailedToFindEvaluation => "Failed to find keys in your evaluation history",
     FailedToDecryptKey => "Failed to decrypt key",
-    EncryptionFailed => "Failed to encrypt key",
+    DecryptionFailed => "Failed to decrypt",
+    EncryptionFailed => "Failed to encrypt",
     UserNotFound => "User not found",
     UserSettingNotFound => "User setting not found",
+    EvaluationNotFound => "Evaluation not found",
     InvalidAccountNumber => "Invalid account number",
     NoAsymmetricKey => "No asymmetric key found",
     UsersNotFound => "Users not found",
@@ -17,13 +18,9 @@ plugin_error! {
     InvalidProposal => "Invalid proposal",
     KeyDeserializationFailed => "Failed to deserialize key data",
     InvalidKeyLength => "Invalid key length",
-    InvalidPrivateKey => "Invalid private key format",
     DuplicateElement => "Duplicate element found in proposal during attestation",
-    DecryptionFailed => "Failed to decrypt data",
     MissingKeySubmitter => "Key submitter not found",
     GraphQLParseError(msg: String) => "GraphQL parsing error: {msg}",
-    InvalidGroupSize => "Invalid group size",
     TransactionFailed(msg: String) => "Transaction failed: {msg}",
-    EvaluationDataMissing => "Evaluation data not found",
     UserSubmissionNotFound => "User submission not found"
 }

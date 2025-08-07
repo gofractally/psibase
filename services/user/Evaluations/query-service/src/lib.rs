@@ -12,15 +12,6 @@ mod service {
     use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]
-    struct KeysSet {
-        owner: AccountNumber,
-        evaluation_id: String,
-        group_number: String,
-        keys: Vec<Vec<u8>>,
-        hash: String,
-    }
-
-    #[derive(Deserialize, SimpleObject)]
     struct GroupFinish {
         owner: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -31,7 +22,17 @@ mod service {
         result: Vec<u8>,
     }
 
+    #[derive(Deserialize, SimpleObject)]
+    struct KeyDetails {
+        user: AccountNumber,
+        key: Vec<u8>,
+        key_hash: String,
+        salt: Vec<u8>,
+    }
+
     struct Query;
+
+    // TODO: Add doc comments for all queries
 
     #[Object]
     impl Query {
@@ -40,13 +41,39 @@ mod service {
             evaluation_owner: AccountNumber,
             evaluation_id: u32,
             group_number: u32,
-        ) -> async_graphql::Result<Connection<u64, KeysSet>> {
-            EventQuery::new("history.evaluations.keysset")
-                .condition(format!(
-                    "owner = '{}' AND evaluation_id = {} AND group_number = {}",
-                    evaluation_owner, evaluation_id, group_number
-                ))
-                .query()
+            user: AccountNumber,
+        ) -> Option<KeyDetails> {
+            let group = GroupTable::with_service(evaluations::SERVICE)
+                .get_index_pk()
+                .get(&(evaluation_owner, evaluation_id, group_number));
+
+            check(group.is_some(), "group not found");
+            let group = group.unwrap();
+
+            if let Some(key_hash) = group.key_hash.clone() {
+                let users = group.get_users();
+                let user = users.iter().find(|u| u.user == user);
+                check(user.is_some(), "user not part of group");
+                let user = user.unwrap();
+
+                let key = user.sym_key.clone();
+                check(key.is_some(), "user has no symmetric key");
+
+                let salt = UserSettingsTable::with_service(evaluations::SERVICE)
+                    .get_index_pk()
+                    .get(&user.user)
+                    .unwrap()
+                    .key;
+
+                return Some(KeyDetails {
+                    user: user.user,
+                    key: key.unwrap(),
+                    key_hash,
+                    salt,
+                });
+            }
+
+            None
         }
 
         async fn get_group_result(

@@ -9,16 +9,6 @@ pub mod service {
     use psibase::*;
 
     #[event(history)]
-    pub fn keysset(
-        owner: AccountNumber,
-        evaluation_id: u32,
-        group_number: u32,
-        keys: Vec<Vec<u8>>,
-        hash: String,
-    ) {
-    }
-
-    #[event(history)]
     pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
@@ -122,19 +112,14 @@ pub mod service {
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
         let sender = get_sender();
-
         let group_number = evaluation
             .get_user(sender)
-            .expect("user not found")
+            .expect("user not part of evaluation")
             .group_number
-            .expect("user not grouped");
+            .expect("user not yet grouped");
 
         let mut group = evaluation.get_group(group_number).expect("group not found");
-        group.set_key_submitter(sender);
-
-        Wrapper::emit()
-            .history()
-            .keysset(owner, evaluation_id, group_number, keys, hash);
+        group.set_user_sym_keys(keys, hash);
     }
 
     /// Closes an evaluation and deletes its groups.
