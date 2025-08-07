@@ -7,8 +7,10 @@ world impl {
     include producers:plugin/imports;
     include branding:plugin/imports;
     include transact:plugin/imports;
+    include packages:plugin/imports;
 
     export branding;
     export producers;
+    export packaging;
 
 }

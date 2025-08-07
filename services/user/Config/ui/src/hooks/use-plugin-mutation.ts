@@ -53,7 +53,7 @@ export const usePluginMutation = <T>(
             });
         },
         onError: (errorObj, params, id) => {
-            console.error({ service, intf, method, params }, error);
+            console.error({ service, intf, method, params, errorObj }, error);
             toast.error(error, {
                 description: errorObj.message,
                 id,

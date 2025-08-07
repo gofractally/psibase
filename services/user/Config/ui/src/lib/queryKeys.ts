@@ -8,6 +8,9 @@ const QueryKey = {
     brandingFiles: () => ["brandingFiles"] as const,
     chainId: () => ["chainId"] as const,
     connectedAccounts: () => ["connectedAccounts"] as const,
+    availablePackages: () => ["availablePackages"] as const,
+    installedPackages: () => ["installedPackages"] as const,
+    sources: () => ["sources"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

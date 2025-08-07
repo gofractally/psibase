@@ -1,29 +1,6 @@
 package packages:plugin;
 
-interface private-api {
-    use host:common/types.{error};
-    use types.{meta, package-info, package-source, package-op-info, package-op-full, package-preference};
 
-    // Takes a list of available packages and packages to install or update
-    // and returns a list of operations to apply.
-    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
-
-    // Returns two lists of transactions
-    // - Upload package data. These transactions should be executed
-    //   by passing them to push-data. The order of execution does not
-    //   matter.
-    // - Install packages. These must be staged with propose-install
-    //   after all the data transactions are completed. This will usually
-    //   only have one transaction, but it's possible to have more when
-    //   installing many packages at once.
-    //
-    // The format of the result is unspecified. The transactions returned
-    // should only be passed to push-data and stage-install.
-    build-transactions: func(owner: string, packages: list<package-op-full>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
-
-    push-data: func(tx: list<u8>);
-    propose-install: func(tx: list<u8>) -> result<_, error>;
-}
 
 world impl {
     include host:common/imports;
@@ -31,6 +8,7 @@ world impl {
     include setcode:plugin/imports;
     include sites:plugin/imports;
     include staged-tx:plugin/imports;
+    include transact:plugin/imports;
 
     export queries;
     export private-api;

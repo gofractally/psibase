@@ -1,4 +1,4 @@
-import { FolderUp, type LucideIcon, Pickaxe } from "lucide-react";
+import { FolderUp, type LucideIcon, Package, Pickaxe } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@shared/lib/utils";
@@ -26,6 +26,11 @@ export const appMenus: Menu[] = [
         title: "Branding",
         icon: FolderUp,
         path: "branding",
+    },
+    {
+        title: "Packages",
+        icon: Package,
+        path: "packages",
     },
 ];
 

@@ -9,6 +9,12 @@ interface branding {
     set-network-name: func(name: string) -> result<_, error>;
 }
 
+interface packaging  {
+    use host:common/types.{error};
+    
+    set-account-sources: func(accounts: list<string>) -> result<_, error>;
+}
+
 interface producers {
     use host:common/types.{error};
     use sites:plugin/types.{file};
@@ -30,4 +36,5 @@ interface producers {
 world imports {
     import producers;
     import branding;
+    import packaging;
 }

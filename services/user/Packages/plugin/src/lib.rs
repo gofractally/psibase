@@ -14,11 +14,13 @@ use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use staged_tx::plugin::proposer as StagedTx;
 
+use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::packages::plugin::types;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
 
 use psibase::fracpack::{Pack, Unpack};
+use psibase::services::packages::PackageSource;
 use psibase::{
     get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
     EssentialServices, InstalledPackageInfo, PackageDisposition, PackageManifest, PackagedService,
@@ -452,7 +454,7 @@ impl PrivateApi for PackagesPlugin {
     }
     // Only callable by the UI
     fn push_data(tx: Vec<u8>) {
-        assert!(Client::get_sender() == Client::get_receiver());
+        assert!(Client::get_sender() == "config".to_string());
 
         let tx = Transaction::unpacked(&tx).unwrap();
         for action in tx.actions {
@@ -481,13 +483,35 @@ impl PrivateApi for PackagesPlugin {
         }
     }
     fn propose_install(tx: Vec<u8>) -> Result<(), CommonTypes::Error> {
-        assert!(Client::get_sender() == Client::get_receiver());
+        assert!(Client::get_sender() == "config".to_string());
 
         let tx = Transaction::unpacked(&tx).unwrap();
         StagedTx::propose(
             &tx.actions.into_iter().map(|a| a.into()).collect::<Vec<_>>(),
             true,
         )
+    }
+
+    fn set_account_sources(accounts: Vec<String>) -> Result<(), CommonTypes::Error> {
+        // TODO: Review
+        // assert!(Client::get_sender() == "config".to_string());
+
+        let packed_args = psibase::services::packages::action_structs::setSources {
+            sources: accounts
+                .into_iter()
+                .map(|account| PackageSource {
+                    account: Some(AccountNumber::from(account.as_str())),
+                    url: None,
+                })
+                .collect(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            psibase::services::packages::action_structs::setSources::ACTION_NAME,
+            &packed_args,
+        )?;
+        Ok(())
     }
 }
 
