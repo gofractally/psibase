@@ -35,6 +35,7 @@ mod to_bin;
 mod to_key;
 mod trace;
 mod transaction_builder;
+mod trust;
 mod web_services;
 
 pub use account_number::*;
@@ -76,6 +77,10 @@ use internal_macros::*;
 
 pub use fracpack;
 pub use psibase_macros::*;
+
+// Re-export these to simplify use of the `trust` macro
+pub use indoc;
+pub use lazy_static;
 
 // TODO: decide on an error type. Reexporting anyhow
 // and using it as a return type of library functions

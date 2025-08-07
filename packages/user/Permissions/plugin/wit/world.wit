@@ -1,23 +1,38 @@
 package permissions:plugin;
 
 interface types {
-    /// This represents the trust threshold for a third-party application to
-    /// perform an action on the user's behalf. It's just a hint to help guide the user.
-    record trust {
-        /// Valid values: `0`-`4`. See description of standardized levels in the documentation 
-        /// for the `authorize` function.
-        level: u8,
 
-        /// A description that will be placed on the UI shown to the user. Intended to provide
-        ///   context that may help the user determine if they sufficiently trust the 
-        ///   requesting app. 
-        description: string,
+    /// Values of this type specify a particular trust level
+    /// - `none`: No meaningful risk (e.g., read-only calls on public data). Using this level
+    ///   will result in an automatic approval.
+    /// - `low`: Can consume client-side user resources or make some authenticated queries.
+    ///   Using this level prompts the user if the caller lacks sufficient trust level.
+    /// - `medium`: Can consume server-side resources or modify app-local user data. 
+    ///    "app-local data" means that modifying it will not have any side-effects outside 
+    ///    of your app. Using this level prompts the user if the caller lacks sufficient trust 
+    ///    level.
+    /// - `high`: access to data or functionality that can affect the user outside of your app
+    ///    or involves other users (e.g., sending messages, updating keys, reading private user-data).
+    ///    Using this level prompts the user if the caller lacks sufficient trust level.
+    /// - `max`: Too much risk to be called by anyone other than you're own app. Using this
+    ///    level will result in any caller except your own app being automatically denied.
+    enum trust-level {
+        none,
+        low,
+        medium,
+        high,
+        max
     }
+
+    /// Descriptions for low, medium, and high trust (respectively) in the context of your
+    ///   app. These are shown to the user to help them determine if they should trust the 
+    ///   requesting app.
+    type descriptions = tuple<string, string, string>;
 }
 
 interface api {
     use host:common/types.{error};
-    use types.{trust};
+    use types.{trust-level, descriptions};
 
     /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller`
     ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
@@ -26,21 +41,15 @@ interface api {
     /// # Arguments
     ///
     /// - `caller`: The app requesting permission.
-    /// - `trust`: The level of trust needed for a third-party application to perform this action
-    ///   on the user's behalf. `trust.description` is text that will be shown to help guide the user in their decision.
-    ///   Valid `trust.level` values are from `0` to `4`, corresponding to:
-    ///   - `0`: No meaningful risk (e.g., read-only calls on public data).
-    ///   - `1`: Low risk — can consume client-side user resources or make some authenticated queries.
-    ///   - `2`: Medium risk — can consume server-side resources or modify app-local user data. If data is app-local, 
-    ///          that implies modifying it will not have any side-effects outside of your app.
-    ///   - `3`: High risk — access to data or functionality that can affect the user outside of your app
-    ///     or involves other users (e.g., sending messages, updating keys, reading private user-data).
-    ///   - `4`: Too risky for third-party apps; should only be called by your own app.
+    /// - `level`: The level of trust needed for a third-party application to perform this action
+    ///   on the user's behalf.
     /// - `debug_label`: If an unexpected error occurs, this label will be printed with the error
     ///   message to help track down the root cause.
+    /// - `descriptions`: A list of descriptions that help the user know what capabilities they will be
+    ///   granting the requesting application should they approve the request.
     /// - `whitelist`: A list of accounts who are pre-authorized to perform this action.
     ///   These accounts are not generally authorized at the specified `trust` level but will pass this check.
-    authorize: func(caller: string, trust: trust, debug-label: string, whitelist: list<string>) -> result<bool, error>;
+    authorize: func(caller: string, level: trust-level, descriptions: descriptions, debug-label: string, whitelist: list<string>) -> result<bool, error>;
 }
 
 world imports {

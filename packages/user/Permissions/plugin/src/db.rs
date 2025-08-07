@@ -1,4 +1,7 @@
-use crate::host::common::store::{DbMode::*, StorageDuration::*, *};
+use crate::{
+    bindings::exports::permissions::plugin::api::TrustLevel,
+    host::common::store::{DbMode::*, StorageDuration::*, *},
+};
 use psibase::fracpack::{Pack, Unpack};
 
 mod tables {
@@ -18,7 +21,7 @@ mod tables {
 #[derive(Pack, Unpack, Default)]
 pub struct Permission {
     pub caller: String,
-    pub trust_level: u8,
+    pub trust_level: TrustLevel,
 }
 
 #[derive(Pack, Unpack, Default)]
@@ -27,7 +30,7 @@ pub struct Permissions {
 }
 
 impl Permissions {
-    fn get_trust_level(&self, caller: &str) -> Option<u8> {
+    fn get_trust_level(&self, caller: &str) -> Option<TrustLevel> {
         self.get_permission_index(caller)
             .ok()
             .map(|index| self.permissions[index].trust_level)
@@ -44,7 +47,13 @@ impl Permissions {
             .map(|p| <Permissions>::unpacked(&p).unwrap())
     }
 
-    pub fn set(user: &str, caller: &str, callee: &str, trust_level: u8, duration: StorageDuration) {
+    pub fn set(
+        user: &str,
+        caller: &str,
+        callee: &str,
+        trust_level: TrustLevel,
+        duration: StorageDuration,
+    ) {
         let table = tables::permissions(duration);
         let key = format!("{user}:{callee}");
 
@@ -59,7 +68,7 @@ impl Permissions {
                     index,
                     Permission {
                         caller: caller.to_string(),
-                        trust_level: trust_level,
+                        trust_level,
                     },
                 );
             }
@@ -68,7 +77,7 @@ impl Permissions {
         table.set(&key, &user_app_perms.packed());
     }
 
-    pub fn get(user: &str, caller: &str, callee: &str) -> Option<u8> {
+    pub fn get(user: &str, caller: &str, callee: &str) -> Option<TrustLevel> {
         let key = format!("{user}:{callee}");
 
         let session_trust = Self::callee_permissions(&tables::permissions(Session), &key)
