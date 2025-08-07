@@ -23,14 +23,11 @@ namespace UserService
       // Callable by any action that wants to confirm that the current transaction
       // contains a claim for the specified public key.
       void requireAuth(const SystemService::AuthSig::SubjectPublicKeyInfo& pubkey);
-
-      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
    };
    PSIO_REFLECT(AuthInvite,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
                 method(requireAuth, pubkey),
-                method(serveSys, request),
                 //
    )
 
