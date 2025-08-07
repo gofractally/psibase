@@ -548,6 +548,8 @@ fn process_mod(
             }
         });
 
+        let mut event_structs_decls = Vec::new();
+
         for (kind, fns) in event_fns {
             let event_name = match kind {
                 EventType::History => &history_events,
@@ -631,17 +633,23 @@ fn process_mod(
                     &mut event_structs,
                 )
             }
+            event_structs_decls.push(quote! {
+                pub mod #event_module_name {
+                    use super::super::*;
+                    #event_structs
+                }
+                pub use #event_module_name::#event_name;
+            });
+        }
+
+        if !event_structs_decls.is_empty() {
             items.push(parse_quote! {
                 #[automatically_derived]
                 #[allow(non_snake_case)]
                 #[allow(non_camel_case_types)]
                 #[allow(non_upper_case_globals)]
                 pub mod #event_structs_mod {
-                    pub mod #event_module_name {
-                        use super::super::*;
-                        #event_structs
-                    }
-                    pub use #event_module_name::#event_name;
+                    #(#event_structs_decls)*
                 }
             });
         }
