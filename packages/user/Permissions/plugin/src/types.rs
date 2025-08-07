@@ -58,17 +58,11 @@ impl<'a> Unpack<'a> for TrustLevel {
     const FIXED_SIZE: u32 = 1;
     const VARIABLE_SIZE: bool = false;
     fn unpack(src: &mut FracInputStream<'a>) -> Result<Self> {
-        Self::verify(src)?;
-        let byte = src.data[(src.pos - 1) as usize];
-        Ok(TrustLevel::from(byte))
+        Ok(TrustLevel::from(u8::unpack(src)?))
     }
     fn verify(src: &mut FracInputStream) -> Result<()> {
-        if src.pos as usize >= src.data.len() {
-            Err(Error::ReadPastEnd)
-        } else {
-            src.pos += 1;
-            Ok(())
-        }
+        let _ = TrustLevel::from(u8::unpack(src)?);
+        u8::verify(src)
     }
 }
 
