@@ -188,6 +188,7 @@ namespace psibase
    {
       ConstRevisionPtr                    revision;
       std::vector<BlockHeaderAuthAccount> services;
+      BlockHeaderWasmConfig               wasmConfig;
 
       // Reads the next or current state
       BlockAuthState(SystemContext* systemContext, const WriterPtr& writer, Database& db)
@@ -196,16 +197,12 @@ namespace psibase
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
          {
             Database dst{systemContext->sharedDatabase, revision};
-            auto     session = dst.startWrite(writer);
-            if (status->consensus.next)
-            {
-               services = status->consensus.next->consensus.services;
-            }
-            else
-            {
-               services = status->consensus.current.services;
-            }
-            copyServices(dst, db, services);
+            auto     session   = dst.startWrite(writer);
+            auto&    consensus = status->consensus.next ? status->consensus.next->consensus
+                                                        : status->consensus.current;
+            services           = consensus.services;
+            wasmConfig         = consensus.wasmConfig;
+            copyServices(dst, db, services, wasmConfig);
             revision = dst.getModifiedRevision();
          }
       }
@@ -223,13 +220,12 @@ namespace psibase
          }
       }
 
-      const std::vector<BlockHeaderAuthAccount>* getUpdatedAuthServices(
-          const BlockHeader& header) const
+      const Consensus* getUpdatedAuthServices(const BlockHeader& header) const
       {
          if (header.newConsensus)
          {
-            auto& result = header.newConsensus->services;
-            if (result != services)
+            auto& result = *header.newConsensus;
+            if (result.services != services || result.wasmConfig != wasmConfig)
                return &result;
          }
          return nullptr;
@@ -240,11 +236,12 @@ namespace psibase
                                                   const std::shared_ptr<BlockAuthState>& prev,
                                                   const BlockHeader&                     header)
       {
-         if (const auto* newServices = prev->getUpdatedAuthServices(header))
+         if (const auto* newConsensus = prev->getUpdatedAuthServices(header))
          {
             check(!!header.authCode, "code must be provided when changing auth services");
             return std::make_shared<BlockAuthState>(systemContext, writer, *prev, header,
-                                                    *newServices);
+                                                    newConsensus->services,
+                                                    newConsensus->wasmConfig);
          }
          else
          {
@@ -257,13 +254,15 @@ namespace psibase
                      const WriterPtr&                           writer,
                      const BlockAuthState&                      prev,
                      const BlockHeader&                         header,
-                     const std::vector<BlockHeaderAuthAccount>& newServices)
+                     const std::vector<BlockHeaderAuthAccount>& newServices,
+                     const BlockHeaderWasmConfig&               newWasmConfig)
       {
          check(!!header.authCode, "code must be provided when changing auth services");
-         services = newServices;
+         services   = newServices;
+         wasmConfig = newWasmConfig;
          Database db{systemContext->sharedDatabase, prev.revision};
          auto     session = db.startWrite(writer);
-         updateServices(db, prev.services, services, *header.authCode);
+         updateServices(db, prev.services, prev.wasmConfig, services, wasmConfig, *header.authCode);
          revision = db.getModifiedRevision();
       }
    };

@@ -593,6 +593,7 @@ namespace psibase
    {
       using base = typename psio::reflect<T>::template proxy<action_builder_proxy>;
       using base::base;
+      transactor() : base(T::service, T::service) {}
 
       auto from(AccountNumber other) const
       {

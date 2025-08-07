@@ -26,7 +26,7 @@ endif()
 
 target_include_directories(psinode PUBLIC
     ../../libraries/psibase/service/include
-    ../../services/psibase_tests)
+    ../../packages/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
 find_package(Python COMPONENTS Interpreter)
@@ -55,6 +55,7 @@ if(Python_Interpreter_FOUND)
         NAME py_test_psibase_types
         COMMAND ${Python_EXECUTABLE} test_psibase_types.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_psinode_test(test_connect)
     add_psinode_test(test_routing)
     set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)
     add_psinode_test(test_crash ${LIBSOFTHSM2_ARG})

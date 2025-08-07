@@ -17,7 +17,6 @@
 
 namespace psibase::net
 {
-
    struct connection_base
    {
       enum close_code
@@ -46,9 +45,68 @@ namespace psibase::net
       // Information for display
       virtual std::string endpoint() const { return ""; }
       //
-      loggers::common_logger     logger;
-      std::optional<std::string> url;
-      std::optional<NodeId>      id;
+      loggers::common_logger   logger;
+      std::vector<std::string> urls;
+      std::optional<NodeId>    id;
+      // This is used to manage closing duplicate connections
+      // - A peer is identified by host:id
+      // - A secure connection will be kept over an insecure connection
+      // - If both connections are secure or both are insecure, we pick
+      //   which one to close based on node id. It's arbitrary as long
+      //   as both nodes agree about which connection should be closed.
+      // - Making an outgoing connection verifies the hostname of the
+      //   the peer well enough for deduplication. An insecure connection
+      //   trusts DNS. A secure connection trusts the certificate chain.
+      //   A connection made to a local socket trusts the hostname reported
+      //   by the peer.
+      // - A node will only close its own outgoing connections. This allows
+      //   us to ensure that the URL of the peer is copied to the connection
+      //   that remains before the other connection is closed.
+      //
+      // A node sends a connection id over incoming connections.
+      // A node sends its hostnames over all connections.
+      //
+      // After a node recieves the hostname over an incoming connection,
+      // it sends duplicate connection messages with the ids of all outgoing
+      // connections that have the same hostname.
+      //
+      // When a node recieves a duplicate connection message over an outgoing
+      // connection, it checks that the host:id matches the host:id of the other
+      // connection, and may close the connection.
+      //
+      // If A and B are both honest, then they are both aware of the set of
+      // duplicate connections. They may have additional connections with
+      // dishonest nodes that appear as (unverified) duplicates.
+      //
+      // If either A or B is dishonest, then we don't care if the connection
+      // between them gets dropped. They can always just disconnect.
+      bool outgoing = false;
+      // secure and local are only meaningful for outgoing connections,
+      // because incoming connections may be coming through a reverse proxy.
+      bool                         secure            = false;
+      bool                         local             = false;
+      std::uint8_t                 pending_hostnames = 0;
+      std::vector<std::string>     hosts;
+      std::optional<std::uint64_t> connection_id;
+
+      bool host_intersects(const connection_base& other) const
+      {
+         for (const auto& host : hosts)
+         {
+            if (std::ranges::find(other.hosts, host) != other.hosts.end())
+            {
+               return true;
+            }
+         }
+         return false;
+      }
+   };
+
+   struct peer_key
+   {
+      std::string host;
+      NodeId      id;
+      friend auto operator<=>(const peer_key&, const peer_key&) = default;
    };
 
    struct connection_manager : std::enable_shared_from_this<connection_manager>
@@ -56,21 +114,27 @@ namespace psibase::net
       static constexpr std::chrono::seconds timeout_base{30};
       static constexpr std::chrono::seconds timeout_delta{30};
       static constexpr std::chrono::seconds max_timeout{300};
-      struct peer_info
+      struct url_info
       {
          template <typename F>
-         explicit peer_info(F&& f)
-             : connected(false),
+         explicit url_info(F&& f)
+             : connected(0),
                current_timeout(timeout_base),
                retry_time(std::chrono::steady_clock::now()),
                connect(std::forward<F>(f))
          {
          }
-         bool                                  connected;
+         std::size_t                           connected;
          std::chrono::seconds                  current_timeout;
          std::chrono::steady_clock::time_point retry_time;
          using connect_callback = std::function<void(const std::error_code&)>;
          std::function<void(const std::string&, connect_callback)> connect;
+      };
+      struct host_id_info
+      {
+         std::vector<std::shared_ptr<connection_base>> outgoing;
+         std::vector<std::shared_ptr<connection_base>> incoming;
+         bool empty() const { return outgoing.empty() && incoming.empty(); }
       };
       std::vector<std::string> peers;
       std::size_t              idx    = 0;
@@ -79,10 +143,10 @@ namespace psibase::net
       // This stores both active and potential connections. If a peer is
       // removed from the peer list, it will remain in this map until it
       // is disconnected.
-      std::map<std::string, peer_info> info;
+      std::map<std::string, url_info> info;
       // connection reports identity, which is used to de-duplicate
-      std::map<NodeId, std::shared_ptr<connection_base>> nodes;
-      boost::asio::steady_timer                          _timer;
+      std::map<peer_key, host_id_info> nodes;
+      boost::asio::steady_timer        _timer;
       template <typename ExecutionContext>
       explicit connection_manager(ExecutionContext& ctx) : _timer(ctx)
       {
@@ -132,32 +196,19 @@ namespace psibase::net
             _timer.cancel();
          }
       }
-      void do_connect(const std::string& url, peer_info& peer, auto now)
+      void do_connect(const std::string& url, url_info& peer, auto now)
       {
-         // possible connection lifecycles:
-         // - postconnect -> disconnect: no URL
-         // - postconnect -> duplicate -> disconnect: okay, receives ownership of URL
-         // - postconnect(duplicate) -> disconnect: no URL
-         // - disconnect: no URL
-         // - connect(ok) -> postconnect -> disconnect: okay
-         // - connect(ok) -> postconnect(duplicate) -> disconnect: okay, transfers ownership of URL
-         // - connect(ok) -> disconnect: okay
-         // - connect(error): okay
-         //
-         // required invariants:
-         // - If connect is successful, then disconnect will be called on connection close
-         // - A connection owns its url iff either it has no known NodeId or its
-         //   NodeId is associated with itself in the nodes map.
          peer.connect(url,
                       [this, url](const std::error_code& ec)
                       {
                          if (ec)
                          {
-                            disconnect(url);
+                            release_url(url);
+                            maybe_connect_some();
                          }
                       });
          peer.retry_time = now + peer.current_timeout;
-         peer.connected  = true;
+         ++peer.connected;
          ++count;
          peer.current_timeout += timeout_delta;
          if (peer.current_timeout > max_timeout)
@@ -173,25 +224,89 @@ namespace psibase::net
             do_connect(url, iter->second, std::chrono::steady_clock::now());
          }
       }
-      bool postconnect(const NodeId& id, const std::shared_ptr<connection_base>& conn)
+      std::span<const std::shared_ptr<connection_base>> incoming(const std::string& host,
+                                                                 const NodeId&      id)
       {
-         auto [iter, inserted] = nodes.try_emplace(id, conn);
-         conn->id              = id;
-         if (!inserted && conn->url && !iter->second->url)
+         if (auto pos = nodes.find(peer_key{host, id}); pos != nodes.end())
          {
-            // TODO: how should we handle nodes that are reachable through
-            // multiple configured URLs?
-            iter->second->url = conn->url;
+            return pos->second.incoming;
          }
-         return inserted;
+         return {};
       }
-      void disconnect(const std::string& url)
+      std::span<const std::shared_ptr<connection_base>> outgoing(const std::string& host,
+                                                                 const NodeId&      id)
+      {
+         if (auto pos = nodes.find(peer_key{host, id}); pos != nodes.end())
+         {
+            return pos->second.outgoing;
+         }
+         return {};
+      }
+      void init_hosts(const std::shared_ptr<connection_base>& conn)
+      {
+         auto tmp = std::move(conn->hosts);
+         set_hosts(conn, std::move(tmp));
+      }
+      void clear_hosts(const std::shared_ptr<connection_base>& conn)
+      {
+         if (conn->id)
+         {
+            for (const auto& host : conn->hosts)
+            {
+               peer_key key{.host = host, .id = *conn->id};
+               auto     pos = nodes.find(key);
+               if (pos != nodes.end())
+               {
+                  auto& group = conn->outgoing ? pos->second.outgoing : pos->second.incoming;
+                  std::erase(group, conn);
+                  if (pos->second.empty())
+                     nodes.erase(pos);
+               }
+            }
+         }
+         conn->hosts.clear();
+      }
+      void set_hosts(const std::shared_ptr<connection_base>& conn, std::vector<std::string>&& hosts)
+      {
+         clear_hosts(conn);
+         if (conn->id)
+         {
+            for (const auto& host : hosts)
+            {
+               peer_key key{.host = host, .id = *conn->id};
+               auto&    group = conn->outgoing ? nodes[key].outgoing : nodes[key].incoming;
+               group.push_back(conn);
+            }
+         }
+         conn->hosts = std::move(hosts);
+      }
+      void add_urls(const std::shared_ptr<connection_base>& conn,
+                    const std::vector<std::string>&         urls)
+      {
+         for (const auto& url : urls)
+         {
+            if (std::ranges::find(conn->urls, url) == conn->urls.end())
+            {
+               auto pos = info.find(url);
+               if (pos != info.end())
+               {
+                  conn->urls.push_back(url);
+                  ++pos->second.connected;
+               }
+               else
+               {
+                  PSIBASE_LOG(conn->logger, warning)
+                      << "Connection should only copy an existing URL";
+               }
+            }
+         }
+      }
+      void release_url(const std::string& url)
       {
          if (auto iter = info.find(url); iter != info.end())
          {
-            if (iter->second.connected)
+            if (--iter->second.connected == 0)
             {
-               iter->second.connected = false;
                if (iter->second.retry_time <= std::chrono::steady_clock::now())
                {
                   iter->second.current_timeout = timeout_base;
@@ -199,27 +314,15 @@ namespace psibase::net
                --count;
             }
          }
-         maybe_connect_some();
       }
       void disconnect(const std::shared_ptr<connection_base>& conn)
       {
-         bool is_primary = true;
-         if (conn->id)
+         clear_hosts(conn);
+         for (const std::string& url : conn->urls)
          {
-            auto pos = nodes.find(*conn->id);
-            if (pos != nodes.end() && pos->second == conn)
-            {
-               nodes.erase(pos);
-            }
-            else
-            {
-               is_primary = false;
-            }
+            release_url(url);
          }
-         if (conn->url && is_primary)
-         {
-            disconnect(*conn->url);
-         }
+         maybe_connect_some();
       }
       template <typename F>
       void set(std::vector<std::string>&& peers, std::size_t target, F&& connect)
@@ -276,6 +379,12 @@ namespace psibase::net
              [this, &ctx = _ctx, f = std::forward<F>(f)](const std::error_code& ec) mutable
              { boost::asio::dispatch(ctx, [this, f = std::move(f), ec]() mutable { f(ec); }); });
       }
+      void send_message(const std::shared_ptr<connection_base>& conn, const auto& msg)
+      {
+         PSIBASE_LOG(conn->logger, debug)
+             << "Sending message: " << network().message_to_string(msg);
+         conn->async_write(network().serialize_message(msg), [](const std::error_code&) {});
+      }
       void async_recv(peer_id id, std::shared_ptr<connection_base>&& c)
       {
          auto p = c.get();
@@ -329,15 +438,126 @@ namespace psibase::net
          return false;
       }
 
-      void set_node_id(peer_id peer, const NodeId& id)
+      void on_duplicate(peer_id peer, std::uint64_t connection_id, bool secure)
+      {
+         auto other_peer = static_cast<peer_id>(connection_id);
+         if (auto pos = _connections.find(peer); pos != _connections.end())
+         {
+            auto& conn = pos->second;
+            if (conn->outgoing)
+            {
+               if (auto other_pos = _connections.find(other_peer); other_pos != _connections.end())
+               {
+                  auto& other_conn = other_pos->second;
+
+                  if (conn->id && conn->id == other_conn->id && conn->host_intersects(*other_conn))
+                  {
+                     autoconnector->add_urls(other_conn, conn->urls);
+                     if (conn->secure == secure)
+                     {
+                        if (network().should_close_duplicate(*conn->id))
+                        {
+                           PSIBASE_LOG(conn->logger, info) << "Duplicate peer";
+                           disconnect(peer, connection_base::close_code::duplicate);
+                        }
+                     }
+                     else if (secure && !conn->secure)
+                     {
+                        PSIBASE_LOG(conn->logger, info) << "Duplicate peer";
+                        disconnect(peer, connection_base::close_code::duplicate);
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      void process_hosts(const std::shared_ptr<connection_base>& conn)
+      {
+         if (conn->pending_hostnames == 0 && conn->id)
+         {
+            if (conn->outgoing)
+            {
+               // TODO: find other outgoing connections with the same set of hosts
+               if (conn->connection_id)
+               {
+                  for (const auto& host : conn->hosts)
+                  {
+                     for (const auto& duplicate : autoconnector->incoming(host, *conn->id))
+                     {
+                        send_message(duplicate, network().make_duplicate_message(
+                                                    *conn->connection_id, conn->secure));
+                     }
+                  }
+               }
+            }
+            else
+            {
+               for (const auto& host : conn->hosts)
+               {
+                  // For each outgoing connection with this host
+                  for (auto& duplicate : autoconnector->outgoing(host, *conn->id))
+                  {
+                     if (duplicate->outgoing && duplicate->connection_id)
+                     {
+                        send_message(conn, network().make_duplicate_message(
+                                               *duplicate->connection_id, duplicate->secure));
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      void set_hosts(peer_id peer, std::vector<std::string>&& hosts)
       {
          if (auto pos = _connections.find(peer); pos != _connections.end())
          {
-            if (!autoconnector->postconnect(id, pos->second))
+            const auto& conn = pos->second;
+            if (!conn->outgoing || conn->local)
             {
-               PSIBASE_LOG(pos->second->logger, info) << "Duplicate peer";
-               disconnect(peer, connection_base::close_code::duplicate);
+               autoconnector->set_hosts(conn, std::move(hosts));
+               process_hosts(conn);
             }
+         }
+      }
+
+      void set_node_id(peer_id                             peer,
+                       const NodeId&                       id,
+                       const std::optional<std::uint64_t>& connection_id)
+      {
+         if (auto pos = _connections.find(peer); pos != _connections.end())
+         {
+            const auto& conn = pos->second;
+            conn->id         = id;
+            if (conn->outgoing && connection_id)
+            {
+               conn->connection_id = connection_id;
+            }
+            autoconnector->init_hosts(conn);
+            process_hosts(conn);
+         }
+      }
+
+      void start_hostname_update(peer_id peer)
+      {
+         if (auto pos = _connections.find(peer); pos != _connections.end())
+         {
+            const auto& conn = pos->second;
+            if (++conn->pending_hostnames == 0)
+               throw std::runtime_error("Too many pending hostname updates");
+         }
+      }
+
+      void finish_hostname_update(peer_id peer)
+      {
+         if (auto pos = _connections.find(peer); pos != _connections.end())
+         {
+            const auto& conn = pos->second;
+            if (conn->pending_hostnames == 0)
+               throw std::runtime_error("No pending hostname updates");
+            --conn->pending_hostnames;
+            process_hosts(conn);
          }
       }
 
