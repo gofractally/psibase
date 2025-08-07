@@ -52,71 +52,77 @@ macro_rules! define_trust {
         }
     ) => {
 
-        $crate::lazy_static::lazy_static! {
-            static ref TRUST_LEVELS: std::collections::HashMap<&'static str, crate::bindings::permissions::plugin::types::TrustLevel> = TrustRequirement::get_trust_levels();
-        }
-
-        struct TrustRequirement;
-
-        impl TrustRequirement {
-            fn get_trust_levels() -> std::collections::HashMap<&'static str, crate::bindings::permissions::plugin::types::TrustLevel> {
-                let mut map = std::collections::HashMap::new();
-                $(
-                    $(
-                        map.insert(stringify!($func_name), crate::bindings::permissions::plugin::types::TrustLevel::$func_level);
-                    )*
-                )*
-                map
-            }
-
-            fn get_descriptions() -> crate::bindings::permissions::plugin::types::Descriptions {
-                (
-                    $(
-                        $crate::indoc::indoc! { $desc }.to_string(),
-                    )*
-                )
-            }
-
-            fn get_level(fn_name: &str) -> crate::bindings::permissions::plugin::types::TrustLevel {
-                *TRUST_LEVELS.get(fn_name).unwrap_or(&crate::bindings::permissions::plugin::types::TrustLevel::Max)
-            }
-        }
-
         pub mod trust {
-            use super::TrustRequirement;
             use crate::bindings::host::common::client::get_sender;
             use crate::bindings::host::common::types::Error;
             use crate::bindings::permissions::plugin::api as Permissions;
 
-            pub fn authorize(fn_name: &str) -> Result<(), Error> {
+            #[derive(Copy, Clone)]
+            #[allow(non_camel_case_types)]
+            pub enum FunctionName {
+                $(
+                    $(
+                        $func_name,
+                    )*
+                )*
+            }
+
+            impl FunctionName {
+                pub fn as_str(&self) -> &'static str {
+                    match self {
+                        $(
+                            $(
+                                Self::$func_name => stringify!($func_name),
+                            )*
+                        )*
+                    }
+                }
+            }
+
+            struct TrustRequirement;
+
+            impl TrustRequirement {
+                fn get_descriptions() -> crate::bindings::permissions::plugin::types::Descriptions {
+                    (
+                        $(
+                            $crate::indoc::indoc! { $desc }.to_string(),
+                        )*
+                    )
+                }
+
+                fn get_level(fn_name: FunctionName) -> crate::bindings::permissions::plugin::types::TrustLevel {
+                    match fn_name {
+                        $(
+                            $(
+                                FunctionName::$func_name => crate::bindings::permissions::plugin::types::TrustLevel::$func_level,
+                            )*
+                        )*
+                    }
+                }
+            }
+
+            pub fn authorize(fn_name: FunctionName) -> Result<(), Error> {
                 Permissions::authorize(
                     &get_sender(),
                     TrustRequirement::get_level(fn_name),
                     &TrustRequirement::get_descriptions(),
-                    fn_name,
+                    fn_name.as_str(),
                     &vec![],
                 )?;
                 Ok(())
             }
 
-            pub fn authorize_with_whitelist(fn_name: &str, whitelist: Option<Vec<String>>) -> Result<(), Error> {
+            pub fn authorize_with_whitelist(fn_name: FunctionName, whitelist: Option<Vec<String>>) -> Result<(), Error> {
                 let whitelist = whitelist.unwrap_or_default();
                 Permissions::authorize(
                     &get_sender(),
                     TrustRequirement::get_level(fn_name),
                     &TrustRequirement::get_descriptions(),
-                    fn_name,
+                    fn_name.as_str(),
                     &whitelist,
                 )?;
                 Ok(())
             }
-
-            $(
-                $(
-                    #[allow(non_upper_case_globals)]
-                    pub const $func_name: &'static str = stringify!($func_name);
-                )*
-            )*
         }
     };
 }
