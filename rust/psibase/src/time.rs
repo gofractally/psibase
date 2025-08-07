@@ -187,7 +187,20 @@ impl<'de> Visitor<'de> for TimePointUSecVisitor {
 }
 
 #[derive(
-    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Pack, Unpack, ToKey, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

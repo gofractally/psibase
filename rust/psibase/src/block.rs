@@ -2,6 +2,7 @@
 
 use crate::{
     AccountNumber, Hex, MethodNumber, Pack, TimePointSec, TimePointUSec, ToKey, ToSchema, Unpack,
+    WasmConfigRow,
 };
 use async_graphql::{InputObject, SimpleObject, Union};
 use serde::{Deserialize, Serialize};
@@ -321,6 +322,7 @@ pub struct BlockHeaderAuthAccount {
 pub struct Consensus {
     data: ConsensusData,
     services: Vec<BlockHeaderAuthAccount>,
+    wasmConfig: WasmConfigRow,
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
