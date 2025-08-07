@@ -5,43 +5,34 @@ use bindings::*;
 mod helpers;
 use helpers::*;
 mod bucket;
-use bucket::*;
 mod plugin_ref;
 
 mod types;
 
+use bindings::host::auth::api as HostAuth;
 use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
     server::Guest as Server,
-    store::{Database, DbMode, Guest as Store, StorageDuration},
+    store::{DbMode, Guest as Store},
     types::Guest as Types,
     types::{BodyTypes, Error, PostRequest},
 };
 use helpers::make_error;
-use psibase::fracpack::{Pack, Unpack};
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
 };
 use url::Url;
 
-use crate::bindings::{
-    exports::host::common::store::GuestBucket, supervisor::bridge::intf::get_active_app,
-};
-
-const QUERY_TOKEN_KEY: &str = "query-token-cookie";
-
-fn get_auth_cookie_store_key(app: String) -> String {
-    format!("{}-{}", QUERY_TOKEN_KEY, app)
-}
+use crate::bindings::supervisor::bridge::intf::get_active_app;
 
 struct HostCommon;
 
 fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
     let active_app = get_active_app();
-    let query_auth_token = get_active_query_token(active_app.clone());
+    let query_auth_token = HostAuth::get_active_query_token(&active_app);
     println!(
         "host:common/do_post(app[{}], endpoint[{}]).query_auth_token: {:?}",
         active_app, endpoint, query_auth_token
@@ -66,7 +57,7 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
     let active_app = get_active_app();
-    let query_auth_token = get_active_query_token(active_app.clone());
+    let query_auth_token = HostAuth::get_active_query_token(&active_app);
     println!(
         "host:common/do_get(app[{}], active_app[{}], endpoint[{}]).query_auth_token: {:?}",
         app, active_app, endpoint, query_auth_token
@@ -89,32 +80,6 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
     .send()?)
 }
 
-fn get_active_query_token(app: String) -> Option<String> {
-    let db = Database {
-        mode: DbMode::NonTransactional,
-        duration: StorageDuration::Persistent,
-    };
-    let bucket = Bucket::new(db, app.clone());
-
-    println!(
-        "host:common/GET_active_query_token().from bucket[{}], at key[{}]",
-        app,
-        get_auth_cookie_store_key(app.clone())
-    );
-    let query_token = bucket.get(get_auth_cookie_store_key(app));
-    let query_token = if query_token.is_some() {
-        let query_token = query_token.unwrap();
-        Some(<String>::unpacked(&query_token).unwrap())
-    } else {
-        None
-    };
-    println!(
-        "get_active_query_token() returning query_token [{:?}]",
-        query_token
-    );
-    query_token
-}
-
 impl Admin for HostCommon {
     fn get_active_app() -> String {
         check_caller(
@@ -131,23 +96,6 @@ impl Admin for HostCommon {
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(app, endpoint, request.body)?;
         Ok(res.body.map(Into::into))
-    }
-
-    fn set_active_query_token(query_token: String, app: String) {
-        check_caller(&["host"], "set-active-query-token@host:common/admin");
-
-        // TODO: save token to token mapping
-        let db = Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        };
-        let bucket = Bucket::new(db, app.clone());
-        println!(
-            "host:common/set_active_query_token().from bucket[{}], at key[{}]",
-            app,
-            get_auth_cookie_store_key(app.clone())
-        );
-        bucket.set(get_auth_cookie_store_key(app), query_token.packed());
     }
 }
 

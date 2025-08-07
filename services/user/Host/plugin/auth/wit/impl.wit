@@ -4,6 +4,7 @@ world impl {
     include host:common/imports;
     include host:common/privileged;
     include transact:plugin/imports;
+    include accounts:plugin/imports;
 
     export api;
 }

@@ -12,6 +12,8 @@ use exports::host::auth::api::Guest as Api;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Serialize;
 
+use crate::bindings::accounts::plugin::api as AccountsApi;
+
 use crate::bindings::host::common::{
     admin as HostAdmin, store as KvStore,
     store::{Database, DbMode, StorageDuration},
@@ -19,19 +21,17 @@ use crate::bindings::host::common::{
 };
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 
-const QUERY_TOKEN_KEY: &str = "query-token-cookie";
+const QUERY_TOKEN_BUCKET: &str = "query-token-cookie";
 
 struct HostAuth;
 
 fn get_auth_cookie_store_key(user: String, app: String) -> String {
-    println!(
-        "host:auth/get_auth_cookie_store_key(): {}-{}-{}",
-        QUERY_TOKEN_KEY, user, app
-    );
-    format!("{}-{}-{}", QUERY_TOKEN_KEY, user, app)
+    println!("host:auth/get_auth_cookie_store_key(): {}-{}", user, app);
+    format!("{}-{}", user, app)
 }
 
-fn set_query_token(query_token: String, app: String, user: String) {
+fn set_active_query_token(query_token: String, app: String, user: String) {
+    // let user = AccountsApi::get_current_user().unwrap();
     #[derive(Serialize, Debug)]
     #[allow(non_snake_case)]
     struct SetAuthCookieReqPayload {
@@ -55,10 +55,11 @@ fn set_query_token(query_token: String, app: String, user: String) {
         mode: DbMode::NonTransactional,
         duration: StorageDuration::Persistent,
     };
-    let bucket = KvStore::Bucket::new(db, &app);
+    let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
 
     println!(
-        "host:auth/set_query_token() storying query-token at key[{}]",
+        "host:auth/set_query_token() storing query-token in bucket[{}] at key[{}]",
+        QUERY_TOKEN_BUCKET,
         get_auth_cookie_store_key(user.clone(), app.clone())
     );
     bucket.set(
@@ -76,7 +77,12 @@ impl Api for HostAuth {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
         };
-        let bucket = KvStore::Bucket::new(db, &app);
+        println!(
+            "Getting query-token from bucket[{}] at key[{}]",
+            QUERY_TOKEN_BUCKET,
+            get_auth_cookie_store_key(user.clone(), app.clone())
+        );
+        let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
         let query_token = bucket.get(&get_auth_cookie_store_key(user.clone(), app.clone()));
 
         let query_token = if query_token.is_none() {
@@ -88,22 +94,49 @@ impl Api for HostAuth {
             <String>::unpacked(&query_token).unwrap()
         };
         println!("query_token: {}", query_token);
-        println!("setting_query_token()...");
-        set_query_token(query_token.clone(), app.clone(), user.clone());
         println!("setting_active_query_token()...");
-        HostAdmin::set_active_query_token(&query_token, &app);
+        set_active_query_token(query_token.clone(), app.clone(), user.clone());
 
         println!(
-            "Saving query_token to key[{}]",
+            "Saving query_token to bucket[{}] at key[{}]",
+            QUERY_TOKEN_BUCKET,
             &get_auth_cookie_store_key(user.clone(), app.clone())
         );
         bucket.set(&get_auth_cookie_store_key(user, app), &query_token.packed());
     }
 
-    fn get_query_token(app: String, user: String) -> Option<String> {
+    // fn get_active_query_token(app: String) -> Option<String> {
+    //     let db = Database {
+    //         mode: DbMode::NonTransactional,
+    //         duration: StorageDuration::Persistent,
+    //     };
+    //     let bucket: Bucket = GuestBucket::new(db, String::from(QUERY_TOKEN_BUCKET));
+    //
+    //     println!(
+    //         "host:common/GET_active_query_token().from bucket[{}], at key[{}]",
+    //         QUERY_TOKEN_BUCKET,
+    //         app.clone()
+    //     );
+    //     let query_token = bucket.get(app);
+    //     let query_token = if query_token.is_some() {
+    //         let query_token = query_token.unwrap();
+    //         Some(<String>::unpacked(&query_token).unwrap())
+    //     } else {
+    //         None
+    //     };
+    //     println!(
+    //         "get_active_query_token() returning query_token [{:?}]",
+    //         query_token
+    //     );
+    //     query_token
+    // }
+
+    fn get_active_query_token(app: String) -> Option<String> {
+        // TODO: WTF is this None?
+        let user = AccountsApi::get_current_user().unwrap();
         println!(
             "host:auth/get_query_token(app[{}], user[{}]).top",
-            app, &user
+            app, user
         );
         check_caller(&["host"], "get-query-token@host:common/admin");
 
@@ -112,11 +145,12 @@ impl Api for HostAuth {
             duration: StorageDuration::Persistent,
         };
         println!(
-            "getting query_token from key[{}], app[{}]",
+            "getting query_token from bucket[{}] from key[{}], app[{}]",
+            QUERY_TOKEN_BUCKET,
             &get_auth_cookie_store_key(user.clone(), app.clone()),
             &user
         );
-        let bucket = KvStore::Bucket::new(db, &app);
+        let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
 
         let record = bucket.get(&get_auth_cookie_store_key(user, app));
 

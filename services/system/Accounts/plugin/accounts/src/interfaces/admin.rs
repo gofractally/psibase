@@ -38,8 +38,13 @@ impl Admin for AccountsPlugin {
         assert_valid_account(&user);
 
         AppsTable::new(&app).login(&user);
-        HostAuth::set_logged_in_user(&user, &app);
         UserTable::new(&user).add_connected_app(&app);
+        println!(
+            "Accounts:admin/login_direct() user[{:?}]",
+            AccountsPlugin::get_current_user()
+        );
+        // TODO: if error, log user out
+        // HostAuth::set_logged_in_user(&user, &app);
     }
 
     fn decode_connection_token(token: String) -> Option<ConnectionToken> {
