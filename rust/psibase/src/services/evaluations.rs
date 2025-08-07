@@ -103,7 +103,7 @@ pub mod Service {
     /// # Arguments
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
-    fn close(evaluation_id: u32) {
+    fn close(owner: AccountNumber, evaluation_id: u32) {
         unimplemented!()
     }
 
@@ -160,4 +160,47 @@ pub mod Service {
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         unimplemented!()
     }
+
+    #[event(history)]
+    pub fn keysset(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        keys: Vec<Vec<u8>>,
+        hash: String,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn group_fin(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        users: Vec<AccountNumber>,
+        result: Vec<u8>,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn evaluation_start(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn new_group(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        users: Vec<AccountNumber>,
+    ) {
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }
