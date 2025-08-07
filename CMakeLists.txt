@@ -215,7 +215,7 @@ list(APPEND doc-src ${CMAKE_CURRENT_BINARY_DIR}/doc/book.toml)
 file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/services/cpp-service/*.cpp)
 file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
 file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
-file(GLOB doc-service-headers services/*/*/include/services/*/*.hpp)
+file(GLOB doc-service-headers packages/*/*/include/services/*/*.hpp)
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/book/html
@@ -259,14 +259,14 @@ ExternalProject_Add(
 include(web-apps.cmake)
 
 # Static (not built) resource dependencies
-file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
+file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/wit/*)
 
 # Build each component
 include(libraries/psibase/sdk/rs-components.cmake)
-add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
+add_rs_component(packages/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
-add_rs_component_workspace(services/:Plugins 
+add_rs_component_workspace(packages/:Plugins 
     accounts
     account-tokens
     aes
@@ -298,11 +298,11 @@ function(psinode_files target pfx)
     DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/x-admin/packages
     )
@@ -311,9 +311,9 @@ endfunction()
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
-install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
-install(DIRECTORY services/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
-install(FILES services/user/CommonApi/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
+install(DIRECTORY packages/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
+install(DIRECTORY packages/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
+install(FILES packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 
 # Build service packages
@@ -338,7 +338,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
         FLAGS allowWriteSubjective allowNativeSubjective
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
@@ -353,10 +353,10 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Accounts-schema.json
         SERVER r-accounts
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/postinstall.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
@@ -426,55 +426,55 @@ psibase_package(
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
-    PATH services/user/Chainmail
+    PATH packages/user/Chainmail
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
-    PATH services/user/Profiles
+    PATH packages/user/Profiles
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
-    PATH services/user/Evaluations
+    PATH packages/user/Evaluations
     DEPENDS ${Evaluations_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
-    PATH services/user/Tokens
+    PATH packages/user/Tokens
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
-    PATH services/user/Fractals
+    PATH packages/user/Fractals
     DEPENDS ${Fractals_js_DEP}
 )
 
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
-    PATH services/user/Branding
+    PATH packages/user/Branding
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
-    PATH services/user/BrotliCodec
+    PATH packages/user/BrotliCodec
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Registry.psi
-    PATH services/user/Registry
+    PATH packages/user/Registry
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/StagedTx.psi
-    PATH services/system/StagedTx
+    PATH packages/system/StagedTx
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
-    PATH services/user/Subgroups
+    PATH packages/user/Subgroups
 )
 
 psibase_package(
@@ -487,7 +487,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthSig-schema.json
         DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSig/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/AuthSig/ui/dist/* /
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
@@ -504,7 +504,7 @@ psibase_package(
     # "Permissions(^${PSIBASE_VERSION}.0)"
 )
 
-set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi)
+set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi)
 set(THIRD_SRC ${COMMON_API}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
@@ -530,7 +530,7 @@ psibase_package(
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
     DEPENDS CommonApiCommonLib_js
     DEPENDS ${ComponentParser_DEP}
     DEPENDS ${PluginTester_js_DEP}
@@ -599,15 +599,15 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network homepage"
     SERVICE homepage
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/ui/dist/*  /
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
-    PATH services/user/Identity
+    PATH packages/user/Identity
     DEPENDS ${Identity_js_DEP}
 )
 
@@ -652,7 +652,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RProducers-schema.json
     ACCOUNTS prods-weak prods-strong
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
@@ -706,7 +706,7 @@ psibase_package(
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Events/src/postinstall.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
     PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
@@ -720,7 +720,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
         SERVER explorer
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Explorer/ui/dist /
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist /
     DEPENDS ${Explorer_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
@@ -767,7 +767,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
     SERVICE supervisor
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
 )
 
@@ -777,10 +777,10 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Handler for client-side permissions"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/postinstall.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/postinstall.json
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/ui/dist/* /
     DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
@@ -815,11 +815,11 @@ psibase_package(
         "Chainmail(^${PSIBASE_VERSION}.0)"
         "ClientData(^${PSIBASE_VERSION}.0)"
     SERVICE workshop
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Workshop/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
     DEPENDS ${Workshop_js_DEP}
     DEPENDS ${Plugins_DEP}
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/postinstall.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Workshop/postinstall.json
 )
 
 psibase_package(
@@ -839,11 +839,11 @@ psibase_package(
         "Chainmail(^${PSIBASE_VERSION})"
         "ClientData(^${PSIBASE_VERSION})"
     SERVICE config
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Config/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Config/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_config} /plugin.wasm
     DEPENDS ${Config_js_DEP}
     DEPENDS ${Plugins_DEP}
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Config/postinstall.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Config/postinstall.json
 )
 
 psibase_package(
@@ -853,7 +853,7 @@ psibase_package(
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
     PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/src/TokenUsers.json
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
 psibase_package(
@@ -865,7 +865,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Packages-schema.json
         SERVER r-packages
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Packages/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Packages/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_packages} /plugin.wasm
     SERVICE r-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
@@ -878,7 +878,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "All development services"
+    DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Evaluations Events Fractals Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop Config
@@ -888,7 +888,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/ProdDefault.psi
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "All production services"
+    DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop Config
@@ -899,7 +899,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
     NAME Minimal
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Minimum services for a functional chain"
+    DESCRIPTION "Minimum packages for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
                     SetCode Transact
 )
@@ -908,7 +908,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/TestDefault.psi
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Services used in the tester"
+    DESCRIPTION "Packages used in the tester"
     PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
@@ -1016,7 +1016,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService-schema.json
         SERVER as-query
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/src/AsyncQueryService.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/psibase_tests/src/AsyncQueryService.json
         FLAGS allowWriteSubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm

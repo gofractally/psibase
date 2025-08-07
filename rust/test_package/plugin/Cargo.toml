@@ -14,4 +14,4 @@ crate-type = ["cdylib"]
 package = "tpack:plugin"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../services/user/Host/plugin/common/wit/world.wit" }
+"host:common" = { path = "../../../packages/user/Host/plugin/common/wit/world.wit" }
