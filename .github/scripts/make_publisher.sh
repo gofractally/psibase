@@ -17,6 +17,8 @@ echo Creating ${NAME} for ${URL}
 PRV=`openssl genpkey -outform PEM -algorithm EC -pkeyopt ec_paramgen_curve:P-256`
 PUB=`openssl pkey -pubout -outform DER <<< "$PRV" | xxd -p -c0`
 
+openssl pkey -pubout -outform PEM <<< "$PRV" > key.pem
+
 jq -c > setup.json <<EOF
 [
     {"sender":"root","service":"auth-sig","method":"newaccount","data":{"name":"$NAME","key":"$PUB"}},
