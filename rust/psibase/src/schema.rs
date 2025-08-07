@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct MethodString(pub String);
 
@@ -38,7 +38,7 @@ type EventMap = IndexMap<MethodString, AnyType>;
 
 type ActionMap = IndexMap<MethodString, FunctionType>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct FieldId {
     pub path: Vec<u32>,
@@ -55,7 +55,7 @@ impl VisitTypes for FieldId {
 
 pub type IndexInfo = Vec<FieldId>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TableInfo {
     pub name: Option<String>,
@@ -81,7 +81,7 @@ pub fn db_name(db: DbId) -> String {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Schema {
     pub service: AccountNumber,
@@ -218,12 +218,6 @@ pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
     package.get_schemas(&mut accounts, &mut schemas).unwrap();
     let real_schema = schemas.get(&my_schema.service).unwrap();
     assert_schemas_equivalent(real_schema, &my_schema);
-}
-
-impl ToSchema for Schema {
-    fn schema(_builder: &mut SchemaBuilder) -> AnyType {
-        todo!()
-    }
 }
 
 pub trait ToActionsSchema {

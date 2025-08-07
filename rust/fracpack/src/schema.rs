@@ -1,5 +1,6 @@
 use crate::{consume_trailing_optional, Error, FracInputStream, Pack, Unpack};
 use indexmap::IndexMap;
+use psibase_macros::ToSchema;
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
@@ -15,7 +16,7 @@ use std::{
 
 pub use indexmap;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
 #[fracpack(fracpack_mod = "crate")]
 pub struct Schema(IndexMap<String, AnyType>);
 
@@ -41,7 +42,7 @@ impl<'a> IntoIterator for &'a Schema {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
 #[fracpack(fracpack_mod = "crate")]
 pub enum AnyType {
     Struct(IndexMap<String, AnyType>),
@@ -91,7 +92,7 @@ impl AnyType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
 #[fracpack(fracpack_mod = "crate")]
 pub struct FunctionType {
     pub params: AnyType,
@@ -455,6 +456,18 @@ impl<T: ToSchema + 'static> ToSchema for Option<T> {
 impl<T: ToSchema + 'static> ToSchema for Vec<T> {
     fn schema(builder: &mut SchemaBuilder) -> AnyType {
         AnyType::List(builder.insert::<T>().into())
+    }
+}
+
+impl<K: ToSchema + 'static, T: ToSchema + 'static> ToSchema for IndexMap<K, T> {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        AnyType::Custom {
+            type_: AnyType::List(
+                AnyType::Tuple(vec![builder.insert::<K>(), builder.insert::<T>()]).into(),
+            )
+            .into(),
+            id: "map".to_string(),
+        }
     }
 }
 
@@ -2364,7 +2377,6 @@ impl BitAndAssign for SchemaDifference {
 pub struct SchemaMatcher<'a> {
     schema1: &'a Schema,
     schema2: &'a Schema,
-    on_stack: HashMap<*const AnyType, usize>,
     known: HashSet<(*const AnyType, *const AnyType)>,
     allowed_difference: SchemaDifference,
 }
@@ -2378,7 +2390,6 @@ impl<'a> SchemaMatcher<'a> {
         Self {
             schema1,
             schema2,
-            on_stack: HashMap::new(),
             known: HashSet::new(),
             allowed_difference,
         }
@@ -2446,19 +2457,10 @@ impl<'a> SchemaMatcher<'a> {
     pub fn compare(&mut self, lhs: &AnyType, rhs: &AnyType) -> bool {
         let plhs = Self::resolve_all(self.schema1, lhs);
         let prhs = Self::resolve_all(self.schema2, rhs);
-        let lhs_pos = self.on_stack.get(&(plhs as *const AnyType));
-        let rhs_pos = self.on_stack.get(&(prhs as *const AnyType));
-        if lhs_pos != rhs_pos {
-            return false;
-        }
 
         if !self.known.insert((&*plhs, &*prhs)) {
             return true;
         }
-
-        let n = self.on_stack.len() / 2;
-        self.on_stack.insert(&*lhs, n);
-        self.on_stack.insert(&*rhs, n);
 
         use AnyType::*;
         let result = match (plhs, prhs) {
@@ -2561,9 +2563,6 @@ impl<'a> SchemaMatcher<'a> {
             }
             _ => false,
         };
-
-        self.on_stack.remove(&(prhs as *const AnyType));
-        self.on_stack.remove(&(plhs as *const AnyType));
 
         result
     }
