@@ -31,8 +31,7 @@ struct HostCommon;
 
 fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
-    let active_app = get_active_app();
-    let query_auth_token = HostAuth::get_active_query_token(&active_app);
+    let query_auth_token = HostAuth::get_active_query_token(&get_active_app());
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
@@ -51,8 +50,7 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
-    let active_app = get_active_app();
-    let query_auth_token = HostAuth::get_active_query_token(&active_app);
+    let query_auth_token = HostAuth::get_active_query_token(&get_active_app());
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {

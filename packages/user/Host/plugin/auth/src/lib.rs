@@ -30,7 +30,6 @@ fn get_auth_cookie_store_key(user: String, app: String) -> String {
 }
 
 fn set_active_query_token(query_token: String, app: String, user: String) {
-    // let user = AccountsApi::get_current_user().unwrap();
     #[derive(Serialize, Debug)]
     #[allow(non_snake_case)]
     struct SetAuthCookieReqPayload {
