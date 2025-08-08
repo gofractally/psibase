@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 // TODO: tables
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
 pub struct ResourceLimit {
     pub value: u64,
 }
@@ -52,7 +52,17 @@ mod service {
     }
 
     #[action]
-    fn setCreator(creator: AccountNumber) {
+    fn getAuthOf(account: AccountNumber) -> AccountNumber {
         unimplemented!()
     }
+
+    #[action]
+    fn billCpu(name: AccountNumber, amount: i64) {
+        unimplemented!();
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

@@ -37,7 +37,11 @@ pub mod server_interface {
     /// but allows database reads, including reading data and events which are normally not available
     /// to services; see [psibase::DbId](crate::DbId).
     #[action]
-    fn serveSys(request: HttpRequest, socket: Option<i32>, user: Option<AccountNumber>) -> Option<HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
         unimplemented!()
     }
 }

@@ -5,6 +5,9 @@ mod service {
     use crate::{AccountNumber, Checksum256, Hex};
 
     #[action]
+    fn init() {}
+
+    #[action]
     fn setCode(service: AccountNumber, vmType: u8, vmVersion: u8, code: Hex<Vec<u8>>) {
         unimplemented!()
     }
@@ -34,4 +37,14 @@ mod service {
     fn setFlags(service: crate::AccountNumber, flags: u64) {
         unimplemented!()
     }
+
+    #[action]
+    fn verifySeq() -> u64 {
+        unimplemented!()
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

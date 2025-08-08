@@ -72,14 +72,6 @@ namespace UserService
       check(found, err);
    }
 
-   auto AuthInvite::serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>
-   {
-      if (auto result = psibase::servePackAction<AuthInvite>(request))
-         return result;
-
-      return std::nullopt;
-   }
-
 }  // namespace UserService
 
 PSIBASE_DISPATCH(UserService::AuthInvite)
