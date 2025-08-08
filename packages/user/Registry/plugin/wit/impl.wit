@@ -5,5 +5,4 @@ world impl {
     include transact:plugin/imports;
 
     export developer;
-    export consumer;
 }

@@ -52,12 +52,29 @@ export const Settings = () => {
                 {isSuccess && (
                     <MetaDataForm
                         key={currentApp}
-                        existingValues={metadata?.appMetadata}
+                        existingValues={
+                            metadata
+                                ? {
+                                      name: metadata.name,
+                                      shortDesc:
+                                          metadata.shortDesc,
+                                      longDesc: metadata.longDesc,
+                                      icon: metadata.icon,
+                                      iconMimeType: metadata.iconMimeType,
+                                      tosSubpage: metadata.tosSubpage,
+                                      privacyPolicySubpage:
+                                          metadata.privacyPolicySubpage,
+                                      appHomepageSubpage:
+                                          metadata.appHomepageSubpage,
+                                      redirectUris: metadata.redirectUris,
+                                      tags: metadata.tags,
+                                  }
+                                : undefined
+                        }
                         onSubmit={async (x) => {
                             await updateMetadata({
                                 metadata: {
                                     ...x,
-                                    owners: [],
                                 },
                                 account: Account.parse(currentApp),
                             });

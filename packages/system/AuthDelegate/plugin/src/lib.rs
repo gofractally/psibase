@@ -16,10 +16,10 @@ use psibase::*;
 struct AuthDelegate;
 
 // TODO: User oauth when available
-fn assert_caller_admin(context: &str) {
+fn assert_caller(allowed_callers: &[&str], context: &str) {
     assert!(
-        Client::get_sender() == psibase::services::auth_delegate::SERVICE.to_string(),
-        "'{}' only callable from 'auth-delegate' app",
+        allowed_callers.contains(&Client::get_sender().as_str()),
+        "[AuthDelegate] Unauthorized call to '{}'",
         context
     );
 }
@@ -45,7 +45,7 @@ impl Api for AuthDelegate {
     fn set_owner(owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::setOwner as set_owner_action;
 
-        assert_caller_admin("set_owner");
+        assert_caller(&[Client::get_receiver().as_str()], "set_owner");
 
         let set_owner = set_owner_action {
             owner: get_account_number(owner.as_str())?,
@@ -59,7 +59,10 @@ impl Api for AuthDelegate {
     fn new_account(name: String, owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::newAccount as new_account_action;
 
-        assert_caller_admin("new_account");
+        assert_caller(
+            &[Client::get_receiver().as_str(), "workshop"],
+            "new_account",
+        );
 
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,

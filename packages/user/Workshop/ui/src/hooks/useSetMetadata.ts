@@ -31,11 +31,16 @@ export const useSetMetadata = () =>
                 appMetadataQueryKey(account),
                 (updater: unknown) => {
                     if (updater) {
-                        const oldData = MetadataResponse.parse(updater);
-                        return MetadataResponse.parse({
-                            appMetadata: metadata,
-                            extraMetadata: oldData.extraMetadata,
-                        });
+                        const oldData =
+                            MetadataResponse.shape.appMetadata.parse(updater);
+                        if (oldData) {
+                            return {
+                                accountId: oldData.accountId,
+                                status: oldData.status,
+                                createdAt: oldData.createdAt,
+                                ...metadata,
+                            };
+                        }
                     }
                 },
             );
