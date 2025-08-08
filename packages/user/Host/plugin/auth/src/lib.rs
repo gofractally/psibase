@@ -2,8 +2,6 @@
 mod bindings;
 use bindings::*;
 
-mod errors;
-
 mod helpers;
 use helpers::*;
 
@@ -25,11 +23,11 @@ const QUERY_TOKEN_BUCKET: &str = "query-token-cookie";
 
 struct HostAuth;
 
-fn get_auth_cookie_store_key(user: String, app: String) -> String {
+fn get_auth_cookie_store_key(user: &str, app: &str) -> String {
     format!("{}-{}", user, app)
 }
 
-fn set_active_query_token(query_token: String, app: String, user: String) {
+fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     #[derive(Serialize, Debug)]
     #[allow(non_snake_case)]
     struct SetAuthCookieReqPayload {
@@ -46,7 +44,7 @@ fn set_active_query_token(query_token: String, app: String, user: String) {
         endpoint: String::from("/common/set-auth-cookie"),
         body: BodyTypes::Json(serde_json::to_string(&payload).unwrap()),
     };
-    HostAdmin::post(&app, &req).unwrap();
+    HostAdmin::post(app, &req).unwrap();
 
     // store query-token in localstorage (for Supervisor use)
     let db = Database {
@@ -70,7 +68,7 @@ impl Api for HostAuth {
             duration: StorageDuration::Persistent,
         };
         let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
-        let query_token = bucket.get(&get_auth_cookie_store_key(user.clone(), app.clone()));
+        let query_token = bucket.get(&get_auth_cookie_store_key(&user, &app));
 
         let query_token = if query_token.is_none() {
             TransactAuthApi::get_query_token(&app, &user).unwrap()
@@ -78,9 +76,12 @@ impl Api for HostAuth {
             let query_token = query_token.unwrap();
             <String>::unpacked(&query_token).unwrap()
         };
-        set_active_query_token(query_token.clone(), app.clone(), user.clone());
+        set_active_query_token(&query_token, &app, &user);
 
-        bucket.set(&get_auth_cookie_store_key(user, app), &query_token.packed());
+        bucket.set(
+            &get_auth_cookie_store_key(&user, &app),
+            &query_token.packed(),
+        );
     }
 
     fn get_active_query_token(app: String) -> Option<String> {
@@ -97,7 +98,7 @@ impl Api for HostAuth {
         };
         let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
 
-        let record = bucket.get(&get_auth_cookie_store_key(user, app));
+        let record = bucket.get(&get_auth_cookie_store_key(&user, &app));
 
         if let Some(value) = record {
             Some(String::unpacked(&value).expect("Failed to get auth cookie"))
