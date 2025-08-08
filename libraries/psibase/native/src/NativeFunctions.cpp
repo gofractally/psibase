@@ -553,15 +553,20 @@ namespace psibase
 
       // TODO: don't unpack rawData
       check(psio::fracpack_validate_strict<Action>(data), "call: invalid data format");
-      auto act = psio::from_frac<Action>(psio::prevalidated{data});
-      check(act.sender == code.codeNum || (code.flags & CodeRow::allowSudo),
-            "service is not authorized to call as another sender");
+      auto act         = psio::from_frac<Action>(psio::prevalidated{data});
+      auto callerFlags = code.flags;
+      if (act.sender != code.codeNum)
+      {
+         check((code.flags & CodeRow::allowSudo) != 0,
+               "service is not authorized to call as another sender");
+         callerFlags |= ExecutionContext::callerSudo;
+      }
 
       currentActContext->actionTrace.innerTraces.push_back({ActionTrace{}});
       auto& inner_action_trace =
           std::get<ActionTrace>(currentActContext->actionTrace.innerTraces.back().inner);
       // TODO: avoid reserialization
-      currentActContext->transactionContext.execCalledAction(code.flags, act, inner_action_trace);
+      currentActContext->transactionContext.execCalledAction(callerFlags, act, inner_action_trace);
       setResult(*this, inner_action_trace.rawRetval);
 
       currentActContext->transactionContext.remainingStack = saved;
