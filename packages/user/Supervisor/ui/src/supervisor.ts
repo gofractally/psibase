@@ -203,6 +203,19 @@ export class Supervisor implements AppInterface {
         return this.parentOrigination.app;
     }
 
+    getActiveQueryToken(): string {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
+
+        const queryToken = this.supervisorCall({
+            service: "host",
+            plugin: "auth",
+            method: "getActiveQueryToken",
+            params: [this.parentOrigination.app],
+        })
+        return queryToken;
+    }
+
     getRootDomain(): string {
         return rootDomain;
     }

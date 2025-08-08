@@ -204,6 +204,10 @@ export class PluginHost implements HostInterface {
     getActiveApp(): string {
         return this.supervisor.getActiveApp();
     }
+    
+    getActiveQueryToken(): string {
+        return this.supervisor.getActiveQueryToken();
+    }
 
     getServiceStack(): string[] {
         return this.supervisor.getServiceStack();
