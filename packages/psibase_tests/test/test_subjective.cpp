@@ -77,3 +77,26 @@ TEST_CASE("subjective db")
    CHECK(t.post<std::optional<std::string>>(SubjectiveDb::service, "/read", "c") ==
          std::optional{std::string("d")});
 }
+
+TEST_CASE("local service sudo")
+{
+   DefaultTestChain t;
+   auto callee = t.addService(AccountNumber{"callee"}, "Nop.wasm", CodeRow::isSubjective);
+   t.startBlock();
+   // sanity check
+   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})));
+
+   // deploy a node-local service
+   auto          nopCode = readWholeFile("Nop.wasm");
+   auto          nopHash = sha256(nopCode.data(), nopCode.size());
+   CodeByHashRow codeByHashRow{nopHash, 0, 0, {nopCode.begin(), nopCode.end()}};
+   CodeRow       codeRow{AccountNumber{"callee"}, 0, nopHash, 0, 0};
+   PSIBASE_SUBJECTIVE_TX
+   {
+      t.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+      t.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+   }
+   t.startBlock();
+   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})),
+          "cannot sudo");
+}

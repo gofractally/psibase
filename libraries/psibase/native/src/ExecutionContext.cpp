@@ -251,11 +251,16 @@ namespace psibase
             {
                auto ca = database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
                if (ca.has_value() && ca->codeHash != Checksum256{})
+               {
+                  ca->flags &= CodeRow::allFlags;
+                  ca->flags |= ExecutionContext::isLocal;
                   return {std::move(*ca), DbId::nativeSubjective};
+               }
             }
             auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
             check(ca.has_value(), "unknown service account: " + service.str());
             check(ca->codeHash != Checksum256{}, "service account has no code");
+            ca->flags &= CodeRow::allFlags;
             return {std::move(*ca), DbId::native};
          }
          else
@@ -270,10 +275,12 @@ namespace psibase
                    database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
                if (subjectiveCode.has_value() && subjectiveCode->codeHash != Checksum256{})
                {
-                  subjectiveCode->flags |= CodeRow::isSubjective;
+                  subjectiveCode->flags &= CodeRow::allFlags;
+                  subjectiveCode->flags |= (CodeRow::isSubjective | ExecutionContext::isLocal);
                   return {std::move(*subjectiveCode), DbId::nativeSubjective};
                }
             }
+            ca->flags &= CodeRow::allFlags;
             return {std::move(*ca), DbId::native};
          }
       }
@@ -405,6 +412,12 @@ namespace psibase
                "subjective services may not call non-subjective ones");
          check((callerFlags & CodeRow::forceReplay) == (impl->code.flags & CodeRow::forceReplay),
                "subjective services that call each other must have the same replay mode");
+      }
+
+      if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
+      {
+         check((impl->code.flags & isLocal) == 0,
+               "on-chain service cannot sudo when calling a node-local service");
       }
 
       auto& bc = impl->transactionContext.blockContext;

@@ -101,3 +101,18 @@ std::int32_t psibase::raw::socketSend(std::int32_t fd, const void* data, std::si
 }
 
 // PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);
+
+void psibase::raw::checkoutSubjective()
+{
+   psibase::tester::raw::checkoutSubjective(psibase::tester::raw::getSelectedChain());
+}
+
+bool psibase::raw::commitSubjective()
+{
+   return psibase::tester::raw::commitSubjective(psibase::tester::raw::getSelectedChain());
+}
+
+void psibase::raw::abortSubjective()
+{
+   return psibase::tester::raw::abortSubjective(psibase::tester::raw::getSelectedChain());
+}

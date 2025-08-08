@@ -79,6 +79,10 @@ namespace psibase
       static constexpr uint64_t allowSocket           = uint64_t(1) << 8;
       static constexpr uint64_t allowNativeSubjective = uint64_t(1) << 9;
 
+      static constexpr auto allFlags =
+          allowSudo | allowWriteNative | isSubjective | allowWriteSubjective | canNotTimeOut |
+          canSetTimeLimit | isAuthService | forceReplay | allowSocket | allowNativeSubjective;
+
       AccountNumber codeNum;
       uint64_t      flags = 0;  // Constants above
 
