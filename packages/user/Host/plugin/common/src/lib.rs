@@ -33,10 +33,6 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
     let (ty, content) = content.get_content();
     let active_app = get_active_app();
     let query_auth_token = HostAuth::get_active_query_token(&active_app);
-    println!(
-        "host:common/do_post(app[{}], endpoint[{}]).query_auth_token: {:?}",
-        active_app, endpoint, query_auth_token
-    );
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
@@ -45,7 +41,6 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
             ("Authorization", &query_auth_token.unwrap()),
         ])
     };
-    println!("host:common/do_post().headers: {:?}", headers);
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "POST".to_string(),
@@ -58,10 +53,6 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
     let active_app = get_active_app();
     let query_auth_token = HostAuth::get_active_query_token(&active_app);
-    println!(
-        "host:common/do_get(app[{}], active_app[{}], endpoint[{}]).query_auth_token: {:?}",
-        app, active_app, endpoint, query_auth_token
-    );
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {
@@ -70,7 +61,6 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
             ("Authorization", &query_auth_token.unwrap()),
         ])
     };
-    println!("host:common/do_get().headers: {:?}", headers);
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "GET".to_string(),

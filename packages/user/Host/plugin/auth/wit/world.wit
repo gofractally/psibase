@@ -8,7 +8,6 @@ interface api {
 
     /// Privileged apps can get the query token to make calls on user's behalf
     get-active-query-token: func(app: string) -> option<string>;
-    // set-active-query-token: func(query-token: string, app: string);
 }
 
 world imports {

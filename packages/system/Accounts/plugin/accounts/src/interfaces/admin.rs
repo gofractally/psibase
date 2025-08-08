@@ -32,7 +32,6 @@ fn assert_valid_account(account: &str) {
 
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
-        println!("login_direct(app[{}], user[{}]", &app, &user);
         assert_caller_admin("login_direct");
 
         assert_valid_account(&user);
@@ -44,10 +43,7 @@ impl Admin for AccountsPlugin {
 
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
-        println!(
-            "Accounts:admin/login_direct() user[{:?}]",
-            AccountsPlugin::get_current_user()
-        );
+
         // TODO: if error, log user out
         HostAuth::set_logged_in_user(&user, &app);
 
