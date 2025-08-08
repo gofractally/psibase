@@ -37,6 +37,11 @@ impl Admin for AccountsPlugin {
 
         assert_valid_account(&user);
 
+        // We want to authenticate as the user who is logging in to the 3rd-party app.
+        // So we need to log in as this user in accounts because accounts is the active app
+        // (because we redirected to accounts to do the login).
+        AppsTable::new(&Client::get_receiver()).login(&user);
+
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
         println!(
@@ -44,7 +49,10 @@ impl Admin for AccountsPlugin {
             AccountsPlugin::get_current_user()
         );
         // TODO: if error, log user out
-        // HostAuth::set_logged_in_user(&user, &app);
+        HostAuth::set_logged_in_user(&user, &app);
+
+        // Logging out to reverse accounts login above
+        AppsTable::new(&Client::get_receiver()).logout();
     }
 
     fn decode_connection_token(token: String) -> Option<ConnectionToken> {

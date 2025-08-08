@@ -58,7 +58,7 @@ fn set_active_query_token(query_token: String, app: String, user: String) {
     let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
 
     println!(
-        "host:auth/set_query_token() storing query-token in bucket[{}] at key[{}]",
+        "host:auth/set_active_query_token() storing query-token in bucket[{}] at key[{}]",
         QUERY_TOKEN_BUCKET,
         get_auth_cookie_store_key(user.clone(), app.clone())
     );
@@ -132,13 +132,16 @@ impl Api for HostAuth {
     // }
 
     fn get_active_query_token(app: String) -> Option<String> {
-        // TODO: WTF is this None?
-        let user = AccountsApi::get_current_user().unwrap();
+        let user = AccountsApi::get_current_user();
+        if user.is_none() {
+            return None;
+        }
+        let user = user.unwrap();
         println!(
-            "host:auth/get_query_token(app[{}], user[{}]).top",
+            "host:auth/get_active_query_token(app[{}], user[{}]).top",
             app, user
         );
-        check_caller(&["host"], "get-query-token@host:common/admin");
+        check_caller(&["host"], "get-active-query-token@host:common/admin");
 
         let db = Database {
             mode: DbMode::NonTransactional,

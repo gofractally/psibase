@@ -73,7 +73,8 @@ impl API for AccountsPlugin {
     }
 
     fn get_current_user() -> Option<String> {
-        println!("accounts::api::get_current_user() [{}]", Privileged::get_active_app());
-        AppsTable::new(&Privileged::get_active_app()).get_logged_in_user()
+        let user = AppsTable::new(&Privileged::get_active_app()).get_logged_in_user();
+        println!("accounts::api::get_current_user() app[{}], user[{:?}]", Privileged::get_active_app(), user);
+        user
     }
 }
