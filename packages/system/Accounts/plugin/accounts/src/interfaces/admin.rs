@@ -44,7 +44,7 @@ impl Admin for AccountsPlugin {
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
 
-        // TODO: if error, log user out
+        // TODO: if set_query_token() fails, logout
         HostAuth::set_logged_in_user(&user, &app);
 
         // Logging out to reverse accounts login above

@@ -38,9 +38,6 @@ impl ActiveApp for AccountsPlugin {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
         AppsTable::new(&app).logout();
 
-        // TODO: request server to remove query token cookie
-        println!("logout(). REMOVE cookie");
-
         Ok(())
     }
 
