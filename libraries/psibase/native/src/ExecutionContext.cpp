@@ -275,6 +275,8 @@ namespace psibase
                    database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
                if (subjectiveCode.has_value() && subjectiveCode->codeHash != Checksum256{})
                {
+                  if (!(subjectiveCode->flags & CodeRow::isReplacement))
+                     abortMessage("Cannot substitute subjective service for " + service.str());
                   subjectiveCode->flags &= CodeRow::allFlags;
                   subjectiveCode->flags |= (CodeRow::isSubjective | ExecutionContext::isLocal);
                   return {std::move(*subjectiveCode), DbId::nativeSubjective};
@@ -416,7 +418,7 @@ namespace psibase
 
       if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
       {
-         check((impl->code.flags & isLocal) == 0,
+         check((impl->code.flags & (isLocal | CodeRow::isReplacement)) != isLocal,
                "on-chain service cannot sudo when calling a node-local service");
       }
 

@@ -3,6 +3,7 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/test/SubjectiveDb.hpp>
+#include <services/test/XSudo.hpp>
 
 using namespace psibase;
 using namespace psio;
@@ -78,25 +79,53 @@ TEST_CASE("subjective db")
          std::optional{std::string("d")});
 }
 
-TEST_CASE("local service sudo")
+void addLocalService(TestChain&       t,
+                     AccountNumber    account,
+                     std::string_view filename,
+                     std::uint64_t    flags)
 {
-   DefaultTestChain t;
-   auto callee = t.addService(AccountNumber{"callee"}, "Nop.wasm", CodeRow::isSubjective);
-   t.startBlock();
-   // sanity check
-   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})));
-
-   // deploy a node-local service
-   auto          nopCode = readWholeFile("Nop.wasm");
-   auto          nopHash = sha256(nopCode.data(), nopCode.size());
-   CodeByHashRow codeByHashRow{nopHash, 0, 0, {nopCode.begin(), nopCode.end()}};
-   CodeRow       codeRow{AccountNumber{"callee"}, 0, nopHash, 0, 0};
+   auto          code = readWholeFile(filename);
+   auto          hash = sha256(code.data(), code.size());
+   CodeByHashRow codeByHashRow{hash, 0, 0, {code.begin(), code.end()}};
+   CodeRow       codeRow{account, flags, hash, 0, 0};
    PSIBASE_SUBJECTIVE_TX
    {
       t.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
       t.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
    }
+}
+
+TEST_CASE("local service sudo")
+{
+   DefaultTestChain t;
+   auto             callee = AccountNumber{"callee"};
+   t.addService(callee, "Nop.wasm", CodeRow::isSubjective);
+   t.startBlock();
+   // sanity check
+   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})));
+
+   addLocalService(t, AccountNumber{"callee"}, "Nop.wasm", 0);
    t.startBlock();
    expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})),
-          "cannot sudo");
+          "Cannot substitute");
+
+   auto sudo = AccountNumber{"sudo"};
+   t.addService(sudo, "XSudo.wasm", XSudo::flags);
+   t.from(sudo).to<HttpServer>().registerServer(sudo);
+   t.startBlock();
+   {
+      auto reply = t.post(sudo, "/", FracPackBody{Action{.sender = callee, .service = callee}});
+      CHECK((int)reply.status == 500);
+      CHECK_THAT(std::string(reply.body.data(), reply.body.size()),
+                 Catch::Matchers::ContainsSubstring("cannot sudo"));
+   }
+
+   t.addAccount(XSudo::service);
+   t.from(XSudo::service).to<HttpServer>().registerServer(XSudo::service);
+   addLocalService(t, XSudo::service, "XSudo.wasm", XSudo::flags);
+   {
+      auto reply =
+          t.post(XSudo::service, "/", FracPackBody{Action{.sender = callee, .service = callee}});
+      CHECK((int)reply.status == 200);
+   }
 }
