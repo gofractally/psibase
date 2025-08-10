@@ -1609,7 +1609,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.19.5"
+version = "0.19.0"
 dependencies = [
  "psibase",
  "serde",
@@ -1787,7 +1787,7 @@ checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
 
 [[package]]
 name = "r-tokens"
-version = "0.19.5"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2393,7 +2393,7 @@ dependencies = [
 
 [[package]]
 name = "tokens"
-version = "0.19.5"
+version = "0.19.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2405,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "tokens-pkg"
-version = "0.19.5"
+version = "0.19.0"
 dependencies = [
  "plugin",
  "r-tokens",
