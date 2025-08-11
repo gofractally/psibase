@@ -8,6 +8,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <filesystem>
+#include <fstream>
 
 #include <catch2/catch_message.hpp>
 
@@ -206,6 +208,36 @@ psibase::TestChain::~TestChain()
    tester::raw::destroyChain(id);
    if (selectedChain && *selectedChain == id)
       selectedChain.reset();
+}
+
+void psibase::TestChain::loadLocalServices()
+{
+   auto serviceRoot = std::getenv("PSIBASE_DATADIR");
+   check(serviceRoot != nullptr, "Cannot find local service directory");
+   auto servicesDir = std::string{serviceRoot} + "/services";
+   auto prefix      = psio::convert_to_key(codePrefix());
+   if (kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
+      abortMessage("local services already loaded");
+   psibase::tester::raw::checkoutSubjective(id);
+   for (auto account : {AccountNumber{"x-admin"}, AccountNumber{"x-run"}})
+   {
+      auto code = readWholeFile(servicesDir + "/" + account.str() + ".wasm");
+
+      auto    codeHash = sha256(code.data(), code.size());
+      CodeRow codeRow{
+          .codeNum = account,
+          .flags =
+              CodeRow::allowWriteSubjective | CodeRow::allowSocket | CodeRow::allowNativeSubjective,
+          .codeHash = codeHash,
+      };
+      kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+      CodeByHashRow codeByHashRow{
+          .codeHash = codeHash,
+          .code{code.begin(), code.end()},
+      };
+      kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+   }
+   check(psibase::tester::raw::commitSubjective(id), "Failed to commit changes");
 }
 
 void psibase::TestChain::shutdown()
