@@ -28,7 +28,7 @@ const response = z.object({
 export const getActorHistory = async (account: Account) => {
     const res = await graphql(
         `{ 
-            actorHistory(actor: "${account}", first: 4) {
+            actorHistory(actor: "${account}", last: 8) {
                 nodes {
                     actor
                     txid

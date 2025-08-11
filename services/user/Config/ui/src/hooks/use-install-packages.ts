@@ -122,7 +122,9 @@ export const useInstallPackages = () => {
                     action: {
                         label: "View",
                         onClick: () => {
-                            navigate(`/pending-transactions/${lastTx.txId}`);
+                            navigate(
+                                `/pending-transactions/${lastTx.stagedId}`,
+                            );
                         },
                     },
                 });
