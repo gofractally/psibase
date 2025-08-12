@@ -3,7 +3,6 @@ import {
     QualifiedPluginId,
     assertTruthy,
     buildFunctionCallResponse,
-    // postGraphQLGetJson,
     siblingUrl,
 } from "@psibase/common-lib";
 import {
@@ -47,15 +46,6 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
 ];
-// interface AuthService {
-//     authService: string;
-// }
-
-// interface GetAccountsResponse {
-//     data: {
-//         getAccounts: (AuthService | null)[];
-//     };
-// }
 
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
@@ -100,7 +90,6 @@ export class Supervisor implements AppInterface {
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
-        console.log("supervisor.ts:preload()::calling getActiveQueryToken(), then setActiveQueryToken()...");
         setQueryToken(this.getActiveQueryToken());
 
         // Loading dynamic plugins may require calling into the standard plugins
@@ -114,7 +103,6 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
 
         // Phase 2: Load the auth services for all connected accounts
-        console.log("supervisor.ts::preload()::calling getConnectedAccounts()");
         const connectedAccounts = this.supervisorCall(
             getCallArgs(
                 "accounts",
@@ -125,22 +113,7 @@ export class Supervisor implements AppInterface {
             ),
         );
         if (!connectedAccounts) return;
-        // TODO: Make this a plugin call
-        // const gql_endpoint = siblingUrl(null, "accounts", "/graphql", true);
-        // const accounts = connectedAccounts
-        //     .map((a: string) => `"${a}"`)
-        //     .join(",");
-        // const { data } = await postGraphQLGetJson<GetAccountsResponse>(
-        //     gql_endpoint,
-        //     `{
-        //         getAccounts(accountNames: [${accounts}]) {
-        //             authService
-        //         }
-        //     }`,
-        // );
-        // const auth_services: (AuthService | null)[] = data?.getAccounts || [];
 
-        console.log("supervisor.ts::preload()::calling getAuthServices()");
         const auth_services: string[] = this.supervisorCall(
             getCallArgs(
                 "accounts",
@@ -150,7 +123,6 @@ export class Supervisor implements AppInterface {
                 [],
             ),
         );
-        console.log("supervisor.auth_services:", auth_services);
 
         const addtl_plugins: QualifiedPluginId[] = [];
         for (const service of auth_services) {
@@ -226,7 +198,6 @@ export class Supervisor implements AppInterface {
     }
 
     getActiveQueryToken(): string {
-        console.log("supervisor.ts:getActiveQueryToken().top");
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
@@ -237,7 +208,6 @@ export class Supervisor implements AppInterface {
             "getActiveQueryToken",
             [this.parentOrigination.app],
         ));
-        console.log("queryToken: ", token);
         return token;
     }
 

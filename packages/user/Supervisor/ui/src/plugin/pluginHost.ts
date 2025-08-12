@@ -206,7 +206,6 @@ export class PluginHost implements HostInterface {
     }
     
     getActiveQueryToken(): string {
-        console.log("pluginHost.ts:getActiveQueryToken().top");
         return this.supervisor.getActiveQueryToken();
     }
 
