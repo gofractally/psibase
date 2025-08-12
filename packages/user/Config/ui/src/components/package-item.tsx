@@ -32,37 +32,37 @@ export const PackageItem = ({
     const buttonLabel = isMutating
         ? "Processing"
         : pack.status == "Available"
-            ? "Install"
-            : pack.status == "InstalledButNotAvailable"
-                ? ""
-                : pack.status == "UpToDate"
-                    ? "Up to date"
-                    : pack.status == "UpdateAvailable"
-                        ? "Update"
-                        : "Rollback";
+          ? "Install"
+          : pack.status == "InstalledButNotAvailable"
+            ? ""
+            : pack.status == "UpToDate"
+              ? "Up to date"
+              : pack.status == "UpdateAvailable"
+                ? "Update"
+                : "Rollback";
 
     const isDisabled =
         isMutating ||
         pack.status === "UpToDate" ||
         pack.status === "InstalledButNotAvailable";
     const buttonVariant =
-        pack.status === "RollBackAvailable" ? "destructive" : "outline";
+        pack.status === "RollBackAvailable" ? "destructive" : "secondary";
 
     const description =
         pack.status === "Available"
             ? pack.description
             : pack.status == "RollBackAvailable"
-                ? pack.rollback.description
-                : pack.status == "UpdateAvailable"
-                    ? pack.available.description
-                    : pack.description;
+              ? pack.rollback.description
+              : pack.status == "UpdateAvailable"
+                ? pack.available.description
+                : pack.description;
 
     if (isLoading) {
         return <div> Loading </div>;
     }
 
     return (
-        <div className="flex justify-between border p-2">
+        <div className="flex justify-between rounded-sm border p-2">
             <div className="flex  flex-col">
                 <div>{pack.id}</div>
                 <div className="text-muted-foreground text-sm">
@@ -80,7 +80,7 @@ export const PackageItem = ({
                     disabled={isDisabled}
                 >
                     {pack.status === "Available" ||
-                        pack.status === "UpdateAvailable" ? (
+                    pack.status === "UpdateAvailable" ? (
                         <ArrowUpFromLine className="mr-2 h-4 w-4" />
                     ) : pack.status === "RollBackAvailable" ? (
                         <ArrowDownFromLine className="mr-2 h-4 w-4" />
