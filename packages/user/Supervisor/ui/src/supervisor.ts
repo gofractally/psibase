@@ -3,7 +3,7 @@ import {
     QualifiedPluginId,
     assertTruthy,
     buildFunctionCallResponse,
-    postGraphQLGetJson,
+    // postGraphQLGetJson,
     siblingUrl,
 } from "@psibase/common-lib";
 import {
@@ -29,6 +29,7 @@ import {
     chainIdPromise,
     parser,
     serviceFromOrigin,
+    setQueryToken,
 } from "./utils";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
@@ -42,18 +43,19 @@ const rootDomain = siblingUrl(null, null, null, true);
 //   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
+    pluginId("host", "auth"),
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
 ];
-interface AuthService {
-    authService: string;
-}
+// interface AuthService {
+//     authService: string;
+// }
 
-interface GetAccountsResponse {
-    data: {
-        getAccounts: (AuthService | null)[];
-    };
-}
+// interface GetAccountsResponse {
+//     data: {
+//         getAccounts: (AuthService | null)[];
+//     };
+// }
 
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
@@ -94,7 +96,12 @@ export class Supervisor implements AppInterface {
             return;
         }
 
-        this.loader.trackPlugins([...systemPlugins, ...plugins]);
+        // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
+        this.loader.trackPlugins([...systemPlugins]);
+        await this.loader.processPlugins();
+        await this.loader.awaitReady();
+        console.log("supervisor.ts:preload()::calling getActiveQueryToken(), then setActiveQueryToken()...");
+        setQueryToken(this.getActiveQueryToken());
 
         // Loading dynamic plugins may require calling into the standard plugins
         //   to look up information to know what plugin to load. Therefore,
@@ -102,10 +109,12 @@ export class Supervisor implements AppInterface {
         //   all dynamic plugins.
 
         // Phase 1: Loads plugins requested by an app
+        this.loader.trackPlugins([...plugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
         // Phase 2: Load the auth services for all connected accounts
+        console.log("supervisor.ts::preload()::calling getConnectedAccounts()");
         const connectedAccounts = this.supervisorCall(
             getCallArgs(
                 "accounts",
@@ -116,26 +125,39 @@ export class Supervisor implements AppInterface {
             ),
         );
         if (!connectedAccounts) return;
-        const gql_endpoint = siblingUrl(null, "accounts", "/graphql", true);
-        const accounts = connectedAccounts
-            .map((a: string) => `"${a}"`)
-            .join(",");
-        const { data } = await postGraphQLGetJson<GetAccountsResponse>(
-            gql_endpoint,
-            `{
-                getAccounts(accountNames: [${accounts}]) {
-                    authService
-                }
-            }`,
+        // TODO: Make this a plugin call
+        // const gql_endpoint = siblingUrl(null, "accounts", "/graphql", true);
+        // const accounts = connectedAccounts
+        //     .map((a: string) => `"${a}"`)
+        //     .join(",");
+        // const { data } = await postGraphQLGetJson<GetAccountsResponse>(
+        //     gql_endpoint,
+        //     `{
+        //         getAccounts(accountNames: [${accounts}]) {
+        //             authService
+        //         }
+        //     }`,
+        // );
+        // const auth_services: (AuthService | null)[] = data?.getAccounts || [];
+
+        console.log("supervisor.ts::preload()::calling getAuthServices()");
+        const auth_services: string[] = this.supervisorCall(
+            getCallArgs(
+                "accounts",
+                "plugin",
+                "admin",
+                "getAuthServices",
+                [],
+            ),
         );
-        const auth_services: (AuthService | null)[] = data?.getAccounts || [];
+        console.log("supervisor.auth_services:", auth_services);
 
         const addtl_plugins: QualifiedPluginId[] = [];
         for (const service of auth_services) {
             if (!service) continue;
 
             // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
-            addtl_plugins.push(pluginId(service.authService, "plugin"));
+            addtl_plugins.push(pluginId(service, "plugin"));
         }
         this.loader.trackPlugins(addtl_plugins);
 
@@ -204,16 +226,19 @@ export class Supervisor implements AppInterface {
     }
 
     getActiveQueryToken(): string {
+        console.log("supervisor.ts:getActiveQueryToken().top");
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
-        const queryToken = this.supervisorCall({
-            service: "host",
-            plugin: "auth",
-            method: "getActiveQueryToken",
-            params: [this.parentOrigination.app],
-        })
-        return queryToken;
+        const token = this.supervisorCall(getCallArgs(
+            "host",
+            "auth",
+            "api",
+            "getActiveQueryToken",
+            [this.parentOrigination.app],
+        ));
+        console.log("queryToken: ", token);
+        return token;
     }
 
     getRootDomain(): string {

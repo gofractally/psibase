@@ -49,6 +49,9 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
                 );
                 setCurrentUser(null);
             } else {
+                console.log(
+                    "CommonApi::LoginBar::handleClick().calling createConnectionToken",
+                );
                 const token = await supervisor.functionCall(
                     withArgs(
                         "accounts",

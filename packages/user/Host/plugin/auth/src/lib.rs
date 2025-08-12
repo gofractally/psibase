@@ -64,7 +64,10 @@ impl Api for HostAuth {
     }
 
     fn get_active_query_token(app: String) -> Option<String> {
-        check_caller(&["host"], "get-active-query-token@host:common/admin");
+        check_caller(
+            &["host", "supervisor"],
+            "get-active-query-token@host:common/admin",
+        );
 
         let user = AccountsApi::get_current_user()?;
 
