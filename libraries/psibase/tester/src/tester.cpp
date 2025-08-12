@@ -219,7 +219,8 @@ void psibase::TestChain::loadLocalServices()
    if (kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
       abortMessage("local services already loaded");
    psibase::tester::raw::checkoutSubjective(id);
-   for (auto account : {AccountNumber{"x-admin"}, AccountNumber{"x-run"}})
+   for (auto account :
+        {AccountNumber{"x-admin"}, AccountNumber{"x-run"}, AccountNumber{"x-transact"}})
    {
       auto code = readWholeFile(servicesDir + "/" + account.str() + ".wasm");
 

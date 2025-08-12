@@ -9,8 +9,10 @@ endfunction()
 add_library(services_local INTERFACE)
 target_mapped_include_directories(services_local INTERFACE
     XRun/include
+    XTransact/include
 )
 
 if(DEFINED IS_WASM)
     add_subdirectory(XRun)
+    add_subdirectory(XTransact)
 endif()

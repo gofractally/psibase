@@ -300,6 +300,7 @@ function(psinode_files target pfx)
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm ${pfx}/share/psibase/services/x-transact.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
@@ -337,7 +338,7 @@ psibase_package(
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
-        FLAGS allowWriteSubjective allowNativeSubjective
+        FLAGS allowWriteSubjective
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
