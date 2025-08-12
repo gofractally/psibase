@@ -24,10 +24,19 @@ pub struct NftRecord {
     Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
+#[graphql(input_name = "BitsetU8Input")]
+struct BitsetU8 {
+    value: u8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
     account: AccountNumber,
-    config: u8, // todo: Implement Bitset
+    config: BitsetU8, // todo: Implement Bitset
 }
 
 #[derive(
@@ -38,12 +47,14 @@ pub struct NftHolderRecord {
 pub struct CreditRecord {
     nftId: NID,
     debitor: AccountNumber,
+    creditor: AccountNumber,
 }
 
 #[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{AccountNumber, NamedBit};
+    use super::NID;
+    use crate::{AccountNumber, HttpReply, HttpRequest, MethodNumber, NamedBit};
 
     #[action]
     fn init() {
@@ -104,4 +115,40 @@ mod service {
     fn getUserConf(account: AccountNumber, flag: NamedBit) -> bool {
         unimplemented!()
     }
+
+    #[action]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        unimplemented!()
+    }
+
+    #[event(history)]
+    fn minted(nftId: NID, issuer: AccountNumber) {
+        unimplemented!()
+    }
+    #[event(history)]
+    fn burned(nftId: NID, owner: AccountNumber) {
+        unimplemented!()
+    }
+    #[event(history)]
+    fn userConfSet(account: AccountNumber, flag: MethodNumber, enable: bool) {
+        unimplemented!()
+    }
+    #[event(history)]
+    fn credited(nftId: NID, sender: AccountNumber, receiver: AccountNumber, memo: String) {
+        unimplemented!()
+    }
+    #[event(history)]
+    fn uncredited(nftId: NID, sender: AccountNumber, receiver: AccountNumber, memo: String) {
+        unimplemented!()
+    }
+
+    #[event(merkle)]
+    fn transferred(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
+        unimplemented!()
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

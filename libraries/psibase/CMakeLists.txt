@@ -150,27 +150,27 @@ function(add suffix)
         target_mapped_include_directories(psitestlib${suffix} PUBLIC
             service/include
             tester/include
-            ../../services/system/Accounts/include
-            ../../services/system/Producers/include
-            ../../services/system/AuthDelegate/include
-            ../../services/system/AuthSig/include
-            ../../services/system/AuthAny/include
-            ../../services/system/CpuLimit/include
-            ../../services/system/HttpServer/include
-            ../../services/system/SetCode/include
-            ../../services/system/StagedTx/service/cpp/include
-            ../../services/system/Transact/include
-            ../../services/user/CommonApi/include
-            ../../services/user/Explorer/include
-            ../../services/user/Invite/include
-            ../../services/user/Nft/include
-            ../../services/user/Packages/include
-            ../../services/user/Sites/include
-            ../../services/user/Symbol/include
-            ../../services/user/Tokens/include
+            ../../packages/system/Accounts/include
+            ../../packages/system/Producers/include
+            ../../packages/system/AuthDelegate/include
+            ../../packages/system/AuthSig/include
+            ../../packages/system/AuthAny/include
+            ../../packages/system/CpuLimit/include
+            ../../packages/system/HttpServer/include
+            ../../packages/system/SetCode/include
+            ../../packages/system/StagedTx/service/cpp/include
+            ../../packages/system/Transact/include
+            ../../packages/user/CommonApi/include
+            ../../packages/user/Explorer/include
+            ../../packages/user/Invite/include
+            ../../packages/user/Nft/include
+            ../../packages/user/Packages/include
+            ../../packages/user/Sites/include
+            ../../packages/user/Symbol/include
+            ../../packages/user/Tokens/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
-            ../../services/system/VerifySig/include
+            ../../packages/system/VerifySig/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start

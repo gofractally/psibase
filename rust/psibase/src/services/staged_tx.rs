@@ -21,6 +21,7 @@ mod service {
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
         pub action_list: ActionList,
+        pub auto_exec: bool,
     }
 
     /// Initialize the service
@@ -90,11 +91,16 @@ mod service {
 
     #[event(history)]
     pub fn updated(
-        txid: String,            // The txid of the staged transaction
+        txid: Checksum256,       // The txid of the staged transaction
         actor: AccountNumber,    // The sender of the action causing the event
         datetime: TimePointUSec, // The time of the event emission
         event_type: String,      // The type of event
     ) {
         unimplemented!()
     }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

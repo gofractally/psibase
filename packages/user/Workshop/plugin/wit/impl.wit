@@ -1,0 +1,17 @@
+package workshop:plugin;
+
+world impl {
+    include host:common/imports;
+    include sites:plugin/imports;
+    include staged-tx:plugin/imports;
+    include setcode:plugin/imports;
+    include chainmail:plugin/imports;
+    include clientdata:plugin/imports;
+    include registry:plugin/imports;
+    include auth-delegate:plugin/imports;
+    include accounts:plugin/imports;
+
+    export app;
+    export mail;
+    export registry;
+}

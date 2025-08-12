@@ -1,8 +1,8 @@
-use crate::{FracInputStream, Pack, Result, Unpack, UnpackOwned};
+use crate::{AnyType, FracInputStream, Pack, Result, SchemaBuilder, ToSchema, Unpack, UnpackOwned};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::marker::PhantomData;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nested<T> {
     data: Vec<u8>,
     _phantom: PhantomData<T>,
@@ -59,5 +59,11 @@ impl<T: Serialize + UnpackOwned> Serialize for Nested<T> {
 impl<'de, T: Deserialize<'de> + Pack> Deserialize<'de> for Nested<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         Ok(Self::new(T::deserialize(deserializer)?.packed()))
+    }
+}
+
+impl<T: ToSchema + 'static> ToSchema for Nested<T> {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        AnyType::FracPack(T::schema(builder).into())
     }
 }

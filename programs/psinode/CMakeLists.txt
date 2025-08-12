@@ -26,7 +26,7 @@ endif()
 
 target_include_directories(psinode PUBLIC
     ../../libraries/psibase/service/include
-    ../../services/psibase_tests)
+    ../../packages/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
 find_package(Python COMPONENTS Interpreter)

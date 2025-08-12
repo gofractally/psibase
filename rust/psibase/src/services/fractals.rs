@@ -105,4 +105,29 @@ pub mod Service {
     fn on_grp_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
         unimplemented!()
     }
+
+    #[event(history)]
+    pub fn created_fractal(fractal_account: AccountNumber) {}
+
+    #[event(history)]
+    pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
+
+    #[event(history)]
+    pub fn evaluation_finished(fractal_account: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn scheduled_evaluation(
+        fractal_account: AccountNumber,
+        evaluation_id: u32,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+    ) {
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

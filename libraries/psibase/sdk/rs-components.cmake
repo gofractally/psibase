@@ -33,7 +33,7 @@ endfunction()
 
 
 # Parameters:
-# TARGET_TUPLE: The target tuple includes the path and the target name. Example: "services/:ServiceComponents"
+# TARGET_TUPLE: The target tuple includes the path and the target name. Example: "packages/:ServiceComponents"
 # ARGN: All of the package names to build. If cargo.toml has `package.name = "auth-invite"`, then pass `auth-invite`
 function(add_rs_component_workspace TARGET_TUPLE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})

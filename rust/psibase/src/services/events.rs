@@ -7,4 +7,22 @@ mod service {
     fn addIndex(db_id: DbId, service: AccountNumber, event: MethodNumber, column: u8) {
         unimplemented!()
     }
+
+    #[action]
+    fn init() {
+        unimplemented!()
+    }
+    #[action]
+    fn sync() {
+        unimplemented!()
+    }
+    #[action]
+    fn onBlock() {
+        unimplemented!()
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

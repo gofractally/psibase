@@ -27,9 +27,11 @@ namespace psibase::net
    struct websocket_connection : connection_base,
                                  std::enable_shared_from_this<websocket_connection<Stream>>
    {
+      using endpoint_type = boost::beast::lowest_layer_type<Stream>::endpoint_type;
       explicit websocket_connection(boost::beast::websocket::stream<Stream>&& stream)
           : stream(std::move(stream))
       {
+         remote_endpoint = get_lowest_layer(this->stream).socket().remote_endpoint();
          logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(endpoint()));
          need_close_msg = true;
       }
@@ -156,11 +158,10 @@ namespace psibase::net
                 });
          }
       }
-      std::string endpoint() const override 
+      std::string endpoint() const override
       {
-         auto               result = get_lowest_layer(stream).socket().remote_endpoint();
          std::ostringstream ss;
-         ss << result;
+         ss << remote_endpoint;
          return ss.str();
       }
       struct message
@@ -169,6 +170,7 @@ namespace psibase::net
          std::function<void(const std::error_code&)> callback;
       };
       boost::beast::websocket::stream<Stream> stream;
+      endpoint_type                           remote_endpoint;
       std::string                             host;
       std::deque<message>                     outbox;
       std::vector<char>                       inbox;
@@ -229,6 +231,8 @@ namespace psibase::net
                        }
                        else
                        {
+                          conn->remote_endpoint =
+                              get_lowest_layer(conn->stream).socket().remote_endpoint();
                           maybe_async_ssl_handshake(
                               std::move(conn),
                               [f = std::move(f)](const std::error_code& ec, auto&& conn) mutable
@@ -289,7 +293,8 @@ namespace psibase::net
              }
              else
              {
-                auto* p = conn.get();
+                conn->remote_endpoint = get_lowest_layer(conn->stream).socket().remote_endpoint();
+                auto* p               = conn.get();
                 p->stream.async_handshake(
                     "localhost", "/native/p2p",
                     [conn = std::move(conn), f = std::move(f)](const std::error_code& ec) mutable

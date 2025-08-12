@@ -5,13 +5,14 @@ pub const VERIFY_SERVICE: AccountNumber = crate::services::verify_sig::SERVICE;
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
-    use crate::{services::transact::ServiceMethod, AccountNumber, Action, Claim};
+    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
 
     #[action]
     fn checkAuthSys(
         flags: u32,
         requester: AccountNumber,
-        action: Action,
+        sender: AccountNumber,
+        action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) {
@@ -27,4 +28,9 @@ mod service {
     fn requireAuth(pubkey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

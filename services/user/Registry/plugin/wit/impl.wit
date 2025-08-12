@@ -1,9 +1,0 @@
-package registry:plugin;
-
-world impl {
-    include host:common/imports;
-    include transact:plugin/imports;
-
-    export developer;
-    export consumer;
-}

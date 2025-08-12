@@ -1,5 +1,5 @@
 pub use crate::services::auth_sig::SubjectPublicKeyInfo;
-use crate::{account, AccountNumber};
+use crate::{account, AccountNumber, TimePointSec};
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ pub struct InviteRecord {
     actor: AccountNumber,
 
     /// The time in seconds at which this invite expires
-    expiry: u32,
+    expiry: TimePointSec,
 
     /// A flag that represents whether a new account may still be created by
     ///   redeeming this invite
@@ -67,6 +67,11 @@ pub const PAYER_ACCOUNT: AccountNumber = account!("invited-sys");
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
     use crate::{AccountNumber, TimePointUSec};
+
+    #[action]
+    fn init() {
+        unimplemented!()
+    }
 
     #[action]
     fn createInvite(
@@ -122,4 +127,9 @@ mod service {
     fn checkClaim(actor: AccountNumber, inviteId: u32) {
         unimplemented!()
     }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

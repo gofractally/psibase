@@ -1,7 +1,10 @@
+use crate::{Pack, ToSchema, Unpack};
 use fracpack::{Pack, ToSchema, Unpack};
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[fracpack(fracpack_mod = "fracpack")]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, Unpack, Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageSource {
@@ -12,6 +15,7 @@ pub struct PackageSource {
 #[crate::service(name = "packages", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
+    use super::PackageSource;
     use crate::package::Meta;
     use crate::services::packages::PackageSource;
     use crate::{Checksum256, Hex, Schema};
@@ -45,4 +49,9 @@ mod service {
     fn removeOrder(id: u64) {
         unimplemented!();
     }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

@@ -182,7 +182,7 @@ impl<'a> Unpack<'a> for DbId {
 }
 
 impl ToSchema for DbId {
-    fn schema(_builder: &mut fracpack::SchemaBuilder) -> fracpack::AnyType {
-        todo!()
+    fn schema(builder: &mut fracpack::SchemaBuilder) -> fracpack::AnyType {
+        u32::schema(builder)
     }
 }

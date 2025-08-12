@@ -208,7 +208,7 @@ mod service {
     /// # Returns token symbol.
     #[action]
     #[allow(non_snake_case)]
-    fn getTokenSymbol(token_id: TID) -> AccountNumber {
+    fn getTokenSym(token_id: TID) -> AccountNumber {
         unimplemented!()
     }
 
@@ -236,7 +236,7 @@ mod service {
     ///
     /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
     #[action]
-    fn getUserConf(account: AccountNumber) -> bool {
+    fn getUserConf(account: AccountNumber, index: u8) -> bool {
         unimplemented!()
     }
 
@@ -262,7 +262,7 @@ mod service {
     ///
     /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
     #[action]
-    fn getBalConf(account: AccountNumber) -> bool {
+    fn getBalConf(account: AccountNumber, token_id: TID, index: u8) -> bool {
         unimplemented!()
     }
 
@@ -361,4 +361,70 @@ mod service {
     fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
         unimplemented!()
     }
+
+    #[event(history)]
+    pub fn recalled(
+        token_id: TID,
+        amount: Quantity,
+        burner: AccountNumber,
+        from: AccountNumber,
+        memo: Memo,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
+
+    #[event(history)]
+    pub fn created(
+        token_id: TID,
+        sender: AccountNumber,
+        precision: Precision,
+        max_issued_supply: Quantity,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
+
+    #[event(history)]
+    pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
+
+    #[event(history)]
+    pub fn credited(
+        token_id: TID,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn uncredited(
+        token_id: TID,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn debited(
+        token_id: TID,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: Memo) {}
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }
