@@ -30,7 +30,9 @@ impl ActiveApp for AccountsPlugin {
         }
 
         AppsTable::new(&app).login(&user);
-        HostAuth::set_logged_in_user(&user, &app);
+        if HostAuth::set_logged_in_user(&user, &app).is_err() {
+            AppsTable::new(&app).logout();
+        }
         Ok(())
     }
 
