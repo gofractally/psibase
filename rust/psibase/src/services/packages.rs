@@ -1,11 +1,8 @@
 use crate::{Pack, ToSchema, Unpack};
-use fracpack::{Pack, ToSchema, Unpack};
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, Unpack, Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageSource {
     pub url: Option<String>,
@@ -17,7 +14,6 @@ pub struct PackageSource {
 mod service {
     use super::PackageSource;
     use crate::package::Meta;
-    use crate::services::packages::PackageSource;
     use crate::{Checksum256, Hex, Schema};
 
     #[action]
