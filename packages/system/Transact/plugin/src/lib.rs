@@ -218,7 +218,7 @@ struct LoginReply {
 
 impl Auth for TransactPlugin {
     fn get_query_token(app: String, user: String) -> Result<String, CommonTypes::Error> {
-        assert!(Host::client::get_sender() == "accounts" || Host::client::get_sender() == "host");
+        assert!(Host::client::get_sender() == "host");
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");

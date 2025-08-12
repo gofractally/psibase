@@ -8,7 +8,6 @@ use helpers::*;
 use exports::host::auth::api::Guest as Api;
 
 use psibase::fracpack::{Pack, Unpack};
-use serde::Serialize;
 
 use crate::bindings::accounts::plugin::api as AccountsApi;
 
@@ -28,30 +27,13 @@ fn get_auth_cookie_store_key(user: &str, app: &str) -> String {
 }
 
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
-    #[derive(Serialize, Debug)]
-    #[allow(non_snake_case)]
-    struct SetAuthCookieReqPayload {
-        #[allow(non_snake_case)]
-        accessToken: String,
-    }
-
-    // call set-cookie to get HttpOnly cookie set
-    let payload = SetAuthCookieReqPayload {
-        accessToken: query_token.to_string(),
-    };
-
     let req: PostRequest = PostRequest {
         endpoint: String::from("/common/set-auth-cookie"),
-        body: BodyTypes::Json(serde_json::to_string(&payload).unwrap()),
+        body: BodyTypes::Json(format!("{{\"accessToken\": \"{}\"}}", query_token)),
     };
     HostAdmin::post(app, &req).unwrap();
 
-    // store query-token in localstorage (for Supervisor use)
-    let db = Database {
-        mode: DbMode::NonTransactional,
-        duration: StorageDuration::Persistent,
-    };
-    let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
+    let bucket = KvStore::Bucket::new(DB, &QUERY_TOKEN_BUCKET);
 
     bucket.set(
         &get_auth_cookie_store_key(user, app),
@@ -59,15 +41,16 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     );
 }
 
+const DB: Database = Database {
+    mode: DbMode::NonTransactional,
+    duration: StorageDuration::Persistent,
+};
+
 impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) {
         check_caller(&["accounts"], "set-logged-in-user@host:common/admin");
 
-        let db = Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        };
-        let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
+        let bucket = KvStore::Bucket::new(DB, &QUERY_TOKEN_BUCKET);
         let query_token = bucket.get(&get_auth_cookie_store_key(&user, &app));
 
         let query_token = if query_token.is_none() {
@@ -85,18 +68,11 @@ impl Api for HostAuth {
     }
 
     fn get_active_query_token(app: String) -> Option<String> {
-        let user = AccountsApi::get_current_user();
-        if user.is_none() {
-            return None;
-        }
-        let user = user.unwrap();
         check_caller(&["host"], "get-active-query-token@host:common/admin");
 
-        let db = Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        };
-        let bucket = KvStore::Bucket::new(db, &QUERY_TOKEN_BUCKET);
+        let user = AccountsApi::get_current_user()?;
+
+        let bucket = KvStore::Bucket::new(DB, &QUERY_TOKEN_BUCKET);
 
         let record = bucket.get(&get_auth_cookie_store_key(&user, &app));
 

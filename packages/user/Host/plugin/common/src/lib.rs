@@ -71,7 +71,7 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
 impl Admin for HostCommon {
     fn get_active_app() -> String {
         check_caller(
-            &["host", "accounts", "staged-tx"],
+            &["accounts", "staged-tx"],
             "get-active-app@host:common/admin",
         );
 
