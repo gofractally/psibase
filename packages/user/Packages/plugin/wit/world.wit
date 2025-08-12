@@ -97,5 +97,4 @@ interface queries {
 
 world imports {
     import queries;
-    import private-api;
 }

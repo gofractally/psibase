@@ -7,6 +7,7 @@ world impl {
     include branding:plugin/imports;
     include transact:plugin/imports;
     include packages:plugin/imports;
+    import packages:plugin/private-api;
 
     export branding;
     export producers;
