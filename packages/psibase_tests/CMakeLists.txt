@@ -23,6 +23,7 @@ function(add suffix)
     service(SubjectiveDb "${suffix}" src/SubjectiveDb.cpp)
     service(NotifyService "${suffix}" src/NotifyService.cpp)
     service(SetWasmConfig "${suffix}" src/SetWasmConfig.cpp)
+    service(XSudo "${suffix}" src/XSudo.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" src/MockCpuLimit.cpp)

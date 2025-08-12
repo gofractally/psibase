@@ -64,7 +64,7 @@ pub struct AuthRecord {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::SubjectPublicKeyInfo;
-    use crate::{services::transact::ServiceMethod, AccountNumber, Action, Claim};
+    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
 
     /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
     ///
@@ -76,7 +76,8 @@ mod service {
     fn checkAuthSys(
         flags: u32,
         requester: AccountNumber,
-        action: Action,
+        sender: AccountNumber,
+        action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) {
@@ -103,4 +104,43 @@ mod service {
     fn setKey(key: SubjectPublicKeyInfo) {
         unimplemented!()
     }
+
+    /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+    /// transaction from a specified sender.
+    ///
+    /// * `sender`: The sender account for the transaction potentially being authorized.
+    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+    ///
+    /// Returns:
+    /// * `true`: If the sender is among the authorizers
+    /// * `false`: If the sender is not among the authorizers
+    #[action]
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+    /// transaction from a specified sender.
+    ///
+    /// * `sender`: The sender account for the transaction potentially being rejected.
+    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+    ///
+    /// Returns:
+    /// * `true`: If the sender is among the rejecters
+    /// * `false`: If the sender is not among the rejecters
+    #[action]
+    fn isRejectSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    /// Create a new account using this auth service configured with the specified public key.
+    #[action]
+    fn newAccount(name: AccountNumber, key: SubjectPublicKeyInfo) {
+        unimplemented!()
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

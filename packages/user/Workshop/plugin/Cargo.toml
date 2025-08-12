@@ -29,3 +29,5 @@ world = "impl"
 "chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"auth-delegate:plugin" = { path = "../../../system/AuthDelegate/plugin/wit/world.wit" }

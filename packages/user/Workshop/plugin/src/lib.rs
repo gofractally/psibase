@@ -2,6 +2,8 @@
 mod bindings;
 use bindings::*;
 
+use accounts::plugin::api::get_current_user;
+use auth_delegate::plugin::api::new_account;
 use exports::workshop::plugin::{
     app::{File, Guest as App},
     mail::Guest as Mail,
@@ -92,7 +94,8 @@ impl Mail for WorkshopPlugin {
 
 impl Registry for WorkshopPlugin {
     fn create_app(app: String) -> Result<(), Error> {
-        registry::plugin::developer::create_app(&app)
+        new_account(&app, &get_current_user().unwrap())?;
+        Ok(())
     }
 
     fn set_app_metadata(app: String, metadata: AppMetadata) -> Result<(), Error> {

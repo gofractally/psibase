@@ -78,6 +78,12 @@ namespace psibase
       static constexpr uint64_t forceReplay           = uint64_t(1) << 7;
       static constexpr uint64_t allowSocket           = uint64_t(1) << 8;
       static constexpr uint64_t allowNativeSubjective = uint64_t(1) << 9;
+      static constexpr uint64_t isReplacement         = uint64_t(1) << 10;
+
+      static constexpr auto allFlags = allowSudo | allowWriteNative | isSubjective |
+                                       allowWriteSubjective | canNotTimeOut | canSetTimeLimit |
+                                       isAuthService | forceReplay | allowSocket |
+                                       allowNativeSubjective | isReplacement;
 
       AccountNumber codeNum;
       uint64_t      flags = 0;  // Constants above

@@ -4,45 +4,23 @@ interface types {
     type account-id = string;
     type base64-str = string;
 
-    enum app-status {
-        draft,
-        published,
-        unpublished,
-    }
-
     record app-metadata {
         name: string,
-        short-description: string,
-        long-description: string,
+        short-desc: string,
+        long-desc: string,
         icon: base64-str,
         icon-mime-type: string, 
         tos-subpage: string,
         privacy-policy-subpage: string,
         app-homepage-subpage: string,
         redirect-uris: list<string>,
-        owners: list<account-id>,
         tags: list<string>,
-    }
-
-    record extra-metadata {
-        status: app-status,
-        created-at: string,
-    }
-
-    record full-app-metadata {
-        app-metadata: app-metadata,
-        extra-metadata: extra-metadata,
     }
 }
 
 interface developer {
     use host:common/types.{error};
     use types.{account-id, app-metadata};
-
-    /// Create a new app with the specified account name
-    /// This creates a new account on the server whose owner is automatically set to the currently
-    /// logged-in user.
-    create-app: func(account: account-id) -> result<_, error>;
 
     /// Set the metadata for an app
     /// 
@@ -53,11 +31,10 @@ interface developer {
     /// 
     /// Validations:
     /// * `name` must be between 1 and 30 characters
-    /// * `short-description` must be between 1 and 100 characters
-    /// * `long-description` must be between 1 and 1000 characters
+    /// * `short-desc` must be between 1 and 100 characters
+    /// * `long-desc` must be between 1 and 1000 characters
     /// * `icon-mime-type` must be a valid MIME type for an icon (e.g. png, jpeg, svg, x-icon, vnd.microsoft.icon)
     /// * subpages must start with "/"
-    /// * owners must exist
     /// * only three tags are allowed, and they must be lowercase alphanumeric with dashes
     /// * all the fields are optional if the app is not published
     set-app-metadata: func(metadata: app-metadata) -> result<_, error>;
@@ -66,7 +43,6 @@ interface developer {
     /// 
     /// All of the metadata fields are validated, all fields are required, except for the icon.
     /// 
-    /// * Only the owners can publish an app
     /// * If the app is already published, the transaction will fail
     publish-app: func(account: account-id) -> result<_, error>;
 
@@ -74,26 +50,11 @@ interface developer {
     /// 
     /// No fields are validated.
     /// 
-    /// * Only the owners can unpublish an app
     /// * If the app is not published, the transaction will fail
     unpublish-app: func(account: account-id) -> result<_, error>;
-}
-
-interface consumer {
-    use host:common/types.{error};
-    use types.{account-id, full-app-metadata};
-
-    /// Retrieve the full metadata for an app
-    get-app-metadata: func(account: account-id) -> result<full-app-metadata, error>;
-
-    /// Retrieve a list of tags that contain the given substring
-    /// 
-    /// This function returns up to 10 tags that contain the given substring.
-    get-related-tags: func(tag-substr: string) -> result<list<string>, error>;
 }
 
 world imports {
     import types;
     import developer;
-    import consumer;
 }

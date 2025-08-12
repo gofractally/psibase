@@ -2,13 +2,14 @@ package permissions:plugin;
 
 interface admin {
     use host:common/types.{error};
+    use types.{trust-level, descriptions};
 
     record prompt-context {
         user: string,
         caller: string,
         callee: string,
-        trust-level: u8,
-        description: string,
+        level: trust-level,
+        descriptions: descriptions,
     }
 
     /// The duration for which an approval is granted.

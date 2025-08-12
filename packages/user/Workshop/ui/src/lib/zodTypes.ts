@@ -20,8 +20,8 @@ export const Account = z
 
 export const Metadata = z.object({
     name: z.string().max(30),
-    shortDescription: z.string().max(100),
-    longDescription: z.string().max(1000),
+    shortDesc: z.string().max(100),
+    longDesc: z.string().max(1000),
     icon: z.string(), // Base64 string
     iconMimeType: z.string(), // MIME type of the icon
     tosSubpage: z
@@ -34,7 +34,6 @@ export const Metadata = z.object({
         .string()
         .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
     redirectUris: z.string().array(),
-    owners: Account.array().default([]),
     tags: z.string().array().max(3),
 });
 

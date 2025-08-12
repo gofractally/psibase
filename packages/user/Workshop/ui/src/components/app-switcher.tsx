@@ -52,9 +52,7 @@ export function AppSwitcher() {
     const { data: app } = useAppMetadata(currentApp);
 
     const currentSrc =
-        app &&
-        app.appMetadata.icon &&
-        buildImageSrc(app.appMetadata.iconMimeType, app.appMetadata.icon);
+        app && app.icon && buildImageSrc(app.iconMimeType, app.icon);
 
     return (
         <SidebarMenu>
@@ -83,9 +81,7 @@ export function AppSwitcher() {
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">
-                                    {app
-                                        ? app.appMetadata.name
-                                        : selectedAppAccount}
+                                    {app ? app.name : selectedAppAccount}
                                 </span>
                                 {app && (
                                     <span className="truncate text-xs">
@@ -106,22 +102,22 @@ export function AppSwitcher() {
                             Apps
                         </DropdownMenuLabel>
                         {apps.map((app) => {
-                            const metadata = MetadataResponse.safeParse(
-                                queryClient.getQueryData(
-                                    appMetadataQueryKey(app.account),
-                                ),
-                            );
+                            const metadata =
+                                MetadataResponse.shape.appMetadata.safeParse(
+                                    queryClient.getQueryData(
+                                        appMetadataQueryKey(app.account),
+                                    ),
+                                );
                             const displayName =
-                                metadata.success &&
-                                metadata.data.appMetadata.name;
+                                metadata.success && metadata.data?.name;
 
                             const src =
                                 metadata.success &&
-                                metadata.data.appMetadata.icon
+                                metadata.data &&
+                                metadata.data.icon
                                     ? buildImageSrc(
-                                          metadata.data.appMetadata
-                                              .iconMimeType,
-                                          metadata.data.appMetadata.icon,
+                                          metadata.data.iconMimeType,
+                                          metadata.data.icon,
                                       )
                                     : createIdenticon(chainId + app.account);
 

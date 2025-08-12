@@ -10,3 +10,8 @@ mod service {
         unimplemented!()
     }
 }
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
+}

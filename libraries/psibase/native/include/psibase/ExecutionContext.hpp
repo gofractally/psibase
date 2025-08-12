@@ -91,6 +91,10 @@ namespace psibase
       ExecutionContext(ExecutionContext&&);
       ~ExecutionContext();
 
+      static constexpr auto callerSudo = static_cast<std::uint64_t>(1) << 62;
+      static constexpr auto isLocal    = static_cast<std::uint64_t>(1) << 63;
+      static_assert(((callerSudo | isLocal) & CodeRow::allFlags) == 0);
+
       static void registerHostFunctions();
 
       std::uint32_t remainingStack() const;

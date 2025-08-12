@@ -26,6 +26,8 @@ pub struct ServiceMethod {
     pub method: crate::MethodNumber,
 }
 
+type CallbackType = u32;
+
 /// Authenticate actions
 ///
 /// [transact](crate::services::transact::Actions)
@@ -210,7 +212,9 @@ pub mod auth_interface {
 #[crate::service(name = "transact", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::Hex;
+    use super::CallbackType;
+    use crate::{Action, Checksum256, Hex, Seconds, Transaction};
+    use fracpack::Nested;
 
     /// Only called once, immediately after the boot transaction.
     ///
@@ -236,6 +240,45 @@ mod service {
     /// Called by native code at the beginning of each block
     #[action]
     fn startBlock() {
+        unimplemented!()
+    }
+
+    /// Called by RTransact to execute a transaction speculatively
+    #[action]
+    fn execTrx(trx: Nested<Transaction>, speculative: bool) {
+        unimplemented!()
+    }
+
+    /// Sets the time between snapshots
+    ///
+    /// A value of 0 will disable snapshots. This is a chain-wide
+    /// setting because snapshots are signed by the block producers.
+    #[action]
+    fn setSnapTime(seconds: Seconds) {
+        unimplemented!()
+    }
+
+    /// Adds a callback that will be run whenever the trigger happens.
+    /// - onTransaction is run at the end of every transaction
+    /// - onBlock runs at the end of every block
+    ///
+    /// Objective callbacks are run by the transaction service and
+    /// must have this service as the sender. If an objective callback
+    /// fails, it will abort the block or transaction.
+    ///
+    /// Subjective callbacks are run by native and must have no sender.
+    ///
+    /// Callbacks are unique. `addCallback` will have no effect if an
+    /// identical callback is already registered.
+    ///
+    /// The order in which callbacks are executed is unspecified.
+    #[action]
+    fn addCallback(type_: CallbackType, objective: bool, act: Action) {
+        unimplemented!()
+    }
+    /// Removes an existing callback
+    #[action]
+    fn removeCallback(type_: CallbackType, objective: bool, act: Action) {
         unimplemented!()
     }
 
@@ -274,6 +317,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Checks authorization for the sender of the first action
+    #[action]
+    fn checkFirstAuth(id: Checksum256, transaction: Transaction) -> bool {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {
@@ -306,3 +355,8 @@ mod service {
 }
 
 // TODO: inline functions in Transact.hpp
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
+}
