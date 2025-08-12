@@ -2,7 +2,6 @@ package config:plugin;
 
 interface branding {
     use host:common/types.{error};
-    use sites:plugin/types.{file};
     use producers:plugin/types.{producer};
 
     upload-network-logo: func(logo: list<u8>) -> result<_, error>;
@@ -17,7 +16,6 @@ interface packaging  {
 
 interface producers {
     use host:common/types.{error};
-    use sites:plugin/types.{file};
     use producers:plugin/types.{producer};
 
     /// Set the producers for CFT consensus.
