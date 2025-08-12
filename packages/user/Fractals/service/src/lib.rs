@@ -183,6 +183,15 @@ pub mod service {
             .award_group_scores(group_number, group_result);
     }
 
+    /// Withdraws the fractal members locked balance depending on it's progression
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal
+    #[action]
+    fn withdraw(fractal: AccountNumber) {
+        Member::get_assert(fractal, get_sender()).withdraw();
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 
