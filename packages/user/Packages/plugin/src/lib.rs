@@ -493,9 +493,6 @@ impl PrivateApi for PackagesPlugin {
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), CommonTypes::Error> {
-        // TODO: Review
-        // assert!(Client::get_sender() == "config".to_string());
-
         let packed_args = psibase::services::packages::action_structs::setSources {
             sources: accounts
                 .into_iter()
