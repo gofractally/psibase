@@ -87,9 +87,14 @@ export const usePackages = (): {
 
     const processed = allPackageNames.map((name): ProcessedPackage => {
         const current = installedPackages.find((pack) => pack.name == name);
-        const available = availablePackages.find((pack) => pack.name == name);
-        if (current && available) {
-            const compared = compareSemVer(available.version, current.version);
+        const latestAvailable = availablePackages
+            .filter((pack) => pack.name == name)
+            .sort((a, b) => compareSemVer(b.version, a.version))[0];
+        if (current && latestAvailable) {
+            const compared = compareSemVer(
+                latestAvailable.version,
+                current.version,
+            );
 
             if (compared == 0) {
                 return {
@@ -102,7 +107,7 @@ export const usePackages = (): {
                     return {
                         id: current.name,
                         status: "UpdateAvailable",
-                        available,
+                        available: latestAvailable,
                         current,
                     };
                 } else {
@@ -110,14 +115,14 @@ export const usePackages = (): {
                         id: current.name,
                         status: "RollBackAvailable",
                         current,
-                        rollback: available,
+                        rollback: latestAvailable,
                     };
                 }
             }
-        } else if (available) {
+        } else if (latestAvailable) {
             return {
-                ...available,
-                id: available.name,
+                ...latestAvailable,
+                id: latestAvailable.name,
                 status: "Available",
             };
         } else if (current) {
@@ -139,9 +144,13 @@ export const usePackages = (): {
         UpToDate: 1,
     };
 
-    processed.sort(
-        (a, b) => statusPriority[b.status] - statusPriority[a.status],
-    );
+    processed.sort((a, b) => {
+        if (a.status === b.status) {
+            return a.id.localeCompare(a.id);
+        } else {
+            return statusPriority[b.status] - statusPriority[a.status];
+        }
+    });
 
     return {
         data: processed,
