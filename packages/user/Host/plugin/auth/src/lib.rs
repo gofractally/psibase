@@ -18,12 +18,12 @@ use crate::bindings::host::common::{
 };
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 
-const QUERY_TOKEN_BUCKET: &str = "query-token-cookie";
+const QUERY_TOKEN_BUCKET: &str = "query_tokens";
 
 struct HostAuth;
 
-fn get_auth_cookie_store_key(user: &str, app: &str) -> String {
-    format!("{}-{}", user, app)
+fn get_query_token_butcket_name(user: &str) -> String {
+    format!("{}-{}", QUERY_TOKEN_BUCKET, user)
 }
 
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
@@ -33,12 +33,9 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     };
     HostAdmin::post(app, &req).unwrap();
 
-    let bucket = KvStore::Bucket::new(DB, &QUERY_TOKEN_BUCKET);
+    let bucket = KvStore::Bucket::new(DB, &get_query_token_butcket_name(user));
 
-    bucket.set(
-        &get_auth_cookie_store_key(user, app),
-        &query_token.to_string().packed(),
-    );
+    bucket.set(&app, &query_token.to_string().packed());
 }
 
 const DB: Database = Database {
@@ -50,8 +47,8 @@ impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) {
         check_caller(&["accounts"], "set-logged-in-user@host:common/admin");
 
-        let bucket = KvStore::Bucket::new(DB, &QUERY_TOKEN_BUCKET);
-        let query_token = bucket.get(&get_auth_cookie_store_key(&user, &app));
+        let bucket = KvStore::Bucket::new(DB, &get_query_token_butcket_name(&user));
+        let query_token = bucket.get(&&app);
 
         let query_token = if query_token.is_none() {
             TransactAuthApi::get_query_token(&app, &user).unwrap()
@@ -61,10 +58,7 @@ impl Api for HostAuth {
         };
         set_active_query_token(&query_token, &app, &user);
 
-        bucket.set(
-            &get_auth_cookie_store_key(&user, &app),
-            &query_token.packed(),
-        );
+        bucket.set(&app, &query_token.packed());
     }
 
     fn get_active_query_token(app: String) -> Option<String> {
@@ -72,9 +66,9 @@ impl Api for HostAuth {
 
         let user = AccountsApi::get_current_user()?;
 
-        let bucket = KvStore::Bucket::new(DB, &QUERY_TOKEN_BUCKET);
+        let bucket = KvStore::Bucket::new(DB, &get_query_token_butcket_name(&user));
 
-        let record = bucket.get(&get_auth_cookie_store_key(&user, &app));
+        let record = bucket.get(&app);
 
         if let Some(value) = record {
             Some(String::unpacked(&value).expect("Failed to get auth cookie"))
