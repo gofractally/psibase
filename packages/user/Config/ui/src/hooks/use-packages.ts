@@ -79,9 +79,11 @@ export const usePackages = (): {
     const installedPackages = installedPackagesData || [];
     const availablePackages = availablePackagesData || [];
     const allPackageNames: string[] = [
-        ...installedPackages.map((x) => x.name),
-        ...availablePackages.map((pack) => pack.name),
-    ].filter((item, index, arr) => arr.indexOf(item) == index);
+        ...new Set([
+            ...installedPackages.map((pack) => pack.name),
+            ...availablePackages.map((pack) => pack.name),
+        ]),
+    ];
 
     const processed = allPackageNames.map((name): ProcessedPackage => {
         const current = installedPackages.find((pack) => pack.name == name);
