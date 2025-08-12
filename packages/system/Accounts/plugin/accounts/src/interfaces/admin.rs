@@ -1,4 +1,3 @@
-use psibase::AccountNumber;
 use serde::Deserialize;
 
 use crate::bindings::host::common::server::post_graphql_get_json;
