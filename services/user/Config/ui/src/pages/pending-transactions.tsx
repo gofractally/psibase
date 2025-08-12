@@ -36,52 +36,54 @@ export const PendingTransactions = () => {
                 {transactions?.map((transaction) => (
                     <div
                         key={transaction.id}
-                        className="border-sm flex justify-between rounded-sm border p-4"
+                        className="border-sm flex justify-between rounded-sm border p-3"
                     >
-                        <div className="flex flex-col gap-2">
-                            <button
-                                className="flex gap-3 hover:underline"
-                                onClick={() => {
-                                    navigate(
-                                        `/pending-transactions/${transaction.id}`,
-                                    );
-                                }}
-                            >
-                                <div className="text-lg">#{transaction.id}</div>
-                            </button>
-                            <div className="text-muted-foreground flex flex-col text-xs">
-                                <div>{shorten(transaction.txid, 5)}</div>
-                                <div>
-                                    {new Date(
-                                        transaction.proposeDate,
-                                    ).toLocaleString()}
-                                </div>
+                        <div className="flex gap-2">
+                            <div className="flex items-center gap-2 text-sm">
+                                <Avatar className="h-6 w-6 rounded-sm">
+                                    <AvatarImage
+                                        src={generateAvatar(
+                                            chainId,
+                                            transaction.proposer,
+                                        )}
+                                    />
+                                </Avatar>
+                                {transaction.proposer}
                             </div>
-                        </div>
-                        <div className="flex flex-col justify-center">
-                            <div className="flex gap-2">
-                                <div className="flex items-center gap-2 text-sm">
-                                    <Avatar className="h-4 w-4 rounded-sm">
-                                        <AvatarImage
-                                            src={generateAvatar(
-                                                chainId,
-                                                transaction.proposer,
-                                            )}
-                                        />
-                                    </Avatar>
-                                    {transaction.proposer}
-                                </div>
-                                <Button
-                                    size="sm"
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    className="flex gap-3 hover:underline"
                                     onClick={() => {
                                         navigate(
                                             `/pending-transactions/${transaction.id}`,
                                         );
                                     }}
                                 >
-                                    Open
-                                </Button>
+                                    <div className="text-lg">
+                                        #{transaction.id}
+                                    </div>
+                                </button>
+                                <div className="text-muted-foreground flex flex-col text-xs">
+                                    <div>{shorten(transaction.txid, 5)}</div>
+                                    <div>
+                                        {new Date(
+                                            transaction.proposeDate,
+                                        ).toLocaleString()}
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+                        <div className="flex flex-col justify-center">
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    navigate(
+                                        `/pending-transactions/${transaction.id}`,
+                                    );
+                                }}
+                            >
+                                Open
+                            </Button>
                         </div>
                     </div>
                 ))}

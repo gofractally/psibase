@@ -159,7 +159,7 @@ export const PendingTransaction = () => {
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                     <div className="flex flex-col gap-2">
-                        <div className="flex justify-around gap-4 pb-2">
+                        <div className="flex justify-around gap-4">
                             <MiniCard
                                 amount={yesResponses.length.toString()}
                                 title="Yes"
