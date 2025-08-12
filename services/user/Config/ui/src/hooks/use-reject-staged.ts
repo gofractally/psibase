@@ -21,7 +21,7 @@ export const useRejectStaged = () => {
             onSuccess: async (args) => {
                 const id = args[0];
 
-                const res = await getStagedTx(id);
+                const res = (await getStagedTx(id)).details;
                 if (!res) {
                     navigate("/pending-transactions");
                 }

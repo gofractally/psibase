@@ -36,12 +36,19 @@ export const PendingTransactions = () => {
                 {transactions?.map((transaction) => (
                     <div
                         key={transaction.id}
-                        className="border-sm flex justify-between border p-4"
+                        className="border-sm flex justify-between rounded-sm border p-4"
                     >
                         <div className="flex flex-col gap-2">
-                            <div className="flex gap-3">
+                            <button
+                                className="flex gap-3 hover:underline"
+                                onClick={() => {
+                                    navigate(
+                                        `/pending-transactions/${transaction.id}`,
+                                    );
+                                }}
+                            >
                                 <div className="text-lg">#{transaction.id}</div>
-                            </div>
+                            </button>
                             <div className="text-muted-foreground flex flex-col text-xs">
                                 <div>{shorten(transaction.txid, 5)}</div>
                                 <div>

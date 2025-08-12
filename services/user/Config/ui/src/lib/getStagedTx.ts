@@ -22,14 +22,28 @@ const zStagedTx = z.object({
     }),
 });
 
-export const Response = z.object({
+const zResponse = z.object({
+    account: zAccount,
+    accepted: z.boolean(),
+});
+
+export const zDataResponse = z.object({
     details: zStagedTx.or(z.null()),
+    responses: z.object({
+        nodes: zResponse.array(),
+    }),
 });
 
 export const getStagedTx = async (id: number) => {
     const res = await graphql(
         `
                     {
+                        responses(id: ${id}) {
+                            nodes {
+                                account
+                                accepted
+                            }
+                        }
                         details(id: ${id}) {
                             id
                             autoExec
@@ -49,5 +63,5 @@ export const getStagedTx = async (id: number) => {
         siblingUrl(null, "staged-tx", "/graphql"),
     );
 
-    return Response.parse(res).details;
+    return zDataResponse.parse(res);
 };

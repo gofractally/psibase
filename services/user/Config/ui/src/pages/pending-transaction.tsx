@@ -28,6 +28,15 @@ import {
 const capitalizeFirstLetter = (word: string) =>
     word[0].toUpperCase() + word.slice(1);
 
+const MiniCard = ({ title, amount }: { title: string; amount: string }) => {
+    return (
+        <div className="border-sm w-full rounded-sm border py-2 text-center">
+            <div className="2xl font-semibold">{amount}</div>
+            <div className="text-muted-foreground text-sm">{title}</div>
+        </div>
+    );
+};
+
 export const PendingTransaction = () => {
     const { id } = useParams();
     const stagedId = Number(id);
@@ -52,11 +61,20 @@ export const PendingTransaction = () => {
         isPendingExecute ||
         isPendingRemove;
 
-    const { data: history } = useTxHistory(data?.txid);
+    const { data: history } = useTxHistory(data?.details?.txid);
 
-    const userIsProposer = data?.proposer === currentUser;
+    const userIsProposer = data?.details?.proposer === currentUser;
 
-    if (data) {
+    const yesResponses =
+        data?.responses.nodes.filter((res) => res.accepted) || [];
+
+    const noResponses =
+        data?.responses.nodes.filter((res) => !res.accepted) || [];
+
+    const approvalPercent =
+        yesResponses.length / yesResponses.length + noResponses.length;
+
+    if (data?.details) {
         return (
             <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
                 <div className="flex flex-col justify-between rounded-sm border p-4">
@@ -64,12 +82,14 @@ export const PendingTransaction = () => {
                         <div className="flex flex-col">
                             <div className="text-2xl">
                                 <span className="text-muted-foreground">#</span>
-                                {data.id}
+                                {data.details?.id}
                             </div>
                         </div>
                         <div className="text-muted-foreground flex flex-row-reverse items-center gap-2 text-sm">
                             <div>
-                                {new Date(data.proposeDate).toLocaleString()}
+                                {new Date(
+                                    data.details?.proposeDate,
+                                ).toLocaleString()}
                             </div>
                         </div>
                     </div>
@@ -81,14 +101,14 @@ export const PendingTransaction = () => {
                                     <AvatarImage
                                         src={generateAvatar(
                                             chainId,
-                                            data.proposer,
+                                            data.details.proposer,
                                         )}
                                     />
                                 </Avatar>
-                                {data.proposer}
+                                {data.details.proposer}
                             </div>
                             <div className="text-muted-foreground rounded-sm border px-1 font-mono text-sm italic">
-                                {data.txid}
+                                {data.details.txid}
                             </div>
                         </div>
 
@@ -112,7 +132,7 @@ export const PendingTransaction = () => {
                                 <Ban />
                                 Reject
                             </Button>
-                            {!data.autoExec && (
+                            {!data.details.autoExec && (
                                 <Button
                                     onClick={() => {
                                         execute([stagedId]);
@@ -138,6 +158,89 @@ export const PendingTransaction = () => {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                        <div className="flex justify-around gap-4 pb-2">
+                            <MiniCard
+                                amount={yesResponses.length.toString()}
+                                title="Yes"
+                            />
+                            <MiniCard
+                                amount={noResponses.length.toString()}
+                                title="No"
+                            />
+                            <MiniCard
+                                amount={
+                                    Math.floor(
+                                        approvalPercent * 100,
+                                    ).toString() + "%"
+                                }
+                                title="Approval"
+                            />
+                        </div>
+                        <div className="rounded-sm border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="text-center">
+                                            Actor
+                                        </TableHead>
+                                        <TableHead className="text-center">
+                                            Vote
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {[...yesResponses, ...noResponses].map(
+                                        (item, index) => (
+                                            <TableRow className="text-muted-foreground">
+                                                <TableCell
+                                                    key={index}
+                                                    className="text-center"
+                                                >
+                                                    {item.account}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    {item.accepted
+                                                        ? "Yes"
+                                                        : "No"}
+                                                </TableCell>
+                                            </TableRow>
+                                        ),
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <div className="rounded-sm border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Actor</TableHead>
+                                        <TableHead>Event</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {history?.map((item, index) => (
+                                        <TableRow className="text-muted-foreground">
+                                            <TableCell>
+                                                {new Date(
+                                                    item.datetime,
+                                                ).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell key={index} className="">
+                                                {item.actor}
+                                            </TableCell>
+                                            <TableCell>
+                                                {capitalizeFirstLetter(
+                                                    item.eventType,
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
                     <div className="rounded-sm border">
                         <Table>
                             <TableHeader>
@@ -148,7 +251,7 @@ export const PendingTransaction = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {data.actionList.actions.map(
+                                {data.details.actionList.actions.map(
                                     (action, index) => (
                                         <TableRow className="text-muted-foreground">
                                             <TableCell key={index} className="">
@@ -163,36 +266,6 @@ export const PendingTransaction = () => {
                                         </TableRow>
                                     ),
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    <div className="rounded-sm border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Actor</TableHead>
-                                    <TableHead>Event</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {history?.map((item, index) => (
-                                    <TableRow className="text-muted-foreground">
-                                        <TableCell>
-                                            {new Date(
-                                                item.datetime,
-                                            ).toLocaleString()}
-                                        </TableCell>
-                                        <TableCell key={index} className="">
-                                            {item.actor}
-                                        </TableCell>
-                                        <TableCell>
-                                            {capitalizeFirstLetter(
-                                                item.eventType,
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
                             </TableBody>
                         </Table>
                     </div>
