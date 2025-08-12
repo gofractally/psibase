@@ -15,6 +15,7 @@ const HistoryItem = z.object({
         "deleted",
         "executed",
         "deleted",
+        "rejected",
     ]),
     datetime: zDateTime,
 });

@@ -19,6 +19,7 @@ const zResponse = z.object({
                     "deleted",
                     "executed",
                     "deleted",
+                    "rejected",
                 ]),
             })
             .array(),
