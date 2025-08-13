@@ -51,7 +51,7 @@ impl Branding for ConfigPlugin {
 
 impl Packaging for ConfigPlugin {
     fn set_account_sources(accounts: Vec<String>) -> Result<(), Error> {
-        set_propose_latch(Some("packages"))?;
+        set_propose_latch(Some("root"))?;
 
         let _ = packages::plugin::private_api::set_account_sources(&accounts);
 

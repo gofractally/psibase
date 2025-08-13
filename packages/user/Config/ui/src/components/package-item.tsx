@@ -34,7 +34,7 @@ export const PackageItem = ({
         : pack.status == "Available"
           ? "Install"
           : pack.status == "InstalledButNotAvailable"
-            ? ""
+            ? "Installed"
             : pack.status == "UpToDate"
               ? "Up to date"
               : pack.status == "UpdateAvailable"
