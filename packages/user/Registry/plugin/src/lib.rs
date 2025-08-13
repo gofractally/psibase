@@ -7,7 +7,7 @@ mod types;
 use ::registry::action_structs::*;
 use bindings::registry::plugin::types::{AccountId, AppMetadata};
 use exports::registry::plugin::developer::Guest as Developer;
-use host::common::types::Error;
+use host::types::types::Error;
 use psibase::{fracpack::Pack, AccountNumber};
 use transact::plugin::intf as Transact;
 

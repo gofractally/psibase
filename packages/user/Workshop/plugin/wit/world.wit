@@ -1,7 +1,7 @@
 package workshop:plugin;
 
 interface registry {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use registry:plugin/types.{app-metadata};
 
     /// Create a new app owned by the currently logged-in user.
@@ -20,7 +20,7 @@ interface registry {
 
 interface app {
     use sites:plugin/types.{file};
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Upload a single file to the site of the specified app.
     ///  
@@ -72,7 +72,7 @@ interface app {
 }
 
 interface mail {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Send an email as the specified app
     send: func(app: string, receiver: string, subject: string, body: string) -> result<_, error>;

@@ -18,8 +18,8 @@ use transact::plugin::hook_handlers::*;
 use host::common::{
     self as Host, server as Server,
     store::{self as Store},
-    types::{self as CommonTypes, BodyTypes},
 };
+use host::types::types::{self as CommonTypes, BodyTypes};
 
 // Exported interfaces/types
 use exports::transact::plugin::{
@@ -123,7 +123,7 @@ impl Intf for TransactPlugin {
         if let Some(plugin) = ActionAuthPlugins::get() {
             ActionAuthPlugins::clear();
             let plugin_ref =
-                Host::types::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
+                CommonTypes::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
             let claims = on_action_auth_claims(plugin_ref, &action)?;
             ActionClaims::push(plugin, claims);
         }
@@ -256,9 +256,9 @@ impl Auth for TransactPlugin {
             return Err(ClaimProofMismatch.into());
         }
 
-        let response = Server::post(&Host::types::PostRequest {
+        let response = Server::post(&CommonTypes::PostRequest {
             endpoint: "/login".to_string(),
-            body: Host::types::BodyTypes::Bytes(signed_tx.packed()),
+            body: CommonTypes::BodyTypes::Bytes(signed_tx.packed()),
         })?;
 
         let reply = match response {

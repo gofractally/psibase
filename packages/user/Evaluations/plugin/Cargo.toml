@@ -28,6 +28,7 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }

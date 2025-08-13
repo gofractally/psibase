@@ -6,7 +6,6 @@ world impl {
 
     export server;
     export client;
-    export types;
     export admin;
     export store;
 }

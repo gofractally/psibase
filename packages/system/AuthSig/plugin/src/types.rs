@@ -1,5 +1,5 @@
 use crate::bindings::auth_sig::plugin::types::Pem;
-use crate::bindings::host::common::types as CommonTypes;
+use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
 use serde::Deserialize;
 

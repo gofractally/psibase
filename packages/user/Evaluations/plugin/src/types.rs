@@ -1,7 +1,7 @@
 use crate::bindings::*;
 use crate::errors::ErrorType::*;
 
-use host::common::types as CommonTypes;
+use host::types::types as CommonTypes;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Deserialize;
 

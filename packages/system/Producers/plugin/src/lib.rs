@@ -3,7 +3,7 @@ mod bindings;
 use bindings::*;
 
 use auth_sig::plugin::keyvault::to_der;
-use host::common::types::Error;
+use host::types::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 
 use exports::producers::plugin::api::Guest as Api;

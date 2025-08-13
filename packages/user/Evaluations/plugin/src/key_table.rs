@@ -1,5 +1,5 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
-use crate::bindings::host::common::types::Error;
+use crate::bindings::host::types::types::Error;
 use crate::errors::ErrorType;
 use ecies::{utils::generate_keypair, PublicKey};
 use psibase::{

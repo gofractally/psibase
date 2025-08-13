@@ -20,7 +20,7 @@ interface types {
 
 interface api {
     use types.{producer, claim};
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Set the producers for CFT consensus.
     /// This also changes the current consensus mode to CFT (crash fault tolerant).

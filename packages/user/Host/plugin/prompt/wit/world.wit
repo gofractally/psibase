@@ -2,7 +2,7 @@ package host:prompt;
 
 /// Calls that are tied to the web platform
 interface web {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// A helper function that simplifies the process of attaching additional context to a
     ///    prompt. This will store the provided context data, and return a string that can 

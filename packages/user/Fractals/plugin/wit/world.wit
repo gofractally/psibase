@@ -2,7 +2,7 @@ package fractals:plugin;
 
 interface admin {
 
-    use host:common/types.{error};
+    use host:types/types.{error};
 
 
     create-fractal: func(account: string, name: string, mission: string) -> result<_, error>;
@@ -15,7 +15,7 @@ interface admin {
 
 
 interface user {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     join: func(fractal: string) -> result<_, error>;
     

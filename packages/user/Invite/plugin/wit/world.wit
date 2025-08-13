@@ -34,7 +34,7 @@ interface types {
 }
 
 // interface admin {
-//     use host:common/types.{error};
+//     use host:types/types.{error};
 
 //     // Restricts the accounts that are able to create invites to those 
 //     // that exist in the whitelist.
@@ -52,7 +52,7 @@ interface types {
 
 /// Functionality exposed for the inviter
 interface inviter {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Allows a user to generate an invite token that can be used to 
     /// invite someone (with or without a preexisting account) to an 
@@ -76,7 +76,7 @@ interface inviter {
 
 /// Functionality exposed for the recipient of an invite (the invitee)
 interface invitee {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     use types.{invite};
 
@@ -118,7 +118,7 @@ interface adv-types {
 
 interface advanced {
     use types.{invite};
-    use host:common/types.{error};
+    use host:types/types.{error};
     use adv-types.{inv-keys};
 
     /// Deserializes an invite token into just the creator app + private key

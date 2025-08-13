@@ -5,7 +5,7 @@ interface types {
 }
 
 interface admin {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{account};
 
     /// Schedules a new evaluation, sender account becomes the owner.
@@ -72,7 +72,7 @@ interface admin {
 }
 
 interface user {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{account};
 
     /// Register for a specific evaluation.
