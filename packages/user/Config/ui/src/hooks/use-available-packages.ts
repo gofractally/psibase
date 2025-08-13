@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
 import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
+import { getSources } from "@/lib/getSources";
 import QueryKey from "@/lib/queryKeys";
 import { PackageSchema } from "@/lib/zod/CommonPackage";
 
@@ -44,12 +44,7 @@ export const zPackageRepo = z.object({
 export type PackageRepo = z.infer<typeof zPackageRepo>;
 
 export async function getPackageIndex(owner: string) {
-    let sources = await supervisor.functionCall({
-        service: "packages",
-        intf: "queries",
-        method: "getSources",
-        params: [owner],
-    });
+    let sources = await getSources(owner);
     if (sources.length == 0) {
         sources = [{ url: siblingUrl(null, "x-admin", "/packages") }];
     }
