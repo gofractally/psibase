@@ -25,7 +25,6 @@ async function readPackageIndexGQL(url: string, account: string) {
             url.replace(/\/?$/, "/graphql"),
             query,
         );
-        console.log(page, "is the page");
 
         for (const edge of page.data.packages.edges) {
             result.push(edge.node);
