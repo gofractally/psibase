@@ -6,14 +6,14 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
-const zPackageSourcee = z
+const zPackageSource = z
     .object({
         url: z.string().optional(),
         account: zAccount.optional(),
     })
     .strict();
 
-export type PackageSource = z.infer<typeof zPackageSourcee>;
+export type PackageSource = z.infer<typeof zPackageSource>;
 
 export const useSources = (owner: string | null | undefined) =>
     useQuery<PackageSource[], Error, Account>({
@@ -28,6 +28,6 @@ export const useSources = (owner: string | null | undefined) =>
                 params: [owner],
             });
 
-            return zPackageSourcee.array().parse(res);
+            return zPackageSource.array().parse(res);
         },
     });
