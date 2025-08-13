@@ -7,6 +7,8 @@ import { PackageItem } from "@/components/package-item";
 import { useInstallPackages } from "@/hooks/use-install-packages";
 import { usePackages } from "@/hooks/use-packages";
 import { useSetAccountSources } from "@/hooks/use-set-sources";
+import { useSources } from "@/hooks/use-sources";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { zAccount } from "@/lib/zod/Account";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -18,8 +20,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-import { useSources } from "@/hooks/use-sources";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export const Packages = () => {
     const { data, isLoading } = usePackages();
@@ -28,7 +28,7 @@ export const Packages = () => {
     const { mutateAsync: installPackages, isPending } = useInstallPackages();
     const { mutateAsync: setAccountSources } = useSetAccountSources();
 
-    const { data: currentUser } = useCurrentUser()
+    const { data: currentUser } = useCurrentUser();
     const { data: sources } = useSources(currentUser);
 
     const form = useAppForm({
@@ -36,18 +36,15 @@ export const Packages = () => {
             accounts: [] as string[],
         },
         onSubmit: async (data) => {
-            console.log('submit was called');
             await setAccountSources(
                 zAccount.array().parse(data.value.accounts),
             );
         },
     });
 
-    console.log(sources, 'are the configured sources for', currentUser)
-
     const onReset = () => {
         form.reset();
-    }
+    };
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
@@ -105,8 +102,10 @@ export const Packages = () => {
                                                                                     variant={
                                                                                         "outline"
                                                                                     }
-                                                                                    onClick={(e) => {
-                                                                                        e.preventDefault()
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) => {
+                                                                                        e.preventDefault();
                                                                                         field.removeValue(
                                                                                             i,
                                                                                         );
@@ -129,7 +128,7 @@ export const Packages = () => {
                                             <Button
                                                 variant="outline"
                                                 onClick={(e) => {
-                                                    e.preventDefault()
+                                                    e.preventDefault();
                                                     form.setFieldValue(
                                                         "accounts",
                                                         (accounts) => [
@@ -143,7 +142,9 @@ export const Packages = () => {
                                             </Button>
                                             <div className="flex gap-2">
                                                 <Button
-                                                    onClick={() => { onReset() }}
+                                                    onClick={() => {
+                                                        onReset();
+                                                    }}
                                                     variant="outline"
                                                     size="icon"
                                                 >
