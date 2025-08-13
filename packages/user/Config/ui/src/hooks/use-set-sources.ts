@@ -5,7 +5,7 @@ import QueryKey from "@/lib/queryKeys";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 export const useSetAccountSources = () =>
-    usePluginMutation(
+    usePluginMutation<[string[]]>(
         {
             service: "config",
             intf: "packaging",
@@ -18,7 +18,6 @@ export const useSetAccountSources = () =>
             isStagable: true,
             onSuccess: (_, status) => {
                 if (status.type == "executed") {
-                    console.log("invalidating queries");
                     queryClient.invalidateQueries({
                         queryKey: QueryKey.availablePackages(),
                     });

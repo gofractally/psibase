@@ -1,4 +1,4 @@
-import { RotateCcw, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
 
 import { useAppForm } from "@/components/forms/app-form";
@@ -8,7 +8,6 @@ import { useInstallPackages } from "@/hooks/use-install-packages";
 import { usePackages } from "@/hooks/use-packages";
 import { useSetAccountSources } from "@/hooks/use-set-sources";
 import { useSources } from "@/hooks/use-sources";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { zAccount } from "@/lib/zod/Account";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -18,7 +17,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
 
 export const Packages = () => {
@@ -28,23 +26,20 @@ export const Packages = () => {
     const { mutateAsync: installPackages, isPending } = useInstallPackages();
     const { mutateAsync: setAccountSources } = useSetAccountSources();
 
-    const { data: currentUser } = useCurrentUser();
-    const { data: sources } = useSources(currentUser);
+    const { data: sources } = useSources();
+    const [showModal, setShowModal] = useState(false);
 
     const form = useAppForm({
         defaultValues: {
-            accounts: [] as string[],
+            accounts:
+                sources?.map((source) => source.account!) || ([] as string[]),
         },
         onSubmit: async (data) => {
-            await setAccountSources(
+            await setAccountSources([
                 zAccount.array().parse(data.value.accounts),
-            );
+            ]);
         },
     });
-
-    const onReset = () => {
-        form.reset();
-    };
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
@@ -57,12 +52,20 @@ export const Packages = () => {
                         </p>
                     </div>
                     <div className="flex items-center">
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button variant="secondary">
-                                    Update sources
-                                </Button>
-                            </DialogTrigger>
+                        <Dialog
+                            open={showModal}
+                            onOpenChange={(showModal) => {
+                                if (!showModal) {
+                                    setShowModal(false);
+                                }
+                            }}
+                        >
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowModal(true)}
+                            >
+                                Update sources
+                            </Button>
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>Sources</DialogTitle>
@@ -141,15 +144,6 @@ export const Packages = () => {
                                                 New source
                                             </Button>
                                             <div className="flex gap-2">
-                                                <Button
-                                                    onClick={() => {
-                                                        onReset();
-                                                    }}
-                                                    variant="outline"
-                                                    size="icon"
-                                                >
-                                                    <RotateCcw />
-                                                </Button>
                                                 <form.AppForm>
                                                     <form.SubmitButton
                                                         labels={[

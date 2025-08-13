@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account, zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 const zPackageSource = z
     .object({
@@ -15,17 +15,15 @@ const zPackageSource = z
 
 export type PackageSource = z.infer<typeof zPackageSource>;
 
-export const useSources = (owner: string | null | undefined) =>
-    useQuery<PackageSource[], Error, Account>({
+export const useSources = () =>
+    useQuery<PackageSource[], Error>({
         queryKey: QueryKey.sources(),
-        enabled: !!owner,
         queryFn: async () => {
             const res = await supervisor.functionCall({
                 service: "packages",
-                plugin: "plugin",
                 intf: "queries",
                 method: "getSources",
-                params: [owner],
+                params: ["root"],
             });
 
             return zPackageSource.array().parse(res);
