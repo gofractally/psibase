@@ -1,4 +1,5 @@
 #include <services/local/XRun.hpp>
+#include <services/local/XTransact.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
@@ -26,64 +27,6 @@ namespace
 
    void cancelSpeculative(const std::optional<std::uint64_t>& id);
    void forwardTransaction(const SignedTransaction& trx);
-
-   void initPreverifyTransaction()
-   {
-      auto key      = notifyKey(NotifyType::preverifyTransaction);
-      auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key);
-      if (!existing)
-         existing = NotifyRow{NotifyType::nextTransaction};
-      if (!std::ranges::any_of(existing->actions,
-                               [](const auto& act) { return act.service == RTransact::service; }))
-      {
-         existing->actions.push_back(
-             {.service = RTransact::service, .method = MethodNumber{"preverify"}});
-         kvPut(DbId::nativeSubjective, key, *existing);
-      }
-   }
-
-   // Tell native that a transaction is ready.
-   // Must be run inside a subjective transaction.
-   void setTransactionReady()
-   {
-      auto key = notifyKey(NotifyType::nextTransaction);
-      if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
-      {
-         if (!std::ranges::any_of(existing->actions, [](const auto& act)
-                                  { return act.service == RTransact::service; }))
-         {
-            existing->actions.push_back(
-                {.service = RTransact::service, .method = MethodNumber{"next"}});
-            kvPut(DbId::nativeSubjective, key, *existing);
-         }
-      }
-      else
-      {
-         kvPut(DbId::nativeSubjective, key,
-               NotifyRow{NotifyType::nextTransaction,
-                         {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
-      }
-   }
-
-   // Tell native that there are no transactions ready
-   // Must be run inside a subjective transaction.
-   void clearTransactionReady()
-   {
-      auto key = notifyKey(NotifyType::nextTransaction);
-      if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
-      {
-         std::erase_if(existing->actions,
-                       [](const auto& act) { return act.service == RTransact::service; });
-         if (existing->actions.empty())
-         {
-            kvRemove(DbId::nativeSubjective, key);
-         }
-         else
-         {
-            kvPut(DbId::nativeSubjective, key, *existing);
-         }
-      }
-   }
 
    // Flushes the transaction queue and schedules all the
    // transactions in it to have their signatures verified again.
@@ -154,7 +97,8 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       unapplied.put({nextSequence});
       if (!result)
       {
-         clearTransactionReady();
+         to<XTransact>().removeCallback(TransactionCallbackType::nextTransaction,
+                                        MethodNumber{"next"});
       }
    }
    return result;
@@ -331,8 +275,9 @@ namespace
                    .speculative = speculative});
 
       // Tell native that we have a transaction
-      setTransactionReady();
-      initPreverifyTransaction();
+      to<XTransact>().addCallback(TransactionCallbackType::nextTransaction, MethodNumber{"next"});
+      to<XTransact>().addCallback(TransactionCallbackType::preverifyTransaction,
+                                  MethodNumber{"preverify"});
    }
 
    // Checks whether the set of verify services has changed
