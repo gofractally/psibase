@@ -4,7 +4,7 @@
 #include <psibase/Service.hpp>
 #include <services/system/SetCode.hpp>
 
-namespace UserService
+namespace LocalService
 {
    using SystemService::CodeRefCountRow;
    using SystemService::CodeRefCountTable;
@@ -43,4 +43,4 @@ namespace UserService
    };
    PSIO_REFLECT(XAdmin, method(isAdmin, account), method(serveSys, req))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective)
-}  // namespace UserService
+}  // namespace LocalService

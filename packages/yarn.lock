@@ -192,10 +192,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.3.1, @babel/runtime@npm:^7.5.5, @babel/runtime@npm:^7.8.3, @babel/runtime@npm:^7.8.7":
+"@babel/runtime@npm:^7.3.1, @babel/runtime@npm:^7.8.3":
   version: 7.27.6
   resolution: "@babel/runtime@npm:7.27.6"
   checksum: 10c0/89726be83f356f511dcdb74d3ea4d873a5f0cf0017d4530cb53aa27380c01ca102d573eff8b8b77815e624b1f8c24e7f0311834ad4fb632c90a770fda00bd4c8
+  languageName: node
+  linkType: hard
+
+"@babel/runtime@npm:^7.5.5, @babel/runtime@npm:^7.8.7":
+  version: 7.28.3
+  resolution: "@babel/runtime@npm:7.28.3"
+  checksum: 10c0/b360f82c2c5114f2a062d4d143d7b4ec690094764853937110585a9497977aed66c102166d0e404766c274e02a50ffb8f6d77fef7251ecf3f607f0e03e6397bc
   languageName: node
   linkType: hard
 
@@ -1884,9 +1891,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@psibase/xadmin-ui@workspace:user/XAdmin/ui":
+"@psibase/xadmin-ui@workspace:local/XAdmin/ui":
   version: 0.0.0-use.local
-  resolution: "@psibase/xadmin-ui@workspace:user/XAdmin/ui"
+  resolution: "@psibase/xadmin-ui@workspace:local/XAdmin/ui"
   dependencies:
     "@bytecodealliance/jco": "npm:1.10.2"
     "@bytecodealliance/preview2-shim": "npm:^0.17.2"
@@ -1927,6 +1934,13 @@ __metadata:
   version: 1.1.2
   resolution: "@radix-ui/primitive@npm:1.1.2"
   checksum: 10c0/5e2d2528d2fe37c16865e77b0beaac2b415a817ad13d8178db6e8187b2a092672568a64ee0041510abfde3034490a5cadd3057049bb15789020c06892047597c
+  languageName: node
+  linkType: hard
+
+"@radix-ui/primitive@npm:1.1.3":
+  version: 1.1.3
+  resolution: "@radix-ui/primitive@npm:1.1.3"
+  checksum: 10c0/88860165ee7066fa2c179f32ffcd3ee6d527d9dcdc0e8be85e9cb0e2c84834be8e3c1a976c74ba44b193f709544e12f54455d892b28e32f0708d89deda6b9f1d
   languageName: node
   linkType: hard
 
@@ -2191,6 +2205,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@radix-ui/react-dismissable-layer@npm:1.1.11":
+  version: 1.1.11
+  resolution: "@radix-ui/react-dismissable-layer@npm:1.1.11"
+  dependencies:
+    "@radix-ui/primitive": "npm:1.1.3"
+    "@radix-ui/react-compose-refs": "npm:1.1.2"
+    "@radix-ui/react-primitive": "npm:2.1.3"
+    "@radix-ui/react-use-callback-ref": "npm:1.1.1"
+    "@radix-ui/react-use-escape-keydown": "npm:1.1.1"
+  peerDependencies:
+    "@types/react": "*"
+    "@types/react-dom": "*"
+    react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+    "@types/react-dom":
+      optional: true
+  checksum: 10c0/c825572a64073c4d3853702029979f6658770ffd6a98eabc4984e1dee1b226b4078a2a4dc7003f96475b438985e9b21a58e75f51db74dd06848dcae1f2d395dc
+  languageName: node
+  linkType: hard
+
 "@radix-ui/react-dropdown-menu@npm:^2.1.15":
   version: 2.1.15
   resolution: "@radix-ui/react-dropdown-menu@npm:2.1.15"
@@ -2418,6 +2455,26 @@ __metadata:
     "@types/react-dom":
       optional: true
   checksum: 10c0/8202647139d6f5097b0abcc43dfba471c00b69da95ca336afe3ea23a165e05ca21992f40fc801760fe442f3e064e54e2f2cbcb9ad758c4b07ef6c69a5b6777bd
+  languageName: node
+  linkType: hard
+
+"@radix-ui/react-presence@npm:1.1.5":
+  version: 1.1.5
+  resolution: "@radix-ui/react-presence@npm:1.1.5"
+  dependencies:
+    "@radix-ui/react-compose-refs": "npm:1.1.2"
+    "@radix-ui/react-use-layout-effect": "npm:1.1.1"
+  peerDependencies:
+    "@types/react": "*"
+    "@types/react-dom": "*"
+    react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+    "@types/react-dom":
+      optional: true
+  checksum: 10c0/d0e61d314250eeaef5369983cb790701d667f51734bafd98cf759072755562018052c594e6cdc5389789f4543cb0a4d98f03ff4e8f37338d6b5bf51a1700c1d1
   languageName: node
   linkType: hard
 
@@ -2667,16 +2724,16 @@ __metadata:
   linkType: hard
 
 "@radix-ui/react-toast@npm:^1.2.1":
-  version: 1.2.14
-  resolution: "@radix-ui/react-toast@npm:1.2.14"
+  version: 1.2.15
+  resolution: "@radix-ui/react-toast@npm:1.2.15"
   dependencies:
-    "@radix-ui/primitive": "npm:1.1.2"
+    "@radix-ui/primitive": "npm:1.1.3"
     "@radix-ui/react-collection": "npm:1.1.7"
     "@radix-ui/react-compose-refs": "npm:1.1.2"
     "@radix-ui/react-context": "npm:1.1.2"
-    "@radix-ui/react-dismissable-layer": "npm:1.1.10"
+    "@radix-ui/react-dismissable-layer": "npm:1.1.11"
     "@radix-ui/react-portal": "npm:1.1.9"
-    "@radix-ui/react-presence": "npm:1.1.4"
+    "@radix-ui/react-presence": "npm:1.1.5"
     "@radix-ui/react-primitive": "npm:2.1.3"
     "@radix-ui/react-use-callback-ref": "npm:1.1.1"
     "@radix-ui/react-use-controllable-state": "npm:1.2.2"
@@ -2692,7 +2749,7 @@ __metadata:
       optional: true
     "@types/react-dom":
       optional: true
-  checksum: 10c0/1a4abdad597d3797fd3b031000e89a5f404c8c6112c83a6dca778b11f0f1dbfab7e0ff9d578e41e39adbb51151bf4833596bb2dda3acea563a495602110afc98
+  checksum: 10c0/e7050d356719f438e087e8033e47a8854fba001cf71eb4e0c0203d53a4fbbd35aca9f17f73abe4dadc406d2d85badf4e37065865d07835763d0e3cb9d95a518d
   languageName: node
   linkType: hard
 
@@ -12627,9 +12684,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"wasm-transpiled@workspace:user/XAdmin/ui/wasm":
+"wasm-transpiled@workspace:local/XAdmin/ui/wasm":
   version: 0.0.0-use.local
-  resolution: "wasm-transpiled@workspace:user/XAdmin/ui/wasm"
+  resolution: "wasm-transpiled@workspace:local/XAdmin/ui/wasm"
   languageName: unknown
   linkType: soft
 
