@@ -299,6 +299,7 @@ function(psinode_files target pfx)
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm ${pfx}/share/psibase/services/x-http.wasm
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm ${pfx}/share/psibase/services/x-transact.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
@@ -314,6 +315,7 @@ psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 include(GNUInstallDirs)
 install(DIRECTORY packages/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-admin.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-http.wasm)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-run.wasm)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-transact.wasm)
 install(DIRECTORY packages/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
@@ -669,7 +671,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/HttpServer-schema.json
         SERVER rhttp-server
-        FLAGS allowSocket allowWriteSubjective
+        FLAGS allowWriteSubjective
     SERVICE rhttp-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer-schema.json

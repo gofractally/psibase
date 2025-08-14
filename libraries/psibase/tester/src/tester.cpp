@@ -164,6 +164,7 @@ psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub)
 {
    if (pub && numPublicChains++ == 0)
       psibase::tester::raw::selectedChain = id;
+   loadLocalServices();
 }
 
 psibase::TestChain::TestChain(const TestChain& other, bool pub) : TestChain{other.id, true, pub}
@@ -210,15 +211,15 @@ psibase::TestChain::~TestChain()
 
 void psibase::TestChain::loadLocalServices()
 {
+   auto prefix = psio::convert_to_key(codePrefix());
+   if (kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
+      return;
    auto serviceRoot = std::getenv("PSIBASE_DATADIR");
    check(serviceRoot != nullptr, "Cannot find local service directory");
    auto servicesDir = std::string{serviceRoot} + "/services";
-   auto prefix      = psio::convert_to_key(codePrefix());
-   if (kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
-      abortMessage("local services already loaded");
    psibase::tester::raw::checkoutSubjective(id);
-   for (auto account :
-        {AccountNumber{"x-admin"}, AccountNumber{"x-run"}, AccountNumber{"x-transact"}})
+   for (auto account : {AccountNumber{"x-admin"}, AccountNumber{"x-http"}, AccountNumber{"x-run"},
+                        AccountNumber{"x-transact"}})
    {
       auto code = readWholeFile(servicesDir + "/" + account.str() + ".wasm");
 

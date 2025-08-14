@@ -41,6 +41,6 @@ namespace UserService
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
    };
-   PSIO_REFLECT(XAdmin, method(isAdmin, account))
+   PSIO_REFLECT(XAdmin, method(isAdmin, account), method(serveSys, req))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective)
 }  // namespace UserService
