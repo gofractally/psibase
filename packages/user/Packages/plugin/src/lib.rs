@@ -432,9 +432,11 @@ impl PrivateApi for PackagesPlugin {
             compression_level.into(),
         )?;
 
-        trx_builder
-            .push(PackagesService::Wrapper::pack_from(sender).removeOrder(id.clone()))
-            .unwrap();
+        if trx_builder.num_transactions() != 0 {
+            trx_builder
+                .push(PackagesService::Wrapper::pack_from(sender).removeOrder(id.clone()))
+                .unwrap();
+        }
 
         let mut upload_transactions = Vec::new();
         for (_label, group, _carry) in upload_builder.finish().unwrap() {
