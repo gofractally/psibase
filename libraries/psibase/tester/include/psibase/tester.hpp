@@ -264,6 +264,11 @@ namespace psibase
       TestChain& operator=(const TestChain&) = delete;
 
       /**
+       * Loads local services into the subjective database
+       */
+      void loadLocalServices();
+
+      /**
        * Boots the chain.
        */
       void boot(const std::vector<std::string>& names, bool installUI);

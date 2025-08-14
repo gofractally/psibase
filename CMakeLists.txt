@@ -299,6 +299,7 @@ function(psinode_files target pfx)
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
