@@ -15,6 +15,14 @@ impl Decimal {
             precision,
         }
     }
+
+    pub fn precision(&self) -> Precision {
+        self.precision
+    }
+
+    pub fn quantity(&self) -> Quantity {
+        self.quantity
+    }
 }
 
 impl std::fmt::Display for Decimal {

@@ -1,12 +1,14 @@
 #[psibase::service_tables]
 pub mod tables {
+    use std::str::FromStr;
     use std::u64;
 
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::tokens::Memo;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
-        ToSchema,
+        abort_message, check_some, get_service, services, AccountNumber, Fracpack, Table,
+        TimePointSec, ToSchema,
     };
 
     use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
@@ -16,6 +18,8 @@ pub mod tables {
     use crate::helpers::parse_rank_to_accounts;
     use crate::scoring::{calculate_ema_u32, Fraction};
 
+    const ONE_MILLION: u64 = 1_000_000;
+
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
@@ -24,6 +28,7 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
+        pub token_id: u32,
     }
 
     impl Fractal {
@@ -34,12 +39,15 @@ pub mod tables {
 
         fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
+            let max_supply = services::tokens::Decimal::from_str("21000000.0000").unwrap();
 
             Self {
                 account,
                 created_at: now,
                 mission,
                 name,
+                token_id: services::tokens::Wrapper::call()
+                    .create(max_supply.precision(), max_supply.quantity()),
             }
         }
 
@@ -128,15 +136,16 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
+
+        pub locked_balance: u64,
+        pub locked_start_time: psibase::TimePointSec,
+        pub locked_wait_seconds: u32,
     }
 
     #[ComplexObject]
     impl Member {
         pub async fn fractal_details(&self) -> Fractal {
-            FractalTable::with_service(crate::Wrapper::SERVICE)
-                .get_index_pk()
-                .get(&self.fractal)
-                .unwrap()
+            self.fractal_instance()
         }
     }
 
@@ -158,7 +167,79 @@ pub mod tables {
                 fractal,
                 created_at: now,
                 member_status: status as StatusU8,
+                locked_balance: 0,
+                locked_start_time: now,
+                locked_wait_seconds: 0,
             }
+        }
+
+        pub fn fractal_instance(&self) -> Fractal {
+            FractalTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.fractal)
+                .unwrap()
+        }
+
+        pub fn deposit(&mut self, amount: u64, lock_seconds: u32) {
+            psibase::check(amount > 0, "deposit must be greater than 0");
+
+            let now = TransactSvc::call().currentBlock().time.seconds();
+            if self.locked_balance == 0 {
+                self.locked_start_time = now;
+                self.locked_wait_seconds = lock_seconds;
+                self.locked_balance = amount;
+            } else if self.locked_start_time == now && self.locked_wait_seconds == lock_seconds {
+                self.locked_balance += amount;
+            } else {
+                self.withdraw();
+
+                let original_balance = self.locked_balance;
+                let original_lock_seconds = self.locked_wait_seconds;
+                let new_balance = original_balance.saturating_add(amount);
+
+                let original_weight =
+                    (original_balance as u128 * ONE_MILLION as u128 / new_balance as u128) as u64;
+                let new_weight = ONE_MILLION - original_weight;
+
+                let original_seconds_adjusted = (original_lock_seconds as u128
+                    * original_weight as u128
+                    / ONE_MILLION as u128) as u32;
+
+                let lock_seconds_adjusted =
+                    (lock_seconds as u128 + new_weight as u128 / ONE_MILLION as u128) as u32;
+
+                self.locked_balance = new_balance;
+                self.locked_wait_seconds = original_seconds_adjusted + lock_seconds_adjusted;
+            }
+        }
+
+        pub fn withdraw(&mut self) {
+            if self.locked_balance == 0 {
+                return;
+            }
+            let now = TransactSvc::call().currentBlock().time.seconds();
+
+            let elapsed = now.seconds as u64 - self.locked_start_time.seconds as u64;
+            let ppm_progressed =
+                ((elapsed * ONE_MILLION) / self.locked_wait_seconds as u64).max(ONE_MILLION) as u64;
+
+            let withdrawable_amount = (ppm_progressed * self.locked_balance) / ONE_MILLION;
+
+            psibase::services::tokens::Wrapper::call().mint(
+                self.fractal_instance().token_id,
+                withdrawable_amount.into(),
+                Memo::from_str("Fractal reward").unwrap(),
+            );
+            psibase::services::tokens::Wrapper::call().credit(
+                self.fractal_instance().token_id,
+                self.account,
+                withdrawable_amount.into(),
+                Memo::from_str("Fractal withdrawal").unwrap(),
+            );
+
+            self.locked_balance -= withdrawable_amount;
+            self.locked_wait_seconds = self.locked_wait_seconds - elapsed as u32;
+            self.locked_start_time = now;
         }
 
         pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
@@ -498,6 +579,8 @@ pub mod tables {
 
         pub fn save_pending_score(&mut self) {
             self.pending.take().map(|pending_score| {
+                Member::get_assert(self.fractal, self.account)
+                    .deposit(pending_score.into(), 86400 * 7 * 3);
                 self.value = calculate_ema_u32(pending_score, self.value, Fraction::new(1, 6));
                 self.save();
             });

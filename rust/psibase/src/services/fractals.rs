@@ -33,6 +33,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Withdraws the fractal members locked balance depending on it's progression
+    /// 
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal
+    #[action]
+    fn withdraw(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
     /// Sets the schedule for an evaluation type within a fractal.
     ///
     /// # Arguments
