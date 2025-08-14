@@ -46,6 +46,7 @@ impl Admin for AccountsPlugin {
 
         if HostAuth::set_logged_in_user(&user, &app).is_err() {
             AppsTable::new(&app).logout();
+            UserTable::new(&user).remove_connected_app(&app);
         }
 
         // Logging out to reverse accounts login above
