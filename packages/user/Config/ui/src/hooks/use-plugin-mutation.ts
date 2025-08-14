@@ -45,7 +45,7 @@ export const usePluginMutation = <T>(
             return res;
         },
         mutationFn: async (paramsArray) => {
-            await supervisor.functionCall({
+            return supervisor.functionCall({
                 service,
                 intf,
                 method,

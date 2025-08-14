@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Package, X } from "lucide-react";
 import { useState } from "react";
 
 import { useAppForm } from "@/components/forms/app-form";
@@ -22,12 +22,31 @@ import {
 export const Packages = () => {
     const { data, isLoading } = usePackages();
 
-    const [selectedId, setSelectedId] = useState("");
     const { mutateAsync: installPackages, isPending } = useInstallPackages();
     const { mutateAsync: setAccountSources } = useSetAccountSources();
 
     const { data: sources } = useSources();
     const [showModal, setShowModal] = useState(false);
+
+    const [selectedIds, setSelectedIds] = useState<{ [key: string]: boolean }>(
+        {},
+    );
+
+    const selectedPackageNames = Object.entries(selectedIds)
+        .filter((pack) => pack[1])
+        .map(([name]) => name);
+
+    const onSelect = (id: string) => {
+        setSelectedIds((current) => ({
+            ...current,
+            [id]: !current[id],
+        }));
+    };
+
+    const onInstall = async () => {
+        await installPackages(selectedPackageNames);
+        setSelectedIds({});
+    };
 
     const form = useAppForm({
         defaultValues: {
@@ -38,6 +57,7 @@ export const Packages = () => {
             await setAccountSources([
                 zAccount.array().parse(data.value.accounts),
             ]);
+            setSelectedIds({});
         },
     });
 
@@ -60,12 +80,25 @@ export const Packages = () => {
                                 }
                             }}
                         >
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowModal(true)}
-                            >
-                                Update sources
-                            </Button>
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setShowModal(true)}
+                                >
+                                    <Package />
+                                </Button>
+                                <Button
+                                    onClick={() => onInstall()}
+                                    disabled={
+                                        isPending ||
+                                        selectedPackageNames.length == 0
+                                    }
+                                >
+                                    Install {selectedPackageNames.length}{" "}
+                                    packages
+                                </Button>
+                            </div>
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>Sources</DialogTitle>
@@ -160,19 +193,21 @@ export const Packages = () => {
                         </Dialog>
                     </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                    {data.map((pack) => (
-                        <PackageItem
-                            pack={pack}
-                            onClick={(id) => {
-                                installPackages([id]);
-                                setSelectedId(id);
-                            }}
-                            key={pack.id}
-                            isLoading={isLoading && selectedId == pack.id}
-                            isMutating={isPending && selectedId == pack.id}
-                        />
-                    ))}
+                <div>
+                    <div className="flex flex-col gap-2">
+                        {data.map((pack) => (
+                            <PackageItem
+                                pack={pack}
+                                isSelected={selectedIds[pack.id]}
+                                onClick={(id) => {
+                                    onSelect(id);
+                                }}
+                                key={pack.id}
+                                isLoading={isLoading && selectedIds[pack.id]}
+                                isMutating={isPending && selectedIds[pack.id]}
+                            />
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

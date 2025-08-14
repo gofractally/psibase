@@ -7,15 +7,18 @@ import {
 
 import { ProcessedPackage } from "@/lib/zod/CommonPackage";
 
-import { Button } from "@shared/shadcn/ui/button";
+import { cn } from "@shared/lib/utils";
+import { Checkbox } from "@shared/shadcn/ui/checkbox";
 
 export const PackageItem = ({
     pack,
+    isSelected,
     isMutating,
     isLoading,
     onClick,
 }: {
     pack: ProcessedPackage;
+    isSelected: boolean;
     isMutating: boolean;
     isLoading: boolean;
     onClick: (id: string) => void;
@@ -45,8 +48,6 @@ export const PackageItem = ({
         isMutating ||
         pack.status === "UpToDate" ||
         pack.status === "InstalledButNotAvailable";
-    const buttonVariant =
-        pack.status === "RollBackAvailable" ? "destructive" : "secondary";
 
     const description =
         pack.status === "Available"
@@ -69,28 +70,36 @@ export const PackageItem = ({
                     {description}
                 </div>
             </div>
-            <div className=" flex items-center justify-between gap-3">
-                <div>{version}</div>
-                <Button
+            <div
+                className={cn("flex items-center justify-between gap-3", {
+                    "text-muted-foreground": pack.status == "UpToDate",
+                })}
+            >
+                <div className="text-sm">{version}</div>
+                <button
+                    type="button"
+                    className={cn(
+                        "flex items-center gap-2 rounded-sm border px-3 py-2",
+                        { "bg-muted": isSelected },
+                    )}
                     onClick={() => {
                         onClick(pack.id);
                     }}
-                    variant={buttonVariant}
-                    size="sm"
                     disabled={isDisabled}
                 >
+                    {!isDisabled && <Checkbox checked={isSelected} />}
                     {pack.status === "Available" ||
                     pack.status === "UpdateAvailable" ? (
-                        <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                        <ArrowUpFromLine className=" h-4 w-4" />
                     ) : pack.status === "RollBackAvailable" ? (
-                        <ArrowDownFromLine className="mr-2 h-4 w-4" />
+                        <ArrowDownFromLine className=" h-4 w-4" />
                     ) : pack.status === "InstalledButNotAvailable" ? (
-                        <LucideShieldQuestion className="mr-2 h-4 w-4" />
+                        <LucideShieldQuestion className=" h-4 w-4" />
                     ) : (
-                        <CircleCheck className="mr-2 h-4 w-4" />
+                        <CircleCheck className=" h-4 w-4" />
                     )}
                     {buttonLabel}
-                </Button>
+                </button>
             </div>
         </div>
     );
