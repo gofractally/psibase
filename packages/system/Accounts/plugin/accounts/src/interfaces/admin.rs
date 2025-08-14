@@ -16,7 +16,6 @@ use crate::helpers::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn get_assert_caller_admin(context: &str) -> String {
-    // TODO: this unwrap() on a failed check panics. useful debugging info does make it into the console but as a panic.
     let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
     assert!(
         caller == Client::get_receiver() || caller == "x-admin",

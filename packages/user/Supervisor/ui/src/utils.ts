@@ -65,7 +65,7 @@ export const parser = (): Promise<any> => {
     return modulePromise;
 };
 
-export let queryToken: string | undefined;
+let queryToken: string | undefined;
 export const setQueryToken = (token: string) =>
     queryToken = token;
 
