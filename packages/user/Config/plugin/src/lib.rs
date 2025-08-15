@@ -3,6 +3,7 @@ mod bindings;
 use bindings::*;
 
 use exports::config::plugin::branding::Guest as Branding;
+use exports::config::plugin::packaging::Guest as Packaging;
 use exports::config::plugin::producers::Guest as Producers;
 
 use host::common::types::Error;
@@ -44,6 +45,16 @@ impl Branding for ConfigPlugin {
         set_propose_latch(Some("branding"))?;
 
         branding::plugin::api::set_network_name(&name);
+        Ok(())
+    }
+}
+
+impl Packaging for ConfigPlugin {
+    fn set_account_sources(accounts: Vec<String>) -> Result<(), Error> {
+        set_propose_latch(Some("root"))?;
+
+        let _ = packages::plugin::private_api::set_account_sources(&accounts);
+
         Ok(())
     }
 }

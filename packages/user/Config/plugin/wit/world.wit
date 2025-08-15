@@ -2,16 +2,20 @@ package config:plugin;
 
 interface branding {
     use host:common/types.{error};
-    use sites:plugin/types.{file};
     use producers:plugin/types.{producer};
 
     upload-network-logo: func(logo: list<u8>) -> result<_, error>;
     set-network-name: func(name: string) -> result<_, error>;
 }
 
+interface packaging  {
+    use host:common/types.{error};
+    
+    set-account-sources: func(accounts: list<string>) -> result<_, error>;
+}
+
 interface producers {
     use host:common/types.{error};
-    use sites:plugin/types.{file};
     use producers:plugin/types.{producer};
 
     /// Set the producers for CFT consensus.
@@ -30,4 +34,5 @@ interface producers {
 world imports {
     import producers;
     import branding;
+    import packaging;
 }
