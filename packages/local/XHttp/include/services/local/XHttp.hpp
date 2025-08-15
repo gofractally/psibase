@@ -24,7 +24,7 @@ namespace LocalService
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void autoClose(std::int32_t socket, bool value);
 
-      /// Sends an HTTP response. The socket have autoClose enabled.
+      /// Sends an HTTP response. The socket must have autoClose enabled.
       void sendReply(std::int32_t socket, const psibase::HttpReply& response);
    };
    PSIO_REFLECT(XHttp,
