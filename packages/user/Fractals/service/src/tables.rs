@@ -18,7 +18,7 @@ pub mod tables {
     use crate::helpers::parse_rank_to_accounts;
     use crate::scoring::{calculate_ema_u32, Fraction};
 
-    const ONE_MILLION: u64 = 1_000_000;
+    const SCALE: u128 = 10_000_000;
 
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -29,6 +29,8 @@ pub mod tables {
         pub name: String,
         pub mission: String,
         pub token_id: u32,
+
+        pub decay_rate_per_second: u32,
     }
 
     impl Fractal {
@@ -48,6 +50,8 @@ pub mod tables {
                 name,
                 token_id: services::tokens::Wrapper::call()
                     .create(max_supply.precision(), max_supply.quantity()),
+                // TODO: Figure out the default;
+                decay_rate_per_second: 1000,
             }
         }
 
@@ -136,10 +140,6 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
-
-        pub locked_balance: u64,
-        pub locked_start_time: psibase::TimePointSec,
-        pub locked_wait_seconds: u32,
     }
 
     #[ComplexObject]
@@ -167,9 +167,6 @@ pub mod tables {
                 fractal,
                 created_at: now,
                 member_status: status as StatusU8,
-                locked_balance: 0,
-                locked_start_time: now,
-                locked_wait_seconds: 0,
             }
         }
 
@@ -178,68 +175,6 @@ pub mod tables {
                 .get_index_pk()
                 .get(&self.fractal)
                 .unwrap()
-        }
-
-        pub fn deposit(&mut self, amount: u64, lock_seconds: u32) {
-            psibase::check(amount > 0, "deposit must be greater than 0");
-
-            let now = TransactSvc::call().currentBlock().time.seconds();
-            if self.locked_balance == 0 {
-                self.locked_start_time = now;
-                self.locked_wait_seconds = lock_seconds;
-                self.locked_balance = amount;
-            } else if self.locked_start_time == now && self.locked_wait_seconds == lock_seconds {
-                self.locked_balance += amount;
-            } else {
-                self.withdraw();
-
-                let original_balance = self.locked_balance;
-                let original_lock_seconds = self.locked_wait_seconds;
-                let new_balance = original_balance.saturating_add(amount);
-
-                let original_weight =
-                    (original_balance as u128 * ONE_MILLION as u128 / new_balance as u128) as u64;
-                let new_weight = ONE_MILLION - original_weight;
-
-                let original_seconds_adjusted = (original_lock_seconds as u128
-                    * original_weight as u128
-                    / ONE_MILLION as u128) as u32;
-
-                let lock_seconds_adjusted =
-                    (lock_seconds as u128 + new_weight as u128 / ONE_MILLION as u128) as u32;
-
-                self.locked_balance = new_balance;
-                self.locked_wait_seconds = original_seconds_adjusted + lock_seconds_adjusted;
-            }
-        }
-
-        pub fn withdraw(&mut self) {
-            if self.locked_balance == 0 {
-                return;
-            }
-            let now = TransactSvc::call().currentBlock().time.seconds();
-
-            let elapsed = now.seconds as u64 - self.locked_start_time.seconds as u64;
-            let ppm_progressed =
-                ((elapsed * ONE_MILLION) / self.locked_wait_seconds as u64).max(ONE_MILLION) as u64;
-
-            let withdrawable_amount = (ppm_progressed * self.locked_balance) / ONE_MILLION;
-
-            psibase::services::tokens::Wrapper::call().mint(
-                self.fractal_instance().token_id,
-                withdrawable_amount.into(),
-                Memo::from_str("Fractal reward").unwrap(),
-            );
-            psibase::services::tokens::Wrapper::call().credit(
-                self.fractal_instance().token_id,
-                self.account,
-                withdrawable_amount.into(),
-                Memo::from_str("Fractal withdrawal").unwrap(),
-            );
-
-            self.locked_balance -= withdrawable_amount;
-            self.locked_wait_seconds = self.locked_wait_seconds - elapsed as u32;
-            self.locked_start_time = now;
         }
 
         pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
@@ -590,5 +525,42 @@ pub mod tables {
             let table = ScoreTable::new();
             table.put(&self).expect("failed to save score");
         }
+    }
+
+    #[table(name = "BucketTable", index = 4)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct Bucket {
+        pub fractal: AccountNumber,
+        pub account: AccountNumber,
+        pub total_deposited: u64,
+        pub total_claimed: u64,
+        pub vesting_at_deposit: u64,
+        pub last_deposit_timestamp: u64,
+    }
+
+    impl Bucket {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
+        }
+
+
+        // The amount that has yet to fully vest. Continuously decays 
+        fn balance_still_vesting(&self) -> u64 {
+            if self.vesting_at_deposit == 0 {
+                return 0;
+            }
+            let now = TransactSvc::call().currentBlock().time.seconds().seconds as u64;
+
+            let delta = now()
+        }
+
+        pub fn deposit(&mut self, amount: u64) {
+            psibase::check(amount > 0, "deposit must be greater than 0");
+
+            self.vesting_at_deposit = self.balance_still_vesting().saturating_add(amount);
+        }
+
+        pub fn claim(&mut self) {}
     }
 }
