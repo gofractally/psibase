@@ -1,3 +1,4 @@
+use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::*;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
@@ -29,6 +30,9 @@ impl ActiveApp for AccountsPlugin {
         }
 
         AppsTable::new(&app).login(&user);
+        if HostAuth::set_logged_in_user(&user, &app).is_err() {
+            AppsTable::new(&app).logout();
+        }
         Ok(())
     }
 
