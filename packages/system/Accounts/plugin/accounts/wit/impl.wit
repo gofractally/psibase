@@ -3,6 +3,7 @@ package accounts:plugin;
 /// This interface is only callable by the accounts app itself.
 interface admin {
     use accounts:account-tokens/types.{connection-token};
+    use host:common/types.{error};
 
     /// Logs the specified user into the specified app without any user interaction.
     /// This function is only callable by the accounts app itself.
@@ -19,6 +20,9 @@ interface admin {
 
     /// Gets a list of all accounts that are known by the accounts app on this device.
     get-all-accounts: func() -> list<string>;
+
+    /// Get a list of auth accounts
+    get-auth-services: func() -> result<list<string>, error>;
 }
 
 world impl {

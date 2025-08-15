@@ -33,7 +33,6 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
                 );
                 setCurrentUser(user || null);
             } catch (e) {
-                console.error("Error fetching current user:", e);
                 alert("Error fetching current user: " + e);
             }
         };

@@ -104,7 +104,10 @@ impl Server for HostCommon {
             if json["errors"].is_null() {
                 return Ok(body);
             } else {
-                return Err(make_error(&json["errors"].to_string()));
+                return Err(make_error(&format!(
+                    "Graphql query error: {}",
+                    &json["errors"].to_string()
+                )));
             }
         }
 
