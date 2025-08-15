@@ -15,7 +15,7 @@ namespace psibase
       for (const auto& account : accounts)
       {
          CodeRow row{.codeNum   = account.codeNum,
-                     .flags     = CodeRow::isAuthService,
+                     .flags     = CodeRow::isVerify,
                      .codeHash  = account.codeHash,
                      .vmType    = account.vmType,
                      .vmVersion = account.vmVersion};

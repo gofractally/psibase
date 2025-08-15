@@ -53,7 +53,7 @@ namespace SystemService
       static constexpr auto service = psibase::AccountNumber("setcode");
 
       /// Flags this service must run with
-      static constexpr uint64_t serviceFlags = psibase::CodeRow::allowWriteNative;
+      static constexpr uint64_t serviceFlags = psibase::CodeRow::isPrivileged;
 
       using Tables =
           psibase::ServiceTables<CodeRefCountTable, StagedCodeTable, VerifySequenceTable>;

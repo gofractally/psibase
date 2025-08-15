@@ -625,7 +625,7 @@ namespace psibase
          // look up the account
          if (auto row = db.kvGet<CodeRow>(CodeRow::db, codeKey(account)))
          {
-            if (row->flags & CodeRow::isAuthService)
+            if (row->flags & CodeRow::isVerify)
             {
                BlockHeaderAuthAccount item{.codeNum   = row->codeNum,
                                            .codeHash  = row->codeHash,

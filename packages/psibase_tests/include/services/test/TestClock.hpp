@@ -6,7 +6,7 @@
 struct TestClock : psibase::Service
 {
    static constexpr auto     service      = psibase::AccountNumber{"clock-service"};
-   static constexpr uint64_t serviceFlags = psibase::CodeRow::isSubjective;
+   static constexpr uint64_t serviceFlags = psibase::CodeRow::runModeRpc;
 
    void testReal();
    void testMono();

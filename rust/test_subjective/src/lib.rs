@@ -44,7 +44,10 @@ mod service {
 #[psibase::test_case(packages("TestSubjective"))]
 fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
     psibase::services::setcode::Wrapper::push(&chain)
-        .setFlags(SERVICE, 0b1100)
+        .setFlags(
+            SERVICE,
+            psibase::CodeRow::RUN_MODE_RPC | psibase::CodeRow::IS_PRIVILEGED,
+        )
         .get()?;
     assert_eq!(Wrapper::push(&chain).inc().get()?, 1);
     chain.start_block();

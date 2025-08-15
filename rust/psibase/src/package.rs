@@ -5,8 +5,8 @@ use crate::services::{
 use crate::{
     new_account_action, reg_server, schema_types, set_auth_service_action, set_code_action,
     set_key_action, solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey,
-    Checksum256, GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition,
-    PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
+    Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString, Pack,
+    PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -252,16 +252,10 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
     let mut result = 0;
     for flag in flags {
         result |= match flag.as_str() {
-            "allowSudo" => 1 << 0,
-            "allowWriteNative" => 1 << 1,
-            "isSubjective" => 1 << 2,
-            "allowWriteSubjective" => 1 << 3,
-            "canNotTimeOut" => 1 << 4,
-            "canSetTimeLimit" => 1 << 5,
-            "isAuthService" => 1 << 6,
-            "forceReplay" => 1 << 7,
-            "allowSocket" => 1 << 8,
-            "allowNativeSubjective" => 1 << 9,
+            "isPrivileged" => CodeRow::IS_PRIVILEGED,
+            "isVerify" => CodeRow::IS_VERIFY,
+            "runModeRpc" => CodeRow::RUN_MODE_CALLBACK,
+            "runModeCallback" => CodeRow::RUN_MODE_CALLBACK,
             _ => Err(Error::InvalidFlags)?,
         };
     }

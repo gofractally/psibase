@@ -47,7 +47,7 @@ namespace
       while (auto row = t.kvGreaterEqualRaw(CodeRow::db, key, prefixLen))
       {
          auto a = psio::from_frac<CodeRow>(*row);
-         if ((a.flags & CodeRow::isAuthService) &&
+         if ((a.flags & CodeRow::isVerify) &&
              t.kvGet<CodeByHashRow>(CodeByHashRow::db,
                                     codeByHashKey(a.codeHash, a.vmType, a.vmVersion)))
             result.push_back({a.codeNum, a.codeHash, a.vmType, a.vmVersion});
@@ -148,7 +148,7 @@ TEST_CASE("Verify service tracking")
    }
    SECTION("Set flag for service")
    {
-      passOrFail({setFlags(RemoveCode::service, CodeRow::isAuthService)});
+      passOrFail({setFlags(RemoveCode::service, CodeRow::isVerify)});
    }
    SECTION("Unset flag for service")
    {
@@ -208,14 +208,14 @@ TEST_CASE("No subjective verify")
       t.kvPut(DbId::nativeSubjective, codeByHash.key(), codeByHash);
       CodeRow code{
           .codeNum  = VerifySig::service,
-          .flags    = CodeRow::isAuthService,
+          .flags    = CodeRow::isVerify,
           .codeHash = codeHash,
       };
       t.kvPut(DbId::nativeSubjective, code.key(), code);
    }
    CHECK(t.from(SetCode::service)
              .to<SetCode>()
-             .setFlags(VerifySig::service, CodeRow::isSubjective | CodeRow::isAuthService)
+             .setFlags(VerifySig::service, CodeRow::runModeRpc | CodeRow::isVerify)
              .succeeded());
    t.startBlock();
    auto alice = t.addAccount("alice", aliceKeys.first);

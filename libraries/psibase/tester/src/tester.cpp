@@ -178,9 +178,8 @@ namespace
 
          auto    codeHash = sha256(code.data(), code.size());
          CodeRow codeRow{
-             .codeNum = account,
-             .flags   = CodeRow::allowWriteSubjective | CodeRow::allowSocket |
-                      CodeRow::allowNativeSubjective,
+             .codeNum  = account,
+             .flags    = CodeRow::isPrivileged,
              .codeHash = codeHash,
          };
          self.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);

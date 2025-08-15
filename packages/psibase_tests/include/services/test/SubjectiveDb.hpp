@@ -24,7 +24,7 @@ namespace TestService
       using Tables                  = psibase::SubjectiveTables<SubjectiveTable>;
       static constexpr auto service = psibase::AccountNumber{"subjective"};
       static constexpr auto serviceFlags =
-          psibase::CodeRow::isSubjective | psibase::CodeRow::allowWriteSubjective;
+          psibase::CodeRow::runModeRpc | psibase::CodeRow::isPrivileged;
       void                       write(std::string key, std::string value);
       std::optional<std::string> read(std::string key);
 
