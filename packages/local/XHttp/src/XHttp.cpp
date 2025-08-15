@@ -43,7 +43,9 @@ void XHttp::autoClose(std::int32_t socket, bool value)
       }
       else
       {
-         abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
+         if (auto row = to->get(socket); !row || row->owner != sender)
+            abortMessage(sender.str() + " cannot send a response on socket " +
+                         std::to_string(socket));
       }
       socketAutoClose(socket, value);
    }
