@@ -112,6 +112,10 @@ extern "C" {
         value: *const u8,
         value_len: u32,
     );
+
+    pub fn checkoutSubjective(chain_handle: u32);
+    pub fn commitSubjective(chain_handle: u32) -> bool;
+    pub fn abortSubjective(chain_handle: u32);
 }
 
 thread_local! {

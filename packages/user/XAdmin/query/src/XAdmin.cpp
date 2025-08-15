@@ -1,10 +1,12 @@
 #include <services/user/XAdmin.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 
 using namespace psibase;
+using namespace LocalService;
 using namespace UserService;
 using namespace SystemService;
 
@@ -93,6 +95,7 @@ namespace UserService
 
    std::optional<HttpReply> XAdmin::serveSys(HttpRequest req)
    {
+      check(getSender() == XHttp::service, "Wrong sender");
       auto target = req.path();
       if (target.starts_with("/services/"))
       {
@@ -330,22 +333,6 @@ namespace UserService
 }  // namespace UserService
 
 #ifndef PSIBASE_GENERATE_SCHEMA
-
-extern "C" [[clang::export_name("serve")]] void serve()
-{
-   auto act = getCurrentAction();
-
-   psibase::internal::receiver = XAdmin::service;
-   auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
-   UserService::XAdmin xadmin;
-   auto                reply = xadmin.serveSys(std::move(req));
-   if (!reply)
-   {
-      reply = HttpReply{
-          .status = HttpStatus::notFound, .contentType = "text/html", .body = toVec("not found")};
-   }
-   socketSend(sock, psio::to_frac(*reply));
-}
 
 extern "C" [[clang::export_name("checkAccess")]] void checkAccess()
 {

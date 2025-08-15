@@ -232,7 +232,7 @@ namespace psibase
       bool                              isAutoRun        = true;
       bool                              isPublicChain;
 
-      explicit TestChain(uint32_t chain_id, bool clone, bool pub = true);
+      explicit TestChain(uint32_t chain_id, bool clone, bool pub = true, bool init = true);
       void setSignature(BlockNum blockNum, std::vector<char> sig);
 
      public:
@@ -262,11 +262,6 @@ namespace psibase
       virtual ~TestChain();
 
       TestChain& operator=(const TestChain&) = delete;
-
-      /**
-       * Loads local services into the subjective database
-       */
-      void loadLocalServices();
 
       /**
        * Boots the chain.

@@ -135,7 +135,6 @@ TEST_CASE("Test login")
 TEST_CASE("Test push_transaction")
 {
    DefaultTestChain t;
-   t.loadLocalServices();
 
    auto httpPush = [&](const SignedTransaction& trx)
    {
@@ -424,7 +423,6 @@ TEST_CASE("Test push_transaction")
 TEST_CASE("Test firstAuth")
 {
    DefaultTestChain t;
-   t.loadLocalServices();
    t.setAutoBlockStart(false);
    t.startBlock();
    auto alice = t.addAccount("alice");
