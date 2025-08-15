@@ -284,6 +284,7 @@ add_rs_component_workspace(packages/:Plugins
     sites
     host-common
     host-prompt
+    host-types
     transact
     workshop
     config
@@ -418,6 +419,7 @@ psibase_package(
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
