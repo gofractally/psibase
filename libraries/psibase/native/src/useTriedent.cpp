@@ -929,7 +929,7 @@ namespace psibase
              auto found = session.get_greater_equal(impl->db(revision, db), key.string_view(),
                                                     &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
-                           memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
+                           (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
                 found = false;
 
              if (auto* changes = impl->getChangeSet(db))
@@ -956,7 +956,7 @@ namespace psibase
              auto found = session.get_less_than(impl->db(revision, db), key.string_view(),
                                                 &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
-                           memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
+                           (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
                 found = false;
 
              if (auto* changes = impl->getChangeSet(db))
