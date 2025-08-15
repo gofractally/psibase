@@ -8,7 +8,7 @@ use base64::{
 };
 use exports::base64::plugin::standard::Guest as Standard;
 use exports::base64::plugin::url::Guest as Url;
-use host::common::types::{Error, PluginId};
+use host::types::types::{Error, PluginId};
 
 struct Base64Plugin;
 

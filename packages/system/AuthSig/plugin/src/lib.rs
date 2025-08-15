@@ -11,7 +11,7 @@ use types::*;
 
 // Other plugins
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::host::common::types as CommonTypes;
+use bindings::host::types::types as CommonTypes;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces

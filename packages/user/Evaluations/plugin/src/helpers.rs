@@ -9,7 +9,7 @@ use bindings::host::common::client as Client;
 use ecies::{decrypt, encrypt};
 use psibase::{fracpack::Pack, AccountNumber};
 
-use crate::bindings::host::common::types::Error;
+use crate::bindings::host::types::types::Error;
 use crate::graphql::{fetch_and_decode, fetch_key_history, fetch_user_settings};
 
 pub fn parse_account_number(s: &str) -> Result<AccountNumber, Error> {

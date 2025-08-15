@@ -30,7 +30,7 @@ interface types {
 }
 
 interface api {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Attest to another Account's identity
     ///  @subject: the username being attested to
@@ -40,7 +40,7 @@ interface api {
 }
 
 interface queries {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{attestation-graph, identity-summary, identity-attestation};
 
     summary: func(subject: string) -> result<option<identity-summary>, error>;

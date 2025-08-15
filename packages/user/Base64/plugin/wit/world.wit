@@ -2,7 +2,7 @@ package base64:plugin;
 
 /// Uses the URL-safe base64 encoding scheme.
 interface url {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Encodes a list of bytes into a base64url string.
     encode: func(input: list<u8>) -> string;
@@ -13,7 +13,7 @@ interface url {
 
 /// Uses the standard base64 encoding scheme.
 interface standard {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Encodes a list of bytes into a standard base64 string.
     encode: func(input: list<u8>) -> string;

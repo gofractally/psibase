@@ -10,7 +10,7 @@ interface types {
 
 interface api {
     use types.{file};
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Upload a single file to Sites.
     /// 

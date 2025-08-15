@@ -63,7 +63,7 @@ interface types {
 }
 
 interface queries {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{meta, package-source};
     get-installed-packages: func() -> result<list<meta>, error>;
     get-sources: func(owner: string) -> result<list<package-source>, error>;

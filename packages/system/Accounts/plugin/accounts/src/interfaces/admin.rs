@@ -5,7 +5,7 @@ use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::admin as HostAdmin;
 use crate::bindings::host::common::client as Client;
-use crate::bindings::host::common::types::{BodyTypes, PostRequest};
+use crate::bindings::host::types::types::{BodyTypes, PostRequest};
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;

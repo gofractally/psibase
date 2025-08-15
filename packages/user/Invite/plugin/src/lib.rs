@@ -30,7 +30,8 @@ use exports::{
     transact_hook_actions_sender::Guest as HookActionsSender,
 };
 use hex;
-use host::common::{client as Client, server as Server, types as CommonTypes};
+use host::common::{client as Client, server as Server};
+use host::types::types as CommonTypes;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::{
     fracpack::Pack,

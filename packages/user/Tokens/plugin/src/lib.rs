@@ -8,7 +8,7 @@ use bindings::exports::tokens::plugin::queries::Guest as Queries;
 use bindings::exports::tokens::plugin::transfer::Guest as Transfer;
 use bindings::exports::tokens::plugin::types as Wit;
 
-use bindings::host::common::types::Error;
+use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;

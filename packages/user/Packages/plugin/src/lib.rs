@@ -7,7 +7,8 @@ use errors::ErrorType;
 
 use serde::{Deserialize, Serialize};
 
-use host::common::{client as Client, server as Server, types as CommonTypes};
+use host::common::{client as Client, server as Server};
+use host::types::types as CommonTypes;
 
 use accounts::plugin::api as Accounts;
 use setcode::plugin::api as SetCode;

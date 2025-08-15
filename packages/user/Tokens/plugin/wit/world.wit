@@ -26,7 +26,7 @@ interface types {
 }
 
 interface intf {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{precision, quantity, token-id, account-number};
     
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
@@ -45,13 +45,13 @@ interface intf {
 }
 
 interface queries {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{token-id, token-detail};
     token-owner: func(token-id: token-id) -> result<token-detail, error>;
 }
 
 interface transfer {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{token-id, account-number, quantity, balance, token-detail};
 
     uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;

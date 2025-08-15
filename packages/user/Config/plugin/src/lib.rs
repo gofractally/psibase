@@ -5,7 +5,7 @@ use bindings::*;
 use exports::config::plugin::branding::Guest as Branding;
 use exports::config::plugin::producers::Guest as Producers;
 
-use host::common::types::Error;
+use host::types::types::Error;
 
 use crate::bindings::exports::config::plugin::producers::Producer;
 use staged_tx::plugin::proposer::set_propose_latch;

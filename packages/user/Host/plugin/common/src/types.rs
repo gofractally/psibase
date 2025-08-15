@@ -1,5 +1,5 @@
 use crate::bindings::supervisor::bridge::types::{self as BridgeTypes, HttpRequest, HttpResponse};
-use crate::exports::host::common::types::{BodyTypes, Error, PluginId};
+use crate::bindings::host::types::types::{BodyTypes, Error, PluginId};
 use crate::supervisor::bridge::intf as Supervisor;
 
 impl From<BridgeTypes::PluginId> for PluginId {

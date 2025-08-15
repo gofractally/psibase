@@ -6,7 +6,7 @@ interface api {
 }
 
 interface queries {
-    use host:common/types.{error};
+    use host:types/types.{error};
     get-network-name: func() -> result<string, error>;
 }
 

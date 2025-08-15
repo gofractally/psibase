@@ -1,5 +1,6 @@
 use crate::bindings::auth_sig::plugin::types::Pem;
-use crate::bindings::host::common::{client as Client, server as Server, types as CommonTypes};
+use crate::bindings::host::common::{client as Client, server as Server};
+use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
 use crate::types::*;
 

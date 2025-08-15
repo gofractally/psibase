@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
-use bindings::host::common::types as CommonTypes;
+use bindings::host::types::types as CommonTypes;
 
 struct AuthAny;
 

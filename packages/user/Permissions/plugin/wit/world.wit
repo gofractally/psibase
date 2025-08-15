@@ -31,7 +31,7 @@ interface types {
 }
 
 interface api {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{trust-level, descriptions};
 
     /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller`

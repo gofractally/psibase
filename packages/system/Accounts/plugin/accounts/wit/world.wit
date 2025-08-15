@@ -11,7 +11,7 @@ interface types {
 /// This interface is only available to the top-level app, or its plugin.
 /// The "top-level" app is the app with which the user is directly interacting.
 interface active-app {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Directly log in a user by their account name.
     /// The user must have already been connected to the app.
@@ -31,7 +31,7 @@ interface active-app {
 
 /// This is the typical API intended to be used by third-party plugins or UIs.
 interface api {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{account};
 
     /// Returns true if there is a user logged in to the currently active top-level application.

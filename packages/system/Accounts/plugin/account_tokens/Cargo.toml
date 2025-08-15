@@ -21,6 +21,7 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../../user/Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
 "base64:plugin" = { path = "../../../../user/Base64/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]

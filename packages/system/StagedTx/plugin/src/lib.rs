@@ -8,7 +8,8 @@ use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest 
 use exports::transact_hook_actions_sender::Guest as HookActionsSender;
 use exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
 use host::common::admin::get_active_app;
-use host::common::{client as Client, server as Server, types::Error};
+use host::common::{client as Client, server as Server};
+use host::types::types::Error;
 use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
 use psibase::{AccountNumber, Checksum256, Hex, MethodNumber};

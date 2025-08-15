@@ -40,12 +40,12 @@ macro_rules! plugin_error {
             }
         }
 
-        impl $(<$($type_params),*>)? From<$name $(<$($type_params),*>)?> for crate::bindings::host::common::types::Error {
-            fn from(src: $name) -> crate::bindings::host::common::types::Error {
+        impl $(<$($type_params),*>)? From<$name $(<$($type_params),*>)?> for crate::bindings::host::types::types::Error {
+            fn from(src: $name) -> crate::bindings::host::types::types::Error {
                 let (service, plugin) = $crate::component_name!().split_once(':').unwrap();
-                crate::bindings::host::common::types::Error {
+                crate::bindings::host::types::types::Error {
                     code: unsafe { *(&src as *const $name as *const u32) },
-                    producer: crate::bindings::host::common::types::PluginId {
+                    producer: crate::bindings::host::types::types::PluginId {
                         service: service.to_string(),
                         plugin: plugin.to_string(),
                     },

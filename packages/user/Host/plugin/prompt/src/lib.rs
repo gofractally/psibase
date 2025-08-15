@@ -11,7 +11,7 @@ use db::*;
 use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
 use host::common::client::{get_app_url, get_sender};
-use host::common::types::{Error, PluginId};
+use host::types::types::{Error, PluginId};
 use psibase::fracpack::{Pack, Unpack};
 
 use chrono::Utc;

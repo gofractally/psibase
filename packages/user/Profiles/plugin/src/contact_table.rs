@@ -6,7 +6,7 @@ use psibase::AccountNumber;
 
 use crate::bindings::profiles::plugin::types::Contact;
 
-use crate::bindings::host::common::types::Error;
+use crate::bindings::host::types::types::Error;
 
 use crate::errors;
 use errors::ErrorType;

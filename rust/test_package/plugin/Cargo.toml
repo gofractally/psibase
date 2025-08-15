@@ -15,3 +15,4 @@ package = "tpack:plugin"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../packages/user/Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../../packages/user/Host/plugin/types/wit/world.wit" }

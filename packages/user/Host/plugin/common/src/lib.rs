@@ -5,7 +5,6 @@ use bindings::*;
 mod helpers;
 use helpers::*;
 mod bucket;
-mod plugin_ref;
 
 mod types;
 use exports::host::common::{
@@ -13,9 +12,8 @@ use exports::host::common::{
     client::Guest as Client,
     server::Guest as Server,
     store::{DbMode, Guest as Store},
-    types::Guest as Types,
-    types::{BodyTypes, Error, PostRequest},
 };
+use host::types::types::{BodyTypes, Error, PostRequest};
 use helpers::make_error;
 use supervisor::bridge::{
     intf as Supervisor,
@@ -136,10 +134,6 @@ impl Client for HostCommon {
             .unwrap();
         url.to_string().trim_end_matches('/').to_string()
     }
-}
-
-impl Types for HostCommon {
-    type PluginRef = plugin_ref::PluginRef;
 }
 
 impl Store for HostCommon {

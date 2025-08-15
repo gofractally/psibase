@@ -7,7 +7,7 @@
 package staged-tx:plugin;
 
 interface proposer {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use transact:plugin/types.{action};
 
     /// This is a latch that is set for this plugin call context, and unset when the call context 
@@ -43,7 +43,7 @@ interface proposer {
 }
 
 interface respondent {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Accept the specified staged transaction
     ///

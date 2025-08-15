@@ -1,5 +1,5 @@
 use crate::bindings::host::common::server as CommonServer;
-use crate::bindings::host::common::types::Error;
+use crate::bindings::host::types::types::Error;
 use crate::types::*;
 
 pub fn fetch_and_decode(

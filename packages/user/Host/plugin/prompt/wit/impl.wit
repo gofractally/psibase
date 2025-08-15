@@ -1,7 +1,7 @@
 package host:prompt;
 
 interface api {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// The details of a prompt that are necessary for the supervisor to trigger it
     record trigger-details {

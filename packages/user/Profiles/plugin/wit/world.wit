@@ -22,7 +22,7 @@ interface types {
 }
 
 interface contacts {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{contact};
 
     set: func(contact: contact, overwrite: bool) -> result<_, error>;
@@ -32,7 +32,7 @@ interface contacts {
 
 interface api {
     
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{profile, avatar};
 
     set-profile: func(profile: profile) -> result<_, error>;

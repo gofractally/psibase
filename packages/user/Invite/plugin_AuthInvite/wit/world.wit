@@ -23,7 +23,7 @@ interface types {
 }
 
 interface intf {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{invite-token};
 
     // Notifies this plugin that it should use the given invite token on this transaction.

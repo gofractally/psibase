@@ -14,7 +14,7 @@ interface types {
 }
 
 interface queries {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{message};
 
     /// Retrieve non-archived messages
@@ -28,7 +28,7 @@ interface queries {
 }
 
 interface api {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     // Send an email
     send: func(receiver: string, subject: string, body: string) -> result<_, error>;

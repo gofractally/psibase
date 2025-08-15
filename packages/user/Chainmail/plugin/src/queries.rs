@@ -1,6 +1,7 @@
 use crate::{
     bindings::exports::chainmail::plugin::queries::Message,
-    bindings::host::common::{server as CommonServer, types::Error},
+    bindings::host::common::server as CommonServer,
+    bindings::host::types::types::Error,
     errors::ErrorType,
     serde_structs::TempMessageForDeserEvents,
 };

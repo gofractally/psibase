@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::exports::test_package::plugin::test::Guest as Test;
-use bindings::host::common::types as CommonTypes;
+use bindings::host::types::types as CommonTypes;
 
 struct TestPlugin;
 

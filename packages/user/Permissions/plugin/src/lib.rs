@@ -18,8 +18,8 @@ use host::common::{
     client as HostClient,
     client::{get_receiver, get_sender},
     store::StorageDuration,
-    types::Error,
 };
+use host::types::types::Error;
 use host::prompt::web as HostPrompt;
 
 mod errors;
