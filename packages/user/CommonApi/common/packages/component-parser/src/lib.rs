@@ -55,7 +55,7 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
 
 // This imported function is dynamically linking to another plugin if:
 //   Its first parameter is a handle to an imported resource
-//   called "plugin-ref" that is owned by the "host:common" package
+//   called "plugin-ref" that is owned by the "host" service
 fn is_linking_dynamically(func: &wit_parser::Function, resolved_wit: &wit_parser::Resolve) -> bool {
     if func.params.len() == 0 {
         return false;
@@ -109,8 +109,7 @@ fn is_linking_dynamically(func: &wit_parser::Function, resolved_wit: &wit_parser
         .get(owner_package_id)
         .expect("Get host type owner package failed");
 
-    let is_owner_host =
-        owner_package.name.namespace == "host" && owner_package.name.name == "common";
+    let is_owner_host = owner_package.name.namespace == "host";
 
     is_plugin_ref && is_resource && is_owner_host
 }
