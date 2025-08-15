@@ -135,6 +135,8 @@ class TestPsibase(unittest.TestCase):
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        # Installing packages that are already installed should do nothing
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
 
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
