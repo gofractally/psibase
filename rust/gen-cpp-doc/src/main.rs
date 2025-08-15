@@ -831,7 +831,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/packages/user/Events/include"),
         &("-I".to_owned() + repo_path + "/packages/user/Invite/include"),
         &("-I".to_owned() + repo_path + "/packages/user/Sites/include"),
-        &("-I".to_owned() + repo_path + "/packages/user/XAdmin/include"),
+        &("-I".to_owned() + repo_path + "/packages/local/XAdmin/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/service/include"),

@@ -1,6 +1,7 @@
 #define GENERATING_DOCUMENTATION
 
 #include <psibase/psibase.hpp>
+#include <services/local/XAdmin.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/CommonApi.hpp>
@@ -12,4 +13,3 @@
 #include <services/user/Invite.hpp>
 #include <services/user/InviteTables.hpp>
 #include <services/user/Sites.hpp>
-#include <services/user/XAdmin.hpp>

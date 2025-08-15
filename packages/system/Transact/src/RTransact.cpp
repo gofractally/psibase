@@ -1,3 +1,4 @@
+#include <services/local/XAdmin.hpp>
 #include <services/local/XRun.hpp>
 #include <services/local/XTransact.hpp>
 #include <services/system/Accounts.hpp>
@@ -5,7 +6,6 @@
 #include <services/system/RTransact.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
-#include <services/user/XAdmin.hpp>
 
 #include <functional>
 #include <psibase/dispatch.hpp>
@@ -15,7 +15,6 @@
 using namespace psibase;
 using namespace SystemService;
 using namespace LocalService;
-using UserService::XAdmin;
 
 namespace
 {

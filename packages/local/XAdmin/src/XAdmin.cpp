@@ -1,4 +1,4 @@
-#include <services/user/XAdmin.hpp>
+#include <services/local/XAdmin.hpp>
 
 #include <psibase/dispatch.hpp>
 #include <services/local/XHttp.hpp>
@@ -7,10 +7,9 @@
 
 using namespace psibase;
 using namespace LocalService;
-using namespace UserService;
 using namespace SystemService;
 
-namespace UserService
+namespace LocalService
 {
    namespace
    {
@@ -330,7 +329,7 @@ namespace UserService
                        .contentType = "text/html",
                        .body = toVec(std::format("The resource '{}' was not found\n", target))};
    }
-}  // namespace UserService
+}  // namespace LocalService
 
 #ifndef PSIBASE_GENERATE_SCHEMA
 
@@ -348,4 +347,4 @@ extern "C" [[clang::export_name("checkAccess")]] void checkAccess()
 
 #endif
 
-PSIBASE_DISPATCH(UserService::XAdmin)
+PSIBASE_DISPATCH(LocalService::XAdmin)
