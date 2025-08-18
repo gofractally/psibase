@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service"]
 
 [workspace.package]
-version = "0.19.0"
+version = "0.20.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -31,4 +31,4 @@ services = ["subgroups"]
 crate-type = ["rlib"]
 
 [dependencies]
-subgroups = { path = "service", version = "0.19.0" }
+subgroups = { path = "service", version = "0.20.0" }

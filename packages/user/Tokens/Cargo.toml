@@ -3,13 +3,13 @@ resolver = "2"
 members = ["service", "plugin", "query-service"]
 
 [workspace.package]
-version = "0.19.0"
+version = "0.20.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
 
 [package]
-name = "tokens-pkg"   # Crate name
+name = "tokens-pkg"                   # Crate name
 description = "Native tokens service"
 version.workspace = true
 rust-version.workspace = true
@@ -28,13 +28,13 @@ package-name = "Tokens"
 services = ["tokens"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.19.0"
-Sites = "0.19.0"
+HttpServer = "0.20.0"
+Sites = "0.20.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-tokens = { path = "service", version = "0.19.0" }
-r-tokens = { path = "query-service", version = "0.19.0" }
-plugin = { path = "plugin", version = "0.19.0" }
+tokens = { path = "service", version = "0.20.0" }
+r-tokens = { path = "query-service", version = "0.20.0" }
+plugin = { path = "plugin", version = "0.20.0" }
