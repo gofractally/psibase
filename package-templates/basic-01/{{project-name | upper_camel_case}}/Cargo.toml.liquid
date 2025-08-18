@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "{{project-name}}-pkg"   # Crate name
+name = "{{project-name}}-pkg"                      # Crate name
 description = "{{description}}"
 version.workspace = true
 rust-version.workspace = true
@@ -30,6 +30,7 @@ services = ["{{project-name}}"]
 [package.metadata.psibase.dependencies]
 HttpServer = "{{version}}"
 Sites = "{{version}}"
+Permissions = "{{version}}"
 
 [lib]
 crate-type = ["rlib"]
@@ -37,4 +38,4 @@ crate-type = ["rlib"]
 [dependencies]
 {{project-name}} = { path = "service", version = "{{version}}" }
 r-{{project-name}} = { path = "query-service", version = "{{version}}" }
-plugin = { path = "plugin", version = "{{version}}" }
+{{project-name}}-plugin = { path = "plugin", version = "{{version}}" }

@@ -14,6 +14,7 @@ members = [
     "user/Host/plugin/auth",
     "user/Host/plugin/common",
     "user/Host/plugin/prompt",
+    "user/Host/plugin/types",
     "user/Invite/plugin",
     "user/Invite/plugin_AuthInvite",
     "user/Kdf/plugin",
@@ -27,7 +28,7 @@ resolver = "2"
 
 exclude = [
     "user/CommonApi/common/packages/component-parser",
-    "user/XAdmin/ui/wasm",
+    "local/XAdmin/ui/wasm",
     # other excludes
 ]
 
@@ -39,7 +40,7 @@ strip = true
 lto = true
 
 [workspace.package]
-version = "0.19.0"
+version = "0.20.0"
 edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"

@@ -62,8 +62,34 @@ interface types {
     }
 }
 
+interface private-api {
+    use host:types/types.{error};
+    use types.{meta, package-info, package-source, package-op-info, package-op-full, package-preference};
+
+    // Takes a list of available packages and packages to install or update
+    // and returns a list of operations to apply.
+    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
+
+    // Returns two lists of transactions
+    // - Upload package data. These transactions should be executed
+    //   by passing them to push-data. The order of execution does not
+    //   matter.
+    // - Install packages. These must be staged with propose-install
+    //   after all the data transactions are completed. This will usually
+    //   only have one transaction, but it's possible to have more when
+    //   installing many packages at once.
+    //
+    // The format of the result is unspecified. The transactions returned
+    // should only be passed to push-data and stage-install.
+    build-transactions: func(owner: string, packages: list<package-op-full>, compression-level: u8) -> result<tuple<list<list<u8>>, list<list<u8>>>, error>;
+
+    push-data: func(tx: list<u8>);
+    propose-install: func(tx: list<u8>) -> result<_, error>;
+    set-account-sources: func(accounts: list<string>) -> result<_, error>;
+}
+
 interface queries {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{meta, package-source};
     get-installed-packages: func() -> result<list<meta>, error>;
     get-sources: func(owner: string) -> result<list<package-source>, error>;

@@ -10,6 +10,8 @@ use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
+use crate::bindings::host::types::types::{BodyTypes, PostRequest};
+use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
@@ -51,6 +53,7 @@ impl Admin for AccountsPlugin {
 
         if HostAuth::set_logged_in_user(&user, &app).is_err() {
             AppsTable::new(&app).logout();
+            UserTable::new(&user).remove_connected_app(&app);
         }
 
         // Logging out to reverse accounts login above

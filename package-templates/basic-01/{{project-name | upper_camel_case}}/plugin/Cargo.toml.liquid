@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "{{project-name}}-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -22,6 +22,7 @@ package = "{{project-name}}:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }

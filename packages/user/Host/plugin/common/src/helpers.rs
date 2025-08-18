@@ -1,4 +1,4 @@
-use crate::exports::host::common::types::{Error, PluginId};
+use crate::host::types::types::{Error, PluginId};
 use crate::supervisor::bridge::intf as Supervisor;
 use crate::supervisor::bridge::types::Header;
 

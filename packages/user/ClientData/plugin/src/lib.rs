@@ -6,13 +6,11 @@ use exports::clientdata::plugin::keyvalue::Guest as KeyValue;
 use exports::clientdata::plugin::tests::Guest as Tests;
 use host::common::{
     client::get_sender, store as KvStore, store::Database, store::DbMode, store::StorageDuration,
-    types::Error,
 };
+use host::types::types::{Error, PluginId};
 
 mod tests;
 use tests::*;
-
-use crate::bindings::host::common::types::PluginId;
 
 struct ClientData;
 

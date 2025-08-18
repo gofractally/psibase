@@ -33,7 +33,7 @@ struct ParallelSubjectiveService : psibase::Service
    using Tables                  = psibase::SubjectiveTables<ParallelSubjectiveTable, GeTable>;
    static constexpr auto service = psibase::AccountNumber{"psubjective"};
    static constexpr auto serviceFlags =
-       psibase::CodeRow::isSubjective | psibase::CodeRow::allowWriteSubjective;
+       psibase::CodeRow::runModeRpc | psibase::CodeRow::isPrivileged;
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
 PSIO_REFLECT(ParallelSubjectiveService, method(serveSys, req))

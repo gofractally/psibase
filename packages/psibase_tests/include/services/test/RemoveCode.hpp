@@ -11,7 +11,7 @@ namespace TestService
    struct RemoveCode : psibase::Service
    {
       static constexpr auto service      = psibase::AccountNumber{"rm-code"};
-      static constexpr auto serviceFlags = psibase::CodeRow::allowWriteNative;
+      static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
       void removeCode(psibase::Checksum256 codeHash, std::uint8_t vmType, std::uint8_t vmVersion);
       void setCodeRow(psibase::CodeRow row);
    };

@@ -7,18 +7,21 @@ use errors::ErrorType;
 
 use serde::{Deserialize, Serialize};
 
-use host::common::{client as Client, server as Server, types as CommonTypes};
+use host::common::{client as Client, server as Server};
+use host::types::types as HostTypes;
 
 use accounts::plugin::api as Accounts;
 use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use staged_tx::plugin::proposer as StagedTx;
 
+use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::packages::plugin::types;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
 
 use psibase::fracpack::{Pack, Unpack};
+use psibase::services::packages::PackageSource;
 use psibase::{
     get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
     EssentialServices, InstalledPackageInfo, PackageDisposition, PackageManifest, PackagedService,
@@ -162,7 +165,7 @@ struct InstalledQuery {
 
 type InstalledRoot = QueryRoot<InstalledQuery>;
 
-fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, CommonTypes::Error> {
+fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, HostTypes::Error> {
     let mut end_cursor: Option<String> = None;
     let mut result = Vec::new();
     loop {
@@ -198,7 +201,7 @@ fn as_upgradable(
 fn get_installed_manifest(
     package: &str,
     owner: AccountNumber,
-) -> Result<PackageManifest, CommonTypes::Error> {
+) -> Result<PackageManifest, HostTypes::Error> {
     let json = Server::get_json(&format!("/manifest?package={}&owner={}", package, owner))?;
     Ok(serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?)
 }
@@ -206,7 +209,7 @@ fn get_installed_manifest(
 fn load_schemas<R: Read + Seek>(
     package: &mut PackagedService<R>,
     schemas: &mut SchemaMap,
-) -> Result<(), CommonTypes::Error> {
+) -> Result<(), HostTypes::Error> {
     package
         .get_all_schemas(schemas)
         .map_err(|e| ErrorType::PackageFormatError(e.to_string()))?;
@@ -234,7 +237,7 @@ struct NewAccountsQuery {
 
 fn get_package_accounts(
     ops: &[types::PackageOpFull],
-) -> Result<Vec<AccountNumber>, CommonTypes::Error> {
+) -> Result<Vec<AccountNumber>, HostTypes::Error> {
     let mut result = Vec::new();
     for op in ops {
         if let Some(new) = &op.new {
@@ -249,7 +252,7 @@ fn get_package_accounts(
 fn get_accounts_to_create(
     accounts: &[AccountNumber],
     sender: AccountNumber,
-) -> Result<Vec<AccountNumber>, CommonTypes::Error> {
+) -> Result<Vec<AccountNumber>, HostTypes::Error> {
     let json = Server::post_graphql_get_json(&format!(
         "query {{ newAccounts(accounts: {}, owner: {}) }}",
         serde_json::to_string(accounts).unwrap(),
@@ -270,7 +273,7 @@ fn apply_packages<
     files: &mut TransactionBuilder<G>,
     sender: AccountNumber,
     compression_level: u32,
-) -> Result<(), CommonTypes::Error> {
+) -> Result<(), HostTypes::Error> {
     let mut schemas = SchemaMap::new();
     for op in ops {
         if let Some(new) = op.new {
@@ -342,13 +345,13 @@ fn make_transaction(actions: Vec<Action>) -> SignedTransaction {
 }
 
 impl Queries for PackagesPlugin {
-    fn get_installed_packages() -> Result<Vec<types::Meta>, CommonTypes::Error> {
+    fn get_installed_packages() -> Result<Vec<types::Meta>, HostTypes::Error> {
         Ok(get_installed_packages()?
             .into_iter()
             .map(|p| p.meta().into())
             .collect())
     }
-    fn get_sources(owner: String) -> Result<Vec<types::PackageSource>, CommonTypes::Error> {
+    fn get_sources(owner: String) -> Result<Vec<types::PackageSource>, HostTypes::Error> {
         let owner: AccountNumber = owner.parse().unwrap();
         let json = Server::post_graphql_get_json(&format!(
             "query {{ sources(account: {}) {{ url account }} }}",
@@ -366,7 +369,7 @@ impl PrivateApi for PackagesPlugin {
         packages: Vec<String>,
         request_pref: types::PackagePreference,
         non_request_pref: types::PackagePreference,
-    ) -> Result<Vec<types::PackageOpInfo>, CommonTypes::Error> {
+    ) -> Result<Vec<types::PackageOpInfo>, HostTypes::Error> {
         let index = index.into_iter().map(|p| p.into()).collect();
         let essential = get_essential_packages(&index, &EssentialServices::new());
         Ok(solve_dependencies(
@@ -387,7 +390,7 @@ impl PrivateApi for PackagesPlugin {
         owner: String,
         packages: Vec<types::PackageOpFull>,
         compression_level: u8,
-    ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), CommonTypes::Error> {
+    ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), HostTypes::Error> {
         let id = getrandom::u64().unwrap();
 
         let index_cell = Cell::new(0);
@@ -432,9 +435,11 @@ impl PrivateApi for PackagesPlugin {
             compression_level.into(),
         )?;
 
-        trx_builder
-            .push(PackagesService::Wrapper::pack_from(sender).removeOrder(id.clone()))
-            .unwrap();
+        if trx_builder.num_transactions() != 0 {
+            trx_builder
+                .push(PackagesService::Wrapper::pack_from(sender).removeOrder(id.clone()))
+                .unwrap();
+        }
 
         let mut upload_transactions = Vec::new();
         for (_label, group, _carry) in upload_builder.finish().unwrap() {
@@ -452,7 +457,7 @@ impl PrivateApi for PackagesPlugin {
     }
     // Only callable by the UI
     fn push_data(tx: Vec<u8>) {
-        assert!(Client::get_sender() == Client::get_receiver());
+        assert!(Client::get_sender() == "config".to_string());
 
         let tx = Transaction::unpacked(&tx).unwrap();
         for action in tx.actions {
@@ -480,14 +485,33 @@ impl PrivateApi for PackagesPlugin {
             }
         }
     }
-    fn propose_install(tx: Vec<u8>) -> Result<(), CommonTypes::Error> {
-        assert!(Client::get_sender() == Client::get_receiver());
+    fn propose_install(tx: Vec<u8>) -> Result<(), HostTypes::Error> {
+        assert!(Client::get_sender() == "config".to_string());
 
         let tx = Transaction::unpacked(&tx).unwrap();
         StagedTx::propose(
             &tx.actions.into_iter().map(|a| a.into()).collect::<Vec<_>>(),
             true,
         )
+    }
+
+    fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {
+        let packed_args = psibase::services::packages::action_structs::setSources {
+            sources: accounts
+                .into_iter()
+                .map(|account| PackageSource {
+                    account: Some(AccountNumber::from(account.as_str())),
+                    url: None,
+                })
+                .collect(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            psibase::services::packages::action_structs::setSources::ACTION_NAME,
+            &packed_args,
+        )?;
+        Ok(())
     }
 }
 

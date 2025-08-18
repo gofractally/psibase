@@ -19,7 +19,7 @@ interface types {
 }
 
 interface developer {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{account-id, app-metadata};
 
     /// Set the metadata for an app

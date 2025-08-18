@@ -89,26 +89,21 @@ impl WasmConfigRow {
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CodeRow {
-    codeNum: AccountNumber,
-    flags: u64,
+    pub codeNum: AccountNumber,
+    pub flags: u64,
 
-    codeHash: Checksum256,
-    vmType: u8,
-    vmVersion: u8,
+    pub codeHash: Checksum256,
+    pub vmType: u8,
+    pub vmVersion: u8,
 }
 
 impl CodeRow {
     pub const DB: DbId = DbId::Native;
-    pub const ALLOW_SUDO: u64 = 1u64 << 0;
-    pub const ALLOW_WRITE_NATIVE: u64 = 1u64 << 1;
-    pub const IS_SUBJECTIVE: u64 = 1u64 << 2;
-    pub const ALLOW_WRITE_SUBJECTIVE: u64 = 1u64 << 3;
-    pub const CANNOT_TIME_OUT: u64 = 1u64 << 4;
-    pub const CAN_SET_TIME_LIMIT: u64 = 1u64 << 5;
-    pub const IS_AUTH_SERVICE: u64 = 1u64 << 6;
-    pub const FORCE_REPLAY: u64 = 1u64 << 7;
-    pub const ALLOW_SOCKET: u64 = 1u64 << 8;
-    pub const ALLOW_NATIVE_SUBJECTIVE: u64 = 1u64 << 9;
+    pub const IS_PRIVILEGED: u64 = 1u64 << 0;
+    pub const IS_VERIFY: u64 = 1u64 << 1;
+    pub const RUN_MODE_RPC: u64 = 1u64 << 2;
+    pub const RUN_MODE_CALLBACK: u64 = 2u64 << 2;
+    pub const IS_REPLACEMENT: u64 = 1u64 << 32;
     pub fn key(&self) -> (NativeTable, NativeIndex, AccountNumber) {
         (CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.codeNum)
     }
@@ -118,12 +113,11 @@ impl CodeRow {
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CodeByHashRow {
-    codeHash: Checksum256,
-    vmType: u8,
-    vmVersion: u8,
+    pub codeHash: Checksum256,
+    pub vmType: u8,
+    pub vmVersion: u8,
 
-    numRefs: u32,
-    code: Hex<Vec<u8>>,
+    pub code: Hex<Vec<u8>>,
 }
 
 impl CodeByHashRow {

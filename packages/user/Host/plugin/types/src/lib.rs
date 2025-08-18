@@ -1,9 +1,13 @@
-use crate::exports::host::common::types::GuestPluginRef;
+#[allow(warnings)]
+mod bindings;
 
-pub struct PluginRef {
-    pub service: String,
-    pub plugin: String,
-    pub intf: String,
+use bindings::exports::host::types::types::{Guest, GuestPluginRef};
+
+// Simple PluginRef implementation that stores service, plugin, and interface names
+pub struct PluginRefImpl {
+    service: String,
+    plugin: String,
+    intf: String,
 }
 
 fn to_camel(s: &str) -> String {
@@ -19,9 +23,9 @@ fn to_camel(s: &str) -> String {
         .collect()
 }
 
-impl GuestPluginRef for PluginRef {
+impl GuestPluginRef for PluginRefImpl {
     fn new(service: String, plugin: String, intf: String) -> Self {
-        PluginRef {
+        Self {
             service,
             plugin,
             intf: to_camel(&intf),
@@ -40,3 +44,12 @@ impl GuestPluginRef for PluginRef {
         self.intf.clone()
     }
 }
+
+// Export the basic implementation
+struct HostTypesImpl;
+
+impl Guest for HostTypesImpl {
+    type PluginRef = PluginRefImpl;
+}
+
+bindings::export!(HostTypesImpl with_types_in bindings);

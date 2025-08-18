@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::exports::sites::plugin::api::Guest as Sites;
-use bindings::host::common::types::Error;
+use bindings::host::types::types::Error;
 use bindings::sites::plugin::types::File;
 use bindings::transact::plugin::intf as Transact;
 use psibase::compress_content;

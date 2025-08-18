@@ -1,0 +1,16 @@
+[package]
+name = "host-types"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "host:types"
+
+[package.metadata.component.target]
+world = "impl"

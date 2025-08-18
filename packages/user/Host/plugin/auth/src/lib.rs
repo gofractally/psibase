@@ -14,15 +14,15 @@ use crate::bindings::accounts::plugin::api as AccountsApi;
 use crate::bindings::host::common::{
     admin as HostAdmin, store as KvStore,
     store::{Database, DbMode, StorageDuration},
-    types::{BodyTypes, Error, PostRequest},
 };
+use crate::bindings::host::types::types::{BodyTypes, PostRequest};
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 
 const QUERY_TOKEN_BUCKET: &str = "query_tokens";
 
 struct HostAuth;
 
-fn get_query_token_butcket_name(user: &str) -> String {
+fn get_query_token_bucket_name(user: &str) -> String {
     format!("{}-{}", QUERY_TOKEN_BUCKET, user)
 }
 
@@ -33,7 +33,7 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     };
     HostAdmin::post(app, &req).unwrap();
 
-    let bucket = KvStore::Bucket::new(DB, &get_query_token_butcket_name(user));
+    let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(user));
 
     bucket.set(&app, &query_token.to_string().packed());
 }
@@ -55,10 +55,10 @@ const DB: Database = Database {
 };
 
 impl Api for HostAuth {
-    fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
+    fn set_logged_in_user(user: String, app: String) -> Result<(), String> {
         check_caller(&["accounts"], "set-logged-in-user@host:common/admin");
 
-        let bucket = KvStore::Bucket::new(DB, &get_query_token_butcket_name(&user));
+        let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
         let query_token = bucket.get(&&app);
 
         let query_token = if query_token.is_none() {
@@ -84,7 +84,7 @@ impl Api for HostAuth {
 
         let user = AccountsApi::get_current_user()?;
 
-        let bucket = KvStore::Bucket::new(DB, &get_query_token_butcket_name(&user));
+        let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
 
         let record = bucket.get(&app);
 

@@ -39,8 +39,15 @@ Properties associated with a service.
 
 | Field  | Type    | Description                                                                                                                                                                   |
 |--------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| flags  | Array   | Can contain the following strings: `"allowSudo"`, `"allowWriteNative"`, `"isSubjective"`, `"allowWriteSubjective"`, `"canNotTimeOut"`, `"canSetTimeLimit"`, `"isAuthService"`, `"forceReplay"`, `"allowSocket"` |
+| flags  | Array   | Can contain the following strings: `"isPrivileged"`, `"isVerify"`, `"runModeRpc"`, `"runModeCallback"` |
 | server | String  | The account that will handle HTTP requests for the service                                                                                                                    |
+
+### Flags
+
+- `isPrivileged`: The service has access to restricted databases and host functions
+- `isVerify`: The service can be used to verify signatures
+- `runModeRpc`: When the service is run in a transaction, switch to RPC mode and save the result on the block producer. On replay, skip execution and return the same result as the block producer.
+- `runModeCallback`: When the service is run in a transaction, switch to callback mode and save the result on the block producer. On replay, suppress errors, ignore the return value, and return the same result as the block producer.
 
 ## data/&lt;service&gt;/*
 

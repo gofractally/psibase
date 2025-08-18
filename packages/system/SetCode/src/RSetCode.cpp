@@ -41,27 +41,21 @@ namespace SystemService
          PSIO_REFLECT(CodeRecord, codeNum, flags, codeHash, vmType, vmVersion, method(codeHex))
       };
 
-      constexpr std::pair<uint64_t, const char*> flagMap[] = {
-          {CodeRow::allowSudo, "allowSudo"},
-          {CodeRow::allowWriteNative, "allowWriteNative"},
-          {CodeRow::isSubjective, "isSubjective"},
-          {CodeRow::allowWriteSubjective, "allowWriteSubjective"},
-          {CodeRow::canNotTimeOut, "canNotTimeOut"},
-          {CodeRow::canSetTimeLimit, "canSetTimeLimit"},
-          {CodeRow::isAuthService, "isAuthService"},
-          {CodeRow::forceReplay, "forceReplay"},
-          {CodeRow::allowSocket, "allowSocket"},
-          {CodeRow::allowNativeSubjective, "allowNativeSubjective"}};
-
       auto convertFlags(uint64_t flags) -> std::vector<std::string>
       {
          std::vector<std::string> result;
-         for (const auto& [flag, name] : flagMap)
+         if (flags & CodeRow::isPrivileged)
+            result.push_back("isPrivileged");
+         if (flags & CodeRow::isVerify)
+            result.push_back("isVerify");
+         switch (flags & CodeRow::runMode)
          {
-            if (flags & flag)
-            {
-               result.push_back(name);
-            }
+            case CodeRow::runModeRpc:
+               result.push_back("runModeRpc");
+               break;
+            case CodeRow::runModeCallback:
+               result.push_back("runModeCallback");
+               break;
          }
          return result;
       }

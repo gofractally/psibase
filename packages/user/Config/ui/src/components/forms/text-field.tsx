@@ -33,15 +33,15 @@ export const TextField = ({
     const isBlurred = field.state.meta.isBlurred;
 
     return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 w-full">
+            {label && <div className="flex items-center justify-between">
                 <Label
                     className={cn(isError && isBlurred && "text-destructive")}
                 >
                     {label}
                 </Label>
                 {rightLabel && rightLabel}
-            </div>
+            </div>}
 
             {isLoading ? (
                 <Skeleton className="h-10 w-full rounded-sm" />

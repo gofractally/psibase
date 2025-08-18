@@ -43,7 +43,7 @@ namespace SystemService
 
       void incrementVerifySeq(std::uint64_t flags)
       {
-         if (flags & CodeRow::isAuthService)
+         if (flags & CodeRow::isVerify)
          {
             auto status = getStatus();
             if (status.consensus.next && status.consensus.next->blockNum != status.current.blockNum)

@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-{{project-name}}"
-plugin = "plugin"
+plugin = "{{project-name}}-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "{{project-name}}", service = "{{project-name}}", method = "init", data = {} },
@@ -16,7 +16,7 @@ postinstall = [
 [dependencies]
 psibase = { version = "{{version}}", path = "../../../../rust/psibase" }
 psibase_macros = { version = "{{version}}", path = "../../../../rust/psibase_macros" }
-async-graphql = "7.0.7"
+async-graphql = "=7.0.17"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.120"
 

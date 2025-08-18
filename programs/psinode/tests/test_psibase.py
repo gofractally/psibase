@@ -99,8 +99,8 @@ class Foo:
         self.deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
         self.added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
 
-        self.foo10.service('bar1', wasm=self.original_wasm, flags=['allowWriteNative'])
-        self.foo10.service('bar2', wasm=self.deleted_wasm, flags=['allowSudo'], server='bar1')
+        self.foo10.service('bar1', wasm=self.original_wasm, flags=['isPrivileged'])
+        self.foo10.service('bar2', wasm=self.deleted_wasm, flags=['isPrivileged'], server='bar1')
         self.foo11.service('bar1', wasm=self.updated_wasm)
         self.foo11.service('bar2', data={'file4.txt': 'cancel server'})
         self.foo11.service('bar3', wasm=self.added_wasm)
@@ -135,6 +135,8 @@ class TestPsibase(unittest.TestCase):
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        # Installing packages that are already installed should do nothing
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
 
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):

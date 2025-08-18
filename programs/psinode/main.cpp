@@ -421,9 +421,8 @@ void load_subjective_services(Database& db)
 
             auto    codeHash = sha256(code.data(), code.size());
             CodeRow codeRow{
-                .codeNum = account,
-                .flags   = CodeRow::allowWriteSubjective | CodeRow::allowSocket |
-                         CodeRow::allowNativeSubjective,
+                .codeNum  = account,
+                .flags    = CodeRow::isPrivileged,
                 .codeHash = codeHash,
             };
             db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);

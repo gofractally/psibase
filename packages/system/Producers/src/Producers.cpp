@@ -91,7 +91,7 @@ namespace
 namespace SystemService
 {
    // Verifies that all the auth services have the correct flags set
-   static void checkAuthServices(const std::vector<psibase::Producer>& producers)
+   static void checkVerifyServices(const std::vector<psibase::Producer>& producers)
    {
       std::vector<AccountNumber> accounts;
       for (const auto& [name, auth] : producers)
@@ -107,7 +107,7 @@ namespace SystemService
       {
          auto code = psibase::kvGet<CodeRow>(CodeRow::db, codeKey(account));
          check(!!code, "Unknown service account: " + account.str());
-         check(code->flags & CodeRow::isAuthService,
+         check(code->flags & CodeRow::isVerify,
                "Service account " + account.str() + " cannot be used for block production");
       }
    }
@@ -120,7 +120,7 @@ namespace SystemService
           [](const auto& c)
           {
              check(!c.producers.empty(), "There must be at least one producer");
-             checkAuthServices(c.producers);
+             checkVerifyServices(c.producers);
           },
           consensus);
       check(!!status, "Missing status row");
@@ -137,7 +137,7 @@ namespace SystemService
       check(getSender() == getReceiver(), "sender must match service account");
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
       check(!prods.empty(), "There must be at least one producer");
-      checkAuthServices(prods);
+      checkVerifyServices(prods);
       check(!!status, "Missing status row");
       check(!status->consensus.next || status->consensus.next->blockNum == status->current.blockNum,
             "Consensus update pending");

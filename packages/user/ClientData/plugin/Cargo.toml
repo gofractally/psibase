@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.33.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.20.0" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -14,10 +14,11 @@ crate-type = ["cdylib"]
 package = "clientdata:plugin"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 # Needed for some manually-run unit tests
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
-"chainmail:plugin" = { path = "../../../user/Chainmail/plugin/wit/world.wit" }
+"chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }
 
 [package.metadata.component.target]
 world = "impl"

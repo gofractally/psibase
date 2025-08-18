@@ -33,7 +33,7 @@ namespace psibase
 
       bool isSubjectiveContext(NativeFunctions& self)
       {
-         return (self.code.flags & CodeRow::isSubjective) || self.dbMode.isSubjective;
+         return (self.code.flags & CodeRow::runMode) || self.dbMode.isSubjective;
       }
 
       DbId getDbRead(NativeFunctions& self, uint32_t db, psio::input_stream key)
@@ -64,7 +64,7 @@ namespace psibase
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be read in a deterministic context");
-            check(self.code.flags & CodeRow::allowNativeSubjective, "service may not read this db");
+            check(self.code.flags & CodeRow::isPrivileged, "service may not read this db");
             return (DbId)db;
          }
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
@@ -109,8 +109,7 @@ namespace psibase
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be written in a deterministic context");
-            check((self.code.flags & CodeRow::allowWriteSubjective),
-                  "service may not write this db");
+            check((self.code.flags & CodeRow::isPrivileged), "service may not write this db");
             return {(DbId)db, false, false};
          }
 
@@ -118,8 +117,7 @@ namespace psibase
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be written in a deterministic context");
-            check((self.code.flags & CodeRow::allowNativeSubjective),
-                  "service may not write this db");
+            check((self.code.flags & CodeRow::isPrivileged), "service may not write this db");
             return {(DbId)db, false, false};
          }
 
@@ -127,10 +125,9 @@ namespace psibase
          {
             check(self.dbMode.isSync, "writeOnly database cannot be written in an async context");
             check(self.transactionContext.dbMode.isSubjective ||
-                      !(self.code.flags & CodeRow::isSubjective) ||
-                      (self.code.flags & CodeRow::forceReplay),
+                      (self.code.flags & CodeRow::runMode) != CodeRow::runModeRpc,
                   "subjective services may only write to DbId::subjective");
-            return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
+            return {(DbId)db, !(self.code.flags & CodeRow::runMode), false};
          }
 
          if (db == uint32_t(DbId::service) || db == uint32_t(DbId::native))
@@ -139,7 +136,7 @@ namespace psibase
             check(self.dbMode.isSync, "database cannot be written in async context");
 
             if (db == uint32_t(DbId::native))
-               check(self.code.flags & CodeRow::allowWriteNative,
+               check(self.code.flags & CodeRow::isPrivileged,
                      "service may not write this database");
 
             return {(DbId)db, true, true};
@@ -191,13 +188,13 @@ namespace psibase
          if (oldValue)
          {
             auto oldCode = psio::view<const CodeRow>(psio::prevalidated{*oldValue});
-            if (oldCode.flags() & CodeRow::isAuthService)
+            if (oldCode.flags() & CodeRow::isVerify)
             {
                oldIsAuth = true;
             }
             //ctx.incCode(oldCode.codeHash(), oldCode.vmType(), oldCode.vmVersion(), -1);
          }
-         bool isAuth = code.flags() & CodeRow::isAuthService;
+         bool isAuth = code.flags() & CodeRow::isVerify;
          if (oldIsAuth || isAuth)
          {
             ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
@@ -214,7 +211,7 @@ namespace psibase
                                psio::input_stream  value)
       {
          auto code = psio::view<const CodeRow>(psio::prevalidated{value});
-         if (code.flags() & CodeRow::isAuthService)
+         if (code.flags() & CodeRow::isVerify)
          {
             ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
          }
@@ -500,8 +497,7 @@ namespace psibase
 
    void NativeFunctions::setMaxTransactionTime(uint64_t nanoseconds)
    {
-      check(code.flags & CodeRow::canSetTimeLimit,
-            "setMaxTransactionTime requires canSetTimeLimit privilege");
+      check(code.flags & CodeRow::isPrivileged, "setMaxTransactionTime requires privileges");
       clearResult(*this);
       // Ensure no overflow by capping the value. The exact value is not visible to
       // wasm and does not affect consensus and there's no way a transaction can
@@ -557,7 +553,7 @@ namespace psibase
       auto callerFlags = code.flags;
       if (act.sender != code.codeNum)
       {
-         check((code.flags & CodeRow::allowSudo) != 0,
+         check((code.flags & CodeRow::isPrivileged) != 0,
                "service is not authorized to call as another sender");
          callerFlags |= ExecutionContext::callerSudo;
       }
@@ -787,7 +783,7 @@ namespace psibase
    int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
-      check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
       return transactionContext.blockContext.systemContext.sockets->send(
           *transactionContext.blockContext.writer, fd, msg);
@@ -796,7 +792,7 @@ namespace psibase
    int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
-      check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
       return database.socketAutoClose(fd, value,
                                       *transactionContext.blockContext.systemContext.sockets,

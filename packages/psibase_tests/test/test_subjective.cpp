@@ -99,7 +99,7 @@ TEST_CASE("local service sudo")
 {
    DefaultTestChain t;
    auto             callee = AccountNumber{"callee"};
-   t.addService(callee, "Nop.wasm", CodeRow::isSubjective);
+   t.addService(callee, "Nop.wasm", CodeRow::runModeRpc);
    t.startBlock();
    // sanity check
    expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})));

@@ -862,7 +862,7 @@ namespace psibase::http
             {
                Action action{
                    .sender  = AccountNumber(),
-                   .service = service != AccountNumber{} ? service : proxyServiceNum,
+                   .service = proxyServiceNum,
                    .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
                };
                tc.execServe(action, atrace);

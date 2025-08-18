@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.20.0" }
 wit-bindgen-rt = { version = "0.38.0", features = ["bitflags"] }
 
 [lib]
@@ -20,4 +20,5 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }

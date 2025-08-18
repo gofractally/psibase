@@ -558,7 +558,8 @@ namespace SystemService
                           bool                                                          speculative)
    {
       check(trxData.data() == nullptr, "Cannot reenter execTrx");
-      check(getSender() == AccountNumber{}, "Wrong sender");
+      auto sender = getSender();
+      check(sender == AccountNumber{} || sender == RTransact::service, "Wrong sender");
       auto _ = recurse();
       processTransactionImpl(trx, speculative);
    }

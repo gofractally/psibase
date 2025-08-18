@@ -44,7 +44,7 @@ namespace SystemService
    /// routing service instead.
    struct HttpServer : psibase::Service
    {
-      static constexpr auto service          = psibase::proxyServiceNum;
+      static constexpr auto service          = psibase::AccountNumber("http-server");
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
       static constexpr auto commonApiPrefix  = "/common/";
       static constexpr auto homepageService  = psibase::AccountNumber("homepage");
@@ -74,13 +74,20 @@ namespace SystemService
       /// * Respond to RPC requests
       /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
+
+      // Entry point for messages
+      void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
+      // Entry point for HTTP requests
+      void serve(std::int32_t socket, psibase::HttpRequest req);
    };
    PSIO_REFLECT(HttpServer,
                 method(sendProds, action),
                 method(deferReply, socket),
                 method(claimReply, socket),
                 method(sendReply, socket, response),
-                method(registerServer, server))
+                method(registerServer, server),
+                method(recv, socket, data),
+                method(serve, socket, req))
 
    PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Subjective)
 }  // namespace SystemService

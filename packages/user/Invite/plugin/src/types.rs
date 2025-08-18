@@ -3,7 +3,7 @@ use crate::{bindings::*, InviteToken};
 
 use accounts::account_tokens::api::deserialize_token;
 use accounts::account_tokens::types::*;
-use host::common::types as CommonTypes;
+use host::types::types as CommonTypes;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Deserialize;
 

@@ -49,8 +49,7 @@ namespace UserService
    struct EventIndex : psibase::Service
    {
       static constexpr psibase::AccountNumber service{"events"};
-      static constexpr auto                   serviceFlags =
-          psibase::CodeRow::isSubjective | psibase::CodeRow::forceReplay;
+      static constexpr auto                   serviceFlags = psibase::CodeRow::runModeCallback;
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
       /// Indexes increase the CPU cost of transactions that create events.

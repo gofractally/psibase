@@ -284,6 +284,7 @@ add_rs_component_workspace(packages/:Plugins
     sites
     host-common
     host-prompt
+    host-types
     host-auth
     transact
     workshop
@@ -298,8 +299,11 @@ function(psinode_files target pfx)
     DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm ${pfx}/share/psibase/services/x-http.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm ${pfx}/share/psibase/services/x-transact.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
@@ -311,7 +315,11 @@ endfunction()
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
-install(DIRECTORY packages/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
+install(DIRECTORY packages/local/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-admin.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-http.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-run.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-transact.wasm)
 install(DIRECTORY packages/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
@@ -321,23 +329,23 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.19)
+set(PSIBASE_VERSION 0.20)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
     NAME Transact
-    VERSION ${PSIBASE_VERSION}.1
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Transact-schema.json
-        FLAGS allowSudo allowWriteNative
+        FLAGS isPrivileged
         SERVER r-transact
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
-        FLAGS allowWriteSubjective allowNativeSubjective
+        FLAGS isPrivileged
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
@@ -347,7 +355,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts
-    VERSION ${PSIBASE_VERSION}.1
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
@@ -419,6 +427,7 @@ psibase_package(
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
@@ -494,7 +503,7 @@ psibase_package(
     SERVICE verify-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
-        FLAGS isAuthService
+        FLAGS isVerify
     DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
@@ -578,7 +587,7 @@ psibase_package(
     SERVICE cpu-limit
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit-schema.json
-        FLAGS isSubjective canSetTimeLimit
+        FLAGS runModeRpc isPrivileged
     DEPENDS wasm
 )
 
@@ -646,7 +655,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Producers-schema.json
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
-        FLAGS allowWriteNative
+        FLAGS isPrivileged
         SERVER r-producers
     SERVICE r-producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
@@ -666,7 +675,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/HttpServer-schema.json
         SERVER rhttp-server
-        FLAGS allowSocket allowWriteSubjective
+        FLAGS isPrivileged
     SERVICE rhttp-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer-schema.json
@@ -682,7 +691,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SetCode-schema.json
         DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
-        FLAGS allowWriteNative
+        FLAGS isPrivileged
         SERVER r-setcode
         INIT
     SERVICE r-setcode
@@ -701,7 +710,7 @@ psibase_package(
     SERVICE events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Events-schema.json
-        FLAGS isSubjective forceReplay
+        FLAGS runModeCallback
         SERVER r-events
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
@@ -988,7 +997,7 @@ psibase_package(
     SERVICE psubjective
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
-        FLAGS isSubjective allowWriteSubjective
+        FLAGS runModeRpc isPrivileged
         SERVER psubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
@@ -1017,7 +1026,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService-schema.json
         SERVER as-query
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/psibase_tests/src/AsyncQueryService.json
-        FLAGS allowWriteSubjective
+        FLAGS isPrivileged
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
@@ -1031,7 +1040,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService-schema.json
         SERVER s-counter
-        FLAGS isSubjective allowWriteSubjective
+        FLAGS runModeRpc isPrivileged
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
@@ -1058,7 +1067,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SocketListService-schema.json
         SERVER s-sock-list
-        FLAGS allowNativeSubjective
+        FLAGS isPrivileged
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )

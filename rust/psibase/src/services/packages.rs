@@ -1,4 +1,5 @@
 use crate::{Pack, ToSchema, Unpack};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
@@ -26,12 +27,12 @@ mod service {
     }
 
     #[action]
-    fn publish(package: Meta, sha256: Checksum256, file: String) {
-        unimplemented!();
+    fn setSources(sources: Vec<PackageSource>) {
+        unimplemented!()
     }
 
     #[action]
-    fn setSources(sources: Vec<PackageSource>) {
+    fn publish(package: Meta, sha256: Checksum256, file: String) {
         unimplemented!();
     }
 

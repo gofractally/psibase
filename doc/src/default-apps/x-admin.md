@@ -65,7 +65,7 @@ This option controls access to the [HTTP API](../run-infrastructure/administrati
 
 ## Service
 
-{{#cpp-doc ::UserService::XAdmin}}
+{{#cpp-doc ::LocalService::XAdmin}}
 
 ## Monitoring Dashboards
 
@@ -73,7 +73,7 @@ Psinode monitoring is powered by metrics collected and fed into Prometheus. Then
 
 The easiest way to run these services is to use docker containers, since we prepared a docker-compose file with all the needed services.
 
-**All the following instructions are assuming you are working with the files under the Psibase repo, in the `/packages/user/XAdmin/monitors` directory.**
+**All the following instructions are assuming you are working with the files under the Psibase repo, in the `/packages/local/XAdmin/monitors` directory.**
 
 ### Running with docker
 

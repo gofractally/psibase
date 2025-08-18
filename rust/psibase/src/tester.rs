@@ -6,19 +6,25 @@
 //!
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
+#![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
+
 use crate::{
-    create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
-    AccountNumber, Action, BlockTime, Caller, DirectoryRegistry, Error, HttpBody, HttpReply,
-    HttpRequest, InnerTraceEnum, PackageRegistry, Seconds, SignedTransaction, StatusRow,
-    TimePointSec, TimePointUSec, Transaction, TransactionTrace,
+    check, create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
+    AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
+    DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry,
+    Seconds, SignedTransaction, StatusRow, TimePointSec, TimePointUSec, ToKey, Transaction,
+    TransactionTrace,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use fracpack::{Pack, Unpack};
 use futures::executor::block_on;
 use psibase_macros::account_raw;
 use serde::de::DeserializeOwned;
+use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
-use std::path::Path;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
 /// Execute a shell command
@@ -50,6 +56,20 @@ impl Drop for Chain {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+impl Chain {
+    pub fn new() -> Chain {
+        unimplemented!();
+    }
+    pub fn push(&self, _transaction: &SignedTransaction) -> TransactionTrace {
+        unimplemented!();
+    }
+    pub fn start_block(&self) {
+        unimplemented!();
+    }
+}
+
+#[cfg(target_family = "wasm")]
 impl Chain {
     /// Create a new chain and make it active for database native functions.
     ///
@@ -112,12 +132,72 @@ impl Chain {
         if chain_handle == 0 {
             tester_raw::tester_select_chain_for_db(chain_handle)
         }
-        Chain {
+        let mut result = Chain {
             chain_handle,
             status: None.into(),
             producing: false.into(),
             is_auto_block_start: true,
+        };
+        result.load_local_services();
+        result
+    }
+
+    fn load_local_services(&mut self) {
+        use crate::{CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX};
+        let prefix = (CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX).to_key();
+        if unsafe {
+            tester_raw::kvGreaterEqual(
+                self.chain_handle,
+                DbId::NativeSubjective,
+                prefix.as_ptr(),
+                prefix.len() as u32,
+                prefix.len() as u32,
+            )
+        } != u32::MAX
+        {
+            return;
         }
+        let services_root: PathBuf = std::env::var_os("PSIBASE_DATADIR")
+            .expect("Cannot find local service directory")
+            .into();
+        let services_dir = services_root.join("services");
+        unsafe {
+            tester_raw::checkoutSubjective(self.chain_handle);
+        }
+        for account in ["x-admin", "x-http", "x-run", "x-transact"] {
+            let path = services_dir.clone().join(account.to_string() + ".wasm");
+            let mut code = Vec::new();
+            File::open(&path)
+                .with_context(|| format!("Cannot open {}", path.to_string_lossy()))
+                .unwrap()
+                .read_to_end(&mut code)
+                .unwrap();
+
+            let hash: [u8; 32] = Sha256::digest(&code).into();
+            let code_hash: Checksum256 = hash.into();
+
+            let code_row = CodeRow {
+                codeNum: AccountNumber::from_exact(account).unwrap(),
+                flags: CodeRow::IS_PRIVILEGED,
+                codeHash: code_hash.clone(),
+                vmType: 0,
+                vmVersion: 0,
+            };
+            let key = code_row.key();
+            self.kv_put(DbId::NativeSubjective, &key, &code_row);
+            let code_by_hash_row = CodeByHashRow {
+                codeHash: code_hash,
+                vmType: 0,
+                vmVersion: 0,
+                code: code.into(),
+            };
+            let key = code_by_hash_row.key();
+            self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
+        }
+        check(
+            unsafe { tester_raw::commitSubjective(self.chain_handle) },
+            "Failed to commit changes",
+        );
     }
 
     /// Start a new block
@@ -153,25 +233,6 @@ impl Chain {
     pub fn finish_block(&self) {
         unsafe { tester_raw::finishBlock(self.chain_handle) }
         self.producing.replace(false);
-    }
-
-    /// Fill tapos fields
-    ///
-    /// `expire_seconds` is relative to the most-recent block.
-    pub fn fill_tapos(&self, trx: &mut Transaction, expire_seconds: u32) {
-        trx.tapos.expiration.seconds = expire_seconds as i64;
-        trx.tapos.refBlockIndex = 0;
-        trx.tapos.refBlockSuffix = 0;
-        if let Some(status) = &*self.status.borrow() {
-            trx.tapos.expiration =
-                status.current.time.seconds() + Seconds::new(expire_seconds as i64);
-            if let Some(head) = &status.head {
-                let mut suffix = [0; 4];
-                suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);
-                trx.tapos.refBlockIndex = (head.header.blockNum & 0x7f) as u8;
-                trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
-            }
-        }
     }
 
     /// By default, the TestChain will automatically advance blocks.
@@ -238,6 +299,29 @@ impl Chain {
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
     pub fn select_chain(&self) {
         tester_raw::tester_select_chain_for_db(self.chain_handle)
+    }
+
+    /// Set a key-value pair
+    ///
+    /// If key already exists, then replace the existing value.
+    pub fn kv_put_bytes(&mut self, db: DbId, key: &[u8], value: &[u8]) {
+        unsafe {
+            tester_raw::kvPut(
+                self.chain_handle,
+                db,
+                key.as_ptr(),
+                key.len() as u32,
+                value.as_ptr(),
+                value.len() as u32,
+            )
+        }
+    }
+
+    /// Set a key-value pair
+    ///
+    /// If key already exists, then replace the existing value.
+    pub fn kv_put<K: ToKey, V: Pack>(&mut self, db: DbId, key: &K, value: &V) {
+        self.kv_put_bytes(db, &key.to_key(), &value.packed())
     }
 
     /// Create a new account
@@ -315,6 +399,27 @@ impl Chain {
     ) -> Result<T, anyhow::Error> {
         self.post(account, "/graphql", HttpBody::graphql(query))?
             .json()
+    }
+}
+
+impl Chain {
+    /// Fill tapos fields
+    ///
+    /// `expire_seconds` is relative to the most-recent block.
+    pub fn fill_tapos(&self, trx: &mut Transaction, expire_seconds: u32) {
+        trx.tapos.expiration.seconds = expire_seconds as i64;
+        trx.tapos.refBlockIndex = 0;
+        trx.tapos.refBlockSuffix = 0;
+        if let Some(status) = &*self.status.borrow() {
+            trx.tapos.expiration =
+                status.current.time.seconds() + Seconds::new(expire_seconds as i64);
+            if let Some(head) = &status.head {
+                let mut suffix = [0; 4];
+                suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);
+                trx.tapos.refBlockIndex = (head.header.blockNum & 0x7f) as u8;
+                trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
+            }
+        }
     }
 }
 

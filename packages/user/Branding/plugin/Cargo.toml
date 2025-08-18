@@ -8,11 +8,11 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.20.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
-branding = { path = "../service/", version = "0.19.0" }
+branding = { path = "../service/", version = "0.20.0" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -25,9 +25,10 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 
 [dev-dependencies]
-branding-pkg = { path = "..", version = "0.19.0" }
+branding-pkg = { path = "..", version = "0.20.0" }

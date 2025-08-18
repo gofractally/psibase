@@ -26,6 +26,27 @@ mod service {
                 .get(&id)
         }
 
+        /// Get all responses to a staged transaction
+        async fn responses(
+            &self,
+            id: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, staged_tx::service::Response>> {
+            TableQuery::subindex::<AccountNumber>(
+                ResponseTable::with_service(staged_tx::SERVICE).get_index_pk(),
+                &(id),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
         /// Gets all staged transactions
         async fn get_staged(
             &self,

@@ -14,7 +14,7 @@ use bindings::sites::plugin::types::File;
 
 use bindings::accounts::plugin::api::{get_account, get_current_user};
 use bindings::host::common::client as Client;
-use bindings::host::common::types::Error;
+use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;

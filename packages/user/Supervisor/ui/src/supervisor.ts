@@ -284,7 +284,7 @@ export class Supervisor implements AppInterface {
         const service = this.supervisorResourceCall(
             getResourceCallArgs(
                 "host",
-                "common",
+                "types",
                 "api",
                 "PluginRef",
                 args.handle,
@@ -295,7 +295,7 @@ export class Supervisor implements AppInterface {
         const plugin = this.supervisorResourceCall(
             getResourceCallArgs(
                 "host",
-                "common",
+                "types",
                 "api",
                 "PluginRef",
                 args.handle,
@@ -306,7 +306,7 @@ export class Supervisor implements AppInterface {
         const intf = this.supervisorResourceCall(
             getResourceCallArgs(
                 "host",
-                "common",
+                "types",
                 "api",
                 "PluginRef",
                 args.handle,

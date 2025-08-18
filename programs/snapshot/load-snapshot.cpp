@@ -397,7 +397,7 @@ std::vector<psibase::BlockHeaderAuthAccount> getAuthServices(std::uint32_t chain
       raw::getKey(key.data(), key.size());
       auto row = psio::from_frac<psibase::CodeRow>(value);
 
-      if (row.flags & psibase::CodeRow::isAuthService)
+      if (row.flags & psibase::CodeRow::isVerify)
       {
          result.push_back({.codeNum   = row.codeNum,
                            .codeHash  = row.codeHash,

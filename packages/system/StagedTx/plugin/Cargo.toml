@@ -6,8 +6,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-staged-tx = { path = "../service/", version = "0.19.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.19.0" }
+staged-tx = { path = "../service/", version = "0.20.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.20.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.36.0", features = ["bitflags"] }
@@ -23,10 +23,11 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 
 
 [dev-dependencies]
-staged-tx-pkg = { path = "..", version = "0.19.0" }
+staged-tx-pkg = { path = "..", version = "0.20.0" }

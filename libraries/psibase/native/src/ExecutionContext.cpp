@@ -200,10 +200,10 @@ namespace psibase
          check(c->vmVersion == 0, "vmVersion is not 0");
          if (transactionContext.dbMode.verifyOnly)
          {
-            check(code.flags & CodeRow::isAuthService,
+            check(code.flags & CodeRow::isVerify,
                   "service account " + service.str() + " cannot be used in verify mode");
             // Ignore all other flags
-            code.flags &= CodeRow::isAuthService;
+            code.flags &= CodeRow::isVerify;
          }
          rethrowVMExcept(
              [&]
@@ -252,7 +252,7 @@ namespace psibase
                auto ca = database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
                if (ca.has_value() && ca->codeHash != Checksum256{})
                {
-                  ca->flags &= CodeRow::allFlags;
+                  ca->flags &= CodeRow::localServiceFlags;
                   ca->flags |= ExecutionContext::isLocal;
                   return {std::move(*ca), DbId::nativeSubjective};
                }
@@ -260,7 +260,7 @@ namespace psibase
             auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
             check(ca.has_value(), "unknown service account: " + service.str());
             check(ca->codeHash != Checksum256{}, "service account has no code");
-            ca->flags &= CodeRow::allFlags;
+            ca->flags &= CodeRow::chainServiceFlags;
             return {std::move(*ca), DbId::native};
          }
          else
@@ -269,20 +269,23 @@ namespace psibase
             auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
             check(ca.has_value(), "unknown service account: " + service.str());
             check(ca->codeHash != Checksum256{}, "service account has no code");
-            if ((ca->flags & CodeRow::isSubjective) && !dbMode.verifyOnly)
+            ca->flags &= CodeRow::chainServiceFlags;
+            auto runMode = ca->flags & CodeRow::runMode;
+            if (runMode && !dbMode.verifyOnly)
             {
+               check((ca->flags & CodeRow::runMode) <= CodeRow::runModeCallback, "Invalid runMode");
                auto subjectiveCode =
                    database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
                if (subjectiveCode.has_value() && subjectiveCode->codeHash != Checksum256{})
                {
                   if (!(subjectiveCode->flags & CodeRow::isReplacement))
                      abortMessage("Cannot substitute subjective service for " + service.str());
-                  subjectiveCode->flags &= CodeRow::allFlags;
-                  subjectiveCode->flags |= (CodeRow::isSubjective | ExecutionContext::isLocal);
+                  subjectiveCode->flags &= CodeRow::localServiceFlags;
+                  subjectiveCode->flags |= (ca->flags & ~CodeRow::localServiceFlags);
+                  subjectiveCode->flags |= ExecutionContext::isLocal;
                   return {std::move(*subjectiveCode), DbId::nativeSubjective};
                }
             }
-            ca->flags &= CodeRow::allFlags;
             return {std::move(*ca), DbId::native};
          }
       }
@@ -407,12 +410,11 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (callerFlags & CodeRow::isSubjective &&
-          !actionContext.transactionContext.dbMode.isSubjective)
+      if (callerFlags & CodeRow::runMode && !actionContext.transactionContext.dbMode.isSubjective)
       {
-         check(impl->code.flags & CodeRow::isSubjective,
+         check(impl->code.flags & CodeRow::runMode,
                "subjective services may not call non-subjective ones");
-         check((callerFlags & CodeRow::forceReplay) == (impl->code.flags & CodeRow::forceReplay),
+         check((callerFlags & CodeRow::runMode) == (impl->code.flags & CodeRow::runMode),
                "subjective services that call each other must have the same replay mode");
       }
 
@@ -423,9 +425,9 @@ namespace psibase
       }
 
       auto& bc = impl->transactionContext.blockContext;
-      if ((impl->code.flags & CodeRow::isSubjective) && !bc.isProducing)
+      if ((impl->code.flags & CodeRow::runMode) && !bc.isProducing)
       {
-         if (impl->code.flags & CodeRow::forceReplay)
+         if ((impl->code.flags & CodeRow::runMode) == CodeRow::runModeCallback)
          {
             try
             {
@@ -440,11 +442,11 @@ namespace psibase
                // If the service is called again, reinitialize it, to prevent corruption
                // from resuming after abrupt termination.
                impl->initialized = false;
-               if (callerFlags & CodeRow::forceReplay)
+               if ((callerFlags & CodeRow::runMode) == CodeRow::runModeCallback)
                   throw;
             }
             // Don't override the return value if the caller is also subjective
-            if (callerFlags & CodeRow::isSubjective)
+            if (callerFlags & CodeRow::runMode)
             {
                return;
             }
@@ -462,7 +464,7 @@ namespace psibase
                                   actionContext.action.sender.value);
       });
 
-      if ((impl->code.flags & CodeRow::isSubjective) && !(callerFlags & CodeRow::isSubjective))
+      if ((impl->code.flags & CodeRow::runMode) && !(callerFlags & CodeRow::runMode))
          impl->transactionContext.subjectiveData.push_back(actionContext.actionTrace.rawRetval);
    }
 
@@ -482,8 +484,6 @@ namespace psibase
 
    void ExecutionContext::asyncTimeout()
    {
-      if (impl->code.flags & CodeRow::canNotTimeOut)
-         return;
       impl->timedOut = true;
       impl->backend.backend->get_module().allocator.disable_code();
    }
