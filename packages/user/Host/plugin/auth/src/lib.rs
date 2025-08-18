@@ -14,8 +14,8 @@ use crate::bindings::accounts::plugin::api as AccountsApi;
 use crate::bindings::host::common::{
     admin as HostAdmin, store as KvStore,
     store::{Database, DbMode, StorageDuration},
-    types::{BodyTypes, PostRequest},
 };
+use crate::bindings::host::types::types::{BodyTypes, PostRequest};
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 
 const QUERY_TOKEN_BUCKET: &str = "query_tokens";

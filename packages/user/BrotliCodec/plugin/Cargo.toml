@@ -24,6 +24,7 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 
 [dev-dependencies]
 brotli-codec-pkg = { path = "..", version = "0.19.0" }

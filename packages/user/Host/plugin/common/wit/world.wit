@@ -1,64 +1,9 @@
 package host:common;
 
-/// Common types used by plugins
-interface types {
-
-    /// A reference to a specific plugin interface. Used for dynamically linking to other plugin functions.
-    resource plugin-ref {
-        constructor(service: string, plugin: string, intf: string);
-
-        /// Gets the name of the service whose plugin is referenced
-        get-service: func() -> string;
-
-        /// Gets the name of the plugin on which the function is being called
-        get-plugin: func() -> string;
-
-        /// Gets the name of the function being called
-        get-intf: func() -> string;
-    }
-
-    /// A standard error type plugins can use to propagate errors
-    /// back up the callchain.
-    /// 
-    /// The producer field should not be relied upon for correctness.
-    /// It is filled in by the plugin, which means it is possible to lie.
-    /// Also it may be changed by a downstream plugin.
-    record error {
-        code: u32,
-        producer: plugin-id,
-        message: string,
-    }
-
-    /// An object that uniquely identifies a plugin
-    record plugin-id {
-        /// The name of a service (e.g. accounts)
-        service: string,
-        /// The name of the plugin (e.g. plugin.wasm)
-        plugin: string,
-    }
-
-    variant body-types {
-        bytes(list<u8>),
-        json(string),
-        text(string),
-    }
-
-    /// The object needed to specify a post request
-    record post-request {
-
-        /// The endpoint being posted to (e.g. `/graphql`)
-        endpoint: string, 
-
-        /// The body of the post request
-        /// New `body` types can be added to enable posting different payloads
-        body: body-types,
-    }
-}
-
 /// Common calls related to interactions with the server
 interface server {
 
-    use types.{error, post-request, body-types};
+    use host:types/types.{error, post-request, body-types};
 
     /// Used to post graphql to the server and get a JSON response back
     /// The graphql payload is automatically posted to the app's own `/graphql` endpoint.
@@ -86,7 +31,7 @@ interface server {
 
 /// Common calls related to client interactions
 interface client {
-    use types.{error};
+    use host:types/types.{error};
 
     /// Gets the account name of the caller app
     get-sender: func() -> string;
@@ -100,7 +45,7 @@ interface client {
 }
 
 interface admin {
-    use types.{post-request, body-types, error};
+    use host:types/types.{post-request, body-types, error};
 
     /// Get account name of the active app (the top level app with which the user is interacting)
     get-active-app: func() -> string;
@@ -192,7 +137,6 @@ interface store {
 }
 
 world imports {
-    import types;
     import server;
     import client;
     import store;

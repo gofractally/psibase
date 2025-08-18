@@ -18,8 +18,8 @@ use transact::plugin::hook_handlers::*;
 use host::common::{
     self as Host, server as Server,
     store::{self as Store},
-    types::{self as CommonTypes, BodyTypes},
 };
+use host::types::types::{self as HostTypes, BodyTypes};
 
 // Exported interfaces/types
 use exports::transact::plugin::{
@@ -107,7 +107,7 @@ impl Intf for TransactPlugin {
     fn add_action_to_transaction(
         method_name: String,
         packed_args: Vec<u8>,
-    ) -> Result<(), CommonTypes::Error> {
+    ) -> Result<(), HostTypes::Error> {
         validate_action_name(&method_name)?;
 
         let service = Host::client::get_sender();
@@ -123,7 +123,7 @@ impl Intf for TransactPlugin {
         if let Some(plugin) = ActionAuthPlugins::get() {
             ActionAuthPlugins::clear();
             let plugin_ref =
-                Host::types::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
+                HostTypes::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
             let claims = on_action_auth_claims(plugin_ref, &action)?;
             ActionClaims::push(plugin, claims);
         }
@@ -160,7 +160,7 @@ impl Admin for TransactPlugin {
         }
     }
 
-    fn finish_tx() -> Result<(), CommonTypes::Error> {
+    fn finish_tx() -> Result<(), HostTypes::Error> {
         assert_from_supervisor();
         ActionSenderHook::clear();
 
@@ -217,7 +217,7 @@ struct LoginReply {
 }
 
 impl Auth for TransactPlugin {
-    fn get_query_token(app: String, user: String) -> Result<String, CommonTypes::Error> {
+    fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
         assert!(Host::client::get_sender() == "host");
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
@@ -256,9 +256,9 @@ impl Auth for TransactPlugin {
             return Err(ClaimProofMismatch.into());
         }
 
-        let response = Server::post(&Host::types::PostRequest {
+        let response = Server::post(&HostTypes::PostRequest {
             endpoint: "/login".to_string(),
-            body: Host::types::BodyTypes::Bytes(signed_tx.packed()),
+            body: HostTypes::BodyTypes::Bytes(signed_tx.packed()),
         })?;
 
         let reply = match response {

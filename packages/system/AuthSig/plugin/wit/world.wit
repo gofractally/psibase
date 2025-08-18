@@ -16,7 +16,7 @@ interface types {
 
 /// Methods related to key management
 interface keyvault {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{keypair, pem};
 
     /// Generates a new keypair managed by this auth plugin.
@@ -50,7 +50,7 @@ interface keyvault {
 
 interface actions {
     use types.{pem};
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Updates the key used by the current user to the specified public key
     /// The specified public key should be the PEM representation of the public key

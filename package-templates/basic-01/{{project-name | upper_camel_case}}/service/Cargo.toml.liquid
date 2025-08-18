@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-{{project-name}}"
-plugin = "plugin"
+plugin = "{{project-name}}-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "{{project-name}}", service = "{{project-name}}", method = "init", data = {} },

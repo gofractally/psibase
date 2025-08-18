@@ -9,7 +9,7 @@ use exports::workshop::plugin::{
     mail::Guest as Mail,
     registry::{AppMetadata, Guest as Registry},
 };
-use host::common::types::Error;
+use host::types::types::Error;
 use staged_tx::plugin::proposer::set_propose_latch;
 
 struct ProposeLatch;

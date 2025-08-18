@@ -1,8 +1,8 @@
 use crate::accounts::plugin::api as Accounts;
 use crate::exports::host::common::{
     store::{Database, DbMode, GuestBucket, StorageDuration},
-    types::Error,
 };
+use crate::host::types::types::Error;
 use crate::make_error;
 use crate::supervisor::bridge::database as HostDb;
 use crate::supervisor::bridge::intf::get_chain_id;

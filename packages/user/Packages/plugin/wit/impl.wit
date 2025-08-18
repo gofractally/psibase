@@ -1,7 +1,5 @@
 package packages:plugin;
 
-
-
 world impl {
     include host:common/imports;
     include accounts:plugin/imports;

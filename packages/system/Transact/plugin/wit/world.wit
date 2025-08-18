@@ -53,7 +53,7 @@ interface hooks {
 }
 
 interface intf {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Adds the specified service action to the current transaction.
     /// 
@@ -68,7 +68,7 @@ interface intf {
 }
 
 interface auth {
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Gets a bearer token for user to make authenticated queries
     get-query-token: func(app: string, user: string) -> result<string, error>;
@@ -93,7 +93,7 @@ world imports {
 // All user auth service plugins must include this world.
 world hook-user-auth {
     export transact-hook-user-auth: interface {
-        use host:common/types.{error};
+        use host:types/types.{error};
         use types.{claim, proof, action};
     
         /// Gets the claim needed to satisfy the authorization of the logged-in user
@@ -107,7 +107,7 @@ world hook-user-auth {
 world hook-action-auth {
     import hooks;
     export transact-hook-action-auth: interface {
-        use host:common/types.{error};
+        use host:types/types.{error};
         use types.{claim, proof, action};
     
         /// Gets the claim(s) needed to satisfy the authorization of the sender of this transaction
@@ -130,7 +130,7 @@ world hook-action-auth {
 world hook-actions-sender {
     import hooks;
     export transact-hook-actions-sender: interface {
-        use host:common/types.{error};
+        use host:types/types.{error};
     
         /// Sets the sender of the specified action when added to this transaction.
         /// Return `None` if the default sender should be used.
@@ -141,7 +141,7 @@ world hook-actions-sender {
 world hook-tx-transform {
     import hooks;
     export transact-hook-tx-transform: interface {
-        use host:common/types.{error};
+        use host:types/types.{error};
         use types.{action};
     
         /// Transform the set of actions in the transaction

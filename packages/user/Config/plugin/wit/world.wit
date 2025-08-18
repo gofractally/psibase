@@ -1,7 +1,8 @@
 package config:plugin;
 
 interface branding {
-    use host:common/types.{error};
+    use host:types/types.{error};
+    use sites:plugin/types.{file};
     use producers:plugin/types.{producer};
 
     upload-network-logo: func(logo: list<u8>) -> result<_, error>;
@@ -9,13 +10,14 @@ interface branding {
 }
 
 interface packaging  {
-    use host:common/types.{error};
+    use host:types/types.{error};
     
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
 }
 
 interface producers {
-    use host:common/types.{error};
+    use host:types/types.{error};
+    use sites:plugin/types.{file};
     use producers:plugin/types.{producer};
 
     /// Set the producers for CFT consensus.

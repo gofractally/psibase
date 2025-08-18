@@ -1,7 +1,7 @@
 use crate::bindings::accounts::plugin::api::get_account;
 use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::host::common as Host;
-use crate::bindings::host::common::types::BodyTypes;
+use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 use crate::bindings::transact::plugin::hook_handlers::*;
 use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
@@ -9,12 +9,12 @@ use crate::{ActionAuthPlugins, ActionClaims, ActionMetadata, ActionSenderHook, T
 use psibase::fracpack::Pack;
 use psibase::{AccountNumber, Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
-use Host::{client as Client, server as Server, types::PluginRef};
+use Host::{client as Client, server as Server};
 
 use regex::Regex;
 use sha2::{Digest, Sha256};
 
-pub fn validate_action_name(action_name: &str) -> Result<(), Host::types::Error> {
+pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
     let re = Regex::new(r"^[a-zA-Z0-9_]+$").unwrap();
     if re.is_match(action_name) {
         return Ok(());
@@ -27,7 +27,7 @@ pub fn assert_from_supervisor() {
     assert!(sender == "supervisor", "Unauthorized: {}", sender);
 }
 
-pub fn get_action_sender(service: &str, method: &str) -> Result<String, Host::types::Error> {
+pub fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {
     if let Some(plugin) = ActionSenderHook::get() {
         if let Some(s) = on_actions_sender(
             PluginRef::new(plugin.as_str(), "plugin", "transact-hook-actions-sender"),
@@ -61,7 +61,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-pub fn transform_actions(actions: Vec<ActionMetadata>) -> Result<Vec<Action>, Host::types::Error> {
+pub fn transform_actions(actions: Vec<ActionMetadata>) -> Result<Vec<Action>, HostTypes::Error> {
     if actions.len() == 0 {
         return Ok(vec![]);
     }
@@ -100,7 +100,7 @@ pub fn transform_actions(actions: Vec<ActionMetadata>) -> Result<Vec<Action>, Ho
 //   and the actions in the transaction.
 // The auth service is therefore the only service other than transact that gets to see
 //   in full what actions are being taken by a user.
-pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Host::types::Error> {
+pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, HostTypes::Error> {
     if actions.is_empty() {
         return Ok(vec![]);
     }
@@ -110,8 +110,7 @@ pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Hos
     // Add claims for the logged-in user if there are any
     if let Some(user) = get_current_user() {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
-        let plugin_ref =
-            Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+        let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
         if let Some(claim) = on_user_auth_claim(plugin_ref, &user)? {
             claims.push(claim);
         }
@@ -125,12 +124,11 @@ pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Hos
     Ok(claims)
 }
 
-pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, Host::types::Error> {
+pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, HostTypes::Error> {
     let mut claims = vec![];
 
     let auth_service_acc = get_account(user)?.unwrap().auth_service;
-    let plugin_ref =
-        Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
     if let Some(claim) = on_user_auth_claim(plugin_ref, &user)? {
         claims.push(claim);
     }
@@ -141,13 +139,12 @@ pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, Host::types::Err
 pub fn get_proofs(
     tx_hash: &[u8; 32],
     use_hooks: bool,
-) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
+) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
     let mut proofs = vec![];
 
     if let Some(user) = get_current_user() {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
-        let plugin_ref =
-            Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+        let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
         if let Some(proof) = on_user_auth_proof(plugin_ref, &user, tx_hash)? {
             proofs.push(proof);
         }
@@ -155,11 +152,8 @@ pub fn get_proofs(
 
     if use_hooks {
         for claims in ActionClaims::get_all() {
-            let plugin_ref = Host::types::PluginRef::new(
-                &claims.claimant,
-                "plugin",
-                "transact-hook-action-auth",
-            );
+            let plugin_ref =
+                PluginRef::new(&claims.claimant, "plugin", "transact-hook-action-auth");
             proofs.extend(on_action_auth_proofs(plugin_ref, &claims.claims, tx_hash)?);
         }
 
@@ -176,12 +170,11 @@ pub fn get_proofs(
 pub fn get_proofs_for_user(
     tx_hash: &[u8; 32],
     user: &String,
-) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
+) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
     let mut proofs = vec![];
 
     let auth_service_acc = get_account(user)?.unwrap().auth_service;
-    let plugin_ref =
-        Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
     if let Some(proof) = on_user_auth_proof(plugin_ref, &user, tx_hash)? {
         proofs.push(proof);
     }
@@ -263,14 +256,14 @@ pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transa
 }
 
 pub trait Publish {
-    fn publish(self) -> Result<BodyTypes, Host::types::Error>;
+    fn publish(self) -> Result<BodyTypes, HostTypes::Error>;
 }
 
 impl Publish for SignedTransaction {
-    fn publish(self) -> Result<BodyTypes, Host::types::Error> {
-        Ok(Server::post(&Host::types::PostRequest {
+    fn publish(self) -> Result<BodyTypes, HostTypes::Error> {
+        Ok(Server::post(&HostTypes::PostRequest {
             endpoint: "/push_transaction".to_string(),
-            body: Host::types::BodyTypes::Bytes(self.packed()),
+            body: HostTypes::BodyTypes::Bytes(self.packed()),
         })?)
     }
 }

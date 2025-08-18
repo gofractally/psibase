@@ -21,4 +21,5 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }

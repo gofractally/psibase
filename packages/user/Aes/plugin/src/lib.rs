@@ -8,7 +8,7 @@ use aes_gcm::{
 };
 use exports::aes::plugin::with_key::Guest as WithKey;
 use exports::aes::plugin::with_password::Guest as WithPassword;
-use host::common::types::{Error, PluginId};
+use host::types::types::{Error, PluginId};
 use kdf::plugin::api as Kdf;
 
 const AES_KEY_SIZE: usize = 32;
