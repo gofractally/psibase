@@ -860,6 +860,8 @@ name = "evaluations"
 version = "0.19.0"
 dependencies = [
  "async-graphql",
+ "average",
+ "ecies",
  "psibase",
  "rand 0.9.1",
  "serde",
@@ -2074,6 +2076,8 @@ name = "r-evaluations"
 version = "0.19.0"
 dependencies = [
  "async-graphql",
+ "average",
+ "ecies",
  "evaluations",
  "psibase",
  "serde",

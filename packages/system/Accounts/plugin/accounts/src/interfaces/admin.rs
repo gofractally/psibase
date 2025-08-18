@@ -3,15 +3,13 @@ use crate::plugin::AccountsPlugin;
 use crate::bindings::accounts::account_tokens::{api::*, types::ConnectionToken};
 use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
-use crate::bindings::host::common::admin as HostAdmin;
+use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types::{BodyTypes, PostRequest};
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
-
-use serde::Serialize;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn get_assert_caller_admin(context: &str) -> String {
@@ -34,31 +32,27 @@ fn assert_valid_account(account: &str) {
     assert!(account_details.is_some(), "Invalid account name");
 }
 
-#[derive(Serialize, Debug)]
-struct SetAuthCookieReqPayload {
-    accessToken: String,
-}
-
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
         assert_caller_admin("login_direct");
 
         assert_valid_account(&user);
 
-        let query_token = TransactAuthApi::get_query_token(&Client::get_receiver(), &user).unwrap();
-
-        let payload = SetAuthCookieReqPayload {
-            accessToken: query_token.to_string(),
-        };
-
-        let req: PostRequest = PostRequest {
-            endpoint: String::from("/common/set-auth-cookie"),
-            body: BodyTypes::Json(serde_json::to_string(&payload).unwrap()),
-        };
-        HostAdmin::post(&app, &req).unwrap();
+        // We want to authenticate as the user who is logging in to the 3rd-party app.
+        // So we need to log in as this user in accounts because accounts is the active app
+        // (because we redirected to accounts to do the login).
+        AppsTable::new(&Client::get_receiver()).login(&user);
 
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
+
+        if HostAuth::set_logged_in_user(&user, &app).is_err() {
+            AppsTable::new(&app).logout();
+            UserTable::new(&user).remove_connected_app(&app);
+        }
+
+        // Logging out to reverse accounts login above
+        AppsTable::new(&Client::get_receiver()).logout();
     }
 
     fn decode_connection_token(token: String) -> Option<ConnectionToken> {

@@ -7,6 +7,8 @@ use helpers::*;
 mod bucket;
 
 mod types;
+
+use bindings::host::auth::api as HostAuth;
 use exports::host::common::{
     admin::Guest as Admin,
     client::Guest as Client,
@@ -21,24 +23,44 @@ use supervisor::bridge::{
 };
 use url::Url;
 
+use crate::bindings::supervisor::bridge::intf::get_active_app;
+
 struct HostCommon;
 
 fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
+    let query_auth_token = HostAuth::get_active_query_token(&get_active_app());
+    let headers = if query_auth_token.is_none() {
+        make_headers(&[("Content-Type", &ty)])
+    } else {
+        make_headers(&[
+            ("Content-Type", &ty),
+            ("Authorization", &query_auth_token.unwrap()),
+        ])
+    };
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "POST".to_string(),
-        headers: make_headers(&[("Content-Type", &ty)]),
+        headers,
         body: Some(content),
     }
     .send()?)
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
+    let query_auth_token = HostAuth::get_active_query_token(&get_active_app());
+    let headers = if query_auth_token.is_none() {
+        make_headers(&[("Accept", "application/json")])
+    } else {
+        make_headers(&[
+            ("Accept", "application/json"),
+            ("Authorization", &query_auth_token.unwrap()),
+        ])
+    };
     Ok(HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "GET".to_string(),
-        headers: make_headers(&[("Accept", "application/json")]),
+        headers,
         body: None,
     }
     .send()?)
@@ -55,7 +77,7 @@ impl Admin for HostCommon {
     }
 
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
-        check_caller(&["accounts"], "post@host:common/admin");
+        check_caller(&["host"], "post@host:common/admin");
 
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(app, endpoint, request.body)?;

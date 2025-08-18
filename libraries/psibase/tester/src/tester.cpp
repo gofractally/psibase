@@ -159,14 +159,54 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    }
 }
 
-psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub)
+namespace
+{
+   void loadLocalServices(psibase::TestChain& self)
+   {
+      using namespace psibase;
+      auto prefix = psio::convert_to_key(codePrefix());
+      if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
+         return;
+      auto serviceRoot = std::getenv("PSIBASE_DATADIR");
+      check(serviceRoot != nullptr, "Cannot find local service directory");
+      auto servicesDir = std::string{serviceRoot} + "/services";
+      tester::raw::checkoutSubjective(self.nativeHandle());
+      for (auto account : {AccountNumber{"x-admin"}, AccountNumber{"x-http"},
+                           AccountNumber{"x-run"}, AccountNumber{"x-transact"}})
+      {
+         auto code = readWholeFile(servicesDir + "/" + account.str() + ".wasm");
+
+         auto    codeHash = sha256(code.data(), code.size());
+         CodeRow codeRow{
+             .codeNum = account,
+             .flags   = CodeRow::allowWriteSubjective | CodeRow::allowSocket |
+                      CodeRow::allowNativeSubjective,
+             .codeHash = codeHash,
+         };
+         self.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+         CodeByHashRow codeByHashRow{
+             .codeHash = codeHash,
+             .code{code.begin(), code.end()},
+         };
+         self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+      }
+      psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
+                     "Failed to commit changes");
+   }
+
+}  // namespace
+
+psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init)
     : id{clone ? tester::raw::cloneChain(chain_id) : chain_id}, isPublicChain(pub)
 {
    if (pub && numPublicChains++ == 0)
       psibase::tester::raw::selectedChain = id;
+   if (init)
+      loadLocalServices(*this);
 }
 
-psibase::TestChain::TestChain(const TestChain& other, bool pub) : TestChain{other.id, true, pub}
+psibase::TestChain::TestChain(const TestChain& other, bool pub)
+    : TestChain{other.id, true, pub, false}
 {
    status = other.status;
 }
@@ -195,7 +235,8 @@ psibase::TestChain::TestChain(std::string_view path, int flags, const DatabaseCo
                                        get_wasi_rights(flags),
                                        &cfg),
                 false,
-                pub)
+                pub,
+                (flags & (O_CREAT | O_TRUNC)) != 0)
 {
 }
 

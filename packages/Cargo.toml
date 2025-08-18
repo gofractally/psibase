@@ -11,6 +11,7 @@ members = [
     "user/Aes/plugin",
     "user/Base64/plugin",
     "user/ClientData/plugin",
+    "user/Host/plugin/auth",
     "user/Host/plugin/common",
     "user/Host/plugin/prompt",
     "user/Host/plugin/types",

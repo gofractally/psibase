@@ -1538,7 +1538,9 @@ async fn do_install<T: Read + Seek>(
     )
     .await?;
 
-    trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
+    if trx_builder.num_transactions() != 0 {
+        trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
+    }
 
     let upload_transactions = upload_builder.finish()?;
     {

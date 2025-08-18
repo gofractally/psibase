@@ -604,9 +604,6 @@ dependencies = [
 name = "config"
 version = "0.19.0"
 dependencies = [
- "psibase",
- "serde",
- "serde_json",
  "wit-bindgen-rt 0.38.0",
 ]
 
@@ -1216,6 +1213,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest",
+]
+
+[[package]]
+name = "host-auth"
+version = "0.19.0"
+dependencies = [
+ "psibase",
+ "wit-bindgen-rt 0.28.0",
 ]
 
 [[package]]

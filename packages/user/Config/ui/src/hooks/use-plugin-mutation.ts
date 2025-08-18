@@ -45,7 +45,7 @@ export const usePluginMutation = <T>(
             return res;
         },
         mutationFn: async (paramsArray) => {
-            await supervisor.functionCall({
+            return supervisor.functionCall({
                 service,
                 intf,
                 method,
@@ -53,17 +53,17 @@ export const usePluginMutation = <T>(
             });
         },
         onError: (errorObj, params, id) => {
-            console.error({ service, intf, method, params }, error);
+            console.error({ service, intf, method, params, errorObj }, error);
             toast.error(error, {
                 description: errorObj.message,
                 id,
             });
         },
-        onSuccess: async (_, networkName, id) => {
+        onSuccess: async (_, params, id) => {
             if (isStagable) {
                 const lastTx = await checkLastTx();
                 if (onSuccess) {
-                    onSuccess(networkName, lastTx);
+                    onSuccess(params, lastTx);
                 }
                 if (lastTx.type == "executed") {
                     toast.success(success, {
@@ -78,16 +78,18 @@ export const usePluginMutation = <T>(
                             label: "View",
                             onClick: () => {
                                 navigate(
-                                    `/pending-transactions/${lastTx.txId}`,
+                                    `/pending-transactions/${lastTx.stagedId}`,
                                 );
                             },
                         },
                     });
                 }
             } else {
+                if (onSuccess) {
+                    (onSuccess as (params: T) => void)(params);
+                }
                 toast.success(success, {
                     id,
-                    description: "Change is live.",
                 });
             }
         },

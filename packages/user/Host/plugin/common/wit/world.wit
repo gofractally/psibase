@@ -46,7 +46,7 @@ interface client {
 
 interface admin {
     use host:types/types.{post-request, body-types, error};
-    
+
     /// Get account name of the active app (the top level app with which the user is interacting)
     get-active-app: func() -> string;
 

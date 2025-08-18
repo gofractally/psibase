@@ -285,6 +285,7 @@ add_rs_component_workspace(packages/:Plugins
     host-common
     host-prompt
     host-types
+    host-auth
     transact
     workshop
     config
@@ -300,6 +301,9 @@ function(psinode_files target pfx)
     COMMAND mkdir -p ${pfx}/share/psibase/services
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm ${pfx}/share/psibase/services/x-http.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
+    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm ${pfx}/share/psibase/services/x-transact.wasm
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
     COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
@@ -312,6 +316,10 @@ psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
 install(DIRECTORY packages/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-admin.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-http.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-run.wasm)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-transact.wasm)
 install(DIRECTORY packages/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
@@ -337,7 +345,7 @@ psibase_package(
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
-        FLAGS allowWriteSubjective allowNativeSubjective
+        FLAGS allowWriteSubjective
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
@@ -420,6 +428,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
@@ -666,7 +675,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/HttpServer-schema.json
         SERVER rhttp-server
-        FLAGS allowSocket allowWriteSubjective
+        FLAGS allowWriteSubjective
     SERVICE rhttp-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer-schema.json

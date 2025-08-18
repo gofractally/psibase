@@ -1,3 +1,5 @@
+#include <services/local/XRun.hpp>
+#include <services/local/XTransact.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
@@ -12,6 +14,7 @@
 
 using namespace psibase;
 using namespace SystemService;
+using namespace LocalService;
 using UserService::XAdmin;
 
 namespace
@@ -24,64 +27,6 @@ namespace
 
    void cancelSpeculative(const std::optional<std::uint64_t>& id);
    void forwardTransaction(const SignedTransaction& trx);
-
-   void initPreverifyTransaction()
-   {
-      auto key      = notifyKey(NotifyType::preverifyTransaction);
-      auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key);
-      if (!existing)
-         existing = NotifyRow{NotifyType::nextTransaction};
-      if (!std::ranges::any_of(existing->actions,
-                               [](const auto& act) { return act.service == RTransact::service; }))
-      {
-         existing->actions.push_back(
-             {.service = RTransact::service, .method = MethodNumber{"preverify"}});
-         kvPut(DbId::nativeSubjective, key, *existing);
-      }
-   }
-
-   // Tell native that a transaction is ready.
-   // Must be run inside a subjective transaction.
-   void setTransactionReady()
-   {
-      auto key = notifyKey(NotifyType::nextTransaction);
-      if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
-      {
-         if (!std::ranges::any_of(existing->actions, [](const auto& act)
-                                  { return act.service == RTransact::service; }))
-         {
-            existing->actions.push_back(
-                {.service = RTransact::service, .method = MethodNumber{"next"}});
-            kvPut(DbId::nativeSubjective, key, *existing);
-         }
-      }
-      else
-      {
-         kvPut(DbId::nativeSubjective, key,
-               NotifyRow{NotifyType::nextTransaction,
-                         {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
-      }
-   }
-
-   // Tell native that there are no transactions ready
-   // Must be run inside a subjective transaction.
-   void clearTransactionReady()
-   {
-      auto key = notifyKey(NotifyType::nextTransaction);
-      if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
-      {
-         std::erase_if(existing->actions,
-                       [](const auto& act) { return act.service == RTransact::service; });
-         if (existing->actions.empty())
-         {
-            kvRemove(DbId::nativeSubjective, key);
-         }
-         else
-         {
-            kvPut(DbId::nativeSubjective, key, *existing);
-         }
-      }
-   }
 
    // Flushes the transaction queue and schedules all the
    // transactions in it to have their signatures verified again.
@@ -101,17 +46,8 @@ namespace
       if (!running)
       {
          transactor<RTransact> rtransact{RTransact::service, RTransact::service};
-         RunRow                row{
-                            .id      = 0,
-                            .mode    = RunMode::rpc,
-                            .maxTime = MicroSeconds::max(),
-                            .action  = rtransact.requeue(),
-                            .continuation = {.service = RTransact::service, .method = MethodNumber{"onRequeue"}},
-         };
-         if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
-            row.id = prev->id + 1;
-
-         kvPut(RunRow::db, row.key(), row);
+         to<XRun>().post(RunMode::rpc, rtransact.requeue(), MicroSeconds::max(),
+                         MethodNumber{"onRequeue"});
       }
    }
 
@@ -161,7 +97,8 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
       unapplied.put({nextSequence});
       if (!result)
       {
-         clearTransactionReady();
+         to<XTransact>().removeCallback(TransactionCallbackType::nextTransaction,
+                                        MethodNumber{"next"});
       }
    }
    return result;
@@ -338,8 +275,9 @@ namespace
                    .speculative = speculative});
 
       // Tell native that we have a transaction
-      setTransactionReady();
-      initPreverifyTransaction();
+      to<XTransact>().addCallback(TransactionCallbackType::nextTransaction, MethodNumber{"next"});
+      to<XTransact>().addCallback(TransactionCallbackType::preverifyTransaction,
+                                  MethodNumber{"preverify"});
    }
 
    // Checks whether the set of verify services has changed
@@ -379,8 +317,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id,
-                         const ClientFilter&         clientFilter) -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
+       -> ClaimedSockets
    {
       {
          auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
@@ -657,14 +595,7 @@ namespace
          if (auto* cancelId = std::get_if<std::uint64_t>(&v))
          {
             pendingVerifies.erase(*cancelId);
-            RunRow cancelledRun{
-                .id           = *cancelId,
-                .mode         = RunMode::rpc,
-                .maxTime      = std::chrono::milliseconds(0),
-                .action       = Action{.service = AccountNumber{"nop"}},
-                .continuation = {.service = RTransact::service, .method = MethodNumber{"onVerify"}},
-            };
-            kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+            to<XRun>().cancel(*cancelId, MethodNumber{"onVerify"});
          }
       }
    }
@@ -675,14 +606,7 @@ namespace
       if (id)
       {
          speculative.erase(*id);
-         RunRow cancelledRun{
-             .id           = *id,
-             .mode         = RunMode::rpc,
-             .maxTime      = std::chrono::milliseconds(0),
-             .action       = Action{.service = AccountNumber{"nop"}},
-             .continuation = {.service = RTransact::service, .method = MethodNumber{"onSpecTrx"}},
-         };
-         kvPut(RunRow::db, cancelledRun.key(), cancelledRun);
+         to<XRun>().cancel(*id, MethodNumber{"onSpecTrx"});
       }
    }
 
@@ -839,7 +763,7 @@ void RTransact::onVerify(std::uint64_t                      id,
    auto broadcastTxId          = std::optional<Checksum256>{};
    PSIBASE_SUBJECTIVE_TX
    {
-      kvRemove(RunRow::db, runKey(id));
+      to<XRun>().finish(id);
       if (auto row = pendingVerifies.get(id))
       {
          pendingVerifies.remove(*row);
@@ -929,7 +853,7 @@ void RTransact::onRequeue(std::uint64_t id, psio::view<const TransactionTrace> t
    check(getSender() == AccountNumber{}, "Wrong sender");
    PSIBASE_SUBJECTIVE_TX
    {
-      kvRemove(RunRow::db, runKey(id));
+      to<XRun>().finish(id);
    }
 }
 
@@ -944,7 +868,7 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::view<const TransactionTrace> t
    std::optional<Checksum256> broadcastTxId;
    PSIBASE_SUBJECTIVE_TX
    {
-      kvRemove(RunRow::db, runKey(id));
+      to<XRun>().finish(id);
       if (auto row = speculative.get(id))
       {
          speculative.remove(*row);
@@ -1038,18 +962,11 @@ namespace
 
    std::uint64_t scheduleSpeculative(const Checksum256& id, const SignedTransaction& trx)
    {
-      transactor<Transact> transact{AccountNumber{}, Transact::service};
-      RunRow               row{
-                        .id      = 0,
-                        .mode    = RunMode::speculative,
-                        .maxTime = std::chrono::seconds(1),
-                        .action  = transact.execTrx(trx.transaction, true),
-                        .continuation = {.service = RTransact::service, .method = MethodNumber{"onSpecTrx"}}};
-      if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
-         row.id = prev->id + 1;
-      kvPut(RunRow::db, row.key(), row);
-      RTransact{}.open<SpeculativeTransactionTable>().put({id, row.id});
-      return row.id;
+      transactor<Transact> transact{RTransact::service, Transact::service};
+      auto runid = to<XRun>().post(RunMode::speculative, transact.execTrx(trx.transaction, true),
+                                   std::chrono::seconds(1), MethodNumber{"onSpecTrx"});
+      RTransact{}.open<SpeculativeTransactionTable>().put({id, runid});
+      return runid;
    }
 
    // Must be run inside PSIBASE_SUBJECTIVE_TX
@@ -1067,26 +984,10 @@ namespace
       check(claims.size() == trx.proofs.size(), "Claims and proofs must have the same size");
       for (auto&& [claim, proof] : std::views::zip(claims, trx.proofs))
       {
-         VerifyArgs args{id, claim, proof};
-         Action     act{.sender  = AccountNumber{},
-                        .service = claim.service(),
-                        .method  = MethodNumber("verifySys"),
-                        .rawData = psio::to_frac(args)};
-
-         RunRow row{
-             .id           = 0,
-             .mode         = RunMode::verify,
-             .maxTime      = std::chrono::milliseconds(200),
-             .action       = std::move(act),
-             .continuation = {.service = RTransact::service, .method = MethodNumber{"onVerify"}},
-         };
-         if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
-            row.id = prev->id + 1;
-
-         remaining.push_back(row.id);
-
-         kvPut(RunRow::db, row.key(), row);
-         pendingVerifies.put({.txid = id, .runid = row.id});
+         auto runid = to<XRun>().verify(id, claim, proof, std::chrono::milliseconds(200),
+                                        MethodNumber{"onVerify"});
+         remaining.push_back(runid);
+         pendingVerifies.put({.txid = id, .runid = runid});
       }
       if (claims.empty())
       {

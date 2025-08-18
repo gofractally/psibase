@@ -156,7 +156,7 @@ impl KeyVault for AuthSig {
     }
 
     fn import_key(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        authorize(FunctionName::import_key)?;
+        authorize_with_whitelist(FunctionName::import_key, vec!["x-admin".into()])?;
 
         let public_key = AuthSig::pub_from_priv(private_key.clone())?;
         ManagedKeys::add(&public_key, &AuthSig::to_der(private_key)?);

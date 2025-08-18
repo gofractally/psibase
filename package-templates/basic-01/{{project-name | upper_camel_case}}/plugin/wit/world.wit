@@ -1,7 +1,8 @@
 package {{project-name}}:plugin;
 
 interface api {
-    set-example-thing: func(thing: string);
+    use host:common/types.{error};
+    set-example-thing: func(thing: string) -> result<_, error>;
 }
 
 interface queries {

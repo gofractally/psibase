@@ -89,12 +89,12 @@ impl WasmConfigRow {
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CodeRow {
-    codeNum: AccountNumber,
-    flags: u64,
+    pub codeNum: AccountNumber,
+    pub flags: u64,
 
-    codeHash: Checksum256,
-    vmType: u8,
-    vmVersion: u8,
+    pub codeHash: Checksum256,
+    pub vmType: u8,
+    pub vmVersion: u8,
 }
 
 impl CodeRow {
@@ -118,12 +118,11 @@ impl CodeRow {
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CodeByHashRow {
-    codeHash: Checksum256,
-    vmType: u8,
-    vmVersion: u8,
+    pub codeHash: Checksum256,
+    pub vmType: u8,
+    pub vmVersion: u8,
 
-    numRefs: u32,
-    code: Hex<Vec<u8>>,
+    pub code: Hex<Vec<u8>>,
 }
 
 impl CodeByHashRow {

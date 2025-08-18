@@ -3,6 +3,7 @@
 #include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 #include "services/system/Accounts.hpp"
@@ -12,6 +13,7 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
+using namespace LocalService;
 
 namespace SystemService
 {
@@ -67,15 +69,14 @@ namespace SystemService
                                " is not authorized to receive messages");
    }
 
-   extern "C" [[clang::export_name("recv")]] void recv()
+   void HttpServer::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
    {
-      auto act = getCurrentActionView();
-      auto [socket, data] =
-          psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
+      check(getSender() == XHttp::service, "Wrong sender");
       if (socket == producer_multicast)
       {
          auto act = psio::from_frac<Action>(data);
          checkRecvAuth(act);
+         auto _ = recurse();
          psibase::call(act);
       }
    }
@@ -85,7 +86,7 @@ namespace SystemService
       if (getSender() != act.service)
          psibase::abortMessage(getSender().str() + " cannot send messages to " + act.service.str());
       checkRecvAuth(act);
-      socketSend(producer_multicast, psio::to_frac(act));
+      to<XHttp>().send(producer_multicast, psio::to_frac(act));
    }
 
    namespace
@@ -106,7 +107,7 @@ namespace SystemService
             }
          }
 
-         socketSend(socket, psio::to_frac(result));
+         to<XHttp>().sendReply(socket, result);
       }
 
       using Temporary = TemporaryTables<PendingRequestTable>;
@@ -124,7 +125,7 @@ namespace SystemService
             auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
             requests.put(*row);
             owned.remove(*row);
-            socketAutoClose(socket, false);
+            to<XHttp>().autoClose(socket, false);
          }
       }
       else
@@ -151,7 +152,7 @@ namespace SystemService
             abortMessage(sender.str() + " cannot send a response on socket " +
                          std::to_string(socket));
          }
-         socketAutoClose(socket, true);
+         to<XHttp>().autoClose(socket, true);
       }
    }
 
@@ -177,10 +178,9 @@ namespace SystemService
             if (row && row->owner == sender)
             {
                requests.remove(*row);
+               to<XHttp>().autoClose(socket, true);
                okay = true;
             }
-            if (okay && socketAutoClose(socket, true) != 0)
-               okay = false;
          }
       }
       if (!okay)
@@ -190,18 +190,11 @@ namespace SystemService
       sendReplyImpl(sender, socket, result);
    }
 
-   extern "C" [[clang::export_name("serve")]] void serve()
+   void HttpServer::serve(std::int32_t sock, HttpRequest req)
    {
-      auto act = getCurrentAction();
+      check(getSender() == XHttp::service, "Wrong sender");
 
-      // TODO: use a view
-      auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
-
-      Actor<RTransact> rtransact(act.service, RTransact::service);
-      auto             user = rtransact.getUser(req);
-
-      auto iface = [&](AccountNumber server)
-      { return psibase::Actor<ServerInterface>(act.service, server); };
+      auto user = to<RTransact>().getUser(req);
 
       // Remove sensitive headers
       req.removeCookie("__HOST-SESSION");
@@ -213,13 +206,13 @@ namespace SystemService
       std::optional<HttpReply> result;
       psibase::AccountNumber   server;
 
-      auto owned = Temporary{act.service}.open<PendingRequestTable>();
+      auto owned = Temporary{getReceiver()}.open<PendingRequestTable>();
 
       auto checkServer = [&](psibase::AccountNumber srv)
       {
          server = srv;
          owned.put({.socket = sock, .owner = server});
-         return iface(server).serveSys(req, std::optional{sock}, user);
+         return recurse().to<ServerInterface>(server).serveSys(req, std::optional{sock}, user);
       };
 
       if (registered)
