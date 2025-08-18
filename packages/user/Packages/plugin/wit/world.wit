@@ -63,7 +63,7 @@ interface types {
 }
 
 interface private-api {
-    use host:common/types.{error};
+    use host:types/types.{error};
     use types.{meta, package-info, package-source, package-op-info, package-op-full, package-preference};
 
     // Takes a list of available packages and packages to install or update

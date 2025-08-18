@@ -10,7 +10,7 @@ interface branding {
 }
 
 interface packaging  {
-    use host:common/types.{error};
+    use host:types/types.{error};
     
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
 }

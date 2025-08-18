@@ -6,7 +6,7 @@ use bindings::exports::identity::plugin::api::Guest as Api;
 use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
 use bindings::exports::identity::plugin::types as IdentityTypes;
 use bindings::host::common::server as CommonServer;
-use bindings::host::types::types as CommonTypes;
+use bindings::host::types::types as HostTypes;
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
@@ -26,7 +26,7 @@ struct Attestation {
 }
 
 impl Api for IdentityPlugin {
-    fn attest_identity_claim(subject: String, score: f32) -> Result<(), CommonTypes::Error> {
+    fn attest_identity_claim(subject: String, score: f32) -> Result<(), HostTypes::Error> {
         if !(score >= 0.0 && score <= 1.0) {
             return Err(InvalidClaim(score).into());
         }
@@ -66,7 +66,7 @@ struct IdentitySummaryResponse {
 impl QueriesApi for IdentityPlugin {
     fn summary(
         subject: String,
-    ) -> Result<Option<IdentityTypes::IdentitySummary>, CommonTypes::Error> {
+    ) -> Result<Option<IdentityTypes::IdentitySummary>, HostTypes::Error> {
         let graphql_str = format!(
             "query {{ subjectStats(subject:\"{}\") {{ numHighConfAttestations, uniqueAttesters }} }}",
             subject

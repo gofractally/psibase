@@ -1,12 +1,12 @@
 use crate::bindings::*;
 use crate::errors::ErrorType::*;
 
-use host::types::types as CommonTypes;
+use host::types::types as HostTypes;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Deserialize;
 
 pub trait TryParseGqlResponse: Sized {
-    fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
+    fn from_gql(s: String) -> Result<Self, HostTypes::Error>;
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -49,7 +49,7 @@ pub struct Node {
 }
 
 impl TryFrom<String> for Data {
-    type Error = CommonTypes::Error;
+    type Error = HostTypes::Error;
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<Data> = serde_json::from_str(&response)
@@ -73,7 +73,7 @@ pub struct GetUserSettingsResponse {
 }
 
 impl TryFrom<String> for GetUserSettingsResponse {
-    type Error = CommonTypes::Error;
+    type Error = HostTypes::Error;
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<GetUserSettingsResponse> = serde_json::from_str(&response)
@@ -109,7 +109,7 @@ pub struct KeyHistoryResponse {
 }
 
 impl TryFrom<String> for KeyHistoryResponse {
-    type Error = CommonTypes::Error;
+    type Error = HostTypes::Error;
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<KeyHistoryResponse> = serde_json::from_str(&response)
@@ -138,7 +138,7 @@ pub struct UserNode {
 }
 
 impl TryFrom<String> for UserConnection {
-    type Error = CommonTypes::Error;
+    type Error = HostTypes::Error;
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<UserConnection> = serde_json::from_str(&response)

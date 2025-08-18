@@ -1,10 +1,5 @@
 package packages:plugin;
 
-interface private-api {
-    use host:types/types.{error};
-    use types.{meta, package-info, package-source, package-op-info, package-op-full, package-preference};
-
-
 world impl {
     include host:common/imports;
     include accounts:plugin/imports;

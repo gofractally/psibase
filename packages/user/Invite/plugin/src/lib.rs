@@ -31,7 +31,7 @@ use exports::{
 };
 use hex;
 use host::common::{client as Client, server as Server};
-use host::types::types as CommonTypes;
+use host::types::types as HostTypes;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::{
     fracpack::Pack,
@@ -57,7 +57,7 @@ fn rand_bytes(nr_bytes: u32) -> Vec<u8> {
 
 struct InvitePlugin;
 
-fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, CommonTypes::Error> {
+fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, HostTypes::Error> {
     let id = token.id;
 
     if let Some(invite) = InvitesTable::get_invite(id) {
@@ -86,7 +86,7 @@ fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, CommonTyp
 }
 
 impl Invitee for InvitePlugin {
-    fn accept_with_new_account(account: String, token: String) -> Result<(), CommonTypes::Error> {
+    fn accept_with_new_account(account: String, token: String) -> Result<(), HostTypes::Error> {
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
             return Err(InvalidAccount(&account));
         })?;
@@ -117,7 +117,7 @@ impl Invitee for InvitePlugin {
         Ok(())
     }
 
-    fn accept(token: String) -> Result<(), CommonTypes::Error> {
+    fn accept(token: String) -> Result<(), HostTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
 
@@ -136,7 +136,7 @@ impl Invitee for InvitePlugin {
         Ok(())
     }
 
-    fn reject(token: String) -> Result<(), CommonTypes::Error> {
+    fn reject(token: String) -> Result<(), HostTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
 
@@ -157,7 +157,7 @@ impl Invitee for InvitePlugin {
         Ok(())
     }
 
-    fn decode_invite(token: String) -> Result<Invite, CommonTypes::Error> {
+    fn decode_invite(token: String) -> Result<Invite, HostTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
 
@@ -197,7 +197,7 @@ impl Invitee for InvitePlugin {
 }
 
 impl Inviter for InvitePlugin {
-    fn generate_invite() -> Result<String, CommonTypes::Error> {
+    fn generate_invite() -> Result<String, HostTypes::Error> {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
         let seed = rand_bytes(8);
@@ -229,7 +229,7 @@ impl Inviter for InvitePlugin {
         Ok(serialize_token(&Token::InviteToken(invite_token)))
     }
 
-    fn delete_invite(token: String) -> Result<(), CommonTypes::Error> {
+    fn delete_invite(token: String) -> Result<(), HostTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
         Transact::add_action_to_transaction(
@@ -245,7 +245,7 @@ impl Inviter for InvitePlugin {
 }
 
 impl Advanced for InvitePlugin {
-    fn deserialize(token: String) -> Result<InviteKeys, CommonTypes::Error> {
+    fn deserialize(token: String) -> Result<InviteKeys, HostTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
 
@@ -274,7 +274,7 @@ impl HookActionsSender for InvitePlugin {
     fn on_actions_sender(
         service: String,
         method: String,
-    ) -> Result<Option<String>, CommonTypes::Error> {
+    ) -> Result<Option<String>, HostTypes::Error> {
         if service == InviteService::SERVICE.to_string()
             && (method == acceptCreate::ACTION_NAME || method == reject::ACTION_NAME)
         {

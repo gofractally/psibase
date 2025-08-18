@@ -7,12 +7,10 @@ use exports::clientdata::plugin::tests::Guest as Tests;
 use host::common::{
     client::get_sender, store as KvStore, store::Database, store::DbMode, store::StorageDuration,
 };
-use host::types::types::Error;
+use host::types::types::{Error, PluginId};
 
 mod tests;
 use tests::*;
-
-use crate::bindings::host::types::types::PluginId;
 
 struct ClientData;
 
