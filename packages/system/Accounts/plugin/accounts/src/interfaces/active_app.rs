@@ -8,14 +8,14 @@ use crate::plugin::AccountsPlugin;
 use accounts::account_tokens::types::*;
 use exports::accounts::plugin::{
     active_app::{Guest as ActiveApp, *},
-    api::Guest,
+    api::Guest as Api,
 };
 use host::common::client::get_app_url;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
         let account_details =
-            AccountsPlugin::get_account(user.clone()).expect("Get account failed");
+            <AccountsPlugin as Api>::get_account(user.clone()).expect("Get account failed");
         if account_details.is_none() {
             return Err(InvalidAccountName(user).into());
         }
@@ -38,10 +38,15 @@ impl ActiveApp for AccountsPlugin {
 
     fn logout() -> Result<(), Error> {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
-        AppsTable::new(&app).logout();
+        let apps_table = AppsTable::new(&app);
+        let user = apps_table.get_logged_in_user();
 
-        // TODO: request server to remove query token cookie
-        println!("logout(). REMOVE cookie");
+        // let user = <AccountsPlugin as Api>::get_current_user();
+        println!("accounts.active_app.user:{:?}", user);
+        let user = user.expect("Get current user failed");
+        HostAuth::log_out_user(&user, &app);
+
+        apps_table.logout();
 
         Ok(())
     }
