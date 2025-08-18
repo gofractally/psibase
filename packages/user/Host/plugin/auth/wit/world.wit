@@ -4,6 +4,9 @@ interface api {
     /// Notify of new logged in user
     set-logged-in-user: func(user: string, app: string) -> result<_, string>;
 
+    /// Notify of user logout
+    log-out-user: func(user: string, app: string);
+
     /// Privileged apps can get the query token to make calls on user's behalf
     get-active-query-token: func(app: string) -> option<string>;
 }
