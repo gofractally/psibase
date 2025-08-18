@@ -28,7 +28,7 @@ resolver = "2"
 
 exclude = [
     "user/CommonApi/common/packages/component-parser",
-    "user/XAdmin/ui/wasm",
+    "local/XAdmin/ui/wasm",
     # other excludes
 ]
 

@@ -299,7 +299,7 @@ function(psinode_files target pfx)
     DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
+    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm ${pfx}/share/psibase/services/x-http.wasm
     COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
@@ -315,7 +315,7 @@ endfunction()
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
-install(DIRECTORY packages/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
+install(DIRECTORY packages/local/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-admin.wasm)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-http.wasm)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-run.wasm)
