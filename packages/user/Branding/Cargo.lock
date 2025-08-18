@@ -351,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "branding"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "async-graphql",
  "branding-pkg",
@@ -363,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "branding-pkg"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "branding",
  "plugin",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1677,7 +1677,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "branding",
  "branding-pkg",
@@ -1737,7 +1737,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1794,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1808,7 +1808,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1820,14 +1820,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "seahash",
 ]

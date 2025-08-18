@@ -329,12 +329,12 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.19)
+set(PSIBASE_VERSION 0.20)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
     NAME Transact
-    VERSION ${PSIBASE_VERSION}.1
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
@@ -355,7 +355,7 @@ psibase_package(
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts
-    VERSION ${PSIBASE_VERSION}.1
+    VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
