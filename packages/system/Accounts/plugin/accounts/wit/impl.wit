@@ -3,7 +3,7 @@ package accounts:plugin;
 /// This interface is only callable by the accounts app itself.
 interface admin {
     use accounts:account-tokens/types.{connection-token};
-    use host:common/types.{error};
+    use host:types/types.{error};
 
     /// Logs the specified user into the specified app without any user interaction.
     /// This function is only callable by the accounts app itself.
