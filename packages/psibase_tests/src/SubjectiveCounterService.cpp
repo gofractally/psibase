@@ -25,7 +25,7 @@ struct SubjectiveCounterService : psibase::Service
    using Tables                  = psibase::SubjectiveTables<SubjectiveCounterTable>;
    static constexpr auto service = psibase::AccountNumber{"counter"};
    static constexpr auto serviceFlags =
-       psibase::CodeRow::isSubjective | psibase::CodeRow::allowWriteSubjective;
+       psibase::CodeRow::runModeRpc | psibase::CodeRow::isPrivileged;
    std::uint32_t                     inc(std::string key, std::uint32_t id);
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };

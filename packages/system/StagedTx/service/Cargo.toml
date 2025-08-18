@@ -8,7 +8,7 @@ edition.workspace = true
 publish = false
 
 [package.metadata.psibase]
-flags = ["allowSudo"]
+flags = ["isPrivileged"]
 server = "r-staged-tx"
 plugin = "plugin"
 postinstall = [{ sender = "staged-tx", service = "staged-tx", method = "init" }]

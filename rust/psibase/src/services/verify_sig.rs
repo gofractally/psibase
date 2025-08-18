@@ -3,7 +3,7 @@
 mod service {
     use crate::{Checksum256, Claim, Hex};
 
-    const SERVICE_FLAGS: u64 = crate::CodeRow::IS_AUTH_SERVICE;
+    const SERVICE_FLAGS: u64 = crate::CodeRow::IS_VERIFY;
 
     #[action]
     fn verifySys(transactionHash: Checksum256, claim: Claim, proof: Hex<Vec<u8>>) {

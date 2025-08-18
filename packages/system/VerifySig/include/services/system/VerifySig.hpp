@@ -8,7 +8,7 @@ namespace SystemService
    struct VerifySig : psibase::Service
    {
       static constexpr auto     service      = psibase::AccountNumber("verify-sig");
-      static constexpr uint64_t serviceFlags = psibase::CodeRow::isAuthService;
+      static constexpr uint64_t serviceFlags = psibase::CodeRow::isVerify;
 
       void verifySys(psibase::Checksum256 transactionHash,
                      psibase::Claim       claim,

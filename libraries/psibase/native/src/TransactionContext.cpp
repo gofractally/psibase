@@ -104,7 +104,7 @@ namespace psibase
                 .flags   = service.flags,
             };
             db.kvPut(CodeRow::db, account.key(), account);
-            if (service.flags & CodeRow::isAuthService)
+            if (service.flags & CodeRow::isVerify)
             {
                self.blockContext.modifiedAuthAccounts.insert(service.service);
             }

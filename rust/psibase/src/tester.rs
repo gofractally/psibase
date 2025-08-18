@@ -178,9 +178,7 @@ impl Chain {
 
             let code_row = CodeRow {
                 codeNum: AccountNumber::from_exact(account).unwrap(),
-                flags: CodeRow::ALLOW_WRITE_SUBJECTIVE
-                    | CodeRow::ALLOW_SOCKET
-                    | CodeRow::ALLOW_NATIVE_SUBJECTIVE,
+                flags: CodeRow::IS_PRIVILEGED,
                 codeHash: code_hash.clone(),
                 vmType: 0,
                 vmVersion: 0,

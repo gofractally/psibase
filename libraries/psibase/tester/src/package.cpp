@@ -25,26 +25,14 @@ namespace psibase
          std::uint64_t result = 0;
          for (const auto& flag : flags)
          {
-            if (flag == "allowSudo")
-               result |= (1 << 0);
-            else if (flag == "allowWriteNative")
-               result |= (1 << 1);
-            else if (flag == "isSubjective")
-               result |= (1 << 2);
-            else if (flag == "allowWriteSubjective")
-               result |= (1 << 3);
-            else if (flag == "canNotTimeOut")
-               result |= (1 << 4);
-            else if (flag == "canSetTimeLimit")
-               result |= (1 << 5);
-            else if (flag == "isAuthService")
-               result |= (1 << 6);
-            else if (flag == "forceReplay")
-               result |= (1 << 7);
-            else if (flag == "allowSocket")
-               result |= (1 << 8);
-            else if (flag == "allowNativeSubjective")
-               result |= (1 << 9);
+            if (flag == "isPrivileged")
+               result |= CodeRow::isPrivileged;
+            else if (flag == "isVerify")
+               result |= CodeRow::isVerify;
+            else if (flag == "runModeRpc")
+               result |= CodeRow::runModeRpc;
+            else if (flag == "runModeCallback")
+               result |= CodeRow::runModeCallback;
             else
                check(false, "Invalid service flags");
          }

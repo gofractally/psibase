@@ -258,8 +258,7 @@ namespace SystemService
       static constexpr auto service = psibase::AccountNumber("transact");
 
       /// Flags this service must run with
-      static constexpr uint64_t serviceFlags =
-          psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
+      static constexpr uint64_t serviceFlags = psibase::CodeRow::isPrivileged;
 
       using Tables = psibase::ServiceTables<TransactStatusTable,
                                             BlockSummaryTable,

@@ -12,7 +12,7 @@ namespace SystemService
    {
      public:
       static constexpr auto service      = psibase::AccountNumber("producers");
-      static constexpr auto serviceFlags = psibase::CodeRow::allowWriteNative;
+      static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
       /// `prods-weak` and `prods-strong` are accounts that represent authorization
       /// by the current block producers.  `prods-weak` is a quorum that is sufficient

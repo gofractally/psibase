@@ -365,14 +365,12 @@ TEST_CASE("Test push_transaction")
       // - allowSudo
       // - canSetTimeLimit
       auto alice = t.addAccount("alice");
-      auto flags =
-          GENERATE(values({CodeRow::allowSudo, CodeRow::allowWriteNative, CodeRow::isSubjective,
-                           CodeRow::canSetTimeLimit, (CodeRow::isSubjective | CodeRow::allowSocket),
-                           (CodeRow::isSubjective | CodeRow::allowNativeSubjective)}));
+      auto flags = GENERATE(values({CodeRow::isPrivileged, CodeRow::runModeRpc,
+                                    CodeRow::runModeRpc | CodeRow::isPrivileged}));
       INFO("flags: " << std::hex << flags);
       t.startBlock();
       auto verifyFlags = t.addService(AccountNumber{"verify-flags"}, "VerifyFlagsService.wasm",
-                                      flags | CodeRow::isAuthService);
+                                      flags | CodeRow::isVerify);
       t.startBlock();
       static_assert(std::same_as<decltype(flags), std::uint64_t>);
 
@@ -408,7 +406,7 @@ TEST_CASE("Test push_transaction")
 
          REQUIRE(t.from(SetCode::service)
                      .to<SetCode>()
-                     .setFlags(verifyFlags, CodeRow::isAuthService)
+                     .setFlags(verifyFlags, CodeRow::isVerify)
                      .succeeded());
          t.startBlock();
 
