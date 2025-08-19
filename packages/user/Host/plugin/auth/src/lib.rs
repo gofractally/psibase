@@ -56,7 +56,7 @@ const DB: Database = Database {
 
 impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), String> {
-        check_caller(&["accounts"], "set-logged-in-user@host:common/admin");
+        check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
         let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
         let query_token = bucket.get(&&app);
@@ -73,13 +73,14 @@ impl Api for HostAuth {
     }
 
     fn log_out_user(user: String, app: String) {
+        check_caller(&["accounts"], "log_out_user@host:auth/api");
         remove_active_query_token(&app, &user);
     }
 
     fn get_active_query_token(app: String) -> Option<String> {
         check_caller(
             &["host", "supervisor"],
-            "get-active-query-token@host:common/admin",
+            "get-active-query-token@host:auth/api",
         );
 
         let user = AccountsApi::get_current_user()?;
