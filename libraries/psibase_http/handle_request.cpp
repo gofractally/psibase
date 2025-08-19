@@ -728,11 +728,6 @@ namespace psibase::http
                }
             }
 
-            if (req.method() == bhttp::verb::options)
-            {
-               return send(ok_no_content(service == AccountNumber{}));
-            }
-
             auto        startTime = steady_clock::now();
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
@@ -756,6 +751,8 @@ namespace psibase::http
                data.method = "PUT";
             else if (req.method() == bhttp::verb::delete_)
                data.method = "DELETE";
+            else if (req.method() == bhttp::verb::options)
+               data.method = "OPTIONS";
             else
                return send(method_not_allowed(req.target(), req.method_string(),
                                               "GET, POST, OPTIONS", true));

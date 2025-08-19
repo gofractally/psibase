@@ -231,6 +231,10 @@ namespace SystemService
          {
             sendReplyImpl(server, sock, std::move(*result));
          }
+         else if (req.method == "OPTIONS")
+         {
+            sendReplyImpl(server, sock, {.status = HttpStatus::ok});
+         }
          else
          {
             std::string msg = "The resource '" + req.target + "' was not found";
