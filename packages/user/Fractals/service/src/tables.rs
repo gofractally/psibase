@@ -94,10 +94,10 @@ pub mod tables {
                 bucket.settle();
             });
             let denominator = seconds as u128;
-            if denominator >= Bucket::PPM {
+            if denominator >= Bucket::PPT {
                 abort_message("half-life too large");
             }
-            self.decay_rate_ppm = (Bucket::PPM / denominator) as u64;
+            self.decay_rate_ppm = (Bucket::PPT / denominator) as u64;
             self.save();
         }
 
@@ -549,7 +549,7 @@ pub mod tables {
     }
 
     impl Bucket {
-        const PPM: u128 = 1_000_000_000_000; // Parts per million, scaled for precision
+        const PPT: u128 = 1_000_000_000_000; // Parts per trillion
 
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
@@ -589,8 +589,8 @@ pub mod tables {
                 .seconds
                 .saturating_sub(self.last_update_timestamp.seconds) as u64;
             let lambda_t = self.decay_rate_ppm() * (delta as u128);
-            let denominator = Self::PPM.saturating_add(lambda_t);
-            ((self.last_update_principal as u128) * Self::PPM / denominator) as u64
+            let denominator = Self::PPT.saturating_add(lambda_t);
+            ((self.last_update_principal as u128) * Self::PPT / denominator) as u64
         }
 
         fn total_vested(&self) -> u64 {
