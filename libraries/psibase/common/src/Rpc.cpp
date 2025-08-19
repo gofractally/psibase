@@ -76,6 +76,11 @@ namespace
       {
          return isSecure() && account.str() + '.' + rootHost == host;
       }
+
+      bool isSubdomain(const std::string& rootHost)
+      {
+         return isSecure() && host == rootHost || host.ends_with('.' + rootHost);
+      }
    };
 }  // namespace
 
@@ -221,11 +226,16 @@ namespace psibase
           origin && Origin(*origin).isService(req.rootHost, account))
       {
          return allowCors(*origin);
-         return {
-             {"Access-Control-Allow-Origin", std::string(*origin)},
-             {"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"},
-             {"Access-Control-Allow-Headers", "*"},
-         };
+      }
+      return {};
+   }
+
+   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req)
+   {
+      if (auto origin = req.getHeader("origin");
+          origin && Origin(*origin).isSubdomain(req.rootHost))
+      {
+         return allowCors(*origin);
       }
       return {};
    }

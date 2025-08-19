@@ -1367,8 +1367,23 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
    auto target = request.path();
-   if (request.method == "POST" && target == "/push_transaction")
+   if (target == "/push_transaction")
    {
+      if (request.method == "OPTIONS")
+         return HttpReply{.headers = allowCorsSubdomains(request)};
+      if (request.method != "POST")
+      {
+         auto message = std::format("The resouce '{}' does not accept the method {}.",
+                                    request.target, request.method);
+         auto headers = allowCorsSubdomains(request);
+         headers.push_back({"Allow", "POST, OPTIONS"});
+         return HttpReply{
+             .status      = HttpStatus::methodNotAllowed,
+             .contentType = "text/html",
+             .body{message.begin(), message.end()},
+             .headers = std::move(headers),
+         };
+      }
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
 

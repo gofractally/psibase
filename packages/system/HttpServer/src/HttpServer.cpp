@@ -94,6 +94,7 @@ namespace SystemService
       constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Headers",  //
                                                      "Access-Control-Allow-Methods",  //
                                                      "Access-Control-Allow-Origin",   //
+                                                     "Allow",                         //
                                                      "Cache-Control",                 //
                                                      "Content-Encoding",              //
                                                      "Content-Security-Policy",       //
