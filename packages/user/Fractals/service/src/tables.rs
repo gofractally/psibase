@@ -594,7 +594,8 @@ pub mod tables {
         }
 
         fn total_vested(&self) -> u64 {
-            self.total_deposited.saturating_sub(self.balance_still_vesting())
+            self.total_deposited
+                .saturating_sub(self.balance_still_vesting())
         }
 
         fn balance_claimable(&self) -> u64 {
@@ -631,5 +632,18 @@ pub mod tables {
         }
     }
 
+    #[ComplexObject]
+    impl Bucket {
+        pub async fn balance_claimable_amount(&self) -> u64 {
+            self.balance_claimable()
+        }
 
+        pub async fn total_vested_amount(&self) -> u64 {
+            self.total_vested()
+        }
+
+        pub async fn balance_still_vesting_amount(&self) -> u64 {
+            self.balance_still_vesting()
+        }
+    }
 }

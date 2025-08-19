@@ -4,8 +4,8 @@ mod service {
 
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
-        EvaluationInstance, EvaluationInstanceTable, Fractal, FractalTable, Member, MemberTable,
-        Score, ScoreTable,
+        Bucket, EvaluationInstance, EvaluationInstanceTable, Fractal, FractalTable, Member,
+        MemberTable, Score, ScoreTable,
     };
     use psibase::*;
     use serde::{Deserialize, Deserializer};
@@ -167,6 +167,9 @@ mod service {
                 .collect()
         }
 
+        async fn bucket(&self, fractal: AccountNumber, account: AccountNumber) -> Bucket {
+            Bucket::get_or_new(fractal, account)
+        }
 
         async fn scores_by_member(
             &self,
