@@ -38,6 +38,17 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     bucket.set(&app, &query_token.to_string().packed());
 }
 
+fn remove_active_query_token(app: &str, user: &str) {
+    let req: PostRequest = PostRequest {
+        endpoint: String::from("/common/remove-auth-cookie"),
+        body: BodyTypes::Json(format!("{{}}")),
+    };
+    HostAdmin::post(app, &req).unwrap();
+
+    let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
+    let query_token = bucket.delete(&&app);
+}
+
 const DB: Database = Database {
     mode: DbMode::NonTransactional,
     duration: StorageDuration::Persistent,
@@ -45,7 +56,7 @@ const DB: Database = Database {
 
 impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), String> {
-        check_caller(&["accounts"], "set-logged-in-user@host:common/admin");
+        check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
         let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
         let query_token = bucket.get(&&app);
@@ -58,13 +69,19 @@ impl Api for HostAuth {
         };
         set_active_query_token(&query_token, &app, &user);
 
-        bucket.set(&app, &query_token.packed());
-
         Ok(())
     }
 
+    fn log_out_user(user: String, app: String) {
+        check_caller(&["accounts"], "log_out_user@host:auth/api");
+        remove_active_query_token(&app, &user);
+    }
+
     fn get_active_query_token(app: String) -> Option<String> {
-        check_caller(&["host"], "get-active-query-token@host:common/admin");
+        check_caller(
+            &["host", "supervisor"],
+            "get-active-query-token@host:auth/api",
+        );
 
         let user = AccountsApi::get_current_user()?;
 
