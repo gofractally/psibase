@@ -1,12 +1,14 @@
 #[psibase::service_tables]
 pub mod tables {
+    use std::str::FromStr;
     use std::u64;
 
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::tokens::Memo;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
-        ToSchema,
+        abort_message, check_some, get_service, services, AccountNumber, Fracpack, Table,
+        TimePointSec, ToSchema,
     };
 
     use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
@@ -24,6 +26,8 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
+        pub token_id: u32,
+        pub decay_rate_ppm: u64,
     }
 
     impl Fractal {
@@ -34,13 +38,18 @@ pub mod tables {
 
         fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
-
-            Self {
+            let max_supply = services::tokens::Decimal::from_str("21000000.0000").unwrap();
+            let mut fractal = Self {
                 account,
                 created_at: now,
                 mission,
                 name,
-            }
+                decay_rate_ppm: 0,
+                token_id: services::tokens::Wrapper::call()
+                    .create(max_supply.precision(), max_supply.quantity()),
+            };
+            fractal.set_half_life(30 * 86_400); // Default 30-day half-life
+            fractal
         }
 
         pub fn add(account: AccountNumber, name: String, mission: String) {
@@ -70,6 +79,26 @@ pub mod tables {
                         ..=(self.account, AccountNumber::new(u64::MAX)),
                 )
                 .collect()
+        }
+
+        pub fn set_half_life(&mut self, seconds: u64) {
+            let buckets: Vec<Bucket> = BucketTable::new()
+                .get_index_pk()
+                .range(
+                    (self.account, AccountNumber::new(0))
+                        ..=(self.account, AccountNumber::new(u64::MAX)),
+                )
+                .collect();
+
+            buckets.into_iter().for_each(|mut bucket| {
+                bucket.settle();
+            });
+            let denominator = seconds as u128;
+            if denominator >= Bucket::PPM {
+                abort_message("half-life too large");
+            }
+            self.decay_rate_ppm = (Bucket::PPM / denominator) as u64;
+            self.save();
         }
 
         pub fn set_schedule(
@@ -338,7 +367,6 @@ pub mod tables {
                 deliberation,
                 submission,
                 finish_by,
-                // TODO: Change back to 4,5,6;
                 vec![2, 3, 4, 5, 6],
                 6,
                 true,
@@ -508,4 +536,100 @@ pub mod tables {
             table.put(&self).expect("failed to save score");
         }
     }
+
+    #[table(name = "BucketTable", index = 4)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct Bucket {
+        pub fractal: AccountNumber,
+        pub account: AccountNumber,
+        pub total_deposited: u64,
+        pub total_claimed: u64,
+        pub last_update_principal: u64,
+        pub last_update_timestamp: TimePointSec,
+    }
+
+    impl Bucket {
+        const PPM: u128 = 1_000_000_000_000; // Parts per million, scaled for precision
+
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
+        }
+
+        pub fn get(fractal: AccountNumber, account: AccountNumber) -> Option<Self> {
+            let table = BucketTable::new();
+            table.get_index_pk().get(&(fractal, account))
+        }
+
+        pub fn get_or_new(fractal: AccountNumber, account: AccountNumber) -> Self {
+            Self::get(fractal, account).unwrap_or(Self {
+                fractal,
+                account,
+                total_claimed: 0,
+                total_deposited: 0,
+                last_update_principal: 0,
+                last_update_timestamp: TimePointSec::from(0),
+            })
+        }
+
+        pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
+            check_some(Self::get(fractal, account), "bucket does not exist")
+        }
+
+        fn decay_rate_ppm(&self) -> u128 {
+            Fractal::get_assert(self.fractal).decay_rate_ppm as u128
+        }
+
+        fn balance_still_vesting(&self) -> u64 {
+            if self.last_update_principal == 0 {
+                return 0;
+            }
+            let now = TransactSvc::call().currentBlock().time.seconds();
+            let delta = now
+                .seconds
+                .saturating_sub(self.last_update_timestamp.seconds) as u64;
+            let lambda_t = self.decay_rate_ppm() * (delta as u128);
+            let denominator = Self::PPM.saturating_add(lambda_t);
+            ((self.last_update_principal as u128) * Self::PPM / denominator) as u64
+        }
+
+        fn total_vested(&self) -> u64 {
+            self.total_deposited.saturating_sub(self.balance_still_vesting())
+        }
+
+        fn balance_claimable(&self) -> u64 {
+            self.total_vested().saturating_sub(self.total_claimed)
+        }
+
+        pub fn deposit(&mut self, amount: u64) {
+            let principal_now = self.settle();
+            self.last_update_principal = principal_now.saturating_add(amount);
+            self.total_deposited = self.total_deposited.saturating_add(amount);
+        }
+
+        fn settle(&mut self) -> u64 {
+            let time_now = TransactSvc::call().currentBlock().time.seconds();
+            let principal_now = self.balance_still_vesting();
+            self.last_update_principal = principal_now;
+            self.last_update_timestamp = time_now;
+            principal_now
+        }
+
+        pub fn claim(&mut self) {
+            let principal_now = self.settle();
+            let amount = self
+                .total_deposited
+                .saturating_sub(self.total_claimed)
+                .saturating_sub(principal_now);
+            self.total_claimed = self.total_claimed.saturating_add(amount);
+            psibase::services::tokens::Wrapper::call().credit(
+                Fractal::get_assert(self.fractal).token_id,
+                self.account,
+                amount.into(),
+                Memo::try_from("Fractal reward".to_string()).unwrap(),
+            )
+        }
+    }
+
+
 }

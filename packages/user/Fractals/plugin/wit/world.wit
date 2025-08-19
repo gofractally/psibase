@@ -7,10 +7,10 @@ interface admin {
 
     create-fractal: func(account: string, name: string, mission: string) -> result<_, error>;
     set-schedule: func(evaluation-type: u8, fractal: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32) -> result<_, error>;
-    
+    set-half-life: func(fractal: string, seconds: u64) -> result<_, error>;
     start: func(fractal: string, evaluation-type: u8) -> result<_, error>;
-    close-eval: func(evaluation-id: u32) -> result<_, error>;   
-    
+    close-eval: func(evaluation-id: u32) -> result<_, error>;
+
 }
 
 
@@ -18,6 +18,8 @@ interface user {
     use host:common/types.{error};
 
     join: func(fractal: string) -> result<_, error>;
+    claim: func(fractal: string) -> result<_, error>;
+
     
     attest: func(evaluation-id: u32, group-number: u32) -> result<_, error>;
     propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;

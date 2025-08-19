@@ -5,7 +5,7 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
 
-    use crate::tables::tables::{EvaluationInstance, Fractal, Member, MemberStatus};
+    use crate::tables::tables::{Bucket, EvaluationInstance, Fractal, Member, MemberStatus};
 
     use psibase::*;
 
@@ -38,6 +38,24 @@ pub mod service {
         evaluation.set_pending_scores(0);
 
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
+    }
+
+    /// Claims the fractal members locked balance depending on it's progression
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal
+    #[action]
+    fn claim(fractal: AccountNumber) {
+        Bucket::get_assert(fractal, get_sender()).claim();
+    }
+
+    /// Sets the half life for fractal awards.
+    ///
+    /// # Arguments
+    /// * `seconds` - Half life in seconds.
+    #[action]
+    fn set_half_life(seconds: u64) {
+        Fractal::get_assert(get_sender()).set_half_life(seconds);
     }
 
     /// Allows a user to join a fractal and immediately become a citizen.
