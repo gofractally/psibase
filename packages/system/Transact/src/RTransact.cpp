@@ -434,9 +434,9 @@ namespace
 
       if (!jsonClients.empty())
       {
-         JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json",
-                                                   .body{pruned}};
-         auto                                action = http.sendReply(0, reply);
+         JsonHttpReply<TransactionTraceRef&> reply{
+             .contentType = "application/json", .body{pruned}, .headers = allowCors()};
+         auto action = http.sendReply(0, reply);
 
          for (auto socket : jsonClients)
          {
@@ -447,9 +447,9 @@ namespace
 
       if (!binClients.empty())
       {
-         FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
-                                                       .body{pruned}};
-         auto                                    action = http.sendReply(0, reply);
+         FracpackHttpReply<TransactionTraceRef&> reply{
+             .contentType = "application/octet-stream", .body{pruned}, .headers = allowCors()};
+         auto action = http.sendReply(0, reply);
 
          for (auto socket : binClients)
          {
@@ -1429,7 +1429,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
                                                                            .aud = request.rootHost,
                                                                            .exp = exp.time_since_epoch().count()});
-         HttpReply           reply{.contentType = "application/json"};
+         HttpReply           reply{.contentType = "application/json", .headers = allowCors()};
          psio::vector_stream stream{reply.body};
          to_json(LoginReply{token}, stream);
          return reply;
@@ -1439,7 +1439,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    {
       check(user.has_value(), "Unauthorized");
       check(to<XAdmin>().isAdmin(*user), "Forbidden");
-      return HttpReply{.contentType = "application/octet-stream", .body = getJWTKey()};
+      return HttpReply{
+          .contentType = "application/octet-stream", .body = getJWTKey(), .headers = allowCors()};
    }
 
    return {};

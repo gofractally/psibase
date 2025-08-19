@@ -91,10 +91,14 @@ namespace SystemService
 
    namespace
    {
-      constexpr std::string_view allowedHeaders[] = {"Cache-Control",            //
-                                                     "Content-Encoding",         //
-                                                     "Content-Security-Policy",  //
-                                                     "ETag", "Set-Cookie"};
+      constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Headers",  //
+                                                     "Access-Control-Allow-Methods",  //
+                                                     "Access-Control-Allow-Origin",   //
+                                                     "Cache-Control",                 //
+                                                     "Content-Encoding",              //
+                                                     "Content-Security-Policy",       //
+                                                     "ETag",
+                                                     "Set-Cookie"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {
@@ -106,10 +110,6 @@ namespace SystemService
                             header.name);
             }
          }
-
-         result.headers.push_back({"Access-Control-Allow-Origin", "*"});
-         result.headers.push_back({"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"});
-         result.headers.push_back({"Access-Control-Allow-Headers", "*"});
 
          to<XHttp>().sendReply(socket, result);
       }
@@ -237,7 +237,7 @@ namespace SystemService
          }
          else if (req.method == "OPTIONS")
          {
-            sendReplyImpl(server, sock, {.status = HttpStatus::ok});
+            sendReplyImpl(server, sock, {.status = HttpStatus::ok, .headers = allowCors()});
          }
          else
          {
@@ -245,7 +245,8 @@ namespace SystemService
             sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
-                           .body        = std::vector(msg.begin(), msg.end())});
+                           .body        = std::vector(msg.begin(), msg.end()),
+                           .headers     = allowCors()});
          }
       }
    }  // serve()

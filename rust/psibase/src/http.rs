@@ -24,6 +24,22 @@ pub struct HttpHeader {
     pub value: String,
 }
 
+impl HttpHeader {
+    pub fn new(name: &str, value: &str) -> Self {
+        HttpHeader {
+            name: name.to_string(),
+            value: value.to_string(),
+        }
+    }
+    pub fn allow_cors() -> Vec<HttpHeader> {
+        vec![
+            HttpHeader::new("Access-Control-Allow-Origin", "*"),
+            HttpHeader::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"),
+            HttpHeader::new("Access-Control-Allow-Headers", "*"),
+        ]
+    }
+}
+
 /// An HTTP Request
 ///
 /// Most services receive this via their [serveSys](crate::server_interface::ServerActions::serveSys)

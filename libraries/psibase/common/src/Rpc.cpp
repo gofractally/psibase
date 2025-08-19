@@ -176,4 +176,16 @@ namespace psibase
 
       return false;
    }
+
+   std::vector<HttpHeader> allowCors(std::string_view methods)
+   {
+      std::vector<HttpHeader> result;
+      result.push_back({"Access-Control-Allow-Origin", "*"});
+      result.push_back(
+          {"Access-Control-Allow-Methods",
+           methods.empty() ? std::string("POST, GET, OPTIONS, HEAD") : std::string(methods)});
+      result.push_back({"Access-Control-Allow-Headers", "*"});
+      return result;
+   }
+
 }  // namespace psibase
