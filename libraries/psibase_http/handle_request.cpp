@@ -354,9 +354,9 @@ namespace psibase::http
 
       const auto set_cors = [&server](auto& res, bool allow_cors)
       {
-         if (!server.http_config->allow_origin.empty() && allow_cors)
+         if (allow_cors)
          {
-            res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
+            res.set(bhttp::field::access_control_allow_origin, "*");
             res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
             res.set(bhttp::field::access_control_allow_headers, "*");
          }
