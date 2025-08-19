@@ -100,7 +100,7 @@ namespace SystemService
             psio::json_token_stream jstream{request.body.data()};
             auto                    params = psio::from_json<cookie_data>(jstream);
 
-            std::vector<HttpHeader> headers     = allowCors();
+            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
             bool                    isLocalhost = psibase::isLocalhost(request);
             std::string             cookieName  = "__Host-SESSION";
 

@@ -1429,7 +1429,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
                                                                            .aud = request.rootHost,
                                                                            .exp = exp.time_since_epoch().count()});
-         HttpReply           reply{.contentType = "application/json", .headers = allowCors()};
+         HttpReply           reply{.contentType = "application/json",
+                                   .headers     = allowCors(request, AccountNumber{"supervisor"})};
          psio::vector_stream stream{reply.body};
          to_json(LoginReply{token}, stream);
          return reply;
@@ -1439,8 +1440,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    {
       check(user.has_value(), "Unauthorized");
       check(to<XAdmin>().isAdmin(*user), "Forbidden");
-      return HttpReply{
-          .contentType = "application/octet-stream", .body = getJWTKey(), .headers = allowCors()};
+      return HttpReply{.contentType = "application/octet-stream",
+                       .body        = getJWTKey(),
+                       .headers     = allowCors(request, AccountNumber{"supervisor"})};
    }
 
    return {};
