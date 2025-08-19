@@ -4,7 +4,7 @@ pub mod tables {
     use std::u64;
 
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::services::tokens::Memo;
+    use psibase::services::tokens;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         abort_message, check_some, get_service, services, AccountNumber, Fracpack, Table,
@@ -48,7 +48,7 @@ pub mod tables {
                 token_id: services::tokens::Wrapper::call()
                     .create(max_supply.precision(), max_supply.quantity()),
             };
-            fractal.set_half_life(30 * 86_400); // Default 30-day half-life
+            fractal.set_half_life(7 * 86_400); // Default 7-day half-life
             fractal
         }
 
@@ -57,8 +57,7 @@ pub mod tables {
         }
 
         pub fn get(fractal: AccountNumber) -> Option<Self> {
-            let table = FractalTable::new();
-            table.get_index_pk().get(&(fractal))
+            FractalTable::new().get_index_pk().get(&(fractal))
         }
 
         pub fn get_assert(fractal: AccountNumber) -> Self {
@@ -66,13 +65,11 @@ pub mod tables {
         }
 
         fn save(&self) {
-            let table = FractalTable::new();
-            table.put(&self).expect("failed to save");
+            FractalTable::new().put(&self).expect("failed to save");
         }
 
         pub fn members(&self) -> Vec<Member> {
-            let table = MemberTable::new();
-            table
+            MemberTable::new()
                 .get_index_pk()
                 .range(
                     (self.account, AccountNumber::new(0))
@@ -526,7 +523,13 @@ pub mod tables {
 
         pub fn save_pending_score(&mut self) {
             self.pending.take().map(|pending_score| {
-                self.value = calculate_ema_u32(pending_score, self.value, Fraction::new(1, 6));
+                let score = calculate_ema_u32(pending_score, self.value, Fraction::new(1, 6));
+                tokens::Wrapper::call().mint(
+                    Fractal::get_assert(self.fractal).token_id,
+                    ((score as u64) * 100).into(),
+                    tokens::Memo::try_from("Score reward for bucket".to_string()).unwrap(),
+                );
+                self.value = score;
                 self.save();
             });
         }
@@ -539,6 +542,7 @@ pub mod tables {
 
     #[table(name = "BucketTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Bucket {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
@@ -623,11 +627,11 @@ pub mod tables {
                 .saturating_sub(self.total_claimed)
                 .saturating_sub(principal_now);
             self.total_claimed = self.total_claimed.saturating_add(amount);
-            psibase::services::tokens::Wrapper::call().credit(
+            tokens::Wrapper::call().credit(
                 Fractal::get_assert(self.fractal).token_id,
                 self.account,
                 amount.into(),
-                Memo::try_from("Fractal reward".to_string()).unwrap(),
+                tokens::Memo::try_from("Fractal reward".to_string()).unwrap(),
             )
         }
     }
