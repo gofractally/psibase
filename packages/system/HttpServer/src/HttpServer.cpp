@@ -96,7 +96,7 @@ namespace SystemService
                                                      "Content-Security-Policy",  //
                                                      "ETag", "Set-Cookie"};
 
-      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
+      void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {
          for (const auto& header : result.headers)
          {
@@ -106,6 +106,10 @@ namespace SystemService
                             header.name);
             }
          }
+
+         result.headers.push_back({"Access-Control-Allow-Origin", "*"});
+         result.headers.push_back({"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"});
+         result.headers.push_back({"Access-Control-Allow-Headers", "*"});
 
          to<XHttp>().sendReply(socket, result);
       }
@@ -156,7 +160,7 @@ namespace SystemService
       }
    }
 
-   void HttpServer::sendReply(std::int32_t socket, const HttpReply& result)
+   void HttpServer::sendReply(std::int32_t socket, HttpReply result)
    {
       bool okay   = false;
       auto sender = getSender();
@@ -187,7 +191,7 @@ namespace SystemService
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
-      sendReplyImpl(sender, socket, result);
+      sendReplyImpl(sender, socket, std::move(result));
    }
 
    void HttpServer::serve(std::int32_t sock, HttpRequest req)

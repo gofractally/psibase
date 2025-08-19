@@ -815,8 +815,7 @@ namespace psibase::http
 
             auto socket = makeHttpSocket(
                 send,
-                [req_version, set_cors, set_keep_alive,
-                 allow_cors = service == AccountNumber{}](HttpReply&& reply)
+                [req_version, set_keep_alive](HttpReply&& reply)
                 {
                    bhttp::response<bhttp::vector_body<char>> res{
                        bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
@@ -824,7 +823,6 @@ namespace psibase::http
                    for (auto& h : reply.headers)
                       res.set(h.name, h.value);
                    res.set(bhttp::field::content_type, reply.contentType);
-                   set_cors(res, allow_cors);
                    set_keep_alive(res);
                    res.body() = std::move(reply.body);
                    res.prepare_payload();
