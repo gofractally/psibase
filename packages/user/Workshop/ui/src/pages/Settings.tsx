@@ -66,7 +66,6 @@ export const Settings = () => {
                                           metadata.privacyPolicySubpage,
                                       appHomepageSubpage:
                                           metadata.appHomepageSubpage,
-                                      redirectUris: metadata.redirectUris,
                                       tags: metadata.tags,
                                   }
                                 : undefined

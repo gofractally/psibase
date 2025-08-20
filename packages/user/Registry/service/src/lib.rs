@@ -25,7 +25,6 @@ pub mod service {
         privacy_policy_subpage: String,
         app_homepage_subpage: String,
         tags: Vec<String>,
-        redirect_uris: Vec<String>,
     ) {
         let app_metadata = AppMetadata::upsert(
             name,
@@ -36,7 +35,6 @@ pub mod service {
             tos_subpage,
             privacy_policy_subpage,
             app_homepage_subpage,
-            redirect_uris,
         );
 
         let mut tags = tags;

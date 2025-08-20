@@ -22,7 +22,6 @@ export const MetadataResponse = z.object({
             appHomepageSubpage: z.string(),
             status: z.string(),
             createdAt: z.string(),
-            redirectUris: z.array(z.string()),
             tags: z.array(z.string()),
         })
         .or(z.null()),
@@ -51,7 +50,6 @@ export const fetchMetadata = async (account: string) => {
             appHomepageSubpage
             status
             createdAt
-            redirectUris
             tags
           }
         }

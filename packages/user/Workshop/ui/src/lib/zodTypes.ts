@@ -33,7 +33,6 @@ export const Metadata = z.object({
     appHomepageSubpage: z
         .string()
         .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
-    redirectUris: z.string().array(),
     tags: z.string().array().max(3),
 });
 
