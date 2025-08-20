@@ -6,7 +6,9 @@ mod helpers;
 pub mod service {
     pub use crate::db::tables::*;
     use crate::helpers::{self, EvaluationStatus};
-    use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
+    use psibase::services::{
+        evaluations::Hooks::hooks_structs as EvalHooks, hook_handler::call_hook,
+    };
     use psibase::*;
 
     #[event(history)]
@@ -201,7 +203,7 @@ pub mod service {
         // we delete all groups + evaluation so that any users of this service
         // have an oppurtunity to read any table data before it's dropped.
         if evaluation.use_hooks {
-            EvalHooks::call_to(evaluation.owner).on_eval_fin(evaluation_id);
+            call_hook(evaluation.owner, EvalHooks::on_eval_fin { evaluation_id });
         }
 
         evaluation.get_groups().iter().for_each(|group| {
