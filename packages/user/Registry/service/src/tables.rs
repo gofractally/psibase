@@ -43,9 +43,6 @@ pub mod tables {
 
         /// The timestamp of when the app was created
         pub created_at: psibase::BlockTime,
-
-        /// The redirect URIs for the app
-        pub redirect_uris: Vec<String>,
     }
 
     #[table(name = "NextIdTable", index = 1)]
@@ -154,7 +151,6 @@ pub mod impls {
     use async_graphql::*;
     use psibase::services::transact;
     use psibase::*;
-    use url::Url;
 
     impl NextId {
         pub fn get() -> u32 {
@@ -333,13 +329,6 @@ pub mod impls {
                     "Unsupported icon MIME type",
                 );
             }
-
-            for uri in &self.redirect_uris {
-                check(
-                    Url::parse(uri).is_ok(),
-                    format!("Invalid redirect URI format: {}", uri).as_str(),
-                );
-            }
         }
 
         pub fn get(account_id: AccountNumber) -> Self {
@@ -356,7 +345,6 @@ pub mod impls {
             tos_subpage: String,
             privacy_policy_subpage: String,
             app_homepage_subpage: String,
-            redirect_uris: Vec<String>,
         ) -> Self {
             let app_metadata_table = AppMetadataTable::new();
 
@@ -379,7 +367,6 @@ pub mod impls {
             } else {
                 metadata.status
             };
-            metadata.redirect_uris = redirect_uris;
 
             if is_new_app {
                 let created_at = transact::Wrapper::call().currentBlock().time;

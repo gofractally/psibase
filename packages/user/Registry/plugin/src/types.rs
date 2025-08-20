@@ -13,7 +13,6 @@ impl From<AppMetadata> for setMetadata {
             privacy_policy_subpage: metadata.privacy_policy_subpage,
             app_homepage_subpage: metadata.app_homepage_subpage,
             tags: metadata.tags,
-            redirect_uris: metadata.redirect_uris,
         }
     }
 }

@@ -40,7 +40,6 @@ const formSchema = z.object({
     tosSubpage: z.string(),
     privacyPolicySubpage: z.string(),
     appHomepageSubpage: z.string(),
-    redirectUris: z.string().array(), // List of redirect URIs
     tags: z.string().array(), // List of tags
 });
 
@@ -60,7 +59,6 @@ const blankDefaultValues = formSchema.parse({
     tosSubpage: "",
     privacyPolicySubpage: "",
     appHomepageSubpage: "",
-    redirectUris: [],
     tags: [],
 });
 
