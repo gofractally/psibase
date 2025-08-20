@@ -58,8 +58,8 @@ impl Tests for ClientData {
         let [nontx_persistent, nontx_session, nontx_ephemeral, tx_persistent, tx_session, tx_ephemeral] =
             buckets.try_into().unwrap();
         standard_test_suite(&nontx_persistent);
-        standard_test_suite(&nontx_persistent);
-        standard_test_suite(&nontx_persistent);
+        standard_test_suite(&nontx_session);
+        standard_test_suite(&nontx_ephemeral);
         standard_test_suite(&tx_persistent);
         standard_test_suite(&tx_session);
 
