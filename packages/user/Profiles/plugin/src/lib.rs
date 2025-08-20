@@ -1,23 +1,17 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::profiles::plugin::api::Guest as Api;
-use bindings::exports::profiles::plugin::contacts::Guest as Contacts;
-
-use bindings::exports::profiles::plugin::contacts::Contact;
-
-use bindings::profiles::plugin::types::Profile as PluginProfile;
-
-use bindings::profiles::plugin::types::Avatar;
-
-use bindings::sites::plugin::types::File;
-
 use bindings::accounts::plugin::api::{get_account, get_current_user};
+use bindings::exports::profiles::plugin::{
+    api::Guest as Api, contacts::Contact, contacts::Guest as Contacts,
+};
 use bindings::host::common::client as Client;
 use bindings::host::types::types::Error;
+use bindings::profiles::plugin::types::{Avatar, Profile as PluginProfile};
+use bindings::sites::plugin::types::File;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
+use psibase::{fracpack::Pack, ActionMeta};
 
 mod errors;
 use errors::ErrorType;

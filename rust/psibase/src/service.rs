@@ -83,6 +83,10 @@ pub trait WithActionStruct {
     fn with_action_struct<P: ProcessActionStruct>(action: &str, process: P) -> Option<P::Output>;
 }
 
+pub trait ActionMeta {
+    const ACTION_NAME: &'static str;
+}
+
 pub trait Caller: Clone {
     type ReturnsNothing;
     type ReturnType<T: UnpackOwned>;

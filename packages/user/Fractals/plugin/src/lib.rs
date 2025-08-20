@@ -9,11 +9,9 @@ use bindings::exports::fractals::plugin::user::Guest as User;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
-
 mod errors;
 mod helpers;
-use psibase::AccountNumber;
+use psibase::{fracpack::Pack, AccountNumber, ActionMeta};
 
 use bindings::evaluations::plugin::admin::close;
 use bindings::evaluations::plugin::user::{

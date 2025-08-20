@@ -4,7 +4,7 @@ mod bindings;
 use bindings::*;
 use exports::setcode::plugin::api::Guest as Api;
 use psibase::services::setcode::action_structs::{setCode, stageCode};
-use psibase::AccountNumber;
+use psibase::{AccountNumber, ActionMeta};
 use transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;

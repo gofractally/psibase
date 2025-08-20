@@ -7,7 +7,7 @@ use crate::key_table;
 use crate::types;
 use bindings::host::common::client as Client;
 use ecies::{decrypt, encrypt};
-use psibase::{fracpack::Pack, AccountNumber};
+use psibase::{fracpack::Pack, AccountNumber, ActionMeta};
 
 use crate::bindings::host::types::types::Error;
 use crate::graphql::{fetch_and_decode, fetch_key_history, fetch_user_settings};

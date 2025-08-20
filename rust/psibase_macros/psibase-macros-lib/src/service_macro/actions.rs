@@ -108,8 +108,8 @@ pub fn process_action_args(
             #struct_members
         }
 
-        impl #fn_name {
-            pub const ACTION_NAME: &'static str = stringify!(#fn_name);
+        impl #psibase_mod::ActionMeta for #fn_name {
+            const ACTION_NAME: &'static str = stringify!(#fn_name);
         }
     };
 
