@@ -15,7 +15,7 @@ use crate::bindings::host::common::{
     admin as HostAdmin, store as KvStore,
     store::{Database, DbMode, StorageDuration},
 };
-use crate::bindings::host::types::types::{BodyTypes, PostRequest};
+use crate::bindings::host::types::types::{BodyTypes, Error, PostRequest};
 use crate::bindings::transact::plugin::auth as TransactAuthApi;
 
 const QUERY_TOKEN_BUCKET: &str = "query_tokens";
@@ -46,7 +46,7 @@ fn remove_active_query_token(app: &str, user: &str) {
     HostAdmin::post(app, &req).unwrap();
 
     let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
-    let query_token = bucket.delete(&&app);
+    bucket.delete(&&app);
 }
 
 const DB: Database = Database {
@@ -55,7 +55,7 @@ const DB: Database = Database {
 };
 
 impl Api for HostAuth {
-    fn set_logged_in_user(user: String, app: String) -> Result<(), String> {
+    fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
         check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
         let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
