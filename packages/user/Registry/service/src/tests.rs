@@ -13,7 +13,6 @@ mod tests {
             account_id: account!("cooking"),
             status: app_status::DRAFT,
             created_at: TimePointUSec::from(0),
-            redirect_uris: vec!["http://localhost:3000/callback".to_string()],
             name: "Super Cooking App".to_string(),
             short_desc: "Alice's Cooking App".to_string(),
             long_desc: "Super cooking app".to_string(),
@@ -48,7 +47,6 @@ mod tests {
             metadata.privacy_policy_subpage,
             metadata.app_homepage_subpage,
             tags,
-            metadata.redirect_uris,
         );
         chain.finish_block();
         res
@@ -77,7 +75,6 @@ mod tests {
                         privacyPolicySubpage,
                         appHomepageSubpage,
                         status,
-                        redirectUris,
                         createdAt,
                         tags
                     }}
@@ -100,7 +97,6 @@ mod tests {
                     "privacyPolicySubpage": "/privacy-policy",
                     "appHomepageSubpage": "/",
                     "status": "Draft",
-                    "redirectUris": ["http://localhost:3000/callback"],
                     "createdAt": "1970-01-01T00:00:04+00:00",
                     "tags": [
                         "cozy",
