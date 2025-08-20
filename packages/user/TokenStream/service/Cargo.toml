@@ -1,0 +1,24 @@
+[package]
+name = "token-stream"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-token-stream"
+plugin = "token-stream-plugin"
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "token-stream", service = "token-stream", method = "init", data = {} },
+]
+
+[dependencies]
+psibase = { version = "0.20.0", path = "../../../../rust/psibase" }
+psibase_macros = { version = "0.20.0", path = "../../../../rust/psibase_macros" }
+async-graphql = "=7.0.17"
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = "1.0.120"
+
+[dev-dependencies]
+token-stream-pkg = { path = "..", version = "0.20.0" }
