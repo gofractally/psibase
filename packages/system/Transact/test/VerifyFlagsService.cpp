@@ -32,13 +32,10 @@ void VerifyFlagsService::verifySys(Checksum256       transactionHash,
    {
       if (flags & CodeRow::isPrivileged)
       {
-         Action act{
-             .sender  = getReceiver(),
-             .service = getReceiver(),
-             .method  = MethodNumber{"recv"},
-             .rawData = psio::to_frac(std::tuple()),
-         };
-         socketSend(SocketRow::producer_multicast, psio::to_frac(act));
+         PSIBASE_SUBJECTIVE_TX
+         {
+            kvPutRaw(DbId::subjective, psio::convert_to_key(getReceiver()), {});
+         }
       }
       else
       {
