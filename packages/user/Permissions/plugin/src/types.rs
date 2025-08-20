@@ -1,6 +1,6 @@
 use crate::bindings::exports::permissions::plugin::admin::{Descriptions, PromptContext};
 use crate::bindings::exports::permissions::plugin::api::TrustLevel;
-use psibase::fracpack::{Error, FracInputStream, Pack, Result, Unpack};
+use psibase::fracpack::{FracInputStream, Pack, Result, Unpack};
 use std::cmp::Ordering;
 
 impl From<u8> for TrustLevel {
