@@ -6,6 +6,8 @@ from predicates import *
 import time
 import psinode
 from threading import Thread, Event
+from services import XAdmin
+import os
 
 def parallel(api, *args):
     threads = []
@@ -37,7 +39,7 @@ class TestQuery(unittest.TestCase):
     def test_(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-        a.install(sources=[testutil.test_packages()], packages=['AsyncQuery', 'SocketList'])
+        a.install(sources=[testutil.test_packages()], packages=['AsyncQuery'])
         a.wait(new_block())
 
         # Basic normal usage
@@ -90,8 +92,10 @@ class TestQuery(unittest.TestCase):
         self.assertEqual(r0, {"i":8})
         self.assertEqual(r1, {"i":9})
 
+        XAdmin(a).install(os.path.join(testutil.test_packages(), "XSocketList.psi"))
+
         # Check that all sockets were cleaned up
-        sockets = a.graphql(service='s-sock-list', query='''
+        sockets = a.graphql(service='x-sock-list', query='''
             query {
                 sockets {
                     edges {

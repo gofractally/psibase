@@ -83,3 +83,12 @@ class XAdmin(Service):
     def set_config(self, json):
         with self.put('/native/admin/config', json=json) as reply:
             reply.raise_for_status()
+    def install(self, file):
+        from zipfile import ZipFile
+        with ZipFile(file) as package:
+            for filename in package.namelist():
+                if filename.startswith('service/') and filename.endswith('.wasm'):
+                    service = filename.removeprefix('service/').removesuffix('.wasm')
+                    with package.open(filename) as f:
+                        with self.put('/services/' + service, data=f, headers={'Content-Type': 'application/wasm'}) as reply:
+                            reply.raise_for_status()
