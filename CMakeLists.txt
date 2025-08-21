@@ -137,7 +137,7 @@ if(DEFINED WASI_SDK_PREFIX)
         RHttpServer RSetCode RTransact SetCode Symbol
         Transact VerifySig XAdmin
         PSubjectiveService CounterService AsyncQueryService
-        SubjectiveCounterService KeepSocketService SocketListService)
+        SubjectiveCounterService KeepSocketService XSocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1059,20 +1059,19 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketList.psi
-    NAME SocketList
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XSocketList.psi
+    NAME XSocketList
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Lists active sockets"
-    SERVICE s-sock-list
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SocketListService-schema.json
-        SERVER s-sock-list
+    SERVICE x-sock-list
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService-schema.json
+        SERVER x-sock-list
         FLAGS isPrivileged
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket XSocketList)
 
 ExternalProject_Add(
     rust

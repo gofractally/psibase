@@ -32,7 +32,7 @@ function(add suffix)
     service(AsyncQueryService "${suffix}" src/AsyncQueryService.cpp)
     service(SubjectiveCounterService "${suffix}" src/SubjectiveCounterService.cpp)
     service(KeepSocketService "${suffix}" src/KeepSocketService.cpp)
-    service(SocketListService "${suffix}" src/SocketListService.cpp)
+    service(XSocketListService "${suffix}" src/XSocketListService.cpp)
     service(VerifyWithCall "${suffix}" src/VerifyWithCall.cpp)
 endfunction(add)
 
