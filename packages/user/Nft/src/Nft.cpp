@@ -49,20 +49,20 @@ void Nft::init()
    to<SystemService::HttpServer>().registerServer(Nft::service);
 
    // Event indices:
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "burned"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "burned"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "userConfSet"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 2);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 2);
-   to<EventIndex>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 0);
-   to<EventIndex>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 1);
-   to<EventIndex>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 2);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 1);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "burned"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "burned"_m, 1);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "userConfSet"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 1);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "credited"_m, 2);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 1);
+   to<EventConfig>().addIndex(DbId::historyEvent, Nft::service, "uncredited"_m, 2);
+   to<EventConfig>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 0);
+   to<EventConfig>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 1);
+   to<EventConfig>().addIndex(DbId::merkleEvent, Nft::service, "transferred"_m, 2);
 }
 
 NID Nft::mint()

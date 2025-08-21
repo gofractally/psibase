@@ -1534,6 +1534,9 @@ struct callbacks
          case uint32_t(psibase::DbId::native):
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):
+         case uint32_t(psibase::DbId::historyEvent):
+         case uint32_t(psibase::DbId::uiEvent):
+         case uint32_t(psibase::DbId::merkleEvent):
          case uint32_t(psibase::DbId::blockProof):
          case uint32_t(psibase::DbId::prevAuthServices):
             return (psibase::DbId)db;
@@ -1559,6 +1562,9 @@ struct callbacks
             return {chain, (psibase::DbId)db};
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):
+         case uint32_t(psibase::DbId::historyEvent):
+         case uint32_t(psibase::DbId::uiEvent):
+         case uint32_t(psibase::DbId::merkleEvent):
          case uint32_t(psibase::DbId::blockProof):
             return (psibase::DbId)db;
          default:

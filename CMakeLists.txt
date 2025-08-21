@@ -710,8 +710,11 @@ psibase_package(
     SERVICE events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Events-schema.json
-        FLAGS runModeCallback
         SERVER r-events
+    SERVICE event-index
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
+        FLAGS runModeCallback
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json

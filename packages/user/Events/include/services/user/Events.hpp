@@ -5,8 +5,6 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/db.hpp>
-#include <psibase/nativeTables.hpp>
-#include <psibase/schema.hpp>
 #include <psio/reflect.hpp>
 #include <services/user/EventsTables.hpp>
 
@@ -46,10 +44,12 @@ namespace UserService
    /// [{"x":5,"y":7,"sum":12},{"x":6,"y":5,"sum":11}]
    /// ```
    ///
-   struct EventIndex : psibase::Service
+   struct EventConfig : psibase::Service
    {
       static constexpr psibase::AccountNumber service{"events"};
-      static constexpr auto                   serviceFlags = psibase::CodeRow::runModeCallback;
+
+      using Tables = psibase::ServiceTables<SecondaryIndexTable>;
+
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
       /// Indexes increase the CPU cost of transactions that create events.
@@ -59,21 +59,10 @@ namespace UserService
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
-
-      /// Initializes the service
-      void init();
-      /// Indexes all new events. This is run automatically at the end of every transaction.
-      void sync();
-      /// Runs in subjective mode at the end of each block
-      void onBlock();
    };
-   PSIO_REFLECT(EventIndex,
-                method(init),
-                method(addIndex, db, service, event, column),
-                method(sync),
-                method(onBlock))
-   PSIBASE_REFLECT_TABLES(EventIndex, EventsTables)
+   PSIO_REFLECT(EventConfig, method(addIndex, db, service, event, column))
+   PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables)
 
-   using Events = EventIndex;
+   using Events = EventConfig;
 
 }  // namespace UserService

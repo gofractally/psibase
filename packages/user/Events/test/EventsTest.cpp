@@ -9,6 +9,7 @@
 
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/testerApi.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -240,4 +241,51 @@ TEST_CASE("events")
    expect(testService.to<TestService>().sendTime(TimePointSec{}).trace());
    CHECK(query<Time>(chain, R"""(SELECT * FROM "history.test-service.time")""") ==
          std::vector<Time>{{TimePointSec{}}});
+}
+
+void clearDb(DbId db)
+{
+   auto key = std::vector<char>();
+   while (raw::kvGreaterEqual(db, key.data(), key.size(), 0) != -1)
+   {
+      key = getKey();
+      kvRemoveRaw(db, key);
+   }
+}
+
+TEST_CASE("events snapshot")
+{
+   DefaultTestChain chain;
+   auto testService = chain.from(chain.addService<TestService>("Events-TestService.wasm"));
+   auto schema      = ServiceSchema::make<TestService>();
+   expect(testService.to<Packages>().setSchema(schema).trace());
+
+   expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
+   expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
+              .trace());
+
+   chain.finishBlock();
+
+   // Wipe writeOnly and event databases to simulate the state after loading a snapshot
+   clearDb(DbId::writeOnly);
+   clearDb(DbId::historyEvent);
+   clearDb(DbId::uiEvent);
+   clearDb(DbId::merkleEvent);
+   tester::raw::commitState(chain.nativeHandle());
+
+   chain.startBlock();
+
+   expect(testService.to<TestService>().send(42, 2.718, std::vector{3}, "c").trace());
+   expect(testService.to<Events>()
+              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
+              .trace());
+   expect(testService.to<TestService>().send(91, 1.618, std::vector{4}, "d").trace());
+
+   CHECK(
+       query<TestEvent>(
+           chain,
+           R"""(SELECT i,d,v,s FROM "history.test-service.testevent" WHERE d > 2 ORDER BY d)""") ==
+       std::vector<TestEvent>{{42, 2.718, {3}, "c"}});
 }

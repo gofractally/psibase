@@ -1,10 +1,11 @@
-#include <services/user/Events.hpp>
+#include <services/user/EventIndex.hpp>
 
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/schema.hpp>
 #include <regex>
+#include <services/user/Events.hpp>
 
 #include "SchemaCache.hpp"
 #include "eventKeys.hpp"
@@ -14,29 +15,12 @@ using namespace psibase;
 using namespace psio::schema_types;
 using namespace UserService;
 
-void EventIndex::addIndex(psibase::DbId          db,
-                          psibase::AccountNumber service,
-                          psibase::MethodNumber  event,
-                          std::uint8_t           column)
+void EventIndex::update(psibase::DbId          db,
+                        psibase::AccountNumber service,
+                        psibase::MethodNumber  event)
 {
-   check(getSender() == service, "Wrong sender");
-   const CompiledType* type = SchemaCache::instance().getSchemaType(db, service, event);
-   check(!!type, "Unknown event");
-   check(column < type->children.size(), "Unknown column");
-   auto secondary = Events{}.open<DbId::writeOnly, secondaryIndexSpecTableNum>();
-   auto row       = secondary.getIndex<0>().get(std::tuple(db, service, event));
-   if (!row)
-      row = SecondaryIndexRecord{db, service, event, std::vector{SecondaryIndexInfo{}}};
-   // Don't add duplicate indexes
-   for (const auto& index : row->indexes)
-   {
-      if (index.indexNum == column)
-         return;
-   }
-   row->indexes.push_back(SecondaryIndexInfo{column});
-   secondary.put(*row);
    // mark the table as dirty
-   auto dirtyTable = Events{}.open<IndexDirtyTable>();
+   auto dirtyTable = EventIndex{}.open<IndexDirtyTable>();
    dirtyTable.put(IndexDirtyRecord{db, service, event});
 }
 
@@ -81,19 +65,21 @@ namespace
           DbId::writeOnly,
           psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
       EventWrapper wrapper{nullptr};
-      void         operator()(psibase::DbId db, std::uint64_t eventNum)
+      bool         operator()(psibase::DbId db, std::uint64_t eventNum)
       {
          std::uint32_t sz = psibase::raw::getSequential(db, eventNum);
+         if (sz == -1)
+            return false;
          data.resize(sz);
          psibase::raw::getResult(data.data(), sz, 0);
          if (!psio::fracpack_validate<SequentialRecord<MethodNumber>>(data))
-            return;
+            return true;
          auto [service, type] = psio::from_frac<SequentialRecord<MethodNumber>>(data);
          if (!type)
-            return;
+            return true;
          const CompiledType* ctype = cache.getSchemaType(db, service, *type);
          if (!ctype)
-            return;
+            return true;
          wrapper.set(ctype);
 
          FracParser parser(psio::FracStream{data}, wrapper.get(), psibase_builtins, false);
@@ -105,7 +91,7 @@ namespace
          while (auto item = parser.next())
          {
             if (item.kind == FracParser::error)
-               return;
+               return true;
          }
 
          auto indexes = secondary.getIndex<0>().get(std::tuple(db, service, *type));
@@ -127,6 +113,7 @@ namespace
             psibase::raw::kvPut(DbId::writeOnly, key.data(), key.size(), nullptr, 0);
             key.clear();
          }
+         return true;
       }
    };
 
@@ -139,7 +126,8 @@ namespace
          {
             return false;
          }
-         writer(db, end);
+         if (!writer(db, end))
+            return false;
       }
       return true;
    }
@@ -240,7 +228,7 @@ namespace
 
    bool processQueue(std::uint32_t maxSteps)
    {
-      auto queue = Events{}.open<PendingIndexTable>();
+      auto queue = EventIndex{}.open<PendingIndexTable>();
 
       auto&             cache = SchemaCache::instance();
       EventWrapper      wrapper;
@@ -263,37 +251,48 @@ namespace
       return false;
    }
 
+   DbIndexStatus initStatus(const psibase::DatabaseStatusRow& dbStatus,
+                            DbIndexStatusTable&               table,
+                            DbId                              db)
+   {
+      if (auto result = table.get(db))
+         return *result;
+
+      auto queue = EventIndex{}.open<PendingIndexTable>();
+
+      auto queueRow = PendingIndexRecord{.seq = 0, .db = db, .endKey = 0};
+      // Look up the current event number
+      switch (db)
+      {
+         case DbId::historyEvent:
+            queueRow.endKey = dbStatus.nextHistoryEventNumber;
+            break;
+         case DbId::merkleEvent:
+            queueRow.endKey = dbStatus.nextMerkleEventNumber;
+            break;
+         default:
+            abortMessage("Unsupported db");
+      }
+      // Find the first available sequence number
+      {
+         auto end  = queue.getIndex<0>().end();
+         auto last = end;
+         --last;
+         if (last != end)
+            queueRow.seq = (*last).seq + 1;
+      }
+      queue.put(queueRow);
+      DbIndexStatus result{.db = db, .nextEventNumber = queueRow.endKey};
+      table.put(result);
+      return result;
+   }
 }  // namespace
-
-void EventIndex::init()
-{
-   const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
-       psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
-   check(!!dbStatus, "DatabaseStatusRow not found");
-
-   auto status = Events{}.open<DbIndexStatusTable>();
-
-   auto queue = Events{}.open<PendingIndexTable>();
-
-   if (!status.getIndex<0>().get(DbId::historyEvent))
-   {
-      queue.put(PendingIndexRecord{
-          .seq = 0, .db = DbId::historyEvent, .endKey = dbStatus->nextHistoryEventNumber});
-      status.put({.db = DbId::historyEvent, .nextEventNumber = dbStatus->nextHistoryEventNumber});
-   }
-   if (!status.getIndex<0>().get(DbId::merkleEvent))
-   {
-      queue.put(PendingIndexRecord{
-          .seq = 1, .db = DbId::merkleEvent, .endKey = dbStatus->nextMerkleEventNumber});
-      status.put({.db = DbId::merkleEvent, .nextEventNumber = dbStatus->nextMerkleEventNumber});
-   }
-}
 
 // Checks event tables that have been marked as dirty and
 // queues any required index updates.
 void queueIndexChanges()
 {
-   auto status          = Events{}.open<DbIndexStatusTable>().getIndex<0>();
+   auto status          = EventIndex{}.open<DbIndexStatusTable>().getIndex<0>();
    auto getNextEventNum = [&](DbId db)
    {
       if (auto result = status.get(db))
@@ -301,11 +300,11 @@ void queueIndexChanges()
       return static_cast<std::uint64_t>(1);
    };
 
-   auto objective  = Events{}.open<DbId::writeOnly, secondaryIndexSpecTableNum>();
-   auto subjective = Events{}.open<DbId::writeOnly, secondaryIndexTableNum>();
-   auto ready      = Events{}.open<DbId::writeOnly, secondaryIndexReadyTableNum>();
-   auto dirtyTable = Events{}.open<IndexDirtyTable>();
-   auto queue      = Events{}.open<PendingIndexTable>();
+   auto objective  = EventConfig{}.open<SecondaryIndexTable>();
+   auto subjective = EventIndex{}.open<DbId::writeOnly, secondaryIndexTableNum>();
+   auto ready      = EventIndex{}.open<DbId::writeOnly, secondaryIndexReadyTableNum>();
+   auto dirtyTable = EventIndex{}.open<IndexDirtyTable>();
+   auto queue      = EventIndex{}.open<PendingIndexTable>();
 
    std::uint64_t nextSeq;
    {
@@ -403,35 +402,34 @@ void queueIndexChanges()
    }
 }
 
-void Events::sync()
+void EventIndex::sync()
 {
    const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
        psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
    check(!!dbStatus, "DatabaseStatusRow not found");
 
-   auto        table = Events{}.open<DbIndexStatusTable>();
+   auto        table = EventIndex{}.open<DbIndexStatusTable>();
    IndexWriter writer;
    for (auto db : {DbId::historyEvent, DbId::merkleEvent})
    {
-      auto status = table.getIndex<0>().get(db);
-      if (!status)
-         status = DbIndexStatus{db, 1};
+      auto status = initStatus(*dbStatus, table, db);
 
-      auto eventNum = status->nextEventNumber;
+      auto eventNum = status.nextEventNumber;
       auto eventEnd = getNextEventNumber(*dbStatus, db);
       for (; eventNum != eventEnd; ++eventNum)
       {
-         writer(db, eventNum);
+         if (!writer(db, eventNum))
+            abortMessage(std::format("Missing event {}", eventNum));
       }
-      if (eventNum != status->nextEventNumber)
+      if (eventNum != status.nextEventNumber)
       {
-         status->nextEventNumber = eventNum;
-         table.put(*status);
+         status.nextEventNumber = eventNum;
+         table.put(status);
       }
    }
 }
 
-void Events::onBlock()
+void EventIndex::onBlock()
 {
    queueIndexChanges();
    processQueue(1000);

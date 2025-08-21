@@ -111,7 +111,7 @@ namespace UserService
                                 SecondaryIndexTable,
                                 PendingIndexTable,
                                 IndexDirtyTable,
-                                SecondaryIndexTable,
+                                void,  // objective
                                 ServiceSchemaTable,
                                 SecondaryIndexTable>;
 
@@ -121,7 +121,7 @@ namespace UserService
    // - all: Derived from spec by applying subjective rules
    // - ready: A subset of all containing only indexes that are fully synced
    constexpr std::uint16_t secondaryIndexTableNum{2};
-   constexpr std::uint16_t secondaryIndexSpecTableNum{5};
+   //constexpr std::uint16_t secondaryIndexSpecTableNum{5};
    constexpr std::uint16_t secondaryIndexReadyTableNum{7};
 
 }  // namespace UserService

@@ -113,11 +113,11 @@ void Symbol::init()
    to<SystemService::HttpServer>().registerServer(Symbol::service);
 
    // Event indices:
-   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 2);
+   to<EventConfig>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 1);
+   to<EventConfig>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 1);
+   to<EventConfig>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 2);
 }
 
 void Symbol::create(SID newSymbol, Quantity maxDebit)
