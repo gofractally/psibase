@@ -331,9 +331,15 @@ pub mod impls {
             }
         }
 
-        pub fn get(account_id: AccountNumber) -> Self {
+        pub fn get(account_id: AccountNumber) -> Option<Self> {
             let app_metadata_table = AppMetadataTable::new();
-            app_metadata_table.get_index_pk().get(&account_id).unwrap()
+            app_metadata_table.get_index_pk().get(&account_id)
+        }
+
+        pub fn get_assert(account_id: AccountNumber) -> Self {
+            let record = Self::get(account_id);
+            check(record.is_some(), "App metadata not found");
+            record.unwrap()
         }
 
         pub fn upsert(
