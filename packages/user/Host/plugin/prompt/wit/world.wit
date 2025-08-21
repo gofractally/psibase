@@ -14,13 +14,15 @@ interface web {
     ///    using the `store-context` function.
     get-context: func(context-id: string) -> result<list<u8>, error>;
 
-    /// Initiates a procedure that intends to display the content at the specified subpath (on
-    ///    the caller's subdomain) to the current user.
+    /// Initiates a procedure that prompts the user with the prompt corresponding to the 
+    ///    specified `prompt-name`. Typically, the psibase platform (e.g. web, cli, etc)
+    ///    uses a well-known path parameterized by the prompt name to retrieve the content 
+    ///    needed to prompt the user.
     ///
     /// If you provide a context_id, then that id will be available to the prompt. This is 
     ///    intended to allow plugins that create user prompts to look up additional context
     ///    relevant for handling the prompt.
-    prompt-user: func(subpath: option<string>, context-id: option<string>) -> result<_, error>;
+    prompt-user: func(prompt-name: string, context-id: option<string>) -> result<_, error>;
 }
 
 world imports {
