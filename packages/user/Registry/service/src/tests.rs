@@ -18,9 +18,6 @@ mod tests {
             long_desc: "Super cooking app".to_string(),
             icon: "icon-as-base64".to_string(),
             icon_mime_type: "image/png".to_string(),
-            tos_subpage: "/tos".to_string(),
-            privacy_policy_subpage: "/privacy-policy".to_string(),
-            app_homepage_subpage: "/".to_string(),
         }
     }
 
@@ -43,9 +40,6 @@ mod tests {
             metadata.long_desc,
             metadata.icon,
             metadata.icon_mime_type,
-            metadata.tos_subpage,
-            metadata.privacy_policy_subpage,
-            metadata.app_homepage_subpage,
             tags,
         );
         chain.finish_block();
@@ -71,9 +65,6 @@ mod tests {
                         longDesc,
                         icon,
                         iconMimeType,
-                        tosSubpage,
-                        privacyPolicySubpage,
-                        appHomepageSubpage,
                         status,
                         createdAt,
                         tags
@@ -93,9 +84,6 @@ mod tests {
                     "longDesc": "Super cooking app",
                     "icon": "icon-as-base64",
                     "iconMimeType": "image/png",
-                    "tosSubpage": "/tos",
-                    "privacyPolicySubpage": "/privacy-policy",
-                    "appHomepageSubpage": "/",
                     "status": "Draft",
                     "createdAt": "1970-01-01T00:00:04+00:00",
                     "tags": [

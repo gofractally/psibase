@@ -61,11 +61,6 @@ export const Settings = () => {
                                       longDesc: metadata.longDesc,
                                       icon: metadata.icon,
                                       iconMimeType: metadata.iconMimeType,
-                                      tosSubpage: metadata.tosSubpage,
-                                      privacyPolicySubpage:
-                                          metadata.privacyPolicySubpage,
-                                      appHomepageSubpage:
-                                          metadata.appHomepageSubpage,
                                       tags: metadata.tags,
                                   }
                                 : undefined

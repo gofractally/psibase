@@ -28,15 +28,6 @@ pub mod tables {
         /// The MIME type of the icon
         pub icon_mime_type: String,
 
-        /// The subpage for Terms of Service
-        pub tos_subpage: String,
-
-        /// The subpage for Privacy Policy
-        pub privacy_policy_subpage: String,
-
-        /// The subpage for the app's homepage
-        pub app_homepage_subpage: String,
-
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
         #[graphql(skip)]
         pub status: u32,
@@ -238,13 +229,6 @@ pub mod impls {
         );
     }
 
-    fn validate_subpath(subpath_name: &str, subpath: &str) {
-        check(
-            subpath.starts_with("/"),
-            format!("{} path must start with /", subpath_name).as_str(),
-        );
-    }
-
     fn set_diff<T>(a: &[T], b: &[T]) -> Vec<T>
     where
         T: Copy + PartialEq,
@@ -313,10 +297,6 @@ pub mod impls {
             validate_length("Short description", &self.short_desc, MAX_SHORT_DESC_SIZE);
             validate_length("Long description", &self.long_desc, MAX_LONG_DESC_SIZE);
 
-            validate_subpath("TOS", &self.tos_subpage);
-            validate_subpath("Privacy policy", &self.privacy_policy_subpage);
-            validate_subpath("Homepage", &self.app_homepage_subpage);
-
             // Validate icon
             if self.icon.len() > 0 {
                 check(
@@ -348,9 +328,6 @@ pub mod impls {
             long_desc: String,
             icon: String,
             icon_mime_type: String,
-            tos_subpage: String,
-            privacy_policy_subpage: String,
-            app_homepage_subpage: String,
         ) -> Self {
             let app_metadata_table = AppMetadataTable::new();
 
@@ -365,9 +342,6 @@ pub mod impls {
             metadata.long_desc = long_desc;
             metadata.icon = icon;
             metadata.icon_mime_type = icon_mime_type;
-            metadata.tos_subpage = tos_subpage;
-            metadata.privacy_policy_subpage = privacy_policy_subpage;
-            metadata.app_homepage_subpage = app_homepage_subpage;
             metadata.status = if is_new_app {
                 app_status::DRAFT
             } else {
@@ -423,16 +397,10 @@ pub mod impls {
                 ("name", &self.name),
                 ("short_description", &self.short_desc),
                 ("long_description", &self.long_desc),
-                ("tos_subpage", &self.tos_subpage),
-                ("privacy_policy_subpage", &self.privacy_policy_subpage),
-                ("app_homepage_subpage", &self.app_homepage_subpage),
             ];
             for (name, v) in required_fields {
                 check(v.len() > 0, &format!("{} required to publish", name));
             }
-
-            // TODO: check each of those subpages exist
-            // in the caller's namespace in sites (or it must be an SPA)
 
             self.status = app_status::PUBLISHED;
             AppMetadataTable::new().put(&self).unwrap();
