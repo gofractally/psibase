@@ -37,9 +37,6 @@ const formSchema = z.object({
     longDesc: z.string(),
     icon: z.string(),
     iconMimeType: z.string(), // MIME type of the icon
-    tosSubpage: z.string(),
-    privacyPolicySubpage: z.string(),
-    appHomepageSubpage: z.string(),
     tags: z.string().array(), // List of tags
 });
 
@@ -56,9 +53,6 @@ const blankDefaultValues = formSchema.parse({
     longDesc: "",
     icon: "",
     iconMimeType: "",
-    tosSubpage: "",
-    privacyPolicySubpage: "",
-    appHomepageSubpage: "",
     tags: [],
 });
 
@@ -76,9 +70,6 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
             toast("Saving...");
             await onSubmit({
                 ...data,
-                tosSubpage: data.tosSubpage || "/",
-                appHomepageSubpage: data.appHomepageSubpage || "/",
-                privacyPolicySubpage: data.privacyPolicySubpage || "/",
             });
             form.reset(data);
             toast("Success", { description: `Saved changes.` });
@@ -266,66 +257,6 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
                             )}
                         />
                         <Separator />
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-medium">App Pages</h3>
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <FormField
-                                    control={form.control}
-                                    name="tosSubpage"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>
-                                                Terms of Service
-                                            </FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    required
-                                                    placeholder="/terms-of-service"
-                                                    {...field}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="privacyPolicySubpage"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>
-                                                Privacy Policy
-                                            </FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    required
-                                                    placeholder="/privacy-policy"
-                                                    {...field}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="appHomepageSubpage"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>App Home</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    required
-                                                    placeholder="/"
-                                                    {...field}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                        </div>
                         <div className="flex justify-end">
                             <Button
                                 type="submit"

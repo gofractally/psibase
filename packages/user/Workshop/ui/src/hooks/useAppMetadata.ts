@@ -17,9 +17,6 @@ export const MetadataResponse = z.object({
             longDesc: z.string(),
             icon: z.string(),
             iconMimeType: z.string(),
-            tosSubpage: z.string(),
-            privacyPolicySubpage: z.string(),
-            appHomepageSubpage: z.string(),
             status: z.string(),
             createdAt: z.string(),
             tags: z.array(z.string()),
@@ -45,9 +42,6 @@ export const fetchMetadata = async (account: string) => {
             longDesc
             icon
             iconMimeType
-            tosSubpage
-            privacyPolicySubpage
-            appHomepageSubpage
             status
             createdAt
             tags

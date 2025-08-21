@@ -21,9 +21,6 @@ pub mod service {
         long_description: String,
         icon: String,
         icon_mime_type: String,
-        tos_subpage: String,
-        privacy_policy_subpage: String,
-        app_homepage_subpage: String,
         tags: Vec<String>,
     ) {
         let app_metadata = AppMetadata::upsert(
@@ -32,9 +29,6 @@ pub mod service {
             long_description,
             icon,
             icon_mime_type,
-            tos_subpage,
-            privacy_policy_subpage,
-            app_homepage_subpage,
         );
 
         let mut tags = tags;
