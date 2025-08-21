@@ -44,13 +44,13 @@ pub mod service {
     #[action]
     fn publish(account_id: AccountNumber) {
         check(account_id == get_sender(), "Unauthorized");
-        AppMetadata::get(account_id).publish();
+        AppMetadata::get_assert(account_id).publish();
     }
 
     #[action]
     fn unpublish(account_id: AccountNumber) {
         check(account_id == get_sender(), "Unauthorized");
-        AppMetadata::get(account_id).unpublish();
+        AppMetadata::get_assert(account_id).unpublish();
     }
 
     #[event(history)]
