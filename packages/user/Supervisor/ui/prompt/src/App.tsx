@@ -38,8 +38,8 @@ export const App = () => {
                 );
 
                 // The well-known path for the web platform is therefore currently
-                //  just `/<prompt-name>.html`
-                iframeUrl.pathname = `/${triggerDetails.payload}.html`;
+                //  `/plugin/web/prompt/<prompt-name>.html`
+                iframeUrl.pathname = `/plugin/web/prompt/${triggerDetails.payload}.html`;
                 if (triggerDetails.contextId) {
                     iframeUrl.searchParams.set(
                         "context_id",
