@@ -6,9 +6,9 @@ export interface Root {
 
 export interface Data {
     userBalances: User;
-    userTokens: UserTokens;
-    userCredits: User;
-    userDebits: User;
+    userTokens: UserBalanceToken[];
+    userCredits: UserCreditDebit;
+    userDebits: UserCreditDebit;
 }
 
 export interface User {
@@ -22,28 +22,31 @@ export interface UserBalancesEdge {
 export interface SharedBalanceNode {
     tokenId: number;
     balance: string;
-    symbolId: string;
-    precision: Precision;
-    creditedTo?: string;
-    debitableFrom?: string;
-}
-
-export interface Precision {
-    value: number;
-}
-
-export interface UserTokens {
-    edges: UserTokensEdge[];
-}
-
-export interface UserTokensEdge {
-    node: UserBalanceToken;
+    symbol: string;
+    precision: number;
 }
 
 export interface UserBalanceToken {
     id: number;
-    precision: Precision;
-    symbolId: string;
+    precision: number;
+    symbol: string;
+}
+
+export interface UserCreditDebit {
+    edges: UserCreditDebitEdge[];
+}
+
+export interface UserCreditDebitEdge {
+    node: UserCreditDebitNode;
+}
+
+export interface UserCreditDebitNode {
+    symbol: string;
+    tokenId: number;
+    token: UserBalanceToken;
+    balance: string;
+    creditor: string;
+    debitor: string;
 }
 
 const queryString = (username: string) => `
@@ -54,36 +57,31 @@ const queryString = (username: string) => `
 			node {
 				tokenId
 				balance
-				symbolId
-				precision {
-					value
-				}
+				symbol
+				precision
 			}
 		}
 	}
 
 	userTokens(user: "${username}") {
-		edges {
-			node {
-				id
-				precision { 
-				  value
-				}
-				symbolId
-			}
-		}
+		id
+		precision
+		symbol
 	}
 	
 	userCredits(user: "${username}") {
 		edges {
 			node {
-				symbolId
+				symbol
 				tokenId
-				precision {
-					value
+				token {
+					id
+					precision
+					symbol
 				}
 				balance
-				creditedTo
+				creditor
+				debitor
 			}
 		}
 	}
@@ -91,13 +89,16 @@ const queryString = (username: string) => `
 	userDebits(user: "${username}") {
 		edges {
 			node {
-				symbolId
+				symbol
 				tokenId
-				precision {
-					value
+				token {
+					id
+					precision
+					symbol
 				}
 				balance
-				debitableFrom
+				creditor
+				debitor
 			}
 		}
 	}
@@ -113,6 +114,6 @@ export const fetchUi = async (username: string) => {
         userDebits: res.userDebits.edges.map(({ node }) => node),
         userCredits: res.userCredits.edges.map(({ node }) => node),
         userBalances: res.userBalances.edges.map(({ node }) => node),
-        userTokens: res.userTokens.edges.map(({ node }) => node),
+        userTokens: res.userTokens,
     };
 };
