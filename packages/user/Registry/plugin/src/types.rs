@@ -9,9 +9,6 @@ impl From<AppMetadata> for setMetadata {
             long_description: metadata.long_desc,
             icon: metadata.icon,
             icon_mime_type: metadata.icon_mime_type,
-            tos_subpage: metadata.tos_subpage,
-            privacy_policy_subpage: metadata.privacy_policy_subpage,
-            app_homepage_subpage: metadata.app_homepage_subpage,
             tags: metadata.tags,
         }
     }

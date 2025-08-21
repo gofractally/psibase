@@ -24,15 +24,6 @@ export const Metadata = z.object({
     longDesc: z.string().max(1000),
     icon: z.string(), // Base64 string
     iconMimeType: z.string(), // MIME type of the icon
-    tosSubpage: z
-        .string()
-        .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
-    privacyPolicySubpage: z
-        .string()
-        .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
-    appHomepageSubpage: z
-        .string()
-        .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
     tags: z.string().array().max(3),
 });
 

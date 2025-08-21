@@ -10,9 +10,6 @@ mod service {
         long_description: String,
         icon: String,
         icon_mime_type: String,
-        tos_subpage: String,
-        privacy_policy_subpage: String,
-        app_homepage_subpage: String,
         tags: Vec<String>,
     ) {
         unimplemented!()

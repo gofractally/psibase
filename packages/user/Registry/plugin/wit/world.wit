@@ -9,10 +9,7 @@ interface types {
         short-desc: string,
         long-desc: string,
         icon: base64-str,
-        icon-mime-type: string, 
-        tos-subpage: string,
-        privacy-policy-subpage: string,
-        app-homepage-subpage: string,
+        icon-mime-type: string,
         tags: list<string>,
     }
 }
@@ -33,7 +30,6 @@ interface developer {
     /// * `short-desc` must be between 1 and 100 characters
     /// * `long-desc` must be between 1 and 1000 characters
     /// * `icon-mime-type` must be a valid MIME type for an icon (e.g. png, jpeg, svg, x-icon, vnd.microsoft.icon)
-    /// * subpages must start with "/"
     /// * only three tags are allowed, and they must be lowercase alphanumeric with dashes
     /// * all the fields are optional if the app is not published
     set-app-metadata: func(metadata: app-metadata) -> result<_, error>;
