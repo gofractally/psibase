@@ -14,11 +14,15 @@ interface types {
     }
 }
 
+/// This is a library that can be used by some top-level app to interact with the app registry.
+/// To avoid attempting to login and submit transactions as the registry app itself, the top level
+///   app should use the StagedTx plugin to allow the user to propose transactions on behalf of an
+///   app account.
 interface developer {
     use host:types/types.{error};
     use types.{account-id, app-metadata};
 
-    /// Set the metadata for an app
+    /// Set the metadata for the caller app
     /// 
     /// Initially the app is set to draft status, but if the app is already published,
     /// it stays published, unless one of the fields in the metadata does not conform
@@ -32,21 +36,21 @@ interface developer {
     /// * `icon-mime-type` must be a valid MIME type for an icon (e.g. png, jpeg, svg, x-icon, vnd.microsoft.icon)
     /// * only three tags are allowed, and they must be lowercase alphanumeric with dashes
     /// * all the fields are optional if the app is not published
-    set-app-metadata: func(metadata: app-metadata) -> result<_, error>;
+    set-metadata: func(metadata: app-metadata);
 
-    /// Set an app to published status
+    /// Set caller app to published status
     /// 
     /// All of the metadata fields are validated, all fields are required, except for the icon.
     /// 
     /// * If the app is already published, the transaction will fail
-    publish-app: func(account: account-id) -> result<_, error>;
+    publish: func();
 
-    /// Set an app to unpublished status
+    /// Set caller app to unpublished status
     /// 
     /// No fields are validated.
     /// 
     /// * If the app is not published, the transaction will fail
-    unpublish-app: func(account: account-id) -> result<_, error>;
+    unpublish: func();
 }
 
 world imports {

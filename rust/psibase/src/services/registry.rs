@@ -1,8 +1,6 @@
 #[crate::service(name = "registry", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::AccountNumber;
-
     #[action]
     fn setMetadata(
         name: String,
@@ -16,12 +14,12 @@ mod service {
     }
 
     #[action]
-    fn publish(account_id: AccountNumber) {
+    fn publish() {
         unimplemented!()
     }
 
     #[action]
-    fn unpublish(account_id: AccountNumber) {
+    fn unpublish() {
         unimplemented!()
     }
 }
