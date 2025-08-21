@@ -36,15 +36,13 @@ pub mod service {
     }
 
     #[action]
-    fn publish(account_id: AccountNumber) {
-        check(account_id == get_sender(), "Unauthorized");
-        AppMetadata::get_assert(account_id).publish();
+    fn publish() {
+        AppMetadata::get_assert(get_sender()).publish();
     }
 
     #[action]
-    fn unpublish(account_id: AccountNumber) {
-        check(account_id == get_sender(), "Unauthorized");
-        AppMetadata::get_assert(account_id).unpublish();
+    fn unpublish() {
+        AppMetadata::get_assert(get_sender()).unpublish();
     }
 
     #[event(history)]
