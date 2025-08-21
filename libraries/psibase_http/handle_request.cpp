@@ -273,19 +273,231 @@ namespace psibase::http
       std::chrono::steady_clock::time_point startTime;
    };
 
+   struct HttpReplyBuilder
+   {
+      const http_config& config;
+      unsigned           req_version;
+      bool               req_keep_alive;
+
+      HttpReplyBuilder(server_state& server, const http_session_base::request_type& req)
+          : config(*server.http_config),
+            req_version(req.version()),
+            req_keep_alive(req.keep_alive())
+      {
+      }
+
+      void setCors(auto& res, bool allow_cors) const
+      {
+         if (allow_cors)
+         {
+            res.set(bhttp::field::access_control_allow_origin, "*");
+            res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
+            res.set(bhttp::field::access_control_allow_headers, "*");
+         }
+      }
+
+      void setKeepAlive(auto& res) const
+      {
+         bool keep_alive = req_keep_alive && !config.status.load().shutdown;
+         res.keep_alive(keep_alive);
+         if (keep_alive)
+         {
+            if (auto usec = config.idle_timeout_us.load(); usec >= 0)
+            {
+               auto sec =
+                   std::chrono::duration_cast<std::chrono::seconds>(std::chrono::microseconds{usec})
+                       .count();
+               res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
+            }
+         }
+      }
+
+      // Returns a method_not_allowed response
+      auto methodNotAllowed(beast::string_view target,
+                            beast::string_view method,
+                            beast::string_view allowed_methods,
+                            bool               allow_cors = false) const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::method_not_allowed,
+                                                       req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::content_type, "text/html");
+         res.set(bhttp::field::allow, allowed_methods);
+         setCors(res, allow_cors);
+         setKeepAlive(res);
+         res.body() = to_vector("The resource '" + std::string(target) +
+                                "' does not accept the method " + std::string(method) + ".");
+         res.prepare_payload();
+         return res;
+      }
+
+      // Returns an error response
+      auto error(bhttp::status      status,
+                 beast::string_view why,
+                 bool               allow_cors   = false,
+                 const char*        content_type = "text/html") const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::content_type, content_type);
+         setCors(res, allow_cors);
+         setKeepAlive(res);
+         res.body() = std::vector(why.begin(), why.end());
+         res.prepare_payload();
+         return res;
+      }
+
+      auto notFound(beast::string_view target, bool allow_cors = false) const
+      {
+         return error(bhttp::status::not_found,
+                      "The resource '" + std::string(target) + "' was not found.", allow_cors);
+      }
+      auto badRequest(beast::string_view why) const
+      {
+         return error(bhttp::status::bad_request, why);
+      };
+
+      // Returns an error response with a WWW-Authenticate header
+      auto authError(bhttp::status status, std::string&& www_auth) const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::content_type, "text/html");
+         res.set(bhttp::field::www_authenticate, std::move(www_auth));
+         setKeepAlive(res);
+         res.body() = to_vector("Not authorized");
+         res.prepare_payload();
+         return res;
+      }
+
+      auto ok(std::vector<char>              reply,
+              const char*                    content_type,
+              const std::vector<HttpHeader>* headers    = nullptr,
+              bool                           allow_cors = false) const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         if (headers)
+            for (auto& h : *headers)
+               res.set(h.name, h.value);
+         res.set(bhttp::field::content_type, content_type);
+         setCors(res, allow_cors);
+         setKeepAlive(res);
+         res.body() = std::move(reply);
+         res.prepare_payload();
+         return res;
+      }
+
+      auto okNoContent(bool allow_cors = false) const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         setCors(res, allow_cors);
+         setKeepAlive(res);
+         res.prepare_payload();
+         return res;
+      }
+
+      auto accepted() const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::accepted, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         setKeepAlive(res);
+         res.prepare_payload();
+         return res;
+      }
+
+      auto redirect(bhttp::status      status,
+                    beast::string_view location,
+                    beast::string_view msg,
+                    bool               allow_cors   = false,
+                    const char*        content_type = "text/html") const
+      {
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::location, location);
+         res.set(bhttp::field::content_type, content_type);
+         setCors(res, allow_cors);
+         setKeepAlive(res);
+         res.body() = std::vector(msg.begin(), msg.end());
+         res.prepare_payload();
+         return res;
+      }
+   };
+
+   // Returns true on success
+   // Sends an appropriate error response and returns false on failure
+   bool checkAdminAuth(http_session_base&                     session,
+                       const http_session_base::request_type& req,
+                       authz::mode_type                       mode)
+   {
+      HttpReplyBuilder builder{session.server, req};
+      if (auto result = check_access(session.server, req, session, mode))
+      {
+         if (*result)
+            return true;
+         else
+         {
+            session(builder.authError(bhttp::status::forbidden,
+                                      "Bearer scope=\"" + mkscope(mode) + "\""));
+            return false;
+         }
+      }
+      else
+      {
+         session(builder.authError(bhttp::status::unauthorized,
+                                   "Bearer scope=\"" + mkscope(mode) + "\""));
+         return false;
+      }
+   }
+
    template <typename F, typename E>
    struct HttpSocket : AutoCloseSocket, std::enable_shared_from_this<HttpSocket<F, E>>
    {
-      explicit HttpSocket(std::shared_ptr<http_session_base>&& session, F&& f, E&& err)
-          : session(std::move(session)), callback(std::forward<F>(f)), err(std::forward<E>(err))
+      explicit HttpSocket(http_session_base::request_type&&    req,
+                          std::shared_ptr<http_session_base>&& session,
+                          F&&                                  f,
+                          E&&                                  err)
+          : req(std::move(req)),
+            session(std::move(session)),
+            callback(std::forward<F>(f)),
+            err(std::forward<E>(err))
       {
          this->session->pause_read = true;
          this->once                = true;
       }
+      void autoCloseImpl(std::string message)
+      {
+         sendImpl([message = std::move(message)](HttpSocket* self) mutable
+                  { return self->err(message); });
+      }
       void autoClose(const std::optional<std::string>& message) noexcept override
       {
-         sendImpl([message = message.value_or("service did not send a response")](
-                      HttpSocket* self) mutable { return self->err(message); });
+         if (!message && parse_request_target(req).second.starts_with("/native/"))
+         {
+            session->post(
+                [self = this->shared_from_this()]
+                {
+                   try
+                   {
+                      self->handleNativeRequest();
+                      if (self->session && self->session->can_read())
+                         self->session->do_read();
+                   }
+                   catch (std::exception& e)
+                   {
+                      self->autoCloseImpl("exception: " + std::string(e.what()));
+                   }
+                   catch (...)
+                   {
+                      self->autoCloseImpl("query failed: unknown exception\n");
+                   }
+                });
+         }
+         else
+         {
+            autoCloseImpl(message.value_or("service did not send a response"));
+         }
       }
       void send(std::span<const char> data) override
       {
@@ -325,209 +537,13 @@ namespace psibase::http
                    session->do_read();
              });
       }
-      virtual SocketInfo                 info() const override { return HttpSocketInfo{}; }
-      std::shared_ptr<http_session_base> session;
-      F                                  callback;
-      E                                  err;
-      TransactionTrace                   trace;
-      QueryTimes                         queryTimes;
-   };
+      virtual SocketInfo info() const override { return HttpSocketInfo{}; }
 
-   template <typename F, typename E>
-   auto makeHttpSocket(http_session_base& send, F&& f, E&& e)
-   {
-      return std::make_shared<HttpSocket<std::decay_t<F>, std::decay_t<E>>>(
-          send.shared_from_this(), std::forward<F>(f), std::forward<E>(e));
-   }
-
-   // This function produces an HTTP response for the given
-   // request. The type of the response object depends on the
-   // contents of the request, so the interface requires the
-   // caller to pass a generic lambda for receiving the response.
-   void handle_request(server_state&                     server,
-                       http_session_base::request_type&& req,
-                       http_session_base&                send)
-   {
-      auto [req_host, req_target] = parse_request_target(req);
-      unsigned req_version        = req.version();
-      bool     req_keep_alive     = req.keep_alive();
-
-      const auto set_cors = [&server](auto& res, bool allow_cors)
+      void runNativeHandler(auto&& request_handler, auto&& callback)
       {
-         if (allow_cors)
-         {
-            res.set(bhttp::field::access_control_allow_origin, "*");
-            res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
-            res.set(bhttp::field::access_control_allow_headers, "*");
-         }
-      };
-
-      const auto set_keep_alive = [&server, req_keep_alive](auto& res)
-      {
-         bool keep_alive = req_keep_alive && !server.http_config->status.load().shutdown;
-         res.keep_alive(keep_alive);
-         if (keep_alive)
-         {
-            if (auto usec = server.http_config->idle_timeout_us.load(); usec >= 0)
-            {
-               auto sec =
-                   std::chrono::duration_cast<std::chrono::seconds>(std::chrono::microseconds{usec})
-                       .count();
-               res.set(bhttp::field::keep_alive, "timeout=" + std::to_string(sec));
-            }
-         }
-      };
-
-      // Returns a method_not_allowed response
-      const auto method_not_allowed = [&server, set_cors, req_version, set_keep_alive](
-                                          beast::string_view target, beast::string_view method,
-                                          beast::string_view allowed_methods,
-                                          bool               allow_cors = false)
-      {
-         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::method_not_allowed,
-                                                       req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, "text/html");
-         res.set(bhttp::field::allow, allowed_methods);
-         set_cors(res, allow_cors);
-         set_keep_alive(res);
-         res.body() = to_vector("The resource '" + std::string(target) +
-                                "' does not accept the method " + std::string(method) + ".");
-         res.prepare_payload();
-         return res;
-      };
-
-      // Returns an error response
-      const auto error = [&server, set_cors, req_version, set_keep_alive](
-                             bhttp::status status, beast::string_view why, bool allow_cors = false,
-                             const char* content_type = "text/html")
-      {
-         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, content_type);
-         set_cors(res, allow_cors);
-         set_keep_alive(res);
-         res.body() = std::vector(why.begin(), why.end());
-         res.prepare_payload();
-         return res;
-      };
-
-      const auto not_found = [&error](beast::string_view target, bool allow_cors = false)
-      {
-         return error(bhttp::status::not_found,
-                      "The resource '" + std::string(target) + "' was not found.", allow_cors);
-      };
-      const auto bad_request = [&error](beast::string_view why)
-      { return error(bhttp::status::bad_request, why); };
-
-      // Returns an error response with a WWW-Authenticate header
-      const auto auth_error = [&server, set_cors, req_version, set_keep_alive](
-                                  bhttp::status status, std::string&& www_auth)
-      {
-         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::content_type, "text/html");
-         res.set(bhttp::field::www_authenticate, std::move(www_auth));
-         set_keep_alive(res);
-         res.body() = to_vector("Not authorized");
-         res.prepare_payload();
-         return res;
-      };
-
-      const auto ok = [&server, set_cors, req_version, set_keep_alive](
-                          std::vector<char> reply, const char* content_type,
-                          const std::vector<HttpHeader>* headers = nullptr, bool allow_cors = false)
-      {
-         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         if (headers)
-            for (auto& h : *headers)
-               res.set(h.name, h.value);
-         res.set(bhttp::field::content_type, content_type);
-         set_cors(res, allow_cors);
-         set_keep_alive(res);
-         res.body() = std::move(reply);
-         res.prepare_payload();
-         return res;
-      };
-
-      const auto ok_no_content =
-          [&server, set_cors, req_version, set_keep_alive](bool allow_cors = false)
-      {
-         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::ok, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         set_cors(res, allow_cors);
-         set_keep_alive(res);
-         res.prepare_payload();
-         return res;
-      };
-
-      const auto accepted = [&server, set_cors, req_version, set_keep_alive]()
-      {
-         bhttp::response<bhttp::vector_body<char>> res{bhttp::status::accepted, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         set_keep_alive(res);
-         res.prepare_payload();
-         return res;
-      };
-
-      const auto redirect =
-          [req_version, set_cors, set_keep_alive](bhttp::status status, beast::string_view location,
-                                                  beast::string_view msg, bool allow_cors = false,
-                                                  const char* content_type = "text/html")
-      {
-         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::location, location);
-         res.set(bhttp::field::content_type, content_type);
-         set_cors(res, allow_cors);
-         set_keep_alive(res);
-         res.body() = std::vector(msg.begin(), msg.end());
-         res.prepare_payload();
-         return res;
-      };
-
-      // Returns true on success
-      // Sends an appropriate error response and returns false on failure
-      const auto check_admin_auth = [&server, &req, &send, &auth_error](authz::mode_type mode)
-      {
-         if (auto result = check_access(server, req, send, mode))
-         {
-            if (*result)
-               return true;
-            else
-            {
-               send(auth_error(bhttp::status::forbidden, "Bearer scope=\"" + mkscope(mode) + "\""));
-               return false;
-            }
-         }
-         else
-         {
-            send(auth_error(bhttp::status::unauthorized, "Bearer scope=\"" + mkscope(mode) + "\""));
-            return false;
-         }
-      };
-
-      // Used for requests that are not subject to CORS such as websockets
-      auto forbid_cross_origin = [&req, &req_host, &send, &error]()
-      {
-         if (auto iter = req.find(bhttp::field::origin); iter != req.end())
-         {
-            const auto& origin = iter->value();
-            if (origin == "null" || remove_scheme(origin) != req_host)
-            {
-               send(error(bhttp::status::bad_request, "Cross origin request refused"));
-               return true;
-            }
-         }
-         return false;
-      };
-
-      const auto run_native_handler = [&send, &req](auto&& request_handler, auto&& callback)
-      {
-         send.pause_read        = true;
+         session->pause_read    = true;
          auto post_back_to_http = [callback = static_cast<decltype(callback)>(callback),
-                                   session  = send.shared_from_this()](auto&& result) mutable
+                                   session  = std::move(session)](auto&& result) mutable
          {
             auto* p = session.get();
             p->post(
@@ -548,14 +564,14 @@ namespace psibase::http
          {
             request_handler(std::move(post_back_to_http));
          }
-      };
+      }
 
       // The result should be a variant with a std::string representing an error
-      const auto& run_native_handler_json = [&](auto&& request_handler)
+      void runNativeHandlerJson(auto&& request_handler)
       {
-         run_native_handler(
+         runNativeHandler(
              request_handler,
-             [error, ok](auto&& result)
+             [builder = HttpReplyBuilder{session->server, req}](auto&& result)
              {
                 return std::visit(
                     [&](auto& body)
@@ -565,84 +581,568 @@ namespace psibase::http
                           std::vector<char>   data;
                           psio::vector_stream stream{data};
                           psio::to_json(body, stream);
-                          return ok(std::move(data), "application/json");
+                          return builder.ok(std::move(data), "application/json");
                        }
                        else
                        {
-                          return error(bhttp::status::internal_server_error, body);
+                          return builder.error(bhttp::status::internal_server_error, body);
                        }
                     },
                     result);
              });
-      };
+      }
 
       // Anything that can serialized as json
-      const auto& run_native_handler_json_nofail = [&](auto&& request_handler)
+      void runNativeHandlerJsonNoFail(auto&& request_handler)
       {
-         run_native_handler(request_handler,
-                            [ok](auto&& result)
-                            {
-                               std::vector<char>   data;
-                               psio::vector_stream stream{data};
-                               psio::to_json(result, stream);
-                               return ok(std::move(data), "application/json");
-                            });
-      };
+         runNativeHandler(request_handler,
+                          [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+                          {
+                             std::vector<char>   data;
+                             psio::vector_stream stream{data};
+                             psio::to_json(result, stream);
+                             return builder.ok(std::move(data), "application/json");
+                          });
+      }
 
       // optional<string>
-      auto run_native_handler_no_content = [&](auto&& request_handler)
+      void runNativeHandlerNoContent(auto&& request_handler)
       {
-         run_native_handler(request_handler,
-                            [ok_no_content, error](auto&& result)
-                            {
-                               if (result)
-                               {
-                                  return error(bhttp::status::internal_server_error, *result);
-                               }
-                               else
-                               {
-                                  return ok_no_content();
-                               }
-                            });
-      };
+         runNativeHandler(request_handler,
+                          [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+                          {
+                             if (result)
+                             {
+                                return builder.error(bhttp::status::internal_server_error, *result);
+                             }
+                             else
+                             {
+                                return builder.okNoContent();
+                             }
+                          });
+      }
 
       // variant<string, function<vector<char>()>>
-      auto run_native_handler_generic = [&](auto& request_handler, const char* content_type)
+      void runNativeHandlerGeneric(auto& request_handler, const char* content_type)
       {
-         run_native_handler(
+         runNativeHandler(
              request_handler,
-             [error, ok, content_type](auto&& result)
+             [builder = HttpReplyBuilder{session->server, req}, content_type](auto&& result)
              {
                 return std::visit(
                     [&](auto& body)
                     {
                        if constexpr (!std::is_same_v<std::decay_t<decltype(body)>, std::string>)
                        {
-                          return ok(body(), content_type);
+                          return builder.ok(body(), content_type);
                        }
                        else
                        {
-                          return error(bhttp::status::internal_server_error, body);
+                          return builder.error(bhttp::status::internal_server_error, body);
                        }
                     },
                     result);
              });
+      }
+
+      void runNativeHandlerGenericNoFail(auto& request_handler, const char* content_type)
+      {
+         runNativeHandler(request_handler, [builder = HttpReplyBuilder{session->server, req},
+                                            content_type](auto&& result)
+                          { return builder.ok(result(), content_type); });
       };
 
-      auto run_native_handler_generic_nofail = [&](auto& request_handler, const char* content_type)
+      // Returns true on success
+      // Sends an appropriate error response and returns false on failure
+      bool checkAdminAuth(authz::mode_type mode)
       {
-         run_native_handler(request_handler, [ok, content_type](auto&& result)
-                            { return ok(result(), content_type); });
-      };
+         return http::checkAdminAuth(*session, req, mode);
+      }
+
+      void handleNativeRequest()
+      {
+         server_state&      server = session->server;
+         http_session_base& send   = *session;
+         HttpReplyBuilder   builder{server, req};
+         auto [req_host, req_target] = parse_request_target(req);
+
+         session->pause_read = false;
+
+         // Used for requests that are not subject to CORS such as websockets
+         auto forbidCrossOrigin = [this, &req_host, &send, &builder]()
+         {
+            if (auto iter = req.find(bhttp::field::origin); iter != req.end())
+            {
+               const auto& origin = iter->value();
+               if (origin == "null" || remove_scheme(origin) != req_host)
+               {
+                  send(builder.error(bhttp::status::bad_request, "Cross origin request refused"));
+                  return true;
+               }
+            }
+            return false;
+         };
+
+         if (req_target == "/native/admin/push_boot" && server.http_config->push_boot_async)
+         {
+            if (!server.http_config->enable_transactions)
+               return send(builder.notFound(req.target()));
+
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (!checkAdminAuth(authz::mode_type::write))
+            {
+               return;
+            }
+
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+
+            if (auto content_type = req.find(bhttp::field::content_type); content_type != req.end())
+            {
+               if (content_type->value() != "application/octet-stream")
+               {
+                  return send(builder.error(bhttp::status::unsupported_media_type,
+                                            "Content-Type must be application/octet-stream\n"));
+               }
+            }
+
+            if (forbidCrossOrigin())
+            {
+               return;
+            }
+
+            runNativeHandlerJson(server.http_config->push_boot_async);
+         }  // push_boot
+         else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
+                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
+                  server.http_config->enable_p2p)
+         {
+            if (forbidCrossOrigin())
+               return;
+            // Stop reading HTTP requests
+            send.pause_read = true;
+            send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
+            return;
+         }
+         else if (req_target == "/native/admin/status")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() == bhttp::verb::get)
+            {
+               if (!checkAdminAuth(authz::mode_type::read))
+               {
+                  return;
+               }
+               auto status = server.http_config->status.load();
+               if (status.needgenesis)
+               {
+                  if (!server.sharedState->needGenesis())
+                  {
+                     status = atomic_set_field(server.http_config->status,
+                                               [](auto& tmp) { tmp.needgenesis = false; });
+                  }
+               }
+               std::vector<char>   body;
+               psio::vector_stream stream{body};
+               to_json(status, stream);
+               send(builder.ok(std::move(body), "application/json"));
+            }
+            else
+            {
+               send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
+            }
+         }
+         else if (req_target == "/native/admin/shutdown")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!checkAdminAuth(authz::mode_type::write))
+            {
+               return;
+            }
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               return send(builder.error(bhttp::status::unsupported_media_type,
+                                         "Content-Type must be application/json\n"));
+            }
+            server.http_config->shutdown(std::move(req.body()));
+            return send(builder.accepted());
+         }
+         else if (req_target == "/native/admin/perf" && server.http_config->get_perf)
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!checkAdminAuth(authz::mode_type::read))
+            {
+               return;
+            }
+            runNativeHandlerGenericNoFail(server.http_config->get_perf, "application/json");
+         }
+         else if (req_target == "/native/admin/metrics" && server.http_config->get_metrics)
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!checkAdminAuth(authz::mode_type::read))
+            {
+               return;
+            }
+            runNativeHandlerGenericNoFail(
+                server.http_config->get_metrics,
+                "application/openmetrics-text; version=1.0.0; charset=utf-8");
+         }
+         else if (req_target == "/native/admin/peers" && server.http_config->get_peers)
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!checkAdminAuth(authz::mode_type::read))
+            {
+               return;
+            }
+
+            // returns json list of {id:int,endpoint:string}
+            runNativeHandlerJsonNoFail(server.http_config->get_peers);
+         }
+         else if (req_target == "/native/admin/connect" && server.http_config->connect)
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!checkAdminAuth(authz::mode_type::write))
+            {
+               return;
+            }
+
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               send(builder.error(bhttp::status::unsupported_media_type,
+                                  "Content-Type must be application/json\n"));
+               return;
+            }
+
+            runNativeHandlerNoContent(server.http_config->connect);
+         }
+         else if (req_target == "/native/admin/disconnect" && server.http_config->disconnect)
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!checkAdminAuth(authz::mode_type::write))
+            {
+               return;
+            }
+
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               send(builder.error(bhttp::status::unsupported_media_type,
+                                  "Content-Type must be application/json\n"));
+               return;
+            }
+
+            runNativeHandlerNoContent(server.http_config->disconnect);
+         }
+         else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
+         {
+            if (!is_admin(*server.http_config, req_host))
+               return send(builder.notFound(req.target()));
+            if (forbidCrossOrigin())
+               return;
+            if (!checkAdminAuth(authz::mode_type::read))
+            {
+               return;
+            }
+            send.pause_read = true;
+            send(websocket_upgrade{}, std::move(req),
+                 [&server](auto&& stream)
+                 {
+                    using stream_type = std::decay_t<decltype(stream)>;
+                    auto session =
+                        std::make_shared<websocket_log_session<stream_type>>(std::move(stream));
+                    server.register_connection(session);
+                    websocket_log_session<stream_type>::run(std::move(session));
+                 });
+         }
+         else if (req_target == "/native/admin/config")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() == bhttp::verb::get)
+            {
+               if (!checkAdminAuth(authz::mode_type::read_write))
+               {
+                  return;
+               }
+               runNativeHandlerGenericNoFail(server.http_config->get_config, "application/json");
+            }
+            else if (req.method() == bhttp::verb::put)
+            {
+               if (!checkAdminAuth(authz::mode_type::write))
+               {
+                  return;
+               }
+               if (req[bhttp::field::content_type] != "application/json")
+               {
+                  return send(builder.error(bhttp::status::unsupported_media_type,
+                                            "Content-Type must be application/json\n"));
+               }
+               runNativeHandlerNoContent(server.http_config->set_config);
+            }
+            else
+            {
+               send(builder.methodNotAllowed(req.target(), req.method_string(), "GET, PUT"));
+            }
+            return;
+         }
+         else if (req_target == "/native/admin/keys")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() == bhttp::verb::get)
+            {
+               if (!checkAdminAuth(authz::mode_type::read))
+               {
+                  return;
+               }
+               runNativeHandlerGenericNoFail(server.http_config->get_keys, "application/json");
+            }
+            else if (req.method() == bhttp::verb::post)
+            {
+               if (!checkAdminAuth(authz::mode_type::write))
+               {
+                  return;
+               }
+               if (req[bhttp::field::content_type] != "application/json")
+               {
+                  return send(builder.error(bhttp::status::unsupported_media_type,
+                                            "Content-Type must be application/json\n"));
+               }
+
+               runNativeHandlerGeneric(server.http_config->new_key, "application/json");
+            }
+            else
+            {
+               send(builder.methodNotAllowed(req.target(), req.method_string(), "GET, POST"));
+            }
+            return;
+         }
+         else if (req_target == "/native/admin/keys/devices")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::get)
+            {
+               send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
+            }
+            if (!checkAdminAuth(authz::mode_type::read))
+            {
+               return;
+            }
+            runNativeHandlerGeneric(server.http_config->get_pkcs11_tokens, "application/json");
+         }
+         else if (req_target == "/native/admin/keys/unlock")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!checkAdminAuth(authz::mode_type::write))
+            {
+               return;
+            }
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               return send(builder.error(bhttp::status::unsupported_media_type,
+                                         "Content-Type must be application/json\n"));
+            }
+            runNativeHandlerNoContent(server.http_config->unlock_keyring);
+         }
+         else if (req_target == "/native/admin/keys/lock")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+            if (!checkAdminAuth(authz::mode_type::write))
+            {
+               return;
+            }
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               return send(builder.error(bhttp::status::unsupported_media_type,
+                                         "Content-Type must be application/json\n"));
+            }
+            runNativeHandlerNoContent(server.http_config->lock_keyring);
+         }
+         else if (req_target == "/native/admin/login")
+         {
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(builder.notFound(req.target()));
+            }
+            if (req.method() != bhttp::verb::post)
+            {
+               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
+            }
+
+            if (req[bhttp::field::content_type] != "application/json")
+            {
+               send(builder.error(bhttp::status::unsupported_media_type,
+                                  "Content-Type must be application/json\n"));
+               return;
+            }
+
+            const token_key* key = nullptr;
+            for (const auto& auth : server.http_config->admin_authz)
+            {
+               if (const auto* bearer = std::get_if<authz_bearer>(&auth.data))
+               {
+                  key = &bearer->key;
+               }
+            }
+            if (!key)
+            {
+               return send(builder.error(bhttp::status::internal_server_error,
+                                         "Login requires bearer tokens to be enabled"));
+            }
+            auto [mode, has_auth] = get_access(server, req, send);
+
+            auto input = std::move(req.body());
+            input.push_back('\0');
+            input.push_back('\0');
+            input.push_back('\0');
+            psio::json_token_stream stream{input.data()};
+            auto                    params = psio::from_json<token_data>(stream);
+            if (!params.exp)
+            {
+               params.exp = std::chrono::time_point_cast<std::chrono::seconds>(
+                                std::chrono::system_clock::now() + std::chrono::hours(1))
+                                .time_since_epoch()
+                                .count();
+            }
+            if (params.mode.empty())
+            {
+               if (mode == authz::read)
+               {
+                  params.mode = "r";
+               }
+               else
+               {
+                  params.mode = "rw";
+               }
+            }
+            auto required_mode = authz::mode_from_string(params.mode);
+            if ((required_mode & mode) != required_mode)
+            {
+               if (has_auth)
+                  return send(builder.authError(bhttp::status::forbidden,
+                                                "Bearer scope=\"" + mkscope(required_mode) + "\""));
+               else
+                  return send(builder.authError(bhttp::status::unauthorized,
+                                                "Bearer scope=\"" + mkscope(required_mode) + "\""));
+            }
+            auto token = encodeJWT(*key, params);
+
+            std::vector<char>   data;
+            psio::vector_stream out{data};
+            psio::to_json(
+                token_response{.accessToken = token, .exp = params.exp, .mode = params.mode}, out);
+            return send(builder.ok(std::move(data), "application/json"));
+         }
+         else
+         {
+            return send(builder.notFound(req.target()));
+         }
+      }
+
+      http_session_base::request_type    req;
+      std::shared_ptr<http_session_base> session;
+      F                                  callback;
+      E                                  err;
+      TransactionTrace                   trace;
+      QueryTimes                         queryTimes;
+   };
+
+   template <typename F, typename E>
+   auto makeHttpSocket(http_session_base::request_type&& req, http_session_base& send, F&& f, E&& e)
+   {
+      return std::make_shared<HttpSocket<std::decay_t<F>, std::decay_t<E>>>(
+          std::move(req), send.shared_from_this(), std::forward<F>(f), std::forward<E>(e));
+   }
+
+   // This function produces an HTTP response for the given
+   // request. The type of the response object depends on the
+   // contents of the request, so the interface requires the
+   // caller to pass a generic lambda for receiving the response.
+   void handle_request(server_state&                     server,
+                       http_session_base::request_type&& req,
+                       http_session_base&                send)
+   {
+      auto [req_host, req_target] = parse_request_target(req);
+      HttpReplyBuilder builder{server, req};
 
       try
       {
          std::shared_lock l{server.http_config->mutex};
          if (req_target == "")
          {
-            return send(bad_request("Invalid request target"));
+            return send(builder.badRequest("Invalid request target"));
          }
-         else if (!req_target.starts_with("/native"))
+         else
          {
             auto [host, port] = split_port(req_host);
             auto service      = AccountNumber{};
@@ -655,12 +1155,12 @@ namespace psibase::http
                {
                   if (req.method() == bhttp::verb::options)
                   {
-                     return send(ok_no_content(true));
+                     return send(builder.okNoContent(true));
                   }
                   else if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
                   {
-                     return send(method_not_allowed(req.target(), req.method_string(),
-                                                    "GET, OPTIONS, HEAD", true));
+                     return send(builder.methodNotAllowed(req.target(), req.method_string(),
+                                                          "GET, OPTIONS, HEAD", true));
                   }
 
                   std::vector<char> contents;
@@ -670,8 +1170,8 @@ namespace psibase::http
                   l.unlock();
                   contents.resize(size);
                   in.read(contents.data(), contents.size());
-                  return send(
-                      ok(std::move(contents), file->second.content_type.c_str(), nullptr, true));
+                  return send(builder.ok(std::move(contents), file->second.content_type.c_str(),
+                                         nullptr, true));
                }
                else
                {
@@ -681,9 +1181,9 @@ namespace psibase::http
                   }
                   if (service == AccountNumber{} || !is_admin(*server.http_config, req_host))
                   {
-                     return send(not_found(req.target(), true));
+                     return send(builder.notFound(req.target(), true));
                   }
-                  if (!check_admin_auth(authz::mode_type::read_write))
+                  if (!checkAdminAuth(send, req, authz::mode_type::read_write))
                   {
                      return;
                   }
@@ -704,8 +1204,13 @@ namespace psibase::http
             }
             if (root_host.empty())
             {
-               if (server.http_config->hosts.empty())
-                  return send(not_found(req.target(), true));
+               if (req_target.starts_with("/native/"))
+               {
+                  if (server.http_config->hosts.empty())
+                     root_host = server.http_config->hosts.front();
+               }
+               else if (server.http_config->hosts.empty())
+                  return send(builder.notFound(req.target(), true));
                else
                {
                   std::string location;
@@ -720,11 +1225,12 @@ namespace psibase::http
                   location += server.http_config->hosts.front();
                   location.append(port.data(), port.size());
                   location.append(req_target.data(), req_target.size());
-                  return send(redirect(bhttp::status::moved_permanently, location,
-                                       "<html><body>"
-                                       "This psibase server is hosted at <a href=\"" +
-                                           location + "\">" + location + "</a>.</body></html>\n",
-                                       true));
+                  return send(builder.redirect(bhttp::status::moved_permanently, location,
+                                               "<html><body>"
+                                               "This psibase server is hosted at <a href=\"" +
+                                                   location + "\">" + location +
+                                                   "</a>.</body></html>\n",
+                                               true));
                }
             }
 
@@ -754,13 +1260,13 @@ namespace psibase::http
             else if (req.method() == bhttp::verb::options)
                data.method = "OPTIONS";
             else
-               return send(method_not_allowed(req.target(), req.method_string(),
-                                              "GET, POST, OPTIONS", true));
+               return send(builder.methodNotAllowed(req.target(), req.method_string(),
+                                                    "GET, POST, OPTIONS", true));
             data.host        = {host.begin(), host.size()};
             data.rootHost    = root_host;
             data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
-            data.body        = std::move(req.body());
+            data.body        = req.body();
 
             // Do not use any reconfigurable members of server.http_config after this point
             l.unlock();
@@ -772,7 +1278,8 @@ namespace psibase::http
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
-            if (service == AccountNumber{} && bc.needGenesisAction)
+            if (service == AccountNumber{} && bc.needGenesisAction &&
+                !req_target.starts_with("/native/"))
             {
                std::string location;
                if (send.is_secure())
@@ -791,19 +1298,19 @@ namespace psibase::http
                   l.unlock();
                   location.append(port.data(), port.size());
                   location.push_back('/');
-                  return send(redirect(bhttp::status::found, location,
-                                       "<html><body>Node is not connected to any psibase network.  "
-                                       "Visit <a href=\"" +
-                                           location + "\">" + location +
-                                           "</a> for node setup.</body></html>\n",
-                                       true));
+                  return send(builder.redirect(
+                      bhttp::status::found, location,
+                      "<html><body>Node is not connected to any psibase network.  "
+                      "Visit <a href=\"" +
+                          location + "\">" + location + "</a> for node setup.</body></html>\n",
+                      true));
                }
                else
                {
                   // No native service to redirect to. Just report an error
                   l.unlock();
-                  return send(error(bhttp::status::internal_server_error,
-                                    "Node is not connected to any psibase network.", true));
+                  return send(builder.error(bhttp::status::internal_server_error,
+                                            "Node is not connected to any psibase network.", true));
                }
             }
 
@@ -814,22 +1321,23 @@ namespace psibase::http
             auto               startExecTime = steady_clock::now();
 
             auto socket = makeHttpSocket(
-                send,
-                [req_version, set_keep_alive](HttpReply&& reply)
+                std::move(req), send,
+                [builder](HttpReply&& reply)
                 {
                    bhttp::response<bhttp::vector_body<char>> res{
-                       bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
+                       bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)),
+                       builder.req_version};
                    res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
                    for (auto& h : reply.headers)
                       res.set(h.name, h.value);
                    res.set(bhttp::field::content_type, reply.contentType);
-                   set_keep_alive(res);
+                   builder.setKeepAlive(res);
                    res.body() = std::move(reply.body);
                    res.prepare_payload();
                    return res;
                 },
-                [error](const std::string& message)
-                { return error(bhttp::status::internal_server_error, message); });
+                [builder](const std::string& message)
+                { return builder.error(bhttp::status::internal_server_error, message); });
             system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
 
             auto setStatus = psio::finally(
@@ -878,443 +1386,18 @@ namespace psibase::http
                else
                   PSIBASE_LOG(logger, info) << proxyServiceNum.str() << "::serve succeeded";
             }
-         }  // !native
-         else if (req_target == "/native/admin/push_boot" && server.http_config->push_boot_async)
-         {
-            if (!server.http_config->enable_transactions)
-               return send(not_found(req.target()));
-
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (!check_admin_auth(authz::mode_type::write))
-            {
-               return;
-            }
-
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-
-            if (auto content_type = req.find(bhttp::field::content_type); content_type != req.end())
-            {
-               if (content_type->value() != "application/octet-stream")
-               {
-                  return send(error(bhttp::status::unsupported_media_type,
-                                    "Content-Type must be application/octet-stream\n"));
-               }
-            }
-
-            if (forbid_cross_origin())
-            {
-               return;
-            }
-
-            run_native_handler_json(server.http_config->push_boot_async);
-         }  // push_boot
-         else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
-                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
-                  server.http_config->enable_p2p)
-         {
-            if (forbid_cross_origin())
-               return;
-            // Stop reading HTTP requests
-            send.pause_read = true;
-            send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
-            return;
-         }
-         else if (req_target == "/native/admin/status")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() == bhttp::verb::get)
-            {
-               if (!check_admin_auth(authz::mode_type::read))
-               {
-                  return;
-               }
-               auto status = server.http_config->status.load();
-               if (status.needgenesis)
-               {
-                  if (!server.sharedState->needGenesis())
-                  {
-                     status = atomic_set_field(server.http_config->status,
-                                               [](auto& tmp) { tmp.needgenesis = false; });
-                  }
-               }
-               std::vector<char>   body;
-               psio::vector_stream stream{body};
-               to_json(status, stream);
-               send(ok(std::move(body), "application/json"));
-            }
-            else
-            {
-               send(method_not_allowed(req.target(), req.method_string(), "GET"));
-            }
-         }
-         else if (req_target == "/native/admin/shutdown")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-            if (!check_admin_auth(authz::mode_type::write))
-            {
-               return;
-            }
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               return send(error(bhttp::status::unsupported_media_type,
-                                 "Content-Type must be application/json\n"));
-            }
-            server.http_config->shutdown(std::move(req.body()));
-            return send(accepted());
-         }
-         else if (req_target == "/native/admin/perf" && server.http_config->get_perf)
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::get)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
-            }
-            if (!check_admin_auth(authz::mode_type::read))
-            {
-               return;
-            }
-            run_native_handler_generic_nofail(server.http_config->get_perf, "application/json");
-         }
-         else if (req_target == "/native/admin/metrics" && server.http_config->get_metrics)
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::get)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
-            }
-            if (!check_admin_auth(authz::mode_type::read))
-            {
-               return;
-            }
-            run_native_handler_generic_nofail(
-                server.http_config->get_metrics,
-                "application/openmetrics-text; version=1.0.0; charset=utf-8");
-         }
-         else if (req_target == "/native/admin/peers" && server.http_config->get_peers)
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::get)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "GET"));
-            }
-            if (!check_admin_auth(authz::mode_type::read))
-            {
-               return;
-            }
-
-            // returns json list of {id:int,endpoint:string}
-            run_native_handler_json_nofail(server.http_config->get_peers);
-         }
-         else if (req_target == "/native/admin/connect" && server.http_config->connect)
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-            if (!check_admin_auth(authz::mode_type::write))
-            {
-               return;
-            }
-
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               send(error(bhttp::status::unsupported_media_type,
-                          "Content-Type must be application/json\n"));
-               return;
-            }
-
-            run_native_handler_no_content(server.http_config->connect);
-         }
-         else if (req_target == "/native/admin/disconnect" && server.http_config->disconnect)
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-            if (!check_admin_auth(authz::mode_type::write))
-            {
-               return;
-            }
-
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               send(error(bhttp::status::unsupported_media_type,
-                          "Content-Type must be application/json\n"));
-               return;
-            }
-
-            run_native_handler_no_content(server.http_config->disconnect);
-         }
-         else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
-         {
-            if (!is_admin(*server.http_config, req_host))
-               return send(not_found(req.target()));
-            if (forbid_cross_origin())
-               return;
-            if (!check_admin_auth(authz::mode_type::read))
-            {
-               return;
-            }
-            send.pause_read = true;
-            send(websocket_upgrade{}, std::move(req),
-                 [&server](auto&& stream)
-                 {
-                    using stream_type = std::decay_t<decltype(stream)>;
-                    auto session =
-                        std::make_shared<websocket_log_session<stream_type>>(std::move(stream));
-                    server.register_connection(session);
-                    websocket_log_session<stream_type>::run(std::move(session));
-                 });
-         }
-         else if (req_target == "/native/admin/config")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() == bhttp::verb::get)
-            {
-               if (!check_admin_auth(authz::mode_type::read_write))
-               {
-                  return;
-               }
-               run_native_handler_generic_nofail(server.http_config->get_config,
-                                                 "application/json");
-            }
-            else if (req.method() == bhttp::verb::put)
-            {
-               if (!check_admin_auth(authz::mode_type::write))
-               {
-                  return;
-               }
-               if (req[bhttp::field::content_type] != "application/json")
-               {
-                  return send(error(bhttp::status::unsupported_media_type,
-                                    "Content-Type must be application/json\n"));
-               }
-               run_native_handler_no_content(server.http_config->set_config);
-            }
-            else
-            {
-               send(method_not_allowed(req.target(), req.method_string(), "GET, PUT"));
-            }
-            return;
-         }
-         else if (req_target == "/native/admin/keys")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() == bhttp::verb::get)
-            {
-               if (!check_admin_auth(authz::mode_type::read))
-               {
-                  return;
-               }
-               run_native_handler_generic_nofail(server.http_config->get_keys, "application/json");
-            }
-            else if (req.method() == bhttp::verb::post)
-            {
-               if (!check_admin_auth(authz::mode_type::write))
-               {
-                  return;
-               }
-               if (req[bhttp::field::content_type] != "application/json")
-               {
-                  return send(error(bhttp::status::unsupported_media_type,
-                                    "Content-Type must be application/json\n"));
-               }
-
-               run_native_handler_generic(server.http_config->new_key, "application/json");
-            }
-            else
-            {
-               send(method_not_allowed(req.target(), req.method_string(), "GET, POST"));
-            }
-            return;
-         }
-         else if (req_target == "/native/admin/keys/devices")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::get)
-            {
-               send(method_not_allowed(req.target(), req.method_string(), "GET"));
-            }
-            if (!check_admin_auth(authz::mode_type::read))
-            {
-               return;
-            }
-            run_native_handler_generic(server.http_config->get_pkcs11_tokens, "application/json");
-         }
-         else if (req_target == "/native/admin/keys/unlock")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::post)
-            {
-               send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-            if (!check_admin_auth(authz::mode_type::write))
-            {
-               return;
-            }
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               return send(error(bhttp::status::unsupported_media_type,
-                                 "Content-Type must be application/json\n"));
-            }
-            run_native_handler_no_content(server.http_config->unlock_keyring);
-         }
-         else if (req_target == "/native/admin/keys/lock")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::post)
-            {
-               send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-            if (!check_admin_auth(authz::mode_type::write))
-            {
-               return;
-            }
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               return send(error(bhttp::status::unsupported_media_type,
-                                 "Content-Type must be application/json\n"));
-            }
-            run_native_handler_no_content(server.http_config->lock_keyring);
-         }
-         else if (req_target == "/native/admin/login")
-         {
-            if (!is_admin(*server.http_config, req_host))
-            {
-               return send(not_found(req.target()));
-            }
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               send(error(bhttp::status::unsupported_media_type,
-                          "Content-Type must be application/json\n"));
-               return;
-            }
-
-            const token_key* key = nullptr;
-            for (const auto& auth : server.http_config->admin_authz)
-            {
-               if (const auto* bearer = std::get_if<authz_bearer>(&auth.data))
-               {
-                  key = &bearer->key;
-               }
-            }
-            if (!key)
-            {
-               return send(error(bhttp::status::internal_server_error,
-                                 "Login requires bearer tokens to be enabled"));
-            }
-            auto [mode, has_auth] = get_access(server, req, send);
-
-            auto input = std::move(req.body());
-            input.push_back('\0');
-            input.push_back('\0');
-            input.push_back('\0');
-            psio::json_token_stream stream{input.data()};
-            auto                    params = psio::from_json<token_data>(stream);
-            if (!params.exp)
-            {
-               params.exp = std::chrono::time_point_cast<std::chrono::seconds>(
-                                std::chrono::system_clock::now() + std::chrono::hours(1))
-                                .time_since_epoch()
-                                .count();
-            }
-            if (params.mode.empty())
-            {
-               if (mode == authz::read)
-               {
-                  params.mode = "r";
-               }
-               else
-               {
-                  params.mode = "rw";
-               }
-            }
-            auto required_mode = authz::mode_from_string(params.mode);
-            if ((required_mode & mode) != required_mode)
-            {
-               if (has_auth)
-                  return send(auth_error(bhttp::status::forbidden,
-                                         "Bearer scope=\"" + mkscope(required_mode) + "\""));
-               else
-                  return send(auth_error(bhttp::status::unauthorized,
-                                         "Bearer scope=\"" + mkscope(required_mode) + "\""));
-            }
-            auto token = encodeJWT(*key, params);
-
-            std::vector<char>   data;
-            psio::vector_stream out{data};
-            psio::to_json(
-                token_response{.accessToken = token, .exp = params.exp, .mode = params.mode}, out);
-            return send(ok(std::move(data), "application/json"));
-         }
-         else
-         {
-            return send(not_found(req.target()));
          }
       }
       catch (const std::exception& e)
       {
-         return send(
-             error(bhttp::status::internal_server_error, "exception: " + std::string(e.what())));
+         return send(builder.error(bhttp::status::internal_server_error,
+                                   "exception: " + std::string(e.what())));
       }
       catch (...)
       {
          // TODO: elog("query failed: unknown exception");
-         return send(
-             error(bhttp::status::internal_server_error, "query failed: unknown exception\n"));
+         return send(builder.error(bhttp::status::internal_server_error,
+                                   "query failed: unknown exception\n"));
       }
    }  // handle_request
 

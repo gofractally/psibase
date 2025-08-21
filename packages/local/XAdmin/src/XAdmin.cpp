@@ -96,7 +96,11 @@ namespace LocalService
    {
       check(getSender() == XHttp::service, "Wrong sender");
       auto target = req.path();
-      if (target.starts_with("/services/"))
+      if (target.starts_with("/native/"))
+      {
+         return {};
+      }
+      else if (target.starts_with("/services/"))
       {
          auto service = AccountNumber{std::string_view{target}.substr(10)};
          if (service == AccountNumber{})

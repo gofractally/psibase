@@ -405,9 +405,6 @@ class Service(object):
         return self.api.graphql(self.service, query)
 
 _default_config = '''# psinode config
-service  = localhost:$PSIBASE_DATADIR/services/x-admin
-service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
-service  = [::1]:$PSIBASE_DATADIR/services/x-admin
 service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
 admin    = static:*
 
