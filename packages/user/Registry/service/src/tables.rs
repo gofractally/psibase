@@ -28,24 +28,12 @@ pub mod tables {
         /// The MIME type of the icon
         pub icon_mime_type: String,
 
-        /// The subpage for Terms of Service
-        pub tos_subpage: String,
-
-        /// The subpage for Privacy Policy
-        pub privacy_policy_subpage: String,
-
-        /// The subpage for the app's homepage
-        pub app_homepage_subpage: String,
-
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
         #[graphql(skip)]
         pub status: u32,
 
         /// The timestamp of when the app was created
         pub created_at: psibase::BlockTime,
-
-        /// The redirect URIs for the app
-        pub redirect_uris: Vec<String>,
     }
 
     #[table(name = "NextIdTable", index = 1)]
@@ -154,7 +142,6 @@ pub mod impls {
     use async_graphql::*;
     use psibase::services::transact;
     use psibase::*;
-    use url::Url;
 
     impl NextId {
         pub fn get() -> u32 {
@@ -242,13 +229,6 @@ pub mod impls {
         );
     }
 
-    fn validate_subpath(subpath_name: &str, subpath: &str) {
-        check(
-            subpath.starts_with("/"),
-            format!("{} path must start with /", subpath_name).as_str(),
-        );
-    }
-
     fn set_diff<T>(a: &[T], b: &[T]) -> Vec<T>
     where
         T: Copy + PartialEq,
@@ -317,10 +297,6 @@ pub mod impls {
             validate_length("Short description", &self.short_desc, MAX_SHORT_DESC_SIZE);
             validate_length("Long description", &self.long_desc, MAX_LONG_DESC_SIZE);
 
-            validate_subpath("TOS", &self.tos_subpage);
-            validate_subpath("Privacy policy", &self.privacy_policy_subpage);
-            validate_subpath("Homepage", &self.app_homepage_subpage);
-
             // Validate icon
             if self.icon.len() > 0 {
                 check(
@@ -333,18 +309,17 @@ pub mod impls {
                     "Unsupported icon MIME type",
                 );
             }
-
-            for uri in &self.redirect_uris {
-                check(
-                    Url::parse(uri).is_ok(),
-                    format!("Invalid redirect URI format: {}", uri).as_str(),
-                );
-            }
         }
 
-        pub fn get(account_id: AccountNumber) -> Self {
+        pub fn get(account_id: AccountNumber) -> Option<Self> {
             let app_metadata_table = AppMetadataTable::new();
-            app_metadata_table.get_index_pk().get(&account_id).unwrap()
+            app_metadata_table.get_index_pk().get(&account_id)
+        }
+
+        pub fn get_assert(account_id: AccountNumber) -> Self {
+            let record = Self::get(account_id);
+            check(record.is_some(), "App metadata not found");
+            record.unwrap()
         }
 
         pub fn upsert(
@@ -353,10 +328,6 @@ pub mod impls {
             long_desc: String,
             icon: String,
             icon_mime_type: String,
-            tos_subpage: String,
-            privacy_policy_subpage: String,
-            app_homepage_subpage: String,
-            redirect_uris: Vec<String>,
         ) -> Self {
             let app_metadata_table = AppMetadataTable::new();
 
@@ -371,15 +342,11 @@ pub mod impls {
             metadata.long_desc = long_desc;
             metadata.icon = icon;
             metadata.icon_mime_type = icon_mime_type;
-            metadata.tos_subpage = tos_subpage;
-            metadata.privacy_policy_subpage = privacy_policy_subpage;
-            metadata.app_homepage_subpage = app_homepage_subpage;
             metadata.status = if is_new_app {
                 app_status::DRAFT
             } else {
                 metadata.status
             };
-            metadata.redirect_uris = redirect_uris;
 
             if is_new_app {
                 let created_at = transact::Wrapper::call().currentBlock().time;
@@ -430,16 +397,10 @@ pub mod impls {
                 ("name", &self.name),
                 ("short_description", &self.short_desc),
                 ("long_description", &self.long_desc),
-                ("tos_subpage", &self.tos_subpage),
-                ("privacy_policy_subpage", &self.privacy_policy_subpage),
-                ("app_homepage_subpage", &self.app_homepage_subpage),
             ];
             for (name, v) in required_fields {
                 check(v.len() > 0, &format!("{} required to publish", name));
             }
-
-            // TODO: check each of those subpages exist
-            // in the caller's namespace in sites (or it must be an SPA)
 
             self.status = app_status::PUBLISHED;
             AppMetadataTable::new().put(&self).unwrap();

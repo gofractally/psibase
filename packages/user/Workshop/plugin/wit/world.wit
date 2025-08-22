@@ -9,13 +9,13 @@ interface registry {
     create-app: func(app: string) -> result<_, error>;
 
     /// Set the metadata for the specified app
-    set-app-metadata: func(app: string, metadata: app-metadata) -> result<_, error>;
+    set-app-metadata: func(app: string, metadata: app-metadata);
 
     /// Publish the specified app
-    publish-app: func(app: string) -> result<_, error>;
+    publish-app: func(app: string);
 
     /// Unpublish specified app
-    unpublish-app: func(app: string) -> result<_, error>;
+    unpublish-app: func(app: string);
 }
 
 interface app {

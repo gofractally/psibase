@@ -19,6 +19,7 @@ pub mod nft;
 pub mod packages;
 pub mod producers;
 pub mod r_events;
+pub mod registry;
 pub mod setcode;
 pub mod sites;
 pub mod staged_tx;
