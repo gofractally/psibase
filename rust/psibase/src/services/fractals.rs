@@ -33,6 +33,24 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Claims the fractal members locked balance depending on it's progression
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal
+    #[action]
+    fn claim(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Sets the half life for fractal awards.
+    ///
+    /// # Arguments
+    /// * `seconds` - Half life in seconds.
+    #[action]
+    fn set_half_life(seconds: u64) {
+        unimplemented!()
+    }
+
     /// Sets the schedule for an evaluation type within a fractal.
     ///
     /// # Arguments
