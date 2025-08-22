@@ -243,6 +243,7 @@ namespace SystemService
              .status      = HttpStatus::notAcceptable,
              .contentType = "text/plain",
              .body        = std::vector<char>(message.begin(), message.end()),
+             .headers     = allowCors(),
          };
       }
 
@@ -386,18 +387,21 @@ namespace SystemService
                // Chrome bug - Devtools still shows 200 status code sometimes
                return HttpReply{
                    .status  = HttpStatus::notModified,
-                   .headers = {{"ETag", etag}},
+                   .headers = {{"ETag", etag},
+                               {"Access-Control-Allow-Origin", "*"},
+                               {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
+                               {"Access-Control-Allow-Headers", "*"}},
                };
             }
 
             auto reply = HttpReply{
                 .contentType = content->contentType,
-                .headers =
-                    {
-                        {"Content-Security-Policy", cspHeader},
-                        {"Cache-Control", "no-cache"},
-                        {"ETag", etag},
-                    },
+                .headers     = {{"Content-Security-Policy", cspHeader},
+                                {"Cache-Control", "no-cache"},
+                                {"ETag", etag},
+                                {"Access-Control-Allow-Origin", "*"},
+                                {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
+                                {"Access-Control-Allow-Headers", "*"}},
             };
 
             if (request.method != "HEAD")

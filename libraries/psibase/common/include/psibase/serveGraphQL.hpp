@@ -41,6 +41,7 @@ namespace psibase
          return HttpReply{
              .contentType = "application/json",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+             .headers     = allowCors(),
          };
       };
 
@@ -55,7 +56,8 @@ namespace psibase
          auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return HttpReply{
              .contentType = "text",                                          // TODO
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy,
+             .headers     = allowCors(),
          };
       }
       else if (request.method == "POST")

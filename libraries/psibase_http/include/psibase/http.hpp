@@ -295,7 +295,6 @@ namespace psibase::http
       uint32_t                 num_threads      = {};
       uint32_t                 max_request_size = {};
       std::atomic<int64_t>     idle_timeout_us  = {};
-      std::string              allow_origin     = {};
       std::vector<listen_spec> listen           = {};
       std::vector<std::string> hosts            = {};
 #ifdef PSIBASE_ENABLE_SSL

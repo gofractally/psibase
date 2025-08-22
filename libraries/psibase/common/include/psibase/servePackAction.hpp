@@ -86,6 +86,7 @@ namespace psibase
                return HttpReply{
                    .contentType = "application/octet-stream",
                    .body        = std::move(*result),
+                   .headers     = allowCors(),
                };
             }
          }

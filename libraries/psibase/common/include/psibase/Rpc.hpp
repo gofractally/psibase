@@ -122,6 +122,10 @@ namespace psibase
       PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
 
+   std::vector<HttpHeader> allowCors(std::string_view origin = "*");
+   std::vector<HttpHeader> allowCors(const HttpRequest& req, AccountNumber account);
+   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req);
+
    using HttpReply = BasicHttpReply<std::vector<char>>;
 
    template <typename T>
