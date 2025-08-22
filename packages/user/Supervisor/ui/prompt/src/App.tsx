@@ -37,7 +37,9 @@ export const App = () => {
                     siblingUrl(null, triggerDetails.subdomain, null, true),
                 );
 
-                iframeUrl.pathname = triggerDetails.payload;
+                // The well-known path for the web platform is therefore currently
+                //  `/plugin/web/prompt/<prompt-name>.html`
+                iframeUrl.pathname = `/plugin/web/prompt/${triggerDetails.payload}.html`;
                 if (triggerDetails.contextId) {
                     iframeUrl.searchParams.set(
                         "context_id",

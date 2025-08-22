@@ -30,6 +30,7 @@
     - [Schema](specifications/data-formats/schema.md)
     - [fracpack](specifications/data-formats/fracpack.md)
     - [App Packages](specifications/data-formats/package.md)
+  - [Platforms](specifications/platforms/README.md)
 
 - [Development guides](development/README.md)
 

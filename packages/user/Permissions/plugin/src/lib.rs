@@ -19,8 +19,8 @@ use host::common::{
     client::{get_receiver, get_sender},
     store::StorageDuration,
 };
-use host::types::types::Error;
 use host::prompt::web as HostPrompt;
+use host::types::types::Error;
 
 mod errors;
 use errors::*;
@@ -104,7 +104,7 @@ impl Api for PermissionsPlugin {
         .packed();
 
         let context_id = HostPrompt::store_context(&packed_context);
-        HostPrompt::prompt_user(Some("/permissions.html"), Some(&context_id))?;
+        HostPrompt::prompt_user("permissions".into(), Some(&context_id))?;
         Ok(false)
     }
 }

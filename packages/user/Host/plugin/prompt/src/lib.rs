@@ -10,9 +10,10 @@ use db::*;
 
 use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
-use host::common::client::{get_app_url, get_sender};
-use host::types::types::{Error, PluginId};
+use host::common::client::get_sender;
+use host::types::types::Error;
 use psibase::fracpack::{Pack, Unpack};
+use supervisor::bridge::prompt::request_prompt;
 
 use chrono::Utc;
 use clientdata::plugin::keyvalue as KeyValue;
@@ -32,7 +33,6 @@ struct ActivePrompt {
 
 const PROMPT_EXPIRATION_SEC: u32 = 2 * 60;
 const ACTIVE_PROMPT_REQ: &str = "active_prompt_request";
-const REDIRECT_ERROR_CODE: u32 = 999999999;
 
 impl Api for HostPrompt {
     fn get_prompt_trigger_details(
@@ -81,26 +81,10 @@ impl Api for HostPrompt {
     }
 }
 
-fn validate_subpath(subpath: &str) -> Result<(), Error> {
-    // Some extra minor validation to help catch a natural mistake
-    if subpath.starts_with("http://") || subpath.starts_with("https://") {
-        return Err(ErrorType::InvalidSubpath().into());
-    }
-
-    Ok(())
-}
-
 impl Web for HostPrompt {
-    // TODO: Rather than prompting with a subpath, the app must register a name for a
-    //   prompt, and they specify it by name. When the host goes to frame the prompt, it will
-    //   dynamically look up the subpath via the registered prompt name.
-    fn prompt_user(subpath: Option<String>, context_id: Option<String>) -> Result<(), Error> {
-        let mut subpath = subpath.unwrap_or("/".to_string());
-        validate_subpath(&subpath)?;
-
-        if subpath.contains("?") {
-            println!("[Warning]: Query params stripped from requested prompt subpath.");
-            subpath = subpath.split('?').next().unwrap().to_string();
+    fn prompt_user(prompt_name: String, context_id: Option<String>) -> Result<(), Error> {
+        if !prompt_name.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err(ErrorType::InvalidPromptName().into());
         }
 
         // Store the active prompt in the host's namespace
@@ -110,7 +94,7 @@ impl Web for HostPrompt {
             &ActivePrompt {
                 id,
                 subdomain: get_sender(),
-                payload: subpath.clone(),
+                payload: prompt_name,
                 expiry_timestamp: Utc::now().timestamp() as u32 + PROMPT_EXPIRATION_SEC,
                 context_id,
                 return_payload: None,
@@ -118,17 +102,10 @@ impl Web for HostPrompt {
             .packed(),
         );
 
-        let redirect_url = get_app_url("supervisor");
-        let redirect_url = format!("{}/prompt.html?id={}", redirect_url, id);
+        request_prompt(&format!("{}", id))
+            .map_err(|err| Error::from(ErrorType::OpenPromptError(err)))?;
 
-        return Err(Error {
-            code: REDIRECT_ERROR_CODE,
-            producer: PluginId {
-                service: "host".to_string(),
-                plugin: "common".to_string(),
-            },
-            message: redirect_url,
-        });
+        Ok(())
     }
 
     fn store_context(packed_context: Vec<u8>) -> String {

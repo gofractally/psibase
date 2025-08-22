@@ -69,4 +69,6 @@ export interface HostInterface {
     getServiceStack(): string[];
 
     getRootDomain(): string;
+
+    requestPrompt: (id: string) => Result<void, string>;
 }

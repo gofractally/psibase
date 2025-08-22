@@ -1,0 +1,11 @@
+package supervisor:bridge;
+
+interface prompt {
+    /// Requests that the host show the prompt with the given ID
+    /// Can return an error string
+    request-prompt: func(id: string) -> result<_, string>;
+}
+
+world imports {
+    import prompt;
+}
