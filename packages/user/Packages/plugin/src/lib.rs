@@ -24,8 +24,9 @@ use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
     get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
-    EssentialServices, InstalledPackageInfo, PackageDisposition, PackageManifest, PackagedService,
-    SchemaMap, SignedTransaction, StagedUpload, Tapos, Transaction, TransactionBuilder,
+    ActionMeta, EssentialServices, InstalledPackageInfo, PackageDisposition, PackageManifest,
+    PackagedService, SchemaMap, SignedTransaction, StagedUpload, Tapos, Transaction,
+    TransactionBuilder,
 };
 
 use psibase::services::{

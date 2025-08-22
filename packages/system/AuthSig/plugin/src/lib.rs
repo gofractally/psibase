@@ -24,7 +24,7 @@ use psibase::services::auth_sig::action_structs as MyService;
 // Third-party crates
 use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
-use psibase::fracpack::Pack;
+use psibase::{fracpack::Pack, ActionMeta};
 use rand_core::OsRng;
 
 psibase::define_trust! {

@@ -36,6 +36,7 @@ use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::{
     fracpack::Pack,
     services::invite::{self as InviteService, action_structs::*},
+    ActionMeta,
 };
 use rand::Rng;
 use transact::plugin::{hooks::*, intf as Transact};

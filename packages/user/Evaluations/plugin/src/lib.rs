@@ -6,7 +6,7 @@ use bindings::exports::evaluations::plugin::user::Guest as User;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
+use psibase::{fracpack::Pack, ActionMeta};
 
 pub mod consensus;
 mod errors;

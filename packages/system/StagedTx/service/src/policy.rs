@@ -1,6 +1,6 @@
 use psibase::services::accounts::Wrapper as Accounts;
 use psibase::services::transact::auth_interface::auth_action_structs;
-use psibase::{AccountNumber, Caller, MethodNumber, ServiceCaller};
+use psibase::{AccountNumber, ActionMeta, Caller, MethodNumber, ServiceCaller};
 
 use crate::service::Wrapper;
 

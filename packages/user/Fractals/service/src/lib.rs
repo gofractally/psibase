@@ -2,10 +2,11 @@ pub mod helpers;
 mod scoring;
 pub mod tables;
 
-#[psibase::service(tables = "tables::tables")]
+#[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
     use crate::tables::tables::{EvaluationInstance, Fractal, Member, MemberStatus};
+    use psibase::define_service_hooks;
 
     use psibase::*;
 
@@ -90,20 +91,13 @@ pub mod service {
         );
     }
 
-    fn check_is_eval() {
-        check(
-            get_sender() == psibase::services::evaluations::SERVICE,
-            "sender must be evaluations",
-        );
-    }
-
     /// Called when an evaluation in a fractal is finalized.
     ///
     /// # Arguments
     /// * `evaluation_id` - The ID of the evaluation.
     #[action]
     fn on_eval_fin(evaluation_id: u32) {
-        check_is_eval();
+        check(get_sender() == get_service(), "invalid sender");
 
         let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
 
@@ -123,7 +117,7 @@ pub mod service {
     /// * `account` - The account number of the registering user.
     #[action]
     fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
-        check_is_eval();
+        check(get_sender() == get_service(), "invalid sender");
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
         let member = check_some(
             Member::get(evaluation.fractal, account),
@@ -143,7 +137,9 @@ pub mod service {
     /// * `evaluation_id` - The ID of the evaluation.
     /// * `account` - The account number of the unregistering user.
     #[action]
-    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
+    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {
+        check(get_sender() == get_service(), "invalid sender");
+    }
 
     /// Called when a user submits an attestation for decrypted proposals in a fractal evaluation.
     ///
@@ -159,7 +155,7 @@ pub mod service {
         _user: AccountNumber,
         attestation: Vec<u8>,
     ) {
-        check_is_eval();
+        check(get_sender() == get_service(), "invalid sender");
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))
             .unwrap()
@@ -178,9 +174,23 @@ pub mod service {
     /// * `group_result` - The result data of the group.
     #[action]
     fn on_grp_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
-        check_is_eval();
+        check(get_sender() == get_service(), "invalid sender");
         EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .award_group_scores(group_number, group_result);
+    }
+
+    define_service_hooks!((
+        psibase::services::evaluations::Wrapper::SERVICE,
+        on_eval_fin,
+        on_ev_reg,
+        on_ev_unreg,
+        on_attest,
+        on_grp_fin
+    ));
+
+    #[action]
+    fn handle_hook(hook_name: String, hook_data: Vec<u8>) {
+        ServiceHook::new(&hook_name, &hook_data).execute();
     }
 
     #[event(history)]

@@ -12,7 +12,7 @@ use bindings::host::common::client as Client;
 use bindings::host::types::types::Error;
 use bindings::invite::plugin::advanced::deserialize;
 use bindings::transact::plugin::{hooks::*, types::*};
-use psibase::services::invite as Invite;
+use psibase::{services::invite as Invite, ActionMeta};
 
 // Exported interfaces/types
 use bindings::exports::auth_invite::plugin::intf::Guest as Intf;

@@ -9,9 +9,7 @@ use transact::plugin::intf::add_action_to_transaction;
 use exports::producers::plugin::api::Guest as Api;
 use producers::plugin::types::*;
 
-use psibase::fracpack::Pack;
-use psibase::services;
-use psibase::AccountNumber;
+use psibase::{fracpack::Pack, services, AccountNumber, ActionMeta};
 use services::producers::action_structs as Actions;
 
 struct ProducersPlugin;

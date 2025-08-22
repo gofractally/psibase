@@ -95,7 +95,10 @@ pub mod impls {
     use crate::helpers::{
         calculate_results, get_current_time_seconds, EvaluationStatus, GroupResult,
     };
-    use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
+    use psibase::services::{
+        evaluations::Hooks::hooks_structs as EvalHooks, hook_handler::call_hook,
+    };
+
     use psibase::services::subgroups::Wrapper as Subgroups;
     use psibase::{AccountNumber, Table};
     use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
@@ -173,11 +176,14 @@ pub mod impls {
             );
 
             if use_hook {
-                EvalHooks::call_to(self.owner).on_attest(
-                    self.evaluation_id,
-                    self.group_number.unwrap(),
-                    self.user,
-                    attestation.clone(),
+                call_hook(
+                    self.owner,
+                    EvalHooks::on_attest {
+                        evaluation_id: self.evaluation_id,
+                        group_number: self.group_number.unwrap(),
+                        user: self.user,
+                        attestation: attestation.clone(),
+                    },
                 );
             }
 
@@ -251,13 +257,25 @@ pub mod impls {
 
         fn notify_register(&self, registrant: AccountNumber) {
             if self.use_hooks {
-                EvalHooks::call_to(self.owner).on_ev_reg(self.id, registrant);
+                call_hook(
+                    self.owner,
+                    EvalHooks::on_ev_reg {
+                        evaluation_id: self.id,
+                        account: registrant,
+                    },
+                );
             }
         }
 
         fn notify_unregister(&self, registrant: AccountNumber) {
             if self.use_hooks {
-                EvalHooks::call_to(self.owner).on_ev_unreg(self.id, registrant);
+                call_hook(
+                    self.owner,
+                    EvalHooks::on_ev_unreg {
+                        evaluation_id: self.id,
+                        account: registrant,
+                    },
+                );
             }
         }
 
@@ -483,10 +501,13 @@ pub mod impls {
             let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
 
             if parent_eval.use_hooks {
-                EvalHooks::call_to(self.owner).on_grp_fin(
-                    self.evaluation_id,
-                    self.number,
-                    result.clone(),
+                call_hook(
+                    self.owner,
+                    EvalHooks::on_grp_fin {
+                        evaluation_id: self.evaluation_id,
+                        group_number: self.number,
+                        result: result.clone(),
+                    },
                 );
             }
 
