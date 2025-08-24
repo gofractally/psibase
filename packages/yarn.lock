@@ -12099,6 +12099,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"token-stream@workspace:user/TokenStream/ui":
+  version: 0.0.0-use.local
+  resolution: "token-stream@workspace:user/TokenStream/ui"
+  dependencies:
+    "@tanstack/react-query": "npm:^5.62.8"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    eslint: "npm:^9.15.0"
+    lucide-react: "npm:^0.475.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    typescript: "npm:^5.7.3"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.24.2"
+  languageName: unknown
+  linkType: soft
+
 "totalist@npm:^3.0.0":
   version: 3.0.1
   resolution: "totalist@npm:3.0.1"
