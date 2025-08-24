@@ -36,8 +36,8 @@ struct TokenStreamPlugin;
 impl Api for TokenStreamPlugin {
     fn set_example_thing(thing: String) -> Result<(), Error> {
         trust::authorize(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = token_stream::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+        // let packed_example_thing_args = token_stream::action_structs::setExampleThing { thing }.packed();
+        // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
         Ok(())
     }
 }
@@ -63,7 +63,7 @@ impl Queries for TokenStreamPlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val = 
+        let examplething_val =
             examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
