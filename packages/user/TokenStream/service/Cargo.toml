@@ -9,9 +9,7 @@ publish.workspace = true
 server = "r-token-stream"
 plugin = "token-stream-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
-postinstall = [
-    { sender = "token-stream", service = "token-stream", method = "init", data = {} },
-]
+postinstall = []
 
 [dependencies]
 psibase = { version = "0.20.0", path = "../../../../rust/psibase" }
