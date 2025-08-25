@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/SnapshotHeader.hpp>
+#include <psibase/SocketInfo.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
@@ -246,25 +247,6 @@ namespace psibase
       auto              key() const -> LogTruncateKeyType;
       PSIO_REFLECT(LogTruncateRow, start)
    };
-
-   struct ProducerMulticastSocketInfo
-   {
-      PSIO_REFLECT(ProducerMulticastSocketInfo)
-      friend bool operator==(const ProducerMulticastSocketInfo&,
-                             const ProducerMulticastSocketInfo&) = default;
-   };
-   struct HttpSocketInfo
-   {
-      PSIO_REFLECT(HttpSocketInfo)
-      friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
-   };
-
-   using SocketInfo = std::variant<ProducerMulticastSocketInfo, HttpSocketInfo>;
-
-   inline auto get_gql_name(SocketInfo*)
-   {
-      return "SocketInfo";
-   }
 
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
    auto socketPrefix() -> KeyPrefixType;

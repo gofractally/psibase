@@ -23,6 +23,8 @@ namespace psibase::http
       void close_impl(boost::beast::error_code& ec) { stream.socket().close(ec); }
       void shutdown_impl() { common_shutdown_impl(); }
 
+      SocketEndpoint remote_endpoint() const;
+
       boost::beast::tcp_stream stream;
    };
 

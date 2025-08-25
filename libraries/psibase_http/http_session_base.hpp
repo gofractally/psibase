@@ -103,7 +103,8 @@ namespace psibase::http
       virtual void close_impl(boost::beast::error_code& ec)                                = 0;
       virtual void shutdown_impl()                                                         = 0;
 
-      virtual bool is_secure() const { return false; }
+      virtual SocketEndpoint remote_endpoint() const = 0;
+      virtual bool           is_secure() const { return false; }
    };
 
 }  // namespace psibase::http

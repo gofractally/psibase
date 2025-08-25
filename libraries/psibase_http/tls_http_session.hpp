@@ -28,6 +28,8 @@ namespace psibase::http
       void shutdown_impl();
       void close_impl(boost::beast::error_code& ec);
 
+      SocketEndpoint remote_endpoint() const;
+
       void run();
 
       tls_context_ptr                                    context;

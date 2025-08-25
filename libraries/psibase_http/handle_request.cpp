@@ -537,7 +537,10 @@ namespace psibase::http
                    session->do_read();
              });
       }
-      virtual SocketInfo info() const override { return HttpSocketInfo{}; }
+      virtual SocketInfo info() const override
+      {
+         return HttpSocketInfo{.endpoint = session->remote_endpoint()};
+      }
 
       void runNativeHandler(auto&& request_handler, auto&& callback)
       {
