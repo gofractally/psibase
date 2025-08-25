@@ -8,14 +8,9 @@ import {
     updateBalanceCache,
     useBalances,
 } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { useBurn } from "@/apps/tokens/hooks/tokensPlugin/useBurn";
 import { useCredit } from "@/apps/tokens/hooks/tokensPlugin/useCredit";
-import { useMint } from "@/apps/tokens/hooks/tokensPlugin/useMint";
-import { Tab, useTab } from "@/apps/tokens/hooks/useTab";
 import { useTokenForm } from "@/apps/tokens/hooks/useTokenForm";
-import { useEffect, useState } from "react";
-
-import { ConfirmationModal } from "@/components";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Account } from "@/lib/zod/Account";
@@ -33,29 +28,19 @@ export const TokensPage = () => {
     const currentUser = isSuccess ? currentUserData : null;
 
     const sharedBalances = data ? data.sharedBalances : [];
-    const tokens = data ? data.tokens : [];
+    const tokens = useMemo(() => (data ? data.tokens : []), [data]);
     const isLoading = !isSuccess || isLoadingBalances;
 
-    const { isPending: isBurnPending, mutateAsync: burn } = useBurn();
-    const { isPending: isCreditPending, mutateAsync: credit } = useCredit();
-    const { isPending: isMintPending, mutateAsync: mint } = useMint();
+    const { isPending, mutateAsync: credit } = useCredit();
 
-    const isPending = isBurnPending || isCreditPending || isMintPending;
-    const { isBurning, isMinting, isTransfer, setTab, tab } = useTab();
+    const form = useTokenForm();
 
-    const form = useTokenForm(tab);
-
-    const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
     const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
     function onSubmit() {
         console.log("onSubmit");
-        if (isTransfer) {
-            setTransferModal(true);
-        } else {
-            setConfirmationModalOpen(true);
-        }
+        setTransferModal(true);
     }
 
     const selectedTokenId = form.watch("token");
@@ -68,30 +53,12 @@ export const TokensPage = () => {
             form.setValue("token", tokens[0].id.toString());
             return;
         }
-        if (!selectedToken) {
-            setTab(Tab.Enum.Transfer);
-            return;
-        }
-        if (!selectedToken.isAdmin && isMinting) {
-            setTab(Tab.Enum.Transfer);
-        }
-    }, [selectedTokenId, selectedToken, tab, tokens]);
-
-    const isAdmin = selectedToken?.isAdmin || false;
-
-    const modalWarning = `This will ${
-        isBurning ? "burn" : isMinting ? "mint" : "transfer"
-    } ${form.watch("amount")} tokens${
-        isBurning && isAdmin && form.watch("from")
-            ? ` from ${form.watch("from")}'s account.`
-            : ""
-    }`;
+    }, [form, selectedTokenId, tokens]);
 
     const onSuccessfulTx = () => {
         form.setValue("amount", "");
         form.setValue("memo", "");
         form.setValue("to", "");
-        form.setValue("from", "");
     };
 
     const performTransfer = async () => {
@@ -127,67 +94,6 @@ export const TokensPage = () => {
         }
     };
 
-    const performTx = async () => {
-        console.log("performTx");
-        if (!currentUser) throw new Error("Expected current user");
-        const tokenId = form.watch("token");
-        const amount = form.watch("amount");
-        const memo = form.watch("memo")!;
-
-        try {
-            const token = tokens.find(
-                (token) => token.id.toString() === tokenId,
-            );
-            if (!token) throw new Error("Failed to find token");
-
-            if (isBurning) {
-                const burningFrom = form.watch("from");
-                await burn({
-                    tokenId,
-                    amount,
-                    account: burningFrom || "",
-                    memo,
-                });
-                toast("Burned", {
-                    description: `Burned ${amount} ${
-                        token.balance?.getDisplayLabel() || ""
-                    } tokens${burningFrom ? ` from ${burningFrom}` : ""}`,
-                });
-                if (!burningFrom) {
-                    updateBalanceCache(
-                        currentUser,
-                        tokenId,
-                        amount,
-                        "Subtract",
-                    );
-                }
-                setConfirmationModalOpen(false);
-                onSuccessfulTx();
-            } else if (isMinting) {
-                await mint({ tokenId, amount, memo });
-                toast("Minted", {
-                    description: `Added ${amount} ${
-                        token.balance?.getDisplayLabel() || token.symbol
-                    } to your balance.`,
-                });
-                onSuccessfulTx();
-                setConfirmationModalOpen(false);
-                updateBalanceCache(currentUser, tokenId, amount, "Add");
-            } else {
-                throw new Error(`Failed to identify type of plugin call`);
-            }
-        } catch (e) {
-            toast("Error", {
-                description:
-                    e instanceof Error
-                        ? e.message
-                        : `Unrecognised error, see logs.`,
-            });
-        } finally {
-            refetchUserBalances();
-        }
-    };
-
     const isNoTokens = currentUser && tokens.length == 0;
 
     return (
@@ -211,13 +117,6 @@ export const TokensPage = () => {
                         }}
                     />
                 </ModalCreateToken>
-                <ConfirmationModal
-                    descriptions={[modalWarning]}
-                    isPending={isPending}
-                    onClose={() => setConfirmationModalOpen(false)}
-                    onContinue={() => performTx()}
-                    open={isConfirmationModalOpen}
-                />
                 <TransferModal
                     isPending={isPending}
                     onClose={() => setTransferModal(false)}
@@ -234,9 +133,7 @@ export const TokensPage = () => {
                     isLoading={isLoading}
                     form={form}
                     tokens={tokens}
-                    tab={tab}
                     selectedToken={selectedToken}
-                    setMode={setTab}
                     setNewTokenModalOpen={setNewTokenModalOpen}
                     onSubmit={() => onSubmit()}
                 />
