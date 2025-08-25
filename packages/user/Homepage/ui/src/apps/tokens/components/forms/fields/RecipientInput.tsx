@@ -13,10 +13,10 @@ import { Input } from "@shared/shadcn/ui/input";
 
 interface Props {
     form: UseFormReturn<FormSchema>;
-    disableTo: boolean;
+    disabled?: boolean;
 }
 
-const RecipientInput: FC<Props> = ({ form, disableTo }) => (
+const RecipientInput: FC<Props> = ({ form, disabled = false }) => (
     <FormField
         control={form.control}
         name="to"
@@ -29,7 +29,7 @@ const RecipientInput: FC<Props> = ({ form, disableTo }) => (
                     <Input
                         placeholder="Account"
                         {...field}
-                        disabled={disableTo}
+                        disabled={disabled}
                     />
                 </FormControl>
                 <FormMessage />
