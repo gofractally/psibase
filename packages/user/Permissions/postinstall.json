@@ -4,7 +4,7 @@
     "service": "sites",
     "method": "setcsp",
     "data": {
-      "path": "/plugin/web/prompt/permissions.html",
+      "path": "/plugin/web/prompt/permissions/index.html",
       "csp": "frame-ancestors *"
     }
   }
