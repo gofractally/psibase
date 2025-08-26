@@ -48,11 +48,12 @@ pub mod tables {
             instance
         }
 
+        pub fn get(nft_id: u32) -> Option<Self> {
+            StreamTable::new().get_index_pk().get(&nft_id)
+        }
+
         pub fn get_assert(nft_id: u32) -> Self {
-            check_some(
-                StreamTable::new().get_index_pk().get(&nft_id),
-                "Stream does not exist",
-            )
+            check_some(Self::get(nft_id), "Stream does not exist")
         }
 
         fn decay_rate(&self) -> f64 {
@@ -136,7 +137,13 @@ pub mod service {
     use crate::tables::Stream;
 
     #[action]
+    fn get_stream(nft_id: u32) -> Option<Stream> {
+        Stream::get(nft_id)
+    }
+
+    #[action]
     fn create(decay_rate_per_million: u32, token_id: u32) -> u32 {
+        psibase::services::tokens::Wrapper::call().getToken(token_id);
         let stream = Stream::add(decay_rate_per_million, token_id);
         let sender = get_sender();
         Nft::Wrapper::call().credit(stream.nft_id, sender, "Redeemer NFT of stream".to_string());
@@ -156,7 +163,7 @@ pub mod service {
 
         let sender = get_sender();
 
-        Tokens::Wrapper::call().debit(
+        Tokens::Wrapper::call_from(Wrapper::SERVICE).debit(
             stream.token_id,
             sender,
             amount,

@@ -30,7 +30,8 @@ services = ["token-stream"]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.20.0"
 Sites = "0.20.0"
-Permissions = "0.20.0"
+Tokens = "0.20.0"
+
 
 [lib]
 crate-type = ["rlib"]
