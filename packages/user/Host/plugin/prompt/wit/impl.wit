@@ -3,23 +3,23 @@ package host:prompt;
 interface api {
     use host:types/types.{error};
 
-    /// The details of a prompt that are necessary for the supervisor to trigger it
-    record trigger-details {
+    /// The details of the currently active prompt
+    record prompt-details {
         subdomain: string,
+        active-app: string,
         payload: string,
         context-id: option<string>,
+        expired: bool,
     }
 
     /// Used by the supervisor app to facilitate the interaction with the user
     /// Also sets the return-payload on the prompt object to ensure it persists and can 
     ///    be queried in `get-return-payload`.
-    get-prompt-trigger-details: func(id: string, return-payload: string) -> result<trigger-details, error>;
+    get-active-prompt: func() -> result<prompt-details, error>;
 
-    /// Used by the supervisor app after it has been notified of prompt completion.
-    ///    This retrieves the payload used to return the user to the app from which they came.
-    ///    The active prompt is deleted automatically when this is called.
-    get-return-details: func(id: string) -> option<string>;
-}
+    /// Deletes the active prompt
+    delete-active-prompt: func();
+} 
 
 world impl {
     include clientdata:plugin/imports;

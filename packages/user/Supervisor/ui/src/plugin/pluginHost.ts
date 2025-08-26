@@ -3,7 +3,6 @@ import {
     QualifiedFunctionCallArgs,
     QualifiedResourceCallArgs,
     assertTruthy,
-    siblingUrl,
 } from "@psibase/common-lib";
 
 import {
@@ -214,7 +213,7 @@ export class PluginHost implements HostInterface {
         return this.supervisor.getRootDomain();
     }
 
-    requestPrompt(id: string): Result<void, string> {
-        throw siblingUrl(null, "supervisor", `/prompt.html?id=${id}`);
+    requestPrompt(): Result<void, string> {
+        throw "user_prompt_request";
     }
 }
