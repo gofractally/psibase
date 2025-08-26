@@ -2,6 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
+#include <services/local/XAdmin.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -115,7 +116,8 @@ extern "C" [[clang::export_name("serve")]] void serve()
             {
                if (!reply)
                {
-                  if (std::string_view{req.target()}.starts_with("/native/"))
+                  if (service == XAdmin::service &&
+                      std::string_view{req.target()}.starts_with("/native/"))
                   {
                      return;
                   }
