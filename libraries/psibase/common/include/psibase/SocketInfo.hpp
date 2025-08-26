@@ -9,20 +9,57 @@
 
 namespace psibase
 {
+   struct IPV4Address
+   {
+      std::array<std::uint8_t, 4> bytes;
+      friend bool                 operator==(const IPV4Address&, const IPV4Address&) = default;
+      PSIO_REFLECT(IPV4Address, definitionWillNotChange(), bytes)
+   };
+   struct IPV6Address
+   {
+      std::array<std::uint8_t, 16> bytes;
+      std::uint32_t                zone;
+      friend bool                  operator==(const IPV6Address&, const IPV6Address&) = default;
+      PSIO_REFLECT(IPV6Address, definitionWillNotChange(), bytes, zone)
+   };
+   using IPAddress = std::variant<IPV4Address, IPV6Address>;
+
+   std::string to_string(const IPV4Address&);
+   std::string to_string(const IPV6Address&);
+   std::string to_string(const IPAddress&);
+
+   std::optional<IPV4Address> parseIPV4Address(std::string_view);
+   std::optional<IPV6Address> parseIPV6Address(std::string_view);
+   std::optional<IPAddress>   parseIPAddress(std::string_view);
+
+   void to_json(const IPAddress& addr, auto& stream)
+   {
+      to_json(to_string(addr), stream);
+   }
+   void from_json(IPAddress& addr, auto& stream)
+   {
+      std::string s;
+      from_json(s, stream);
+      addr = parseIPAddress(s).value();
+   }
+
+   bool isLoopback(const IPV4Address&);
+   bool isLoopback(const IPV6Address&);
+   bool isLoopback(const IPAddress&);
+
    struct IPV4Endpoint
    {
-      std::array<std::uint8_t, 4> addr;
-      std::uint16_t               port;
-      friend bool                 operator==(const IPV4Endpoint&, const IPV4Endpoint&) = default;
-      PSIO_REFLECT(IPV4Endpoint, definitionWillNotChange(), addr, port)
+      IPV4Address   address;
+      std::uint16_t port;
+      friend bool   operator==(const IPV4Endpoint&, const IPV4Endpoint&) = default;
+      PSIO_REFLECT(IPV4Endpoint, definitionWillNotChange(), address, port)
    };
    struct IPV6Endpoint
    {
-      std::array<std::uint8_t, 16> addr;
-      std::uint32_t                zone;
-      std::uint16_t                port;
-      friend bool                  operator==(const IPV6Endpoint&, const IPV6Endpoint&) = default;
-      PSIO_REFLECT(IPV6Endpoint, definitionWillNotChange(), addr, zone, port)
+      IPV6Address   address;
+      std::uint16_t port;
+      friend bool   operator==(const IPV6Endpoint&, const IPV6Endpoint&) = default;
+      PSIO_REFLECT(IPV6Endpoint, definitionWillNotChange(), address, port)
    };
    struct LocalEndpoint
    {

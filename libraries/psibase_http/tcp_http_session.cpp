@@ -11,14 +11,14 @@ namespace psibase::http
       {
          auto         v4 = address.to_v4();
          IPV4Endpoint result{.port = endpoint.port()};
-         std::ranges::copy(v4.to_bytes(), result.addr.begin());
+         std::ranges::copy(v4.to_bytes(), result.address.bytes.begin());
          return result;
       }
       else
       {
          auto         v6 = address.to_v6();
-         IPV6Endpoint result{.zone = v6.scope_id(), .port = endpoint.port()};
-         std::ranges::copy(v6.to_bytes(), result.addr.begin());
+         IPV6Endpoint result{.address = {.zone = v6.scope_id()}, .port = endpoint.port()};
+         std::ranges::copy(v6.to_bytes(), result.address.bytes.begin());
          return result;
       }
    }

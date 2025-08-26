@@ -24,6 +24,7 @@ namespace psibase
    static constexpr NativeTableNum logTruncateTable           = 13;  // subjective
    static constexpr NativeTableNum socketTable                = 14;  // subjective
    static constexpr NativeTableNum runTable                   = 15;  // subjective
+   static constexpr NativeTableNum envTable                   = 16;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -377,6 +378,18 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> RunKeyType;
       PSIO_REFLECT(RunRow, id, mode, maxTime, action, continuation)
+   };
+
+   using EnvKeyType = std::tuple<std::uint16_t, std::uint8_t, std::string>;
+   auto envPrefix() -> KeyPrefixType;
+   auto envKey(std::string_view) -> EnvKeyType;
+   struct EnvRow
+   {
+      std::string       name;
+      std::string       value;
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> EnvKeyType;
+      PSIO_REFLECT(EnvRow, name, value);
    };
 
 }  // namespace psibase
