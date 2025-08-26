@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
@@ -62,10 +62,10 @@ export const App = () => {
         initApp();
     }, []);
 
-    useEffect(() => {
-        if (!iframeUrl) return;
+    const promptFinished = useCallback(
+        async (event: MessageEvent) => {
+            if (!iframeUrl) return;
 
-        const handleMessage = async (event: MessageEvent) => {
             if (event.origin !== new URL(iframeUrl).origin) {
                 return;
             }
@@ -84,13 +84,17 @@ export const App = () => {
                 );
                 window.location.href = rootDomain.toString();
             }
-        };
-        window.addEventListener("message", handleMessage);
+        },
+        [iframeUrl, activeApp, returnPath],
+    );
 
+    useEffect(() => {
+        if (!iframeUrl) return;
+        window.addEventListener("message", promptFinished);
         return () => {
-            window.removeEventListener("message", handleMessage);
+            window.removeEventListener("message", promptFinished);
         };
-    }, [iframeUrl]);
+    }, [iframeUrl, promptFinished]);
 
     if (error) {
         return <div>{error}</div>;
