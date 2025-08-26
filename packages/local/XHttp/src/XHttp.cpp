@@ -135,6 +135,13 @@ extern "C" [[clang::export_name("serve")]] void serve()
    {
       return;
    }
+   else if (std::string_view{req.target()}.starts_with("/native/"))
+   {
+      auto reply =
+          error(HttpStatus::notFound, "The resource '" + req.target().unpack() + "' was not found");
+      psibase::socketSend(sock, psio::to_frac(std::move(reply)));
+      return;
+   }
 
    // Forward other requests to HttpServer
    owned.put({.socket = sock, .owner = HttpServer::service});

@@ -9,7 +9,6 @@ import {
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 import {
     Select,
     SelectContent,
@@ -441,55 +440,6 @@ export const ConfigurationForm = ({
                                     </tbody>
                                 </table>
                             </fieldset>
-                            <Controller
-                                name="admin"
-                                control={configForm.control}
-                                render={({ field }) => (
-                                    <fieldset className="mt-4">
-                                        <Label>Access to admin API</Label>
-                                        <RadioGroup
-                                            value={field.value}
-                                            onValueChange={(e) =>
-                                                field.onChange(e)
-                                            }
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem
-                                                    value="static:*"
-                                                    id="r1"
-                                                />
-                                                <Label htmlFor="r1">
-                                                    Builtin services only{" "}
-                                                    <span className="text-muted-foreground">
-                                                        (recommended)
-                                                    </span>
-                                                </Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem
-                                                    value="*"
-                                                    id="r2"
-                                                />
-                                                <Label htmlFor="r2">
-                                                    All services{" "}
-                                                    <span className="text-muted-foreground">
-                                                        (not recommended)
-                                                    </span>
-                                                </Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem
-                                                    value=""
-                                                    id="r3"
-                                                />
-                                                <Label htmlFor="r3">
-                                                    Disabled
-                                                </Label>
-                                            </div>
-                                        </RadioGroup>
-                                    </fieldset>
-                                )}
-                            />
                         </TabsContent>
                     </Tabs>
 
