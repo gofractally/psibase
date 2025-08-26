@@ -4,46 +4,52 @@ import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
 const supervisor = getSupervisor();
 
-interface TriggerDetails {
+interface PromptDetails {
     subdomain: string;
+    activeApp: string;
     payload: string;
     contextId: number | null;
+    expired: boolean;
 }
 
 export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [returnPath, setReturnPath] = useState<string | null>(null);
+    const [activeApp, setActiveApp] = useState<string | null>(null);
 
     useEffect(() => {
         const initApp = async () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const prompt_id = urlParams.get("id");
-            if (!prompt_id) {
-                setError("User prompt request error: No id provided");
-                return;
-            }
-            const returnUrl = urlParams.get("returnUrl") || "/";
+            setReturnPath(urlParams.get("returnPath") || "/");
 
             try {
-                const triggerDetails = (await supervisor.functionCall({
+                const promptDetails = (await supervisor.functionCall({
                     service: "host",
                     plugin: "prompt",
                     intf: "api",
-                    method: "getPromptTriggerDetails",
-                    params: [prompt_id, returnUrl],
-                })) as TriggerDetails;
+                    method: "getActivePrompt",
+                    params: [],
+                })) as PromptDetails;
+
+                if (promptDetails.expired) {
+                    setError("Prompt expired");
+                    return;
+                }
+
+                setActiveApp(promptDetails.activeApp);
 
                 const iframeUrl = new URL(
-                    siblingUrl(null, triggerDetails.subdomain, null, true),
+                    siblingUrl(null, promptDetails.subdomain, null, true),
                 );
 
                 // The well-known path for the web platform is currently
                 //  `/plugin/web/prompt/<prompt-name>`
-                iframeUrl.pathname = `/plugin/web/prompt/${triggerDetails.payload}`;
-                if (triggerDetails.contextId) {
+                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.payload}`;
+                if (promptDetails.contextId) {
                     iframeUrl.searchParams.set(
                         "context_id",
-                        triggerDetails.contextId.toString(),
+                        promptDetails.contextId.toString(),
                     );
                 }
 
@@ -63,35 +69,20 @@ export const App = () => {
             if (event.origin !== new URL(iframeUrl).origin) {
                 return;
             }
-            const urlParams = new URLSearchParams(window.location.search);
-            const prompt_id = urlParams.get("id");
-            if (!prompt_id) {
-                setError("User prompt request error: No id provided");
-                return;
-            }
 
             if (event.data === "finished") {
-                const returnDetails = (await supervisor.functionCall({
+                await supervisor.functionCall({
                     service: "host",
                     plugin: "prompt",
                     intf: "api",
-                    method: "getReturnDetails",
-                    params: [prompt_id],
-                })) as string | null;
+                    method: "deleteActivePrompt",
+                    params: [],
+                });
 
-                if (!returnDetails) {
-                    console.error(
-                        "No return url provided! Returning to homepage.",
-                    );
-                    const rootDomain = new URL(
-                        siblingUrl(null, null, null, true),
-                    );
-                    window.location.href = rootDomain.toString();
-                    return;
-                }
-
-                const returnUrl = new URL(returnDetails);
-                window.location.href = returnUrl.toString();
+                const rootDomain = new URL(
+                    siblingUrl(null, activeApp, returnPath, true),
+                );
+                window.location.href = rootDomain.toString();
             }
         };
         window.addEventListener("message", handleMessage);
