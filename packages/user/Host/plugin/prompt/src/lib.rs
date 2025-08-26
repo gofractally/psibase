@@ -75,9 +75,7 @@ impl Web for HostPrompt {
             .packed(),
         );
 
-        request_prompt().map_err(|err| Error::from(ErrorType::OpenPromptError(err)))?;
-
-        Ok(())
+        Ok(request_prompt()?)
     }
 
     fn store_context(packed_context: Vec<u8>) -> String {

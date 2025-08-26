@@ -4,10 +4,6 @@ import {
     QualifiedResourceCallArgs,
 } from "@psibase/common-lib";
 
-import { RecoverableErrorPayload } from "./plugin/errors";
-
-export type Result<T, E> = T | E;
-
 export interface HttpRequest {
     uri: string;
     method: string;
@@ -61,9 +57,7 @@ export interface HostInterface {
     syncCallDyn: (args: QualifiedDynCallArgs) => any;
 
     // Send an HTTP request and get the response (synchronously)
-    sendRequest: (
-        req: HttpRequest,
-    ) => Result<HttpResponse, RecoverableErrorPayload>;
+    sendRequest: (req: HttpRequest) => HttpResponse;
 
     // Get the account name of the currently active application
     getActiveApp(): string;
@@ -75,5 +69,5 @@ export interface HostInterface {
     getRootDomain(): string;
 
     // Show the active prompt to the user
-    requestPrompt: () => Result<void, string>;
+    requestPrompt: () => void;
 }
