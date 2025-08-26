@@ -35,7 +35,7 @@ export default defineConfig(({ command }) => ({
         rollupOptions: {
             input: {
                 main: path.resolve(serviceDir, "index.html"),
-                perms: path.resolve(serviceDir, "permissions.html"),
+                permissions: path.resolve(serviceDir, "plugin/web/prompt/permissions/index.html"),
             },
         },
     },
