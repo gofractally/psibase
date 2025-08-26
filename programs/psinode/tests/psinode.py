@@ -406,10 +406,6 @@ class Service(object):
 
 _default_config = '''# psinode config
 service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
-admin    = static:*
-
-admin-authz = r:any
-admin-authz = rw:loopback
 
 http-timeout = 4
 %s
