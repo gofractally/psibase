@@ -9,7 +9,7 @@ import {
 
 import { HostInterface, HttpRequest, HttpResponse } from "../hostInterface";
 import { Supervisor } from "../supervisor";
-import { QualifiedOriginationData, chainId } from "../utils";
+import { QualifiedOriginationData, chainId, isEmbedded } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -209,8 +209,12 @@ export class PluginHost implements HostInterface {
     }
 
     requestPrompt(): void {
-        const err = this.recoverableError("user_prompt_request");
-        err.code = REDIRECT_ERROR_CODE;
-        throw err;
+        if (isEmbedded) {
+            throw this.recoverableError("Cannot prompt in embedded mode");
+        } else {
+            const err = this.recoverableError("user_prompt_request");
+            err.code = REDIRECT_ERROR_CODE;
+            throw err;
+        }
     }
 }
