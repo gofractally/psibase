@@ -42,13 +42,13 @@ interface client {
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;
+
+    /// Get account name of the active app (the top level app with which the user is interacting)
+    get-active-app: func() -> string;
 }
 
 interface admin {
     use host:types/types.{post-request, body-types, error};
-
-    /// Get account name of the active app (the top level app with which the user is interacting)
-    get-active-app: func() -> string;
 
     /// Make a post request
     post: func(app: string, request: post-request) -> result<option<body-types>, error>;

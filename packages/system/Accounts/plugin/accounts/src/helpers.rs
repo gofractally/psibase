@@ -1,4 +1,3 @@
-use crate::bindings::host::common::admin as Privileged;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
@@ -11,7 +10,7 @@ pub fn get_assert_top_level_app(
     privileged_apps: &[&str],
 ) -> Result<String, CommonTypes::Error> {
     let sender_app_name = Client::get_sender();
-    let top_level_app = Privileged::get_active_app();
+    let top_level_app = Client::get_active_app();
 
     let is_privileged = privileged_apps.contains(&sender_app_name.as_str());
 
