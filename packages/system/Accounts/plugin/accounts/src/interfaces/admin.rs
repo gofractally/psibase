@@ -61,6 +61,8 @@ impl Admin for AccountsPlugin {
     fn decode_connection_token(token: String) -> Option<ConnectionToken> {
         assert_caller_admin("decode_connection_token");
 
+        println!("WARNING: decode_connection_token is deprecated");
+
         if let Some(token) = deserialize_token(&token) {
             match token {
                 Token::ConnectionToken(t) => return Some(t),
