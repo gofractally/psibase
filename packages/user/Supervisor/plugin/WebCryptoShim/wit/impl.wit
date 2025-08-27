@@ -1,0 +1,10 @@
+package supervisor:web-crypto-shim;
+
+world impl {
+    include host:types/imports;
+    include host:crypto/imports;
+    include clientdata:plugin/imports;
+    include supervisor:bridge/imports;
+
+    export api;
+}

@@ -200,6 +200,12 @@ export class Supervisor implements AppInterface {
         this.loader = new PluginLoader(this.plugins);
     }
 
+    getActiveApp(): string {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
+        return this.parentOrigination.app;
+    }
+
     getRootDomain(): string {
         return rootDomain;
     }
@@ -207,6 +213,44 @@ export class Supervisor implements AppInterface {
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
         return this.context.stack.export();
+    }
+
+    importKey(privateKey: string): string {
+        // TODO: impl importKey()
+        // future: call out to SubtleCrypto
+        // future: store privateKey, indexed by pubKey
+        return this.supervisorCall(
+            getCallArgs("supervisor", "webcryptoshim", "api", "importKey", [
+                privateKey,
+            ]),
+        );
+    }
+
+    signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
+        // TODO: impl signExplicit()
+        // future: call out to SubtleCrypto
+        this.supervisorCall(
+            getCallArgs("supervisor", "webcryptoshim", "api", "signExplicit", [
+                msg,
+                privateKey,
+            ]),
+        );
+        // future: convert SubtleCrypto types to psibase types
+        return new Uint8Array([]);
+    }
+
+    sign(msg: Uint8Array, publicKey: string): Uint8Array {
+        // TODO: impl sign()
+        // future: call out to SubtleCrypto
+        // future: lookup privateKey by pubKey
+        this.supervisorCall(
+            getCallArgs("supervisor", "webcryptoshim", "api", "sign", [
+                msg,
+                publicKey,
+            ]),
+        );
+        // future: convert SubtleCrypto types to psibase types
+        return new Uint8Array([]);
     }
 
     // Manages callstack and calls plugins

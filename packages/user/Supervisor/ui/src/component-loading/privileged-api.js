@@ -14,6 +14,22 @@ export const intf = {
     getChainId() {
         return host.getChainId();
     },
+
+    getActiveApp() {
+        return host.getActiveApp();
+    },
+
+    importKey(privateKey) {
+        return host.importKey(privateKey);
+    },
+
+    signExplicit(msg, privateKey) {
+        return host.signExplicit(preimage, privateKey);
+    },
+
+    sign(msg, publicKey) {
+        return host.sign(preimage, publicKey);
+    }
 };
 
 export const database = {
