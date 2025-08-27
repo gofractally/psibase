@@ -28,6 +28,7 @@ interface active-app {
     connect-account: func() -> result<_, error>;
 
 
+    /// DEPRECATED!
     /// Create a connection token. This is passed to the `accounts` login page to allow it to link 
     /// a new account to your app.
     create-connection-token: func() -> result<string, error>;

@@ -57,6 +57,7 @@ impl ActiveApp for AccountsPlugin {
     }
 
     fn create_connection_token() -> Result<String, Error> {
+        println!("WARNING: create_connection_token is deprecated");
         let app = get_assert_top_level_app("create_connection_token", &vec![])?;
         let origin = get_app_url(&app);
         Ok(Token::new_connection_token(ConnectionToken {
