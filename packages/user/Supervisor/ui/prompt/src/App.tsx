@@ -78,9 +78,11 @@ export const App = () => {
             }
 
             if (event.data === "finished") {
-                const rootDomain = new URL(
-                    siblingUrl(null, activeApp, returnPath, true),
-                );
+                const rootDomain =
+                    activeApp !== "homepage"
+                        ? new URL(siblingUrl(null, activeApp, returnPath, true))
+                        : new URL(siblingUrl(null, null, null, true));
+
                 window.location.href = rootDomain.toString();
             }
         },
