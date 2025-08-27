@@ -16,7 +16,7 @@ interface PromptDetails {
 // the user can take longer than this expiration to respond to the prompt.
 //
 // NOTE: This expiration also guards page refresh.
-const PROMPT_EXPIRATION_SEC = 1;
+const PROMPT_EXPIRATION_SEC = 300;
 
 export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
