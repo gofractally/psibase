@@ -1,6 +1,6 @@
 package host:prompt;
 
-interface api {
+interface admin {
     use host:types/types.{error};
 
     /// The details of the currently active prompt
@@ -24,6 +24,6 @@ world impl {
     include host:common/imports;
     include supervisor:bridge/imports;
 
+    export admin;
     export api;
-    export web;
 }

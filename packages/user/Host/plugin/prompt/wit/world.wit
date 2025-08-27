@@ -1,7 +1,7 @@
 package host:prompt;
 
 /// Calls that are tied to the web platform
-interface web {
+interface api {
     use host:types/types.{error};
 
     /// A helper function that simplifies the process of attaching additional context to a
@@ -26,5 +26,5 @@ interface web {
 }
 
 world imports {
-    import web;
+    import api;
 }

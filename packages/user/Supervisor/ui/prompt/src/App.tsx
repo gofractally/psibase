@@ -33,7 +33,7 @@ export const App = () => {
                 const promptDetails = (await supervisor.functionCall({
                     service: "host",
                     plugin: "prompt",
-                    intf: "api",
+                    intf: "admin",
                     method: "getActivePrompt",
                     params: [],
                 })) as PromptDetails;
