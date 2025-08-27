@@ -20,7 +20,7 @@ impl ActiveApp for AccountsPlugin {
             return Err(InvalidAccountName(user).into());
         }
 
-        let app = get_assert_top_level_app("login", &vec![])?;
+        let app = get_assert_top_level_app("login")?;
 
         if *app != psibase::services::accounts::SERVICE.to_string() {
             let connected_apps = UserTable::new(&user).get_connected_apps();
@@ -37,7 +37,7 @@ impl ActiveApp for AccountsPlugin {
     }
 
     fn logout() -> Result<(), Error> {
-        let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
+        let app = get_assert_top_level_app("logout")?;
         let apps_table = AppsTable::new(&app);
         let user = apps_table.get_logged_in_user();
 
@@ -50,12 +50,12 @@ impl ActiveApp for AccountsPlugin {
     }
 
     fn get_connected_accounts() -> Result<Vec<String>, Error> {
-        let app = get_assert_top_level_app("get_connected_accounts", &vec!["supervisor"])?;
+        let app = get_assert_top_level_app("get_connected_accounts")?;
         Ok(AppsTable::new(&app).get_connected_accounts())
     }
 
     fn create_connection_token() -> Result<String, Error> {
-        let app = get_assert_top_level_app("create_connection_token", &vec![])?;
+        let app = get_assert_top_level_app("create_connection_token")?;
         let origin = get_app_url(&app);
         Ok(Token::new_connection_token(ConnectionToken {
             app: Some(app),

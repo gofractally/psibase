@@ -28,11 +28,6 @@ impl AppsTable {
     }
 
     fn prefix(&self) -> String {
-        // App data is namespaced by protocol/port because plugins
-        //  are loaded on the same protocol that the supervisor uses.
-        //  e.g. https supervisor will load https plugins and store
-        //  https data.
-
         self.app.clone()
     }
 
