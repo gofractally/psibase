@@ -18,6 +18,10 @@ export const intf = {
     getActiveApp() {
         return host.getActiveApp();
     },
+
+    getPlatformAccount() {
+        return host.getPlatformAccount();
+    },
 };
 
 export const database = {

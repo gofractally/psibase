@@ -60,7 +60,7 @@ function getProxiedImports({
     const interfaces = allInterfaces.filter(
         (i) =>
             i.namespace !== "wasi" &&
-            i.namespace !== "supervisor" &&
+            i.namespace !== "platform" &&
             i.funcs.length !== 0,
     );
 
@@ -124,7 +124,7 @@ async function getWasiImports(): Promise<ImportDetails> {
 async function getPrivilegedImports(): Promise<ImportDetails> {
     const privilegedShimName = "./privileged-api.js"; // internal name used by bundler
     const privileged_importMap: Array<[PkgId, FilePath]> = [
-        [`supervisor:bridge/*`, `${privilegedShimName}#*`],
+        [`platform:bridge/*`, `${privilegedShimName}#*`],
     ];
     const privileged_ShimFile: [FilePath, Code] = [
         privilegedShimName,

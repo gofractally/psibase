@@ -12,8 +12,8 @@ use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
 use host::common::client::get_sender;
 use host::types::types::Error;
+use platform::bridge::prompt::request_prompt;
 use psibase::fracpack::{Pack, Unpack};
-use supervisor::bridge::prompt::request_prompt;
 
 use chrono::Utc;
 use clientdata::plugin::keyvalue as KeyValue;

@@ -69,10 +69,10 @@ export class PluginLoader {
     }
 
     private removeHostPlugins() {
-        // Plugins at these namespace are built into the supervisor host itself and
+        // Plugins at these namespace are built into the supervisor platform itself and
         //  are not pulled from the chain.
         this.currentPlugins = this.currentPlugins.filter(
-            (id) => id.service !== "wasi" && id.service !== "supervisor",
+            (id) => id.service !== "wasi" && id.service !== "platform",
         );
     }
 

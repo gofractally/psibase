@@ -25,7 +25,7 @@ world impl {
     include clientdata:plugin/imports;
     include accounts:plugin/imports;
     include host:common/imports;
-    include supervisor:bridge/imports;
+    include platform:bridge/imports;
 
     export api;
     export web;

@@ -1,11 +1,9 @@
 use crate::accounts::plugin::api as Accounts;
-use crate::exports::host::common::{
-    store::{Database, DbMode, GuestBucket, StorageDuration},
-};
+use crate::exports::host::common::store::{Database, DbMode, GuestBucket, StorageDuration};
 use crate::host::types::types::Error;
 use crate::make_error;
-use crate::supervisor::bridge::database as HostDb;
-use crate::supervisor::bridge::intf::get_chain_id;
+use crate::platform::bridge::database as HostDb;
+use crate::platform::bridge::intf::get_chain_id;
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;

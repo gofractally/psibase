@@ -423,7 +423,7 @@ psibase_package(
     NAME Host
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
     VERSION ${PSIBASE_VERSION}.0
-    ACCOUNTS wasi # This name would be overshadowed
+    ACCOUNTS wasi platform # Prevent overshadowing
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm

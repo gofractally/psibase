@@ -15,15 +15,15 @@ use exports::host::common::{
     server::Guest as Server,
     store::{DbMode, Guest as Store},
 };
-use host::types::types::{BodyTypes, Error, PostRequest};
 use helpers::make_error;
-use supervisor::bridge::{
-    intf as Supervisor,
+use host::types::types::{BodyTypes, Error, PostRequest};
+use platform::bridge::{
+    intf as Platform,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
 };
 use url::Url;
 
-use crate::bindings::supervisor::bridge::intf::get_active_app;
+use crate::bindings::platform::bridge::intf::get_active_app;
 
 struct HostCommon;
 
@@ -73,7 +73,7 @@ impl Admin for HostCommon {
             "get-active-app@host:common/admin",
         );
 
-        Supervisor::get_active_app()
+        Platform::get_active_app()
     }
 
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
@@ -149,7 +149,7 @@ impl Client for HostCommon {
     }
 
     fn get_app_url(app: String) -> String {
-        let root = Supervisor::get_root_domain();
+        let root = Platform::get_root_domain();
         if app == "homepage" {
             return root;
         }
@@ -158,6 +158,11 @@ impl Client for HostCommon {
         url.set_host(Some(&format!("{}.{}", app, url.host_str().unwrap())))
             .unwrap();
         url.to_string().trim_end_matches('/').to_string()
+    }
+
+    fn is_sender_host() -> bool {
+        let sender = Self::get_sender();
+        sender == "host" || sender == Platform::get_platform_account()
     }
 }
 
@@ -173,7 +178,7 @@ impl Store for HostCommon {
 
     fn flush_transactional_data() {
         use crate::bucket::host_buffer;
-        use crate::supervisor::bridge::database as HostDb;
+        use crate::platform::bridge::database as HostDb;
 
         check_caller(&["transact"], "flush@host:common/store");
 

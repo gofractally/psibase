@@ -1,6 +1,6 @@
 use crate::host::types::types::{Error, PluginId};
-use crate::supervisor::bridge::intf as Supervisor;
-use crate::supervisor::bridge::types::Header;
+use crate::platform::bridge::intf as Platform;
+use crate::platform::bridge::types::Header;
 
 pub fn make_error(message: &str) -> Error {
     Error {
@@ -36,7 +36,7 @@ pub fn caller() -> String {
 pub fn get_callstack() -> Vec<String> {
     // the last element is always this plugin, so we can pop it
     // We are interested in the callstack before this call
-    let mut stack = Supervisor::service_stack();
+    let mut stack = Platform::service_stack();
     stack.pop();
     stack
 }
