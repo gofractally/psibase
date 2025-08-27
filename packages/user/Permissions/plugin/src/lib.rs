@@ -16,7 +16,7 @@ use psibase::fracpack::{Pack, Unpack};
 
 use host::common::{
     client as HostClient,
-    client::{get_receiver, get_sender},
+    client::{get_active_app, get_receiver, get_sender},
     store::StorageDuration,
 };
 use host::prompt::web as HostPrompt;
@@ -63,7 +63,26 @@ fn is_authorized(user: &str, caller: &str, callee: &str, trust: TrustLevel) -> b
     Permissions::get(user, caller, callee).map_or(false, |perm| perm >= trust)
 }
 
+fn validate_caller(caller: &str) -> bool {
+    if caller == get_active_app() {
+        return true;
+    }
+
+    let allowed_callers = AllowedCallers::get();
+    allowed_callers.contains(&caller.to_string())
+}
+
 impl Api for PermissionsPlugin {
+    fn set_allowed_callers(callers: Vec<String>) {
+        assert_eq!(
+            get_sender(),
+            get_active_app(),
+            "[set-allowed-callers] Only the active app can set allowed callers"
+        );
+
+        AllowedCallers::set(callers);
+    }
+
     fn authorize(
         caller: String,
         level: TrustLevel,
@@ -86,6 +105,15 @@ impl Api for PermissionsPlugin {
             return Ok(true);
         }
         // TODO incorporate security groups for TrustLevel::Max
+
+        if !validate_caller(&caller) {
+            return Err(ErrorType::InvalidCaller(
+                caller.clone(),
+                callee.clone(),
+                debug_label.clone(),
+            )
+            .into());
+        }
 
         let user = Accounts::get_current_user().ok_or_else(|| {
             ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())
