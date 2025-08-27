@@ -57,8 +57,8 @@ export const App = () => {
                 );
 
                 // The well-known path for the web platform is currently
-                //  `/plugin/web/prompt/<prompt-name>`
-                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}`;
+                //  `/plugin/web/prompt/<prompt-name>/index.html`
+                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}/index.html`;
 
                 setIframeUrl(iframeUrl.toString());
             } catch (e) {
