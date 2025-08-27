@@ -8,21 +8,21 @@ use errors::ErrorType;
 mod db;
 use db::*;
 
-use exports::host::prompt::api::PromptDetails;
-use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
+use exports::host::prompt::admin::PromptDetails;
+use exports::host::prompt::{admin::Guest as Admin, api::Guest as Api};
 use host::common::client::get_sender;
 use host::types::types::Error;
 use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;
 
-impl Api for HostPrompt {
+impl Admin for HostPrompt {
     fn get_active_prompt() -> Result<PromptDetails, Error> {
         assert_eq!(get_sender(), "supervisor", "Unauthorized");
         Ok(ActivePrompts::get().unwrap().into())
     }
 }
 
-impl Web for HostPrompt {
+impl Api for HostPrompt {
     fn prompt_user(prompt_name: String, context_id: Option<String>) -> Result<(), Error> {
         if !prompt_name.chars().all(|c| c.is_ascii_alphanumeric()) {
             return Err(ErrorType::InvalidPromptName().into());

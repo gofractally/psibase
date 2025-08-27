@@ -19,7 +19,7 @@ use host::common::{
     client::{get_active_app, get_receiver, get_sender},
     store::StorageDuration,
 };
-use host::prompt::web as HostPrompt;
+use host::prompt::api as HostPrompt;
 use host::types::types::Error;
 
 mod errors;
