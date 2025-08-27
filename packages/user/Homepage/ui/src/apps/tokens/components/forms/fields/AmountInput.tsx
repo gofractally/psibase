@@ -4,6 +4,8 @@ import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 
+// import { zAmountWithPrecision } from "@/lib/zod/Amount";
+
 import {
     FormControl,
     FormField,
@@ -16,21 +18,30 @@ import { Input } from "@shared/shadcn/ui/input";
 interface Props {
     form: UseFormReturn<FormSchema>;
     selectedToken: Token | undefined;
-    tokenBalance: number;
     disable?: boolean;
 }
 
-const AmountInput: FC<Props> = ({
-    form,
-    selectedToken,
-    tokenBalance,
-    disable,
-}) => {
+const AmountInput: FC<Props> = ({ form, selectedToken, disable }) => {
+    // const tokenPrecision = selectedToken?.balance?.precision ?? 0;
+    const tokenBalance: number = selectedToken?.balance?.amount || 0;
+
     return (
         <FormField
             control={form.control}
             name="amount"
             disabled={disable}
+            rules={{
+                validate: (value) => {
+                    console.log("value", value);
+                    return true;
+                    // TODO: Get precision validation working
+                    // const result =
+                    //     zAmountWithPrecision(tokenPrecision).safeParse(value);
+                    // console.log("result", result);
+                    // if (result.success) return true;
+                    // return result.error.message;
+                },
+            }}
             render={({ field }) => (
                 <FormItem>
                     <FormLabel className="flex w-full justify-between">
@@ -52,8 +63,7 @@ const AmountInput: FC<Props> = ({
                                 <AnimateNumber
                                     n={tokenBalance}
                                     precision={
-                                        selectedToken.balance?.getPrecision() ??
-                                        0
+                                        selectedToken.balance?.precision ?? 0
                                     }
                                 />
                             </button>

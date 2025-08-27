@@ -35,7 +35,6 @@ const FormTransfer: FC<Props> = ({
     isLoading,
 }) => {
     const disableForm = tokens.length == 0;
-    const tokenBalance: number = selectedToken?.balance?.toDecimal() || 0;
 
     return (
         <Form {...form}>
@@ -54,7 +53,6 @@ const FormTransfer: FC<Props> = ({
                         form={form}
                         disable={disableForm}
                         selectedToken={selectedToken}
-                        tokenBalance={tokenBalance}
                     />
                 </div>
                 <FormField

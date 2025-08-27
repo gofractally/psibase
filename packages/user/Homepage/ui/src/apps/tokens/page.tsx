@@ -17,6 +17,8 @@ import { Account } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
+import { Quantity } from "./lib/quantity";
+
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
     const {
@@ -95,6 +97,13 @@ export const TokensPage = () => {
     };
 
     const isNoTokens = currentUser && tokens.length == 0;
+    const amount = form.watch("amount");
+
+    const quantity = useMemo(() => {
+        const { precision, id, symbol } = selectedToken || {};
+        if (!precision || !id) return null;
+        return new Quantity(amount, precision, id, symbol);
+    }, [amount, selectedToken]);
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
@@ -122,12 +131,9 @@ export const TokensPage = () => {
                     onClose={() => setTransferModal(false)}
                     open={isTransferModalOpen}
                     from={currentUser}
-                    amount={form.watch("amount")}
-                    tokenId={selectedToken?.id}
                     to={form.watch("to")}
-                    onContinue={() => {
-                        performTransfer();
-                    }}
+                    onContinue={performTransfer}
+                    quantity={quantity}
                 />
                 <FormTransfer
                     isLoading={isLoading}

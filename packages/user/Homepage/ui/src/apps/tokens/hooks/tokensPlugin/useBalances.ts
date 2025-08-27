@@ -111,7 +111,7 @@ export const useBalances = (
                             (user) => user.id == balance.tokenId,
                         ),
                         symbol: balance.symbol,
-                        precision: quan.getPrecision(),
+                        precision: quan.precision,
                         label: quan.getDisplayLabel(),
                         balance: quan,
                     };
@@ -134,6 +134,7 @@ export const useBalances = (
                     symbol: userToken.symbol,
                 };
             });
+
             const tokens = [...userBalanceTokens, ...userTokens].filter(
                 (token, index, arr) =>
                     arr.findIndex((t) => t.id == token.id) == index,
