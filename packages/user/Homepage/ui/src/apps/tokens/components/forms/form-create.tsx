@@ -105,13 +105,13 @@ export function FormCreate({ onClose }: Props) {
         suggestedPrecision,
         1,
         exampleSymbol,
-    ).format(true, true);
+    ).format({ fullPrecision: true });
     const label = new Quantity(
         (1 * expo).toString(),
         suggestedPrecision,
         1,
         exampleSymbol,
-    ).format(true, true);
+    ).format({ fullPrecision: true });
 
     return (
         <Form {...form}>

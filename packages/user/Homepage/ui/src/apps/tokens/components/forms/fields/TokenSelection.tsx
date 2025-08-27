@@ -3,8 +3,6 @@ import { Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 
-import { formatThousands } from "@/lib/formatNumber";
-
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -83,9 +81,10 @@ const TokenSelection: FC<Props> = ({
                                                         Balance:{" "}
                                                     </span>
                                                     <span className="text-white">
-                                                        {formatThousands(
-                                                            balance.balance?.toDecimal(),
-                                                            balance.balance.getPrecision(),
+                                                        {balance.balance?.format(
+                                                            {
+                                                                includeLabel: false,
+                                                            },
                                                         )}
                                                     </span>
                                                 </div>
