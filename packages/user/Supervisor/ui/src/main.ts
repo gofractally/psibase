@@ -28,20 +28,14 @@ const shouldHandleMessage = (message: MessageEvent) => {
     const fromTop = message.source == window.top;
     const fromParent = message.source == window.parent;
 
-    const messageUrl = new URL(message.origin);
-    const messageHasSubdomain = messageUrl.hostname.split(".").length > 2;
-
-    const currentRootDomain = siblingUrl();
-    const messageRootDomain = siblingUrl(
-        message.origin,
-        null,
-        null,
-        messageHasSubdomain,
-    );
-    const sameRootDomain = currentRootDomain === messageRootDomain;
+    const rootHostname = new URL(siblingUrl()).hostname;
+    const messageHostname = new URL(message.origin).hostname;
+    const isSameRootHostname =
+        messageHostname === rootHostname ||
+        messageHostname.endsWith("." + rootHostname);
 
     const shouldRespond =
-        (fromTop || isEmbedded) && fromParent && sameRootDomain;
+        (fromTop || isEmbedded) && fromParent && isSameRootHostname;
     if (!shouldRespond) {
         console.error("Supervisor rejected postMessage()");
     }
