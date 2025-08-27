@@ -26,6 +26,7 @@ import {
     OriginationData,
     assert,
     chainIdPromise,
+    isEmbedded,
     parser,
     serviceFromOrigin,
     setQueryToken,
@@ -54,6 +55,8 @@ export class Supervisor implements AppInterface {
     private loader: PluginLoader;
 
     private context: CallContext | undefined;
+
+    private embedder: string | undefined;
 
     parser: Promise<any>;
 
@@ -90,6 +93,16 @@ export class Supervisor implements AppInterface {
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
+
+        if (isEmbedded) {
+            const promptDetails = await this.supervisorCall(
+                getCallArgs("host", "prompt", "admin", "getActivePrompt", []),
+            );
+            if (promptDetails) {
+                this.embedder = promptDetails.activeApp;
+            }
+        }
+
         setQueryToken(this.getActiveQueryToken());
 
         // Loading dynamic plugins may require calling into the standard plugins
@@ -103,17 +116,6 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
 
         // Phase 2: Load the auth services for all connected accounts
-        const connectedAccounts = this.supervisorCall(
-            getCallArgs(
-                "accounts",
-                "plugin",
-                "activeApp",
-                "getConnectedAccounts",
-                [],
-            ),
-        );
-        if (!connectedAccounts) return;
-
         const auth_services: string[] = this.supervisorCall(
             getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
@@ -197,9 +199,21 @@ export class Supervisor implements AppInterface {
         this.loader = new PluginLoader(this.plugins);
     }
 
+    // Todo: This *should* always be the bottom of the callstack (and therefore can be derived from the
+    //         `getServiceStack` export, and this can be deleted.
+    //
+    //       It's not because we use supervisorCall(), which injects calls where supervisor is at the bottom of the
+    //       service stack, at which point the bottom of the callstack deviates from the active app.
+    //
+    //       We need to update the service stack to be more sane.
     getActiveApp(): string {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
+
+        if (this.embedder) {
+            return this.embedder;
+        }
+
         return this.parentOrigination.app;
     }
 
@@ -218,13 +232,17 @@ export class Supervisor implements AppInterface {
 
         const bottomFrame = this.context.stack.peekBottom(0);
         assertTruthy(bottomFrame, "Invalid callstack");
-        const topLevelApp = bottomFrame.caller.app;
+        const initialCaller = bottomFrame.caller.app;
         assertTruthy(
-            topLevelApp,
+            initialCaller,
             "Top-level app must be mappable to a psibase service",
         );
+
+        const embedder = this.embedder ? [this.embedder] : [];
+
         return [
-            topLevelApp,
+            ...embedder,
+            initialCaller,
             ...this.context.stack.export().map((p) => p.service),
         ];
     }
