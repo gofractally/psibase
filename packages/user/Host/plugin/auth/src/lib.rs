@@ -12,7 +12,7 @@ use psibase::fracpack::{Pack, Unpack};
 use crate::bindings::accounts::plugin::api as AccountsApi;
 
 use crate::bindings::host::common::{
-    admin as HostAdmin, store as KvStore,
+    admin as HostAdmin, client as Client, store as KvStore,
     store::{Database, DbMode, StorageDuration},
 };
 use crate::bindings::host::types::types::{BodyTypes, Error, PostRequest};
@@ -78,9 +78,10 @@ impl Api for HostAuth {
     }
 
     fn get_active_query_token(app: String) -> Option<String> {
-        check_caller(
-            &["host", "supervisor"],
-            "get-active-query-token@host:auth/api",
+        assert!(
+            Client::is_sender_host(),
+            "[get-active-query-token@host:auth/api] Unauthorized caller {}",
+            Client::get_sender()
         );
 
         let user = AccountsApi::get_current_user()?;

@@ -16,7 +16,7 @@ use crate::helpers::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn get_assert_caller_admin(context: &str) -> String {
-    let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
+    let caller = get_assert_top_level_app("admin interface").unwrap();
     assert!(
         caller == Client::get_receiver() || caller == "x-admin",
         "{} only callable by `accounts` or `x-admin`",
@@ -72,7 +72,7 @@ impl Admin for AccountsPlugin {
     }
 
     fn get_connected_apps(user: String) -> Vec<String> {
-        let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
+        let caller = get_assert_top_level_app("admin interface").unwrap();
         assert!(
             caller == "homepage",
             "get_connected_apps only callable by `homepage`"
@@ -93,8 +93,8 @@ impl Admin for AccountsPlugin {
 
     fn get_auth_services() -> Result<Vec<String>, Error> {
         assert!(
-            Client::get_sender() == "supervisor",
-            "{} only callable by `supervisor`",
+            Client::is_sender_host(),
+            "{} only callable by the host",
             "get_auth_services()"
         );
 

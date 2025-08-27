@@ -1,6 +1,6 @@
 use crate::bindings::host::types::types::{BodyTypes, Error, PluginId};
-use crate::bindings::supervisor::bridge::types::{self as BridgeTypes, HttpRequest, HttpResponse};
-use crate::supervisor::bridge::intf as Supervisor;
+use crate::bindings::platform::bridge::types::{self as BridgeTypes, HttpRequest, HttpResponse};
+use crate::platform::bridge::intf as Platform;
 
 impl From<BridgeTypes::PluginId> for PluginId {
     fn from(e: BridgeTypes::PluginId) -> Self {
@@ -53,6 +53,6 @@ impl BodyTypes {
 
 impl HttpRequest {
     pub fn send(&self) -> Result<HttpResponse, Error> {
-        Ok(Supervisor::send_request(self).map_err(|e| Error::from(e))?)
+        Ok(Platform::send_request(self).map_err(|e| Error::from(e))?)
     }
 }

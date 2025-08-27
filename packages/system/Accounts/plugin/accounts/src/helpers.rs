@@ -4,18 +4,14 @@ use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
 
 /// Asserts that the caller of the current plugin function is the top-level app,
-///    or one of the privileged apps.
+///    or the host
 /// Returns the top-level app data.
-pub fn get_assert_top_level_app(
-    context: &str,
-    privileged_apps: &[&str],
-) -> Result<String, CommonTypes::Error> {
+pub fn get_assert_top_level_app(context: &str) -> Result<String, CommonTypes::Error> {
     let sender_app_name = Client::get_sender();
     let top_level_app = Privileged::get_active_app();
+    let is_host = Client::is_sender_host();
 
-    let is_privileged = privileged_apps.contains(&sender_app_name.as_str());
-
-    if is_privileged {
+    if is_host {
         return Ok(top_level_app);
     }
 

@@ -22,9 +22,12 @@ pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
     Err(InvalidActionName(action_name).into())
 }
 
-pub fn assert_from_supervisor() {
-    let sender = Client::get_sender();
-    assert!(sender == "supervisor", "Unauthorized: {}", sender);
+pub fn assert_from_host() {
+    assert!(
+        Client::is_sender_host(),
+        "Unauthorized: {}",
+        Client::get_sender()
+    );
 }
 
 pub fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {

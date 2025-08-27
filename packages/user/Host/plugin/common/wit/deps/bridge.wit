@@ -1,4 +1,4 @@
-package supervisor:bridge;
+package platform:bridge;
 
 interface types {
     record error {
@@ -55,6 +55,8 @@ interface intf {
     get-root-domain: func() -> string;
 
     get-chain-id: func() -> string;
+
+    get-platform-account: func() -> string;
 }
 
 interface database {

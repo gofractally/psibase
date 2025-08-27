@@ -42,6 +42,11 @@ interface client {
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;
+
+    /// Returns `true` if the sender app is `host` OR is the account name of the 
+    ///   platform native host (e.g. `supervisor`)
+    /// Returns `false` otherwise.
+    is-sender-host: func() -> bool;
 }
 
 interface admin {

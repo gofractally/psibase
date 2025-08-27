@@ -137,7 +137,7 @@ impl Intf for TransactPlugin {
 impl Admin for TransactPlugin {
     fn start_tx() {
         Store::clear_buffers();
-        assert_from_supervisor();
+        assert_from_host();
         if CurrentActions::has_actions() {
             println!("[Warning] Transaction should already have been cleared.");
             CurrentActions::clear();
@@ -161,7 +161,7 @@ impl Admin for TransactPlugin {
     }
 
     fn finish_tx() -> Result<(), HostTypes::Error> {
-        assert_from_supervisor();
+        assert_from_host();
         ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
