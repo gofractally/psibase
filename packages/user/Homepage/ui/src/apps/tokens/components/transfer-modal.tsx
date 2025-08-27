@@ -1,8 +1,6 @@
-import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { Quantity } from "@/apps/tokens/lib/quantity";
 
 import { useAvatar } from "@/hooks/use-avatar";
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import {
     AlertDialog,
@@ -22,9 +20,8 @@ interface Props {
     isPending: boolean;
     title?: string;
     from?: string | null;
-    amount?: string;
-    tokenId?: number;
     to?: string;
+    quantity: Quantity | null;
 }
 
 export const TransferModal = ({
@@ -34,27 +31,12 @@ export const TransferModal = ({
     from,
     to,
     isPending,
-    tokenId,
-    amount,
+    quantity,
 }: Props) => {
-    const { data: currentUserData } = useCurrentUser();
-
-    const { data: balances } = useBalances(currentUserData);
-    const token = balances?.tokens.find((token) => token.id == tokenId);
-
-    const convertedToInteger = Math.floor(
-        Number(amount) * Math.pow(10, token?.precision || 0),
-    );
-
-    const quantity = token
-        ? new Quantity(convertedToInteger.toString(), token.precision, token.id)
-        : undefined;
-
-    const numSymbol = quantity ? quantity.format(true).split(" ") : ["", ""];
-    const [amountFormatted, symbol] = numSymbol;
-
     const { avatarSrc: fromAvatar } = useAvatar(from);
     const { avatarSrc: toAvatar } = useAvatar(to);
+
+    if (!quantity) return null;
 
     return (
         <AlertDialog open={open}>
@@ -91,8 +73,7 @@ export const TransferModal = ({
                     </div>
                     <div className="flex w-full justify-center gap-2 text-center text-xl font-semibold">
                         <span>Sending </span>
-                        <span>{amountFormatted}</span>
-                        <span className="text-muted-foreground">{symbol}</span>
+                        <span>{quantity.format()}</span>
                     </div>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
