@@ -1,3 +1,6 @@
+import * as React from "react";
+import { createRoot } from "react-dom/client";
+
 import {
     buildMessageSupervisorInitialized,
     isFunctionCallRequest,
@@ -7,6 +10,7 @@ import {
 import { siblingUrl } from "@psibase/common-lib/rpc";
 
 import { AppInterface } from "./appInterace";
+import { MainPage } from "./mainPage";
 import { Supervisor } from "./supervisor";
 import {
     CallHandler,
@@ -14,11 +18,9 @@ import {
     registerCallHandlers,
 } from "./windowMessaging";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <div>
-    Supervisor here
-  </div>
-`;
+const appContainer = document.querySelector<HTMLDivElement>("#app")!;
+const root = createRoot(appContainer);
+root.render(React.createElement(MainPage));
 
 const supervisor: AppInterface = new Supervisor();
 const callHandlers: CallHandler[] = [];
