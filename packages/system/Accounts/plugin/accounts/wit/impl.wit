@@ -6,7 +6,6 @@ interface admin {
     use host:types/types.{error};
 
     /// Logs the specified user into the specified app without any user interaction.
-    /// This function is only callable by the accounts app itself.
     login-direct: func(app: string, user: string);
 
     /// Gets details of the connection token
@@ -29,6 +28,7 @@ world impl {
     include host:common/imports;
     include host:common/privileged;
     include host:auth/imports;
+    include host:prompt/imports;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
     include accounts:account-tokens/imports;

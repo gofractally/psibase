@@ -23,6 +23,7 @@ world = "impl"
 "host:common" = { path = "../../../../user/Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
 "host:auth" = { path = "../../../../user/Host/plugin/auth/wit/world.wit" }
+"host:prompt" = { path = "../../../../user/Host/plugin/prompt/wit/world.wit" }
 "transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:account-tokens" = { path = "../account_tokens/wit/world.wit" }

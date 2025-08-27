@@ -32,5 +32,11 @@ export default defineConfig(({ command }) => ({
     build: {
         minify: true,
         sourcemap: false,
+        rollupOptions: {
+            input: {
+                main: path.resolve(serviceDir, "index.html"),
+                connect: path.resolve(serviceDir, "plugin/web/prompt/connect/index.html"),
+            },
+        },
     },
 }));
