@@ -9,7 +9,7 @@ interface api {
         active-app: string,
         prompt-name: string,
         context-id: option<string>,
-        expired: bool,
+        created: string,
     }
 
     /// Used by the supervisor app to facilitate the interaction with the user

@@ -9,8 +9,14 @@ interface PromptDetails {
     activeApp: string;
     promptName: string;
     contextId: number | null;
-    expired: boolean;
+    created: string;
 }
+
+// This is the expiration time for displaying the prompt. If the prompt loads immediately,
+// the user can take longer than this expiration to respond to the prompt.
+//
+// NOTE: This expiration also guards page refresh.
+const PROMPT_EXPIRATION_SEC = 1;
 
 export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
@@ -32,9 +38,16 @@ export const App = () => {
                     params: [],
                 })) as PromptDetails;
 
-                if (promptDetails.expired) {
-                    setError("Prompt expired");
-                    return;
+                if (promptDetails.created) {
+                    const createdDate = new Date(promptDetails.created);
+                    const now = new Date();
+                    const diffSec =
+                        (now.getTime() - createdDate.getTime()) / 1000;
+
+                    if (diffSec > PROMPT_EXPIRATION_SEC) {
+                        setError("Prompt expired");
+                        return;
+                    }
                 }
 
                 setActiveApp(promptDetails.activeApp);

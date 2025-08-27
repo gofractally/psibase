@@ -4,8 +4,6 @@ use crate::host::common::store::{DbMode::*, StorageDuration::*, *};
 use chrono::Utc;
 use psibase::fracpack::{Pack, Unpack};
 
-const PROMPT_EXPIRATION_SEC: u32 = 10;
-
 mod tables {
     use super::*;
 
@@ -78,7 +76,7 @@ pub struct ActivePrompt {
     pub subdomain: String,
     pub active_app: String, // Currently active application
     pub prompt_name: String,
-    pub expiry_timestamp: u32,
+    pub created: String,
     pub context_id: Option<String>,
     pub return_payload: Option<String>, // e.g. subpath on subdomain for web platform
 }
@@ -90,7 +88,7 @@ impl From<ActivePrompt> for PromptDetails {
             active_app: prompt.active_app,
             prompt_name: prompt.prompt_name,
             context_id: prompt.context_id,
-            expired: Utc::now().timestamp() as u32 >= prompt.expiry_timestamp,
+            created: prompt.created,
         }
     }
 }
@@ -103,7 +101,7 @@ impl ActivePrompts {
             subdomain: get_sender(),
             active_app: get_active_app(),
             prompt_name,
-            expiry_timestamp: Utc::now().timestamp() as u32 + PROMPT_EXPIRATION_SEC,
+            created: Utc::now().to_rfc3339(),
             context_id,
             return_payload: None,
         };
