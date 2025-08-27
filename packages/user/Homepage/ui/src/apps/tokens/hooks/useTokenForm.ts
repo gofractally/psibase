@@ -3,13 +3,13 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Account } from "@/lib/zod/Account";
-import { Amount } from "@/lib/zod/Amount";
+import { zAmount } from "@/lib/zod/Amount";
 import { TokenId } from "@/lib/zod/TokenId";
 
 const formSchema = z.object({
     token: TokenId,
     to: Account,
-    amount: Amount,
+    amount: zAmount,
     memo: z.string().max(50).optional(),
 });
 
