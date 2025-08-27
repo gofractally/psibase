@@ -27,12 +27,21 @@ const callHandlers: CallHandler[] = [];
 const shouldHandleMessage = (message: MessageEvent) => {
     const fromTop = message.source == window.top;
     const fromParent = message.source == window.parent;
-    const protocol = new URL(message.origin).protocol + "//";
-    const urlSuffix = siblingUrl().slice(protocol.length);
-    const fromSameOrigin = message.origin.endsWith(urlSuffix);
+
+    const messageUrl = new URL(message.origin);
+    const messageHasSubdomain = messageUrl.hostname.split(".").length > 2;
+
+    const currentRootDomain = siblingUrl();
+    const messageRootDomain = siblingUrl(
+        message.origin,
+        null,
+        null,
+        messageHasSubdomain,
+    );
+    const sameRootDomain = currentRootDomain === messageRootDomain;
 
     const shouldRespond =
-        (fromTop || isEmbedded) && fromParent && fromSameOrigin;
+        (fromTop || isEmbedded) && fromParent && sameRootDomain;
     if (!shouldRespond) {
         console.error("Supervisor rejected postMessage()");
     }
