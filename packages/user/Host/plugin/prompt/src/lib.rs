@@ -10,7 +10,7 @@ use db::*;
 
 use exports::host::prompt::api::TriggerDetails;
 use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
-use host::common::client::get_sender;
+use host::common::client::{get_sender, is_sender_host};
 use host::types::types::Error;
 use platform::bridge::prompt::request_prompt;
 use psibase::fracpack::{Pack, Unpack};
@@ -39,7 +39,7 @@ impl Api for HostPrompt {
         id: String,
         return_payload: String,
     ) -> Result<TriggerDetails, Error> {
-        assert_eq!(get_sender(), "supervisor", "Unauthorized");
+        assert!(is_sender_host(), "Unauthorized");
 
         let id = id.parse::<u32>().unwrap();
 
@@ -67,7 +67,7 @@ impl Api for HostPrompt {
     }
 
     fn get_return_details(id: String) -> Option<String> {
-        assert_eq!(get_sender(), "supervisor", "Unauthorized");
+        assert!(is_sender_host(), "Unauthorized");
 
         let val = KeyValue::get(ACTIVE_PROMPT_REQ).unwrap();
         let details = <ActivePrompt>::unpacked(&val).unwrap();
