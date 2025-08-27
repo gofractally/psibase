@@ -8,9 +8,6 @@ interface admin {
     /// Logs the specified user into the specified app without any user interaction.
     login-direct: func(app: string, user: string);
 
-    /// Gets details of the connection token
-    decode-connection-token: func(token: string) -> option<connection-token>;
-
     /// Gets the names of all apps to which the user has connected
     get-connected-apps: func(user: string) -> list<string>;
 
@@ -22,6 +19,10 @@ interface admin {
 
     /// Get a list of auth accounts
     get-auth-services: func() -> result<list<string>, error>;
+
+
+    /// DEPRECATED: Gets details of the connection token
+    decode-connection-token: func(token: string) -> option<connection-token>;
 }
 
 world impl {
