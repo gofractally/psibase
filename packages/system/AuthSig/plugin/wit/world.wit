@@ -1,23 +1,9 @@
 package auth-sig:plugin;
 
-/// Common types used when dealing with auth service plugins
-interface types {
-
-    /// PEM type is just a string
-    type pem = string;
-
-    /// This represents a keypair of the specified type.
-    /// The public and private keys are encoded in PEM format.
-    record keypair {
-        public-key: pem,
-        private-key: pem,
-    }
-}
-
 /// Methods related to key management
 interface keyvault {
     use host:types/types.{error};
-    use types.{keypair, pem};
+    use host:crypto/types.{keypair, pem};
 
     /// Generates a new keypair managed by this auth plugin.
     /// It stores the private key and returns the public key in pem format.
@@ -49,7 +35,7 @@ interface keyvault {
 }
 
 interface actions {
-    use types.{pem};
+    use host:crypto/types.{pem};
     use host:types/types.{error};
 
     /// Updates the key used by the current user to the specified public key

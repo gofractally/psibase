@@ -1,4 +1,4 @@
-use crate::bindings::host::crypto::types::Pem;
+use crate::bindings::exports::host::crypto::types::Pem;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
 use serde::Deserialize;
