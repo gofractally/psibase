@@ -7,7 +7,7 @@ const supervisor = getSupervisor();
 interface PromptDetails {
     subdomain: string;
     activeApp: string;
-    payload: string;
+    promptName: string;
     contextId: number | null;
     expired: boolean;
 }
@@ -45,7 +45,7 @@ export const App = () => {
 
                 // The well-known path for the web platform is currently
                 //  `/plugin/web/prompt/<prompt-name>`
-                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.payload}`;
+                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}`;
                 if (promptDetails.contextId) {
                     iframeUrl.searchParams.set(
                         "context_id",
@@ -71,14 +71,6 @@ export const App = () => {
             }
 
             if (event.data === "finished") {
-                await supervisor.functionCall({
-                    service: "host",
-                    plugin: "prompt",
-                    intf: "api",
-                    method: "deleteActivePrompt",
-                    params: [],
-                });
-
                 const rootDomain = new URL(
                     siblingUrl(null, activeApp, returnPath, true),
                 );

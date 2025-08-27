@@ -7,7 +7,7 @@ interface api {
     record prompt-details {
         subdomain: string,
         active-app: string,
-        payload: string,
+        prompt-name: string,
         context-id: option<string>,
         expired: bool,
     }
@@ -16,9 +16,6 @@ interface api {
     /// Also sets the return-payload on the prompt object to ensure it persists and can 
     ///    be queried in `get-return-payload`.
     get-active-prompt: func() -> result<prompt-details, error>;
-
-    /// Deletes the active prompt
-    delete-active-prompt: func();
 } 
 
 world impl {
