@@ -104,7 +104,6 @@ pub mod tables {
                 return self.claimable_at_last_deposit;
             }
             let now = TransactSvc::call().currentBlock().time.seconds().seconds;
-
             let delta_seconds = (now - self.last_deposit_timestamp.seconds) as f64;
             let factor = (-self.decay_rate() * delta_seconds).exp();
             let new_principal = self
