@@ -97,6 +97,7 @@ if(DEFINED WASI_SDK_PREFIX)
         BINARY_DIR catch2
         TEST_EXCLUDE_FROM_MAIN 1
         EXCLUDE_FROM_ALL 1
+        DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/catch2
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
         CMAKE_ARGS
