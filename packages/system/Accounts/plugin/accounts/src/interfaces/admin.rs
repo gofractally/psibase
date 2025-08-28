@@ -5,9 +5,8 @@ use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
 use crate::bindings::accounts::account_tokens::{api::*, types::ConnectionToken};
-use crate::bindings::exports::accounts::plugin::active_app::Guest;
 use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
-use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
+use crate::bindings::exports::accounts::plugin::api::*;
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
@@ -29,15 +28,11 @@ fn assert_caller_admin(context: &str) {
     let _ = get_assert_caller_admin(context);
 }
 
-fn assert_valid_account(account: &str) {
-    let account_details =
-        AccountsPlugin::get_account(account.to_string()).expect("Get account failed");
-    assert!(account_details.is_some(), "Invalid account name");
-}
-
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
         assert_caller_admin("login_direct");
+
+        println!("WARNING: login_direct is deprecated");
 
         assert_valid_account(&user);
 
@@ -89,7 +84,8 @@ impl Admin for AccountsPlugin {
     }
 
     fn get_all_accounts() -> Vec<String> {
-        assert_caller_admin("get_all_accounts");
+        let sender = Client::get_sender();
+        assert!(sender == Client::get_receiver() || sender == "supervisor");
         AppsTable::new(&Client::get_receiver()).get_connected_accounts()
     }
 
@@ -100,8 +96,8 @@ impl Admin for AccountsPlugin {
             "get_auth_services()"
         );
 
-        let connected_accounts = Self::get_connected_accounts();
-        let accounts = connected_accounts?
+        let connected_accounts = Self::get_all_accounts();
+        let accounts = connected_accounts
             .into_iter()
             .map(|a| format!("\"{}\"", a))
             .collect::<Vec<String>>()
