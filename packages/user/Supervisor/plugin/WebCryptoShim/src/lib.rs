@@ -130,9 +130,7 @@ impl Api for WebCryptoShim {
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
         // authorize(FunctionName::sign)?;
 
-        // TODO: look up private CryptoKey in Map by public_key
-        let public_pem = String::from(""); // pem::Pem::try_to_pem_str(&public_key)?;
-        let private_key = ManagedKeys::get(&public_pem);
+        let private_key = ManagedKeys::get(&pem::Pem::try_into(public_key));
 
         let signing_key =
             SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
@@ -144,14 +142,15 @@ impl Api for WebCryptoShim {
 
     fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
         // authorize_with_whitelist(FunctionName::import_key, vec!["x-admin".into()])?;
+        // TODO: support extractable = true? or remove this param?
 
         let public_key = pub_from_priv(private_key.clone())?;
 
-        // TODO: Store private CryptoKey in Map by public_key
+        // Store private CryptoKey in Map by public_key
         ManagedKeys::add(&public_key, &to_der(private_key)?);
 
         // Hypothetical call out to SubtleCrypto
-        // Supervisor::import_key(private_key, extractable.unwrap_or(false));
+        // convert SubtleCrypto types to psibase types
         Ok(public_key)
     }
 }

@@ -12,13 +12,14 @@ use db::*;
 mod types;
 use types::*;
 
+use crate::supervisor::bridge::intf as Supervisor;
 use bindings::exports::host::crypto::types::{Keypair, Pem};
 use bindings::host::types::types as HostTypes;
-use exports::host::crypto::keyvault::Guest as KeyVault;
-use supervisor::bridge::{
+use bindings::supervisor::bridge::{
     intf as Supervisor,
     // types::{self as BridgeTypes, HttpRequest, HttpResponse},
 };
+use exports::host::crypto::keyvault::Guest as KeyVault;
 
 // use trust::*;
 

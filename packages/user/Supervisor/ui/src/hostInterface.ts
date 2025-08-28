@@ -69,4 +69,10 @@ export interface HostInterface {
     getServiceStack(): string[];
 
     getRootDomain(): string;
+
+    importKey(privateKey: string): string;
+
+    signExplicit(preimage: Uint8Array, privateKey: string): Uint8Array;
+
+    sign(preimage: Uint8Array, publicKey: string): Uint8Array;
 }

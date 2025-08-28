@@ -47,8 +47,6 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("clientdata", "plugin"),
 ];
 
-
-
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -213,8 +211,6 @@ export class Supervisor implements AppInterface {
         return this.parentOrigination.app;
     }
 
-    
-
     getRootDomain(): string {
         return rootDomain;
     }
@@ -239,6 +235,54 @@ export class Supervisor implements AppInterface {
             topLevelApp,
             ...this.context.stack.export().map((p) => p.service),
         ];
+    }
+
+    importKey(privateKey: string): string {
+        // TODO: impl importKey()
+        // future: call out to SubtleCrypto
+        // future: store privateKey, indexed by pubKey
+        return this.supervisorCall(
+            getCallArgs(
+                "supervisor",
+                "webcryptoshim",
+                "api",
+                "importKey",
+                [privateKey],
+            ),
+        );
+    }
+
+    signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
+        // TODO: impl signExplicit()
+        // future: call out to SubtleCrypto
+        this.supervisorCall(
+            getCallArgs(
+                "supervisor",
+                "webcryptoshim",
+                "api",
+                "signExplicit",
+                [msg, privateKey],
+            ),
+        );
+        // future: convert SubtleCrypto types to psibase types
+        return new Uint8Array([]);
+    }
+
+    sign(msg: Uint8Array, publicKey: string): Uint8Array {
+        // TODO: impl sign()
+        // future: call out to SubtleCrypto
+        // future: lookup privateKey by pubKey
+        this.supervisorCall(
+            getCallArgs(
+                "supervisor",
+                "webcryptoshim",
+                "api",
+                "sign",
+                [msg, publicKey],
+            ),
+        );
+        // future: convert SubtleCrypto types to psibase types
+        return new Uint8Array([]);
     }
 
     // Manages callstack and calls plugins
