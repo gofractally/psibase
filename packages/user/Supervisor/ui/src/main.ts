@@ -12,6 +12,7 @@ import { siblingUrl } from "@psibase/common-lib/rpc";
 import { AppInterface } from "./appInterace";
 import { MainPage } from "./mainPage";
 import { Supervisor } from "./supervisor";
+import { isEmbedded } from "./utils";
 import {
     CallHandler,
     addCallHandler,
@@ -26,18 +27,17 @@ const supervisor: AppInterface = new Supervisor();
 const callHandlers: CallHandler[] = [];
 
 const shouldHandleMessage = (message: MessageEvent) => {
-    const isTop = message.source == window.top;
-    const isTopSupervisor =
-        !isTop &&
-        window.top?.location.origin ==
-            siblingUrl(null, "supervisor", null, true);
-    const isParent = message.source == window.parent;
-    const protocol = new URL(message.origin).protocol + "//";
-    const urlSuffix = siblingUrl().slice(protocol.length);
-    const isSameRootDomain = message.origin.endsWith(urlSuffix);
+    const fromTop = message.source == window.top;
+    const fromParent = message.source == window.parent;
+
+    const rootHostname = new URL(siblingUrl()).hostname;
+    const messageHostname = new URL(message.origin).hostname;
+    const isSameRootHostname =
+        messageHostname === rootHostname ||
+        messageHostname.endsWith("." + rootHostname);
 
     const shouldRespond =
-        (isTop || isTopSupervisor) && isParent && isSameRootDomain;
+        (fromTop || isEmbedded) && fromParent && isSameRootHostname;
     if (!shouldRespond) {
         console.error("Supervisor rejected postMessage()");
     }

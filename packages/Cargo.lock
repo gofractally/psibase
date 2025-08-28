@@ -1241,7 +1241,6 @@ version = "0.20.0"
 dependencies = [
  "chrono",
  "psibase",
- "rand",
  "urlencoding",
  "wit-bindgen-rt 0.28.0",
 ]

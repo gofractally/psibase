@@ -1,19 +1,15 @@
+import { REDIRECT_ERROR_CODE } from "@/constants";
+
 import {
     QualifiedDynCallArgs,
     QualifiedFunctionCallArgs,
     QualifiedResourceCallArgs,
     assertTruthy,
-    siblingUrl,
 } from "@psibase/common-lib";
 
-import {
-    HostInterface,
-    HttpRequest,
-    HttpResponse,
-    Result,
-} from "../hostInterface";
+import { HostInterface, HttpRequest, HttpResponse } from "../hostInterface";
 import { Supervisor } from "../supervisor";
-import { QualifiedOriginationData, chainId } from "../utils";
+import { QualifiedOriginationData, chainId, isEmbedded } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -96,9 +92,7 @@ export class PluginHost implements HostInterface {
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
     //    from BytecodeAlliance's JCO project.
-    public sendRequest(
-        req: HttpRequest,
-    ): Result<HttpResponse, RecoverableErrorPayload> {
+    public sendRequest(req: HttpRequest): HttpResponse {
         try {
             const xhr = new XMLHttpRequest();
             xhr.open(req.method.toString(), req.uri, false);
@@ -205,7 +199,7 @@ export class PluginHost implements HostInterface {
     getActiveApp(): string {
         return this.supervisor.getActiveApp();
     }
-    
+
     getServiceStack(): string[] {
         return this.supervisor.getServiceStack();
     }
@@ -214,7 +208,13 @@ export class PluginHost implements HostInterface {
         return this.supervisor.getRootDomain();
     }
 
-    requestPrompt(id: string): Result<void, string> {
-        throw siblingUrl(null, "supervisor", `/prompt.html?id=${id}`);
+    requestPrompt(): void {
+        if (isEmbedded) {
+            throw this.recoverableError("Cannot prompt in embedded mode");
+        } else {
+            const err = this.recoverableError("user_prompt_request");
+            err.code = REDIRECT_ERROR_CODE;
+            throw err;
+        }
     }
 }

@@ -33,7 +33,7 @@ export const database = {
 };
 
 export const prompt = {
-    requestPrompt(id) {
-        return host.requestPrompt(id);
+    requestPrompt() {
+        return host.requestPrompt();
     },
 };

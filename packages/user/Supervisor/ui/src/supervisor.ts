@@ -47,8 +47,6 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("clientdata", "plugin"),
 ];
 
-
-
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -117,13 +115,7 @@ export class Supervisor implements AppInterface {
         if (!connectedAccounts) return;
 
         const auth_services: string[] = this.supervisorCall(
-            getCallArgs(
-                "accounts",
-                "plugin",
-                "admin",
-                "getAuthServices",
-                [],
-            ),
+            getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
 
         const addtl_plugins: QualifiedPluginId[] = [];
@@ -189,13 +181,11 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
-        const token = this.supervisorCall(getCallArgs(
-            "host",
-            "auth",
-            "api",
-            "getActiveQueryToken",
-            [this.parentOrigination.app],
-        ));
+        const token = this.supervisorCall(
+            getCallArgs("host", "auth", "api", "getActiveQueryToken", [
+                this.parentOrigination.app,
+            ]),
+        );
         return token;
     }
 
@@ -212,8 +202,6 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
         return this.parentOrigination.app;
     }
-
-    
 
     getRootDomain(): string {
         return rootDomain;
