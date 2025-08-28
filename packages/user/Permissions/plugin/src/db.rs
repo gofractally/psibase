@@ -1,5 +1,6 @@
 use crate::{
     bindings::exports::permissions::plugin::api::TrustLevel,
+    host::common::client::get_active_app,
     host::common::store::{DbMode::*, StorageDuration::*, *},
 };
 use psibase::fracpack::{Pack, Unpack};
@@ -14,6 +15,16 @@ mod tables {
                 duration,
             },
             "user-app-permissions",
+        )
+    }
+
+    pub fn allowed_callers() -> Bucket {
+        Bucket::new(
+            Database {
+                mode: DbMode::NonTransactional,
+                duration: StorageDuration::Persistent,
+            },
+            "allowed-callers",
         )
     }
 }
@@ -91,5 +102,33 @@ impl Permissions {
             (None, Some(p)) => Some(p),
             (None, None) => None,
         }
+    }
+}
+
+pub struct AllowedCallers;
+
+impl AllowedCallers {
+    pub fn set(callers: Vec<String>) {
+        // Design notes:
+        // Originally, this was planned to be an ephemeral list, but as such it would need to be set
+        //   at the start of every plugin call. If so, then every active app plugin function that sets
+        //   the allowed callers would be unable to be embedded in third-party apps (because the call
+        //   to set-allowed-callers would fail in such a case).
+        // Therefore, the allowed callers should either be stored in session or permanent storage,
+        //   allowing the setting of the allowed callers to be decoupled from the plugin functions
+        //   being executed.
+
+        if callers.len() > 0 {
+            tables::allowed_callers().set(&get_active_app(), &callers.packed());
+        } else {
+            tables::allowed_callers().delete(&get_active_app());
+        }
+    }
+
+    pub fn get() -> Vec<String> {
+        tables::allowed_callers()
+            .get(&get_active_app())
+            .map(|p| <Vec<String>>::unpacked(&p).unwrap())
+            .unwrap_or_default()
     }
 }
