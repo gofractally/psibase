@@ -5,9 +5,6 @@ interface admin {
     use accounts:account-tokens/types.{connection-token};
     use host:types/types.{error};
 
-    /// Logs the specified user into the specified app without any user interaction.
-    login-direct: func(app: string, user: string);
-
     /// Gets the names of all apps to which the user has connected
     get-connected-apps: func(user: string) -> list<string>;
 
@@ -21,8 +18,17 @@ interface admin {
     get-auth-services: func() -> result<list<string>, error>;
 
 
-    /// DEPRECATED: Gets details of the connection token
+    /// DEPRECATED
     decode-connection-token: func(token: string) -> option<connection-token>;
+    login-direct: func(app: string, user: string);
+}
+
+interface prompt {
+    /// Will connect the specified account with the active app, if not already 
+    ///   connected, and login.
+    connect-account: func(account: string);
+
+    import-existing: func(account: string);
 }
 
 world impl {
@@ -37,5 +43,6 @@ world impl {
     export api;
     export active-app;
 
+    export prompt;
     export admin;
 }

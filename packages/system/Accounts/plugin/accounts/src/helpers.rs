@@ -1,6 +1,8 @@
+use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
+use crate::plugin::AccountsPlugin;
 
 /// Asserts that the caller of the current plugin function is the top-level app,
 ///    or one of the privileged apps.
@@ -27,4 +29,10 @@ pub fn get_assert_top_level_app(
         context
     ))
     .into());
+}
+
+pub fn assert_valid_account(account: &str) {
+    let account_details =
+        AccountsPlugin::get_account(account.to_string()).expect("Get account failed");
+    assert!(account_details.is_some(), "Invalid account name");
 }
