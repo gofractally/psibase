@@ -44,6 +44,8 @@ interface client {
     get-app-url: func(app: string) -> string;
 
     /// Get account name of the active app (the top level app with which the user is interacting)
+    /// If the user is interacting with a prompt, the "top level app" is the app with which the user 
+    ///   was interacting when the prompt was triggered.
     get-active-app: func() -> string;
 }
 

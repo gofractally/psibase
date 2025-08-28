@@ -199,24 +199,6 @@ export class Supervisor implements AppInterface {
         this.loader = new PluginLoader(this.plugins);
     }
 
-    // Todo: This *should* always be the bottom of the callstack (and therefore can be derived from the
-    //         `getServiceStack` export, and this can be deleted.
-    //
-    //       It's not because we use supervisorCall(), which injects calls where supervisor is at the bottom of the
-    //       service stack, at which point the bottom of the callstack deviates from the active app.
-    //
-    //       We need to update the service stack to be more sane.
-    getActiveApp(): string {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
-
-        if (this.embedder) {
-            return this.embedder;
-        }
-
-        return this.parentOrigination.app;
-    }
-
     getRootDomain(): string {
         return rootDomain;
     }
