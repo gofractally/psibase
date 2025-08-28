@@ -12,7 +12,10 @@ namespace psibase::net
    class auto_timeout
    {
      public:
-      explicit auto_timeout(typename Clock::duration initial_value) : _current(initial_value) {}
+      explicit auto_timeout(typename Clock::duration initial_value) : _current(initial_value)
+      {
+         start();
+      }
       void stop() {}
       void start()
       {
