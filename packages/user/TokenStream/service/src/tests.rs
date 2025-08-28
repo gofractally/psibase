@@ -13,11 +13,22 @@ mod tests {
     static CHARLIE: AccountNumber = account!("charlie");
     static TOKEN_STREAM: AccountNumber = account!("token-stream");
 
-    fn get_balance(chain: &psibase::Chain, token_id: u32, account: AccountNumber) -> Quantity {
-        Tokens::push(&chain)
+    fn check_balance(
+        chain: &psibase::Chain,
+        token_id: u32,
+        account: AccountNumber,
+        value: Option<u64>,
+    ) -> Quantity {
+        let res = Tokens::push(&chain)
             .getBalance(token_id, account)
             .get()
-            .unwrap()
+            .unwrap();
+
+        if value.is_some() {
+            assert_eq!(res.value, value.unwrap())
+        }
+
+        res
     }
 
     fn get_shared_balance(
@@ -59,25 +70,19 @@ mod tests {
     }
 
     fn setup_env(chain: &psibase::Chain) -> Result<u32, psibase::Error> {
-        let token_stream = account!("token-stream");
-
-        let alice = account!("alice");
-        let bob = account!("bob");
-        let charlie = account!("charlie");
-
-        chain.new_account(alice)?;
-        chain.new_account(bob)?;
-        chain.new_account(charlie)?;
+        chain.new_account(ALICE)?;
+        chain.new_account(BOB)?;
+        chain.new_account(CHARLIE)?;
 
         let supply = Quantity::from(10000000);
 
-        let token_id = Tokens::push_from(&chain, alice)
+        let token_id = Tokens::push_from(&chain, ALICE)
             .create(4.try_into().unwrap(), supply)
             .get()
             .unwrap();
         assert_eq!(token_id, 2);
 
-        Tokens::push_from(&chain, alice).mint(
+        Tokens::push_from(&chain, ALICE).mint(
             token_id,
             supply,
             "memo".to_string().try_into().unwrap(),
@@ -85,28 +90,36 @@ mod tests {
         Ok(token_id)
     }
 
-    fn decay_rate_from_half_life(days: f64) -> u32 {
-        let rate = std::f64::consts::LN_2 / (days * 86_400.0);
-        (rate * 1_000_000.0).round() as u32
+    fn reset_clock(chain: &psibase::Chain) {
+        let time: i64 = 1000;
+        chain.start_block_at(TimePointSec { seconds: time }.microseconds());
+    }
+
+    fn create_stream(
+        chain: &psibase::Chain,
+        author: AccountNumber,
+        decay_rate: u32,
+        token_id: u32,
+    ) -> u32 {
+        TokenStream::push_from(&chain, author)
+            .create(decay_rate, token_id)
+            .get()
+            .unwrap()
     }
 
     #[psibase::test_case(packages("TokenStream"))]
     fn test_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.start_block();
 
-        let x = TimePointSec { seconds: 100 };
-        chain.start_block_at(x.microseconds());
+        reset_clock(&chain);
 
         let token_id = setup_env(&chain)?;
 
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 500);
 
-        let stream_nft_id = TokenStream::push_from(&chain, ALICE)
-            .create(10000, token_id)
-            .get()
-            .unwrap();
+        let stream_nft_id = create_stream(&chain, ALICE, 10000, token_id);
 
-        assert_eq!(get_balance(&chain, token_id, TOKEN_STREAM), 0.into());
+        check_balance(&chain, token_id, TOKEN_STREAM, Some(0));
 
         assert_eq!(
             get_shared_balance(&chain, token_id, ALICE, TOKEN_STREAM),
@@ -131,7 +144,7 @@ mod tests {
             .get()
             .unwrap();
 
-        assert_eq!(get_balance(&chain, token_id, BOB), 20.into());
+        check_balance(&chain, token_id, BOB, Some(20));
 
         chain.start_block_at(
             TimePointSec {
@@ -143,28 +156,20 @@ mod tests {
             .claim(stream_nft_id)
             .get()
             .unwrap();
-
-        assert_eq!(get_balance(&chain, token_id, BOB), 500.into());
+        check_balance(&chain, token_id, BOB, Some(500));
 
         Ok(())
     }
 
     #[psibase::test_case(packages("TokenStream"))]
     fn claiming_sparsely_is_same_as_regularly(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        let mut time: i64 = 1000;
-        chain.start_block_at(TimePointSec { seconds: time }.microseconds());
+        reset_clock(&chain);
 
         let token_id = setup_env(&chain)?;
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 200000);
 
-        let first_stream = TokenStream::push_from(&chain, ALICE)
-            .create(10000, token_id)
-            .get()
-            .unwrap();
-        let second_stream = TokenStream::push_from(&chain, ALICE)
-            .create(10000, token_id)
-            .get()
-            .unwrap();
+        let first_stream = create_stream(&chain, ALICE, 10000, token_id);
+        let second_stream = create_stream(&chain, ALICE, 10000, token_id);
 
         TokenStream::push_from(&chain, ALICE)
             .deposit(first_stream, 100.into())
@@ -179,28 +184,212 @@ mod tests {
         Nfts::push_from(&chain, ALICE).credit(second_stream, CHARLIE, "memo".to_string());
 
         let mut bob_total_claimed = 0;
-        for i in 0..8 {
-            time += 50;
-            chain.start_block_at(TimePointSec { seconds: time }.microseconds());
+        for _ in 0..8 {
+            chain.progress_seconds(50);
+
             TokenStream::push_from(&chain, BOB)
                 .claim(first_stream)
                 .get()
                 .unwrap();
-            let bob_balance = get_balance(&chain, token_id, BOB);
+            let bob_balance = check_balance(&chain, token_id, BOB, None);
             bob_total_claimed += bob_balance.value - bob_total_claimed;
         }
-        let bob_balance = get_balance(&chain, token_id, BOB);
+        let bob_balance = check_balance(&chain, token_id, BOB, None);
         assert_eq!(bob_balance.value, bob_total_claimed);
 
         TokenStream::push_from(&chain, CHARLIE)
             .claim(second_stream)
             .get()
             .unwrap();
-        let charlie_balance = get_balance(&chain, token_id, CHARLIE);
+        let charlie_balance = check_balance(&chain, token_id, CHARLIE, None);
 
         assert_eq!(
             bob_balance, charlie_balance,
             "Balances should match after claims"
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("TokenStream"))]
+    fn dust_eventually_rounds_to_zero(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        reset_clock(&chain);
+        let token_id = setup_env(&chain)?;
+
+        tokens_credit(&chain, token_id, ALICE, BOB, 100);
+        tokens_credit(&chain, token_id, BOB, TOKEN_STREAM, 100);
+
+        let first_stream = TokenStream::push_from(&chain, BOB)
+            .create(100, token_id)
+            .get()
+            .unwrap();
+
+        TokenStream::push_from(&chain, BOB)
+            .deposit(first_stream, 100.into())
+            .get()
+            .unwrap();
+
+        chain.progress_seconds(9999999999);
+
+        TokenStream::push_from(&chain, BOB)
+            .claim(first_stream)
+            .get()
+            .unwrap();
+
+        check_balance(&chain, token_id, BOB, Some(100));
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("TokenStream"))]
+    fn multiple_deposits_same_stream(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        reset_clock(&chain);
+
+        let token_id = setup_env(&chain)?;
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 1000);
+
+        let stream_nft_id = TokenStream::push_from(&chain, ALICE)
+            .create(10000, token_id)
+            .get()
+            .unwrap();
+
+        // First deposit
+        TokenStream::push_from(&chain, ALICE)
+            .deposit(stream_nft_id, 300.into())
+            .get()
+            .unwrap();
+
+        chain.progress_seconds(50);
+
+        // Second deposit after some time
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 200);
+        TokenStream::push_from(&chain, ALICE)
+            .deposit(stream_nft_id, 200.into())
+            .get()
+            .unwrap();
+
+        // Transfer NFT to Bob
+        Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
+
+        // Claim after another time increment
+        chain.progress_seconds(50);
+
+        TokenStream::push_from(&chain, BOB)
+            .claim(stream_nft_id)
+            .get()
+            .unwrap();
+
+        let bob_balance = check_balance(&chain, token_id, BOB, None);
+        let stream = get_stream(&chain, stream_nft_id);
+        assert_eq!(
+            stream.total_deposited,
+            500.into(),
+            "Total deposited should be 500"
+        );
+        assert!(bob_balance.value > 0, "Bob should have claimed some tokens");
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("TokenStream"))]
+    fn zero_deposit_fails(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        reset_clock(&chain);
+
+        let token_id = setup_env(&chain)?;
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 100);
+
+        let stream_nft_id = TokenStream::push_from(&chain, ALICE)
+            .create(10000, token_id)
+            .get()
+            .unwrap();
+
+        // Attempt to deposit zero
+        let result = TokenStream::push_from(&chain, ALICE)
+            .deposit(stream_nft_id, 0.into())
+            .get();
+
+        assert!(result.is_err(), "Depositing zero should fail");
+        assert_eq!(
+            get_stream(&chain, stream_nft_id).total_deposited,
+            0.into(),
+            "No tokens should be deposited"
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("TokenStream"))]
+    fn claim_without_deposit(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        reset_clock(&chain);
+
+        let token_id = setup_env(&chain)?;
+        let stream_nft_id = TokenStream::push_from(&chain, ALICE)
+            .create(10000, token_id)
+            .get()
+            .unwrap();
+
+        Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
+
+        chain.progress_seconds(100);
+
+        let err = TokenStream::push_from(&chain, BOB)
+            .claim(stream_nft_id)
+            .get()
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "service 'tokens' aborted with message: credit quantity must be greater than 0"
+                .to_string()
+        );
+
+        let bob_balance = check_balance(&chain, token_id, BOB, None);
+        assert_eq!(
+            bob_balance,
+            0.into(),
+            "No tokens should be claimable without deposit"
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("TokenStream"))]
+    fn stream_transfer_preserves_vesting(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        reset_clock(&chain);
+
+        let token_id = setup_env(&chain)?;
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 500);
+
+        let stream_nft_id = TokenStream::push_from(&chain, ALICE)
+            .create(10000, token_id)
+            .get()
+            .unwrap();
+
+        TokenStream::push_from(&chain, ALICE)
+            .deposit(stream_nft_id, 500.into())
+            .get()
+            .unwrap();
+
+        chain.progress_seconds(50);
+
+        Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
+        Nfts::push_from(&chain, BOB).credit(stream_nft_id, CHARLIE, "memo".to_string());
+
+        chain.progress_seconds(50);
+
+        TokenStream::push_from(&chain, CHARLIE)
+            .claim(stream_nft_id)
+            .get()
+            .unwrap();
+
+        let charlie_balance = check_balance(&chain, token_id, CHARLIE, None);
+        assert!(
+            charlie_balance.value > 0,
+            "Charlie should claim vested tokens"
+        );
+        assert_eq!(
+            get_stream(&chain, stream_nft_id).total_deposited,
+            500.into(),
+            "Total deposited should remain unchanged"
         );
 
         Ok(())
