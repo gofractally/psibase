@@ -105,6 +105,19 @@ impl Admin for FractallyPlugin {
             &packed_args,
         )
     }
+
+    fn set_half_life(fractal: String, seconds: u64) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let _latch = ProposeLatch::new(&fractal);
+
+        let packed_args = fractals::action_structs::set_half_life { seconds }.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_half_life::ACTION_NAME,
+            &packed_args,
+        )
+    }
 }
 
 impl User for FractallyPlugin {
@@ -184,6 +197,16 @@ impl User for FractallyPlugin {
         }
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
+    }
+
+    fn claim(fractal: String) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let packed_args = fractals::action_structs::claim {
+            fractal: AccountNumber::from(fractal.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(fractals::action_structs::claim::ACTION_NAME, &packed_args)
     }
 }
 
