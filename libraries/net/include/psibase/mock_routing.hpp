@@ -143,6 +143,17 @@ namespace psibase::net
             }
          }
       }
+      bool is_reachable(producer_id producer) const
+      {
+         for (const auto& [id, peer] : _peers)
+         {
+            if (static_cast<Derived*>(peer.ptr)->producer_name() == producer)
+            {
+               return true;
+            }
+         }
+         return false;
+      }
       void add_peer(mock_routing* other, test::mock_clock::duration latency = {})
       {
          auto* p1 = add_peer_impl(other, latency);

@@ -85,6 +85,7 @@ namespace psibase::net
          }
          async_multicast(std::move(peers_for_producer), msg);
       }
+      bool is_reachable(producer_id prod) const { return producers.find(prod) != producers.end(); }
       struct connection;
       void connect(peer_id id)
       {

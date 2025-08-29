@@ -536,6 +536,11 @@ namespace psibase::net
          }
       }
 
+      bool is_reachable(producer_id prod) const
+      {
+         return selectedRoutes.find(prod) != selectedRoutes.end();
+      }
+
       using message_type = std::
           variant<RouteUpdateMessage, RouteSeqnoRequest, RequestRoutesMessage, RoutingEnvelope>;
 
