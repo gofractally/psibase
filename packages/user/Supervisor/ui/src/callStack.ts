@@ -1,41 +1,21 @@
-import { assertTruthy, toString } from "@psibase/common-lib";
-import {
-    QualifiedFunctionCallArgs,
-    QualifiedPluginId,
-} from "@psibase/common-lib/messaging";
-
-import { OriginationData } from "./utils";
-
 export interface Call {
-    caller: OriginationData;
-    args: QualifiedFunctionCallArgs;
+    service: string;
+    context: string;
     startTime?: number;
 }
 
-const onlyPrintRootCalls = true;
+const seeTimingTraces = false;
 
 // Callstack implementation that manages frames for every inter-plugin call
 export class CallStack {
     private storage: Array<Call> = [];
 
-    push(sender: OriginationData, args: QualifiedFunctionCallArgs): void {
+    push(service: string, context: string): void {
         this.storage.push({
-            caller: sender,
-            args: args,
+            service,
+            context,
             startTime: Date.now(),
         });
-
-        const bottomFrame = this.peekBottom(0);
-        assertTruthy(bottomFrame, "rootCall method is undefined");
-        const rootCall = bottomFrame.args.method;
-        const initiator = bottomFrame.caller.app;
-        if (
-            rootCall === "startTx" ||
-            rootCall === "finishTx" ||
-            initiator === "supervisor" ||
-            (onlyPrintRootCalls && this.storage.length > 1)
-        )
-            return;
     }
 
     pop(): Call | undefined {
@@ -44,21 +24,28 @@ export class CallStack {
             return undefined;
         }
 
-        const bottomFrame = this.peekBottom(0);
-        assertTruthy(bottomFrame, "rootCall method is undefined");
-        const rootCall = bottomFrame.args.method;
-        const initiator = bottomFrame.caller.app;
-        if (
-            rootCall !== "startTx" &&
-            rootCall !== "finishTx" &&
-            initiator !== "supervisor" &&
-            (!onlyPrintRootCalls || this.storage.length === 1)
-        ) {
-            const popped = this.peek(0)!;
-            const resolutionTime = Date.now() - popped.startTime!;
-            console.log(
-                `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}${toString(popped.args)} [${resolutionTime} ms]`,
-            );
+        const idx = this.storage.length - 1;
+
+        if (seeTimingTraces) {
+            let shouldPrint = true;
+            for (let i = 0; i < idx; ++i) {
+                const frame = this.storage[i];
+                if (
+                    frame.service === "supervisor" ||
+                    frame.context.includes("startTx") ||
+                    frame.context.includes("finishTx")
+                ) {
+                    shouldPrint = false;
+                    break;
+                }
+            }
+            if (shouldPrint) {
+                const popped = this.peek(0)!;
+                const resolutionTime = Date.now() - popped.startTime!;
+                console.log(
+                    `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}${popped.context} [${resolutionTime} ms]`,
+                );
+            }
         }
 
         return this.storage.pop();
@@ -83,10 +70,7 @@ export class CallStack {
         this.storage = [];
     }
 
-    export(): QualifiedPluginId[] {
-        return this.storage.map((frame) => ({
-            service: frame.args.service,
-            plugin: frame.args.plugin,
-        }));
+    export(): string[] {
+        return this.storage.map((frame) => frame.service);
     }
 }

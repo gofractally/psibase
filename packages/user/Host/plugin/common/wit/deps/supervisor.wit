@@ -40,13 +40,6 @@ interface types {
 interface intf {
     use types.{http-request, http-response, error, plugin-id};
 
-    // The top-level app through which the app is accessing psibase
-    // 
-    // Cannot be derived from the callstack, as the supervisor is allowed
-    //   to originate calls in the context of a non-supervisor root window 
-    //   (e.g. start-tx, finish-tx)
-    get-active-app: func() -> string;
-
     send-request: func(req: http-request) -> result<http-response, error>;
 
     // The last items in the list are the most recent services in the callstack
