@@ -65,7 +65,7 @@ T convert_from_json(const std::vector<char>& data)
 template <typename T>
 HttpReply json_reply(const T& body)
 {
-   HttpReply           response{.contentType = "application/json"};
+   HttpReply           response{.contentType = "application/json", .headers = allowCors()};
    psio::vector_stream stream{response.body};
    psio::to_json(body, stream);
    return response;

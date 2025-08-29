@@ -142,7 +142,10 @@ namespace UserService
             return psibase::HttpReply{
                 .contentType = "application/json",
                 .body        = std::move(result->data),
-                .headers     = {{"Content-Encoding", "gzip"}},
+                .headers     = {{"Content-Encoding", "gzip"},
+                                {"Access-Control-Allow-Origin", "*"},
+                                {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
+                                {"Access-Control-Allow-Headers", "*"}},
             };
          }
       }
@@ -166,6 +169,7 @@ namespace UserService
          {
             psibase::HttpReply reply{
                 .contentType = "application/json",
+                .headers     = psibase::allowCors(),
             };
             psio::vector_stream stream{reply.body};
             psio::to_json(row->schema, stream);
@@ -178,6 +182,7 @@ namespace UserService
                 .status      = psibase::HttpStatus::notFound,
                 .contentType = "text/html",
                 .body        = {msg.begin(), msg.end()},
+                .headers     = psibase::allowCors(),
             };
          }
       }

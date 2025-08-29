@@ -81,6 +81,7 @@ namespace psibase
          return HttpReply{
              .contentType = "application/json",
              .body        = generateActionJsonTemplate<Service>(),
+             .headers     = allowCors(),
          };
       }
       return std::nullopt;

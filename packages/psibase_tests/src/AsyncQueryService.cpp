@@ -36,8 +36,8 @@ struct AsyncQueryService : psibase::Service
    using Subjective              = psibase::SubjectiveTables<AsyncResponseTable, CounterTable>;
    static constexpr auto service = psibase::AccountNumber{"as-query"};
    void                  onBlock();
-   auto                  serveSys(const HttpRequest&          req,
-                                  std::optional<std::int32_t> socket) -> std::optional<HttpReply>;
+   auto                  serveSys(const HttpRequest& req, std::optional<std::int32_t> socket)
+       -> std::optional<HttpReply>;
 };
 PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
 PSIBASE_REFLECT_TABLES(AsyncQueryService, AsyncQueryService::Subjective)
@@ -101,7 +101,8 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
 {
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
-   auto reply         = HttpReply{.contentType = request.contentType, .body = request.body};
+   auto reply =
+       HttpReply{.contentType = request.contentType, .body = request.body, .headers = allowCors()};
    auto [path, delay] = parseQuery(request.target);
    if (path == "/send")
    {

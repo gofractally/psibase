@@ -31,6 +31,7 @@ namespace SystemService
          return HttpReply{
              .contentType = "application/json",
              .body        = {json.begin(), json.end()},
+             .headers     = allowCors(),
          };
       };
 
@@ -58,6 +59,7 @@ namespace SystemService
             return HttpReply{
                 .contentType = "application/json",
                 .body        = {json.begin(), json.end()},
+                .headers     = allowCors(),
             };
          }
          if (request.target == "/common/chainid")
@@ -77,6 +79,7 @@ namespace SystemService
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(trx),
+                .headers     = allowCors(),
             };
          }
          if (request.target == "/common/pack/SignedTransaction")
@@ -88,6 +91,7 @@ namespace SystemService
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(trx),
+                .headers     = allowCors(),
             };
          }
          if (request.target == "/common/set-auth-cookie")
@@ -96,7 +100,7 @@ namespace SystemService
             psio::json_token_stream jstream{request.body.data()};
             auto                    params = psio::from_json<cookie_data>(jstream);
 
-            std::vector<HttpHeader> headers;
+            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
             bool                    isLocalhost = psibase::isLocalhost(request);
             std::string             cookieName  = "__Host-SESSION";
 

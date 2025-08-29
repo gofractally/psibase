@@ -61,7 +61,7 @@ namespace SystemService
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void claimReply(std::int32_t socket);
       /// Sends a reply
-      void sendReply(std::int32_t socket, const psibase::HttpReply& response);
+      void sendReply(std::int32_t socket, psibase::HttpReply response);
 
       /// Register sender's subdomain
       ///

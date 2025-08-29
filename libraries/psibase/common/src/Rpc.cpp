@@ -48,6 +48,40 @@ namespace
       auto size = static_cast<std::size_t>(std::ranges::distance(r));
       return std::string_view{data, size};
    }
+
+   struct Origin
+   {
+      std::string_view scheme;
+      std::string_view host;
+
+      Origin(std::string_view url)
+      {
+         auto pos = url.find("://");
+         if (pos != std::string_view::npos)
+         {
+            scheme = url.substr(0, pos);
+            host   = url.substr(pos + 3);
+            pos    = host.rfind(':');
+            if (pos != std::string_view::npos && host.find(']', pos) == std::string_view::npos)
+               host = host.substr(0, pos);
+         }
+      }
+
+      bool isSecure() const
+      {
+         return scheme == "https" || host == "localhost" || host.ends_with(".localhost");
+      }
+
+      bool isService(const std::string& rootHost, psibase::AccountNumber account)
+      {
+         return isSecure() && account.str() + '.' + rootHost == host;
+      }
+
+      bool isSubdomain(const std::string& rootHost)
+      {
+         return isSecure() && host == rootHost || host.ends_with('.' + rootHost);
+      }
+   };
 }  // namespace
 
 namespace psibase
@@ -176,4 +210,34 @@ namespace psibase
 
       return false;
    }
+
+   std::vector<HttpHeader> allowCors(std::string_view origin)
+   {
+      return {
+          {"Access-Control-Allow-Origin", std::string(origin)},
+          {"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"},
+          {"Access-Control-Allow-Headers", "*"},
+      };
+   }
+
+   std::vector<HttpHeader> allowCors(const HttpRequest& req, AccountNumber account)
+   {
+      if (auto origin = req.getHeader("origin");
+          origin && Origin(*origin).isService(req.rootHost, account))
+      {
+         return allowCors(*origin);
+      }
+      return {};
+   }
+
+   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req)
+   {
+      if (auto origin = req.getHeader("origin");
+          origin && Origin(*origin).isSubdomain(req.rootHost))
+      {
+         return allowCors(*origin);
+      }
+      return {};
+   }
+
 }  // namespace psibase

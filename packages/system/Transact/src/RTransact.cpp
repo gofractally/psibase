@@ -434,9 +434,9 @@ namespace
 
       if (!jsonClients.empty())
       {
-         JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json",
-                                                   .body{pruned}};
-         auto                                action = http.sendReply(0, reply);
+         JsonHttpReply<TransactionTraceRef&> reply{
+             .contentType = "application/json", .body{pruned}, .headers = allowCors()};
+         auto action = http.sendReply(0, reply);
 
          for (auto socket : jsonClients)
          {
@@ -447,9 +447,9 @@ namespace
 
       if (!binClients.empty())
       {
-         FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
-                                                       .body{pruned}};
-         auto                                    action = http.sendReply(0, reply);
+         FracpackHttpReply<TransactionTraceRef&> reply{
+             .contentType = "application/octet-stream", .body{pruned}, .headers = allowCors()};
+         auto action = http.sendReply(0, reply);
 
          for (auto socket : binClients)
          {
@@ -1367,8 +1367,23 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
    auto target = request.path();
-   if (request.method == "POST" && target == "/push_transaction")
+   if (target == "/push_transaction")
    {
+      if (request.method == "OPTIONS")
+         return HttpReply{.headers = allowCorsSubdomains(request)};
+      if (request.method != "POST")
+      {
+         auto message = std::format("The resouce '{}' does not accept the method {}.",
+                                    request.target, request.method);
+         auto headers = allowCorsSubdomains(request);
+         headers.push_back({"Allow", "POST, OPTIONS"});
+         return HttpReply{
+             .status      = HttpStatus::methodNotAllowed,
+             .contentType = "text/html",
+             .body{message.begin(), message.end()},
+             .headers = std::move(headers),
+         };
+      }
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
 
@@ -1429,7 +1444,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
                                                                            .aud = request.rootHost,
                                                                            .exp = exp.time_since_epoch().count()});
-         HttpReply           reply{.contentType = "application/json"};
+         HttpReply           reply{.contentType = "application/json",
+                                   .headers     = allowCors(request, AccountNumber{"supervisor"})};
          psio::vector_stream stream{reply.body};
          to_json(LoginReply{token}, stream);
          return reply;
@@ -1439,7 +1455,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    {
       check(user.has_value(), "Unauthorized");
       check(to<XAdmin>().isAdmin(*user), "Forbidden");
-      return HttpReply{.contentType = "application/octet-stream", .body = getJWTKey()};
+      return HttpReply{.contentType = "application/octet-stream",
+                       .body        = getJWTKey(),
+                       .headers     = allowCors(request, AccountNumber{"supervisor"})};
    }
 
    return {};
