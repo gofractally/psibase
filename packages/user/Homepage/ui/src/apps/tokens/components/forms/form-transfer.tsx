@@ -1,8 +1,8 @@
-import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
+import type { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
+import type { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
+
 import { ArrowRight } from "lucide-react";
-import { FC } from "react";
-import { UseFormReturn } from "react-hook-form";
+import { useFormContext } from "react-hook-form";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -18,27 +18,29 @@ import { Input } from "@shared/shadcn/ui/input";
 import { AmountInput, RecipientInput, TokenSelection } from "./fields";
 
 interface Props {
-    form: UseFormReturn<FormSchema>;
     tokens: Token[];
-    selectedToken: Token | undefined;
+    selectedToken?: Token;
     setNewTokenModalOpen: (open: boolean) => void;
     onSubmit: () => void;
     isLoading: boolean;
 }
 
-const FormTransfer: FC<Props> = ({
-    form,
+const FormTransfer = ({
     tokens,
     selectedToken,
     setNewTokenModalOpen,
     onSubmit,
     isLoading,
-}) => {
+}: Props) => {
+    const form = useFormContext<FormSchema>();
     const disableForm = tokens.length == 0;
 
     return (
         <Form {...form}>
-            <form className="mx-auto w-full  space-y-8">
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="mx-auto w-full  space-y-8"
+            >
                 {(tokens.length > 0 || isLoading) && (
                     <TokenSelection
                         isLoading={isLoading}
@@ -48,9 +50,8 @@ const FormTransfer: FC<Props> = ({
                     />
                 )}
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <RecipientInput form={form} disabled={disableForm} />
+                    <RecipientInput disabled={disableForm} />
                     <AmountInput
-                        form={form}
                         disable={disableForm}
                         selectedToken={selectedToken}
                     />
@@ -79,8 +80,7 @@ const FormTransfer: FC<Props> = ({
                 />
                 <div className="flex justify-end">
                     <Button
-                        type="button"
-                        onClick={onSubmit}
+                        type="submit"
                         className="flex w-full gap-2 sm:w-auto"
                         disabled={disableForm || isLoading}
                     >
