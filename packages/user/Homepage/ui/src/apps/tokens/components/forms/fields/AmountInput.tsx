@@ -1,10 +1,8 @@
 import { AnimateNumber } from "@/apps/tokens/components/AnimateNumber";
 import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
-import { FC } from "react";
-import { UseFormReturn } from "react-hook-form";
-
-// import { zAmountWithPrecision } from "@/lib/zod/Amount";
+import { useEffect } from "react";
+import { useFormContext } from "react-hook-form";
 
 import {
     FormControl,
@@ -16,32 +14,28 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 
 interface Props {
-    form: UseFormReturn<FormSchema>;
     selectedToken: Token | undefined;
     disable?: boolean;
 }
 
-const AmountInput: FC<Props> = ({ form, selectedToken, disable }) => {
-    // const tokenPrecision = selectedToken?.balance?.precision ?? 0;
+const AmountInput = ({ selectedToken, disable }: Props) => {
+    const form = useFormContext<FormSchema>();
     const tokenBalance: number = selectedToken?.balance?.amount || 0;
+
+    const { amount, token } = form.watch();
+    const { trigger } = form;
+
+    useEffect(() => {
+        // if the token changes, revalidate the amount so that the precision is checked
+        if (!amount) return;
+        trigger("amount");
+    }, [trigger, amount, token]);
 
     return (
         <FormField
             control={form.control}
             name="amount"
             disabled={disable}
-            rules={{
-                validate: (value) => {
-                    console.log("value", value);
-                    return true;
-                    // TODO: Get precision validation working
-                    // const result =
-                    //     zAmountWithPrecision(tokenPrecision).safeParse(value);
-                    // console.log("result", result);
-                    // if (result.success) return true;
-                    // return result.error.message;
-                },
-            }}
             render={({ field }) => (
                 <FormItem>
                     <FormLabel className="flex w-full justify-between">

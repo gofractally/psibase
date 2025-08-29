@@ -25,20 +25,3 @@ export const zAmount = z
             message: "Amount must be greater than 0",
         },
     );
-
-export const zAmountWithPrecision = (precision: number) =>
-    z.string().refine(
-        (amount) => {
-            // Check decimal places don't exceed precision
-            const parts = amount.split(".");
-            if (parts.length === 1) {
-                // No decimal part, so it's valid
-                return true;
-            }
-            const decimalPart = parts[1];
-            return decimalPart.length <= precision;
-        },
-        {
-            message: `Amount cannot have more than ${precision} decimal places`,
-        },
-    );
