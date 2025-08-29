@@ -11,13 +11,12 @@ import {
 import { useCredit } from "@/apps/tokens/hooks/tokensPlugin/useCredit";
 import { useTokenForm } from "@/apps/tokens/hooks/useTokenForm";
 import { useEffect, useMemo, useState } from "react";
+import { FormProvider } from "react-hook-form";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Account } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
-
-import { Quantity } from "./lib/quantity";
 
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
@@ -35,13 +34,12 @@ export const TokensPage = () => {
 
     const { isPending, mutateAsync: credit } = useCredit();
 
-    const form = useTokenForm();
+    const form = useTokenForm(tokens);
 
     const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
     function onSubmit() {
-        console.log("onSubmit");
         setTransferModal(true);
     }
 
@@ -97,60 +95,52 @@ export const TokensPage = () => {
     };
 
     const isNoTokens = currentUser && tokens.length == 0;
-    const amount = form.watch("amount");
-
-    const quantity = useMemo(() => {
-        const { precision, id, symbol } = selectedToken || {};
-        if (!precision || !id) return null;
-        return new Quantity(amount, precision, id, symbol);
-    }, [amount, selectedToken]);
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <div className="mx-auto flex max-w-screen-lg flex-col gap-3 p-4">
-                {isNoTokens && (
-                    <NoTokensWarning
-                        onContinue={() => {
-                            setNewTokenModalOpen(true);
-                        }}
+        <FormProvider {...form}>
+            <div className="mx-auto h-screen w-screen max-w-screen-lg">
+                <div className="mx-auto flex max-w-screen-lg flex-col gap-3 p-4">
+                    {isNoTokens && (
+                        <NoTokensWarning
+                            onContinue={() => {
+                                setNewTokenModalOpen(true);
+                            }}
+                        />
+                    )}
+                    <ModalCreateToken
+                        open={isNewTokenModalOpen}
+                        onOpenChange={(e) => setNewTokenModalOpen(e)}
+                    >
+                        <FormCreate
+                            onClose={() => {
+                                refetchUserBalances();
+                                setNewTokenModalOpen(false);
+                            }}
+                        />
+                    </ModalCreateToken>
+                    <TransferModal
+                        isPending={isPending}
+                        onClose={() => setTransferModal(false)}
+                        open={isTransferModalOpen}
+                        onContinue={performTransfer}
+                        selectedToken={selectedToken}
                     />
-                )}
-                <ModalCreateToken
-                    open={isNewTokenModalOpen}
-                    onOpenChange={(e) => setNewTokenModalOpen(e)}
-                >
-                    <FormCreate
-                        onClose={() => {
-                            refetchUserBalances();
-                            setNewTokenModalOpen(false);
-                        }}
-                    />
-                </ModalCreateToken>
-                <TransferModal
-                    isPending={isPending}
-                    onClose={() => setTransferModal(false)}
-                    open={isTransferModalOpen}
-                    from={currentUser}
-                    to={form.watch("to")}
-                    onContinue={performTransfer}
-                    quantity={quantity}
-                />
-                <FormTransfer
-                    isLoading={isLoading}
-                    form={form}
-                    tokens={tokens}
-                    selectedToken={selectedToken}
-                    setNewTokenModalOpen={setNewTokenModalOpen}
-                    onSubmit={() => onSubmit()}
-                />
-                <div className="my-4">
-                    <CreditTable
+                    <FormTransfer
                         isLoading={isLoading}
-                        user={currentUser}
-                        balances={sharedBalances}
+                        tokens={tokens}
+                        selectedToken={selectedToken}
+                        setNewTokenModalOpen={setNewTokenModalOpen}
+                        onSubmit={() => onSubmit()}
                     />
+                    <div className="my-4">
+                        <CreditTable
+                            isLoading={isLoading}
+                            user={currentUser}
+                            balances={sharedBalances}
+                        />
+                    </div>
                 </div>
             </div>
-        </div>
+        </FormProvider>
     );
 };
