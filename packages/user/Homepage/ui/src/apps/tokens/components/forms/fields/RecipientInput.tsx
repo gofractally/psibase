@@ -1,6 +1,5 @@
 import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
-import { FC } from "react";
-import { UseFormReturn } from "react-hook-form";
+import { useFormContext } from "react-hook-form";
 
 import {
     FormControl,
@@ -12,30 +11,32 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 
 interface Props {
-    form: UseFormReturn<FormSchema>;
     disabled?: boolean;
 }
 
-const RecipientInput: FC<Props> = ({ form, disabled = false }) => (
-    <FormField
-        control={form.control}
-        name="to"
-        render={({ field }) => (
-            <FormItem>
-                <FormLabel className="flex justify-between">
-                    Recipient
-                </FormLabel>
-                <FormControl>
-                    <Input
-                        placeholder="Account"
-                        {...field}
-                        disabled={disabled}
-                    />
-                </FormControl>
-                <FormMessage />
-            </FormItem>
-        )}
-    />
-);
+const RecipientInput = ({ disabled = false }: Props) => {
+    const form = useFormContext<FormSchema>();
+    return (
+        <FormField
+            control={form.control}
+            name="to"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel className="flex justify-between">
+                        Recipient
+                    </FormLabel>
+                    <FormControl>
+                        <Input
+                            placeholder="Account"
+                            {...field}
+                            disabled={disabled}
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+    );
+};
 
 export default RecipientInput;

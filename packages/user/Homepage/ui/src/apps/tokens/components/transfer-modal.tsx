@@ -1,13 +1,18 @@
+import type { FormSchema } from "../hooks/useTokenForm";
+import type { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
+
 import { Quantity } from "@/apps/tokens/lib/quantity";
+import { useMemo } from "react";
+import { useFormContext } from "react-hook-form";
 
 import { useAvatar } from "@/hooks/use-avatar";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    // AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
@@ -19,22 +24,30 @@ interface Props {
     onClose: () => void;
     isPending: boolean;
     title?: string;
-    from?: string | null;
-    to?: string;
-    quantity: Quantity | null;
+    selectedToken?: Token;
 }
 
 export const TransferModal = ({
     open,
     onContinue,
     onClose,
-    from,
-    to,
     isPending,
-    quantity,
+    selectedToken,
 }: Props) => {
-    const { avatarSrc: fromAvatar } = useAvatar(from);
+    const { data: currentUser } = useCurrentUser();
+    const form = useFormContext<FormSchema>();
+
+    const to = form.watch("to");
+    const amount = form.watch("amount");
+
+    const { avatarSrc: fromAvatar } = useAvatar(currentUser);
     const { avatarSrc: toAvatar } = useAvatar(to);
+
+    const quantity = useMemo(() => {
+        if (!selectedToken || !form.formState.isValid) return null;
+        const { precision, id, symbol } = selectedToken;
+        return new Quantity(amount, precision, id, symbol);
+    }, [amount, selectedToken, form.formState.isValid]);
 
     if (!quantity) return null;
 
@@ -45,7 +58,7 @@ export const TransferModal = ({
                     <AlertDialogTitle>Token transfer</AlertDialogTitle>
                     <div className="grid w-full grid-cols-2 gap-2">
                         {[
-                            { label: "From", address: from },
+                            { label: "From", address: currentUser },
                             { label: "To", address: to },
                         ].map(({ label, address }) => (
                             <div
