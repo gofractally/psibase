@@ -78,7 +78,6 @@ pub struct ActivePrompt {
     pub prompt_name: String,
     pub created: String,
     pub context_id: Option<String>,
-    pub return_payload: Option<String>, // e.g. subpath on subdomain for web platform
 }
 
 impl From<ActivePrompt> for PromptDetails {
@@ -103,7 +102,6 @@ impl ActivePrompts {
             prompt_name,
             created: Utc::now().to_rfc3339(),
             context_id,
-            return_payload: None,
         };
         tables::active_prompts().set(PROMPT_KEY, &prompt.packed());
     }
