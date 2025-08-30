@@ -26,10 +26,23 @@ interface with-password {
     decrypt: func(password: list<u8>, cipher: list<u8>, salt: string) -> result<list<u8>, error>;
 }
 
+interface types {
+    enum key-size-bytes {
+        sixteen,
+        thirty-two,
+    }
+
+    record key {
+        size: key-size-bytes,
+        key-data: list<u8>
+    }
+}
+
 interface with-key {
     use host:types/types.{error};
+    use types.{key};
 
-    /// Encrypts data using a key.
+    /// Encrypts data using the provided 32-byte key.
     /// 
     /// Arguments:
     /// - key: The key to use for encryption
@@ -37,9 +50,9 @@ interface with-key {
     /// 
     /// Returns:
     /// - The encrypted data
-    encrypt: func(key: list<u8>, data: list<u8>) -> list<u8>;
+    encrypt: func(key: key, data: list<u8>) -> list<u8>;
 
-    /// Decrypts data using a key.
+    /// Decrypts data using the provided 32-byte key.
     /// 
     /// Arguments:
     /// - key: The key to use for decryption
@@ -47,7 +60,7 @@ interface with-key {
     /// 
     /// Returns:
     /// - The decrypted data or an error if decryption fails
-    decrypt: func(key: list<u8>, cipher: list<u8>) -> result<list<u8>, error>;
+    decrypt: func(key: key, cipher: list<u8>) -> result<list<u8>, error>;
 }
 
 world imports {
