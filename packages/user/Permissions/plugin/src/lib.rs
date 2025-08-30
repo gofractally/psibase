@@ -35,15 +35,15 @@ fn assert_admin() {
 }
 
 impl PermsAdmin for PermissionsPlugin {
-    fn get_context(context_id: String) -> PromptContext {
+    fn get_context() -> PromptContext {
         assert_admin();
-        let context = HostPrompt::get_context(&context_id).unwrap();
+        let context = HostPrompt::get_context().unwrap();
         PackablePromptContext::unpacked(&context).unwrap().into()
     }
 
-    fn approve(context_id: String, duration: ApprovalDuration) {
+    fn approve(duration: ApprovalDuration) {
         assert_admin();
-        let context = HostPrompt::get_context(&context_id).unwrap();
+        let context = HostPrompt::get_context().unwrap();
         let context = PackablePromptContext::unpacked(&context).unwrap();
 
         Permissions::set(

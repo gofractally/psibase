@@ -5,11 +5,11 @@ interface admin {
 
     /// The details of the currently active prompt
     record prompt-details {
-        subdomain: string,
-        active-app: string,
+        prompt-app: string,
         prompt-name: string,
-        context-id: option<string>,
+        active-app: string,
         created: string,
+        packed-context: option<list<u8>>,
     }
 
     /// Used by the supervisor app to facilitate the interaction with the user
@@ -20,7 +20,7 @@ interface admin {
     /// Stores packed data and returns an ID that can be used to retrieve it
     ///    using `get-context`
     /// The returned context_id should be passed to the prompt window.
-    store-context: func(packed-context: list<u8>) -> string;
+    store-context: func(packed-context: list<u8>);
 } 
 
 world impl {

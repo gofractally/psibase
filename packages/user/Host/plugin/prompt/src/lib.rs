@@ -21,8 +21,9 @@ impl Admin for HostPrompt {
         Ok(ActivePrompts::get().unwrap().into())
     }
 
-    fn store_context(packed_context: Vec<u8>) -> String {
-        PromptContexts::get_id(packed_context)
+    fn store_context(packed_context: Vec<u8>) {
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
+        ActivePrompts::set_context(packed_context);
     }
 }
 
@@ -33,16 +34,16 @@ impl Api for HostPrompt {
             "[Error] Invalid prompt name. Prompt name must be [a-zA-Z0-9]."
         );
 
-        let context_id = packed_context.map(|packed_context| Self::store_context(packed_context));
-
-        ActivePrompts::set(prompt_name, context_id);
+        ActivePrompts::set(prompt_name, packed_context);
 
         request_prompt();
     }
 
-    fn get_context(context_id: String) -> Result<Vec<u8>, Error> {
-        Ok(PromptContexts::get(context_id.clone())
-            .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(context_id.clone())))?)
+    fn get_context() -> Result<Vec<u8>, Error> {
+        let prompt = ActivePrompts::get().unwrap();
+        prompt
+            .packed_context
+            .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(prompt.prompt_name)))
     }
 }
 
