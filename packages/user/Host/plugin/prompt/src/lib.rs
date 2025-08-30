@@ -20,21 +20,24 @@ impl Admin for HostPrompt {
         assert_eq!(get_sender(), "supervisor", "Unauthorized");
         Ok(ActivePrompts::get().unwrap().into())
     }
-}
-
-impl Api for HostPrompt {
-    fn prompt_user(prompt_name: String, context_id: Option<String>) -> Result<(), Error> {
-        if !prompt_name.chars().all(|c| c.is_ascii_alphanumeric()) {
-            return Err(ErrorType::InvalidPromptName().into());
-        }
-
-        ActivePrompts::set(prompt_name, context_id);
-
-        Ok(request_prompt()?)
-    }
 
     fn store_context(packed_context: Vec<u8>) -> String {
         PromptContexts::get_id(packed_context)
+    }
+}
+
+impl Api for HostPrompt {
+    fn prompt(prompt_name: String, packed_context: Option<Vec<u8>>) {
+        assert!(
+            prompt_name.chars().all(|c| c.is_ascii_alphanumeric()),
+            "[Error] Invalid prompt name. Prompt name must be [a-zA-Z0-9]."
+        );
+
+        let context_id = packed_context.map(|packed_context| Self::store_context(packed_context));
+
+        ActivePrompts::set(prompt_name, context_id);
+
+        request_prompt();
     }
 
     fn get_context(context_id: String) -> Result<Vec<u8>, Error> {

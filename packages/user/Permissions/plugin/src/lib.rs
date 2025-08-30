@@ -131,8 +131,7 @@ impl Api for PermissionsPlugin {
         }
         .packed();
 
-        let context_id = HostPrompt::store_context(&packed_context);
-        HostPrompt::prompt_user("permissions".into(), Some(&context_id))?;
+        HostPrompt::prompt("permissions".into(), Some(&packed_context));
         Ok(false)
     }
 }

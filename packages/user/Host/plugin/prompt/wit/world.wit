@@ -4,12 +4,6 @@ package host:prompt;
 interface api {
     use host:types/types.{error};
 
-    /// A helper function that simplifies the process of attaching additional context to a
-    ///    prompt. This will store the provided context data, and return a string that can 
-    ///    be used as the `context-id` parameter in the `prompt-user` function.
-    /// The context data can also be retrieved using `get-context`.
-    store-context: func(packed-context: list<u8>) -> string;
-
     /// Retrieves the context data associated with the specified `context-id` that was stored 
     ///    using the `store-context` function.
     get-context: func(context-id: string) -> result<list<u8>, error>;
@@ -22,7 +16,7 @@ interface api {
     /// If you provide a context_id, then that id will be available to the prompt. This is 
     ///    intended to allow plugins that create user prompts to look up additional context
     ///    relevant for handling the prompt.
-    prompt-user: func(prompt-name: string, context-id: option<string>) -> result<_, error>;
+    prompt: func(prompt-name: string, packed-context: option<list<u8>>);
 }
 
 world imports {

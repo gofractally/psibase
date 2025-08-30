@@ -16,6 +16,11 @@ interface admin {
     /// Also sets the return-payload on the prompt object to ensure it persists and can 
     ///    be queried in `get-return-payload`.
     get-active-prompt: func() -> result<prompt-details, error>;
+
+    /// Stores packed data and returns an ID that can be used to retrieve it
+    ///    using `get-context`
+    /// The returned context_id should be passed to the prompt window.
+    store-context: func(packed-context: list<u8>) -> string;
 } 
 
 world impl {
