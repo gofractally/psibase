@@ -27,13 +27,13 @@ interface with-password {
 }
 
 interface types {
-    enum key-size-bytes {
-        sixteen,
-        thirty-two,
+    enum strength {
+        aes128,
+        aes256,
     }
 
     record key {
-        size: key-size-bytes,
+        strength: strength,
         key-data: list<u8>
     }
 }

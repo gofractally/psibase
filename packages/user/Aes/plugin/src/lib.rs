@@ -70,22 +70,16 @@ where
 
 impl WithKey for AesPlugin {
     fn encrypt(key: AesTypes::Key, data: Vec<u8>) -> Vec<u8> {
-        match key.size {
-            AesTypes::KeySizeBytes::Sixteen => encrypt_with_aes::<Aes128Gcm>(&key.key_data, &data),
-            AesTypes::KeySizeBytes::ThirtyTwo => {
-                encrypt_with_aes::<Aes256Gcm>(&key.key_data, &data)
-            }
+        match key.strength {
+            AesTypes::Strength::Aes128 => encrypt_with_aes::<Aes128Gcm>(&key.key_data, &data),
+            AesTypes::Strength::Aes256 => encrypt_with_aes::<Aes256Gcm>(&key.key_data, &data),
         }
     }
 
     fn decrypt(key: AesTypes::Key, cipher: Vec<u8>) -> Result<Vec<u8>, Error> {
-        match key.size {
-            AesTypes::KeySizeBytes::Sixteen => {
-                decrypt_with_aes::<Aes128Gcm>(&key.key_data, &cipher)
-            }
-            AesTypes::KeySizeBytes::ThirtyTwo => {
-                decrypt_with_aes::<Aes256Gcm>(&key.key_data, &cipher)
-            }
+        match key.strength {
+            AesTypes::Strength::Aes128 => decrypt_with_aes::<Aes128Gcm>(&key.key_data, &cipher),
+            AesTypes::Strength::Aes256 => decrypt_with_aes::<Aes256Gcm>(&key.key_data, &cipher),
         }
     }
 }
