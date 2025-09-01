@@ -31,13 +31,11 @@ export const Home = () => {
             tokenId: "1",
         },
         onSubmit: async ({ value }) => {
-            console.log("a");
             await createStream({
                 halfLifeSeconds: Number(value.halfLifeSeconds),
                 tokenId: Number(value.tokenId),
             });
             setShowModal(false);
-            console.log("posh");
         },
     });
 
