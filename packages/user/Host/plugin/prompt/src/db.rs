@@ -27,6 +27,18 @@ pub struct ActivePrompt {
     pub packed_context: Option<Vec<u8>>,
 }
 
+impl ActivePrompt {
+    pub fn new(prompt_name: String, packed_context: Option<Vec<u8>>) -> Self {
+        Self {
+            prompt_app: get_sender(),
+            prompt_name,
+            active_app: get_active_app(),
+            created: Utc::now().to_rfc3339(),
+            packed_context,
+        }
+    }
+}
+
 impl From<ActivePrompt> for PromptDetails {
     fn from(prompt: ActivePrompt) -> Self {
         PromptDetails {
@@ -43,13 +55,7 @@ const PROMPT_KEY: &str = "prompt";
 pub struct ActivePrompts;
 impl ActivePrompts {
     pub fn set(prompt_name: String, packed_context: Option<Vec<u8>>) {
-        let prompt = ActivePrompt {
-            prompt_app: get_sender(),
-            prompt_name,
-            active_app: get_active_app(),
-            created: Utc::now().to_rfc3339(),
-            packed_context,
-        };
+        let prompt = ActivePrompt::new(prompt_name, packed_context);
         tables::active_prompt().set(PROMPT_KEY, &prompt.packed());
     }
 

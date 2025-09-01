@@ -16,9 +16,9 @@ use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;
 
 impl Admin for HostPrompt {
-    fn get_active_prompt() -> Result<PromptDetails, Error> {
+    fn get_active_prompt() -> PromptDetails {
         assert_eq!(get_sender(), "supervisor", "Unauthorized");
-        Ok(ActivePrompts::get().unwrap().into())
+        ActivePrompts::get().unwrap().into()
     }
 
     fn store_context(packed_context: Vec<u8>) {
@@ -27,15 +27,17 @@ impl Admin for HostPrompt {
     }
 }
 
+fn validate_prompt_name(prompt_name: &str) {
+    assert!(
+        prompt_name.chars().all(|c| c.is_ascii_alphanumeric()),
+        "[Error] Invalid prompt name. Prompt name must be [a-zA-Z0-9]."
+    );
+}
+
 impl Api for HostPrompt {
     fn prompt(prompt_name: String, packed_context: Option<Vec<u8>>) {
-        assert!(
-            prompt_name.chars().all(|c| c.is_ascii_alphanumeric()),
-            "[Error] Invalid prompt name. Prompt name must be [a-zA-Z0-9]."
-        );
-
+        validate_prompt_name(&prompt_name);
         ActivePrompts::set(prompt_name, packed_context);
-
         request_prompt();
     }
 

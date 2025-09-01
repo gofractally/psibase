@@ -15,7 +15,7 @@ interface admin {
     /// Used by the supervisor app to facilitate the interaction with the user
     /// Also sets the return-payload on the prompt object to ensure it persists and can 
     ///    be queried in `get-return-payload`.
-    get-active-prompt: func() -> result<prompt-details, error>;
+    get-active-prompt: func() -> prompt-details;
 
     /// Stores packed data and returns an ID that can be used to retrieve it
     ///    using `get-context`
