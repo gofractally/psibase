@@ -2,8 +2,6 @@
 mod bindings;
 
 use bindings::exports::token_stream::plugin::api::Guest as Api;
-use bindings::exports::token_stream::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -11,62 +9,71 @@ use psibase::define_trust;
 use psibase::fracpack::Pack;
 
 mod errors;
-use errors::ErrorType;
 
 define_trust! {
     descriptions {
-        Low => "
-        Low trust grants these abilities:
-            - Reading the value of the example-thing
-        ",
-        Medium => "",
-        High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Setting the example thing
-        ",
+        Low => "",
+        Medium => "Create a token stream",
+        High => "Deposit tokens into stream and claim from stream",
     }
     functions {
         Low => [get_example_thing],
-        High => [set_example_thing],
+        Medium => [create],
+        High => [deposit, claim],
     }
 }
 
 struct TokenStreamPlugin;
 
+fn decay_rate_from_half_life(seconds: f64) -> u32 {
+    let rate = std::f64::consts::LN_2 / seconds;
+
+    (rate * 1_000_000.0).round() as u32
+}
+
 impl Api for TokenStreamPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::authorize(trust::FunctionName::set_example_thing)?;
-        // let packed_example_thing_args = token_stream::action_structs::setExampleThing { thing }.packed();
-        // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
-        Ok(())
+    fn create(half_life_seconds: u64, token_id: u32) -> Result<(), Error> {
+        trust::authorize(trust::FunctionName::create)?;
+
+        let decay_rate_per_million = decay_rate_from_half_life(half_life_seconds as f64);
+        let packed_args = token_stream::action_structs::create {
+            decay_rate_per_million,
+            token_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            token_stream::action_structs::create::ACTION_NAME,
+            &packed_args,
+        )
     }
-}
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
+    fn deposit(nft_id: u32, token_id: String, amount: String, memo: String) -> Result<(), Error> {
+        trust::authorize(trust::FunctionName::deposit)?;
 
-impl Queries for TokenStreamPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        trust::authorize(trust::FunctionName::get_example_thing)?;
-
-        let graphql_str = "query { exampleThing }";
-
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
+        let _ = bindings::tokens::plugin::transfer::credit(
+            &token_id,
+            &"token-stream".to_string(),
+            &amount,
+            &memo,
         );
 
-        let examplething_val =
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        let packed_args = token_stream::action_structs::deposit { nft_id }.packed();
 
-        Ok(examplething_val.data.example_thing)
+        add_action_to_transaction(
+            token_stream::action_structs::deposit::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn claim(nft_id: u32) -> Result<(), Error> {
+        trust::authorize(trust::FunctionName::claim)?;
+
+        let packed_args = token_stream::action_structs::claim { nft_id }.packed();
+
+        add_action_to_transaction(
+            token_stream::action_structs::claim::ACTION_NAME,
+            &packed_args,
+        )
     }
 }
 

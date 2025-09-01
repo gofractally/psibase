@@ -127,7 +127,7 @@ mod tests {
         );
 
         TokenStream::push_from(&chain, ALICE)
-            .deposit(stream_nft_id, 500.into())
+            .deposit(stream_nft_id)
             .get()
             .unwrap();
 
@@ -166,17 +166,17 @@ mod tests {
         reset_clock(&chain);
 
         let token_id = setup_env(&chain)?;
-        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 200000);
-
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 100000);
         let first_stream = create_stream(&chain, ALICE, 10000, token_id);
-        let second_stream = create_stream(&chain, ALICE, 10000, token_id);
-
         TokenStream::push_from(&chain, ALICE)
-            .deposit(first_stream, 100.into())
+            .deposit(first_stream)
             .get()
             .unwrap();
+
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 100000);
+        let second_stream = create_stream(&chain, ALICE, 10000, token_id);
         TokenStream::push_from(&chain, ALICE)
-            .deposit(second_stream, 100.into())
+            .deposit(second_stream)
             .get()
             .unwrap();
 
@@ -225,7 +225,7 @@ mod tests {
             .unwrap();
 
         TokenStream::push_from(&chain, BOB)
-            .deposit(first_stream, 100.into())
+            .deposit(first_stream)
             .get()
             .unwrap();
 
@@ -245,7 +245,7 @@ mod tests {
         reset_clock(&chain);
 
         let token_id = setup_env(&chain)?;
-        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 1000);
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 300);
 
         let stream_nft_id = TokenStream::push_from(&chain, ALICE)
             .create(10000, token_id)
@@ -254,7 +254,7 @@ mod tests {
 
         // First deposit
         TokenStream::push_from(&chain, ALICE)
-            .deposit(stream_nft_id, 300.into())
+            .deposit(stream_nft_id)
             .get()
             .unwrap();
 
@@ -263,7 +263,7 @@ mod tests {
         // Second deposit after some time
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 200);
         TokenStream::push_from(&chain, ALICE)
-            .deposit(stream_nft_id, 200.into())
+            .deposit(stream_nft_id)
             .get()
             .unwrap();
 
@@ -295,7 +295,6 @@ mod tests {
         reset_clock(&chain);
 
         let token_id = setup_env(&chain)?;
-        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 100);
 
         let stream_nft_id = TokenStream::push_from(&chain, ALICE)
             .create(10000, token_id)
@@ -304,7 +303,7 @@ mod tests {
 
         // Attempt to deposit zero
         let result = TokenStream::push_from(&chain, ALICE)
-            .deposit(stream_nft_id, 0.into())
+            .deposit(stream_nft_id)
             .get();
 
         assert!(result.is_err(), "Depositing zero should fail");
@@ -365,7 +364,7 @@ mod tests {
             .unwrap();
 
         TokenStream::push_from(&chain, ALICE)
-            .deposit(stream_nft_id, 500.into())
+            .deposit(stream_nft_id)
             .get()
             .unwrap();
 

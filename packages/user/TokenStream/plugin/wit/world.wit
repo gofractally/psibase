@@ -1,16 +1,16 @@
 package token-stream:plugin;
 
 interface api {
+
     use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
+    create: func(half-life-seconds: u64, token-id: u32) -> result<_, error>;
+
+    deposit: func(nft-id: u32, token-id: string, amount: string, memo: string) -> result<_, error>;
+    claim: func(nft-id: u32) -> result<_, error>;
+
 }
 
-interface queries {
-    use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
-}
 
 world imports {
     import api;
-    import queries;
 }

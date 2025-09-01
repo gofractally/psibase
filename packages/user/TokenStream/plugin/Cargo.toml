@@ -26,3 +26,4 @@ world = "impl"
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
