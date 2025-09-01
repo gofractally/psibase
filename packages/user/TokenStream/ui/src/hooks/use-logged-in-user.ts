@@ -3,13 +3,13 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
+import QueryKey from "@/lib/queryKeys";
+
 const supervisor = getSupervisor();
 
-export const useLoggedInUser = (enabled = true) =>
+export const useCurrentUser = () =>
     useQuery({
-        queryKey: ["loggedInUser"],
-        enabled,
-        initialData: null,
+        queryKey: QueryKey.currentUser(),
         queryFn: async () => {
             const res = await supervisor.functionCall({
                 method: "getCurrentUser",

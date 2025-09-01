@@ -7,6 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 postinstall = [
+    { sender = "token-stream", service = "sites", method = "enablespa", data = { enable = true } },
     { sender = "token-stream", service = "tokens", method = "setUserConf", data = { index = 0, enabled = true } },
 ]
 

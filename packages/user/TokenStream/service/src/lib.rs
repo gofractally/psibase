@@ -27,16 +27,20 @@ pub mod tables {
 
     #[ComplexObject]
     impl Stream {
-        pub async fn total_deposited(&self) -> Decimal {
+        pub async fn deposited(&self) -> Decimal {
             Decimal::new(self.total_deposited, self.precision())
         }
 
-        pub async fn total_claimed(&self) -> Decimal {
+        pub async fn claimed(&self) -> Decimal {
             Decimal::new(self.total_claimed, self.precision())
         }
 
-        pub async fn claimable_at_last_deposit(&self) -> Decimal {
-            Decimal::new(self.claimable_at_last_deposit, self.precision())
+        pub async fn vested(&self) -> Decimal {
+            Decimal::new(self.total_vested(), self.precision())
+        }
+
+        pub async fn unclaimed(&self) -> Decimal {
+            Decimal::new(self.unclaimed_total(), self.precision())
         }
     }
 

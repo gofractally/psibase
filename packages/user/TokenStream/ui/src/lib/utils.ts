@@ -7,18 +7,6 @@ export function formatDate(input: string | number): string {
     });
 }
 
-export function debounce<T extends (...args: unknown[]) => unknown>(
-    cb: T,
-    wait: number,
-): (...args: Parameters<T>) => void {
-    let h: NodeJS.Timeout;
-    const callable = (...args: Parameters<T>) => {
-        clearTimeout(h);
-        h = setTimeout(() => cb(...args), wait);
-    };
-    return callable as T;
-}
-
 export const modifyUrlParams = (
     url: string,
     params: { [key: string]: string },
