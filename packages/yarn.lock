@@ -1630,7 +1630,7 @@ __metadata:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
     "@psibase/common-lib": "workspace:*"
-    "@tanstack/react-form": "npm:^1.11.1"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.75.7"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.5.0"
@@ -1654,8 +1654,8 @@ __metadata:
   dependencies:
     "@noble/hashes": "npm:^1.7.1"
     "@tanstack/pacer": "npm:^0.1.0"
-    "@tanstack/react-form": "npm:^1.2.1"
-    "@tanstack/react-pacer": "npm:^0.1.0"
+    "@tanstack/react-form": "npm:^1.19.3"
+    "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.62.8"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
@@ -1721,8 +1721,8 @@ __metadata:
   dependencies:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
-    "@tanstack/react-form": "npm:^1.11.1"
-    "@tanstack/react-pacer": "npm:^0.6.0"
+    "@tanstack/react-form": "npm:^1.19.3"
+    "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.75.7"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
@@ -1754,6 +1754,8 @@ __metadata:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@react-spring/web": "npm:^10.0.1"
+    "@tanstack/react-form": "npm:^1.19.3"
+    "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -3854,26 +3856,36 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/form-core@npm:1.12.3":
-  version: 1.12.3
-  resolution: "@tanstack/form-core@npm:1.12.3"
-  dependencies:
-    "@tanstack/store": "npm:^0.7.1"
-  checksum: 10c0/3f49f95f98f174afe850eccf145780f877d51fd4fca324a14488600bc85b40b5c854e59f2ff6e64c8ced9434bb4176de6b3f698ad56f2cb8708d01989198e404
+"@tanstack/devtools-event-client@npm:^0.2.2":
+  version: 0.2.3
+  resolution: "@tanstack/devtools-event-client@npm:0.2.3"
+  checksum: 10c0/d57f97f254dfdd19be6dd264b8f69b95e5a73fdd222c811427558ce65c39e74877318d90a59cbdf3f318b94a46f689a731aef39df0f5e1403a163900936f1b66
   languageName: node
   linkType: hard
 
-"@tanstack/pacer@npm:0.1.0, @tanstack/pacer@npm:^0.1.0":
+"@tanstack/form-core@npm:1.19.3":
+  version: 1.19.3
+  resolution: "@tanstack/form-core@npm:1.19.3"
+  dependencies:
+    "@tanstack/store": "npm:^0.7.4"
+  checksum: 10c0/e56a82ad59679d02bb0f3a0e3a4f95296edf1d71949b77c6b7ae07cb64fc709fd5b9edda9a6648af6acb06f57aaa6a8d62ee0940db44cffe4bfaaa7a62ee89f5
+  languageName: node
+  linkType: hard
+
+"@tanstack/pacer@npm:0.15.1":
+  version: 0.15.1
+  resolution: "@tanstack/pacer@npm:0.15.1"
+  dependencies:
+    "@tanstack/devtools-event-client": "npm:^0.2.2"
+    "@tanstack/store": "npm:^0.7.2"
+  checksum: 10c0/1034c9bd8961f946db348258d7f115daaeb6bca762d754106b752bcfbfcbfda6c8bcbded32729d12d90260c8ade8abfeb8a31a600908308e7da1d3a18bcf8300
+  languageName: node
+  linkType: hard
+
+"@tanstack/pacer@npm:^0.1.0":
   version: 0.1.0
   resolution: "@tanstack/pacer@npm:0.1.0"
   checksum: 10c0/7a8ec1e1918d1cfd57b4cc14775b2d27d0743ca9f24babec637c229bc013b667420a32360540a83f100092b138b069b2df307993a3e6abb59bf717aea7073f75
-  languageName: node
-  linkType: hard
-
-"@tanstack/pacer@npm:0.6.0":
-  version: 0.6.0
-  resolution: "@tanstack/pacer@npm:0.6.0"
-  checksum: 10c0/4deae6181d77cfab8099325cb1712fc583ff71870d1d5011461896b5c35cf20fa9d20ae7d0bd9f89ef1429cc355b798da82d392ff74c0678e68302eba48e72ee
   languageName: node
   linkType: hard
 
@@ -3891,48 +3903,34 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/react-form@npm:^1.11.1, @tanstack/react-form@npm:^1.2.1":
-  version: 1.12.3
-  resolution: "@tanstack/react-form@npm:1.12.3"
+"@tanstack/react-form@npm:^1.19.3":
+  version: 1.19.3
+  resolution: "@tanstack/react-form@npm:1.19.3"
   dependencies:
-    "@tanstack/form-core": "npm:1.12.3"
-    "@tanstack/react-store": "npm:^0.7.1"
+    "@tanstack/form-core": "npm:1.19.3"
+    "@tanstack/react-store": "npm:^0.7.4"
     decode-formdata: "npm:^0.9.0"
-    devalue: "npm:^5.1.1"
+    devalue: "npm:^5.3.2"
   peerDependencies:
-    "@tanstack/react-start": ^1.112.0
+    "@tanstack/react-start": ^1.130.10
     react: ^17.0.0 || ^18.0.0 || ^19.0.0
-    vinxi: ^0.5.0
   peerDependenciesMeta:
     "@tanstack/react-start":
       optional: true
-    vinxi:
-      optional: true
-  checksum: 10c0/97fd2849eeb7ed4afcb35acb9802d2bf91156d4bc0675968430e68548f5d42983ce710688a883fdfeb15bb6391d330c7353925acd01573d59d02a55e59465431
+  checksum: 10c0/d7c71fd919adeea9bb17cef9492103dd23ce5ee367ff0967fb02ba1816bad2dab0a8c52d22d22688bcc2de17fc170ca32f723f9b3a72d520b2de3f1340033c92
   languageName: node
   linkType: hard
 
-"@tanstack/react-pacer@npm:^0.1.0":
-  version: 0.1.0
-  resolution: "@tanstack/react-pacer@npm:0.1.0"
+"@tanstack/react-pacer@npm:^0.16.1":
+  version: 0.16.1
+  resolution: "@tanstack/react-pacer@npm:0.16.1"
   dependencies:
-    "@tanstack/pacer": "npm:0.1.0"
+    "@tanstack/pacer": "npm:0.15.1"
+    "@tanstack/react-store": "npm:^0.7.3"
   peerDependencies:
     react: ">=16.8"
     react-dom: ">=16.8"
-  checksum: 10c0/cddcedd7942f2ec5e5ce71e5441ab0bdc5ccb4d8ce091cd82289c2db2ebe1177b224c9965c986c57e490e58dd131fd8823678e74a0f779b570021687f972c1ca
-  languageName: node
-  linkType: hard
-
-"@tanstack/react-pacer@npm:^0.6.0":
-  version: 0.6.0
-  resolution: "@tanstack/react-pacer@npm:0.6.0"
-  dependencies:
-    "@tanstack/pacer": "npm:0.6.0"
-  peerDependencies:
-    react: ">=16.8"
-    react-dom: ">=16.8"
-  checksum: 10c0/4854e329ada0c3c95b05e1fbdaa9a9b1636a4b5e89a0b9f346adac3d103f87b9c9a26569e95a49ded712f019439b30a8a57cc26217ade8f42d222fdb9c72bf79
+  checksum: 10c0/48c378d61dbb78aa2f3abf12e222da666ab66a567223d975304805059676b22e7e397e08461364a822cebe187dec8d83dbfb6cc1625d1614b952dcce2f9569ac
   languageName: node
   linkType: hard
 
@@ -3966,16 +3964,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/react-store@npm:^0.7.1":
-  version: 0.7.1
-  resolution: "@tanstack/react-store@npm:0.7.1"
+"@tanstack/react-store@npm:^0.7.3, @tanstack/react-store@npm:^0.7.4":
+  version: 0.7.4
+  resolution: "@tanstack/react-store@npm:0.7.4"
   dependencies:
-    "@tanstack/store": "npm:0.7.1"
+    "@tanstack/store": "npm:0.7.4"
     use-sync-external-store: "npm:^1.5.0"
   peerDependencies:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
     react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10c0/50a64f615f448fd323eb968237c91faae1a3c3cb0ed4b52d3b6a620723dab10437ae99d94bd9e1ff03bd3ad1d4d75cadc5fee042ab6d9b3c47f5972716cac680
+  checksum: 10c0/2f99b6f28377e7ef403761e29c7a3f9a0a132b101560c53ade1ae63cc966b4711e7aa613217adda7060f6fb152901674f2e5885096bceede7fa5e52eeb6f772f
   languageName: node
   linkType: hard
 
@@ -3991,10 +3989,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/store@npm:0.7.1, @tanstack/store@npm:^0.7.1":
-  version: 0.7.1
-  resolution: "@tanstack/store@npm:0.7.1"
-  checksum: 10c0/bc1ebf0e8ced2717ec89b7bfac94da436fd23b0ea485b7805b594bee6c6870d67e1184efd5f140cd8d64d9192ee09adad155abea9a2f5bc1ba96f21645299cd8
+"@tanstack/store@npm:0.7.4, @tanstack/store@npm:^0.7.2, @tanstack/store@npm:^0.7.4":
+  version: 0.7.4
+  resolution: "@tanstack/store@npm:0.7.4"
+  checksum: 10c0/084aa3cf9a2b49bf9b1fb44872cb6fe4a05f8e6fc1bf584f1f30e6e0d89558b9003830562ece7794df85e1fc106542f3f50d71f0ea682deb11846576c1d33595
   languageName: node
   linkType: hard
 
@@ -6572,10 +6570,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"devalue@npm:^5.1.0, devalue@npm:^5.1.1":
+"devalue@npm:^5.1.0":
   version: 5.1.1
   resolution: "devalue@npm:5.1.1"
   checksum: 10c0/f6717a856fd54216959abd341cb189e47a9b37d72d8419e055ae77567ff4ed0fb683b1ffb6a71067f645adae5991bffabe6468a3e2385937bff49273e71c1f51
+  languageName: node
+  linkType: hard
+
+"devalue@npm:^5.3.2":
+  version: 5.3.2
+  resolution: "devalue@npm:5.3.2"
+  checksum: 10c0/2dab403779233224285afe4b30eaded038df10cb89b8f2c1e41dd855a8e6b634aa24175b87f64df665204bb9a6a6e7758d172682719b9c5cf3cef336ff9fa507
   languageName: node
   linkType: hard
 
