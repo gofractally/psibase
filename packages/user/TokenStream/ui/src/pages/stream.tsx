@@ -186,15 +186,13 @@ export const Stream = () => {
                     </div>
                 </div>
                 <div className="text-muted-foreground">
-                    <div>
-                        Stream balance:{" "}
-                        <span className="text-primary">
-                            <NumberFlow
-                                value={stream ? Number(stream.stream.unclaimed) : 0}
-                                format={{ minimumFractionDigits: 0 }}
-                            />
-                        </span>
-                    </div>
+                    Stream balance:{" "}
+                    <span className="text-primary">
+                        <NumberFlow
+                            value={stream ? Number(stream.stream.unclaimed) : 0}
+                            format={{ minimumFractionDigits: 0 }}
+                        />
+                    </span>
                 </div>
             </div>
             <div className="rounded-sm border p-3">
