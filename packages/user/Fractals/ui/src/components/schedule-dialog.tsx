@@ -1,11 +1,10 @@
 import dayjs from "dayjs";
 
-import { useAppForm } from "@/components/form/app-form";
-
 import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
