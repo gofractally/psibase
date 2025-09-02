@@ -74,3 +74,18 @@ TEST_CASE("Test ipv6 endpoint")
    CHECK(!isLoopback(mappedV4));
    CHECK(parseSocketEndpoint(mappedV4Str) == SocketEndpoint{mappedV4});
 }
+
+TEST_CASE("Test local endpoint")
+{
+   LocalEndpoint path{"/run/psibase/socket"};
+   CHECK(to_string(path) == "/run/psibase/socket");
+
+   LocalEndpoint notaddr{"192.168.0.1"};
+   auto          notaddrStr = "./192.168.0.1";
+   CHECK(to_string(notaddr) == notaddrStr);
+   CHECK(parseSocketEndpoint(notaddrStr) == SocketEndpoint{LocalEndpoint{notaddrStr}});
+
+   LocalEndpoint empty{""};
+   CHECK(to_string(empty) == "");
+   CHECK(parseSocketEndpoint("") == SocketEndpoint{empty});
+}

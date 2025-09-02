@@ -281,7 +281,7 @@ std::string psibase::to_string(const IPV6Endpoint& endpoint)
 
 std::string psibase::to_string(const LocalEndpoint& endpoint)
 {
-   if (endpoint.path.empty() && endpoint.path.contains('/'))
+   if (endpoint.path.empty() || endpoint.path.contains('/'))
       return endpoint.path;
    else
       // make sure that the path cannot be interpreted as an IP address
