@@ -1,10 +1,11 @@
+import { useNavigate } from "react-router-dom";
+
 import { siblingUrl } from "@psibase/common-lib";
 
 import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
 
 import { AccountSwitcher } from "./account-switcher";
 import { ModeToggle } from "./mode-toggle";
-import { useNavigate } from "react-router-dom";
 
 function HoverBorderGradientDemo() {
     return (
@@ -29,7 +30,12 @@ export const Nav = ({ title }: { title?: string }) => {
                 <HoverBorderGradientDemo />
             </a>
             {title && (
-                <div className="flex flex-col justify-center text-2xl font-semibold hover:underline" onClick={() => { navigate('/') }}>
+                <div
+                    className="flex flex-col justify-center text-2xl font-semibold hover:underline"
+                    onClick={() => {
+                        navigate("/");
+                    }}
+                >
                     {title}
                 </div>
             )}

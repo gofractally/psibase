@@ -1,5 +1,6 @@
 import { useAppForm } from "@/form/app-form";
 import NumberFlow from "@number-flow/react";
+import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -7,20 +8,24 @@ import { ErrorCard } from "@/components/error-card";
 
 import { useCurrentUser } from "@/hooks";
 import { useClaim } from "@/hooks/use-claim";
+import { useDeleteStream } from "@/hooks/use-delete-stream";
 import { useDeposit } from "@/hooks/use-deposit";
 import { useNft } from "@/hooks/use-nft";
 import { useStream } from "@/hooks/use-stream";
 import { useToken } from "@/hooks/use-token";
 
-import { Button } from "@shared/shadcn/ui/button";
-import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
-import { Progress } from "@shared/shadcn/ui/progress";
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import { useDeleteStream } from "@/hooks/use-delete-stream";
-import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Badge } from "@shared/shadcn/ui/badge";
-
-
+import { Button } from "@shared/shadcn/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
+import { Progress } from "@shared/shadcn/ui/progress";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import {
     Table,
     TableBody,
@@ -30,20 +35,24 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-
 export const Stream = () => {
     const { id } = useParams();
 
     const { data: stream, error, isLoading: isLoadingStream } = useStream(id);
-    const { data: token } = useToken(stream ? stream.stream.tokenId.toString() : null);
+    const { data: token } = useToken(
+        stream ? stream.stream.tokenId.toString() : null,
+    );
     const { data: currentUser } = useCurrentUser();
     const { data: nft } = useNft(stream?.stream.nftId.toString());
 
     const { mutateAsync: deposit } = useDeposit();
     const { mutateAsync: claim, isPending: isClaiming } = useClaim();
-    const [showModal, setShowModal] = useState(false);
 
-    const { mutateAsync: deleteStream, isPending: isDeleting } = useDeleteStream()
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+    const { mutateAsync: deleteStream, isPending: isDeleting } =
+        useDeleteStream();
 
     const form = useAppForm({
         defaultValues: {
@@ -59,64 +68,59 @@ export const Stream = () => {
                 memo: value.memo,
                 nftId: value.nftId!,
             });
-            setShowModal(false);
-            form.reset()
+            setShowCreateModal(false);
+            form.reset();
         },
     });
 
     const isHoldingNft = currentUser === nft?.owner?.account;
 
-    console.log({ isHoldingNft, currentUser, nft });
-
-    const isEmpty = stream && stream?.stream.deposited === stream?.stream.claimed;
-    const isNewStream = stream && Number(stream.stream.deposited) == 0;
-    const isFullyClaimed = stream && stream.stream.claimed === stream.stream.deposited;
+    const isEmpty =
+        stream && stream?.stream.deposited === stream?.stream.claimed;
+    const isFullyClaimed =
+        stream && stream.stream.claimed === stream.stream.deposited;
 
     const percent = stream
         ? isEmpty
             ? 100
-            : (Number(stream.stream.claimable) / Number(stream.stream.unclaimed)) * 100
+            : (Number(stream.stream.claimable) /
+                  Number(stream.stream.unclaimed)) *
+              100
         : 50;
 
-    console.log({ isEmpty, percent, stream }, Number(stream?.stream.claimable), Number(stream?.stream.unclaimed));
+    console.log(
+        { isEmpty, percent, stream },
+        Number(stream?.stream.claimable),
+        Number(stream?.stream.unclaimed),
+    );
 
     if (error) {
-        console.error(error)
+        console.error(error);
         return <ErrorCard error={error} />;
     }
 
-    console.log(isNewStream, 'x')
-    // if (isNewStream) {
-    //     return <EmptyBlock title={`Stream ${id} is empty.`} buttonLabel="Create first deposit" description={`Stream requires token ID: ${stream.tokenId}`} onButtonClick={() => {
-    //         setShowModal(true)
-    //         console.log('hit the modal')
-    //     }} />
-    // }
-
-
-
     return (
         <div className="flex flex-col gap-2">
-
             <div className="rounded-sm border p-3">
-                <div className="w-full my-3">
+                <div className="my-3 w-full">
                     <Progress value={percent} />
                 </div>
                 <div className="flex justify-between">
                     <div className="">
-                        <span className="text-muted-foreground">Stream</span> #{id}
+                        <span className="text-muted-foreground">Stream</span> #
+                        {id}
                     </div>
                     <div>
                         <div className="flex gap-2">
                             <Dialog
-                                open={showModal}
+                                open={showCreateModal}
                                 onOpenChange={(show) => {
-                                    setShowModal(show);
+                                    setShowCreateModal(show);
                                 }}
                             >
                                 <Button
                                     onClick={() => {
-                                        setShowModal(true);
+                                        setShowCreateModal(true);
                                     }}
                                     variant="outline"
                                 >
@@ -165,14 +169,19 @@ export const Stream = () => {
                                     !isHoldingNft ||
                                     isClaiming ||
                                     isEmpty ||
-                                    (stream && Number(stream.stream.claimable) == 0)
+                                    (stream &&
+                                        Number(stream.stream.claimable) == 0)
                                 }
                                 onClick={() => claim({ nftId: id! })}
                             >
                                 <ArrowDown />
-                                {isClaiming ? 'Claiming' : "Claim"}
+                                {isClaiming ? "Claiming" : "Claim"}
                                 <NumberFlow
-                                    value={stream ? Number(stream.stream.claimable) : 0}
+                                    value={
+                                        stream
+                                            ? Number(stream.stream.claimable)
+                                            : 0
+                                    }
                                     format={{
                                         minimumFractionDigits: token
                                             ? token.precision
@@ -180,28 +189,64 @@ export const Stream = () => {
                                     }}
                                 />
                             </Button>
-                            <Button variant="outline" disabled={!isFullyClaimed || isDeleting} onClick={() => { deleteStream({ nftId: id! }) }}>
-                                <Trash2 />
-                            </Button>
+                            <Dialog
+                                open={showDeleteModal}
+                                onOpenChange={(show) => {
+                                    setShowCreateModal(show);
+                                }}
+                            >
+                                <Button
+                                    variant="outline"
+                                    disabled={!isFullyClaimed || isDeleting}
+                                    onClick={() => {
+                                        setShowDeleteModal(true);
+                                    }}
+                                >
+                                    <Trash2 />
+                                </Button>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>Delete stream</DialogTitle>
+                                        <DialogDescription>
+                                            Are you sure you want to delete
+                                            stream ID: {id}
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <DialogFooter>
+                                        <Button
+                                            type="submit"
+                                            onClick={() =>
+                                                deleteStream({ nftId: id! })
+                                            }
+                                        >
+                                            Delete
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </div>
-                <div className="text-muted-foreground flex justify-between my-2">
+                <div className="text-muted-foreground my-2 flex justify-between">
                     <div>
-
                         Balance:{" "}
                         <span className="text-primary">
                             <NumberFlow
-                                value={stream ? Number(stream.stream.unclaimed) : 0}
+                                value={
+                                    stream ? Number(stream.stream.unclaimed) : 0
+                                }
                                 format={{
                                     minimumFractionDigits: token
                                         ? token.precision
                                         : 4,
-                                }} />
+                                }}
+                            />
                         </span>
                     </div>
                     <div>
-                        <Badge variant="outline">Token ID: {stream?.stream.tokenId}</Badge>
+                        <Badge variant="outline">
+                            Token ID: {stream?.stream.tokenId}
+                        </Badge>
                     </div>
                 </div>
             </div>
@@ -209,46 +254,47 @@ export const Stream = () => {
                 <Table className="text-sm">
                     <TableHeader>
                         <TableRow>
-                            <TableHead >
-                                Type
-                            </TableHead>
-                            <TableHead>
-                                Actor
-                            </TableHead>
-                            <TableHead className="text-right">
-                                Amount
-                            </TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Actor</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody className="text-muted-foreground">
                         {isLoadingStream
                             ? [...new Array(4)].map((_, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>
-                                        <Skeleton className="h-6 w-48" />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Skeleton className="h-6 w-48" />
-                                    </TableCell>
-                                    <TableCell className="text-right flex justify-end">
-                                        <Skeleton className="h-6 w-48" />
-                                    </TableCell>
-
-                                </TableRow>
-                            ))
+                                  <TableRow key={index}>
+                                      <TableCell>
+                                          <Skeleton className="h-6 w-48" />
+                                      </TableCell>
+                                      <TableCell>
+                                          <Skeleton className="h-6 w-48" />
+                                      </TableCell>
+                                      <TableCell className="flex justify-end text-right">
+                                          <Skeleton className="h-6 w-48" />
+                                      </TableCell>
+                                  </TableRow>
+                              ))
                             : stream?.updates?.map((update, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>
-                                        {update.txType == 'claimed' ? <div className="flex items-center gap-2"><ArrowDown />Claimed</div> : <div className="flex items-center gap-2"><ArrowUp />Deposited</div>}
-                                    </TableCell>
-                                    <TableCell >
-                                        {update.actor}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {update.amount}
-                                    </TableCell>{" "}
-                                </TableRow>
-                            ))}
+                                  <TableRow key={index}>
+                                      <TableCell>
+                                          {update.txType == "claimed" ? (
+                                              <div className="flex items-center gap-2">
+                                                  <ArrowDown />
+                                                  Claimed
+                                              </div>
+                                          ) : (
+                                              <div className="flex items-center gap-2">
+                                                  <ArrowUp />
+                                                  Deposited
+                                              </div>
+                                          )}
+                                      </TableCell>
+                                      <TableCell>{update.actor}</TableCell>
+                                      <TableCell className="text-right">
+                                          {update.amount}
+                                      </TableCell>{" "}
+                                  </TableRow>
+                              ))}
                     </TableBody>
                 </Table>
             </div>
