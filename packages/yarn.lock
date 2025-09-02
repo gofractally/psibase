@@ -1880,7 +1880,6 @@ __metadata:
   resolution: "@psibase/evaluations-ui@workspace:user/Evaluations/ui"
   dependencies:
     "@noble/hashes": "npm:^1.7.1"
-    "@tanstack/pacer": "npm:^0.1.0"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.62.8"
@@ -1948,7 +1947,6 @@ __metadata:
   dependencies:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
-    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.75.7"
     "@types/humanize-duration": "npm:^3.27.4"
@@ -1981,7 +1979,6 @@ __metadata:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@react-spring/web": "npm:^10.0.1"
-    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
@@ -4087,13 +4084,6 @@ __metadata:
     "@tanstack/devtools-event-client": "npm:^0.2.5"
     "@tanstack/store": "npm:^0.7.5"
   checksum: 10c0/943fa69e4c41ac0d30316ef35b34db66fcc46e8e8a604645345db66c02227efafdcafa15f006e7770b2787ad8c8356b3d61d54ea4581aaae33f04bd86fb06b16
-  languageName: node
-  linkType: hard
-
-"@tanstack/pacer@npm:^0.1.0":
-  version: 0.1.0
-  resolution: "@tanstack/pacer@npm:0.1.0"
-  checksum: 10c0/7a8ec1e1918d1cfd57b4cc14775b2d27d0743ca9f24babec637c229bc013b667420a32360540a83f100092b138b069b2df307993a3e6abb59bf717aea7073f75
   languageName: node
   linkType: hard
 
@@ -11352,6 +11342,7 @@ __metadata:
     "@tailwindcss/forms": "npm:^0.5.10"
     "@tailwindcss/typography": "npm:^0.5.16"
     "@tailwindcss/vite": "npm:^4.1.8"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^4.29.19"
     "@trivago/prettier-plugin-sort-imports": "npm:^5.2.2"
     "@types/babel__template": "npm:^7.4.4"

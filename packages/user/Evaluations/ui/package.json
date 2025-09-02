@@ -10,7 +10,6 @@
     },
     "dependencies": {
         "@noble/hashes": "^1.7.1",
-        "@tanstack/pacer": "^0.1.0",
         "@tanstack/react-form": "^1.19.3",
         "@tanstack/react-pacer": "^0.16.1",
         "@tanstack/react-query": "^5.62.8",
