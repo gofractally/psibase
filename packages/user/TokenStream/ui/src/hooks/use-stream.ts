@@ -11,5 +11,5 @@ export const useStream = (id: OptionalString) =>
             return getStream(z.number().parse(Number(id)));
         },
         enabled: !!id,
-        refetchInterval: 5000,
+        refetchInterval: 2000,
     });

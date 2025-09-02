@@ -6,6 +6,7 @@ import { useParams } from "react-router-dom";
 import { ErrorCard } from "@/components/error-card";
 
 import { useCurrentUser } from "@/hooks";
+import { useClaim } from "@/hooks/use-claim";
 import { useDeposit } from "@/hooks/use-deposit";
 import { useNft } from "@/hooks/use-nft";
 import { useStream } from "@/hooks/use-stream";
@@ -14,12 +15,7 @@ import { useToken } from "@/hooks/use-token";
 import { Button } from "@shared/shadcn/ui/button";
 import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
 import { Progress } from "@shared/shadcn/ui/progress";
-import { useClaim } from "@/hooks/use-claim";
 
-// Live update on the progress.
-// Live updates on the vested amount
-// Refresh on the total deposited, every 10 seconds
-//
 
 export const Stream = () => {
     const { id } = useParams();
@@ -29,12 +25,9 @@ export const Stream = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: nft } = useNft(stream?.nftId.toString());
 
-
     const { mutateAsync: deposit } = useDeposit();
     const { mutateAsync: claim, isPending: isClaiming } = useClaim();
     const [showModal, setShowModal] = useState(false);
-
-
 
     const form = useAppForm({
         defaultValues: {
@@ -56,13 +49,17 @@ export const Stream = () => {
 
     const isHoldingNft = currentUser === nft?.owner?.account;
 
-    console.log({ isHoldingNft, currentUser, nft })
+    console.log({ isHoldingNft, currentUser, nft });
 
     const isEmpty = stream && stream.deposited === stream.claimed;
 
-    const percent = stream ? isEmpty ? 100 : (Number(stream.claimable) / Number(stream.unclaimed)) * 100 : 0
+    const percent = stream
+        ? isEmpty
+            ? 100
+            : (Number(stream.claimable) / Number(stream.unclaimed)) * 100
+        : 50;
 
-    console.log({ isEmpty, percent, stream, })
+    console.log({ isEmpty, percent, stream }, Number(stream?.claimable), Number(stream?.unclaimed));
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -128,39 +125,35 @@ export const Stream = () => {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        <Button disabled={!isHoldingNft || isClaiming || isEmpty} onClick={() => claim({ nftId: id! })}>Claim</Button>
+                        <Button
+                            disabled={
+                                !isHoldingNft ||
+                                isClaiming ||
+                                isEmpty ||
+                                (stream && Number(stream.claimable) == 0)
+                            }
+                            onClick={() => claim({ nftId: id! })}
+                        >
+                            Claim{" "}
+                            <NumberFlow
+                                value={stream ? Number(stream.claimable) : 0}
+                                format={{
+                                    minimumFractionDigits: token
+                                        ? token.precision
+                                        : 4,
+                                }}
+                            />
+                        </Button>
                     </div>
                 </div>
             </div>
             <div className="text-muted-foreground">
                 <div>
-                    Deposited:{" "}
-                    <span className="text-primary">
-                        <NumberFlow
-                            value={stream ? Number(stream.deposited) : 0}
-                            format={{ minimumFractionDigits: token?.precision }}
-                        />
-                    </span>
-                </div>
-                <div>
-                    Claimed:{" "}
-                    <span className="text-primary">{stream?.claimed}</span>
-                </div>
-                <div>
                     Unclaimed:{" "}
                     <span className="text-primary">
                         <NumberFlow
                             value={stream ? Number(stream.unclaimed) : 0}
-                            format={{ minimumFractionDigits: token?.precision }}
-                        />
-                    </span>
-                </div>
-                <div>
-                    Vested:{" "}
-                    <span className="text-primary">
-                        <NumberFlow
-                            value={stream ? Number(stream.vested) : 0}
-                            format={{ minimumFractionDigits: token?.precision }}
+                            format={{ minimumFractionDigits: 0 }}
                         />
                     </span>
                 </div>
