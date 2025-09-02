@@ -20,11 +20,6 @@ impl Admin for HostPrompt {
         assert_eq!(get_sender(), "supervisor", "Unauthorized");
         ActivePrompts::get().unwrap().into()
     }
-
-    fn store_context(packed_context: Vec<u8>) {
-        assert_eq!(get_sender(), "supervisor", "Unauthorized");
-        ActivePrompts::set_context(packed_context);
-    }
 }
 
 fn validate_prompt_name(prompt_name: &str) {

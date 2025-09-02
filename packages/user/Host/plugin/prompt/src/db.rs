@@ -63,10 +63,4 @@ impl ActivePrompts {
         let val = tables::active_prompt().get(PROMPT_KEY).unwrap();
         Some(<ActivePrompt>::unpacked(&val).unwrap())
     }
-
-    pub fn set_context(packed_context: Vec<u8>) {
-        let mut prompt = Self::get().unwrap();
-        prompt.packed_context = Some(packed_context);
-        tables::active_prompt().set(PROMPT_KEY, &prompt.packed());
-    }
 }
