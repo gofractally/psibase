@@ -18,6 +18,7 @@ import { Progress } from "@shared/shadcn/ui/progress";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useDeleteStream } from "@/hooks/use-delete-stream";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Badge } from "@shared/shadcn/ui/badge";
 
 
 import {
@@ -185,14 +186,23 @@ export const Stream = () => {
                         </div>
                     </div>
                 </div>
-                <div className="text-muted-foreground">
-                    Stream balance:{" "}
-                    <span className="text-primary">
-                        <NumberFlow
-                            value={stream ? Number(stream.stream.unclaimed) : 0}
-                            format={{ minimumFractionDigits: 0 }}
-                        />
-                    </span>
+                <div className="text-muted-foreground flex justify-between my-2">
+                    <div>
+
+                        Balance:{" "}
+                        <span className="text-primary">
+                            <NumberFlow
+                                value={stream ? Number(stream.stream.unclaimed) : 0}
+                                format={{
+                                    minimumFractionDigits: token
+                                        ? token.precision
+                                        : 4,
+                                }} />
+                        </span>
+                    </div>
+                    <div>
+                        <Badge variant="outline">Token ID: {stream?.stream.tokenId}</Badge>
+                    </div>
                 </div>
             </div>
             <div className="rounded-sm border p-3">
