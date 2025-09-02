@@ -115,7 +115,7 @@ pub mod tables {
 
         /// Deposit `amount` into the bucket.
         pub fn deposit(&mut self, amount: Quantity) {
-            self.claimable_at_last_deposit = self.balance_claimable();
+            self.claimable_at_last_deposit = self.total_vested();
             self.total_deposited = self
                 .total_deposited
                 .value
@@ -156,10 +156,7 @@ pub mod tables {
                 .value
                 .saturating_sub(self.claimable_at_last_deposit.value);
             let still_vesting = ((new_principal as f64) * factor).floor() as u64;
-            new_principal
-                .saturating_sub(still_vesting)
-                .saturating_add(self.claimable_at_last_deposit.value)
-                .into()
+            self.claimable_at_last_deposit.value.saturating_add(new_principal.saturating_sub(still_vesting)).into()
         }
 
         pub fn save(&mut self) {
