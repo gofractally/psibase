@@ -1567,7 +1567,6 @@ void run(const std::string&              db_path,
       http_config->num_threads         = 4;
       http_config->max_request_size    = 20 * 1024 * 1024;
       http_config->idle_timeout_us     = http_timeout.duration.count();
-      http_config->allow_origin        = "*";
       http_config->listen              = listen;
       http_config->hosts               = hosts;
       http_config->enable_transactions = !hosts.empty();

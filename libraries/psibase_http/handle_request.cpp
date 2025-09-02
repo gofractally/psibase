@@ -354,9 +354,9 @@ namespace psibase::http
 
       const auto set_cors = [&server](auto& res, bool allow_cors)
       {
-         if (!server.http_config->allow_origin.empty() && allow_cors)
+         if (allow_cors)
          {
-            res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
+            res.set(bhttp::field::access_control_allow_origin, "*");
             res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
             res.set(bhttp::field::access_control_allow_headers, "*");
          }
@@ -728,11 +728,6 @@ namespace psibase::http
                }
             }
 
-            if (req.method() == bhttp::verb::options)
-            {
-               return send(ok_no_content(service == AccountNumber{}));
-            }
-
             auto        startTime = steady_clock::now();
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
@@ -756,6 +751,8 @@ namespace psibase::http
                data.method = "PUT";
             else if (req.method() == bhttp::verb::delete_)
                data.method = "DELETE";
+            else if (req.method() == bhttp::verb::options)
+               data.method = "OPTIONS";
             else
                return send(method_not_allowed(req.target(), req.method_string(),
                                               "GET, POST, OPTIONS", true));
@@ -818,8 +815,7 @@ namespace psibase::http
 
             auto socket = makeHttpSocket(
                 send,
-                [req_version, set_cors, set_keep_alive,
-                 allow_cors = service == AccountNumber{}](HttpReply&& reply)
+                [req_version, set_keep_alive](HttpReply&& reply)
                 {
                    bhttp::response<bhttp::vector_body<char>> res{
                        bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
@@ -827,7 +823,6 @@ namespace psibase::http
                    for (auto& h : reply.headers)
                       res.set(h.name, h.value);
                    res.set(bhttp::field::content_type, reply.contentType);
-                   set_cors(res, allow_cors);
                    set_keep_alive(res);
                    res.body() = std::move(reply.body);
                    res.prepare_payload();

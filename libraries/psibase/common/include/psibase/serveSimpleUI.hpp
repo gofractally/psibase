@@ -37,6 +37,7 @@ namespace psibase
          return HttpReply{
              .contentType = "text/html",
              .body        = {simpleUIMainPage, simpleUIMainPage + strlen(simpleUIMainPage)},
+             .headers     = allowCors(),
          };
       }
       return std::nullopt;
