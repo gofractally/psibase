@@ -1,12 +1,15 @@
+use serde::Deserialize;
+
+use crate::bindings::host::common::server::post_graphql_get_json;
+use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
 use crate::bindings::accounts::account_tokens::{api::*, types::ConnectionToken};
+use crate::bindings::exports::accounts::plugin::active_app::Guest;
 use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
-use crate::bindings::exports::accounts::plugin::api::Guest as API;
+use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
-use crate::bindings::host::types::types::{BodyTypes, PostRequest};
-use crate::bindings::transact::plugin::auth as TransactAuthApi;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
@@ -86,5 +89,56 @@ impl Admin for AccountsPlugin {
     fn get_all_accounts() -> Vec<String> {
         assert_caller_admin("get_all_accounts");
         AppsTable::new(&Client::get_receiver()).get_connected_accounts()
+    }
+
+    fn get_auth_services() -> Result<Vec<String>, Error> {
+        assert!(
+            Client::get_sender() == "supervisor",
+            "{} only callable by `supervisor`",
+            "get_auth_services()"
+        );
+
+        let connected_accounts = Self::get_connected_accounts();
+        let accounts = connected_accounts?
+            .into_iter()
+            .map(|a| format!("\"{}\"", a))
+            .collect::<Vec<String>>()
+            .join(",");
+        let graphql_query = format!(
+            "query {{
+                getAccounts(accountNames: [{}]) {{
+                    authService
+                }}
+            }}",
+            accounts
+        );
+
+        #[derive(Deserialize, Debug)]
+        struct ResponseRoot {
+            data: Data,
+        }
+
+        #[allow(non_snake_case)]
+        #[derive(Deserialize, Debug)]
+        struct Data {
+            getAccounts: Vec<Option<Accnt>>,
+        }
+
+        #[allow(non_snake_case)]
+        #[derive(Deserialize, Debug)]
+        struct Accnt {
+            authService: String,
+        }
+
+        let auth_services_res = post_graphql_get_json(&graphql_query)?;
+        let response_root = serde_json::from_str::<ResponseRoot>(&auth_services_res)
+            .map_err(|e| DeserializationError(e.to_string()))?;
+        let auth_services = response_root
+            .data
+            .getAccounts
+            .into_iter()
+            .map(|a| a.unwrap().authService)
+            .collect();
+        Ok(auth_services)
     }
 }

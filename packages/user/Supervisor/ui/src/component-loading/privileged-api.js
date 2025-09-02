@@ -31,3 +31,9 @@ export const database = {
         return host.dbRemove(...args);
     },
 };
+
+export const prompt = {
+    requestPrompt() {
+        return host.requestPrompt();
+    },
+};

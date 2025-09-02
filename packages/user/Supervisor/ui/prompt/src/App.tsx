@@ -1,47 +1,68 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
 const supervisor = getSupervisor();
 
-interface TriggerDetails {
+interface PromptDetails {
     subdomain: string;
-    payload: string;
+    activeApp: string;
+    promptName: string;
     contextId: number | null;
+    created: string;
 }
+
+// This is the expiration time for displaying the prompt. If the prompt loads immediately,
+// the user can take longer than this expiration to respond to the prompt.
+//
+// NOTE: This expiration also guards page refresh.
+const PROMPT_EXPIRATION_SEC = 300;
 
 export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [returnPath, setReturnPath] = useState<string | null>(null);
+    const [activeApp, setActiveApp] = useState<string | null>(null);
 
     useEffect(() => {
         const initApp = async () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const prompt_id = urlParams.get("id");
-            if (!prompt_id) {
-                setError("User prompt request error: No id provided");
-                return;
-            }
-            const returnUrl = urlParams.get("returnUrl") || "/";
+            setReturnPath(urlParams.get("returnPath") || "/");
 
             try {
-                const triggerDetails = (await supervisor.functionCall({
+                const promptDetails = (await supervisor.functionCall({
                     service: "host",
                     plugin: "prompt",
                     intf: "api",
-                    method: "getPromptTriggerDetails",
-                    params: [prompt_id, returnUrl],
-                })) as TriggerDetails;
+                    method: "getActivePrompt",
+                    params: [],
+                })) as PromptDetails;
+
+                if (promptDetails.created) {
+                    const createdDate = new Date(promptDetails.created);
+                    const now = new Date();
+                    const diffSec =
+                        (now.getTime() - createdDate.getTime()) / 1000;
+
+                    if (diffSec > PROMPT_EXPIRATION_SEC) {
+                        setError("Prompt expired");
+                        return;
+                    }
+                }
+
+                setActiveApp(promptDetails.activeApp);
 
                 const iframeUrl = new URL(
-                    siblingUrl(null, triggerDetails.subdomain, null, true),
+                    siblingUrl(null, promptDetails.subdomain, null, true),
                 );
 
-                iframeUrl.pathname = triggerDetails.payload;
-                if (triggerDetails.contextId) {
+                // The well-known path for the web platform is currently
+                //  `/plugin/web/prompt/<prompt-name>`
+                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}`;
+                if (promptDetails.contextId) {
                     iframeUrl.searchParams.set(
                         "context_id",
-                        triggerDetails.contextId.toString(),
+                        promptDetails.contextId.toString(),
                     );
                 }
 
@@ -54,50 +75,31 @@ export const App = () => {
         initApp();
     }, []);
 
-    useEffect(() => {
-        if (!iframeUrl) return;
+    const promptFinished = useCallback(
+        async (event: MessageEvent) => {
+            if (!iframeUrl) return;
 
-        const handleMessage = async (event: MessageEvent) => {
             if (event.origin !== new URL(iframeUrl).origin) {
-                return;
-            }
-            const urlParams = new URLSearchParams(window.location.search);
-            const prompt_id = urlParams.get("id");
-            if (!prompt_id) {
-                setError("User prompt request error: No id provided");
                 return;
             }
 
             if (event.data === "finished") {
-                const returnDetails = (await supervisor.functionCall({
-                    service: "host",
-                    plugin: "prompt",
-                    intf: "api",
-                    method: "getReturnDetails",
-                    params: [prompt_id],
-                })) as string | null;
-
-                if (!returnDetails) {
-                    console.error(
-                        "No return url provided! Returning to homepage.",
-                    );
-                    const rootDomain = new URL(
-                        siblingUrl(null, null, null, true),
-                    );
-                    window.location.href = rootDomain.toString();
-                    return;
-                }
-
-                const returnUrl = new URL(returnDetails);
-                window.location.href = returnUrl.toString();
+                const rootDomain = new URL(
+                    siblingUrl(null, activeApp, returnPath, true),
+                );
+                window.location.href = rootDomain.toString();
             }
-        };
-        window.addEventListener("message", handleMessage);
+        },
+        [iframeUrl, activeApp, returnPath],
+    );
 
+    useEffect(() => {
+        if (!iframeUrl) return;
+        window.addEventListener("message", promptFinished);
         return () => {
-            window.removeEventListener("message", handleMessage);
+            window.removeEventListener("message", promptFinished);
         };
-    }, [iframeUrl]);
+    }, [iframeUrl, promptFinished]);
 
     if (error) {
         return <div>{error}</div>;

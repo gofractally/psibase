@@ -117,6 +117,24 @@ namespace SystemService
                              .body        = {},
                              .headers     = headers};
          }
+         if (request.target == "/common/remove-auth-cookie")
+         {
+            std::vector<HttpHeader> headers;
+            bool                    isLocalhost = psibase::isLocalhost(request);
+            std::string             cookieName  = "__Host-SESSION";
+
+            std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
+            if (isLocalhost)
+               cookieName = "SESSION";
+
+            std::string cookieValue = cookieName + "=; " + cookieAttribs;
+            headers.push_back({"Set-Cookie", cookieValue});
+
+            return HttpReply{.status      = HttpStatus::ok,
+                             .contentType = "text/plain",
+                             .body        = {},
+                             .headers     = headers};
+         }
       }
       return std::nullopt;
    }  // CommonApi::serveSys

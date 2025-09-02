@@ -3,13 +3,20 @@ import { getJson, siblingUrl } from "@psibase/common-lib";
 import { loadBasic } from "./component-loading";
 import { DownloadFailed } from "./errors";
 
-export const wasmFromUrl = (url: string) =>
-    fetch(url)
+export const wasmFromUrl = async (url: string) => {
+    let headers: [string, string][] = [];
+    if (queryToken) {
+        headers = [["Authorization", queryToken]];
+    }
+    return fetch(url, {
+        headers,
+    })
         .then((res) => {
             if (!res.ok) throw new DownloadFailed(url);
             return res.arrayBuffer();
         })
         .then((buffer) => new Uint8Array(buffer));
+};
 
 export const serviceFromOrigin = (callerOrigin: string): string | undefined => {
     const extractRootDomain = (origin: string): string => {
@@ -56,6 +63,9 @@ export const parser = (): Promise<any> => {
     return modulePromise;
 };
 
+let queryToken: string | undefined;
+export const setQueryToken = (token: string) => (queryToken = token);
+
 export let chainId: string | undefined;
 const getChainId = (): Promise<string> => {
     if (!chainId) {
@@ -71,3 +81,14 @@ export const chainIdPromise: Promise<string> = getChainId();
 export const isString = (value: any): value is string => {
     return typeof value === "string";
 };
+
+export const isEmbedded: boolean = (() => {
+    try {
+        return (
+            window.top?.location.origin ===
+            siblingUrl(null, "supervisor", null, true)
+        );
+    } catch {
+        return false;
+    }
+})();

@@ -42,13 +42,13 @@ interface client {
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;
+
+    /// Get account name of the active app (the top level app with which the user is interacting)
+    get-active-app: func() -> string;
 }
 
 interface admin {
     use host:types/types.{post-request, body-types, error};
-
-    /// Get account name of the active app (the top level app with which the user is interacting)
-    get-active-app: func() -> string;
 
     /// Make a post request
     post: func(app: string, request: post-request) -> result<option<body-types>, error>;
@@ -68,7 +68,6 @@ interface store {
 
         /// Writes to a transactional database will automatically roll-back if the current action
         ///    fails for any reason (including the failure of a scheduled server-side transaction).
-        /// NOTE: This `db-mode` is not yet supported!
         transactional
     }
 
@@ -78,11 +77,9 @@ interface store {
         persistent,
         /// Session storage will be deleted at the close of a session. The duration
         ///    of a session is defined by the host platform.
-        /// NOTE: `session` duration is not yet supported!
         session,
         /// Ephemeral storage will be deleted at the close of the current transaction
         ///    context.
-        /// NOTE: `ephemeral` duration is not yet supported!
         ephemeral
     }
 

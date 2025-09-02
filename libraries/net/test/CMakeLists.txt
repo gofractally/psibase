@@ -42,6 +42,11 @@ add_test(
     COMMAND test_consensus "[bft]"
 )
 
+set_tests_properties(
+    test_consensus test_consensus-cft test_consensus-bft
+    PROPERTIES TIMEOUT 900
+)
+
 add_executable(bft_fuzz bft_fuzz.cpp test_util.cpp fuzz.cpp)
 target_include_directories(bft_fuzz PUBLIC ../include)
 target_link_libraries(bft_fuzz PUBLIC Catch2::Catch2WithMain psibase services_system)

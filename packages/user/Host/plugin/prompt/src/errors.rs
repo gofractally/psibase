@@ -7,4 +7,5 @@ plugin_error! {
     PromptExpired(id: u32) => "[Error] Prompt expired: {id}",
     InvalidSubpath() => "[Error] Invalid subpath. Subpath must not be a full URL.",
     PromptContextNotFound(context_id: String) => "[Error] Prompt context not found: {context_id}",
+    InvalidPromptName() => "[Error] Invalid prompt name. Prompt name must be [a-zA-Z0-9].",
 }

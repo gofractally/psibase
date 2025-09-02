@@ -15,8 +15,8 @@ use exports::host::common::{
     server::Guest as Server,
     store::{DbMode, Guest as Store},
 };
-use host::types::types::{BodyTypes, Error, PostRequest};
 use helpers::make_error;
+use host::types::types::{BodyTypes, Error, PostRequest};
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
@@ -67,15 +67,6 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
 }
 
 impl Admin for HostCommon {
-    fn get_active_app() -> String {
-        check_caller(
-            &["accounts", "staged-tx"],
-            "get-active-app@host:common/admin",
-        );
-
-        Supervisor::get_active_app()
-    }
-
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
         check_caller(&["host"], "post@host:common/admin");
 
@@ -102,7 +93,10 @@ impl Server for HostCommon {
             if json["errors"].is_null() {
                 return Ok(body);
             } else {
-                return Err(make_error(&json["errors"].to_string()));
+                return Err(make_error(&format!(
+                    "Graphql query error: {}",
+                    &json["errors"].to_string()
+                )));
             }
         }
 
@@ -155,6 +149,10 @@ impl Client for HostCommon {
         url.set_host(Some(&format!("{}.{}", app, url.host_str().unwrap())))
             .unwrap();
         url.to_string().trim_end_matches('/').to_string()
+    }
+
+    fn get_active_app() -> String {
+        Supervisor::get_active_app()
     }
 }
 

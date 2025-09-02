@@ -13,15 +13,11 @@ mod tests {
             account_id: account!("cooking"),
             status: app_status::DRAFT,
             created_at: TimePointUSec::from(0),
-            redirect_uris: vec!["http://localhost:3000/callback".to_string()],
             name: "Super Cooking App".to_string(),
             short_desc: "Alice's Cooking App".to_string(),
             long_desc: "Super cooking app".to_string(),
             icon: "icon-as-base64".to_string(),
             icon_mime_type: "image/png".to_string(),
-            tos_subpage: "/tos".to_string(),
-            privacy_policy_subpage: "/privacy-policy".to_string(),
-            app_homepage_subpage: "/".to_string(),
         }
     }
 
@@ -44,11 +40,7 @@ mod tests {
             metadata.long_desc,
             metadata.icon,
             metadata.icon_mime_type,
-            metadata.tos_subpage,
-            metadata.privacy_policy_subpage,
-            metadata.app_homepage_subpage,
             tags,
-            metadata.redirect_uris,
         );
         chain.finish_block();
         res
@@ -73,11 +65,7 @@ mod tests {
                         longDesc,
                         icon,
                         iconMimeType,
-                        tosSubpage,
-                        privacyPolicySubpage,
-                        appHomepageSubpage,
                         status,
-                        redirectUris,
                         createdAt,
                         tags
                     }}
@@ -96,11 +84,7 @@ mod tests {
                     "longDesc": "Super cooking app",
                     "icon": "icon-as-base64",
                     "iconMimeType": "image/png",
-                    "tosSubpage": "/tos",
-                    "privacyPolicySubpage": "/privacy-policy",
-                    "appHomepageSubpage": "/",
                     "status": "Draft",
-                    "redirectUris": ["http://localhost:3000/callback"],
                     "createdAt": "1970-01-01T00:00:04+00:00",
                     "tags": [
                         "cozy",

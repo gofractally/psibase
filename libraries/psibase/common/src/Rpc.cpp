@@ -62,7 +62,7 @@ namespace
             scheme = url.substr(0, pos);
             host   = url.substr(pos + 3);
             pos    = host.rfind(':');
-            if (pos != std::string_view::npos && host.find(pos, ']') == std::string_view::npos)
+            if (pos != std::string_view::npos && host.find(']', pos) == std::string_view::npos)
                host = host.substr(0, pos);
          }
       }

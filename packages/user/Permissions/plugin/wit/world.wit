@@ -34,6 +34,20 @@ interface api {
     use host:types/types.{error};
     use types.{trust-level, descriptions};
 
+    /// When an app 'A' calls into an app 'B', and B calls into the permissions plugin to authorize the call,
+    ///   app A is known as the "caller" app. This plugin restricts callers so that they are either:
+    ///     * The currently active application, or
+    ///     * An explicitly set "allowed caller"
+    /// This function allows the active app to set the list of allowed callers.
+    /// It can only be called by the active app.
+    /// The list is stored permanently until deleted by the active app.
+    ///   To delete, the active app can call this function with an empty list.
+    ///
+    /// The intention behind this restriction is so that the user is only presented for requests to authorize
+    ///   apps with which they are familiar. That is why the active app is always whitelisted (the user is using
+    ///   the active app, and is therefore familiar with it). 
+    set-allowed-callers: func(callers: list<string>);
+
     /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller`
     ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
     ///     permission, this function will cause the user to be prompted to consider the request.

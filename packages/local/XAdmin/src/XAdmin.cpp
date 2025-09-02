@@ -225,6 +225,7 @@ namespace LocalService
                }
 
                account->codeHash  = codeHash;
+               account->flags     = CodeRow::isPrivileged;
                account->vmType    = vmType;
                account->vmVersion = vmVersion;
                kvPut(DbId::nativeSubjective, account->key(), *account);
