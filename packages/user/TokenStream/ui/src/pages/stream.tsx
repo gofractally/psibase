@@ -224,13 +224,13 @@ export const Stream = () => {
                         {isLoadingStream
                             ? [...new Array(4)].map((_, index) => (
                                 <TableRow key={index}>
-                                    <TableCell className="">
+                                    <TableCell>
                                         <Skeleton className="h-6 w-48" />
                                     </TableCell>
-                                    <TableCell className="">
+                                    <TableCell>
                                         <Skeleton className="h-6 w-48" />
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right flex justify-end">
                                         <Skeleton className="h-6 w-48" />
                                     </TableCell>
 
@@ -238,7 +238,7 @@ export const Stream = () => {
                             ))
                             : stream?.updates?.map((update, index) => (
                                 <TableRow key={index}>
-                                    <TableCell className="">
+                                    <TableCell>
                                         {update.txType == 'claimed' ? <div className="flex items-center gap-2"><ArrowDown />Claimed</div> : <div className="flex items-center gap-2"><ArrowUp />Deposited</div>}
                                     </TableCell>
                                     <TableCell >
