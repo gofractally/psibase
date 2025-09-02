@@ -39,7 +39,7 @@ export const useDeleteStream = () => {
             queryClient.invalidateQueries({
                 queryKey: QueryKey.stream(nftId),
             });
-            navigate("/streams");
+            navigate("/");
         },
     });
 };

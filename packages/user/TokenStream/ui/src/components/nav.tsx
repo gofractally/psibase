@@ -4,6 +4,7 @@ import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
 
 import { AccountSwitcher } from "./account-switcher";
 import { ModeToggle } from "./mode-toggle";
+import { useNavigate } from "react-router-dom";
 
 function HoverBorderGradientDemo() {
     return (
@@ -21,13 +22,14 @@ function HoverBorderGradientDemo() {
 
 export const Nav = ({ title }: { title?: string }) => {
     const home = siblingUrl();
+    const navigate = useNavigate();
     return (
         <div className="mt-4 flex w-full justify-between px-2">
             <a href={home}>
                 <HoverBorderGradientDemo />
             </a>
             {title && (
-                <div className="flex flex-col justify-center text-2xl font-semibold">
+                <div className="flex flex-col justify-center text-2xl font-semibold hover:underline" onClick={() => { navigate('/') }}>
                     {title}
                 </div>
             )}
