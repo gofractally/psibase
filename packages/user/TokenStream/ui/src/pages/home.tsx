@@ -128,53 +128,53 @@ export const Home = () => {
                                     Claimable
                                 </TableHead>
                                 <TableHead className="text-right">
-                                    Total remaining
+                                    Unclaimed
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading
                                 ? [...new Array(4)].map((_, index) => (
-                                      <TableRow key={index}>
-                                          <TableCell className="font-medium">
-                                              <Skeleton className="h-6 w-48" />
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                              <Skeleton className="h-6 w-48" />
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                              <Skeleton className="h-6 w-48" />
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                              <Skeleton className="h-6 w-48" />
-                                          </TableCell>
-                                      </TableRow>
-                                  ))
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                                 : streams?.map((stream) => (
-                                      <TableRow key={stream.nftId.toString()}>
-                                          <TableCell className="font-medium">
-                                              {stream.nftId}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                              {stream.vested}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                              {stream.unclaimed}
-                                          </TableCell>{" "}
-                                          <TableCell className="flex justify-end">
-                                              <Button
-                                                  variant="outline"
-                                                  onClick={() => {
-                                                      navigate(
-                                                          `/stream/${stream.nftId}`,
-                                                      );
-                                                  }}
-                                              >
-                                                  Open
-                                              </Button>
-                                          </TableCell>
-                                      </TableRow>
-                                  ))}
+                                    <TableRow key={stream.nftId.toString()}>
+                                        <TableCell className="font-medium">
+                                            {stream.nftId}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {stream.claimable}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {stream.unclaimed}
+                                        </TableCell>{" "}
+                                        <TableCell className="flex justify-end">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => {
+                                                    navigate(
+                                                        `/stream/${stream.nftId}`,
+                                                    );
+                                                }}
+                                            >
+                                                Open
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                         </TableBody>
                     </Table>
                 )}

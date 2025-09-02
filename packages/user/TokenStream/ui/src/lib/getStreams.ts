@@ -8,7 +8,7 @@ export const zStream = z.object({
     nftId: z.number().int().positive(),
     tokenId: z.number().int().positive(),
     deposited: z.string(),
-    claimed: z.string(),
+    claimable: z.string(),
     unclaimed: z.string(),
     vested: z.string(),
 });
@@ -24,7 +24,7 @@ export const getStreams = async () => {
                         nftId
                         tokenId
                         deposited
-                        claimed
+                        claimable
                         unclaimed
                         vested
                     }
@@ -34,7 +34,6 @@ export const getStreams = async () => {
         siblingUrl(null, "token-stream", "/graphql"),
     );
 
-    console.log("x");
     const response = z
         .object({
             streams: z.object({
