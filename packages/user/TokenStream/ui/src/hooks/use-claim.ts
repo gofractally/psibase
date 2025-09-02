@@ -1,9 +1,11 @@
+import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
 import { TOKEN_STREAM } from "@/lib/constants";
+import QueryKey from "@/lib/queryKeys";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -27,6 +29,12 @@ export const useClaim = () =>
 
             toast.success(`Claimed from stream.`, {
                 id: toastId,
+            });
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.stream(nftId),
+            });
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.streams(),
             });
         },
     });

@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getNft } from "@/lib/getNft";
+import { getToken } from "@/lib/getToken";
 import QueryKey, { OptionalString } from "@/lib/queryKeys";
 
-export const useNft = (id: OptionalString) =>
+export const useToken = (id: OptionalString) =>
     useQuery({
-        queryKey: QueryKey.nft(id),
+        queryKey: QueryKey.token(id),
         queryFn: async () => {
-            return getNft(z.number().parse(Number(id)));
+            return getToken(z.string().parse(id));
         },
         enabled: !!id,
     });

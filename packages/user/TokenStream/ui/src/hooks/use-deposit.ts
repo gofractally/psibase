@@ -1,9 +1,11 @@
+import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
 import { TOKEN_STREAM } from "@/lib/constants";
+import QueryKey from "@/lib/queryKeys";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -21,6 +23,7 @@ export const useDeposit = () =>
             const { amount, nftId, tokenId, memo } = zParams.parse(params);
 
             const toastId = toast.loading("Depositing...");
+
             await supervisor.functionCall({
                 method: "deposit",
                 params: [nftId, tokenId, amount, memo],
@@ -31,6 +34,11 @@ export const useDeposit = () =>
             toast.success(`Deposited into stream.`, {
                 id: toastId,
                 description: `${amount}`,
+            });
+        },
+        onSuccess: (_, { nftId }) => {
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.stream(nftId),
             });
         },
     });

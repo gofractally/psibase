@@ -1,14 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { getStream } from "@/lib/getStream";
-import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalString } from "@/lib/queryKeys";
 
-export const useStream = (id: OptionalNumber) =>
+export const useStream = (id: OptionalString) =>
     useQuery({
         queryKey: QueryKey.stream(id),
         queryFn: async () => {
-            return getStream(id!);
+            return getStream(z.number().parse(Number(id)));
         },
         enabled: !!id,
-        refetchInterval: 10000,
+        refetchInterval: 5000,
     });

@@ -9,6 +9,7 @@ export const zStream = z.object({
     tokenId: z.number().int().positive(),
     deposited: z.string(),
     claimed: z.string(),
+    claimable: z.string(),
     vested: z.string(),
     unclaimed: z.string(),
     lastDepositTimestamp: z.string().datetime({ offset: true }),
@@ -18,7 +19,7 @@ export const zStream = z.object({
 export type Evaluation = z.infer<typeof zStream>;
 
 export const getStream = async (nftId: number) => {
-    const streams = await graphql(
+    const stream = await graphql(
         `
             {
                 stream(nftId: ${nftId}) {
@@ -26,6 +27,7 @@ export const getStream = async (nftId: number) => {
                     tokenId
                     deposited
                     claimed
+                    claimable
                     unclaimed
                     vested
                     lastDepositTimestamp
@@ -40,7 +42,7 @@ export const getStream = async (nftId: number) => {
         .object({
             stream: zStream,
         })
-        .parse(streams);
+        .parse(stream);
 
     return response.stream;
 };

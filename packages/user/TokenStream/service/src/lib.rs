@@ -39,6 +39,10 @@ pub mod tables {
             Decimal::new(self.total_vested(), self.precision())
         }
 
+        pub async fn claimable(&self) -> Decimal {
+            Decimal::new(self.balance_claimable(), self.precision())
+        }
+
         pub async fn unclaimed(&self) -> Decimal {
             Decimal::new(self.unclaimed_total(), self.precision())
         }

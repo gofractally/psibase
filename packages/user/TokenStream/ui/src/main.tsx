@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 
 import { router } from "./router";
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

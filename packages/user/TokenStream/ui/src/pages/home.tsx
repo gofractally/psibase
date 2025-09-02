@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { EmptyBlock } from "@/components/empty-block";
+
+import { useCurrentUser } from "@/hooks";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import {
     Table,
     TableBody,
@@ -18,17 +22,21 @@ import { useCreateStream } from "../hooks/use-create-stream";
 import { useStreams } from "../hooks/use-streams";
 
 export const Home = () => {
-    const { data } = useStreams();
+    const { data: streams, isLoading: isLoadingStream } = useStreams();
+    const { data: currentUser, isLoading: isLoadingCurrentUser } =
+        useCurrentUser();
     const { mutateAsync: createStream } = useCreateStream();
 
-    console.log(data, "is the data");
+    const isLoading = isLoadingStream || isLoadingCurrentUser;
+
+    console.log(streams, "is the data");
 
     const [showModal, setShowModal] = useState(false);
 
     const form = useAppForm({
         defaultValues: {
             halfLifeSeconds: "",
-            tokenId: "1",
+            tokenId: "",
         },
         onSubmit: async ({ value }) => {
             await createStream({
@@ -42,8 +50,7 @@ export const Home = () => {
     const navigate = useNavigate();
 
     return (
-        <div >
-            <TableBody />
+        <div>
             <Dialog
                 open={showModal}
                 onOpenChange={(show) => {
@@ -62,8 +69,9 @@ export const Home = () => {
                             onClick={() => {
                                 setShowModal(true);
                             }}
+                            disabled={!currentUser}
                         >
-                            Create
+                            {currentUser ? "Create" : "Login to continue"}
                         </Button>
                     </div>
                 </div>
@@ -77,6 +85,12 @@ export const Home = () => {
                         className="space-y-4"
                     >
                         <form.AppField
+                            name="tokenId"
+                            children={(field) => (
+                                <field.NumberField label="Token ID" />
+                            )}
+                        />
+                        <form.AppField
                             name="halfLifeSeconds"
                             children={(field) => (
                                 <field.Duration
@@ -85,7 +99,6 @@ export const Home = () => {
                                 />
                             )}
                         />
-
                         <div className="flex justify-between">
                             <form.AppForm>
                                 <form.SubmitButton
@@ -97,38 +110,74 @@ export const Home = () => {
                 </DialogContent>
             </Dialog>
             <div>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-[100px]">NFT ID</TableHead>
-                            <TableHead className="text-right">Claimable</TableHead>
-                            <TableHead className="text-right">Total remaining</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {data?.map((stream) => (
-                            <TableRow id={stream.nftId.toString()}>
-                                <TableCell className="font-medium">
-                                    {stream.nftId}
-                                </TableCell>
-                                <TableCell className="text-right">{stream.vested}</TableCell>
-                                <TableCell className="text-right">
-                                    {stream.unclaimed}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            navigate(`/stream/${stream.nftId}`);
-                                        }}
-                                    >
-                                        Open
-                                    </Button>
-                                </TableCell>
+                {streams?.length == 0 ? (
+                    <EmptyBlock
+                        title="No streams"
+                        buttonLabel="Create stream"
+                        disabled={!currentUser}
+                        onButtonClick={() => setShowModal(true)}
+                    />
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[100px]">
+                                    NFT ID
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Claimable
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Total remaining
+                                </TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>{" "}
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading
+                                ? [...new Array(4)].map((_, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Skeleton className="h-6 w-48" />
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                                : streams?.map((stream) => (
+                                    <TableRow key={stream.nftId.toString()}>
+                                        <TableCell className="font-medium">
+                                            {stream.nftId}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {stream.vested}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {stream.unclaimed}
+                                        </TableCell>{" "}
+                                        <TableCell className="flex justify-end">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => {
+                                                    navigate(
+                                                        `/stream/${stream.nftId}`,
+                                                    );
+                                                }}
+                                            >
+                                                Open
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                        </TableBody>
+                    </Table>
+                )}
             </div>
         </div>
     );
