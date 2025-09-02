@@ -156,7 +156,10 @@ pub mod tables {
                 .value
                 .saturating_sub(self.claimable_at_last_deposit.value);
             let still_vesting = ((new_principal as f64) * factor).floor() as u64;
-            self.claimable_at_last_deposit.value.saturating_add(new_principal.saturating_sub(still_vesting)).into()
+            self.claimable_at_last_deposit
+                .value
+                .saturating_add(new_principal.saturating_sub(still_vesting))
+                .into()
         }
 
         pub fn save(&mut self) {
@@ -218,9 +221,12 @@ pub mod service {
             Memo::try_from(format!("Deposit into stream {}", nft_id)).unwrap(),
         );
 
-        Wrapper::emit()
-            .history()
-            .deposited(nft_id, shared_balance.value, sender);
+        Wrapper::emit().history().updated(
+            nft_id,
+            shared_balance.value,
+            sender,
+            "deposited".to_string(),
+        );
     }
 
     #[action]
@@ -238,9 +244,12 @@ pub mod service {
             Memo::try_from(format!("Claim from stream {}", nft_id)).unwrap(),
         );
 
-        Wrapper::emit()
-            .history()
-            .claimed(nft_id, sender, claimed_amount.value);
+        Wrapper::emit().history().updated(
+            nft_id,
+            claimed_amount.value,
+            sender,
+            "claimed".to_string(),
+        );
     }
 
     #[action]
@@ -260,10 +269,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn deposited(nft_id: u32, amount: u64, depositor: AccountNumber) {}
-
-    #[event(history)]
-    pub fn claimed(nft_id: u32, claimer: AccountNumber, amount: u64) {}
+    pub fn updated(nft_id: u32, amount: u64, actor: AccountNumber, tx_type: String) {}
 }
 
 #[cfg(test)]

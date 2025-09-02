@@ -19,22 +19,15 @@ mod service {
     }
 
     #[derive(Deserialize, SimpleObject)]
-    struct DepositedEvent {
+    struct UpdatedEvent {
         #[serde(deserialize_with = "deserialize_number_from_string")]
         nft_id: u32,
-        depositor: AccountNumber,
+        actor: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         amount: u64,
+        tx_type: String
     }
 
-    #[derive(Deserialize, SimpleObject)]
-    struct ClaimedEvent {
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        nft_id: u32,
-        claimer: AccountNumber,
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        amount: u64,
-    }
 
     struct Query;
 
@@ -80,14 +73,19 @@ mod service {
                 .query()
         }
 
-        async fn deposited(
+        async fn updates(
             &self,
+            nft_id: u32,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, DepositedEvent>> {
-            EventQuery::new("history.token-stream.deposited")
+        ) -> async_graphql::Result<Connection<u64, UpdatedEvent>> {
+            EventQuery::new("history.token-stream.updated")
+                .condition(format!(
+                    "nft_id = {}",
+                    nft_id
+                ))
                 .first(first)
                 .last(last)
                 .before(before)
@@ -95,20 +93,7 @@ mod service {
                 .query()
         }
 
-        async fn claimed(
-            &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, ClaimedEvent>> {
-            EventQuery::new("history.token-stream.claimed")
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-        }
+
     }
 
     #[action]

@@ -14,12 +14,12 @@ define_trust! {
     descriptions {
         Low => "",
         Medium => "Create a token stream",
-        High => "Deposit tokens into stream and claim from stream",
+        High => "Deposit tokens, claim and delete a stream",
     }
     functions {
         Low => [get_example_thing],
         Medium => [create],
-        High => [deposit, claim],
+        High => [deposit, claim, delete],
     }
 }
 
@@ -72,6 +72,17 @@ impl Api for TokenStreamPlugin {
 
         add_action_to_transaction(
             token_stream::action_structs::claim::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn delete(nft_id: u32) -> Result<(), Error> {
+        trust::authorize(trust::FunctionName::delete)?;
+
+        let packed_args = token_stream::action_structs::delete { nft_id }.packed();
+
+        add_action_to_transaction(
+            token_stream::action_structs::delete::ACTION_NAME,
             &packed_args,
         )
     }

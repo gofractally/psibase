@@ -4,6 +4,8 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@shared/shadcn/ui/sonner";
+
 
 import { router } from "./router";
 
@@ -14,6 +16,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
             <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
                 <RouterProvider router={router} />
+                <Toaster />
             </ThemeProvider>
         </QueryClientProvider>
     </React.StrictMode>,

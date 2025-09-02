@@ -1,5 +1,6 @@
 import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
@@ -10,34 +11,35 @@ import QueryKey from "@/lib/queryKeys";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({
-    amount: z.string(),
     nftId: z.string(),
-    tokenId: z.string(),
-    memo: z.string(),
 });
 
-export const useDeposit = () =>
-    useMutation<void, Error, z.infer<typeof zParams>>({
-        mutationKey: ["deposit"],
-        mutationFn: async (params) => {
-            const { amount, nftId, tokenId, memo } = zParams.parse(params);
+export const useDeleteStream = () => {
+    const navigate = useNavigate();
 
-            const toastId = toast.loading("Depositing...");
+    return useMutation<void, Error, z.infer<typeof zParams>>({
+        mutationKey: ["deleteStream"],
+        mutationFn: async (params) => {
+            const { nftId } = zParams.parse(params);
+
+            const toastId = toast.loading("Deleting...");
 
             await supervisor.functionCall({
-                method: "deposit",
-                params: [nftId, tokenId, amount, memo],
+                method: "delete",
+                params: [nftId],
                 service: TOKEN_STREAM,
                 intf: "api",
             });
 
-            toast.success(`Deposited into stream.`, {
+            toast.success(`Deleted stream ${nftId}.`, {
                 id: toastId,
             });
         },
         onSuccess: (_, { nftId }) => {
-            queryClient.refetchQueries({
+            queryClient.invalidateQueries({
                 queryKey: QueryKey.stream(nftId),
             });
+            navigate("/streams");
         },
     });
+};
