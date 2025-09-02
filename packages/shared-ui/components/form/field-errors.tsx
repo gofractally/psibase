@@ -1,6 +1,6 @@
 import type { AnyFieldMeta } from "@tanstack/react-form";
 
-import { parseError } from "@/lib/parseErrorMessage";
+import { parseError } from "@shared/lib/parseErrorMessage";
 
 type FieldErrorsProps = {
     meta: AnyFieldMeta;
