@@ -17,12 +17,6 @@ export const zStream = z.object({
     decayRatePerMillion: z.number().int().nonnegative(),
 });
 
-export const zEvent = z.object({
-    amount: z.number().int(),
-    action: z.enum(["Deposit", "Claim"]),
-    actor: zAccount,
-});
-
 export const getStream = async (nftId: number) => {
     const stream = await graphql(
         `
@@ -59,7 +53,7 @@ export const getStream = async (nftId: number) => {
                     .object({
                         nftId: z.number(),
                         actor: zAccount,
-                        amount: z.number().int(),
+                        amount: z.string(),
                         txType: z.enum(["deposited", "claimed"]),
                     })
                     .array(),

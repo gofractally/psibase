@@ -23,8 +23,7 @@ mod service {
         #[serde(deserialize_with = "deserialize_number_from_string")]
         nft_id: u32,
         actor: AccountNumber,
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        amount: u64,
+        amount: String,
         tx_type: String
     }
 
