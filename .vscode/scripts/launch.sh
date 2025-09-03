@@ -17,4 +17,4 @@ fi
 
 
 rm -rf "$PROJECT_ROOT/db"
-psinode "$PROJECT_ROOT/db" -p "$PRODUCER" --admin-authz=rw:ip:"$HOST_IP" --admin-authz=rw:loopback -l "$PORT" 
+PSIBASE_ADMIN_IP=$HOST_IP psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
