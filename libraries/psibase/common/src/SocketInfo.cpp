@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <charconv>
-#include <format>
 
 using namespace psibase;
 
