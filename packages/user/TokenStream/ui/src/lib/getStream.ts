@@ -34,10 +34,10 @@ export const getStream = async (nftId: number) => {
                 }
                 updates(nftId: ${nftId}) {
                     nodes {
-                    nftId
-                    actor
-                    amount
-                    txType
+                        nftId
+                        actor
+                        amount
+                        txType
                     }
                 }
             }
