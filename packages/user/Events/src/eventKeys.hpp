@@ -21,7 +21,7 @@ namespace UserService
 
    void to_key(const EventIndexTable& obj, auto& stream)
    {
-      psio::to_key(psibase::AccountNumber{"events"}, stream);
+      psio::to_key(psibase::AccountNumber{"event-index"}, stream);
       psio::to_key(eventIndexesNum, stream);
       psio::to_key(obj.db, stream);
       psio::to_key(obj.service, stream);

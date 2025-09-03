@@ -1,6 +1,6 @@
 use crate::{
-    check, generate_action_templates, HttpReply, HttpRequest, ProcessActionStruct, ToServiceSchema,
-    WithActionStruct,
+    check, generate_action_templates, HttpHeader, HttpReply, HttpRequest, ProcessActionStruct,
+    ToServiceSchema, WithActionStruct,
 };
 use async_graphql::{
     http::{receive_body, GraphiQLSource},
@@ -45,7 +45,7 @@ pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
             status: 200,
             contentType: "text/html".into(),
             body: SIMPLE_UI.to_vec().into(),
-            headers: vec![],
+            headers: HttpHeader::allow_cors(),
         })
     } else {
         None
@@ -70,7 +70,7 @@ pub fn serve_action_templates<Wrapper: ToServiceSchema>(
             status: 200,
             contentType: "text/html".into(),
             body: generate_action_templates::<Wrapper>().into(),
-            headers: vec![],
+            headers: HttpHeader::allow_cors(),
         })
     } else {
         None
@@ -108,7 +108,7 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
                 status: 200,
                 contentType: "application/octet-stream".into(),
                 body: arg_struct_result.unwrap().packed().into(),
-                headers: vec![],
+                headers: HttpHeader::allow_cors(),
             }
         }
     }
@@ -149,14 +149,14 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 status: 200,
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),
-                headers: vec![],
+                headers: HttpHeader::allow_cors(),
             })
         } else if request.method == "GET" {
             Some(HttpReply {
                 status: 200,
                 contentType: "text".into(), // TODO
                 body: schema.sdl().into_bytes().into(),
-                headers: vec![],
+                headers: HttpHeader::allow_cors(),
             })
         } else if request.contentType == "application/graphql" {
             let res = schema
@@ -166,7 +166,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 status: 200,
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),
-                headers: vec![],
+                headers: HttpHeader::allow_cors(),
             })
         } else {
             let request_result = receive_body(
@@ -185,7 +185,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 status: 200,
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),
-                headers: vec![],
+                headers: HttpHeader::allow_cors(),
             })
         }
     })
@@ -205,7 +205,7 @@ pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
             status: 200,
             contentType: "text/html".into(),
             body: GraphiQLSource::build().endpoint("/graphql").finish().into(),
-            headers: vec![],
+            headers: HttpHeader::allow_cors(),
         })
     } else {
         None

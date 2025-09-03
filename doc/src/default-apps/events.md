@@ -1,3 +1,3 @@
 # events
 
-{{#cpp-doc ::UserService::EventIndex}}
+{{#cpp-doc ::UserService::EventConfig}}
