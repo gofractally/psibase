@@ -6,7 +6,7 @@ The adminstrator service is hosted on localhost by default as a [Builtin Service
 
 Access to `x-admin` is allowed only if
 - The client is running over a loopback interface (localhost), or
-- The client's IP address is listed in the environmental variable `PSIBASE_ADMIN_IP`, or
+- The client's IP address is listed in the environmental variable `PSIBASE_ADMIN_IP`, which holds a comma separated list of IP addresses, or
 - The user is logged in as an authorized on-chain account
 
 ## Configuration Options
