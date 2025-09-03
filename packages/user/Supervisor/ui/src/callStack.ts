@@ -1,6 +1,6 @@
 export interface Call {
     service: string;
-    context: string;
+    debugInfo: string;
     startTime?: number;
 }
 
@@ -10,10 +10,10 @@ const seeTimingTraces = false;
 export class CallStack {
     private storage: Array<Call> = [];
 
-    push(service: string, context: string): void {
+    push(service: string, debugInfo: string): void {
         this.storage.push({
             service,
-            context,
+            debugInfo,
             startTime: Date.now(),
         });
     }
@@ -24,28 +24,12 @@ export class CallStack {
             return undefined;
         }
 
-        const idx = this.storage.length - 1;
-
         if (seeTimingTraces) {
-            let shouldPrint = true;
-            for (let i = 0; i < idx; ++i) {
-                const frame = this.storage[i];
-                if (
-                    frame.service === "supervisor" ||
-                    frame.context.includes("startTx") ||
-                    frame.context.includes("finishTx")
-                ) {
-                    shouldPrint = false;
-                    break;
-                }
-            }
-            if (shouldPrint) {
-                const popped = this.peek(0)!;
-                const resolutionTime = Date.now() - popped.startTime!;
-                console.log(
-                    `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}${popped.context} [${resolutionTime} ms]`,
-                );
-            }
+            const popped = this.peek(0)!;
+            const resolutionTime = Date.now() - popped.startTime!;
+            console.log(
+                `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}${popped.debugInfo} [${resolutionTime} ms]`,
+            );
         }
 
         return this.storage.pop();
