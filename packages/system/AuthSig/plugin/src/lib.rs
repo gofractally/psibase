@@ -95,8 +95,6 @@ impl KeyVault for AuthSig {
 
     fn generate_unmanaged_keypair() -> Result<Keypair, CommonTypes::Error> {
         assert_authorized(FunctionName::generate_unmanaged_keypair)?;
-        let w = bindings::webidl::auth_sig_idl::my_interface::get_window();
-        w.alert("Hello, world!");
 
         let signing_key = SigningKey::random(&mut OsRng);
         let verifying_key: &VerifyingKey = signing_key.verifying_key();
