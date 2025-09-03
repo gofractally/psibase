@@ -1,21 +1,17 @@
 #[allow(warnings)]
 mod bindings;
+use bindings::*;
 
-use bindings::aes::plugin::{
+use aes::plugin::{
     types::*,
     with_key::{decrypt, encrypt},
 };
-use bindings::exports::secrets::plugin::api::Guest as Api;
-use bindings::host::common::server;
-use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use exports::secrets::plugin::api::Guest as Api;
+use host::{common::server, types::types::Error};
+use psibase::{define_trust, fracpack::Pack};
 use secrets::action_structs as Actions;
-
-use psibase::define_trust;
-use psibase::fracpack::Pack;
-
+use transact::plugin::intf::add_action_to_transaction;
 mod errors;
-
 use errors::ErrorType;
 use rand::{rngs::OsRng, Rng, TryRngCore};
 
@@ -41,7 +37,8 @@ struct SecretsPlugin;
 
 impl Api for SecretsPlugin {
     fn encode_secret(secret: Vec<u8>) -> String {
-        trust::authorize(trust::FunctionName::encode_secret)?;
+        trust::assert_authorized(trust::FunctionName::encode_secret).unwrap();
+
         let mut key16 = [0u8; 16];
         OsRng.try_fill_bytes(&mut key16).unwrap();
 
@@ -71,6 +68,8 @@ impl Api for SecretsPlugin {
     }
 
     fn decode_secret(token: String) -> Result<Vec<u8>, Error> {
+        trust::assert_authorized(trust::FunctionName::decode_secret).unwrap();
+
         let token_bytes = hex::decode(token).unwrap();
         let id = u32::from_be_bytes(token_bytes[..4].try_into().unwrap());
         let key: [u8; 16] = token_bytes[4..].try_into().unwrap();
@@ -100,33 +99,5 @@ impl Api for SecretsPlugin {
         Ok(decrypted)
     }
 }
-
-// #[derive(serde::Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// struct ExampleThingData {
-//     example_thing: String,
-// }
-// #[derive(serde::Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// struct ExampleThingResponse {
-//     data: ExampleThingData,
-// }
-
-// impl Queries for SecretsPlugin {
-//     fn get_example_thing() -> Result<String, Error> {
-//         trust::authorize(trust::FunctionName::get_example_thing)?;
-
-//         let graphql_str = "query { exampleThing }";
-
-//         let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-//             &CommonServer::post_graphql_get_json(&graphql_str)?,
-//         );
-
-//         let examplething_val =
-//             examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-//         Ok(examplething_val.data.example_thing)
-//     }
-// }
 
 bindings::export!(SecretsPlugin with_types_in bindings);
