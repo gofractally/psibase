@@ -59,9 +59,6 @@ export interface HostInterface {
     // Send an HTTP request and get the response (synchronously)
     sendRequest: (req: HttpRequest) => HttpResponse;
 
-    // Get the account name of the currently active application
-    getActiveApp(): string;
-
     // Get the service name from each level of the callstack
     getServiceStack(): string[];
 
