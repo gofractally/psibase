@@ -104,7 +104,11 @@ impl Api for PermissionsPlugin {
             // Callee is always authorized to call itself
             return Ok(true);
         }
-        // TODO incorporate security groups for TrustLevel::Max
+        if level == TrustLevel::Max {
+            // Max trust level is only allowed when caller == callee
+            // TODO incorporate security groups for TrustLevel::Max
+            return Ok(false);
+        }
 
         if !validate_caller(&caller) {
             return Err(ErrorType::InvalidCaller(
