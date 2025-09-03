@@ -48,6 +48,7 @@ export const Stream = () => {
     const { mutateAsync: deposit } = useDeposit();
     const { mutateAsync: claim, isPending: isClaiming } = useClaim();
 
+
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -84,8 +85,8 @@ export const Stream = () => {
         ? isEmpty
             ? 100
             : (Number(stream.stream.claimable) /
-                  Number(stream.stream.unclaimed)) *
-              100
+                Number(stream.stream.unclaimed)) *
+            100
         : 50;
 
     console.log(
@@ -262,39 +263,39 @@ export const Stream = () => {
                     <TableBody className="text-muted-foreground">
                         {isLoadingStream
                             ? [...new Array(4)].map((_, index) => (
-                                  <TableRow key={index}>
-                                      <TableCell>
-                                          <Skeleton className="h-6 w-48" />
-                                      </TableCell>
-                                      <TableCell>
-                                          <Skeleton className="h-6 w-48" />
-                                      </TableCell>
-                                      <TableCell className="flex justify-end text-right">
-                                          <Skeleton className="h-6 w-48" />
-                                      </TableCell>
-                                  </TableRow>
-                              ))
+                                <TableRow key={index}>
+                                    <TableCell>
+                                        <Skeleton className="h-6 w-48" />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Skeleton className="h-6 w-48" />
+                                    </TableCell>
+                                    <TableCell className="flex justify-end text-right">
+                                        <Skeleton className="h-6 w-48" />
+                                    </TableCell>
+                                </TableRow>
+                            ))
                             : stream?.updates?.map((update, index) => (
-                                  <TableRow key={index}>
-                                      <TableCell>
-                                          {update.txType == "claimed" ? (
-                                              <div className="flex items-center gap-2">
-                                                  <ArrowDown />
-                                                  Claimed
-                                              </div>
-                                          ) : (
-                                              <div className="flex items-center gap-2">
-                                                  <ArrowUp />
-                                                  Deposited
-                                              </div>
-                                          )}
-                                      </TableCell>
-                                      <TableCell>{update.actor}</TableCell>
-                                      <TableCell className="text-right">
-                                          {update.amount}
-                                      </TableCell>{" "}
-                                  </TableRow>
-                              ))}
+                                <TableRow key={index}>
+                                    <TableCell>
+                                        {update.txType == "claimed" ? (
+                                            <div className="flex items-center gap-2">
+                                                <ArrowDown />
+                                                Claimed
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <ArrowUp />
+                                                Deposited
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>{update.actor}</TableCell>
+                                    <TableCell className="text-right">
+                                        {update.amount}
+                                    </TableCell>{" "}
+                                </TableRow>
+                            ))}
                     </TableBody>
                 </Table>
             </div>
