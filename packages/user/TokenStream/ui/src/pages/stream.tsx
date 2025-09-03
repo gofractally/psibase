@@ -89,12 +89,6 @@ export const Stream = () => {
             100
         : 50;
 
-    console.log(
-        { isEmpty, percent, stream },
-        Number(stream?.stream.claimable),
-        Number(stream?.stream.unclaimed),
-    );
-
     if (error) {
         console.error(error);
         return <ErrorCard error={error} />;
