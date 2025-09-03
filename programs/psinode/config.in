@@ -8,14 +8,10 @@ host     = psibase.127.0.0.1.sslip.io
 listen   = 8080
 # peer     = http://localhost:8080/
 service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
-admin    = static:*
 database-cache-size = 256MiB
 service-threads = 4
 
 http-timeout = 4s
-
-admin-authz = r:any
-admin-authz = rw:loopback
 
 [logger.stderr]
 type   = console

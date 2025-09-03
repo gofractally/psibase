@@ -17,12 +17,11 @@ A typical boot sequence contains more configuration than is able to fit in a sin
 
 ## Node administrator services
 
-The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). Authorization to access this API is controlled by the server's `admin-authz` configuration option.
+The administrator API under `/native/admin` provides tools for monitoring and controlling the server. All APIs use JSON (`Content-Type` should be `application/json`). Authorization to access this API is controlled by the `x-admin` service.
 
 | Method | URL                          | Description                                                                   |
 |--------|------------------------------|-------------------------------------------------------------------------------|
 | `GET`  | `/native/admin/status`       | Returns status conditions currently affecting the server                      |
-| `POST` | `/native/admin/login`        | Returns a bearer token that can be used to access the admin API               |
 | `POST` | `/native/admin/shutdown`     | Stops or restarts the server                                                  |
 | `GET`  | `/native/admin/peers`        | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`      | Connects to another node                                                      |
@@ -54,19 +53,6 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `restart` | Boolean | If set to `true`, the server will be restarted                                                                                                                                                                                  |
 | `force`   | Boolean | If set to `true`, the server will close all connections immediately without notifying the remote endpoint. Since this includes the connection used to send the shutdown, a request with `force` set may not receive a response. |
 | `soft`    | Boolean | Applies to restarts only. If set to `true`, `psinode` will keep the current process image.                                                                                                                                      |
-
-`POST` to `/native/admin/login` returns a bearer token that can be used to access the admin API. Requires bearer tokens to be enabled by the server configuration.
-
-| Field  | Type        | Description                                                                                                                                |
-|--------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| `exp`  | NumericDate | The time at which the token expires in seconds since the UNIX epoch. If not specified, the token will expire 1 hour from the current time. |
-| `mode` | String      | Should be either `"r"` or `"rw"`. If not specified, the token will have the same access rights as the client.                              |
-
-| Field         | Type        | Description |
-|---------------|-------------|-------------|
-| `accessToken` | String      |             |
-| `exp`         | NumericDate |             |
-| `mode`        | String      |             |
 
 ### Peer management
 
@@ -152,12 +138,6 @@ Each peer has the following fields:
 | `tls.key`                | String            | The path to the file containing the private key for the server's certificate in PEM format                                                                                                                |
 | `tls.trustfiles`         | Array             | A list of files containing trusted root CAs in PEM format.                                                                                                                                                |
 | `services`               | Array             | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
-| `admin`                  | String            | Controls service access to the admin API. `*` allows access for all services.  `static:*` allows access for builtin services. The name of a service allows access for that service.                       |
-| `admin_authz`            | Array             | Controls which clients are allowed to access the admin API                                                                                                                                                |
-| `admin_authz[n].kind`    | String            | One of `any`, `loopback`, `ip`, or `bearer`                                                                                                                                                               |
-| `admin_authz[n].mode`    | String            | One of `r` or `rw`                                                                                                                                                                                        |
-| `admin_authz[n].address` | String            | (`ip` only) The client's IP address                                                                                                                                                                       |
-| `admin_authz[n].key`     | String            | (`bearer` only) The key used to verify bearer tokens                                                                                                                                                      |
 | `http_timeout`           | Number            | The timeout in microseconds before the server closes idle connections. If it is null or missing, connections do not time out.                                                                             |
 | `loggers`                | Object            | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
@@ -187,12 +167,6 @@ Example:
             "root": "/usr/share/psibase/services/x-admin"
         }
     ],
-    "admin": "static:*",
-    "admin_authz": [{
-        "mode": "rw",
-        "kind": "bearer",
-        "key": "swordfish"
-    }],
     "loggers": {
         "console": {
             "type": "console",

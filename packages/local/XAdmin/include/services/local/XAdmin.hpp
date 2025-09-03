@@ -39,8 +39,9 @@ namespace LocalService
       /// Returns true if the account is a node admin
       bool isAdmin(psibase::AccountNumber account);
 
-      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
+      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        req,
+                                                 std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(XAdmin, method(isAdmin, account), method(serveSys, req))
+   PSIO_REFLECT(XAdmin, method(isAdmin, account), method(serveSys, req, socket))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective)
 }  // namespace LocalService

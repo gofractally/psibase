@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/SnapshotHeader.hpp>
+#include <psibase/SocketInfo.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
@@ -23,6 +24,7 @@ namespace psibase
    static constexpr NativeTableNum logTruncateTable           = 13;  // subjective
    static constexpr NativeTableNum socketTable                = 14;  // subjective
    static constexpr NativeTableNum runTable                   = 15;  // subjective
+   static constexpr NativeTableNum envTable                   = 16;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -247,25 +249,6 @@ namespace psibase
       PSIO_REFLECT(LogTruncateRow, start)
    };
 
-   struct ProducerMulticastSocketInfo
-   {
-      PSIO_REFLECT(ProducerMulticastSocketInfo)
-      friend bool operator==(const ProducerMulticastSocketInfo&,
-                             const ProducerMulticastSocketInfo&) = default;
-   };
-   struct HttpSocketInfo
-   {
-      PSIO_REFLECT(HttpSocketInfo)
-      friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
-   };
-
-   using SocketInfo = std::variant<ProducerMulticastSocketInfo, HttpSocketInfo>;
-
-   inline auto get_gql_name(SocketInfo*)
-   {
-      return "SocketInfo";
-   }
-
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
    auto socketPrefix() -> KeyPrefixType;
    auto socketKey(std::int32_t fd) -> SocketKeyType;
@@ -395,6 +378,18 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> RunKeyType;
       PSIO_REFLECT(RunRow, id, mode, maxTime, action, continuation)
+   };
+
+   using EnvKeyType = std::tuple<std::uint16_t, std::uint8_t, std::string>;
+   auto envPrefix() -> KeyPrefixType;
+   auto envKey(std::string_view) -> EnvKeyType;
+   struct EnvRow
+   {
+      std::string       name;
+      std::string       value;
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> EnvKeyType;
+      PSIO_REFLECT(EnvRow, name, value);
    };
 
 }  // namespace psibase

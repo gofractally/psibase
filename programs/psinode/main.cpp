@@ -36,7 +36,6 @@
 using namespace psibase;
 using namespace psibase::net;
 
-using http::authz;
 using http::listen_spec;
 
 struct native_service
@@ -436,6 +435,33 @@ void load_subjective_services(Database& db)
    }
 }
 
+void clear_environment(Database& db)
+{
+   auto       key       = psio::convert_to_key(envPrefix());
+   const auto prefixLen = key.size();
+   while (auto kv = db.kvGreaterEqualRaw(EnvRow::db, key, prefixLen))
+   {
+      key.assign(kv->key.pos, kv->key.end);
+      db.kvRemoveRaw(EnvRow::db, key);
+   }
+}
+
+void load_environment(Database& db)
+{
+   clear_environment(db);
+   for (const char* const* iter = ::environ; *iter; ++iter)
+   {
+      std::string_view entry{*iter};
+      auto             pos = entry.find('=');
+      if (pos != std::string_view::npos)
+      {
+         EnvRow row{.name  = std::string(entry.substr(0, pos)),
+                    .value = std::string{entry.substr(pos + 1)}};
+         db.kvPut(EnvRow::db, row.key(), row);
+      }
+   }
+}
+
 void load_service(const native_service& config,
                   http::services_t&     services,
                   const std::string&    root_host)
@@ -530,20 +556,6 @@ namespace psibase
 
    namespace http
    {
-      void validate(boost::any& v, const std::vector<std::string>& values, admin_service*, int)
-      {
-         boost::program_options::validators::check_first_occurrence(v);
-         const auto& s = boost::program_options::validators::get_single_string(values);
-         try
-         {
-            v = admin_service_from_string(s);
-         }
-         catch (std::exception&)
-         {
-            throw boost::program_options::invalid_option_value(s);
-         }
-      }
-
       void validate(boost::any& v, const std::vector<std::string>& values, listen_spec*, int)
       {
          boost::program_options::validators::check_first_occurrence(v);
@@ -551,20 +563,6 @@ namespace psibase
          try
          {
             v = parse_listen(s);
-         }
-         catch (std::exception& e)
-         {
-            throw boost::program_options::invalid_option_value(s);
-         }
-      }
-
-      void validate(boost::any& v, const std::vector<std::string>& values, authz*, int)
-      {
-         boost::program_options::validators::check_first_occurrence(v);
-         const auto& s = boost::program_options::validators::get_single_string(values);
-         try
-         {
-            v = authz_from_string(s);
          }
          catch (std::exception& e)
          {
@@ -1189,8 +1187,6 @@ struct PsinodeConfig
    std::vector<listen_spec>    listen;
    TLSConfig                   tls;
    std::vector<native_service> services;
-   http::admin_service         admin;
-   std::vector<authz>          admin_authz;
    Timeout                     http_timeout;
    std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
@@ -1207,8 +1203,6 @@ PSIO_REFLECT(PsinodeConfig,
              tls,
 #endif
              services,
-             admin,
-             admin_authz,
              http_timeout,
              service_threads,
              loggers);
@@ -1283,22 +1277,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
           "", "service", services, [](std::string_view text)
           { return service_from_string(text).host; }, "Native service root directory");
    }
-   if (!std::holds_alternative<http::admin_none>(config.admin))
-   {
-      file.set("", "admin", std::visit([](const auto& v) { return v.str(); }, config.admin),
-               "Which services can access the admin API");
-   }
-   if (!config.admin_authz.empty())
-   {
-      std::vector<std::string> admin_authz;
-      for (const auto& authz : config.admin_authz)
-      {
-         admin_authz.push_back(authz.str());
-      }
-      file.set(
-          "", "admin-authz", admin_authz, [](std::string_view text) { return std::string(text); },
-          "Authorization for admin access");
-   }
    if (config.http_timeout != Timeout::none())
    {
       file.set("", "http-timeout", to_string(config.http_timeout),
@@ -1327,8 +1305,6 @@ void run(const std::string&              db_path,
          std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
-         http::admin_service&            admin,
-         std::vector<authz>&             admin_authz,
          Timeout&                        http_timeout,
          std::size_t&                    service_threads,
          std::vector<std::string>        root_ca,
@@ -1384,12 +1360,30 @@ void run(const std::string&              db_path,
       if (!db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
       {
          load_subjective_services(db);
-         if (!db.commitSubjective(*system->sockets, autoClose))
-         {
-            throw std::runtime_error("Failed to initialize database");
-         }
+      }
+      load_environment(db);
+      if (!db.commitSubjective(*system->sockets, autoClose))
+      {
+         throw std::runtime_error("Failed to initialize database");
       }
    }
+   psio::finally resetEnvironment{
+       [&]
+       {
+          // It's not important if this fails. We'll fix it the next time psinode starts
+          try
+          {
+             Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
+             SocketAutoCloseSet autoClose;
+             auto               session = db.startWrite(system->sharedDatabase.createWriter());
+             db.checkoutSubjective();
+             clear_environment(db);
+             db.commitSubjective(*system->sockets, autoClose);
+          }
+          catch (...)
+          {
+          }
+       }};
 
    // Manages the session and and unlinks all keys from prover on destruction
    struct PKCS11SessionManager
@@ -1580,8 +1574,6 @@ void run(const std::string&              db_path,
             load_service(entry, http_config->services, host);
          }
       }
-      http_config->admin       = admin;
-      http_config->admin_authz = admin_authz;
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
@@ -1759,10 +1751,9 @@ void run(const std::string&              db_path,
       };
 
       http_config->set_config =
-          [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &admin, &admin_authz,
-           &http_timeout, &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca,
-           &pkcs11_modules, &connect_one,
-           setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
+          [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
+           &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+           &connect_one, setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
@@ -1770,9 +1761,9 @@ void run(const std::string&              db_path,
          boost::asio::post(
              chainContext,
              [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
-              &runResult, &http_config, &hosts, &services, &admin, &admin_authz, &http_timeout,
-              &service_threads, &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
-              &connect_one, setPKCS11Libs, callback = std::move(callback)]() mutable
+              &runResult, &http_config, &hosts, &services, &http_timeout, &service_threads, &tpool,
+              &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, setPKCS11Libs,
+              callback = std::move(callback)]() mutable
              {
                 std::optional<http::services_t> new_services;
                 for (auto& entry : config.services)
@@ -1817,8 +1808,6 @@ void run(const std::string&              db_path,
                 pkcs11_modules  = config.pkcs11_modules;
                 hosts           = config.hosts;
                 services        = config.services;
-                admin           = config.admin;
-                admin_authz     = config.admin_authz;
                 http_timeout    = config.http_timeout;
                 service_threads = config.service_threads;
 #ifdef PSIBASE_ENABLE_SSL
@@ -1831,8 +1820,6 @@ void run(const std::string&              db_path,
                    std::lock_guard l{http_config->mutex};
                    http_config->hosts               = hosts;
                    http_config->listen              = config.listen;
-                   http_config->admin               = admin;
-                   http_config->admin_authz         = admin_authz;
                    http_config->enable_transactions = !hosts.empty();
                    http_config->idle_timeout_us     = http_timeout.duration.count();
                    if (new_services)
@@ -1861,14 +1848,14 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &hosts, &admin, &admin_authz,
-                                 &http_timeout, &service_threads, &tls_cert, &tls_key, &root_ca,
-                                 &pkcs11_modules, &services](http::get_config_callback callback)
+      http_config->get_config = [&chainContext, &node, &http_config, &hosts, &http_timeout,
+                                 &service_threads, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+                                 &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &hosts, &services, &admin,
-                            &admin_authz, &http_timeout, &service_threads, &tls_cert, &tls_key,
-                            &root_ca, &pkcs11_modules, callback = std::move(callback)]() mutable
+                           [&chainContext, &node, &http_config, &hosts, &services, &http_timeout,
+                            &service_threads, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+                            callback = std::move(callback)]() mutable
                            {
                               PsinodeConfig result;
                               result.p2p = http_config->enable_p2p;
@@ -1883,8 +1870,6 @@ void run(const std::string&              db_path,
                               result.tls.trustfiles  = root_ca;
 #endif
                               result.services        = services;
-                              result.admin           = admin;
-                              result.admin_authz     = admin_authz;
                               result.http_timeout    = http_timeout;
                               result.service_threads = service_threads,
                               result.loggers         = loggers::Config::get();
@@ -2235,8 +2220,6 @@ int main(int argc, char* argv[])
    autoconnect_t               autoconnect;
    bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
-   http::admin_service         admin;
-   std::vector<http::authz>    admin_authz;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
    std::string                 tls_key;
@@ -2265,10 +2248,6 @@ int main(int argc, char* argv[])
        "Limits the number of peers to be connected automatically");
    opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
        "Serve static content from directory using the specified virtual host name");
-   opt("admin", po::value(&admin)->default_value({}, ""),
-       "Controls which services can access the admin API");
-   opt("admin-authz", po::value(&admin_authz)->default_value({}, "")->value_name("SPEC"),
-       "Controls client access to the admin API");
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
        "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: "
@@ -2380,8 +2359,8 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
-             autoconnect, enable_incoming_p2p, hosts, listen, services, admin, admin_authz,
-             http_timeout, service_threads, root_ca, tls_cert, tls_key, leeway_us, restart);
+             autoconnect, enable_incoming_p2p, hosts, listen, services, http_timeout,
+             service_threads, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

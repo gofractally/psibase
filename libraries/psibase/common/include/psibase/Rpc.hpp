@@ -90,6 +90,8 @@ namespace psibase
    {
       ok                   = 200,
       notModified          = 304,
+      unauthorized         = 401,
+      forbidden            = 403,
       notFound             = 404,
       methodNotAllowed     = 405,
       notAcceptable        = 406,

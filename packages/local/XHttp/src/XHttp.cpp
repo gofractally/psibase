@@ -2,12 +2,23 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
+#include <services/local/XAdmin.hpp>
 
 using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
 
 using Temporary = TemporaryTables<PendingRequestTable>;
+
+namespace
+{
+   HttpReply error(HttpStatus status, std::string_view msg)
+   {
+      return {.status      = status,
+              .contentType = "text/html",
+              .body        = std::vector(msg.begin(), msg.end())};
+   }
+}  // namespace
 
 extern "C" [[clang::export_name("recv")]] void recv()
 {
@@ -105,16 +116,33 @@ extern "C" [[clang::export_name("serve")]] void serve()
             {
                if (!reply)
                {
-                  std::string msg = "The resource '" + req.target().unpack() + "' was not found";
-                  reply           = {.status      = HttpStatus::notFound,
-                                     .contentType = "text/html",
-                                     .body        = std::vector(msg.begin(), msg.end())};
+                  if (service == XAdmin::service &&
+                      std::string_view{req.target()}.starts_with("/native/"))
+                  {
+                     return;
+                  }
+                  else
+                  {
+                     reply = error(HttpStatus::notFound,
+                                   "The resource '" + req.target().unpack() + "' was not found");
+                  }
                }
                psibase::socketSend(sock, psio::to_frac(std::move(*reply)));
             }
             return;
          }
       }
+   }
+   else if (std::string_view{req.target()} == "/native/p2p")
+   {
+      return;
+   }
+   else if (std::string_view{req.target()}.starts_with("/native/"))
+   {
+      auto reply =
+          error(HttpStatus::notFound, "The resource '" + req.target().unpack() + "' was not found");
+      psibase::socketSend(sock, psio::to_frac(std::move(reply)));
+      return;
    }
 
    // Forward other requests to HttpServer

@@ -79,6 +79,83 @@ namespace LocalService
             }
          }
       }
+
+      bool chainIsBooted()
+      {
+         auto row = kvGet<StatusRow>(StatusRow::db, statusKey());
+         return row && row->head;
+      }
+
+      // Returns nullopt on success, an appropriate error on failure
+      std::optional<HttpReply> checkAdminAuth(XAdmin&            self,
+                                              const HttpRequest& req,
+                                              std::int32_t       socket)
+      {
+         std::optional<SocketRow> row;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            row = kvGet<SocketRow>(SocketRow::db, socketKey(socket));
+         }
+         const auto& info     = std::get<HttpSocketInfo>(row.value().info);
+         const auto& endpoint = info.endpoint.value();
+         if (isLoopback(endpoint))
+            return {};
+
+         std::optional<EnvRow> env;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            env = kvGet<EnvRow>(EnvRow::db, envKey("PSIBASE_ADMIN_IP"));
+         }
+         if (env)
+         {
+            std::string_view            addrs = env->value;
+            std::string_view::size_type prev  = 0;
+            while (true)
+            {
+               auto pos     = addrs.find(prev, ',');
+               auto addrStr = addrs.substr(prev, pos);
+               if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
+               {
+                  if (auto addr = parseIPV4Address(addrStr))
+                  {
+                     if (v4->address == addr)
+                        return {};
+                  }
+               }
+               else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
+               {
+                  if (auto addr = parseIPV6Address(addrStr))
+                  {
+                     if (v6->address == addr)
+                        return {};
+                  }
+               }
+               if (pos == std::string_view::npos)
+                  break;
+               prev = pos + 1;
+            }
+         }
+
+         if (chainIsBooted())
+         {
+            if (auto user = to<RTransact>().getUser(req))
+            {
+               PSIBASE_SUBJECTIVE_TX
+               {
+                  if (self.open<AdminAccountTable>().get(*user).has_value())
+                     return {};
+               }
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/html",
+                                .body        = toVec("Not authorized")};
+            }
+         }
+
+         return HttpReply{.status      = HttpStatus::unauthorized,
+                          .contentType = "text/html",
+                          .body        = toVec("Not authorized")};
+      }
+
    }  // namespace
 
    bool XAdmin::isAdmin(AccountNumber account)
@@ -92,11 +169,19 @@ namespace LocalService
       __builtin_unreachable();
    }
 
-   std::optional<HttpReply> XAdmin::serveSys(HttpRequest req)
+   std::optional<HttpReply> XAdmin::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
    {
       check(getSender() == XHttp::service, "Wrong sender");
+
+      if (auto reply = checkAdminAuth(*this, req, socket.value()))
+         return reply;
+
       auto target = req.path();
-      if (target.starts_with("/services/"))
+      if (target.starts_with("/native/"))
+      {
+         return {};
+      }
+      else if (target.starts_with("/services/"))
       {
          auto service = AccountNumber{std::string_view{target}.substr(10)};
          if (service == AccountNumber{})
@@ -331,21 +416,5 @@ namespace LocalService
                        .body = toVec(std::format("The resource '{}' was not found\n", target))};
    }
 }  // namespace LocalService
-
-#ifndef PSIBASE_GENERATE_SCHEMA
-
-extern "C" [[clang::export_name("checkAccess")]] void checkAccess()
-{
-   psibase::internal::receiver = XAdmin::service;
-   auto act                    = getCurrentAction();
-
-   auto [req] = psio::from_frac<std::tuple<HttpRequest>>(act.rawData);
-   auto user  = to<RTransact>().getUser(req);
-   check(user.has_value(), "Not logged in");
-   check(XAdmin{}.open<AdminAccountTable>().get(*user).has_value(),
-         std::format("'{}' is not a node admin", user->str()));
-}
-
-#endif
 
 PSIBASE_DISPATCH(LocalService::XAdmin)

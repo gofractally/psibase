@@ -25,6 +25,17 @@ class Transact(Service):
     def push_action(self, sender, service, method, data, timeout=10, flags=0, keys=[]):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
         return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]), keys)
+    def login(self, account, timeout=10, keys=[]):
+        from fracpack import Object, String
+        import urllib3
+        class LoginData(Object):
+            rootHost: String
+        tapos = self.api.get_tapos(timeout=timeout, flags=1)
+        rootHost = urllib3.util.parse_url(self.api.url).host
+        packed = self.api.pack_signed_transaction(Transaction(tapos, actions=[Action(account, 'transact', 'loginSys', LoginData(rootHost))], claims=[]), keys)
+        with self.post('/login', headers={'Content-Type': 'application/octet-stream'}, data=packed) as reply:
+            reply.raise_for_status()
+            return reply.json()['access_token']
     def get_jwt_key(self, token):
         with self.get('/jwt_key', headers={"Authorization": "Bearer " + token}) as reply:
             reply.raise_for_status()

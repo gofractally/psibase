@@ -38,9 +38,8 @@ namespace psibase
       return codeKey(codeNum);
    }
 
-   auto codeByHashKey(const Checksum256& codeHash,
-                      uint8_t            vmType,
-                      uint8_t            vmVersion) -> CodeByHashKeyType
+   auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
+       -> CodeByHashKeyType
    {
       return std::tuple{codeByHashTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
    }
@@ -162,6 +161,19 @@ namespace psibase
    auto RunRow::key() const -> RunKeyType
    {
       return runKey(id);
+   }
+
+   auto envPrefix() -> KeyPrefixType
+   {
+      return std::tuple{envTable, nativeTablePrimaryIndex};
+   }
+   auto envKey(std::string_view name) -> EnvKeyType
+   {
+      return std::tuple{envTable, nativeTablePrimaryIndex, std::string(name)};
+   }
+   auto EnvRow::key() const -> EnvKeyType
+   {
+      return envKey(name);
    }
 
 }  // namespace psibase
