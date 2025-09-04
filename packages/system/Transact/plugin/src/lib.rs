@@ -175,19 +175,23 @@ impl Admin for TransactPlugin {
 
         let tx = make_transaction(actions, 3);
 
+        println!("Transact.finish_tx.1");
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs: get_proofs(&sha256(&tx.packed()), true)?,
         };
+        println!("Transact.finish_tx.2");
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
         }
+        println!("Transact.finish_tx.3");
 
         // TODO (idea): on_hook_pre_publish(signed_tx) -> bool
         // Could allow a user to inspect a final transaction rather than publish
         //   (Helpful for debugging, post-install scripts, offline msig, etc.)
 
         let body = signed_tx.publish()?;
+        println!("Transact.finish_tx.4.body: {:?}", body);
         let trace = match body {
             BodyTypes::Json(t) => from_str::<TransactionTrace>(&t).unwrap(),
             _ => {
@@ -198,6 +202,7 @@ impl Admin for TransactPlugin {
         // TODO (idea): on_hook_post_publish(trace)
         // Could be for logging, or for other post-transaction client-side processing
 
+        println!("Transact.finish_tx.5.trace: {:?}", trace);
         match trace.error {
             Some(err) => Err(TransactionError(err).into()),
             None => {
@@ -218,10 +223,13 @@ struct LoginReply {
 
 impl Auth for TransactPlugin {
     fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
+        println!("Transact:Auth.get_query_token.1.app: {:?}", app);
         assert!(Host::client::get_sender() == "host");
 
+        println!("Transact:Auth.get_query_token.2");
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");
+        println!("Transact:Auth.get_query_token.3");
         let actions = vec![Action {
             sender: user.clone(),
             service: app,
@@ -229,12 +237,15 @@ impl Auth for TransactPlugin {
             raw_data: (root_host,).packed(),
         }];
 
+        println!("Transact:Auth.get_query_token.4");
         let claims =
             get_claims_for_user(&user).expect("Failed to retrieve claims from auth plugin");
 
+        println!("Transact:Auth.get_query_token.5");
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
+        println!("Transact:Auth.get_query_token.6");
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
             expiration: expiration,
@@ -243,24 +254,29 @@ impl Auth for TransactPlugin {
             refBlockIndex: 0,
         };
 
+        println!("Transact:Auth.get_query_token.7");
         let tx = Transaction {
             tapos,
             actions,
             claims,
         };
+        println!("Transact:Auth.get_query_token.8");
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs: get_proofs_for_user(&sha256(&tx.packed()), &user)?,
         };
+        println!("Transact:Auth.get_query_token.9");
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
         }
 
+        println!("Transact:Auth.get_query_token.10");
         let response = Server::post(&HostTypes::PostRequest {
             endpoint: "/login".to_string(),
             body: HostTypes::BodyTypes::Bytes(signed_tx.packed()),
         })?;
 
+        println!("Transact:Auth.get_query_token.11");
         let reply = match response {
             BodyTypes::Json(t) => {
                 serde_json::from_str::<LoginReply>(&t).expect("Failed to deserialize response")
@@ -269,6 +285,7 @@ impl Auth for TransactPlugin {
                 return Err(BadResponse("Invalid body type").into());
             }
         };
+        println!("Transact:Auth.get_query_token.12");
         Ok(reply.access_token)
     }
 }

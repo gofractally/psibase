@@ -213,6 +213,7 @@ export class PluginHost implements HostInterface {
     }
 
     importKey(privateKey: string): string {
+        console.log("Supervisor.pluginHost.ts:importKey.0");
         return this.supervisor.importKey(privateKey);
     }
 

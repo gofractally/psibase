@@ -56,18 +56,22 @@ const DB: Database = Database {
 
 impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
+        println!("set_logged_in_user().1");
         check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
         let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
         let query_token = bucket.get(&&app);
 
+        println!("set_logged_in_user().2");
         let query_token = if query_token.is_none() {
             TransactAuthApi::get_query_token(&app, &user).unwrap()
         } else {
             let query_token = query_token.unwrap();
             <String>::unpacked(&query_token).unwrap()
         };
+        println!("set_logged_in_user().3");
         set_active_query_token(&query_token, &app, &user);
+        println!("set_logged_in_user().4");
 
         Ok(())
     }

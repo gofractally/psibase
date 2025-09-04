@@ -339,6 +339,7 @@ dependencies = [
 name = "auth-invite"
 version = "0.20.0"
 dependencies = [
+ "p256",
  "psibase",
  "wit-bindgen-rt 0.33.0",
 ]
@@ -349,8 +350,10 @@ version = "0.20.0"
 dependencies = [
  "indoc",
  "lazy_static",
+ "p256",
  "pem",
  "psibase",
+ "rand_core 0.6.4",
  "seahash",
  "serde",
  "serde_json",
@@ -3275,7 +3278,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "web-crypto-shim"
+name = "web-crypto"
 version = "0.20.0"
 dependencies = [
  "p256",

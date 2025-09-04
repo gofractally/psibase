@@ -44,6 +44,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
+    pluginId("webcrypto", "plugin"),
 ];
 
 // The supervisor facilitates all communication
@@ -216,11 +217,12 @@ export class Supervisor implements AppInterface {
     }
 
     importKey(privateKey: string): string {
+        console.log("supervisor.ts:importKey.0");
         // TODO: impl importKey()
         // future: call out to SubtleCrypto
         // future: store privateKey, indexed by pubKey
         return this.supervisorCall(
-            getCallArgs("supervisor", "webcryptoshim", "api", "importKey", [
+            getCallArgs("webcrypto", "plugin", "api", "importKey", [
                 privateKey,
             ]),
         );
@@ -229,14 +231,12 @@ export class Supervisor implements AppInterface {
     signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
         // TODO: impl signExplicit()
         // future: call out to SubtleCrypto
-        this.supervisorCall(
-            getCallArgs("supervisor", "webcryptoshim", "api", "signExplicit", [
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "signExplicit", [
                 msg,
                 privateKey,
             ]),
         );
-        // future: convert SubtleCrypto types to psibase types
-        return new Uint8Array([]);
     }
 
     sign(msg: Uint8Array, publicKey: string): Uint8Array {
@@ -244,10 +244,7 @@ export class Supervisor implements AppInterface {
         // future: call out to SubtleCrypto
         // future: lookup privateKey by pubKey
         this.supervisorCall(
-            getCallArgs("supervisor", "webcryptoshim", "api", "sign", [
-                msg,
-                publicKey,
-            ]),
+            getCallArgs("webcrypto", "plugin", "api", "sign", [msg, publicKey]),
         );
         // future: convert SubtleCrypto types to psibase types
         return new Uint8Array([]);

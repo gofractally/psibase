@@ -55,8 +55,8 @@ interface admin {
     /// Make a post request
     post: func(app: string, request: post-request) -> result<option<body-types>, error>;
 
-    /// ~SubtleCrypto.importKey()
-    import-key: func(private-key: string, extractable: option<bool>) -> result<option<private-key: string>, error>;
+    // /// ~SubtleCrypto.importKey()
+    // import-key: func(private-key: string, extractable: option<bool>) -> result<option<string>, error>;
 }
 
 /// A keyvalue interface that provides key-value operations.

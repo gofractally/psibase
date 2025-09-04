@@ -1,4 +1,4 @@
-package supervisor:web-crypto-shim;
+package web-crypto:plugin;
 
 /// Methods related to key management
 interface api {
@@ -26,7 +26,7 @@ interface api {
 
     // /// Signs a pre-hashed message for the DER-encoded pubKey
     sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
-    
+
     // /// Signs a pre-hashed message with the specified DER-encoded private key
     sign-explicit: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
 

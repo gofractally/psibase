@@ -1,10 +1,12 @@
-package supervisor:web-crypto-shim;
+package web-crypto:plugin;
 
 world impl {
     include host:types/imports;
     include host:crypto/imports;
+    include host:common/imports;
     include clientdata:plugin/imports;
     include supervisor:bridge/imports;
+    include permissions:plugin/imports;
 
     export api;
 }
