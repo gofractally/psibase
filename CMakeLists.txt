@@ -426,7 +426,7 @@ cargo_psibase_package(
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
-    PATH packages/user/Credentials
+    PATH packages/system/Credentials
 )
 
 cargo_psibase_package(
