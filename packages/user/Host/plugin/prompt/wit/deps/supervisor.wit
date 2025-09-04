@@ -4,7 +4,7 @@ interface prompt {
     use host:types/types.{error};
 
     /// Requests that the host show the active prompt
-    request-prompt: func() -> result<_, error>;
+    request-prompt: func();
 }
 
 world imports {

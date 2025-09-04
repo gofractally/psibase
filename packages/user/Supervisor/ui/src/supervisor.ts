@@ -107,7 +107,7 @@ export class Supervisor implements AppInterface {
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
-                getCallArgs("host", "prompt", "api", "getActivePrompt", []),
+                getCallArgs("host", "prompt", "admin", "getActivePrompt", []),
             );
             if (promptDetails) {
                 this.embedder = promptDetails.activeApp;
