@@ -58,20 +58,6 @@ bool SocketAutoCloseSet::owns(Sockets& sockets, const AutoCloseSocket& sock)
 
 namespace
 {
-   struct NullProducersSocket : Socket
-   {
-      virtual void       send(std::span<const char>) override {}
-      virtual SocketInfo info() const override { return ProducerMulticastSocketInfo{}; }
-   };
-
-   struct NullHttpSocket : AutoCloseSocket
-   {
-      NullHttpSocket() { once = true; }
-      virtual void       send(std::span<const char>) override {}
-      virtual void       autoClose(const std::optional<std::string>&) noexcept override {}
-      virtual SocketInfo info() const override { return HttpSocketInfo{}; }
-   };
-
    void doRemoveSocket(std::shared_ptr<Socket>& socket, SharedDatabase& sharedDb)
    {
       assert(!socket->closed);
@@ -84,18 +70,6 @@ namespace
       socket->closed = true;
       socket.reset();
    }
-
-   struct MakeNullSocketVisitor
-   {
-      std::shared_ptr<Socket> operator()(const ProducerMulticastSocketInfo&)
-      {
-         return std::make_shared<NullProducersSocket>();
-      }
-      std::shared_ptr<Socket> operator()(const HttpSocketInfo&)
-      {
-         return std::make_shared<NullHttpSocket>();
-      }
-   };
 }  // namespace
 
 Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
@@ -107,28 +81,9 @@ Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
    auto                   key       = psio::convert_to_key(socketPrefix());
    auto                   prefixLen = key.size();
    std::vector<SocketRow> rows;
-   while (auto kv = db.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
+   if (db.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
    {
-      auto row = psio::from_frac<SocketRow>(std::span{kv->value.pos, kv->value.end});
-      check(row.fd >= 0, "invalid fd");
-      rows.push_back(row);
-      key.assign(kv->key.pos, kv->key.end);
-      key.push_back(0);
-   }
-
-   if (!rows.empty())
-   {
-      auto maxFd = static_cast<std::size_t>(rows.back().fd);
-      available.resize(maxFd + 1, true);
-      sockets.resize(maxFd + 1);
-      for (const auto& row : rows)
-      {
-         auto pos  = static_cast<std::size_t>(row.fd);
-         auto sock = std::visit(MakeNullSocketVisitor{}, row.info);
-         sock->id  = row.fd;
-         available.reset(pos);
-         sockets[pos] = std::move(sock);
-      }
+      abortMessage("Socket table should start empty");
    }
 }
 
