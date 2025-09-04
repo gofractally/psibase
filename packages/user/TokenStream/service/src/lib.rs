@@ -202,16 +202,6 @@ pub mod service {
             .history()
             .created(stream.nft_id, decay_rate_per_million, token_id, sender);
 
-        Wrapper::emit().history().updated(
-            (6 as u32).into(),
-            sender,
-            "deposited".to_string(),
-            Decimal::new(
-                432423.into(),
-                4.try_into().unwrap(),
-            ),
-        );
-
         stream.nft_id
     }
 
