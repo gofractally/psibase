@@ -33,7 +33,7 @@ void SocketAutoCloseSet::close(Writer&                           writer,
    {
       socket->autoClose(message);
       auto key = socketKey(socket->id);
-      parent.sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      parent.sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
    {
       std::lock_guard l{parent.mutex};
@@ -159,7 +159,7 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
    if (p->closed)
    {
       auto key = socketKey(p->id);
-      sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
 
    p->send(buf);
@@ -199,7 +199,8 @@ void Sockets::add(Writer& writer, const std::shared_ptr<Socket>& socket, SocketA
 
    {
       SocketRow row{socket->id, socket->info()};
-      sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
+      sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
+                               psio::to_frac(row));
    }
 }
 void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>& socket)
@@ -235,7 +236,8 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
    if (!existing)
    {
       SocketRow row{socket->id, socket->info()};
-      sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
+      sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
+                               psio::to_frac(row));
    }
 }
 void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket)
@@ -252,7 +254,7 @@ void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket)
    if (matched)
    {
       auto key = socketKey(socket->id);
-      sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
 }
 std::int32_t Sockets::autoClose(std::int32_t               fd,

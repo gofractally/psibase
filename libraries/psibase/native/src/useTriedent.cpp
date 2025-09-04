@@ -182,6 +182,10 @@ namespace psibase
       std::mutex          subjectiveMutex;
       IndependentRevision subjective;
 
+      static constexpr auto numPersistentDatabases =
+          static_cast<std::uint32_t>(DbId::endPersistent) -
+          static_cast<std::uint32_t>(DbId::beginIndependent);
+
       SharedDatabaseImpl(const std::filesystem::path&     dir,
                          const triedent::database_config& config,
                          triedent::open_mode              mode)
@@ -202,8 +206,8 @@ namespace psibase
          std::vector<std::shared_ptr<triedent::root>> roots;
          if (s->get(topRoot, subjectiveKey, nullptr, &roots))
          {
-            check(roots.size() == numIndependentDatabases, "Wrong number of subjective databases");
-            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+            check(roots.size() == numPersistentDatabases, "Wrong number of subjective databases");
+            for (std::size_t i = 0; i < numPersistentDatabases; ++i)
                subjective[i] = roots[i];
          }
       }
@@ -219,10 +223,10 @@ namespace psibase
          return topRoot;
       }
 
-      auto getNativeSubjective()
+      auto getNativeSubjective(DbId db = DbId::nativeSubjective)
       {
          std::lock_guard l{subjectiveMutex};
-         return subjective[independentIndex(DbId::nativeSubjective)];
+         return subjective[independentIndex(db)];
       }
 
       auto getHead()
@@ -250,6 +254,11 @@ namespace psibase
          std::lock_guard lock{topMutex};
          session.upsert(topRoot, revisionById(blockId), r.roots);
          session.set_top_root(topRoot);
+      }
+
+      std::span<DbPtr> persistent()
+      {
+         return std::span{subjective}.subspan(0, numPersistentDatabases);
       }
    };  // SharedDatabaseImpl
 
@@ -354,29 +363,31 @@ namespace psibase
    }  // removeRevisions
 
    void SharedDatabase::kvPutSubjective(Writer&               writer,
+                                        DbId                  db,
                                         std::span<const char> key,
                                         std::span<const char> value)
    {
       std::lock_guard l{impl->subjectiveMutex};
-      writer.upsert(impl->subjective[independentIndex(DbId::nativeSubjective)], key, value);
+      writer.upsert(impl->subjective[independentIndex(db)], key, value);
       std::lock_guard lock{impl->topMutex};
-      writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+      writer.upsert(impl->topRoot, subjectiveKey, impl->persistent());
       writer.set_top_root(impl->topRoot);
    }
 
-   void SharedDatabase::kvRemoveSubjective(Writer& writer, std::span<const char> key)
+   void SharedDatabase::kvRemoveSubjective(Writer& writer, DbId db, std::span<const char> key)
    {
       std::lock_guard l{impl->subjectiveMutex};
-      writer.remove(impl->subjective[independentIndex(DbId::nativeSubjective)], key);
+      writer.remove(impl->subjective[independentIndex(db)], key);
       std::lock_guard lock{impl->topMutex};
-      writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+      writer.upsert(impl->topRoot, subjectiveKey, impl->persistent());
       writer.set_top_root(impl->topRoot);
    }
 
    std::optional<std::vector<char>> SharedDatabase::kvGetSubjective(Writer&               reader,
+                                                                    DbId                  db,
                                                                     std::span<const char> key)
    {
-      auto root = impl->getNativeSubjective();
+      auto root = impl->getNativeSubjective(db);
       return reader.get(root, key);
    }
 
@@ -430,7 +441,7 @@ namespace psibase
             }
          }
          std::lock_guard lock{impl->topMutex};
-         writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+         writer.upsert(impl->topRoot, subjectiveKey, impl->persistent());
          writer.set_top_root(impl->topRoot);
       }
       return true;
