@@ -18,7 +18,6 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
 `psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
-`psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 `psibase` *subcommand* [*args*\.\.\.]  
 
 ## DESCRIPTION
@@ -292,20 +291,6 @@ Upload a file to a service's subdomain. The file will be stored to and served fr
 - `-S`, `--sender` *sender*
 
   Account to use as the sender of the transaction. Required. Files are uploaded to this account's subdomain.
-
-### create-token
-
-`psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
-
-Create an access token. `psibase` will prompt for the key to use to sign the token. For the token to be useful, the server must enable bearer tokens with the same key.
-
-- `-e`, `--expires-after` *seconds*
-
-  Lifetime of the token in seconds. The default is 1 hour.
-  
-- `-m`, `--mode` *mode*
-
-  The permissions granted by the token. Should be `r` or `rw`. The default is `rw`.
 
 ### Custom Commands
 

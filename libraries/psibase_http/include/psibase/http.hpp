@@ -1,6 +1,5 @@
 #pragma once
 
-#include <psibase/authz.hpp>
 #include <psibase/http_types.hpp>
 
 #include <boost/asio/local/stream_protocol.hpp>
@@ -227,65 +226,6 @@ namespace psibase::http
    using services_t =
        std::map<std::string, std::map<std::string, native_content, std::less<>>, std::less<>>;
 
-   // Identifies which services are allowed to access the native API
-   struct admin_none
-   {
-      std::string str() const { return ""; }
-   };
-   struct admin_any
-   {
-      std::string str() const { return "*"; }
-   };
-   struct admin_any_native
-   {
-      std::string str() const { return "static:*"; }
-   };
-   using admin_service = std::variant<admin_none, admin_any, admin_any_native, AccountNumber>;
-
-   inline admin_service admin_service_from_string(std::string_view s)
-   {
-      if (s == "")
-      {
-         return admin_none{};
-      }
-      else if (s == "*")
-      {
-         return admin_any{};
-      }
-      else if (s == "static:*")
-      {
-         return admin_any_native{};
-      }
-      else
-      {
-         return AccountNumber{s};
-      }
-   }
-
-   void from_json(admin_service& obj, auto& stream)
-   {
-      if (stream.get_null_pred())
-      {
-         obj = admin_none{};
-      }
-      else
-      {
-         obj = admin_service_from_string(stream.get_string());
-      }
-   }
-
-   void to_json(const admin_service& obj, auto& stream)
-   {
-      if (std::holds_alternative<admin_none>(obj))
-      {
-         stream.write("null", 4);
-      }
-      else
-      {
-         std::visit([&](const auto& value) { to_json(value.str(), stream); }, obj);
-      }
-   }
-
 #ifdef PSIBASE_ENABLE_SSL
    using tls_context_ptr = std::shared_ptr<boost::asio::ssl::context>;
 #endif
@@ -295,7 +235,6 @@ namespace psibase::http
       uint32_t                 num_threads      = {};
       uint32_t                 max_request_size = {};
       std::atomic<int64_t>     idle_timeout_us  = {};
-      std::string              allow_origin     = {};
       std::vector<listen_spec> listen           = {};
       std::vector<std::string> hosts            = {};
 #ifdef PSIBASE_ENABLE_SSL
@@ -316,8 +255,6 @@ namespace psibase::http
       unlock_keyring_t       unlock_keyring       = {};
       lock_keyring_t         lock_keyring         = {};
       get_pkcs11_tokens_t    get_pkcs11_tokens    = {};
-      admin_service          admin                = {};
-      std::vector<authz>     admin_authz;
       services_t             services;
       std::atomic<bool>      enable_p2p;
       std::atomic<bool>      enable_transactions;

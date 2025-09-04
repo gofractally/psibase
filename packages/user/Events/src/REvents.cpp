@@ -7,7 +7,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psio/schema.hpp>
 #include <regex>
-#include <services/user/Events.hpp>
+#include <services/user/EventIndex.hpp>
 #include <services/user/EventsTables.hpp>
 
 #include "SchemaCache.hpp"

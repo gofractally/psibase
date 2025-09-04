@@ -21,11 +21,7 @@ pub mod service {
         long_description: String,
         icon: String,
         icon_mime_type: String,
-        tos_subpage: String,
-        privacy_policy_subpage: String,
-        app_homepage_subpage: String,
         tags: Vec<String>,
-        redirect_uris: Vec<String>,
     ) {
         let app_metadata = AppMetadata::upsert(
             name,
@@ -33,10 +29,6 @@ pub mod service {
             long_description,
             icon,
             icon_mime_type,
-            tos_subpage,
-            privacy_policy_subpage,
-            app_homepage_subpage,
-            redirect_uris,
         );
 
         let mut tags = tags;
@@ -44,15 +36,13 @@ pub mod service {
     }
 
     #[action]
-    fn publish(account_id: AccountNumber) {
-        check(account_id == get_sender(), "Unauthorized");
-        AppMetadata::get(account_id).publish();
+    fn publish() {
+        AppMetadata::get_assert(get_sender()).publish();
     }
 
     #[action]
-    fn unpublish(account_id: AccountNumber) {
-        check(account_id == get_sender(), "Unauthorized");
-        AppMetadata::get(account_id).unpublish();
+    fn unpublish() {
+        AppMetadata::get_assert(get_sender()).unpublish();
     }
 
     #[event(history)]

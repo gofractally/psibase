@@ -15,7 +15,6 @@ const transformConfigServerToUI = (
 ): PsinodeConfigUI => {
     return {
         ...serverConfig,
-        admin: serverConfig.admin ? serverConfig.admin : undefined,
         listen: serverConfig.listen.map((listen) => ({
             ...listen,
             key: listen.protocol + listen.address + listen.path + listen.port,

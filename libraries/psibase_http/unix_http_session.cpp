@@ -22,5 +22,10 @@ namespace psibase::http
       common_shutdown_impl();
    }
 
+   SocketEndpoint unix_http_session::remote_endpoint() const
+   {
+      return LocalEndpoint{stream.socket().remote_endpoint().path()};
+   }
+
    template class http_session<unix_http_session>;
 }  // namespace psibase::http

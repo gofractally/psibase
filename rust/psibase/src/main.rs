@@ -3,10 +3,8 @@ use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::{join_all, try_join_all};
-use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
-use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
@@ -22,7 +20,7 @@ use psibase::{
 };
 use regex::Regex;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
 use std::cmp::Ordering;
@@ -434,23 +432,6 @@ struct InfoArgs {
 }
 
 #[derive(Args, Debug)]
-struct CreateTokenArgs {
-    #[command(flatten)]
-    sig_args: SigArgs,
-
-    #[command(flatten)]
-    tx_args: TxArgs,
-
-    /// The lifetime of the new token
-    #[clap(short = 'e', long, default_value = "3600", value_name = "SECONDS")]
-    expires_after: i64,
-
-    /// The access mode: "r" or "rw"
-    #[clap(short = 'm', long, default_value = "rw")]
-    mode: String,
-}
-
-#[derive(Args, Debug)]
 struct LoginArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -502,9 +483,6 @@ enum Command {
 
     /// Shows package contents
     Info(InfoArgs),
-
-    /// Create a bearer token that can be used to access a node
-    CreateToken(CreateTokenArgs),
 
     /// Get a bearer token that can be used to access an app
     Login(LoginArgs),
@@ -1970,24 +1948,6 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
-struct TokenData<'a> {
-    exp: i64,
-    mode: &'a str,
-}
-
-fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error> {
-    let key_text = rpassword::prompt_password("Enter Key: ")?;
-    let claims = TokenData {
-        exp: (Utc::now() + expires_after).timestamp(),
-        mode: mode,
-    };
-    let key: Hmac<Sha256> = Hmac::new_from_slice(key_text.as_bytes())?;
-    let token = claims.sign_with_key(&key)?;
-    println!("{}", token);
-    Ok(())
-}
-
 #[derive(Deserialize)]
 struct LoginReply {
     access_token: String,
@@ -2220,9 +2180,6 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::List(args) => list(args).await?,
         Command::Search(args) => search(&args).await?,
         Command::Info(args) => package_info(&args).await?,
-        Command::CreateToken(args) => {
-            create_token(Duration::seconds(args.expires_after), &args.mode)?
-        }
         Command::Login(args) => handle_login(&args).await?,
         Command::Config(config) => handle_cli_config_cmd(&config)?,
         Command::Help { command } => print_help(&command)?,

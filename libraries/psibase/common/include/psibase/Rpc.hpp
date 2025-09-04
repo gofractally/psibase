@@ -90,6 +90,8 @@ namespace psibase
    {
       ok                   = 200,
       notModified          = 304,
+      unauthorized         = 401,
+      forbidden            = 403,
       notFound             = 404,
       methodNotAllowed     = 405,
       notAcceptable        = 406,
@@ -121,6 +123,10 @@ namespace psibase
       std::vector<HttpHeader> headers;      ///< HTTP Headers
       PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
+
+   std::vector<HttpHeader> allowCors(std::string_view origin = "*");
+   std::vector<HttpHeader> allowCors(const HttpRequest& req, AccountNumber account);
+   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req);
 
    using HttpReply = BasicHttpReply<std::vector<char>>;
 

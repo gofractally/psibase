@@ -146,7 +146,7 @@ std::optional<HttpReply> SubjectiveDb::serveSys(const HttpRequest& req)
       {
          Tables{}.open<SubjectiveTable>().put(row);
       }
-      return HttpReply{};
+      return HttpReply{.headers = allowCors()};
    }
    else if (req.target == "/read")
    {
@@ -158,7 +158,7 @@ std::optional<HttpReply> SubjectiveDb::serveSys(const HttpRequest& req)
          if (auto row = Tables{}.open<SubjectiveTable>().getIndex<0>().get(key))
             result = row->value;
       }
-      HttpReply           response{.contentType = "application/json"};
+      HttpReply           response{.contentType = "application/json", .headers = allowCors()};
       psio::vector_stream stream{response.body};
       psio::to_json(result, stream);
       return response;

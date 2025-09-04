@@ -91,12 +91,17 @@ namespace SystemService
 
    namespace
    {
-      constexpr std::string_view allowedHeaders[] = {"Cache-Control",            //
-                                                     "Content-Encoding",         //
-                                                     "Content-Security-Policy",  //
-                                                     "ETag", "Set-Cookie"};
+      constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Headers",  //
+                                                     "Access-Control-Allow-Methods",  //
+                                                     "Access-Control-Allow-Origin",   //
+                                                     "Allow",                         //
+                                                     "Cache-Control",                 //
+                                                     "Content-Encoding",              //
+                                                     "Content-Security-Policy",       //
+                                                     "ETag",
+                                                     "Set-Cookie"};
 
-      void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
+      void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {
          for (const auto& header : result.headers)
          {
@@ -156,7 +161,7 @@ namespace SystemService
       }
    }
 
-   void HttpServer::sendReply(std::int32_t socket, const HttpReply& result)
+   void HttpServer::sendReply(std::int32_t socket, HttpReply result)
    {
       bool okay   = false;
       auto sender = getSender();
@@ -187,7 +192,7 @@ namespace SystemService
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
-      sendReplyImpl(sender, socket, result);
+      sendReplyImpl(sender, socket, std::move(result));
    }
 
    void HttpServer::serve(std::int32_t sock, HttpRequest req)
@@ -231,13 +236,18 @@ namespace SystemService
          {
             sendReplyImpl(server, sock, std::move(*result));
          }
+         else if (req.method == "OPTIONS")
+         {
+            sendReplyImpl(server, sock, {.status = HttpStatus::ok, .headers = allowCors()});
+         }
          else
          {
             std::string msg = "The resource '" + req.target + "' was not found";
             sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
-                           .body        = std::vector(msg.begin(), msg.end())});
+                           .body        = std::vector(msg.begin(), msg.end()),
+                           .headers     = allowCors()});
          }
       }
    }  // serve()

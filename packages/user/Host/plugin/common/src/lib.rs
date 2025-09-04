@@ -152,7 +152,7 @@ impl Client for HostCommon {
     fn get_active_app() -> String {
         let stack = get_callstack();
         assert!(stack.len() > 0);
-        stack[0].clone()
+        stack.into_iter().next().unwrap()
     }
 }
 
