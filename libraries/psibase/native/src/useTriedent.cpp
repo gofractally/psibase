@@ -260,6 +260,7 @@ namespace psibase
       {
          return std::span{subjective}.subspan(0, numPersistentDatabases);
       }
+      std::span<DbPtr> session() { return std::span{subjective}.subspan(numPersistentDatabases); }
    };  // SharedDatabaseImpl
 
    SharedDatabase::SharedDatabase(const std::filesystem::path&     dir,
@@ -273,6 +274,10 @@ namespace psibase
    {
       SharedDatabase result{*this};
       result.impl = std::make_shared<SharedDatabaseImpl>(*impl);
+      for (auto& sessionRoot : result.impl->session())
+      {
+         sessionRoot.reset();
+      }
       return result;
    }
 

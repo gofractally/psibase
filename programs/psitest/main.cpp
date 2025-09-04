@@ -305,7 +305,10 @@ struct test_chain
          sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
    }
 
-   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()} {}
+   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()}
+   {
+      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
+   }
 
    bool setFork(const psibase::Checksum256& id)
    {
