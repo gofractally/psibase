@@ -1,22 +1,7 @@
 package supervisor:bridge;
 
 interface types {
-    record error {
-        code: u32,
-        producer: plugin-id,
-        message: string,
-    }
-
-    record plugin-id {
-        service: string,
-        plugin: string,
-    }
-
-    variant body-types {
-        bytes(list<u8>),
-        json(string),
-        text(string),
-    }
+    use host:types/types.{body-types};
 
     record header {
         key: string,
@@ -38,12 +23,13 @@ interface types {
 }
 
 interface intf {
-    use types.{http-request, http-response, error, plugin-id};
+    use host:types/types.{pem, error, plugin-id};
+    use types.{http-request, http-response};
 
     // The top-level app through which the app is accessing psibase
-    // 
+    //
     // Cannot be derived from the callstack, as the supervisor is allowed
-    //   to originate calls in the context of a non-supervisor root window 
+    //   to originate calls in the context of a non-supervisor root window
     //   (e.g. start-tx, finish-tx)
     get-active-app: func() -> string;
 
@@ -55,6 +41,18 @@ interface intf {
     get-root-domain: func() -> string;
 
     get-chain-id: func() -> string;
+
+    // /// Signs a pre-hashed message for the DER-encoded pubKey
+    sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
+
+    // /// Signs a pre-hashed message with the specified DER-encoded private key
+    sign-explicit: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
+
+    // /// Imports a PEM-encoded private key into the keyvault.
+    // /// This does not change the key of any account, it simply allows AuthSig to sign
+    // ///   with the specified private key.
+    // /// Returns the corresponding public key in PEM format.
+    import-key: func(private-key: pem, extractable: option<bool>) -> result<pem, error>;
 }
 
 interface database {

@@ -28,8 +28,8 @@ export default defineConfig(({ command }) => ({
     ],
     build: {
         target: "esnext",
-        minify: true,
-        sourcemap: false,
+        minify: false,
+        sourcemap: true,
         rollupOptions: {
             external: ["hash.js", "elliptic"],
             input: {

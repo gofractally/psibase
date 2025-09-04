@@ -72,7 +72,7 @@ export interface HostInterface {
 
     importKey(privateKey: string): string;
 
-    signExplicit(preimage: Uint8Array, privateKey: string): Uint8Array;
+    signExplicit(msg: Uint8Array, privateKey: string): Uint8Array;
 
-    sign(preimage: Uint8Array, publicKey: string): Uint8Array;
+    sign(msg: Uint8Array, publicKey: string): Uint8Array;
 }

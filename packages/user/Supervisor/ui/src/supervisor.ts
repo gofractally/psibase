@@ -45,6 +45,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("host", "auth"),
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
+    pluginId("webcrypto", "plugin"),
 ];
 
 // The supervisor facilitates all communication
@@ -238,13 +239,14 @@ export class Supervisor implements AppInterface {
     }
 
     importKey(privateKey: string): string {
+        console.log("supervisor.ts:importKey.0");
         // TODO: impl importKey()
         // future: call out to SubtleCrypto
         // future: store privateKey, indexed by pubKey
         return this.supervisorCall(
             getCallArgs(
-                "supervisor",
-                "webcryptoshim",
+                "webcrypto",
+                "plugin",
                 "api",
                 "importKey",
                 [privateKey],
@@ -257,8 +259,8 @@ export class Supervisor implements AppInterface {
         // future: call out to SubtleCrypto
         this.supervisorCall(
             getCallArgs(
-                "supervisor",
-                "webcryptoshim",
+                "webcrypto",
+                "plugin",
                 "api",
                 "signExplicit",
                 [msg, privateKey],
@@ -274,8 +276,8 @@ export class Supervisor implements AppInterface {
         // future: lookup privateKey by pubKey
         this.supervisorCall(
             getCallArgs(
-                "supervisor",
-                "webcryptoshim",
+                "webcrypto",
+                "plugin",
                 "api",
                 "sign",
                 [msg, publicKey],

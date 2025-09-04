@@ -24,11 +24,11 @@ export const intf = {
     },
 
     signExplicit(msg, privateKey) {
-        return host.signExplicit(preimage, privateKey);
+        return host.signExplicit(msg, privateKey);
     },
 
     sign(msg, publicKey) {
-        return host.sign(preimage, publicKey);
+        return host.sign(msg, publicKey);
     }
 };
 

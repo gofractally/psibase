@@ -3276,7 +3276,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "web-crypto-shim"
+name = "web-crypto"
 version = "0.20.0"
 dependencies = [
  "p256",

@@ -231,6 +231,7 @@ impl From<Transaction> for SimpleTx {
 }
 
 pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transaction {
+    println!("Transact.make_transaction().1");
     let claims = get_claims(&actions, true).expect("Failed to retrieve claims from auth plugin");
     let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
 

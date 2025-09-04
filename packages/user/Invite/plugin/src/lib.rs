@@ -87,25 +87,34 @@ fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, HostTypes
 
 impl Invitee for InvitePlugin {
     fn accept_with_new_account(account: String, token: String) -> Result<(), HostTypes::Error> {
+        println!("accept_with_new_account().1");
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
             return Err(InvalidAccount(&account));
         })?;
 
+        println!("accept_with_new_account().2");
         if Accounts::api::get_account(&account)?.is_some() {
             return Err(AccountExists("accept_with_new_account").into());
         }
 
+        println!("accept_with_new_account().3");
         hook_actions_sender();
 
+        println!("accept_with_new_account().4");
         AuthInvite::notify(&token)?;
 
+        println!("accept_with_new_account().5");
         let invite_token = InviteToken::from_encoded(&token)?;
+        println!("accept_with_new_account().6");
         let invite = fetch_and_decode(&invite_token)?;
 
+        println!("accept_with_new_account().7");
         let account_keypair = keyvault::generate_unmanaged_keypair()?;
         // TODO: save private key to password manager
-        keyvault::import_key(&account_keypair.private_key)?;
+        println!("accept_with_new_account().8");
+        keyvault::import_key(&account_keypair.private_key, None)?;
 
+        println!("accept_with_new_account().9");
         Transact::add_action_to_transaction(
             acceptCreate::ACTION_NAME,
             &acceptCreate {
@@ -116,6 +125,7 @@ impl Invitee for InvitePlugin {
             .packed(),
         )?;
 
+        println!("accept_with_new_account().10");
         InvitesTable::delete_invite(invite_token.id);
 
         Ok(())

@@ -51,14 +51,16 @@ struct AuthSig;
 
 impl HookUserAuth for AuthSig {
     fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
+        println!("authSig.on_user_auth_claim.1");
         if !from_transact() {
             return Err(Unauthorized("on_user_auth_claim".to_string()).into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
-        if !ManagedKeys::has(&pubkey) {
-            return Err(KeyNotFound("on_user_auth_claim").into());
-        }
+        println!("authSig.on_user_auth_claim.2");
+        // if !ManagedKeys::has(&pubkey) {
+        //     return Err(KeyNotFound("on_user_auth_claim").into());
+        // }
 
         Ok(Some(Claim {
             verify_service: psibase::services::verify_sig::SERVICE.to_string(),
@@ -70,14 +72,17 @@ impl HookUserAuth for AuthSig {
         account_name: String,
         transaction_hash: Vec<u8>,
     ) -> Result<Option<Proof>, Error> {
+        println!("authSig.on_user_auth_proof().1");
         if !from_transact() {
             return Err(Unauthorized("get_proofs".to_string()).into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
         // replace next 2 lines with HostCrypto::sign(tx_hash, pubKey)
-        let private_key = ManagedKeys::get(&pubkey);
-        let signature = AuthSig::sign(transaction_hash, private_key)?;
+        let public_key = pubkey.into();
+        println!("authSig.on_user_auth_proof().2");
+        let signature = AuthSig::sign(transaction_hash, public_key)?;
+        println!("authSig.on_user_auth_proof().3");
         Ok(Some(Proof { signature }))
     }
 }
@@ -108,15 +113,33 @@ impl KeyVault for AuthSig {
         HostCrypto::to_der(&key)
     }
 
-    fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
+    fn sign_explicit(
+        hashed_message: Vec<u8>,
+        private_key: Vec<u8>,
+    ) -> Result<Vec<u8>, HostTypes::Error> {
+        println!("authSig.sign_explicit().1");
         authorize(FunctionName::sign)?;
+        println!("authSig.sign_explicit().2");
         // NOTE: this could very well not be an account's key, so I'd have to import it to WebCrypto and then sign (perferably don't import it to WebCryto to avoid bloat)
-        HostCrypto::sign(&hashed_message, &private_key)
+        HostCrypto::sign_explicit(&hashed_message, &private_key)
     }
 
-    fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
-        authorize_with_whitelist(FunctionName::import_key, vec!["x-admin".into()])?;
-        HostCrypto::import_key(&private_key)
+    fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
+        println!("authSig.sign().1");
+        authorize(FunctionName::sign)?;
+        println!("authSig.sign().2");
+        // NOTE: this could very well not be an account's key, so I'd have to import it to WebCrypto and then sign (perferably don't import it to WebCryto to avoid bloat)
+        HostCrypto::sign(&hashed_message, &public_key)
+    }
+
+    fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
+        println!("AuthSig.import_key().1");
+        authorize_with_whitelist(
+            FunctionName::import_key,
+            vec!["x-admin".into(), "invite".into()],
+        )?;
+        println!("AuthSig.import_key().2");
+        HostCrypto::import_key(&private_key, extractable)
     }
 }
 

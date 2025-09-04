@@ -19,8 +19,8 @@ use host::common::{
     client::{get_receiver, get_sender},
     store::StorageDuration,
 };
-use host::types::types::Error;
 use host::prompt::web as HostPrompt;
+use host::types::types::Error;
 
 mod errors;
 use errors::*;
@@ -71,6 +71,7 @@ impl Api for PermissionsPlugin {
         debug_label: String,
         whitelist: Vec<String>,
     ) -> Result<bool, Error> {
+        println!("Permissions.authorize().top");
         let callee = HostClient::get_sender();
 
         if level == TrustLevel::None {
