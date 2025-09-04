@@ -178,7 +178,7 @@ pub mod tables {
 
 #[psibase::service(name = "token-stream", tables = "tables")]
 pub mod service {
-    use psibase::services::tokens::Memo;
+    use psibase::services::tokens::{Decimal, Memo};
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
@@ -201,6 +201,16 @@ pub mod service {
         Wrapper::emit()
             .history()
             .created(stream.nft_id, decay_rate_per_million, token_id, sender);
+
+        Wrapper::emit().history().updated(
+            (6 as u32).into(),
+            sender,
+            "deposited".to_string(),
+            Decimal::new(
+                432423.into(),
+                4.try_into().unwrap(),
+            ),
+        );
 
         stream.nft_id
     }
@@ -225,8 +235,10 @@ pub mod service {
             nft_id,
             sender,
             "deposited".to_string(),
-            shared_balance.value,
-            Tokens::call().getToken(stream.token_id).precision.value(),
+            Decimal::new(
+                shared_balance,
+                Tokens::call().getToken(stream.token_id).precision,
+            ),
         );
     }
 
@@ -249,8 +261,10 @@ pub mod service {
             nft_id,
             sender,
             "claimed".to_string(),
-            claimed_amount.value,
-            Tokens::call().getToken(stream.token_id).precision.value(),
+            Decimal::new(
+                claimed_amount,
+                Tokens::call().getToken(stream.token_id).precision,
+            ),
         );
     }
 
@@ -271,8 +285,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: u64, precision: u8) {
-    }
+    pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: Decimal) {}
 }
 
 #[cfg(test)]

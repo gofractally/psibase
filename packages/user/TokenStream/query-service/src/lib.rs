@@ -21,40 +21,13 @@ mod service {
         creator: AccountNumber,
     }
 
-    #[derive(SimpleObject)]
+    #[derive(Deserialize, SimpleObject)]
     struct UpdatedEvent {
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         nft_id: u32,
         actor: AccountNumber,
-        amount: String,
         tx_type: String,
-    }
-
-    impl<'de> Deserialize<'de> for UpdatedEvent {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            #[derive(Deserialize)]
-            struct UpdatedEventRaw {
-                #[serde(deserialize_with = "deserialize_number_from_string")]
-                nft_id: u32,
-                actor: AccountNumber,
-                #[serde(deserialize_with = "deserialize_number_from_string")]
-                amount: u64,
-                #[serde(deserialize_with = "deserialize_number_from_string")]
-                precision: u8,
-                tx_type: String,
-            }
-
-            let raw = UpdatedEventRaw::deserialize(deserializer)?;
-            Ok(UpdatedEvent {
-                actor: raw.actor,
-                amount: Decimal::new(raw.amount.into(), raw.precision.try_into().unwrap())
-                    .to_string(),
-                nft_id: raw.nft_id,
-                tx_type: raw.tx_type,
-            })
-        }
+        amount: Decimal,
     }
 
     struct Query;
@@ -65,6 +38,16 @@ mod service {
             StreamTable::with_service(token_stream::SERVICE)
                 .get_index_pk()
                 .get(&nft_id)
+        }
+
+        async fn derp(&self) -> UpdatedEvent {
+            UpdatedEvent {
+                nft_id: 7,
+                actor: "ifwjei".into(),
+                tx_type: "fwehu".to_string(),
+                amount:         Decimal::new(43434.into(), 4.try_into().unwrap())
+
+            }
         }
 
         async fn streams(
