@@ -243,7 +243,7 @@ namespace SystemService
                                                                 PendingVerifyTable,
                                                                 ReverifySignaturesTable,
                                                                 SpeculativeTransactionTable>;
-      using Session                 = psibase::DbTables<psibase::DbId::session, TraceClientTable>;
+      using Session                 = psibase::SessionTables<TraceClientTable>;
       using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
                                                                ReversibleBlocksTable,
                                                                TxSuccessTable,
