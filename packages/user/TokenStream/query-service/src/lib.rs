@@ -40,16 +40,6 @@ mod service {
                 .get(&nft_id)
         }
 
-        async fn derp(&self) -> UpdatedEvent {
-            UpdatedEvent {
-                nft_id: 7,
-                actor: "ifwjei".into(),
-                tx_type: "fwehu".to_string(),
-                amount:         Decimal::new(43434.into(), 4.try_into().unwrap())
-
-            }
-        }
-
         async fn streams(
             &self,
             first: Option<i32>,
