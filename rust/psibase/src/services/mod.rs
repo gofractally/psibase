@@ -1,6 +1,7 @@
 //! Interfaces for standard services
 
 pub mod accounts;
+pub mod auth_cred;
 pub mod auth_delegate;
 pub mod auth_invite;
 pub mod auth_sig;
@@ -8,6 +9,7 @@ pub mod brotli_codec;
 pub mod chainmail;
 pub mod common_api;
 pub mod cpu_limit;
+pub mod credentials;
 pub mod evaluations;
 pub mod events;
 pub mod fractals;
