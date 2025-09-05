@@ -3,7 +3,8 @@ pub mod tables {
     use std::u64;
 
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::services::tokens::{Quantity, TID};
+    use psibase::services::token_stream::{self, Stream};
+    use psibase::services::tokens::{self, Quantity, TID};
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
@@ -25,7 +26,8 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
-        pub reward_rate_ppm: u32,
+        pub half_life_seconds: u32,
+        pub token_id: TID,
     }
 
     impl Fractal {
@@ -36,13 +38,16 @@ pub mod tables {
 
         fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
+            let token_id =
+                tokens::service::Wrapper::call().create(4.into(), 210000000000000.into());
 
             Self {
                 account,
                 created_at: now,
                 mission,
                 name,
-                reward_rate_ppm: 1,
+                token_id,
+                half_life_seconds: 1,
             }
         }
 
@@ -131,7 +136,7 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
-        pub reward_stream: TID,
+        pub reward_stream_id: TID,
     }
 
     #[ComplexObject]
@@ -162,7 +167,7 @@ pub mod tables {
                 fractal,
                 created_at: now,
                 member_status: status as StatusU8,
-                reward_stream: 0,
+                reward_stream_id: 0,
             }
         }
 
@@ -176,7 +181,7 @@ pub mod tables {
             new_instance
         }
 
-        pub fn initialize_score(&self, eval_type: EvalType) {
+        fn initialize_score(&self, eval_type: EvalType) {
             Score::add(self.fractal, eval_type, self.account);
         }
 
@@ -189,14 +194,53 @@ pub mod tables {
             check_some(Self::get(fractal, account), "member does not exist")
         }
 
+        fn get_or_create_stream(&mut self) -> Stream {
+            let fractal = Fractal::get_assert(self.fractal);
+            if self.reward_stream_id != 0 {
+                if let Some(stream) =
+                    token_stream::Wrapper::call().get_stream(self.reward_stream_id)
+                {
+                    if stream.half_life_seconds == fractal.half_life_seconds {
+                        return stream;
+                    }
+                }
+            }
+
+            let new_stream_id =
+                token_stream::Wrapper::call().create(fractal.half_life_seconds, fractal.token_id);
+
+            self.reward_stream_id = new_stream_id;
+            self.save();
+
+            token_stream::Wrapper::call()
+                .get_stream(new_stream_id)
+                .unwrap()
+        }
+
         pub fn award_stream(&mut self, amount: Quantity) {
-            // check the current stream details are OK, if not create a new stream that is
-            //
+            let stream = self.get_or_create_stream();
+
+            tokens::Wrapper::call().credit(
+                Fractal::get_assert(self.fractal).token_id,
+                token_stream::SERVICE,
+                amount,
+                "Award stream".to_string().try_into().unwrap(),
+            );
+            token_stream::Wrapper::call().deposit(stream.nft_id);
+        }
+
+        pub fn claim(&mut self) {
+            // try to get amount;
+            let stream = check_some(
+                token_stream::Wrapper::call().get_stream(self.reward_stream_id),
+                "stream does not exist",
+            );
+            stream.half_life_seconds;
+            // how to figure out how much has got credited...?;
         }
 
         fn save(&self) {
-            let table = MemberTable::new();
-            table.put(&self).expect("failed to save");
+            MemberTable::new().put(&self).expect("failed to save");
         }
     }
 
@@ -516,6 +560,56 @@ pub mod tables {
         fn save(&self) {
             let table = ScoreTable::new();
             table.put(&self).expect("failed to save score");
+        }
+    }
+
+    #[table(name = "FineTable", index = 4)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct Fine {
+        pub fractal: AccountNumber,
+        pub account: AccountNumber,
+        pub created_at: psibase::TimePointSec,
+        pub fine_remaining: Quantity,
+        pub rate_ppm: u32,
+    }
+
+    impl Fine {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
+        }
+
+        fn new(
+            fractal: AccountNumber,
+            account: AccountNumber,
+            amount: Quantity,
+            rate_ppm: u32,
+        ) -> Self {
+            let now = TransactSvc::call().currentBlock().time.seconds();
+
+            Self {
+                account,
+                created_at: now,
+                fine_remaining: amount,
+                fractal,
+                rate_ppm,
+            }
+        }
+
+        pub fn add(
+            fractal: AccountNumber,
+            account: AccountNumber,
+            amount: Quantity,
+            rate_ppm: u32,
+        ) -> Self {
+            let new_instance = Self::new(fractal, account, amount, rate_ppm);
+            new_instance.save();
+            new_instance
+        }
+
+        fn save(&self) {
+            let table = FineTable::new();
+            table.put(&self).unwrap();
         }
     }
 }
