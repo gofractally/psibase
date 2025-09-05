@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct Stream {
     pub nft_id: NID,
     pub token_id: TID,
-    pub decay_rate_per_million: u32,
+    pub half_life_seconds: u32,
     pub total_deposited: Quantity,
     pub total_claimed: Quantity,
     pub last_deposit_timestamp: TimePointSec,
@@ -49,7 +49,7 @@ pub mod Service {
     /// # Returns
     /// The ID of the redeemer NFT which is also the unique ID of the stream.    
     #[action]
-    fn create(decay_rate_per_million: u32, token_id: u32) -> u32 {
+    fn create(half_life_seconds: u32, token_id: u32) -> u32 {
         unimplemented!()
     }
 
@@ -72,6 +72,17 @@ pub mod Service {
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
     #[action]
     fn claim(nft_id: u32) {
+        unimplemented!()
+    }
+
+    /// Delete a stream.
+    ///
+    /// * Requires stream to be empty.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    #[action]
+    fn delete(nft_id: u32) {
         unimplemented!()
     }
 
