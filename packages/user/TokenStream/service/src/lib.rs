@@ -181,11 +181,26 @@ pub mod service {
 
     use crate::tables::Stream;
 
+    /// Lookup stream information
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    ///
+    /// # Returns
+    /// Option of stream information, will be None if no longer exists.
     #[action]
     fn get_stream(nft_id: u32) -> Option<Stream> {
         Stream::get(nft_id)
     }
 
+    /// Creates a token stream.
+    ///
+    /// # Arguments
+    /// * `half_life_seconds` - Half life of the vesting rate in seconds
+    /// * `token_id` - Token ID to be deposited into the stream.
+    ///
+    /// # Returns
+    /// The ID of the redeemer NFT which is also the unique ID of the stream.    
     #[action]
     fn create(half_life_seconds: u32, token_id: u32) -> u32 {
         psibase::services::tokens::Wrapper::call().getToken(token_id);
@@ -200,6 +215,12 @@ pub mod service {
         stream.nft_id
     }
 
+    /// Deposit into a token stream.
+    ///
+    /// * Requires pre-existing shared balance of the token assigned to the strema, whole balance will be billed.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
     #[action]
     fn deposit(nft_id: u32) {
         let mut stream = Stream::get_assert(nft_id);
@@ -228,6 +249,12 @@ pub mod service {
         );
     }
 
+    /// Claim from a token stream.
+    ///
+    /// * Requires holding the redeemer NFT of the stream.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
     #[action]
     fn claim(nft_id: u32) {
         let mut stream = Stream::get_assert(nft_id);
@@ -255,6 +282,12 @@ pub mod service {
         );
     }
 
+    /// Delete a stream.
+    ///
+    /// * Requires stream to be empty.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
     #[action]
     fn delete(nft_id: u32) {
         let stream = Stream::get_assert(nft_id);

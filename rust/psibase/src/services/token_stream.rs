@@ -43,7 +43,7 @@ pub mod Service {
     /// Creates a token stream.
     ///
     /// # Arguments
-    /// * `decay_rate_per_million` - Decay rate in parts-per-million. (1,000,000 ppm = 100%)
+    /// * `half_life_seconds` - Half life of the vesting rate in seconds
     /// * `token_id` - Token ID to be deposited into the stream.
     ///
     /// # Returns
