@@ -200,6 +200,25 @@ impl Chain {
         );
     }
 
+    /// Advance the blockchain time by the specified number of seconds and start a new block.
+    ///
+    /// This method increments the current block time by `seconds` and starts a new block at that time.
+    /// If no current block exists, it starts from a default time (e.g., 0 microseconds).
+    pub fn progress_seconds(&self, seconds: i64) {
+        // Scope the immutable borrow to ensure it’s dropped before calling start_block_at
+        let current_time = {
+            let status = self.status.borrow();
+            status
+                .as_ref()
+                .map(|s| s.current.time)
+                .unwrap_or(TimePointUSec { microseconds: 0 })
+        };
+        let new_time = TimePointUSec {
+            microseconds: current_time.microseconds + (seconds * 1_000_000),
+        };
+        self.start_block_at(new_time);
+    }
+
     /// Start a new block
     ///
     /// Starts a new block at `time`. If `time.seconds` is 0,
