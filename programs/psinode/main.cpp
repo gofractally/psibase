@@ -435,20 +435,8 @@ void load_subjective_services(Database& db)
    }
 }
 
-void clear_environment(Database& db)
-{
-   auto       key       = psio::convert_to_key(envPrefix());
-   const auto prefixLen = key.size();
-   while (auto kv = db.kvGreaterEqualRaw(EnvRow::db, key, prefixLen))
-   {
-      key.assign(kv->key.pos, kv->key.end);
-      db.kvRemoveRaw(EnvRow::db, key);
-   }
-}
-
 void load_environment(Database& db)
 {
-   clear_environment(db);
    for (const char* const* iter = ::environ; *iter; ++iter)
    {
       std::string_view entry{*iter};
@@ -1367,23 +1355,6 @@ void run(const std::string&              db_path,
          throw std::runtime_error("Failed to initialize database");
       }
    }
-   psio::finally resetEnvironment{
-       [&]
-       {
-          // It's not important if this fails. We'll fix it the next time psinode starts
-          try
-          {
-             Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
-             SocketAutoCloseSet autoClose;
-             auto               session = db.startWrite(system->sharedDatabase.createWriter());
-             db.checkoutSubjective();
-             clear_environment(db);
-             db.commitSubjective(*system->sockets, autoClose);
-          }
-          catch (...)
-          {
-          }
-       }};
 
    // Manages the session and and unlinks all keys from prover on destruction
    struct PKCS11SessionManager

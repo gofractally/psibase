@@ -237,13 +237,13 @@ namespace SystemService
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
-                                                                TraceClientTable,
                                                                 JWTKeyTable,
                                                                 TxFailedTable,
                                                                 UnverifiedTransactionTable,
                                                                 PendingVerifyTable,
                                                                 ReverifySignaturesTable,
                                                                 SpeculativeTransactionTable>;
+      using Session                 = psibase::SessionTables<TraceClientTable>;
       using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
                                                                ReversibleBlocksTable,
                                                                TxSuccessTable,
@@ -288,5 +288,8 @@ namespace SystemService
                 method(serveSys, request, socket, user),
                 method(login, rootHost),
                 method(getUser, request))
-   PSIBASE_REFLECT_TABLES(RTransact, RTransact::Subjective, RTransact::WriteOnly)
+   PSIBASE_REFLECT_TABLES(RTransact,
+                          RTransact::Subjective,
+                          RTransact::Session,
+                          RTransact::WriteOnly)
 }  // namespace SystemService

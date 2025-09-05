@@ -293,8 +293,6 @@ struct test_chain
                                  std::make_shared<psibase::Sockets>(this->db)});
       state.shared_memory_cache.init(*sys);
       head = this->db.getHead();
-
-      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
    }
 
    test_chain(::state&                         state,
@@ -303,9 +301,14 @@ struct test_chain
               triedent::open_mode              mode)
        : test_chain{state, {path, config, mode}}
    {
+      if (mode != triedent::open_mode::read_only)
+         sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
    }
 
-   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()} {}
+   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()}
+   {
+      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
+   }
 
    bool setFork(const psibase::Checksum256& id)
    {

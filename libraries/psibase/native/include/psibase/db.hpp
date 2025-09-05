@@ -109,9 +109,14 @@ namespace psibase
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
-      void kvPutSubjective(Writer& writer, std::span<const char> key, std::span<const char> value);
-      void kvRemoveSubjective(Writer& writer, std::span<const char> key);
-      std::optional<std::vector<char>> kvGetSubjective(Writer& writer, std::span<const char> key);
+      void kvPutSubjective(Writer&               writer,
+                           DbId                  db,
+                           std::span<const char> key,
+                           std::span<const char> value);
+      void kvRemoveSubjective(Writer& writer, DbId db, std::span<const char> key);
+      std::optional<std::vector<char>> kvGetSubjective(Writer&               writer,
+                                                       DbId                  db,
+                                                       std::span<const char> key);
 
       IndependentRevision getSubjective();
       bool                commitSubjective(Writer&                writer,

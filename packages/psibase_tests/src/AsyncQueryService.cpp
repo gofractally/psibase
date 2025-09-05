@@ -33,14 +33,15 @@ PSIO_REFLECT_TYPENAME(CounterTable)
 
 struct AsyncQueryService : psibase::Service
 {
-   using Subjective              = psibase::SubjectiveTables<AsyncResponseTable, CounterTable>;
+   using Subjective              = psibase::SubjectiveTables<CounterTable>;
+   using Session                 = psibase::SessionTables<AsyncResponseTable>;
    static constexpr auto service = psibase::AccountNumber{"as-query"};
    void                  onBlock();
    auto                  serveSys(const HttpRequest& req, std::optional<std::int32_t> socket)
        -> std::optional<HttpReply>;
 };
 PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
-PSIBASE_REFLECT_TABLES(AsyncQueryService, AsyncQueryService::Subjective)
+PSIBASE_REFLECT_TABLES(AsyncQueryService, AsyncQueryService::Subjective, AsyncQueryService::Session)
 
 void wait_until(std::chrono::steady_clock::time_point end)
 {
@@ -59,7 +60,7 @@ void AsyncQueryService::onBlock()
    std::vector<AsyncResponseRow> rows;
    PSIBASE_SUBJECTIVE_TX
    {
-      auto table = Subjective{}.open<AsyncResponseTable>();
+      auto table = open<AsyncResponseTable>();
       for (auto row : table.getIndex<0>())
       {
          table.remove(row);
@@ -116,7 +117,7 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
    }
    else if (path == "/send_async")
    {
-      auto table = Subjective{}.open<AsyncResponseTable>();
+      auto table = open<AsyncResponseTable>();
       PSIBASE_SUBJECTIVE_TX
       {
          table.put({.socket = *socket, .reply = reply});
@@ -126,7 +127,7 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
    }
    else if (path == "/send_and_abort_async")
    {
-      auto table = Subjective{}.open<AsyncResponseTable>();
+      auto table = open<AsyncResponseTable>();
       PSIBASE_SUBJECTIVE_TX
       {
          table.put({.socket = *socket, .error = "test send and abort async"});
@@ -142,7 +143,7 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
    }
    else if (path == "/send_async_and_abort")
    {
-      auto table = Subjective{}.open<AsyncResponseTable>();
+      auto table = open<AsyncResponseTable>();
       PSIBASE_SUBJECTIVE_TX
       {
          table.put({.socket = *socket, .reply = reply});
@@ -165,7 +166,7 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
    }
    else if (path == "/send_async_with_contention")
    {
-      auto table = Subjective{}.open<AsyncResponseTable>();
+      auto table = open<AsyncResponseTable>();
       PSIBASE_SUBJECTIVE_TX
       {
          table.put({.socket = *socket, .reply = reply});

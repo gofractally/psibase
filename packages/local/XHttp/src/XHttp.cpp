@@ -41,7 +41,7 @@ void XHttp::autoClose(std::int32_t socket, bool value)
    auto sender = getSender();
    PSIBASE_SUBJECTIVE_TX
    {
-      auto requests = Subjective{}.open<PendingRequestTable>();
+      auto requests = Session{}.open<PendingRequestTable>();
       auto owned    = Temporary{}.open<PendingRequestTable>();
 
       auto from = value ? &requests : &owned;

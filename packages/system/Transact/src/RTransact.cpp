@@ -320,7 +320,7 @@ namespace
        -> ClaimedSockets
    {
       {
-         auto                      clients = RTransact::Subjective{}.open<TraceClientTable>();
+         auto                      clients = RTransact{}.open<TraceClientTable>();
          std::vector<std::int32_t> json_clients, bin_clients;
 
          auto socketClaimed = [&](const auto& client)
@@ -616,7 +616,7 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    check(getSender() == AccountNumber{}, "Wrong sender");
    printf("trace size: %zu\n", find_view_span(trace).size());
 
-   auto clients = Subjective{}.open<TraceClientTable>();
+   auto clients = open<TraceClientTable>();
 
    bool waitForApplied = false;
    bool waitForFinal   = false;
@@ -695,7 +695,7 @@ void RTransact::onBlock()
    auto failedTxTable     = Subjective{}.open<TxFailedTable>();
    auto pendingTxTable    = Subjective{}.open<PendingTransactionTable>();
    auto dataTable         = Subjective{}.open<TransactionDataTable>();
-   auto clientTable       = Subjective{}.open<TraceClientTable>();
+   auto clientTable       = open<TraceClientTable>();
 
    // Get all successful and irreversible transactions
    auto successTxIdx = successfulTxTable.getIndex<1>();
@@ -862,7 +862,7 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::view<const TransactionTrace> t
    auto                       speculative = open<SpeculativeTransactionTable>();
    auto                       unverified  = open<UnverifiedTransactionTable>();
    auto                       pending     = open<PendingTransactionTable>();
-   auto                       clients     = Subjective{}.open<TraceClientTable>();
+   auto                       clients     = open<TraceClientTable>();
    std::optional<Checksum256> errorTxId;
    std::optional<Checksum256> broadcastTxId;
    PSIBASE_SUBJECTIVE_TX
@@ -1394,7 +1394,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       bool json        = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {
-         auto clients = Subjective{}.open<TraceClientTable>();
+         auto clients = open<TraceClientTable>();
          auto row     = clients.get(id).value_or(
              TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
          row.clients.push_back({*socket, json, query.flag()});

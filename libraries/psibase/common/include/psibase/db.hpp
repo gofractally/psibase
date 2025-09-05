@@ -145,11 +145,19 @@ namespace psibase
       /// blocks.
       nativeSubjective,
 
+      endPersistent,
+
+      /// Data that is not part of consensus and is not preserved when the server exits
+      session = endPersistent,
+
+      /// Native subjective tables that are not preserved when the server exits
+      nativeSession,
+
       endIndependent,
 
       /// Subjective tables that are local to the transaction/query/callback
       /// context.
-      temporary,
+      temporary = endIndependent,
    };
 
    inline constexpr uint32_t numChainDatabases = ((uint32_t)DbId::numChainDatabases);

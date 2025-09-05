@@ -81,8 +81,8 @@ namespace psibase
 
      private:
       template <typename M>
-      static auto makeParams(psio::SchemaBuilder&         builder,
-                             std::span<const char* const> ref) -> psio::schema_types::Object
+      static auto makeParams(psio::SchemaBuilder& builder, std::span<const char* const> ref)
+          -> psio::schema_types::Object
       {
          psio::schema_types::Object type;
          auto                       nameIter = ref.begin();
@@ -293,6 +293,8 @@ namespace psibase
             return "writeOnly";
          else if (db == DbId::subjective)
             return "subjective";
+         else if (db == DbId::session)
+            return "session";
          else
             abortMessage("db cannot be used in schema");
       }
