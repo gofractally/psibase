@@ -106,45 +106,51 @@ impl Hooks for TransactPlugin {
     }
 }
 
+fn schedule_action(
+    service: String,
+    method_name: String,
+    packed_args: Vec<u8>,
+) -> Result<(), HostTypes::Error> {
+    validate_action_name(&method_name)?;
+    let sender = get_action_sender(service.as_str(), method_name.as_str())?;
+
+    let action = Action {
+        sender,
+        service,
+        method: method_name,
+        raw_data: packed_args,
+    };
+
+    if let Some(plugin) = ActionAuthPlugins::get() {
+        ActionAuthPlugins::clear();
+        let plugin_ref = HostTypes::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
+        let claims = on_action_auth_claims(plugin_ref, &action)?;
+        ActionClaims::push(plugin, claims);
+    }
+
+    CurrentActions::push(action, TxTransformLabel::get_current_label());
+
+    Ok(())
+}
+
 impl Intf for TransactPlugin {
     fn add_action_to_transaction(
         method_name: String,
         packed_args: Vec<u8>,
     ) -> Result<(), HostTypes::Error> {
-        validate_action_name(&method_name)?;
-
-        let service = Host::client::get_sender();
-        let sender = get_action_sender(service.as_str(), method_name.as_str())?;
-
-        let action = Action {
-            sender,
-            service,
-            method: method_name,
-            raw_data: packed_args,
-        };
-
-        if let Some(plugin) = ActionAuthPlugins::get() {
-            ActionAuthPlugins::clear();
-            let plugin_ref =
-                HostTypes::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
-            let claims = on_action_auth_claims(plugin_ref, &action)?;
-            ActionClaims::push(plugin, claims);
-        }
-
-        CurrentActions::push(action, TxTransformLabel::get_current_label());
-
-        Ok(())
+        schedule_action(Host::client::get_sender(), method_name, packed_args)
     }
 }
 
 impl Network for TransactPlugin {
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
-        let packed_args = setSnapTime {
-            seconds: Seconds::new(seconds as i64),
-        }
-        .packed();
+        let packed_args = setSnapTime { seconds }.packed();
 
-        TransactPlugin::add_action_to_transaction(setSnapTime::ACTION_NAME.to_string(), packed_args)
+        schedule_action(
+            psibase::services::transact::SERVICE.to_string(),
+            setSnapTime::ACTION_NAME.to_string(),
+            packed_args,
+        )
     }
 }
 

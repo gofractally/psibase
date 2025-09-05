@@ -112,7 +112,7 @@ namespace SystemService
       }
    }
 
-   void Transact::setSnapTime(psibase::Seconds seconds)
+   void Transact::setSnapTime(uint32_t seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");
       Tables tables(Transact::service);
@@ -123,9 +123,9 @@ namespace SystemService
       auto row   = table.get({});
       if (!row)
          row = {.lastSnapshot     = stat.head ? stat.head->header.time : stat.current.time,
-                .snapshotInterval = seconds};
+                .snapshotInterval = psibase::Seconds{seconds}};
       else
-         row->snapshotInterval = seconds;
+         row->snapshotInterval = psibase::Seconds{seconds};
       table.put(*row);
    }
 
@@ -337,7 +337,7 @@ namespace SystemService
                               ServiceMethod{action.service, action.method}, allowedActions,
                               std::vector<Claim>{});
          }  // if (requester != account->authService)
-      }  // if(enforceAuth)
+      }     // if(enforceAuth)
 
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
