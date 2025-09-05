@@ -1,6 +1,7 @@
 import { useAppForm } from "@/components/forms/app-form";
 
 import { useSetSnapshot } from "@/hooks/use-set-snapshot";
+import { useSnapshotSeconds } from "@/hooks/use-snapshot-seconds";
 
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -16,9 +17,10 @@ const oneDay = 86400;
 export const Settings = () => {
     const { mutateAsync: setSnapshot } = useSetSnapshot();
 
+    const { data: seconds } = useSnapshotSeconds();
     const form = useAppForm({
         defaultValues: {
-            seconds: oneDay,
+            seconds: seconds || oneDay,
         },
         onSubmit: async (data) => {
             await setSnapshot([data.value.seconds]);

@@ -1,8 +1,8 @@
-// import { queryClient } from "@/queryClient";
-// import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 
 import { usePluginMutation } from "./use-plugin-mutation";
+import QueryKey from "@/lib/queryKeys";
+import { queryClient } from "@/queryClient";
 
 export const useSetSnapshot = () =>
     usePluginMutation<[number]>(
@@ -18,8 +18,7 @@ export const useSetSnapshot = () =>
             isStagable: true,
             onSuccess: (seconds, status) => {
                 if (status.type == "executed") {
-                    console.log(seconds, "seconds");
-                    // queryClient.setQueryData(QueryKey., networkName);
+                    queryClient.setQueryData(QueryKey.snapshotSeconds(), seconds);
                 }
             },
         },
