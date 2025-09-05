@@ -10,7 +10,7 @@ import QueryKey from "@/lib/queryKeys";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({
-    halfLifeSeconds: z.number().positive().min(0).max(1000000),
+    halfLifeSeconds: z.number().int().positive(),
     tokenId: z.number().positive(),
 });
 
