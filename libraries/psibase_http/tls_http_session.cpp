@@ -8,6 +8,7 @@ namespace beast = boost::beast;
 
 namespace psibase::http
 {
+   SocketEndpoint toSocketEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
 
    tls_http_session::tls_http_session(server_state& server, boost::asio::ip::tcp::socket&& socket)
        : http_session<tls_http_session>(server),
@@ -41,6 +42,12 @@ namespace psibase::http
                                 }
                              });
    }
+
+   SocketEndpoint tls_http_session::remote_endpoint() const
+   {
+      return toSocketEndpoint(stream.next_layer().socket().remote_endpoint());
+   }
+
    template class http_session<tls_http_session>;
 }  // namespace psibase::http
 

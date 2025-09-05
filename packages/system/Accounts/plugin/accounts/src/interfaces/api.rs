@@ -1,6 +1,5 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
-use crate::bindings::host::common::admin as Privileged;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
@@ -73,6 +72,6 @@ impl API for AccountsPlugin {
     }
 
     fn get_current_user() -> Option<String> {
-        AppsTable::new(&Privileged::get_active_app()).get_logged_in_user()
+        AppsTable::new(&Client::get_active_app()).get_logged_in_user()
     }
 }

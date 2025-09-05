@@ -1,58 +1,66 @@
+use crate::bindings::exports::host::prompt::admin::PromptDetails;
+use crate::host::common::client::{get_active_app, get_sender};
 use crate::host::common::store::{DbMode::*, StorageDuration::*, *};
+use chrono::Utc;
+use psibase::fracpack::{Pack, Unpack};
 
 mod tables {
     use super::*;
 
-    pub fn prompt_ids() -> Bucket {
+    pub fn active_prompt() -> Bucket {
         Bucket::new(
             Database {
                 mode: NonTransactional,
                 duration: Session,
             },
-            "prompt-ids",
-        )
-    }
-
-    pub fn prompt_contexts_by_id() -> Bucket {
-        Bucket::new(
-            Database {
-                mode: NonTransactional,
-                duration: Session,
-            },
-            "prompt-contexts-by-id",
+            "active-prompt",
         )
     }
 }
 
-pub struct PromptId;
-impl PromptId {
-    pub fn get_next_id() -> u32 {
-        let prompt_ids = tables::prompt_ids();
-        let val = match prompt_ids.get("next") {
-            Some(value) => {
-                let next_value = u32::from_le_bytes(value.try_into().unwrap()) + 1;
-                prompt_ids.set("next", &next_value.to_le_bytes().to_vec());
-                next_value
-            }
-            None => {
-                let next_value: u32 = 1;
-                prompt_ids.set("next", &next_value.to_le_bytes().to_vec());
-                next_value
-            }
-        };
-        val
+#[derive(Pack, Unpack)]
+pub struct ActivePrompt {
+    pub prompt_app: String,
+    pub active_app: String, // Currently active application
+    pub prompt_name: String,
+    pub created: String,
+    pub packed_context: Option<Vec<u8>>,
+}
+
+impl ActivePrompt {
+    pub fn new(prompt_name: String, packed_context: Option<Vec<u8>>) -> Self {
+        Self {
+            prompt_app: get_sender(),
+            prompt_name,
+            active_app: get_active_app(),
+            created: Utc::now().to_rfc3339(),
+            packed_context,
+        }
     }
 }
 
-pub struct PromptContexts;
-impl PromptContexts {
-    pub fn get_id(packed_context: Vec<u8>) -> String {
-        let id: u32 = PromptId::get_next_id();
-        tables::prompt_contexts_by_id().set(&id.to_string(), &packed_context);
-        id.to_string()
+impl From<ActivePrompt> for PromptDetails {
+    fn from(prompt: ActivePrompt) -> Self {
+        PromptDetails {
+            prompt_app: prompt.prompt_app,
+            prompt_name: prompt.prompt_name,
+            active_app: prompt.active_app,
+            created: prompt.created,
+            packed_context: prompt.packed_context,
+        }
+    }
+}
+
+const PROMPT_KEY: &str = "prompt";
+pub struct ActivePrompts;
+impl ActivePrompts {
+    pub fn set(prompt_name: String, packed_context: Option<Vec<u8>>) {
+        let prompt = ActivePrompt::new(prompt_name, packed_context);
+        tables::active_prompt().set(PROMPT_KEY, &prompt.packed());
     }
 
-    pub fn get(id: String) -> Option<Vec<u8>> {
-        tables::prompt_contexts_by_id().get(&id)
+    pub fn get() -> Option<ActivePrompt> {
+        let val = tables::active_prompt().get(PROMPT_KEY).unwrap();
+        Some(<ActivePrompt>::unpacked(&val).unwrap())
     }
 }

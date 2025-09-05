@@ -248,7 +248,6 @@ export const mergeConfig = (
             updated.services,
             user.services,
         ),
-        admin: mergeSimple(prev.admin, updated.admin, user.admin),
         loggers: mergeLoggers(prev.loggers, updated.loggers, user.loggers),
     };
 };
@@ -263,7 +262,6 @@ export const writeConfig = (input: PsinodeConfigUI): PsinodeConfigUpdate => ({
             root: s.root,
         })),
     hosts: input.hosts.map((h) => h.host),
-    admin: input.admin != "" ? input.admin : null,
     loggers: writeLoggers(input.loggers),
 });
 

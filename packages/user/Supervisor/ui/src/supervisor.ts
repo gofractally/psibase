@@ -11,9 +11,11 @@ import {
     QualifiedResourceCallArgs,
     RedirectErrorObject,
     getResourceCallArgs,
-    toQualifiedFunctionCallArgs,
 } from "@psibase/common-lib/messaging";
-import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
+import {
+    getCallArgs,
+    toString,
+} from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { pluginId } from "@psibase/common-lib/messaging/PluginId";
 
 import { AppInterface } from "./appInterace";
@@ -26,16 +28,12 @@ import {
     OriginationData,
     assert,
     chainIdPromise,
+    isEmbedded,
     parser,
     serviceFromOrigin,
     setQueryToken,
 } from "./utils";
 
-const supervisorDomain = siblingUrl(null, "supervisor");
-const supervisorOrigination = {
-    app: serviceFromOrigin(supervisorDomain),
-    origin: supervisorDomain,
-};
 const rootDomain = siblingUrl(null, null, null, true);
 
 // System plugins are always loaded, even if they are not used
@@ -43,11 +41,10 @@ const rootDomain = siblingUrl(null, null, null, true);
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("host", "auth"),
+    pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
 ];
-
-
 
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
@@ -57,9 +54,24 @@ export class Supervisor implements AppInterface {
 
     private context: CallContext | undefined;
 
+    private embedder: string | undefined;
+
     parser: Promise<any>;
 
     parentOrigination: OriginationData | undefined;
+
+    private getCallContext(): CallContext {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
+
+        if (!this.context) {
+            this.context = new CallContext(
+                this.embedder,
+                this.parentOrigination.app,
+            );
+        }
+        return this.context;
+    }
 
     private setParentOrigination(callerOrigin: string) {
         assert(
@@ -92,6 +104,17 @@ export class Supervisor implements AppInterface {
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
+
+        if (isEmbedded) {
+            const promptDetails = await this.supervisorCall(
+                getCallArgs("host", "prompt", "admin", "getActivePrompt", []),
+            );
+            if (promptDetails) {
+                this.embedder = promptDetails.activeApp;
+                delete this.context; // A new one will be created with the embedder
+            }
+        }
+
         setQueryToken(this.getActiveQueryToken());
 
         // Loading dynamic plugins may require calling into the standard plugins
@@ -105,25 +128,8 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
 
         // Phase 2: Load the auth services for all connected accounts
-        const connectedAccounts = this.supervisorCall(
-            getCallArgs(
-                "accounts",
-                "plugin",
-                "activeApp",
-                "getConnectedAccounts",
-                [],
-            ),
-        );
-        if (!connectedAccounts) return;
-
         const auth_services: string[] = this.supervisorCall(
-            getCallArgs(
-                "accounts",
-                "plugin",
-                "admin",
-                "getAuthServices",
-                [],
-            ),
+            getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
 
         const addtl_plugins: QualifiedPluginId[] = [];
@@ -148,38 +154,27 @@ export class Supervisor implements AppInterface {
     }
 
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
-        let newContext = false;
-        if (!this.context) {
-            newContext = true;
-            this.context = new CallContext();
-        }
+        const context = this.getCallContext();
+        context.stack.push("supervisor", "callFunction");
 
         let ret: any;
         try {
-            ret = this.call(supervisorOrigination, callArgs);
+            ret = this.call(callArgs);
         } finally {
-            if (newContext) {
-                this.context = undefined;
-            }
+            context.stack.pop();
         }
 
         return ret;
     }
 
     private supervisorResourceCall(callArgs: QualifiedResourceCallArgs): any {
-        let newContext = false;
-        if (!this.context) {
-            newContext = true;
-            this.context = new CallContext();
-        }
-
+        const context = this.getCallContext();
+        context.stack.push("supervisor", "callResource");
         let ret: any;
         try {
-            ret = this.callResource(supervisorOrigination, callArgs);
+            ret = this.callResource(callArgs);
         } finally {
-            if (newContext) {
-                this.context = undefined;
-            }
+            context.stack.pop();
         }
 
         return ret;
@@ -189,13 +184,11 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
-        const token = this.supervisorCall(getCallArgs(
-            "host",
-            "auth",
-            "api",
-            "getActiveQueryToken",
-            [this.parentOrigination.app],
-        ));
+        const token = this.supervisorCall(
+            getCallArgs("host", "auth", "api", "getActiveQueryToken", [
+                this.parentOrigination.app,
+            ]),
+        );
         return token;
     }
 
@@ -207,72 +200,27 @@ export class Supervisor implements AppInterface {
         this.loader = new PluginLoader(this.plugins);
     }
 
-    getActiveApp(): string {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
-        return this.parentOrigination.app;
-    }
-
-    
-
     getRootDomain(): string {
         return rootDomain;
     }
 
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
-
-        const frame = this.context.stack.peek(0);
-        assertTruthy(
-            frame,
-            "`getCallstack` invalid outside plugin call resolution",
-        );
-
-        const bottomFrame = this.context.stack.peekBottom(0);
-        assertTruthy(bottomFrame, "Invalid callstack");
-        const topLevelApp = bottomFrame.caller.app;
-        assertTruthy(
-            topLevelApp,
-            "Top-level app must be mappable to a psibase service",
-        );
-        return [
-            topLevelApp,
-            ...this.context.stack.export().map((p) => p.service),
-        ];
+        return this.context.stack.export();
     }
 
     // Manages callstack and calls plugins
-    call(sender: OriginationData, args: QualifiedFunctionCallArgs): any {
+    call(args: QualifiedFunctionCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
-        assertTruthy(this.parentOrigination, "Uninitialized call origination");
-
-        if (this.context.stack.isEmpty()) {
-            assert(
-                sender.origin === this.parentOrigination.origin ||
-                    sender.origin === supervisorDomain,
-                "Invalid call origination",
-            );
-        } else {
-            assertTruthy(sender.app, "Cannot determine caller service");
-            assert(
-                sender.app === this.context.stack.peek(0)!.args.service ||
-                    sender.app === "supervisor",
-                "Invalid sync call sender",
-            );
-        }
 
         const { service, plugin, intf, method, params } = args;
-        const p = this.plugins.getPlugin({ service, plugin });
-        assert(
-            p.new === false,
-            `Tried to call plugin ${service}:${plugin} before initialization`,
-        );
+        const p = this.plugins.getAssertPlugin({ service, plugin });
 
         // Manage the callstack and call the plugin
-        this.context.stack.push(sender, args);
+        this.context.stack.push(args.service, toString(args));
         let ret: any;
         try {
-            ret = p.plugin.call(intf, method, params);
+            ret = p.call(intf, method, params);
         } finally {
             this.context.stack.pop();
         }
@@ -280,7 +228,7 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    callDyn(sender: OriginationData, args: QualifiedDynCallArgs): any {
+    callDyn(args: QualifiedDynCallArgs): any {
         const service = this.supervisorResourceCall(
             getResourceCallArgs(
                 "host",
@@ -316,45 +264,20 @@ export class Supervisor implements AppInterface {
         );
 
         return this.call(
-            sender,
             getCallArgs(service, plugin, intf, args.method, args.params),
         );
     }
 
-    callResource(
-        sender: OriginationData,
-        args: QualifiedResourceCallArgs,
-    ): any {
+    callResource(args: QualifiedResourceCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
-        assertTruthy(this.parentOrigination, "Uninitialized call origination");
-
-        if (this.context.stack.isEmpty()) {
-            assert(
-                sender.origin === this.parentOrigination.origin ||
-                    sender.origin === supervisorDomain,
-                "Invalid call origination",
-            );
-        } else {
-            assertTruthy(sender.app, "Cannot determine caller service");
-            assert(
-                sender.app === this.context.stack.peek(0)!.args.service ||
-                    sender.app === "supervisor",
-                "Invalid sync call sender",
-            );
-        }
-
         const { service, plugin, intf, type, handle, method, params } = args;
-        const p = this.plugins.getPlugin({ service, plugin });
-        assert(
-            p.new === false,
-            `Tried to call plugin ${service}:${plugin} before initialization`,
-        );
+        const p = this.plugins.getAssertPlugin({ service, plugin });
 
         // Manage the callstack and call the plugin
-        this.context.stack.push(sender, toQualifiedFunctionCallArgs(args));
+        this.context.stack.push(service, toString(args));
         let ret: any;
         try {
-            ret = p.plugin.resourceCall(intf, type, handle, method, params);
+            ret = p.resourceCall(intf, type, handle, method, params);
         } finally {
             this.context.stack.pop();
         }
@@ -408,21 +331,16 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
-            this.context = new CallContext();
-
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
-            //   preloaded.
-            assertTruthy(
-                this.parentOrigination,
-                "Parent origination corrupted",
-            );
+            this.context = this.getCallContext();
 
             // Starts the tx context.
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "startTx", []),
             );
 
-            const result = this.call(this.parentOrigination, args);
+            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
+            //   preloaded.
+            const result = this.call(args);
 
             // Closes the current tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
@@ -431,9 +349,6 @@ export class Supervisor implements AppInterface {
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
             }
-
-            // Post execution assertions
-            assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
             // Send plugin result to parent window
             this.replyToParent(id, result);

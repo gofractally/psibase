@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/ForkDb.hpp>
+#include <psibase/auto_timeout.hpp>
 #include <psibase/blocknet.hpp>
 #include <psibase/net_base.hpp>
 #include <psibase/random_timer.hpp>
@@ -99,8 +100,8 @@ namespace psibase::net
       producer_id              voted_for = null_producer;
       std::vector<producer_id> votes_for_me[2];
 
-      basic_random_timer<Timer> _election_timer;
-      std::chrono::milliseconds _timeout = std::chrono::seconds(3);
+      basic_random_timer<Timer>                _election_timer;
+      auto_timeout<typename Timer::clock_type> _timeout{std::chrono::seconds{3}};
 
       std::vector<block_num> match_index[2];
 
@@ -112,6 +113,7 @@ namespace psibase::net
       void cancel()
       {
          _election_timer.cancel();
+         _timeout.stop();
          match_index[0].clear();
          match_index[1].clear();
          Base::cancel();
@@ -124,6 +126,7 @@ namespace psibase::net
          if (prods.first->algorithm != ConsensusAlgorithm::cft)
          {
             _election_timer.cancel();
+            _timeout.stop();
             return Base::set_producers(std::move(prods));
          }
          if (active_producers[0] && active_producers[0]->algorithm != ConsensusAlgorithm::cft)
@@ -169,6 +172,7 @@ namespace psibase::net
             if (active_producers[0]->size() == 0 && !active_producers[1])
             {
                _election_timer.cancel();
+               _timeout.stop();
                stop_leader("Stopping boot block production");
                _state = producer_state::unknown;
             }
@@ -192,10 +196,12 @@ namespace psibase::net
             {
                PSIBASE_LOG(logger, info) << "Node is active producer";
                _state = producer_state::follower;
+               _timeout.start();
                randomize_timer();
             }
             else if (start_cft)
             {
+               _timeout.start();
                randomize_timer();
             }
          }
@@ -205,6 +211,7 @@ namespace psibase::net
             {
                PSIBASE_LOG(logger, info) << "Node is non-voting";
                _election_timer.cancel();
+               _timeout.stop();
                stop_leader();
             }
             _state = producer_state::nonvoting;
@@ -256,6 +263,7 @@ namespace psibase::net
             if (term >= current_term)
             {
                _election_timer.restart();
+               _timeout.reset();
             }
             if (state->info.header.commitNum > chain().commit_index())
             {
@@ -308,6 +316,7 @@ namespace psibase::net
          if (chain().commit(jointCommitIndex))
          {
             _election_timer.restart();
+            _timeout.reset();
             consensus().set_producers(chain().getProducers());
          }
       }
@@ -372,6 +381,22 @@ namespace psibase::net
             start_leader();
          }
       }
+      bool is_quorum_reachable(const ProducerSet& prods)
+      {
+         auto remaining = prods.threshold();
+         for (const auto& [account, _] : prods.activeProducers)
+         {
+            if (network().is_reachable(account) || account == self)
+               if (--remaining == 0)
+                  return true;
+         }
+         return false;
+      }
+      bool is_quorum_reachable()
+      {
+         return is_quorum_reachable(*active_producers[0]) &&
+                (!active_producers[1] || is_quorum_reachable(*active_producers[1]));
+      }
       // -------------- The timer loop --------------------
       void randomize_timer()
       {
@@ -384,12 +409,15 @@ namespace psibase::net
                   active_producers[1]->algorithm == ConsensusAlgorithm::cft ||
                   active_producers[0]->isProducer(self))
          {
-            _election_timer.expires_after(_timeout, _timeout * 2);
+            auto timeout = _timeout.get();
+            _election_timer.expires_after(timeout, timeout * 2);
             _election_timer.async_wait(
                 [this](const std::error_code& ec)
                 {
                    if (ec || !is_cft())
                       return;
+                   if (is_quorum_reachable())
+                      _timeout.increase();
                    if (_state == producer_state::leader)
                    {
                       stop_leader();
@@ -489,6 +517,7 @@ namespace psibase::net
                                                           request.last_log_index >= head->blockNum))
                {
                   _election_timer.restart();
+                  _timeout.reset();
                   vote_granted = true;
                   voted_for    = request.candidate_id;
                }

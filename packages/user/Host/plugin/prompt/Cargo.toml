@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { version = "0.20.0", path = "../../../../../rust/psibase" }
-rand = "0.9.1"
 chrono = "0.4"
 urlencoding = "2.1.2"
 
@@ -24,3 +23,4 @@ world = "impl"
 "accounts:plugin" = { path = "../../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "host:common" = { path = "../common/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
+"supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }

@@ -22,11 +22,11 @@ interface admin {
         permanent, 
     }
 
-    /// Gets the context of a particular user-prompt
-    get-context: func(context-id: string) -> prompt-context;
+    /// Gets the context of the active user-prompt
+    get-context: func() -> prompt-context;
 
     /// Approve a prompt for permissions
-    approve: func(context-id: string, duration: approval-duration);
+    approve: func(duration: approval-duration);
 
     // Note: no need to implement any `deny` function. To deny a permissions 
     //      popup is simpy to not approve it.

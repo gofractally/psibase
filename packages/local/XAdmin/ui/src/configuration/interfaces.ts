@@ -33,7 +33,6 @@ export type PsinodeConfigUI = {
     port?: number;
     listen: ListenConfig[];
     services: ServiceConfig[];
-    admin?: string;
     loggers: { [index: string]: LogConfig };
 };
 
@@ -66,8 +65,6 @@ const LogConfigSchema = z.object({
 });
 
 const path = z.string();
-const Authmode = z.enum(["r", "rw"]);
-const Kind = z.enum(["any", "loopback", "ip", "bearer"]);
 
 const ListenProperty = z
     .object({
@@ -92,13 +89,6 @@ export const psinodeConfigSchema = z
         producer: z.string(),
         hosts: z.string().array(),
         port: z.number().optional(),
-        admin_authz: z
-            .object({
-                mode: Authmode,
-                kind: Kind,
-                address: z.string().optional(),
-            })
-            .array(),
         http_timeout: z.string().nullable().optional(),
         listen: ListenProperty,
         services: z
@@ -107,7 +97,6 @@ export const psinodeConfigSchema = z
                 root: z.string(),
             })
             .array(),
-        admin: z.string().optional().nullable(),
         loggers: z.record(z.string(), LogConfigSchema),
     })
     .passthrough();

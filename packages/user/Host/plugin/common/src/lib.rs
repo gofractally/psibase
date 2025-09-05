@@ -15,21 +15,19 @@ use exports::host::common::{
     server::Guest as Server,
     store::{DbMode, Guest as Store},
 };
-use host::types::types::{BodyTypes, Error, PostRequest};
 use helpers::make_error;
+use host::types::types::{BodyTypes, Error, PostRequest};
 use supervisor::bridge::{
     intf as Supervisor,
     types::{self as BridgeTypes, HttpRequest, HttpResponse},
 };
 use url::Url;
 
-use crate::bindings::supervisor::bridge::intf::get_active_app;
-
 struct HostCommon;
 
 fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
-    let query_auth_token = HostAuth::get_active_query_token(&get_active_app());
+    let query_auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
@@ -48,7 +46,7 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
-    let query_auth_token = HostAuth::get_active_query_token(&get_active_app());
+    let query_auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
     let headers = if query_auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {
@@ -67,15 +65,6 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
 }
 
 impl Admin for HostCommon {
-    fn get_active_app() -> String {
-        check_caller(
-            &["accounts", "staged-tx"],
-            "get-active-app@host:common/admin",
-        );
-
-        Supervisor::get_active_app()
-    }
-
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
         check_caller(&["host"], "post@host:common/admin");
 
@@ -158,6 +147,12 @@ impl Client for HostCommon {
         url.set_host(Some(&format!("{}.{}", app, url.host_str().unwrap())))
             .unwrap();
         url.to_string().trim_end_matches('/').to_string()
+    }
+
+    fn get_active_app() -> String {
+        let stack = get_callstack();
+        assert!(stack.len() > 0);
+        stack.into_iter().next().unwrap()
     }
 }
 

@@ -17,4 +17,4 @@ if [ -z "$HOST_IP" ] || [ -z "$PRODUCER" ] || [ -z "$PORT" ] || [ -z "$PKCS11_MO
 fi
 
 rm -rf "$PROJECT_ROOT/db"
-psinode "$PROJECT_ROOT/db" -p "$PRODUCER" --admin-authz=rw:ip:"$HOST_IP" --admin-authz=rw:loopback -l "$PORT" --pkcs11-module="$PKCS11_MODULE" 
+PSIBASE_ADMIN_IP=$HOST_IP psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT" --pkcs11-module="$PKCS11_MODULE"

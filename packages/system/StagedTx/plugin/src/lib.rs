@@ -7,7 +7,6 @@ use accounts::plugin::api::get_account;
 use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest as Respondent};
 use exports::transact_hook_actions_sender::Guest as HookActionsSender;
 use exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
-use host::common::admin::get_active_app;
 use host::common::{client as Client, server as Server};
 use host::types::types::Error;
 use psibase::fracpack::Pack;
@@ -111,7 +110,7 @@ struct StagedTxPlugin;
 
 impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
-        if Client::get_sender() != get_active_app() {
+        if Client::get_sender() != Client::get_active_app() {
             return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
         }
 

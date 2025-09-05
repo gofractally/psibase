@@ -32,7 +32,7 @@ namespace psibase
          return false;
       if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})
          return false;
-      if (action.service == AccountNumber{"events"} && action.method == MethodNumber{"sync"})
+      if (action.service == AccountNumber{"event-index"} && action.method == MethodNumber{"sync"})
          return false;
       return true;
    }

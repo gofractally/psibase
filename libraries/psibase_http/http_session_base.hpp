@@ -97,13 +97,12 @@ namespace psibase::http
       virtual void write_response(message_type&& msg)                                      = 0;
       virtual void accept_websocket(request_type&& request, accept_p2p_websocket_t&& next) = 0;
       virtual void do_read()                                                               = 0;
-      virtual bool check_access(const authz_loopback&) const                               = 0;
-      virtual bool check_access(const authz_ip&) const                                     = 0;
       virtual void post(std::function<void()>)                                             = 0;
       virtual void close_impl(boost::beast::error_code& ec)                                = 0;
       virtual void shutdown_impl()                                                         = 0;
 
-      virtual bool is_secure() const { return false; }
+      virtual SocketEndpoint remote_endpoint() const = 0;
+      virtual bool           is_secure() const { return false; }
    };
 
 }  // namespace psibase::http

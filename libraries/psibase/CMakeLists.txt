@@ -12,6 +12,7 @@ function(add suffix)
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
         common/src/Rpc.cpp
+        common/src/SocketInfo.cpp
         common/src/schema.cpp
         common/src/trace.cpp
         common/src/jwt.cpp

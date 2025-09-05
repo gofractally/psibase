@@ -2,6 +2,13 @@
 
 The adminstrator service is hosted on localhost by default as a [Builtin Service](#builtin-services). It provides tools for monitoring and controlling the server.
 
+## Authentication
+
+Access to `x-admin` is allowed only if
+- The client is running over a loopback interface (localhost), or
+- The client's IP address is listed in the environmental variable `PSIBASE_ADMIN_IP`, which holds a comma separated list of IP addresses, or
+- The user is logged in as an authorized on-chain account
+
 ## Configuration Options
 
 All of these options can also be specified on the command line or in the server's config file. Changes applied through the web API will be saved to the config file and will be remembered across server restarts. Except where noted otherwise, a new configuration takes effect when saved.
@@ -41,14 +48,6 @@ Builtin services can only serve the following files types:
 - `.css`
 - `.ttf`
 - `.wasm`
-
-### Access to admin API
-
-This option controls access to the [HTTP API](../run-infrastructure/administration.md#node-administrator-services) under `/native/admin`, which is used by the administrator service. The admin API must be restricted to services trusted by the node operator, because it can tell `psinode` to read or write any file.
-
-- Builtin services only: Allows builtin services to access the admin API. This is the default and should rarely need to be changed.
-- All services: Allows any service to access the admin API. This should only be used for trusted private chains.
-- Disabled: The admin API will not be available. Configuration changes can only be made via the command line and config file, which require a server restart. Disabling the admin API will disconnect the administrator service.
 
 ## HTTP Endpoints
 

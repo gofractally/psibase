@@ -10,22 +10,6 @@ using namespace psio;
 using namespace SystemService;
 using namespace TestService;
 
-template <typename T>
-struct Catch::StringMaker<std::optional<T>>
-{
-   static std::string convert(const std::optional<T>& value)
-   {
-      if (value)
-      {
-         return Catch::StringMaker<T>::convert(*value);
-      }
-      else
-      {
-         return "nullopt";
-      }
-   }
-};
-
 TEST_CASE("subjective db")
 {
    DefaultTestChain t;

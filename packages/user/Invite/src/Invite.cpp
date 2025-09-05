@@ -52,7 +52,7 @@ void Invite::init()
    to<Accounts>().newAccount(payerAccount, AuthInvite::service, false);
 
    // Register event indices
-   to<EventIndex>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
 }
 
 uint32_t Invite::createInvite(Spki                         inviteKey,

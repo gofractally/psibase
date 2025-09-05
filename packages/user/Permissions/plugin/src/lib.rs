@@ -16,11 +16,11 @@ use psibase::fracpack::{Pack, Unpack};
 
 use host::common::{
     client as HostClient,
-    client::{get_receiver, get_sender},
+    client::{get_active_app, get_receiver, get_sender},
     store::StorageDuration,
 };
+use host::prompt::api as HostPrompt;
 use host::types::types::Error;
-use host::prompt::web as HostPrompt;
 
 mod errors;
 use errors::*;
@@ -35,15 +35,15 @@ fn assert_admin() {
 }
 
 impl PermsAdmin for PermissionsPlugin {
-    fn get_context(context_id: String) -> PromptContext {
+    fn get_context() -> PromptContext {
         assert_admin();
-        let context = HostPrompt::get_context(&context_id).unwrap();
+        let context = HostPrompt::get_context().unwrap();
         PackablePromptContext::unpacked(&context).unwrap().into()
     }
 
-    fn approve(context_id: String, duration: ApprovalDuration) {
+    fn approve(duration: ApprovalDuration) {
         assert_admin();
-        let context = HostPrompt::get_context(&context_id).unwrap();
+        let context = HostPrompt::get_context().unwrap();
         let context = PackablePromptContext::unpacked(&context).unwrap();
 
         Permissions::set(
@@ -63,7 +63,26 @@ fn is_authorized(user: &str, caller: &str, callee: &str, trust: TrustLevel) -> b
     Permissions::get(user, caller, callee).map_or(false, |perm| perm >= trust)
 }
 
+fn validate_caller(caller: &str) -> bool {
+    if caller == get_active_app() {
+        return true;
+    }
+
+    let allowed_callers = AllowedCallers::get();
+    allowed_callers.contains(&caller.to_string())
+}
+
 impl Api for PermissionsPlugin {
+    fn set_allowed_callers(callers: Vec<String>) {
+        assert_eq!(
+            get_sender(),
+            get_active_app(),
+            "[set-allowed-callers] Only the active app can set allowed callers"
+        );
+
+        AllowedCallers::set(callers);
+    }
+
     fn authorize(
         caller: String,
         level: TrustLevel,
@@ -87,6 +106,15 @@ impl Api for PermissionsPlugin {
         }
         // TODO incorporate security groups for TrustLevel::Max
 
+        if !validate_caller(&caller) {
+            return Err(ErrorType::InvalidCaller(
+                caller.clone(),
+                callee.clone(),
+                debug_label.clone(),
+            )
+            .into());
+        }
+
         let user = Accounts::get_current_user().ok_or_else(|| {
             ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())
         })?;
@@ -103,8 +131,7 @@ impl Api for PermissionsPlugin {
         }
         .packed();
 
-        let context_id = HostPrompt::store_context(&packed_context);
-        HostPrompt::prompt_user(Some("/permissions.html"), Some(&context_id))?;
+        HostPrompt::prompt("permissions".into(), Some(&packed_context));
         Ok(false)
     }
 }

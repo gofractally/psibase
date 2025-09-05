@@ -14,10 +14,6 @@ export const intf = {
     getChainId() {
         return host.getChainId();
     },
-
-    getActiveApp() {
-        return host.getActiveApp();
-    },
 };
 
 export const database = {
@@ -29,5 +25,11 @@ export const database = {
     },
     remove(...args) {
         return host.dbRemove(...args);
+    },
+};
+
+export const prompt = {
+    requestPrompt() {
+        return host.requestPrompt();
     },
 };

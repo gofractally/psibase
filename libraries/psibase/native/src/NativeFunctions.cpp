@@ -65,6 +65,7 @@ namespace psibase
             check(isSubjectiveContext(self),
                   "subjective databases cannot be read in a deterministic context");
             check(self.code.flags & CodeRow::isPrivileged, "service may not read this db");
+            check(self.code.flags & ExecutionContext::isLocal, "service may not read this db");
             return (DbId)db;
          }
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
@@ -118,6 +119,7 @@ namespace psibase
             check(isSubjectiveContext(self),
                   "subjective databases cannot be written in a deterministic context");
             check((self.code.flags & CodeRow::isPrivileged), "service may not write this db");
+            check((self.code.flags & ExecutionContext::isLocal), "service may not write this db");
             return {(DbId)db, false, false};
          }
 
@@ -784,6 +786,7 @@ namespace psibase
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
+      check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
       return transactionContext.blockContext.systemContext.sockets->send(
           *transactionContext.blockContext.writer, fd, msg);
@@ -793,6 +796,7 @@ namespace psibase
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
+      check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
       return database.socketAutoClose(fd, value,
                                       *transactionContext.blockContext.systemContext.sockets,
