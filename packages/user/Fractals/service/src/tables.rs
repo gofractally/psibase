@@ -3,6 +3,7 @@ pub mod tables {
     use std::u64;
 
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::tokens::{Quantity, TID};
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
@@ -24,6 +25,7 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
+        pub reward_rate_ppm: u32,
     }
 
     impl Fractal {
@@ -40,6 +42,7 @@ pub mod tables {
                 created_at: now,
                 mission,
                 name,
+                reward_rate_ppm: 1,
             }
         }
 
@@ -128,6 +131,7 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
+        pub reward_stream: TID,
     }
 
     #[ComplexObject]
@@ -158,6 +162,7 @@ pub mod tables {
                 fractal,
                 created_at: now,
                 member_status: status as StatusU8,
+                reward_stream: 0,
             }
         }
 
@@ -182,6 +187,11 @@ pub mod tables {
 
         pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
             check_some(Self::get(fractal, account), "member does not exist")
+        }
+
+        pub fn award_stream(&mut self, amount: Quantity) {
+            // check the current stream details are OK, if not create a new stream that is
+            //
         }
 
         fn save(&self) {
