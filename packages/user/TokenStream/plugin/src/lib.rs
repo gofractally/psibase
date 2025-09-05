@@ -25,19 +25,12 @@ define_trust! {
 
 struct TokenStreamPlugin;
 
-fn decay_rate_from_half_life(seconds: f64) -> u32 {
-    let rate = std::f64::consts::LN_2 / seconds;
-
-    (rate * 1_000_000.0).round() as u32
-}
-
 impl Api for TokenStreamPlugin {
-    fn create(half_life_seconds: u64, token_id: u32) -> Result<(), Error> {
+    fn create(half_life_seconds: u32, token_id: u32) -> Result<(), Error> {
         trust::authorize(trust::FunctionName::create)?;
 
-        let decay_rate_per_million = decay_rate_from_half_life(half_life_seconds as f64);
         let packed_args = token_stream::action_structs::create {
-            decay_rate_per_million,
+            half_life_seconds,
             token_id,
         }
         .packed();

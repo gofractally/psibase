@@ -3,7 +3,7 @@ package token-stream:plugin;
 interface api {
     use host:types/types.{error};
 
-    create: func(half-life-seconds: u64, token-id: u32) -> result<_, error>;
+    create: func(half-life-seconds: u32, token-id: u32) -> result<_, error>;
     deposit: func(nft-id: u32, token-id: string, amount: string, memo: string) -> result<_, error>;
     claim: func(nft-id: u32) -> result<_, error>;
     delete: func(nft-id: u32) -> result<_, error>;
