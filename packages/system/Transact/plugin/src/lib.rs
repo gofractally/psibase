@@ -144,10 +144,7 @@ impl Intf for TransactPlugin {
 
 impl Network for TransactPlugin {
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
-        let packed_args = setSnapTime {
-            seconds: Seconds::new(seconds as i64),
-        }
-        .packed();
+        let packed_args = setSnapTime { seconds }.packed();
 
         schedule_action(
             psibase::services::transact::SERVICE.to_string(),
