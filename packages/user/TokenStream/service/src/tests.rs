@@ -144,7 +144,7 @@ mod tests {
             .get()
             .unwrap();
 
-        check_balance(&chain, token_id, BOB, Some(20));
+        check_balance(&chain, token_id, BOB, Some(1));
 
         chain.start_block_at(
             TimePointSec {

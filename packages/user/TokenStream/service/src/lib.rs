@@ -15,7 +15,7 @@ pub mod tables {
         #[primary_key]
         pub nft_id: NID,
         pub token_id: TID,
-        pub decay_rate_per_million: u32, // Decay rate in parts-per-million (1,000,000 ppm = 1.0)
+        pub half_life_seconds: u32, // Half life decay rate seconds
         #[graphql(skip)]
         pub total_deposited: Quantity, // Cumulative deposited amount
         #[graphql(skip)]
@@ -49,19 +49,14 @@ pub mod tables {
     }
 
     impl Stream {
-        const PPM: f64 = 1_000_000.0; // Parts-per-million scale factor
-
-        fn new(decay_rate_per_million: u32, token_id: u32) -> Self {
-            check(
-                decay_rate_per_million > 0 && decay_rate_per_million < Self::PPM as u32,
-                "rate must be between 0 and 100%",
-            );
+        fn new(half_life_seconds: u32, token_id: u32) -> Self {
+            check(half_life_seconds > 0, "half life must be over 0");
             let now = TransactSvc::call().currentBlock().time.seconds();
 
             Self {
                 nft_id: Nfts::call().mint(),
                 token_id,
-                decay_rate_per_million,
+                half_life_seconds,
                 total_deposited: 0.into(),
                 total_claimed: 0.into(),
                 last_deposit_timestamp: now,
@@ -102,7 +97,7 @@ pub mod tables {
         }
 
         fn decay_rate(&self) -> f64 {
-            self.decay_rate_per_million as f64 / Self::PPM
+            std::f64::consts::LN_2 / self.half_life_seconds as f64
         }
 
         /// Total available to be claimed now (vested - already claimed)
@@ -192,15 +187,15 @@ pub mod service {
     }
 
     #[action]
-    fn create(decay_rate_per_million: u32, token_id: u32) -> u32 {
+    fn create(half_life_seconds: u32, token_id: u32) -> u32 {
         psibase::services::tokens::Wrapper::call().getToken(token_id);
-        let stream = Stream::add(decay_rate_per_million, token_id);
+        let stream = Stream::add(half_life_seconds, token_id);
         let sender = get_sender();
         Nft::call().credit(stream.nft_id, sender, "Redeemer NFT of stream".to_string());
 
         Wrapper::emit()
             .history()
-            .created(stream.nft_id, decay_rate_per_million, token_id, sender);
+            .created(stream.nft_id, half_life_seconds, token_id, sender);
 
         stream.nft_id
     }
@@ -268,13 +263,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn created(
-        nft_id: u32,
-        decay_rate_per_million: u32,
-        token_id: u32,
-        creator: AccountNumber,
-    ) {
-    }
+    pub fn created(nft_id: u32, half_life_seconds: u32, token_id: u32, creator: AccountNumber) {}
 
     #[event(history)]
     pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: String) {}
