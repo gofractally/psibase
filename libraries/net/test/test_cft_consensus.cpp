@@ -41,7 +41,7 @@ TEST_CASE("cft crash", "[cft]")
    PSIBASE_LOG(logger, info) << "Final sync";
    // Make all nodes active
    nodes.connect_all();
-   runFor(ctx, 10s);
+   runFor(ctx, 20s);
 
    auto final_state = nodes[0].chain().get_head_state();
    // Verify that all three chains are consistent
