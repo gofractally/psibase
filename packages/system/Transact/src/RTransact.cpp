@@ -1364,7 +1364,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 struct SnapInfo
 {
    psibase::BlockTime lastSnapshot;
-   int64_t            snapshotInterval;
+   uint32_t           snapshotInterval;
 };
 PSIO_REFLECT(SnapInfo, lastSnapshot, snapshotInterval);
 
@@ -1375,8 +1375,11 @@ struct TransactQuery
       auto snapInfo = Transact::Tables{Transact::service}.open<SnapshotInfoTable>().get({});
       if (snapInfo.has_value())
       {
+         auto count = snapInfo->snapshotInterval.count();
+         check(count >= 0 && static_cast<uint64_t>(count) <= std::numeric_limits<uint32_t>::max(),
+               "snapshotInterval out of range");
          auto ret = SnapInfo{.lastSnapshot     = snapInfo->lastSnapshot,
-                             .snapshotInterval = snapInfo->snapshotInterval.count()};
+                             .snapshotInterval = static_cast<uint32_t>(count)};
          return std::optional<SnapInfo>{std::move(ret)};
       }
 
@@ -1421,7 +1424,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       {
          auto clients = Subjective{}.open<TraceClientTable>();
          auto row     = clients.get(id).value_or(
-             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+                 TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
          row.clients.push_back({*socket, json, query.flag()});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
