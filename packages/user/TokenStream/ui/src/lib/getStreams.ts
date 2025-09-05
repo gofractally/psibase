@@ -13,8 +13,6 @@ export const zStream = z.object({
     vested: z.string(),
 });
 
-export type Evaluation = z.infer<typeof zStream>;
-
 export const getStreams = async () => {
     const streams = await graphql(
         `

@@ -22,6 +22,8 @@ import { useCreateStream } from "../hooks/use-create-stream";
 import { useStreams } from "../hooks/use-streams";
 
 export const Home = () => {
+    const navigate = useNavigate();
+
     const { data: streams, isLoading: isLoadingStream } = useStreams();
     const { data: currentUser, isLoading: isLoadingCurrentUser } =
         useCurrentUser();
@@ -29,9 +31,6 @@ export const Home = () => {
 
     const isLoading = isLoadingStream || isLoadingCurrentUser;
 
-    console.log(streams, "is the data");
-
-    const navigate = useNavigate();
 
     const [showModal, setShowModal] = useState(false);
 

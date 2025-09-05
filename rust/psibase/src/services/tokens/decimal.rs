@@ -1,16 +1,8 @@
 use std::str::FromStr;
 
-use crate::fracpack;
 use crate::serialize_as_str;
 use crate::services::tokens::{Precision, Quantity, TokensError};
-use fracpack::{Pack, ToSchema, Unpack};
 
-#[derive(Pack, Unpack, Debug, ToSchema, Clone)]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "Decimal"
-)]
 pub struct Decimal {
     quantity: Quantity,
     precision: Precision,
