@@ -18,6 +18,7 @@ interface packaging {
 interface settings {
     use host:types/types.{error};
 
+    /// Set snapshot interval period network wide
     set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
