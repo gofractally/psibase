@@ -5,7 +5,7 @@ if(ENABLE_SSL)
     find_package(OpenSSL REQUIRED SSL)
 endif()
 
-add_executable(psinode main.cpp connection.cpp connect.cpp)
+add_executable(psinode main.cpp connection.cpp connect.cpp init.cpp)
 
 target_link_libraries(psinode
     services_system

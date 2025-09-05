@@ -86,7 +86,7 @@ namespace psibase
    bool isPrerelease(std::string_view version)
    {
       auto pos = version.find_first_of("-+");
-      return pos != std::string_view::npos || version[pos] == '-';
+      return pos != std::string_view::npos && version[pos] == '-';
    }
 
    // Both strings should start after the patch version (i.e. at the '-', if there is one)
@@ -203,6 +203,7 @@ namespace psibase
                return comparePrerelease(copy, version) == 0;
             }
          }
+         __builtin_unreachable();
       }
       static std::optional<bool> matchNum(std::string_view& lhs, std::string_view& rhs, bool exact)
       {

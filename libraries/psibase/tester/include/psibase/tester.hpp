@@ -3,6 +3,7 @@
 #include <iostream>
 #include <psibase/Actor.hpp>
 #include <psibase/Rpc.hpp>
+#include <psibase/fileUtil.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
@@ -63,8 +64,6 @@ namespace psibase
       check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];
    }
-
-   std::vector<char> readWholeFile(std::string_view filename);
 
    /**
     * Validates the status of a transaction.  If expectedExcept is "", then the

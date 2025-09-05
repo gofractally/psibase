@@ -60,9 +60,10 @@ namespace psibase
       std::int32_t send(Writer& writer, std::int32_t fd, std::span<const char> buf);
       void         add(Writer&                        writer,
                        const std::shared_ptr<Socket>& socket,
-                       SocketAutoCloseSet*            owner = nullptr);
+                       SocketAutoCloseSet*            owner = nullptr,
+                       Database*                      db    = nullptr);
       void         set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>& socket);
-      void         remove(Writer& writer, const std::shared_ptr<Socket>& socket);
+      void remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db = nullptr);
       std::int32_t autoClose(std::int32_t               socket,
                              bool                       value,
                              SocketAutoCloseSet*        owner,

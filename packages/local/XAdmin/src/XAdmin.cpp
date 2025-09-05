@@ -96,7 +96,10 @@ namespace LocalService
          {
             row = kvGet<SocketRow>(SocketRow::db, socketKey(socket));
          }
-         const auto& info     = std::get<HttpSocketInfo>(row.value().info);
+         check(row.has_value(), "Missing socket row");
+         check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
+         const auto& info = std::get<HttpSocketInfo>(row.value().info);
+         check(info.endpoint.has_value(), "Missing endpoint for socket");
          const auto& endpoint = info.endpoint.value();
          if (isLoopback(endpoint))
             return {};

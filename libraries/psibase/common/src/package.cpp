@@ -1,5 +1,6 @@
 #include <psibase/Actor.hpp>
 #include <psibase/check.hpp>
+#include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
 #include <psio/schema.hpp>
@@ -16,28 +17,8 @@ namespace psibase
 {
    using namespace psibase::zip;
 
-   std::vector<char> readWholeFile(std::string_view filename);
-
    namespace
    {
-      std::uint64_t translateFlags(std::span<const std::string> flags)
-      {
-         std::uint64_t result = 0;
-         for (const auto& flag : flags)
-         {
-            if (flag == "isPrivileged")
-               result |= CodeRow::isPrivileged;
-            else if (flag == "isVerify")
-               result |= CodeRow::isVerify;
-            else if (flag == "runModeRpc")
-               result |= CodeRow::runModeRpc;
-            else if (flag == "runModeCallback")
-               result |= CodeRow::runModeCallback;
-            else
-               check(false, "Invalid service flags");
-         }
-         return result;
-      }
       const std::pair<std::string_view, std::string_view> fileTypes[] = {
           {".cpp", "text/plain"},
           {".css", "text/css"},
@@ -129,6 +110,27 @@ namespace psibase
       return versionCompare(rhs.version, lhs.version);
    }
 
+   std::uint64_t ServiceInfo::parseFlags() const
+   {
+      std::uint64_t result = 0;
+      for (const auto& flag : flags)
+      {
+         if (flag == "isPrivileged")
+            result |= CodeRow::isPrivileged;
+         else if (flag == "isVerify")
+            result |= CodeRow::isVerify;
+         else if (flag == "runModeRpc")
+            result |= CodeRow::runModeRpc;
+         else if (flag == "runModeCallback")
+            result |= CodeRow::runModeCallback;
+         else if (flag == "isReplacement")
+            result |= CodeRow::isReplacement;
+         else
+            check(false, "Invalid service flags");
+      }
+      return result;
+   }
+
    PackagedService::PackagedService(std::vector<char> buf) : buf(std::move(buf)), archive(this->buf)
    {
       std::map<AccountNumber, FileHeader>               info_files;
@@ -203,6 +205,17 @@ namespace psibase
       }
    }
 
+   std::pair<std::string_view, std::string_view> PackagedService::dataFileInfo(
+       std::string_view filename)
+   {
+      assert(filename.starts_with("data/"));
+      auto path = filename.substr(5);
+      auto pos  = path.find('/');
+      assert(pos != std::string::npos);
+      path = path.substr(pos);
+      return {path, guessMimeType(path)};
+   }
+
    void PackagedService::genesis(std::vector<GenesisService>& out)
    {
       for (const auto& [account, index, info] : services)
@@ -215,7 +228,7 @@ namespace psibase
 
          out.push_back(GenesisService{
              .service   = account,
-             .flags     = translateFlags(info.flags),
+             .flags     = info.parseFlags(),
              .vmType    = 0,
              .vmVersion = 0,
              .code      = archive.getEntry(index).read(),
@@ -248,12 +261,9 @@ namespace psibase
    {
       for (const auto& [sender, index] : data)
       {
-         auto path = index.filename.substr(5);
-         auto pos  = path.find('/');
-         assert(pos != std::string::npos);
-         path = path.substr(pos);
+         auto [path, mimeType] = dataFileInfo(index.filename);
          actions.push_back(transactor<Sites>{sender, Sites::service}.storeSys(
-             path, guessMimeType(path), std::nullopt, archive.getEntry(index).read()));
+             path, mimeType, std::nullopt, archive.getEntry(index).read()));
       }
    }
    void PackagedService::regServer(std::vector<Action>& actions)

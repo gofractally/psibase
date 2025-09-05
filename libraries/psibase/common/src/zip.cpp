@@ -66,7 +66,6 @@ namespace psibase::zip
    constexpr bool operator==(CompressionMethod lhs, std::uint16_t rhs)
    {
       return static_cast<std::uint16_t>(lhs) == rhs;
-      ;
    }
 
    enum class ExtraId : std::uint16_t
@@ -77,7 +76,6 @@ namespace psibase::zip
    constexpr bool operator==(ExtraId lhs, std::uint16_t rhs)
    {
       return static_cast<std::uint16_t>(lhs) == rhs;
-      ;
    }
 
    struct ExtraHeader
@@ -424,7 +422,7 @@ namespace psibase::zip
       return ZipReader::Entry::cdUncompressedSize;
    }
 
-   ZipReader::Entry ZipReader::getEntry(const FileHeader& cdHeader)
+   ZipReader::Entry ZipReader::getEntry(const FileHeader& cdHeader) const
    {
       auto info = cdHeader.zip64();
       check(info.localHeaderOffset <= buf.size(), "local header offset out-of-range");

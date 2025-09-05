@@ -165,7 +165,10 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
    p->send(buf);
    return 0;
 }
-void Sockets::add(Writer& writer, const std::shared_ptr<Socket>& socket, SocketAutoCloseSet* owner)
+void Sockets::add(Writer&                        writer,
+                  const std::shared_ptr<Socket>& socket,
+                  SocketAutoCloseSet*            owner,
+                  Database*                      db)
 {
    {
       std::lock_guard l{mutex};
@@ -199,7 +202,14 @@ void Sockets::add(Writer& writer, const std::shared_ptr<Socket>& socket, SocketA
 
    {
       SocketRow row{socket->id, socket->info()};
-      sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
+      if (db)
+      {
+         db->kvPut(SocketRow::db, row.key(), row);
+      }
+      else
+      {
+         sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
+      }
    }
 }
 void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>& socket)
@@ -238,7 +248,7 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
       sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
    }
 }
-void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket)
+void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db)
 {
    bool matched = false;
    {
@@ -252,7 +262,14 @@ void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket)
    if (matched)
    {
       auto key = socketKey(socket->id);
-      sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      if (db)
+      {
+         db->kvRemove(SocketRow::db, key);
+      }
+      else
+      {
+         sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      }
    }
 }
 std::int32_t Sockets::autoClose(std::int32_t               fd,

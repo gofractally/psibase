@@ -115,7 +115,7 @@ namespace psibase::zip
          std::span<const char> data;
       };
 
-      Entry getEntry(const FileHeader& cdHeader);
+      Entry getEntry(const FileHeader& cdHeader) const;
 
       struct CentralDirectoryIterator
       {
