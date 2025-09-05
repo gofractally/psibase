@@ -65,6 +65,9 @@ interface intf {
     /// * `method-name`: The method name of the action being called
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
+
+
+    set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
 interface auth {

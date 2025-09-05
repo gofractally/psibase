@@ -132,6 +132,10 @@ impl Intf for TransactPlugin {
 
         Ok(())
     }
+
+    fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
+        Ok(())
+    }
 }
 
 impl Admin for TransactPlugin {
