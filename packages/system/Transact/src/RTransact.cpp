@@ -10,6 +10,7 @@
 #include <functional>
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <ranges>
 
 using namespace psibase;
@@ -1360,6 +1361,30 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    return {};
 }
 
+struct SnapInfo
+{
+   psibase::BlockTime lastSnapshot;
+   int64_t            snapshotInterval;
+};
+PSIO_REFLECT(SnapInfo, lastSnapshot, snapshotInterval);
+
+struct TransactQuery
+{
+   auto snapshotInfo() const -> std::optional<SnapInfo>
+   {
+      auto snapInfo = Transact::Tables{Transact::service}.open<SnapshotInfoTable>().get({});
+      if (snapInfo.has_value())
+      {
+         auto ret = SnapInfo{.lastSnapshot     = snapInfo->lastSnapshot,
+                             .snapshotInterval = snapInfo->snapshotInterval.count()};
+         return std::optional<SnapInfo>{std::move(ret)};
+      }
+
+      return {};
+   }
+};
+PSIO_REFLECT(TransactQuery, method(snapshotInfo));
+
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  request,
                                              std::optional<std::int32_t>  socket,
                                              std::optional<AccountNumber> user)
@@ -1459,6 +1484,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
                        .body        = getJWTKey(),
                        .headers     = allowCors(request, AccountNumber{"supervisor"})};
    }
+   else if (auto result = serveGraphQL(request, TransactQuery{}))
+      return result;
 
    return {};
 }
