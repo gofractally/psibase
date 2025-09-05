@@ -4,10 +4,10 @@ mod service {
     use ::token_stream::tables::{Stream, StreamTable};
     use async_graphql::{connection::Connection, *};
     use psibase::{
-        services::{token_stream, tokens::Decimal},
+        services::{token_stream},
         *,
     };
-    use serde::{Deserialize, Deserializer};
+    use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]

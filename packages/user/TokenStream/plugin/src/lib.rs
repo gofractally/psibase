@@ -17,7 +17,7 @@ define_trust! {
         High => "Deposit tokens, claim and delete a stream",
     }
     functions {
-        Low => [get_example_thing],
+        Low => [],
         Medium => [create],
         High => [deposit, claim, delete],
     }
