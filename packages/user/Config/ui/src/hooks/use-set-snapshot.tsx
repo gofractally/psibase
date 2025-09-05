@@ -1,5 +1,4 @@
 // import { queryClient } from "@/queryClient";
-
 // import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 
@@ -19,7 +18,7 @@ export const useSetSnapshot = () =>
             isStagable: true,
             onSuccess: (seconds, status) => {
                 if (status.type == "executed") {
-                    console.log(seconds, 'seconds')
+                    console.log(seconds, "seconds");
                     // queryClient.setQueryData(QueryKey., networkName);
                 }
             },

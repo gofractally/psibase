@@ -1,5 +1,7 @@
 import { useAppForm } from "@/components/forms/app-form";
+
 import { useSetSnapshot } from "@/hooks/use-set-snapshot";
+
 import { Label } from "@shared/shadcn/ui/label";
 import {
     Select,
@@ -9,21 +11,20 @@ import {
     SelectValue,
 } from "@shared/shadcn/ui/select";
 
-
 const oneDay = 86400;
 
 export const Settings = () => {
-    const { mutateAsync: setSnapshot } = useSetSnapshot()
+    const { mutateAsync: setSnapshot } = useSetSnapshot();
 
     const form = useAppForm({
         defaultValues: {
             seconds: oneDay,
         },
         onSubmit: async (data) => {
-            await setSnapshot([data.value.seconds])
+            await setSnapshot([data.value.seconds]);
             form.reset({
-                seconds: data.value.seconds
-            })
+                seconds: data.value.seconds,
+            });
         },
     });
 
@@ -44,24 +45,21 @@ export const Settings = () => {
                 }}
                 className="space-y-4"
             >
-                <div className="rounded-lg  p-4 border ">
+                <div className="rounded-lg  border p-4 ">
                     <div className="flex justify-between">
-
-                        <div className="space-y-0.5 pb-3 w-full">
+                        <div className="w-full space-y-0.5 pb-3">
                             <Label className="text-base">Snapshots</Label>
                             <div className="text-muted-foreground text-sm">
                                 Network snapshot interval.{" "}
                             </div>
                         </div>
-                        <div className="w-full flex justify-end">
+                        <div className="flex w-full justify-end">
                             <form.Field name="seconds">
                                 {(field) => (
                                     <div className="flex gap-2">
                                         <Select
                                             onValueChange={(value) => {
-                                                field.setValue(
-                                                    Number(value),
-                                                );
+                                                field.setValue(Number(value));
                                             }}
                                             value={field.state.value.toString()}
                                         >
@@ -69,39 +67,47 @@ export const Settings = () => {
                                                 <SelectValue placeholder="Select mode" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value={'0'}>
+                                                <SelectItem value={"0"}>
                                                     Never
                                                 </SelectItem>
-                                                <SelectItem value={oneDay.toString()}>
+                                                <SelectItem
+                                                    value={oneDay.toString()}
+                                                >
                                                     1 day
                                                 </SelectItem>
-                                                <SelectItem value={(oneDay * 2).toString()}>
+                                                <SelectItem
+                                                    value={(
+                                                        oneDay * 2
+                                                    ).toString()}
+                                                >
                                                     2 days
                                                 </SelectItem>
-                                                <SelectItem value={(oneDay * 7).toString()}>
+                                                <SelectItem
+                                                    value={(
+                                                        oneDay * 7
+                                                    ).toString()}
+                                                >
                                                     1 week
                                                 </SelectItem>
-                                                <SelectItem value={(oneDay * 14).toString()}>
+                                                <SelectItem
+                                                    value={(
+                                                        oneDay * 14
+                                                    ).toString()}
+                                                >
                                                     2 weeks
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
-
                                     </div>
                                 )}
                             </form.Field>
                         </div>
-
-
                     </div>
                     <div className="mt-6 flex flex-row-reverse font-medium">
                         <form.AppForm>
-                            <form.SubmitButton
-                                labels={["Save", "Saving..."]}
-                            />
+                            <form.SubmitButton labels={["Save", "Saving..."]} />
                         </form.AppForm>
                     </div>
-
                 </div>
             </form>
         </div>
