@@ -26,8 +26,10 @@ use exports::transact::plugin::{
     admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
 };
 
+use psibase::services::transact::action_structs::setSnapTime;
+
 // Third-party crates
-use psibase::fracpack::Pack;
+use psibase::{fracpack::Pack, Seconds};
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
 use serde::Deserialize;
 use serde_json::from_str;
@@ -134,7 +136,12 @@ impl Intf for TransactPlugin {
     }
 
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
-        Ok(())
+        let packed_args = setSnapTime {
+            seconds: Seconds::new(seconds as i64),
+        }
+        .packed();
+
+        TransactPlugin::add_action_to_transaction(setSnapTime::ACTION_NAME.to_string(), packed_args)
     }
 }
 
