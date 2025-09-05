@@ -24,6 +24,7 @@ use host::types::types::{self as HostTypes, BodyTypes};
 // Exported interfaces/types
 use exports::transact::plugin::{
     admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
+    network::Guest as Network,
 };
 
 use psibase::services::transact::action_structs::setSnapTime;
@@ -134,7 +135,9 @@ impl Intf for TransactPlugin {
 
         Ok(())
     }
+}
 
+impl Network for TransactPlugin {
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
         let packed_args = setSnapTime {
             seconds: Seconds::new(seconds as i64),
