@@ -35,7 +35,7 @@ struct {{project-name | upper_camel_case}}Plugin;
 
 impl Api for {{project-name | upper_camel_case}}Plugin {
     fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::authorize(trust::FunctionName::set_example_thing)?;
+        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
         let packed_example_thing_args = {{project-name | snake_case}}::action_structs::setExampleThing { thing }.packed();
         add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
         Ok(())
@@ -55,7 +55,7 @@ struct ExampleThingResponse {
 
 impl Queries for {{project-name | upper_camel_case}}Plugin {
     fn get_example_thing() -> Result<String, Error> {
-        trust::authorize(trust::FunctionName::get_example_thing)?;
+        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
 
         let graphql_str = "query { exampleThing }";
 

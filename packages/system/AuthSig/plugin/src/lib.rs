@@ -86,7 +86,7 @@ impl HookUserAuth for AuthSig {
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
+        assert_authorized_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
 
         let keypair = AuthSig::generate_unmanaged_keypair()?;
         ManagedKeys::add(&keypair.public_key, &AuthSig::to_der(keypair.private_key)?);
@@ -94,7 +94,7 @@ impl KeyVault for AuthSig {
     }
 
     fn generate_unmanaged_keypair() -> Result<Keypair, CommonTypes::Error> {
-        authorize(FunctionName::generate_unmanaged_keypair)?;
+        assert_authorized(FunctionName::generate_unmanaged_keypair)?;
 
         let signing_key = SigningKey::random(&mut OsRng);
         let verifying_key: &VerifyingKey = signing_key.verifying_key();
@@ -114,7 +114,7 @@ impl KeyVault for AuthSig {
     }
 
     fn pub_from_priv(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        authorize(FunctionName::pub_from_priv)?;
+        assert_authorized(FunctionName::pub_from_priv)?;
 
         let pem = pem::Pem::try_from_pem_str(&private_key)?;
         let signing_key =
@@ -127,7 +127,7 @@ impl KeyVault for AuthSig {
     }
 
     fn priv_from_pub(public_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        authorize(FunctionName::priv_from_pub)?;
+        assert_authorized(FunctionName::priv_from_pub)?;
 
         let private_key = ManagedKeys::get(&public_key);
         Ok(SigningKey::from_pkcs8_der(&private_key)
@@ -138,14 +138,14 @@ impl KeyVault for AuthSig {
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
-        authorize(FunctionName::to_der)?;
+        assert_authorized(FunctionName::to_der)?;
 
         let pem = pem::Pem::try_from_pem_str(&key)?;
         Ok(pem.contents().to_vec())
     }
 
     fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
-        authorize(FunctionName::sign)?;
+        assert_authorized(FunctionName::sign)?;
 
         let signing_key =
             SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
@@ -156,7 +156,7 @@ impl KeyVault for AuthSig {
     }
 
     fn import_key(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        authorize_with_whitelist(FunctionName::import_key, vec!["x-admin".into()])?;
+        assert_authorized_with_whitelist(FunctionName::import_key, vec!["x-admin".into()])?;
 
         let public_key = AuthSig::pub_from_priv(private_key.clone())?;
         ManagedKeys::add(&public_key, &AuthSig::to_der(private_key)?);
@@ -166,7 +166,7 @@ impl KeyVault for AuthSig {
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
-        authorize(FunctionName::set_key)?;
+        assert_authorized(FunctionName::set_key)?;
 
         Transact::add_action_to_transaction(
             MyService::setKey::ACTION_NAME,
