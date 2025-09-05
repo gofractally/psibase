@@ -71,7 +71,6 @@ impl Api for PermissionsPlugin {
         debug_label: String,
         whitelist: Vec<String>,
     ) -> Result<bool, Error> {
-        println!("Permissions.authorize().top");
         let callee = HostClient::get_sender();
 
         if level == TrustLevel::None {

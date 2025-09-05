@@ -18,8 +18,10 @@ use bindings::host::types::types as HostTypes;
 use trust::*;
 
 // Thurd-party crates
-use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey};
-use p256::pkcs8::{DecodePrivateKey, EncodePublicKey, LineEnding};
+use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
+use p256::pkcs8::{
+    DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding,
+};
 
 psibase::define_trust! {
     descriptions {
@@ -37,7 +39,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [pub_from_priv, to_der, from_der, sign, sign_explicit],
+        None => [pub_from_priv, to_der, pub_from_der, priv_from_der, sign, sign_explicit],
         Low => [import_key],
         High => [],
     }
@@ -63,10 +65,22 @@ fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {
     Ok(pem.contents().to_vec())
 }
 
-fn from_der(key: Vec<u8>) -> Result<Pem, HostTypes::Error> {
-    authorize(FunctionName::from_der)?;
+fn priv_from_der(key: Vec<u8>) -> Result<Pem, HostTypes::Error> {
+    authorize(FunctionName::priv_from_der)?;
 
-    Ok(pem::parse(&key)
+    Ok(SigningKey::from_pkcs8_der(&key)
+        .map_err(|e| CryptoError(e.to_string()))?
+        .to_pkcs8_pem(LineEnding::LF)
+        .map_err(|e| CryptoError(e.to_string()))?
+        .to_string())
+}
+
+fn pub_from_der(key: Vec<u8>) -> Result<Pem, HostTypes::Error> {
+    authorize(FunctionName::pub_from_der)?;
+
+    Ok(VerifyingKey::from_public_key_der(&key)
+        .map_err(|e| CryptoError(e.to_string()))?
+        .to_public_key_pem(LineEnding::LF)
         .map_err(|e| CryptoError(e.to_string()))?
         .to_string())
 }
@@ -120,8 +134,12 @@ impl Api for WebCryptoShim {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        println!("WebCrypto.sign_explicit().0");
+        println!(
+            "WebCrypto.sign_explicit().0 private_key: {:?}",
+            priv_from_der(private_key.clone()).unwrap()
+        );
         authorize(FunctionName::sign_explicit)?;
+        // TODO: assert(HostCommon::get_sender == "Supervisor");
 
         println!("WebCrypto.sign_explicit().1");
         let signing_key =
@@ -139,17 +157,9 @@ impl Api for WebCryptoShim {
         authorize(FunctionName::sign)?;
 
         println!("WebCrypto.sign().1");
-        let private_key = ManagedKeys::get(&from_der(public_key)?);
+        let private_key = ManagedKeys::get(&pub_from_der(public_key)?);
 
-        println!("WebCrypto.sign().2");
-        let signing_key =
-            SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
-        println!("WebCrypto.sign().3");
-        let signature: Signature = signing_key
-            .sign_prehash(&hashed_message)
-            .map_err(|e| CryptoError(e.to_string()))?;
-        println!("WebCrypto.sign().4");
-        Ok(signature.to_bytes().to_vec())
+        Self::sign_explicit(hashed_message, private_key)
     }
 
     fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {

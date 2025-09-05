@@ -87,12 +87,12 @@ fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, HostTypes
 
 impl Invitee for InvitePlugin {
     fn accept_with_new_account(account: String, token: String) -> Result<(), HostTypes::Error> {
-        println!("accept_with_new_account().1");
+        println!("accept_with_new_account().1 account {:?}", account);
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
             return Err(InvalidAccount(&account));
         })?;
 
-        println!("accept_with_new_account().2");
+        println!("accept_with_new_account().2 accepted_by: {:?}", accepted_by);
         if Accounts::api::get_account(&account)?.is_some() {
             return Err(AccountExists("accept_with_new_account").into());
         }
@@ -111,7 +111,10 @@ impl Invitee for InvitePlugin {
         println!("accept_with_new_account().7");
         let account_keypair = keyvault::generate_unmanaged_keypair()?;
         // TODO: save private key to password manager
-        println!("accept_with_new_account().8");
+        println!(
+            "accept_with_new_account().8 new account private_key: {:?}",
+            account_keypair.private_key
+        );
         keyvault::import_key(&account_keypair.private_key, None)?;
 
         println!("accept_with_new_account().9");

@@ -7,8 +7,8 @@ use bindings::*;
 
 mod errors;
 use errors::ErrorType::*;
-mod db;
-use db::*;
+// mod db;
+// use db::*;
 mod types;
 use types::*;
 
@@ -23,7 +23,7 @@ use exports::host::crypto::keyvault::Guest as KeyVault;
 use trust::*;
 
 // Thurd-party crates
-use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
+use p256::ecdsa::{SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use rand_core::OsRng;
 
@@ -44,24 +44,24 @@ psibase::define_trust! {
     }
     functions {
         None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign, sign_explicit],
-        Low => [generate_keypair, import_key],
-        High => [priv_from_pub, set_key],
+        Low => [import_key],
+        High => [set_key],
     }
 }
 
 struct HostCrypto;
 
 impl KeyVault for HostCrypto {
-    fn generate_keypair() -> Result<String, HostTypes::Error> {
-        authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
+    // fn generate_keypair() -> Result<String, HostTypes::Error> {
+    //     authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
 
-        let keypair = HostCrypto::generate_unmanaged_keypair()?;
-        ManagedKeys::add(
-            &keypair.public_key,
-            &HostCrypto::to_der(keypair.private_key)?,
-        );
-        Ok(keypair.public_key)
-    }
+    //     let keypair = HostCrypto::generate_unmanaged_keypair()?;
+    //     ManagedKeys::add(
+    //         &keypair.public_key,
+    //         &HostCrypto::to_der(keypair.private_key)?,
+    //     );
+    //     Ok(keypair.public_key)
+    // }
 
     fn generate_unmanaged_keypair() -> Result<Keypair, HostTypes::Error> {
         authorize(FunctionName::generate_unmanaged_keypair)?;
@@ -96,16 +96,16 @@ impl KeyVault for HostCrypto {
             .map_err(|e| CryptoError(e.to_string()))?)
     }
 
-    fn priv_from_pub(public_key: Pem) -> Result<Pem, HostTypes::Error> {
-        authorize(FunctionName::priv_from_pub)?;
+    // fn priv_from_pub(public_key: Pem) -> Result<Pem, HostTypes::Error> {
+    //     authorize(FunctionName::priv_from_pub)?;
 
-        let private_key = ManagedKeys::get(&public_key);
-        Ok(SigningKey::from_pkcs8_der(&private_key)
-            .map_err(|e| CryptoError(e.to_string()))?
-            .to_pkcs8_pem(LineEnding::LF)
-            .map_err(|e| CryptoError(e.to_string()))?
-            .to_string())
-    }
+    //     let private_key = ManagedKeys::get(&public_key);
+    //     Ok(SigningKey::from_pkcs8_der(&private_key)
+    //         .map_err(|e| CryptoError(e.to_string()))?
+    //         .to_pkcs8_pem(LineEnding::LF)
+    //         .map_err(|e| CryptoError(e.to_string()))?
+    //         .to_string())
+    // }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {
         authorize(FunctionName::to_der)?;
@@ -135,8 +135,7 @@ impl KeyVault for HostCrypto {
         println!("Host:crypto.sign_explicit().1");
         authorize(FunctionName::sign_explicit)?;
 
-        let signature = Supervisor::sign_explicit(&hashed_message, &private_key).unwrap();
-        Ok(signature)
+        Supervisor::sign_explicit(&hashed_message, &private_key)
     }
 
     fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
@@ -149,9 +148,7 @@ impl KeyVault for HostCrypto {
         // let public_key = Self::pub_from_priv(private_key.clone())?;
         // ManagedKeys::add(&public_key, &HostCrypto::to_der(private_key)?);
         println!("Host:crypto.import_key().2");
-        let public_key = Supervisor::import_key(&private_key, extractable)?;
-        println!("Host:crypto.import_key().3");
-        Ok(public_key)
+        Supervisor::import_key(&private_key, extractable)
     }
 }
 

@@ -47,6 +47,8 @@ psibase::define_trust! {
 }
 use trust::*;
 
+use crate::bindings::host::crypto::keyvault::to_der;
+
 struct AuthSig;
 
 impl HookUserAuth for AuthSig {
@@ -79,8 +81,11 @@ impl HookUserAuth for AuthSig {
 
         let pubkey = get_pubkey(&account_name)?;
         // replace next 2 lines with HostCrypto::sign(tx_hash, pubKey)
-        let public_key = pubkey.into();
-        println!("authSig.on_user_auth_proof().2");
+        let public_key = to_der(&pubkey)?;
+        println!(
+            "authSig.on_user_auth_proof().2 public_key: {:?}",
+            public_key
+        );
         let signature = AuthSig::sign(transaction_hash, public_key)?;
         println!("authSig.on_user_auth_proof().3");
         Ok(Some(Proof { signature }))
@@ -88,10 +93,10 @@ impl HookUserAuth for AuthSig {
 }
 
 impl KeyVault for AuthSig {
-    fn generate_keypair() -> Result<String, HostTypes::Error> {
-        authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
-        HostCrypto::generate_keypair()
-    }
+    // fn generate_keypair() -> Result<String, HostTypes::Error> {
+    //     authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
+    //     HostCrypto::generate_keypair()
+    // }
 
     fn generate_unmanaged_keypair() -> Result<Keypair, HostTypes::Error> {
         authorize(FunctionName::generate_unmanaged_keypair)?;
@@ -103,10 +108,10 @@ impl KeyVault for AuthSig {
         HostCrypto::pub_from_priv(&private_key)
     }
 
-    fn priv_from_pub(public_key: Pem) -> Result<Pem, HostTypes::Error> {
-        authorize(FunctionName::priv_from_pub)?;
-        HostCrypto::priv_from_pub(&public_key)
-    }
+    // fn priv_from_pub(public_key: Pem) -> Result<Pem, HostTypes::Error> {
+    //     authorize(FunctionName::priv_from_pub)?;
+    //     HostCrypto::priv_from_pub(&public_key)
+    // }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {
         authorize(FunctionName::to_der)?;
