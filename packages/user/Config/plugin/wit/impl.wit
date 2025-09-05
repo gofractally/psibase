@@ -12,5 +12,6 @@ world impl {
     export branding;
     export producers;
     export packaging;
+    export settings;
 
 }
