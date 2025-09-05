@@ -27,7 +27,7 @@ mod service {
         nft_id: u32,
         actor: AccountNumber,
         tx_type: String,
-        amount: Decimal,
+        amount: String,
     }
 
     struct Query;

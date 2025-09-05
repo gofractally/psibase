@@ -228,7 +228,8 @@ pub mod service {
             Decimal::new(
                 shared_balance,
                 Tokens::call().getToken(stream.token_id).precision,
-            ),
+            )
+            .to_string(),
         );
     }
 
@@ -254,7 +255,8 @@ pub mod service {
             Decimal::new(
                 claimed_amount,
                 Tokens::call().getToken(stream.token_id).precision,
-            ),
+            )
+            .to_string(),
         );
     }
 
@@ -275,7 +277,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: Decimal) {}
+    pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: String) {}
 }
 
 #[cfg(test)]
