@@ -1,9 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-// mod helpers;
-// use helpers::*;
-
 mod errors;
 use errors::ErrorType::*;
 mod db;
@@ -12,12 +9,13 @@ mod types;
 use types::*;
 
 use bindings::exports::web_crypto::plugin::api::Guest as Api;
+use bindings::host::common::client as HostCommon;
 use bindings::host::crypto::types::Pem;
 use bindings::host::types::types as HostTypes;
 
 use trust::*;
 
-// Thurd-party crates
+// Third-party crates
 use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{
     DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding,
@@ -88,55 +86,15 @@ fn pub_from_der(key: Vec<u8>) -> Result<Pem, HostTypes::Error> {
 struct WebCryptoShim;
 
 impl Api for WebCryptoShim {
-    // fn generate_keypair() -> Result<String, HostTypes::Error> {
-    //     // authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
-
-    //     let keypair = Self::generate_unmanaged_keypair()?;
-    //     ManagedKeys::add(
-    //         &keypair.public_key,
-    //         &Self::to_der(keypair.private_key)?,
-    //     );
-    //     Ok(keypair.public_key)
-    // }
-
-    // fn generate_unmanaged_keypair() -> Result<Keypair, HostTypes::Error> {
-    //     // authorize(FunctionName::generate_unmanaged_keypair)?;
-
-    //     let signing_key = SigningKey::random(&mut OsRng);
-    //     let verifying_key: &VerifyingKey = signing_key.verifying_key();
-
-    //     let private_key = signing_key
-    //         .to_pkcs8_pem(LineEnding::LF)
-    //         .map_err(|e| CryptoError(e.to_string()))?
-    //         .to_string();
-    //     let public_key = verifying_key
-    //         .to_public_key_pem(LineEnding::LF)
-    //         .map_err(|e| CryptoError(e.to_string()))?;
-
-    //     Ok(Keypair {
-    //         public_key,
-    //         private_key,
-    //     })
-    // }
-
-    // fn priv_from_pub(public_key: Pem) -> Result<Pem, HostTypes::Error> {
-    //     // authorize(FunctionName::priv_from_pub)?;
-
-    //     let private_key = ManagedKeys::get(&public_key);
-    //     Ok(SigningKey::from_pkcs8_der(&private_key)
-    //         .map_err(|e| CryptoError(e.to_string()))?
-    //         .to_pkcs8_pem(LineEnding::LF)
-    //         .map_err(|e| CryptoError(e.to_string()))?
-    //         .to_string())
-    // }
-
     fn sign_explicit(
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
         authorize(FunctionName::sign_explicit)?;
-        // TODO: assert(HostCommon::get_sender == "Supervisor");
+        assert!(HostCommon::get_sender() == "Supervisor");
 
+        // NOTE for future: this could very well not be an account's key, so I'd have to import it to WebCrypto and then sign
+        // (perferably don't import it to WebCryto to avoid bloat)
         let signing_key =
             SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
         let signature: Signature = signing_key
@@ -152,12 +110,11 @@ impl Api for WebCryptoShim {
         Self::sign_explicit(hashed_message, private_key)
     }
 
-    fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
+    fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
         authorize_with_whitelist(
             FunctionName::import_key,
             vec!["x-admin".into(), "host".into()],
         )?;
-        // TODO: support extractable = true? or remove this param?
         let public_key = pub_from_priv(private_key.clone())?;
         // Store private CryptoKey in Map by public_key
         ManagedKeys::add(&public_key, &to_der(private_key)?);

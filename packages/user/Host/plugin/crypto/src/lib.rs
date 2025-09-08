@@ -2,27 +2,19 @@
 mod bindings;
 use bindings::*;
 
-// mod helpers;
-// use helpers::*;
-
 mod errors;
 use errors::ErrorType::*;
-// mod db;
-// use db::*;
 mod types;
 use types::*;
 
 use bindings::exports::host::crypto::types::{Keypair, Pem};
 use bindings::host::types::types as HostTypes;
-use bindings::supervisor::bridge::{
-    intf as Supervisor,
-    // types::{self as BridgeTypes, HttpRequest, HttpResponse},
-};
+use bindings::supervisor::bridge::intf as Supervisor;
 use exports::host::crypto::keyvault::Guest as KeyVault;
 
 use trust::*;
 
-// Thurd-party crates
+// Third-party crates
 use p256::ecdsa::{SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use rand_core::OsRng;
@@ -52,17 +44,6 @@ psibase::define_trust! {
 struct HostCrypto;
 
 impl KeyVault for HostCrypto {
-    // fn generate_keypair() -> Result<String, HostTypes::Error> {
-    //     authorize_with_whitelist(FunctionName::generate_keypair, vec!["invite".into()])?;
-
-    //     let keypair = HostCrypto::generate_unmanaged_keypair()?;
-    //     ManagedKeys::add(
-    //         &keypair.public_key,
-    //         &HostCrypto::to_der(keypair.private_key)?,
-    //     );
-    //     Ok(keypair.public_key)
-    // }
-
     fn generate_unmanaged_keypair() -> Result<Keypair, HostTypes::Error> {
         authorize(FunctionName::generate_unmanaged_keypair)?;
 
@@ -96,17 +77,6 @@ impl KeyVault for HostCrypto {
             .map_err(|e| CryptoError(e.to_string()))?)
     }
 
-    // fn priv_from_pub(public_key: Pem) -> Result<Pem, HostTypes::Error> {
-    //     authorize(FunctionName::priv_from_pub)?;
-
-    //     let private_key = ManagedKeys::get(&public_key);
-    //     Ok(SigningKey::from_pkcs8_der(&private_key)
-    //         .map_err(|e| CryptoError(e.to_string()))?
-    //         .to_pkcs8_pem(LineEnding::LF)
-    //         .map_err(|e| CryptoError(e.to_string()))?
-    //         .to_string())
-    // }
-
     fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {
         authorize(FunctionName::to_der)?;
 
@@ -129,13 +99,13 @@ impl KeyVault for HostCrypto {
         Ok(Supervisor::sign_explicit(&hashed_message, &private_key)?)
     }
 
-    fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
+    fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
         authorize_with_whitelist(
             FunctionName::import_key,
             vec!["x-admin".into(), "invite".into(), "auth-sig".into()],
         )?;
 
-        Supervisor::import_key(&private_key, extractable)
+        Supervisor::import_key(&private_key)
     }
 }
 

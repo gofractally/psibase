@@ -11,14 +11,12 @@ export const useImportAccount = () => {
 
     return useMutation<void, string, string>({
         mutationFn: async (accountName) => {
-            console.log("useImportAccount().importAccount().1");
             await supervisor.functionCall({
                 method: "importAccount",
                 params: [accountName],
                 service: "accounts",
                 intf: "admin",
             });
-            console.log("useImportAccount().importAccount().2");
         },
         onSuccess: async () => {
             fetchAccounts();

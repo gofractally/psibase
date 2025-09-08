@@ -3,7 +3,7 @@ mod bindings;
 use bindings::*;
 
 use crate::host::crypto::keyvault as HostCrypto;
-// use crate::auth_sig::plugin::keyvault as HostCrypto;
+
 use host::types::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 

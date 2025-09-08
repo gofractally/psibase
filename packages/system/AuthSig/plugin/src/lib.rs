@@ -4,8 +4,6 @@ mod errors;
 use errors::ErrorType::*;
 mod helpers;
 use helpers::*;
-mod db;
-use db::*;
 mod types;
 
 // Other plugins
@@ -21,11 +19,7 @@ use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 // Services
 use psibase::services::auth_sig::action_structs as MyService;
 
-// Third-party crates
-use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
-use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use psibase::fracpack::Pack;
-use rand_core::OsRng;
 
 psibase::define_trust! {
     descriptions {
@@ -49,9 +43,6 @@ psibase::define_trust! {
     }
 }
 use trust::*;
-
-use crate::bindings::host::crypto::keyvault::to_der;
-use crate::types::TryFromPemStr;
 
 struct AuthSig;
 
@@ -83,13 +74,7 @@ impl HookUserAuth for AuthSig {
             return Err(Unauthorized("get_proofs".to_string()).into());
         }
 
-        let pubkey = get_pubkey(&account_name)?;
-        // replace next 2 lines with HostCrypto::sign(tx_hash, pubKey)
-        let public_key = to_der(&pubkey)?;
-        println!(
-            "authSig.on_user_auth_proof().2 public_key: {:?}",
-            public_key
-        );
+        let public_key = HostCrypto::to_der(&get_pubkey(&account_name)?)?;
         let signature = AuthSig::sign(transaction_hash, public_key)?;
         println!("authSig.on_user_auth_proof().3 signature: {:?}", signature);
         Ok(Some(Proof { signature }))
@@ -122,18 +107,15 @@ impl KeyVault for AuthSig {
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
         assert_authorized(FunctionName::sign)?;
-        // NOTE: this could very well not be an account's key, so I'd have to import it to WebCrypto and then sign (perferably don't import it to WebCryto to avoid bloat)
         HostCrypto::sign(&hashed_message, &public_key)
     }
 
-    fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
-        println!("AuthSig.import_key().1");
+    fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
         authorize_with_whitelist(
             FunctionName::import_key,
             vec!["x-admin".into(), "invite".into()],
         )?;
-        println!("AuthSig.import_key().2");
-        HostCrypto::import_key(&private_key, extractable)
+        HostCrypto::import_key(&private_key)
     }
 }
 

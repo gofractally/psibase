@@ -37,31 +37,25 @@ fn assert_valid_account(account: &str) {
 
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
-        println!("Accounts.login_direct().0");
         assert_caller_admin("login_direct");
 
         assert_valid_account(&user);
 
-        println!("Accounts.login_direct().1");
         // We want to authenticate as the user who is logging in to the 3rd-party app.
         // So we need to log in as this user in accounts because accounts is the active app
         // (because we redirected to accounts to do the login).
         AppsTable::new(&Client::get_receiver()).login(&user);
 
-        println!("Accounts.login_direct().2");
         AppsTable::new(&app).login(&user);
         UserTable::new(&user).add_connected_app(&app);
 
-        println!("Accounts.login_direct().3");
         if HostAuth::set_logged_in_user(&user, &app).is_err() {
             AppsTable::new(&app).logout();
             UserTable::new(&user).remove_connected_app(&app);
         }
 
-        println!("Accounts.login_direct().4");
         // Logging out to reverse accounts login above
         AppsTable::new(&Client::get_receiver()).logout();
-        println!("Accounts.login_direct().5");
     }
 
     fn decode_connection_token(token: String) -> Option<ConnectionToken> {

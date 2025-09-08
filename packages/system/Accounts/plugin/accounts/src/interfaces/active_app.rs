@@ -41,12 +41,8 @@ impl ActiveApp for AccountsPlugin {
         let apps_table = AppsTable::new(&app);
         let user = apps_table.get_logged_in_user();
 
-        if user.is_none() {
-            // no user to log out; done.
-        } else {
-            let user = user.unwrap();
-            HostAuth::log_out_user(&user, &app);
-
+        if user.is_some() {
+            HostAuth::log_out_user(&user.unwrap(), &app);
             apps_table.logout();
         }
 

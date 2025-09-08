@@ -1,22 +1,6 @@
 use crate::bindings::host::crypto::types::Pem;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
-use serde::Deserialize;
-
-#[derive(Deserialize, Debug)]
-pub struct AuthRecord {
-    pub pubkey: Pem,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct AccountDetails {
-    pub account: AuthRecord,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Response {
-    pub data: AccountDetails,
-}
 
 pub trait TryFromPemStr: Sized {
     fn try_from_pem_str(p: &Pem) -> Result<Self, CommonTypes::Error>;

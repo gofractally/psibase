@@ -88,13 +88,11 @@ export const AccountSelection = () => {
                 }
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
                 await createAccount(values.username);
-                console.log("Account UI.onSubmit().1");
                 void (await acceptInvite({
                     app,
                     accountName: values.username,
                     token: z.string().parse(token),
                 }));
-                console.log("Account UI.onSubmit().2; redirecting to app...");
                 window.location.href = inviteToken?.appDomain;
             } else {
                 // Import existing account
@@ -110,7 +108,6 @@ export const AccountSelection = () => {
             await logout();
             return;
         }
-        console.log("Accounts UI.closing modal...");
         setIsModalOpen(false);
     };
 
@@ -251,13 +248,11 @@ export const AccountSelection = () => {
             if (!inviteToken) {
                 throw new Error(`Expected invite token loaded`);
             }
-            console.log("Account UI.onAcceptOrLogin().1");
             await acceptInvite({
                 token: z.string().parse(token),
                 accountName: z.string().parse(selectedAccount?.account),
                 app: inviteToken.app,
             });
-            console.log("Account UI.onAcceptOrLogin().2");
             window.location.href = inviteToken?.appDomain;
         } else {
             // This is dead code; now handled by the click event on an account

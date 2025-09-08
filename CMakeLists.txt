@@ -426,7 +426,6 @@ psibase_package(
     NAME WebCrypto
     DESCRIPTION "Plugin that provides a shim for browser's SubtleCrypto api"
     VERSION ${PSIBASE_VERSION}.0
-    # ACCOUNTS wasi # This name would be overshadowed
     SERVICE webcrypto
         DATA ${Plugins_OUTPUT_FILE_web_crypto} /plugin.wasm
     DEPENDS ${Plugins_DEP}

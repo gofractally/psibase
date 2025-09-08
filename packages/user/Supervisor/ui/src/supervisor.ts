@@ -217,8 +217,6 @@ export class Supervisor implements AppInterface {
     }
 
     importKey(privateKey: string): string {
-        console.log("supervisor.ts:importKey.0");
-        // TODO: impl importKey()
         // future: call out to SubtleCrypto
         // future: store privateKey, indexed by pubKey
         return this.supervisorCall(
@@ -229,7 +227,6 @@ export class Supervisor implements AppInterface {
     }
 
     signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
-        // TODO: impl signExplicit()
         // future: call out to SubtleCrypto
         return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "signExplicit", [
@@ -240,9 +237,7 @@ export class Supervisor implements AppInterface {
     }
 
     sign(msg: Uint8Array, publicKey: string): Uint8Array {
-        // TODO: impl sign()
         // future: call out to SubtleCrypto
-        // future: lookup privateKey by pubKey
         return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "sign", [msg, publicKey]),
         );

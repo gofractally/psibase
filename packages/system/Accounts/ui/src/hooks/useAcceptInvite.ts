@@ -14,7 +14,6 @@ export const useAcceptInvite = () => {
             const { accountName, app, token } =
                 AcceptInviteParams.parse(params);
 
-            console.log("useAcceptInvite().1");
             void (await supervisor.functionCall({
                 method: "login",
                 params: [accountName],
@@ -22,7 +21,6 @@ export const useAcceptInvite = () => {
                 intf: "activeApp",
             }));
 
-            console.log("useAcceptInvite().2");
             void (await supervisor.functionCall({
                 method: "accept",
                 params: [token],
@@ -30,7 +28,6 @@ export const useAcceptInvite = () => {
                 intf: "invitee",
             }));
 
-            console.log("useAcceptInvite().3");
             await supervisor.functionCall({
                 method: "loginDirect",
                 params: [app, accountName],

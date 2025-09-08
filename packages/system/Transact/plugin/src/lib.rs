@@ -175,23 +175,19 @@ impl Admin for TransactPlugin {
 
         let tx = make_transaction(actions, 3);
 
-        println!("Transact.finish_tx.1");
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs: get_proofs(&sha256(&tx.packed()), true)?,
         };
-        println!("Transact.finish_tx.2");
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
         }
-        println!("Transact.finish_tx.3");
 
         // TODO (idea): on_hook_pre_publish(signed_tx) -> bool
         // Could allow a user to inspect a final transaction rather than publish
         //   (Helpful for debugging, post-install scripts, offline msig, etc.)
 
         let body = signed_tx.publish()?;
-        println!("Transact.finish_tx.4.body: {:?}", body);
         let trace = match body {
             BodyTypes::Json(t) => from_str::<TransactionTrace>(&t).unwrap(),
             _ => {
@@ -202,7 +198,6 @@ impl Admin for TransactPlugin {
         // TODO (idea): on_hook_post_publish(trace)
         // Could be for logging, or for other post-transaction client-side processing
 
-        println!("Transact.finish_tx.5.trace: {:?}", trace);
         match trace.error {
             Some(err) => Err(TransactionError(err).into()),
             None => {
