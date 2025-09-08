@@ -19,6 +19,7 @@ target_mapped_include_directories(services_local INTERFACE
     XAdmin/include
     XHttp/include
     XRun/include
+    XSites/include
     XTransact/include
 )
 
@@ -26,5 +27,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(XAdmin)
     add_subdirectory(XHttp)
     add_subdirectory(XRun)
+    add_subdirectory(XSites)
     add_subdirectory(XTransact)
 endif()

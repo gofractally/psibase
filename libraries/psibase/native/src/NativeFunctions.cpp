@@ -110,7 +110,9 @@ namespace psibase
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be written in a deterministic context");
-            check((self.code.flags & CodeRow::isPrivileged), "service may not write this db");
+            check((self.code.flags & CodeRow::isPrivileged) ||
+                      (self.code.flags & ExecutionContext::isLocal),
+                  "service may not write this db");
             return {(DbId)db, false, false};
          }
 

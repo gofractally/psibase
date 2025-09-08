@@ -121,6 +121,9 @@ namespace psibase
       std::string             contentType;  ///< "application/json", "text/html", ...
       T                       body;         ///< Response body
       std::vector<HttpHeader> headers;      ///< HTTP Headers
+
+      static BasicHttpReply methodNotAllowed(const HttpRequest& req);
+
       PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
 

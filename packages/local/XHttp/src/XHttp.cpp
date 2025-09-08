@@ -3,6 +3,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
 #include <services/local/XAdmin.hpp>
+#include <services/local/XSites.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -90,47 +91,48 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    auto owned = Temporary{act->service()}.open<PendingRequestTable>();
 
-   std::string_view host     = req.host();
-   std::string_view rootHost = req.rootHost();
-   if (host.size() > rootHost.size() + 1 && host.ends_with(rootHost) &&
-       host[host.size() - rootHost.size() - 1] == '.')
+   if (auto service = XHttp::getService(req); service != AccountNumber{})
    {
-      std::string_view serviceName(host);
-      serviceName.remove_suffix(rootHost.size() + 1);
-      AccountNumber service{serviceName};
-      if (service != AccountNumber{})
+      // Handle local service subdomains
+      std::optional<CodeRow> row;
+      PSIBASE_SUBJECTIVE_TX
       {
-         // Handle local service subdomains
-         std::optional<CodeRow> row;
-         PSIBASE_SUBJECTIVE_TX
-         {
-            row = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
-         }
-         if (row && !(row->flags & CodeRow::isReplacement))
-         {
-            owned.put({.socket = sock, .owner = service});
-            auto reply = psibase::Actor<ServerInterface>(XHttp::service, service)
-                             .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
+         row = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
+      }
+      if (row && !(row->flags & CodeRow::isReplacement))
+      {
+         owned.put({.socket = sock, .owner = service});
+         auto reply = psibase::Actor<ServerInterface>(XHttp::service, service)
+                          .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
 
-            if (owned.get(sock))
+         if (!reply && owned.get(sock))
+         {
+            if (service == XAdmin::service &&
+                std::string_view{req.target()}.starts_with("/native/"))
             {
-               if (!reply)
-               {
-                  if (service == XAdmin::service &&
-                      std::string_view{req.target()}.starts_with("/native/"))
-                  {
-                     return;
-                  }
-                  else
-                  {
-                     reply = error(HttpStatus::notFound,
-                                   "The resource '" + req.target().unpack() + "' was not found");
-                  }
-               }
-               psibase::socketSend(sock, psio::to_frac(std::move(*reply)));
+               return;
             }
-            return;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               row = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(XSites::service));
+            }
+            if (row)
+            {
+               reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
+                           .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
+            }
          }
+
+         if (owned.get(sock))
+         {
+            if (!reply)
+            {
+               reply = error(HttpStatus::notFound,
+                             "The resource '" + req.target().unpack() + "' was not found");
+            }
+            psibase::socketSend(sock, psio::to_frac(std::move(*reply)));
+         }
+         return;
       }
    }
    else if (std::string_view{req.target()} == "/native/p2p")

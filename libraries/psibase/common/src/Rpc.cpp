@@ -240,4 +240,16 @@ namespace psibase
       return {};
    }
 
+   template <typename T>
+   BasicHttpReply<T> BasicHttpReply<T>::methodNotAllowed(const HttpRequest& req)
+   {
+      auto message =
+          std::format("The resource '{}' does not accept the method {}.\n", req.target, req.method);
+      return HttpReply{.status      = HttpStatus::methodNotAllowed,
+                       .contentType = "text/html",
+                       .body{message.begin(), message.end()}};
+   }
+
+   template HttpReply HttpReply::methodNotAllowed(const HttpRequest&);
+
 }  // namespace psibase

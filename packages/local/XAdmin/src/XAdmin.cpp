@@ -86,15 +86,18 @@ namespace LocalService
          return row && row->head;
       }
 
-      // Returns nullopt on success, an appropriate error on failure
-      std::optional<HttpReply> checkAdminAuth(XAdmin&            self,
-                                              const HttpRequest& req,
-                                              std::int32_t       socket)
+   }  // namespace
+
+   // Returns nullopt on success, an appropriate error on failure
+   std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
+                                              std::optional<std::int32_t> socket)
+   {
+      if (socket)
       {
          std::optional<SocketRow> row;
          PSIBASE_SUBJECTIVE_TX
          {
-            row = kvGet<SocketRow>(SocketRow::db, socketKey(socket));
+            row = kvGet<SocketRow>(SocketRow::db, socketKey(*socket));
          }
          check(row.has_value(), "Missing socket row");
          check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
@@ -138,28 +141,27 @@ namespace LocalService
                prev = pos + 1;
             }
          }
-
-         if (chainIsBooted())
-         {
-            if (auto user = to<RTransact>().getUser(req))
-            {
-               PSIBASE_SUBJECTIVE_TX
-               {
-                  if (self.open<AdminAccountTable>().get(*user).has_value())
-                     return {};
-               }
-               return HttpReply{.status      = HttpStatus::forbidden,
-                                .contentType = "text/html",
-                                .body        = toVec("Not authorized")};
-            }
-         }
-
-         return HttpReply{.status      = HttpStatus::unauthorized,
-                          .contentType = "text/html",
-                          .body        = toVec("Not authorized")};
       }
 
-   }  // namespace
+      if (chainIsBooted())
+      {
+         if (auto user = to<RTransact>().getUser(req))
+         {
+            PSIBASE_SUBJECTIVE_TX
+            {
+               if (open<AdminAccountTable>().get(*user).has_value())
+                  return {};
+            }
+            return HttpReply{.status      = HttpStatus::forbidden,
+                             .contentType = "text/html",
+                             .body        = toVec("Not authorized")};
+         }
+      }
+
+      return HttpReply{.status      = HttpStatus::unauthorized,
+                       .contentType = "text/html",
+                       .body        = toVec("Not authorized")};
+   }
 
    bool XAdmin::isAdmin(AccountNumber account)
    {
@@ -176,16 +178,19 @@ namespace LocalService
    {
       check(getSender() == XHttp::service, "Wrong sender");
 
-      if (auto reply = checkAdminAuth(*this, req, socket.value()))
-         return reply;
-
       auto target = req.path();
       if (target.starts_with("/native/"))
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          return {};
       }
       else if (target.starts_with("/services/"))
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          auto service = AccountNumber{std::string_view{target}.substr(10)};
          if (service == AccountNumber{})
          {
@@ -268,14 +273,13 @@ namespace LocalService
             initRefCounts();
             // MUST delete all data to avoid exposing node secrets to on-chain services
          }
-         return HttpReply{
-             .status      = HttpStatus::methodNotAllowed,
-             .contentType = "text/html",
-             .body = toVec(std::format("The resource '{}' does not accept the method {}.\n", target,
-                                       req.method))};
+         return HttpReply::methodNotAllowed(req);
       }
       else if (target == "/admin_accounts")
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          auto adminAccounts = open<AdminAccountTable>();
          if (req.method == "POST")
          {
@@ -321,22 +325,17 @@ namespace LocalService
          }
          else
          {
-            return HttpReply{
-                .status      = HttpStatus::methodNotAllowed,
-                .contentType = "text/html",
-                .body = toVec(std::format("The resource '{}' does not accept the method {}.\n",
-                                          target, req.method))};
+            return HttpReply::methodNotAllowed(req);
          }
       }
       else if (target == "/admin_login")
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          if (req.method != "GET")
          {
-            return HttpReply{
-                .status      = HttpStatus::methodNotAllowed,
-                .contentType = "text/html",
-                .body = toVec(std::format("The resource '{}' does not accept the method {}.\n",
-                                          target, req.method))};
+            return HttpReply::methodNotAllowed(req);
          }
 
          HttpReply           reply{.contentType = "application/json"};
@@ -344,79 +343,7 @@ namespace LocalService
          to_json(LoginReply{to<RTransact>().login(req.rootHost)}, stream);
          return reply;
       }
-      else
-      {
-         auto table = open<ContentTable>();
-         if (req.method == "PUT")
-         {
-            ContentRow row{
-                .path        = target,
-                .contentType = req.contentType,
-                .contentHash = sha256(req.body.data(), req.body.size()),
-                .content     = std::move(req.body),
-            };
-            for (auto& h : req.headers)
-            {
-               if (h.matches("content-encoding"))
-               {
-                  row.contentEncoding = std::move(h.value);
-                  break;
-               }
-            }
-            PSIBASE_SUBJECTIVE_TX
-            {
-               table.put(row);
-            }
-            return HttpReply{};
-         }
-         else if (req.method == "GET")
-         {
-            std::optional<ContentRow> row;
-            PSIBASE_SUBJECTIVE_TX
-            {
-               row = table.get(target);
-               if (!row)
-               {
-                  row = table.get(target + (target.ends_with('/') ? "index.html" : "/index.html"));
-               }
-            }
-            if (row)
-            {
-               auto reply = HttpReply{
-                   .contentType = std::move(row->contentType),
-                   .body        = std::move(row->content),
-               };
-               if (row->contentEncoding)
-               {
-                  reply.headers.push_back({"Content-Encoding", std::move(*row->contentEncoding)});
-               }
-               if (row->csp)
-               {
-                  reply.headers.push_back({"Content-Security-Policy", std::move(*row->csp)});
-               }
-               return reply;
-            }
-         }
-         else if (req.method == "DELETE")
-         {
-            PSIBASE_SUBJECTIVE_TX
-            {
-               table.erase(target);
-            }
-            return HttpReply{};
-         }
-         else
-         {
-            return HttpReply{
-                .status      = HttpStatus::methodNotAllowed,
-                .contentType = "text/html",
-                .body = toVec(std::format("The resource '{}' does not accept the method {}.\n",
-                                          target, req.method))};
-         }
-      }
-      return HttpReply{.status      = HttpStatus::notFound,
-                       .contentType = "text/html",
-                       .body = toVec(std::format("The resource '{}' was not found\n", target))};
+      return {};
    }
 }  // namespace LocalService
 
