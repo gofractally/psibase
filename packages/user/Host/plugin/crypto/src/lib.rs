@@ -115,42 +115,26 @@ impl KeyVault for HostCrypto {
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        println!("Host:crypto.sign().1");
         authorize(FunctionName::sign)?;
 
-        // let signing_key =
-        //     SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
-        // let signature: Signature = signing_key
-        //     .sign_prehash(&hashed_message)
-        //     .map_err(|e| CryptoError(e.to_string()))?;
-        let signature = Supervisor::sign(&hashed_message, &public_key).unwrap();
-        println!("Host:crypto.sign().2");
-        Ok(signature)
+        Ok(Supervisor::sign(&hashed_message, &public_key).unwrap())
     }
 
     fn sign_explicit(
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        println!("Host:crypto.sign_explicit().1");
         authorize(FunctionName::sign_explicit)?;
 
-        let sig = Supervisor::sign_explicit(&hashed_message, &private_key)?;
-        println!("HostCrypto.sign_explicit.sig: {:?}", sig);
-
-        Ok(sig)
+        Ok(Supervisor::sign_explicit(&hashed_message, &private_key)?)
     }
 
     fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
-        println!("Host:crypto.import_key().1");
         authorize_with_whitelist(
             FunctionName::import_key,
             vec!["x-admin".into(), "invite".into(), "auth-sig".into()],
         )?;
 
-        // let public_key = Self::pub_from_priv(private_key.clone())?;
-        // ManagedKeys::add(&public_key, &HostCrypto::to_der(private_key)?);
-        println!("Host:crypto.import_key().2");
         Supervisor::import_key(&private_key, extractable)
     }
 }

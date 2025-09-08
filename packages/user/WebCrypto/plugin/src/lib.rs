@@ -134,53 +134,34 @@ impl Api for WebCryptoShim {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        println!(
-            "WebCrypto.sign_explicit().0 private_key: {:?}",
-            priv_from_der(private_key.clone()).unwrap()
-        );
         authorize(FunctionName::sign_explicit)?;
         // TODO: assert(HostCommon::get_sender == "Supervisor");
 
-        println!("WebCrypto.sign_explicit().1");
         let signing_key =
             SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
-        println!(
-            "WebCrypto.sign_explicit().2 hashed_message: {:?}",
-            &hashed_message
-        );
         let signature: Signature = signing_key
             .sign_prehash(&hashed_message)
             .map_err(|e| CryptoError(e.to_string()))?;
-        println!("WebCrypto.sign_explicit().3 signature: {:?}", signature);
         Ok(signature.to_bytes().to_vec())
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        println!("WebCrypto.sign().0");
         authorize(FunctionName::sign)?;
 
-        println!("WebCrypto.sign().1");
         let private_key = ManagedKeys::get(&pub_from_der(public_key)?);
-
         Self::sign_explicit(hashed_message, private_key)
     }
 
     fn import_key(private_key: Pem, extractable: Option<bool>) -> Result<Pem, HostTypes::Error> {
-        println!("webcrypto:import_key().1");
         authorize_with_whitelist(
             FunctionName::import_key,
             vec!["x-admin".into(), "host".into()],
         )?;
         // TODO: support extractable = true? or remove this param?
-
-        println!("webcrypto:import_key.2");
         let public_key = pub_from_priv(private_key.clone())?;
-
-        println!("webcrypto:import_key.3");
         // Store private CryptoKey in Map by public_key
         ManagedKeys::add(&public_key, &to_der(private_key)?);
 
-        println!("webcrypto:import_key.4");
         // Hypothetical call out to SubtleCrypto
         // convert SubtleCrypto types to psibase types
         Ok(public_key)

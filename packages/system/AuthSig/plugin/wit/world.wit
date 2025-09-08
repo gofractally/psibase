@@ -27,13 +27,6 @@ interface keyvault {
     ///   with the specified private key.
     /// Returns the corresponding public key in PEM format.
     import-key: func(private-key: pem, extractable: option<bool>) -> result<pem, error>;
-
-    generate-unmanaged-keypair2: func() -> result<keypair, error>;
-    pub-from-priv2: func(private-key: pem) -> result<pem, error>;
-    to-der2: func(key: pem) -> result<list<u8>, error>;
-    // sign2: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
-    sign-explicit2: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
-    import-key2: func(private-key: pem, extractable: option<bool>) -> result<pem, error>;
 }
 
 interface actions {

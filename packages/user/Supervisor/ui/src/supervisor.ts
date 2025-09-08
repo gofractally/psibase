@@ -243,11 +243,9 @@ export class Supervisor implements AppInterface {
         // TODO: impl sign()
         // future: call out to SubtleCrypto
         // future: lookup privateKey by pubKey
-        this.supervisorCall(
+        return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "sign", [msg, publicKey]),
         );
-        // future: convert SubtleCrypto types to psibase types
-        return new Uint8Array([]);
     }
 
     // Manages callstack and calls plugins

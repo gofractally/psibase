@@ -31,13 +31,12 @@ export const useAcceptInvite = () => {
             }));
 
             console.log("useAcceptInvite().3");
-            const queryToken = await supervisor.functionCall({
+            await supervisor.functionCall({
                 method: "loginDirect",
                 params: [app, accountName],
                 service: "accounts",
                 intf: "admin",
             });
-            console.log("queryToken:", queryToken);
         },
     });
 };
