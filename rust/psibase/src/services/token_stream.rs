@@ -23,10 +23,7 @@ pub struct Stream {
 #[crate::service(name = "token-stream", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
-    use crate::{
-        services::{token_stream::Stream, tokens::Quantity},
-        AccountNumber,
-    };
+    use crate::{services::token_stream::Stream, AccountNumber};
 
     /// Lookup stream information
     ///
@@ -87,13 +84,10 @@ pub mod Service {
     }
 
     #[event(history)]
-    pub fn created(decay_rate_per_million: u32, token_id: u32, creator: AccountNumber) {}
+    pub fn created(nft_id: u32, half_life_seconds: u32, token_id: u32, creator: AccountNumber) {}
 
     #[event(history)]
-    pub fn deposited(nft_id: u32, amount: Quantity, depositor: AccountNumber) {}
-
-    #[event(history)]
-    pub fn claimed(nft_id: u32, claimer: AccountNumber, amount: Quantity) {}
+    pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: String) {}
 }
 
 #[test]
