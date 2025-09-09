@@ -428,6 +428,19 @@ pub mod tables {
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
         }
 
+        pub fn debit_up_to(&mut self, quantity: Quantity, memo: Memo) -> Quantity {
+            let current_balance = self.balance.value;
+            let debit_amount: Quantity = if quantity.value == 0 {
+                current_balance.into()
+            } else {
+                current_balance.min(quantity.value).into()
+            };
+            if debit_amount.value > 0 {
+                self.debit(debit_amount, memo);
+            }
+            debit_amount
+        }
+
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
             check(quantity.value > 0, "debit quantity must be greater than 0");
 

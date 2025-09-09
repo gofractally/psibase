@@ -36,6 +36,24 @@ mod tests {
         )
     }
 
+    fn debit_up_to(
+        chain: &psibase::Chain,
+        token_id: u32,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+    ) -> Quantity {
+        Wrapper::push_from(chain, debitor)
+            .debit_up_to(
+                token_id,
+                creditor,
+                amount,
+                "debit".to_string().try_into().unwrap(),
+            )
+            .get()
+            .unwrap()
+    }
+
     fn assert_error(result: ChainEmptyResult, message: &str) {
         assert_eq!(result.trace.error.unwrap(), message);
     }
@@ -101,8 +119,11 @@ mod tests {
                 12345.into(),
                 "memo".to_string().try_into().unwrap(),
             ),
-            "service 'tokens' aborted with message: failed to find token",
+            "service 'tokens' aborted with message: Token DNE",
         );
+
+        Wrapper::push_from(&chain, alice).setUserConf(0, true);
+        Wrapper::push_from(&chain, bob).setUserConf(0, true);
 
         // Alice can create a new token
         let token_id = Wrapper::push_from(&chain, alice)
@@ -130,7 +151,7 @@ mod tests {
         // Bob cannot debit more than whats in the shared balance
         assert_error(
             debit(&chain, token_id, alice, bob, 6.into()),
-            "unreachable: unreachable",
+            "service 'tokens' aborted with message: Insufficient token balance",
         );
 
         debit(&chain, token_id, alice, bob, 5.into()).get()?;
@@ -142,8 +163,44 @@ mod tests {
                 67656.into(),
                 "memo".to_string().try_into().unwrap(),
             ),
-            "service 'tokens' aborted with message: over max issued supply",
+            "service 'tokens' aborted with message: Max issued supply exceeded",
         );
+
+        // Bob sends back 100 tokens
+        credit(&chain, token_id, bob, alice, 100.into())
+            .get()
+            .unwrap();
+
+        assert_shared_balance(&chain, bob, alice, token_id, 100.into());
+
+        // Alice only takes 85 / 100 tokens
+        assert_eq!(
+            debit_up_to(&chain, token_id, bob, alice, 85.into()),
+            85.into()
+        );
+
+        assert_shared_balance(&chain, bob, alice, token_id, 15.into());
+
+        // Alice debits more than balance remaining
+        assert_eq!(
+            debit_up_to(&chain, token_id, bob, alice, 1000.into()),
+            15.into()
+        );
+        assert_shared_balance(&chain, bob, alice, token_id, 0.into());
+
+        // Bob sends another 5 tokens
+        credit(&chain, token_id, bob, alice, 5.into())
+            .get()
+            .unwrap();
+
+        assert_shared_balance(&chain, bob, alice, token_id, 5.into());
+
+        // Alice can debit 0 to debit entire balance
+        assert_eq!(
+            debit_up_to(&chain, token_id, bob, alice, 0.into()),
+            5.into()
+        );
+        assert_shared_balance(&chain, bob, alice, token_id, 0.into());
 
         Ok(())
     }

@@ -131,6 +131,27 @@ mod service {
         unimplemented!()
     }
 
+    /// Debit up to
+    ///
+    /// Debits up to X amount of tokens from a shared balance between the creditor and the debitor (sender)
+    ///
+    /// Action will return the amount of tokens actually debited. Set amount to 0 for entire shared balance.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier.
+    /// * `creditor` - User which previously sent balance towards debitor (sender).
+    /// * `amount`   - Max amount to debit from shared balance, set to 0 for entire shared balance.
+    /// * `memo`     - Memo
+    #[action]
+    fn debit_up_to(
+        token_id: TID,
+        creditor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) -> Quantity {
+        unimplemented!()
+    }
+
     /// Create a new token.
     ///
     /// # Arguments

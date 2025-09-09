@@ -348,7 +348,7 @@ pub mod service {
 
     /// Debit
     ///
-    /// Debits tokens from a shared balance between the creditor and the debitor (sender)
+    /// Debits exact amount of tokens from a shared balance between the creditor and the debitor (sender)
     ///
     /// By default, the debitor will automatically debit the amount towards the debitors balance.
     /// `manual_debit` can be enabled using `setBalConf` or `setUserConf`
@@ -361,6 +361,27 @@ pub mod service {
     #[action]
     fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
         SharedBalance::get_assert(creditor, get_sender(), token_id).debit(amount, memo);
+    }
+
+    /// Debit up to
+    ///
+    /// Debits up to X amount of tokens from a shared balance between the creditor and the debitor (sender)
+    ///
+    /// Action will return the amount of tokens actually debited. Set amount to 0 for entire shared balance.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier.
+    /// * `creditor` - User which previously sent balance towards debitor (sender).
+    /// * `amount`   - Max amount to debit from shared balance, set to 0 for entire shared balance.
+    /// * `memo`     - Memo
+    #[action]
+    fn debit_up_to(
+        token_id: TID,
+        creditor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) -> Quantity {
+        SharedBalance::get_assert(creditor, get_sender(), token_id).debit_up_to(amount, memo)
     }
 
     /// Reject
