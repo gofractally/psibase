@@ -110,15 +110,15 @@ pub mod tables {
 
         /// Deposit `amount` into the bucket.
         pub fn deposit(&mut self, amount: Quantity) {
+            self.total_deposited = (self.total_deposited.value - self.total_claimed.value).into();
+            self.total_claimed = 0.into();
             self.claimable_at_last_deposit = self.total_vested();
-            self.total_deposited = self
-                .total_deposited
-                .value
-                .saturating_add(amount.value)
-                .into();
+            self.total_deposited = (self.total_deposited.value + amount.value).into();
             self.last_deposit_timestamp = TransactSvc::call().currentBlock().time.seconds();
+
             self.save();
         }
+
 
         /// Claim everything currently claimable; returns the claimed amount.
         pub fn claim(&mut self) -> Quantity {
