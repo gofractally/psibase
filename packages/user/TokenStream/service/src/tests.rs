@@ -163,12 +163,8 @@ mod tests {
 
         let expected_full_vesting_wait_time = full_vesting_time(10000, 500);
 
-        chain.start_block_at(
-            TimePointSec {
-                seconds: expected_full_vesting_wait_time,
-            }
-            .microseconds(),
-        );
+        chain.start_block_after(Seconds::new(expected_full_vesting_wait_time).into());
+
         TokenStream::push_from(&chain, BOB)
             .claim(stream_nft_id)
             .get()
