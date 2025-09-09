@@ -11,17 +11,6 @@ const supervisorUrl = siblingUrl(null, "supervisor", null, true);
  */
 export const prompt = {
   /**
-   * Gets the contextId specified by your plugin when it triggered the prompt.
-   * A contextId is often used to look up (within your plugin) additional information about
-   * the context of this prompt.
-   * @returns {string | null} The contextId or null if not present.
-   */
-  getContextId(): string | null {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("context_id") || null;
-  },
-
-  /**
    * Call this when the user has finished interacting with your prompt.
    * It will redirect the user back to the app from which they came.
    */

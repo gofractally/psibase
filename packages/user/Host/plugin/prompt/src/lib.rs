@@ -8,38 +8,39 @@ use errors::ErrorType;
 mod db;
 use db::*;
 
-use exports::host::prompt::api::PromptDetails;
-use exports::host::prompt::{api::Guest as Api, web::Guest as Web};
+use exports::host::prompt::admin::PromptDetails;
+use exports::host::prompt::{admin::Guest as Admin, api::Guest as Api};
 use host::common::client::get_sender;
 use host::types::types::Error;
 use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;
 
-impl Api for HostPrompt {
-    fn get_active_prompt() -> Result<PromptDetails, Error> {
+impl Admin for HostPrompt {
+    fn get_active_prompt() -> PromptDetails {
         assert_eq!(get_sender(), "supervisor", "Unauthorized");
-        Ok(ActivePrompts::get().unwrap().into())
+        ActivePrompts::get().unwrap().into()
     }
 }
 
-impl Web for HostPrompt {
-    fn prompt_user(prompt_name: String, context_id: Option<String>) -> Result<(), Error> {
-        if !prompt_name.chars().all(|c| c.is_ascii_alphanumeric()) {
-            return Err(ErrorType::InvalidPromptName().into());
-        }
+fn validate_prompt_name(prompt_name: &str) {
+    assert!(
+        prompt_name.chars().all(|c| c.is_ascii_alphanumeric()),
+        "[Error] Invalid prompt name. Prompt name must be [a-zA-Z0-9]."
+    );
+}
 
-        ActivePrompts::set(prompt_name, context_id);
-
-        Ok(request_prompt()?)
+impl Api for HostPrompt {
+    fn prompt(prompt_name: String, packed_context: Option<Vec<u8>>) {
+        validate_prompt_name(&prompt_name);
+        ActivePrompts::set(prompt_name, packed_context);
+        request_prompt();
     }
 
-    fn store_context(packed_context: Vec<u8>) -> String {
-        PromptContexts::get_id(packed_context)
-    }
-
-    fn get_context(context_id: String) -> Result<Vec<u8>, Error> {
-        Ok(PromptContexts::get(context_id.clone())
-            .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(context_id.clone())))?)
+    fn get_context() -> Result<Vec<u8>, Error> {
+        let prompt = ActivePrompts::get().unwrap();
+        prompt
+            .packed_context
+            .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(prompt.prompt_name)))
     }
 }
 

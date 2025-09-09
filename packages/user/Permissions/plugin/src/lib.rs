@@ -19,7 +19,7 @@ use host::common::{
     client::{get_active_app, get_receiver, get_sender},
     store::StorageDuration,
 };
-use host::prompt::web as HostPrompt;
+use host::prompt::api as HostPrompt;
 use host::types::types::Error;
 
 mod errors;
@@ -35,15 +35,15 @@ fn assert_admin() {
 }
 
 impl PermsAdmin for PermissionsPlugin {
-    fn get_context(context_id: String) -> PromptContext {
+    fn get_context() -> PromptContext {
         assert_admin();
-        let context = HostPrompt::get_context(&context_id).unwrap();
+        let context = HostPrompt::get_context().unwrap();
         PackablePromptContext::unpacked(&context).unwrap().into()
     }
 
-    fn approve(context_id: String, duration: ApprovalDuration) {
+    fn approve(duration: ApprovalDuration) {
         assert_admin();
-        let context = HostPrompt::get_context(&context_id).unwrap();
+        let context = HostPrompt::get_context().unwrap();
         let context = PackablePromptContext::unpacked(&context).unwrap();
 
         Permissions::set(
@@ -131,8 +131,7 @@ impl Api for PermissionsPlugin {
         }
         .packed();
 
-        let context_id = HostPrompt::store_context(&packed_context);
-        HostPrompt::prompt_user("permissions".into(), Some(&context_id))?;
+        HostPrompt::prompt("permissions".into(), Some(&packed_context));
         Ok(false)
     }
 }

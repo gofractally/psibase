@@ -5,11 +5,11 @@ import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 const supervisor = getSupervisor();
 
 interface PromptDetails {
-    subdomain: string;
-    activeApp: string;
+    promptApp: string;
     promptName: string;
-    contextId: number | null;
+    activeApp: string;
     created: string;
+    packedContext: Uint8Array | null;
 }
 
 // This is the expiration time for displaying the prompt. If the prompt loads immediately,
@@ -33,7 +33,7 @@ export const App = () => {
                 const promptDetails = (await supervisor.functionCall({
                     service: "host",
                     plugin: "prompt",
-                    intf: "api",
+                    intf: "admin",
                     method: "getActivePrompt",
                     params: [],
                 })) as PromptDetails;
@@ -53,18 +53,12 @@ export const App = () => {
                 setActiveApp(promptDetails.activeApp);
 
                 const iframeUrl = new URL(
-                    siblingUrl(null, promptDetails.subdomain, null, true),
+                    siblingUrl(null, promptDetails.promptApp, null, true),
                 );
 
                 // The well-known path for the web platform is currently
                 //  `/plugin/web/prompt/<prompt-name>`
                 iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}`;
-                if (promptDetails.contextId) {
-                    iframeUrl.searchParams.set(
-                        "context_id",
-                        promptDetails.contextId.toString(),
-                    );
-                }
 
                 setIframeUrl(iframeUrl.toString());
             } catch (e) {
