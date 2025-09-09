@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Packages.hpp"
+#include <psibase/Rpc.hpp>
+#include <psibase/Service.hpp>
 
 namespace UserService
 {

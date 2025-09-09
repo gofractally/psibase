@@ -1,6 +1,7 @@
 #include <services/user/Packages.hpp>
 
 #include <psibase/check.hpp>
+#include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthDelegate.hpp>
 

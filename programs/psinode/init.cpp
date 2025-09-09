@@ -1,9 +1,11 @@
 #include <psibase/BlockContext.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/SystemContext.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/package.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 
 using namespace psibase;
