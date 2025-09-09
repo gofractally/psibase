@@ -116,7 +116,7 @@ mod service {
 
     /// Debit
     ///
-    /// Debits tokens from a shared balance between the creditor and the debitor (sender)
+    /// Debits exact amount of tokens from a shared balance between the creditor and the debitor (sender)
     ///
     /// By default, the debitor will automatically debit the amount towards the debitors balance.
     /// `manual_debit` can be enabled using `setBalConf` or `setUserConf`
