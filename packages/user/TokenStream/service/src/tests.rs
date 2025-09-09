@@ -108,7 +108,8 @@ mod tests {
     }
 
     #[psibase::test_case(packages("TokenStream"))]
-    fn test_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_basics(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.set_auto_block_start(false);
         chain.start_block();
 
         reset_clock(&chain);
@@ -139,12 +140,18 @@ mod tests {
         Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
         Nfts::push_from(&chain, BOB).debit(stream_nft_id, "memo".to_string());
 
-        TokenStream::push_from(&chain, BOB)
-            .claim(stream_nft_id)
-            .get()
-            .unwrap();
+        // Claim fails because no vesting has yet occured.
+        assert_eq!(
+            TokenStream::push_from(&chain, BOB)
+                .claim(stream_nft_id)
+                .get()
+                .unwrap_err()
+                .to_string(),
+            "service 'tokens' aborted with message: credit quantity must be greater than 0"
+                .to_string()
+        );
 
-        check_balance(&chain, token_id, BOB, Some(1));
+        check_balance(&chain, token_id, BOB, Some(0));
 
         chain.start_block_at(
             TimePointSec {
