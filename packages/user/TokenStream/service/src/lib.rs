@@ -230,7 +230,7 @@ pub mod service {
 
         stream.deposit(shared_balance);
 
-        Tokens::call_from(get_service()).debit(
+        Tokens::call().debit(
             stream.token_id,
             sender,
             shared_balance,
