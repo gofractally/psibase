@@ -63,16 +63,6 @@ fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {
     Ok(pem.contents().to_vec())
 }
 
-fn priv_from_der(key: Vec<u8>) -> Result<Pem, HostTypes::Error> {
-    authorize(FunctionName::priv_from_der)?;
-
-    Ok(SigningKey::from_pkcs8_der(&key)
-        .map_err(|e| CryptoError(e.to_string()))?
-        .to_pkcs8_pem(LineEnding::LF)
-        .map_err(|e| CryptoError(e.to_string()))?
-        .to_string())
-}
-
 fn pub_from_der(key: Vec<u8>) -> Result<Pem, HostTypes::Error> {
     authorize(FunctionName::pub_from_der)?;
 
@@ -90,8 +80,7 @@ impl Api for WebCryptoShim {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        authorize(FunctionName::sign_explicit)?;
-        assert!(HostCommon::get_sender() == "Supervisor");
+        authorize_with_whitelist(FunctionName::sign_explicit, vec!["supervisor".into()])?;
 
         // NOTE for future: this could very well not be an account's key, so I'd have to import it to WebCrypto and then sign
         // (perferably don't import it to WebCryto to avoid bloat)
@@ -104,7 +93,7 @@ impl Api for WebCryptoShim {
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        authorize(FunctionName::sign)?;
+        authorize_with_whitelist(FunctionName::sign, vec!["supervisor".into()])?;
 
         let private_key = ManagedKeys::get(&pub_from_der(public_key)?);
         Self::sign_explicit(hashed_message, private_key)
@@ -113,7 +102,7 @@ impl Api for WebCryptoShim {
     fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
         authorize_with_whitelist(
             FunctionName::import_key,
-            vec!["x-admin".into(), "host".into()],
+            vec!["x-admin".into(), "supervisor".into()],
         )?;
         let public_key = pub_from_priv(private_key.clone())?;
         // Store private CryptoKey in Map by public_key
