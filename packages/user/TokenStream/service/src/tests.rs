@@ -90,6 +90,14 @@ mod tests {
         Ok(token_id)
     }
 
+    pub fn full_vesting_time(half_life_seconds: u32, balance: u64) -> i64 {
+        if balance == 0 {
+            return 0;
+        }
+        let t = half_life_seconds as f64 * ((2.0 * balance as f64).ln() / std::f64::consts::LN_2);
+        t.ceil() as i64 + 1
+    }
+
     fn reset_clock(chain: &psibase::Chain) {
         let time: i64 = 1000;
         chain.start_block_at(TimePointSec { seconds: time }.microseconds());
@@ -98,11 +106,11 @@ mod tests {
     fn create_stream(
         chain: &psibase::Chain,
         author: AccountNumber,
-        decay_rate: u32,
+        half_life_seconds: u32,
         token_id: u32,
     ) -> u32 {
         TokenStream::push_from(&chain, author)
-            .create(decay_rate, token_id)
+            .create(half_life_seconds, token_id)
             .get()
             .unwrap()
     }
@@ -153,9 +161,11 @@ mod tests {
 
         check_balance(&chain, token_id, BOB, Some(0));
 
+        let expected_full_vesting_wait_time = full_vesting_time(10000, 500);
+
         chain.start_block_at(
             TimePointSec {
-                seconds: 3600 * 7 * 52 * 20,
+                seconds: expected_full_vesting_wait_time,
             }
             .microseconds(),
         );
