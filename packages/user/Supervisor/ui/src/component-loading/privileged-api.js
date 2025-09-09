@@ -15,10 +15,6 @@ export const intf = {
         return host.getChainId();
     },
 
-    getActiveApp() {
-        return host.getActiveApp();
-    },
-
     importKey(privateKey) {
         return host.importKey(privateKey);
     },

@@ -201,12 +201,6 @@ export class Supervisor implements AppInterface {
         this.loader = new PluginLoader(this.plugins);
     }
 
-    getActiveApp(): string {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        assertTruthy(this.parentOrigination.app, "Root app unrecognized");
-        return this.parentOrigination.app;
-    }
-
     getRootDomain(): string {
         return rootDomain;
     }
