@@ -40,7 +40,7 @@ pub mod Service {
     /// Creates a token stream.
     ///
     /// # Arguments
-    /// * `half_life_seconds` - Half life of the vesting rate in seconds
+    /// * `half_life_seconds` - Time (in seconds) until half of the total unvested balance is withdrawable
     /// * `token_id` - Token ID to be deposited into the stream.
     ///
     /// # Returns

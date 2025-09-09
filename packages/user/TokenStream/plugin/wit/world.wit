@@ -7,7 +7,7 @@ interface api {
     /// Creates a new token stream
     ///
     /// Parameters:
-    /// * `half-life-seconds`: Half life of the vesting rate in seconds
+    /// * `half-life-seconds`: Time (in seconds) until half of the total unvested balance is withdrawable
     /// * `token-id`: Token ID to be deposited into the stream.
     create: func(half-life-seconds: u32, token-id: u32) -> result<_, error>;
 
