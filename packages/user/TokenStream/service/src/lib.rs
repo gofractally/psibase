@@ -217,7 +217,7 @@ pub mod service {
 
     /// Deposit into a token stream.
     ///
-    /// * Requires pre-existing shared balance of the token assigned to the strema, whole balance will be billed.
+    /// * Requires pre-existing shared balance of the token assigned to the stream, whole balance will be billed.
     ///
     /// # Arguments
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
