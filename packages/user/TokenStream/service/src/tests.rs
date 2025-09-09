@@ -185,7 +185,7 @@ mod tests {
 
         let mut bob_total_claimed = 0;
         for _ in 0..8 {
-            chain.progress_seconds(50);
+            chain.start_block_after(Seconds::new(50).into());
 
             TokenStream::push_from(&chain, BOB)
                 .claim(first_stream)
@@ -229,7 +229,7 @@ mod tests {
             .get()
             .unwrap();
 
-        chain.progress_seconds(9999999999);
+        chain.start_block_after(Seconds::new(9999999999).into());
 
         TokenStream::push_from(&chain, BOB)
             .claim(first_stream)
@@ -258,7 +258,7 @@ mod tests {
             .get()
             .unwrap();
 
-        chain.progress_seconds(50);
+        chain.start_block_after(Seconds::new(50).into());
 
         // Second deposit after some time
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 200);
@@ -271,7 +271,7 @@ mod tests {
         Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
 
         // Claim after another time increment
-        chain.progress_seconds(50);
+        chain.start_block_after(Seconds::new(50).into());
 
         TokenStream::push_from(&chain, BOB)
             .claim(stream_nft_id)
@@ -328,7 +328,7 @@ mod tests {
 
         Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
 
-        chain.progress_seconds(100);
+        chain.start_block_after(Seconds::new(100).into());
 
         let err = TokenStream::push_from(&chain, BOB)
             .claim(stream_nft_id)
@@ -368,12 +368,12 @@ mod tests {
             .get()
             .unwrap();
 
-        chain.progress_seconds(50);
+        chain.start_block_after(Seconds::new(50).into());
 
         Nfts::push_from(&chain, ALICE).credit(stream_nft_id, BOB, "memo".to_string());
         Nfts::push_from(&chain, BOB).credit(stream_nft_id, CHARLIE, "memo".to_string());
 
-        chain.progress_seconds(50);
+        chain.start_block_after(Seconds::new(50).into());
 
         TokenStream::push_from(&chain, CHARLIE)
             .claim(stream_nft_id)
