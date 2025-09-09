@@ -410,4 +410,42 @@ mod tests {
 
         Ok(())
     }
+
+    #[psibase::test_case(packages("TokenStream"))]
+    fn precision_check(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        reset_clock(&chain);
+
+        let token_id = setup_env(&chain)?;
+        let alice_balance_before = check_balance(&chain, token_id, ALICE, None);
+
+        tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 80000);
+
+        let half_life_seconds = 10000 as u32;
+        let stream_nft_id = TokenStream::push_from(&chain, ALICE)
+            .create(half_life_seconds, token_id)
+            .get()
+            .unwrap();
+
+        TokenStream::push_from(&chain, ALICE)
+            .deposit(stream_nft_id)
+            .get()
+            .unwrap();
+
+        chain.start_block_after(Seconds::new((half_life_seconds * 3) as i64).into());
+
+        TokenStream::push_from(&chain, ALICE)
+            .claim(stream_nft_id)
+            .get()
+            .unwrap();
+
+        let alice_balance_after = check_balance(&chain, token_id, ALICE, None);
+
+        let dust = 1;
+        assert_eq!(
+            (alice_balance_before - alice_balance_after).value,
+            10000 - dust
+        );
+
+        Ok(())
+    }
 }
