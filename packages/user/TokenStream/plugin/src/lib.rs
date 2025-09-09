@@ -43,12 +43,12 @@ impl Api for TokenStreamPlugin {
     fn deposit(nft_id: u32, token_id: String, amount: String, memo: String) -> Result<(), Error> {
         trust::authorize(trust::FunctionName::deposit)?;
 
-        let _ = bindings::tokens::plugin::transfer::credit(
+        bindings::tokens::plugin::transfer::credit(
             &token_id,
             &"token-stream".to_string(),
             &amount,
             &memo,
-        );
+        )?;
 
         let packed_args = token_stream::action_structs::deposit { nft_id }.packed();
 
