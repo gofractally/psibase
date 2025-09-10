@@ -68,40 +68,6 @@ mod tests {
         token_id
     }
 
-    // λ = ln(2) / half_life_seconds
-    fn rate(half_life_seconds: u32) -> f64 {
-        std::f64::consts::LN_2 / half_life_seconds as f64
-    }
-
-    // Δt > (1/λ) * ln(P(0))
-    pub fn full_vesting_time(half_life_seconds: u32, balance: u64) -> i64 {
-        if balance == 0 {
-            return 0;
-        }
-
-        let factor = 1.0 / rate(half_life_seconds);
-        let t = factor * ((balance as f64).ln());
-
-        t.ceil() as i64
-    }
-
-    fn reset_clock(chain: &psibase::Chain) {
-        let time: i64 = 1000;
-        chain.start_block_at(TimePointSec { seconds: time }.microseconds());
-    }
-
-    fn create_stream(
-        chain: &psibase::Chain,
-        author: AccountNumber,
-        half_life_seconds: u32,
-        token_id: u32,
-    ) -> u32 {
-        TokenStream::push_from(&chain, author)
-            .create(half_life_seconds, token_id)
-            .get()
-            .unwrap()
-    }
-
     struct TestHelper {
         chain: psibase::Chain,
         token_id: u32,
@@ -168,6 +134,40 @@ mod tests {
         fn pass_time(&self, seconds: i64) {
             self.chain.start_block_after(Seconds::new(seconds).into());
         }
+    }
+
+    // λ = ln(2) / half_life_seconds
+    fn rate(half_life_seconds: u32) -> f64 {
+        std::f64::consts::LN_2 / half_life_seconds as f64
+    }
+
+    // Δt > (1/λ) * ln(P(0))
+    pub fn full_vesting_time(half_life_seconds: u32, balance: u64) -> i64 {
+        if balance == 0 {
+            return 0;
+        }
+
+        let factor = 1.0 / rate(half_life_seconds);
+        let t = factor * ((balance as f64).ln());
+
+        t.ceil() as i64
+    }
+
+    fn reset_clock(chain: &psibase::Chain) {
+        let time: i64 = 1000;
+        chain.start_block_at(TimePointSec { seconds: time }.microseconds());
+    }
+
+    fn create_stream(
+        chain: &psibase::Chain,
+        author: AccountNumber,
+        half_life_seconds: u32,
+        token_id: u32,
+    ) -> u32 {
+        TokenStream::push_from(&chain, author)
+            .create(half_life_seconds, token_id)
+            .get()
+            .unwrap()
     }
 
     #[psibase::test_case(packages("TokenStream"))]
