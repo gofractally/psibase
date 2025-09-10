@@ -5,6 +5,7 @@ use errors::ErrorType::*;
 mod helpers;
 use helpers::*;
 mod types;
+use trust::*;
 
 // Other plugins
 use bindings::host::crypto::keyvault as HostCrypto;
@@ -42,26 +43,18 @@ psibase::define_trust! {
         High => [priv_from_pub, set_key],
     }
 }
-use trust::*;
 
 struct AuthSig;
 
 impl HookUserAuth for AuthSig {
     fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
-        println!("authSig.on_user_auth_claim.1");
         if !from_transact() {
             return Err(Unauthorized("on_user_auth_claim".to_string()).into());
         }
 
-        let pubkey = get_pubkey(&account_name)?;
-        println!("authSig.on_user_auth_claim.2");
-        // if !ManagedKeys::has(&pubkey) {
-        //     return Err(KeyNotFound("on_user_auth_claim").into());
-        // }
-
         Ok(Some(Claim {
             verify_service: psibase::services::verify_sig::SERVICE.to_string(),
-            raw_data: AuthSig::to_der(pubkey)?,
+            raw_data: AuthSig::to_der(get_pubkey(&account_name)?)?,
         }))
     }
 
@@ -69,14 +62,12 @@ impl HookUserAuth for AuthSig {
         account_name: String,
         transaction_hash: Vec<u8>,
     ) -> Result<Option<Proof>, Error> {
-        println!("authSig.on_user_auth_proof().1");
         if !from_transact() {
             return Err(Unauthorized("get_proofs".to_string()).into());
         }
 
         let public_key = HostCrypto::to_der(&get_pubkey(&account_name)?)?;
         let signature = AuthSig::sign(transaction_hash, public_key)?;
-        println!("authSig.on_user_auth_proof().3 signature: {:?}", signature);
         Ok(Some(Proof { signature }))
     }
 }
