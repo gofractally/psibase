@@ -127,7 +127,7 @@ namespace SystemService
       {
          PSIBASE_SUBJECTIVE_TX
          {
-            auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
+            auto requests = HttpServer::Session{}.open<PendingRequestTable>();
             requests.put(*row);
             owned.remove(*row);
             to<XHttp>().autoClose(socket, false);
@@ -144,7 +144,7 @@ namespace SystemService
       auto sender = getSender();
       PSIBASE_SUBJECTIVE_TX
       {
-         auto requests = Subjective{}.open<PendingRequestTable>();
+         auto requests = Session{}.open<PendingRequestTable>();
          auto owned    = Temporary{}.open<PendingRequestTable>();
          auto row      = requests.get(socket);
          if (row && row->owner == sender)
@@ -178,7 +178,7 @@ namespace SystemService
       {
          PSIBASE_SUBJECTIVE_TX
          {
-            auto requests = Subjective{}.open<PendingRequestTable>();
+            auto requests = Session{}.open<PendingRequestTable>();
             auto row      = requests.get(socket);
             if (row && row->owner == sender)
             {
