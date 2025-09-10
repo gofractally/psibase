@@ -260,7 +260,7 @@ namespace psibase
       std::int32_t fd;
       SocketInfo   info;
 
-      static const auto db = psibase::DbId::nativeSubjective;
+      static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> SocketKeyType;
       PSIO_REFLECT(SocketRow, fd, info)
    };
@@ -387,7 +387,7 @@ namespace psibase
    {
       std::string       name;
       std::string       value;
-      static const auto db = psibase::DbId::nativeSubjective;
+      static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> EnvKeyType;
       PSIO_REFLECT(EnvRow, name, value);
    };

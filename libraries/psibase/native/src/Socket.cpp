@@ -33,7 +33,7 @@ void SocketAutoCloseSet::close(Writer&                           writer,
    {
       socket->autoClose(message);
       auto key = socketKey(socket->id);
-      parent.sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      parent.sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
    {
       std::lock_guard l{parent.mutex};
@@ -58,20 +58,6 @@ bool SocketAutoCloseSet::owns(Sockets& sockets, const AutoCloseSocket& sock)
 
 namespace
 {
-   struct NullProducersSocket : Socket
-   {
-      virtual void       send(std::span<const char>) override {}
-      virtual SocketInfo info() const override { return ProducerMulticastSocketInfo{}; }
-   };
-
-   struct NullHttpSocket : AutoCloseSocket
-   {
-      NullHttpSocket() { once = true; }
-      virtual void       send(std::span<const char>) override {}
-      virtual void       autoClose(const std::optional<std::string>&) noexcept override {}
-      virtual SocketInfo info() const override { return HttpSocketInfo{}; }
-   };
-
    void doRemoveSocket(std::shared_ptr<Socket>& socket, SharedDatabase& sharedDb)
    {
       assert(!socket->closed);
@@ -84,18 +70,6 @@ namespace
       socket->closed = true;
       socket.reset();
    }
-
-   struct MakeNullSocketVisitor
-   {
-      std::shared_ptr<Socket> operator()(const ProducerMulticastSocketInfo&)
-      {
-         return std::make_shared<NullProducersSocket>();
-      }
-      std::shared_ptr<Socket> operator()(const HttpSocketInfo&)
-      {
-         return std::make_shared<NullHttpSocket>();
-      }
-   };
 }  // namespace
 
 Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
@@ -107,28 +81,9 @@ Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
    auto                   key       = psio::convert_to_key(socketPrefix());
    auto                   prefixLen = key.size();
    std::vector<SocketRow> rows;
-   while (auto kv = db.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
+   if (db.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
    {
-      auto row = psio::from_frac<SocketRow>(std::span{kv->value.pos, kv->value.end});
-      check(row.fd >= 0, "invalid fd");
-      rows.push_back(row);
-      key.assign(kv->key.pos, kv->key.end);
-      key.push_back(0);
-   }
-
-   if (!rows.empty())
-   {
-      auto maxFd = static_cast<std::size_t>(rows.back().fd);
-      available.resize(maxFd + 1, true);
-      sockets.resize(maxFd + 1);
-      for (const auto& row : rows)
-      {
-         auto pos  = static_cast<std::size_t>(row.fd);
-         auto sock = std::visit(MakeNullSocketVisitor{}, row.info);
-         sock->id  = row.fd;
-         available.reset(pos);
-         sockets[pos] = std::move(sock);
-      }
+      abortMessage("Socket table should start empty");
    }
 }
 
@@ -159,7 +114,7 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
    if (p->closed)
    {
       auto key = socketKey(p->id);
-      sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+      sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
 
    p->send(buf);
@@ -208,7 +163,8 @@ void Sockets::add(Writer&                        writer,
       }
       else
       {
-         sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
+         sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
+                                  psio::to_frac(row));
       }
    }
 }
@@ -245,7 +201,8 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
    if (!existing)
    {
       SocketRow row{socket->id, socket->info()};
-      sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
+      sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
+                               psio::to_frac(row));
    }
 }
 void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db)
@@ -268,7 +225,7 @@ void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Data
       }
       else
       {
-         sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+         sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
       }
    }
 }

@@ -44,7 +44,8 @@ namespace psibase
                   "database access disabled during proof verification");
             return (DbId)db;
          }
-         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary))
+         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::session) ||
+             db == uint32_t(DbId::temporary))
          {
             uint64_t prefix = self.code.codeNum.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
@@ -60,7 +61,7 @@ namespace psibase
                   "subjective databases cannot be read in a deterministic context");
             return (DbId)db;
          }
-         if (db == uint32_t(DbId::nativeSubjective))
+         if (db == uint32_t(DbId::nativeSubjective) || db == uint32_t(DbId::nativeSession))
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be read in a deterministic context");
@@ -86,7 +87,8 @@ namespace psibase
       bool keyHasServicePrefix(uint32_t db)
       {
          return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
-                db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary);
+                db == uint32_t(DbId::subjective) || db == uint32_t(DbId::session) ||
+                db == uint32_t(DbId::temporary);
       }
 
       struct Writable
@@ -106,7 +108,8 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary))
+         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::session) ||
+             db == uint32_t(DbId::temporary))
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be written in a deterministic context");
@@ -116,7 +119,7 @@ namespace psibase
             return {(DbId)db, false, false};
          }
 
-         if (db == uint32_t(DbId::nativeSubjective))
+         if (db == uint32_t(DbId::nativeSubjective) || db == uint32_t(DbId::nativeSession))
          {
             check(isSubjectiveContext(self),
                   "subjective databases cannot be written in a deterministic context");
@@ -332,6 +335,16 @@ namespace psibase
                "ScheduledSnapshotRow has incorrect key");
       }
 
+      void verifySocketRow(psio::input_stream key, psio::input_stream value)
+      {
+         abortMessage("Socket table is read only");
+      }
+
+      void verifyEnvRow(psio::input_stream key, psio::input_stream value)
+      {
+         // Native doesn't do anything with the env table.
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -373,6 +386,20 @@ namespace psibase
             verifyCodeByHashRow(key, value);
          else if (table == runTable)
             verifySubjectiveRunTableRow(db, key, value);
+         else
+            throw std::runtime_error("Unrecognized key in nativeSubjective");
+      }
+
+      void verifyWriteSession(Database& db, psio::input_stream key, psio::input_stream value)
+      {
+         NativeTableNum table;
+         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
+         memcpy(&table, key.pos, sizeof(table));
+         std::reverse((char*)&table, (char*)(&table + 1));
+         if (table == socketTable)
+            verifySocketRow(key, value);
+         else if (table == envTable)
+            verifyEnvRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
@@ -619,6 +646,11 @@ namespace psibase
              {
                 verifyWriteSubjective(database, {key.data(), key.size()},
                                       {value.data(), value.size()});
+             }
+             else if (db == uint32_t(DbId::nativeSession))
+             {
+                verifyWriteSession(database, {key.data(), key.size()},
+                                   {value.data(), value.size()});
              }
              database.kvPutRaw(w.db, {key.data(), key.size()}, {value.data(), value.size()});
           });

@@ -593,8 +593,9 @@ namespace psibase
             auto commit          = consensus.light_verify(*this, info, block);
             consensusChangeReady = true;
             ConsensusChangeRow changeRow{start, commit, info.header.blockNum};
-            systemContext->sharedDatabase.kvPutSubjective(
-                *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
+            systemContext->sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
+                                                          psio::convert_to_key(changeRow.key()),
+                                                          psio::to_frac(changeRow));
          }
          prevBlockNum         = info.header.blockNum;
          auto     blockNumKey = psio::convert_to_key(info.header.blockNum);
@@ -609,8 +610,8 @@ namespace psibase
          if (block->auxConsensusData())
          {
             BlockDataRow row{info.blockId, *block->auxConsensusData()};
-            systemContext->sharedDatabase.kvPutSubjective(*writer, psio::convert_to_key(row.key()),
-                                                          psio::to_frac(row));
+            systemContext->sharedDatabase.kvPutSubjective(
+                *writer, BlockDataRow::db, psio::convert_to_key(row.key()), psio::to_frac(row));
          }
          revision = database.getModifiedRevision();
       }
@@ -1380,12 +1381,14 @@ namespace psibase
          byBlocknumIndex.insert({head->blockNum(), head->blockId()});
          // Record the snapshot
          SnapshotRow snapshotRow{id, SnapshotRow::Item{hash, signatures}};
-         systemContext->sharedDatabase.kvPutSubjective(
-             *writer, psio::convert_to_key(snapshotRow.key()), psio::to_frac(snapshotRow));
+         systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db,
+                                                       psio::convert_to_key(snapshotRow.key()),
+                                                       psio::to_frac(snapshotRow));
          logStart = head->blockNum();
          LogTruncateRow logTruncateRow{logStart};
-         systemContext->sharedDatabase.kvPutSubjective(
-             *writer, psio::convert_to_key(logTruncateRow.key()), psio::to_frac(logTruncateRow));
+         systemContext->sharedDatabase.kvPutSubjective(*writer, LogTruncateRow::db,
+                                                       psio::convert_to_key(logTruncateRow.key()),
+                                                       psio::to_frac(logTruncateRow));
          return head;
       }
       Checksum256 get_last_snapshot_id()
@@ -1435,7 +1438,7 @@ namespace psibase
       SnapshotRow get_snapshot_info(const Checksum256& id)
       {
          auto row = systemContext->sharedDatabase.kvGetSubjective(
-             *writer, psio::convert_to_key(snapshotKey(id)));
+             *writer, SnapshotRow::db, psio::convert_to_key(snapshotKey(id)));
          if (!row)
             return SnapshotRow{id};
          return psio::from_frac<SnapshotRow>(*row);
@@ -1504,14 +1507,14 @@ namespace psibase
       void setBlockData(const Checksum256& id, std::vector<char>&& data)
       {
          BlockDataRow row{id, std::move(data)};
-         systemContext->sharedDatabase.kvPutSubjective(*writer, psio::convert_to_key(row.key()),
-                                                       psio::to_frac(row));
+         systemContext->sharedDatabase.kvPutSubjective(
+             *writer, BlockDataRow::db, psio::convert_to_key(row.key()), psio::to_frac(row));
       }
 
       std::optional<std::vector<char>> getBlockData(const Checksum256& id) const
       {
          if (auto data = systemContext->sharedDatabase.kvGetSubjective(
-                 *writer, psio::convert_to_key(blockDataKey(id))))
+                 *writer, BlockDataRow::db, psio::convert_to_key(blockDataKey(id))))
          {
             auto row = psio::from_frac<BlockDataRow>(*data);
             if (row.auxConsensusData)
@@ -1722,7 +1725,8 @@ namespace psibase
          bool        inserted = false;
          SnapshotRow row{.id = id};
          auto        key = psio::convert_to_key(row.key());
-         if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
+         if (auto bytes =
+                 systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
             psio::from_frac(row, *bytes);
          }
@@ -1763,7 +1767,8 @@ namespace psibase
                inserted = true;
             }
          }
-         systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
+         systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db, key,
+                                                       psio::to_frac(row));
          PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
          verify_state_checksum(row, producers, ChecksumLog::always);
          if (inserted)
@@ -1818,7 +1823,8 @@ namespace psibase
          auto        log      = ChecksumLog::never;
          SnapshotRow row{.id = id};
          auto        key = psio::convert_to_key(row.key());
-         if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
+         if (auto bytes =
+                 systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
             psio::from_frac(row, *bytes);
          }
@@ -1853,7 +1859,8 @@ namespace psibase
          }
          if (inserted)
          {
-            systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
+            systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db, key,
+                                                          psio::to_frac(row));
             PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
             verify_state_checksum(row, producers, log);
          }
@@ -2149,7 +2156,7 @@ namespace psibase
          currentTerm = head->info.header.term;
 
          // If the block log is truncated, find where it starts
-         if (auto row = sc->sharedDatabase.kvGetSubjective(*writer,
+         if (auto row = sc->sharedDatabase.kvGetSubjective(*writer, LogTruncateRow::db,
                                                            psio::convert_to_key(logTruncateKey())))
          {
             logStart = psio::from_frac<LogTruncateRow>(*row).start;

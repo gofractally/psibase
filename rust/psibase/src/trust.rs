@@ -9,6 +9,8 @@
 /// To use this macro, you must also link your plugin to `permissions:plugin` and add its imports
 /// to your plugin's target world.
 ///
+/// Valid trust levels are: [None, Low, Medium, High, Max]
+///
 /// Example usage:
 /// ```rust,ignore
 /// psibase::define_trust! {
@@ -110,19 +112,35 @@ macro_rules! define_trust {
                 }
             }
 
-            pub fn authorize(fn_name: FunctionName) -> Result<(), Error> {
-                authorize_with_whitelist(fn_name, vec![])?;
+
+            pub fn authorize(fn_name: FunctionName) -> Result<bool, Error> {
+                authorize_with_whitelist(fn_name, vec![])
+            }
+
+            pub fn assert_authorized(fn_name: FunctionName) -> Result<(), Error> {
+                if !authorize(fn_name)? {
+                    panic!("Unauthorized call to: {}", fn_name.as_str());
+                }
+
                 Ok(())
             }
 
-            pub fn authorize_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<(), Error> {
+            pub fn authorize_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<bool, Error> {
                 Permissions::authorize(
                     &get_sender(),
                     TrustRequirement::get_level(fn_name),
                     &TrustRequirement::get_descriptions(),
                     fn_name.as_str(),
                     &whitelist,
-                )?;
+                )
+            }
+
+            pub fn assert_authorized_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<(), Error> {
+                if !authorize_with_whitelist(fn_name, whitelist)? {
+                    let err_msg = format!("Unauthorized call to: {}", fn_name.as_str());
+                    panic!("{}", err_msg);
+                }
+
                 Ok(())
             }
         }

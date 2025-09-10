@@ -28,7 +28,7 @@ std::vector<char> psibase::readWholeFile(std::string_view filename)
    while (remaining)
    {
       auto count = ::read(fd, pos, remaining);
-      if (count < 0)
+      if (count <= 0)
          fail();
       remaining -= count;
       pos += count;
