@@ -244,7 +244,7 @@ namespace psibase
    BasicHttpReply<T> BasicHttpReply<T>::methodNotAllowed(const HttpRequest& req)
    {
       auto message =
-          std::format("The resource '{}' does not accept the method {}.\n", req.target, req.method);
+          "The resource '" + req.target + "' does not accept the method " + req.method + ".\n";
       return HttpReply{.status      = HttpStatus::methodNotAllowed,
                        .contentType = "text/html",
                        .body{message.begin(), message.end()}};
