@@ -23,16 +23,16 @@ interface types {
         /// The service that will execute this action
         service: string,
         /// The name of the action to execute
-        method: string,
+        method: string, 
         /// The data passed to the action, packed in fracpack format
         raw-data: list<u8>,
     }
 }
 
-/// Hooks allow plugins to hook into the transact plugin and customize its behavior
+/// Hooks allow plugins to hook into the transact plugin and customize its behavior 
 /// during transaction construction and authorization.
 interface hooks {
-    /// Allows the the caller plugin to add transaction authorization claims and proofs
+    /// Allows the the caller plugin to add transaction authorization claims and proofs 
     /// based on the next action added to this transaction.
     hook-action-auth: func();
 
@@ -46,9 +46,9 @@ interface hooks {
 
     /// Allows the caller plugin to transform the actions in a transaction before it is published.
     /// Adding a label allows the transformation to happen in batches (grouped by label)
-    ///
+    /// 
     /// Parameters
-    /// * `label`: A label identifying the group into which actions are placed.
+    /// * `label`: A label identifying the group into which actions are placed. 
     hook-tx-transform-label: func(label: option<string>);
 }
 
@@ -56,24 +56,15 @@ interface intf {
     use host:types/types.{error};
 
     /// Adds the specified service action to the current transaction.
-    ///
+    /// 
     /// No service is specified, as it is only possible for a plugin to call an
     /// action on its own service. To call actions on another service, it must use
     /// that service's plugin.
-    ///
+    /// 
     /// Parameters
     /// * `method-name`: The method name of the action being called
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
-
-
-}
-
-interface network {
-    use host:types/types.{error};
-
-    /// Set snapshot interval period network wide
-    set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
 interface auth {
@@ -92,26 +83,33 @@ world imports {
 
 //      HOOK WORLDS
 //
-// Include the worlds below in plugins that you are implementing,
+// Include the worlds below in plugins that you are implementing, 
 //   if you want to use the corresponding hook.
 //
 // NOTE: Currently, the following limitation applies:
-//   - The transact plugin will always call the hook handler at:
+//   - The transact plugin will always call the hook handler at: 
 //     `<service>:plugin/transact-hook-<hook_name>`
-//     Therefore, If you use any of these hooks, your plugin must be called "plugin".
+//     Therefore, If you use any of these hooks, your plugin must be called "plugin". 
 
 // All user auth service plugins must include this world.
 world hook-user-auth {
     export transact-hook-user-auth: interface {
         use host:types/types.{error};
         use types.{claim, proof, action};
-
+    
         /// Gets the claim needed to satisfy the authorization of the logged-in user
         on-user-auth-claim: func(account-name: string) -> result<option<claim>, error>;
-
-        /// Provides proof of the user claim.
+    
+        /// Provides proof of the user claim. 
         on-user-auth-proof: func(account-name: string, transaction-hash: list<u8>) -> result<option<proof>, error>;
     }
+}
+
+interface network {
+    use host:types/types.{error};
+
+    /// Set snapshot interval period network wide
+    set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
 world hook-action-auth {
@@ -119,17 +117,17 @@ world hook-action-auth {
     export transact-hook-action-auth: interface {
         use host:types/types.{error};
         use types.{claim, proof, action};
-
+    
         /// Gets the claim(s) needed to satisfy the authorization of the sender of this transaction
-        ///
+        /// 
         /// Parameters
         /// * `action`: The action being added to the current transaction context
         on-action-auth-claims: func(action: action) -> result<list<claim>, error>;
-
-        /// Provides proof(s) of the claim(s).
-        /// If there are multiple claims, the returned list of proofs must be in the same order as the
+    
+        /// Provides proof(s) of the claim(s). 
+        /// If there are multiple claims, the returned list of proofs must be in the same order as the 
         /// claims were specified.
-        ///
+        /// 
         /// Parameters
         /// * `claims`: The claims this transaction is attempting to satisfy
         /// * `transaction-hash`: A hash of the current transaction. Often signed to generate a proof.
@@ -141,7 +139,7 @@ world hook-actions-sender {
     import hooks;
     export transact-hook-actions-sender: interface {
         use host:types/types.{error};
-
+    
         /// Sets the sender of the specified action when added to this transaction.
         /// Return `None` if the default sender should be used.
         on-actions-sender: func(service: string, method: string) -> result<option<string>, error>;
@@ -153,7 +151,7 @@ world hook-tx-transform {
     export transact-hook-tx-transform: interface {
         use host:types/types.{error};
         use types.{action};
-
+    
         /// Transform the set of actions in the transaction
         /// Return `None` if no transformations are needed
         on-tx-transform: func(label: option<string>, actions: list<action>) -> result<option<list<action>>, error>;
