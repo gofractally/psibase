@@ -52,6 +52,8 @@ interface api {
     ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
     ///     permission, this function will cause the user to be prompted to consider the request.
     /// 
+    /// On successful execution, the return value represents whether the user is authorized or not.
+    /// 
     /// # Arguments
     ///
     /// - `caller`: The app requesting permission.
