@@ -1,5 +1,6 @@
 #include <psibase/DefaultTestChain.hpp>
 
+#include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <services/system/AuthAny.hpp>
