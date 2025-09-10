@@ -2,6 +2,7 @@ import { useAppForm } from "@/components/forms/app-form";
 
 import { useSetSnapshot } from "@/hooks/use-set-snapshot";
 import { useSnapshotSeconds } from "@/hooks/use-snapshot-seconds";
+import { siblingUrl } from "@psibase/common-lib";
 
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -51,9 +52,18 @@ export const Settings = () => {
                     <div className="flex justify-between">
                         <div className="w-full space-y-0.5 pb-3">
                             <Label className="text-base">Snapshots</Label>
-                            <div className="text-muted-foreground text-sm">
-                                Network snapshot interval.{" "}
-                            </div>
+                            <a
+                                className="hover:text-primary text-muted-foreground text-sm underline underline-offset-2"
+                                href={siblingUrl(
+                                    undefined,
+                                    "docs",
+                                    "/specifications/blockchain/snapshots.html",
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Network snapshot interval
+                            </a>
                         </div>
                         <div className="flex w-full justify-end">
                             <form.Field name="seconds">
