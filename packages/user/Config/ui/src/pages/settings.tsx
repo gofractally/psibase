@@ -18,15 +18,17 @@ const oneDay = 86400;
 export const Settings = () => {
     const { mutateAsync: setSnapshot } = useSetSnapshot();
 
-    const { data: seconds } = useSnapshotSeconds();
+    const { data: seconds, } = useSnapshotSeconds();
+
     const form = useAppForm({
         defaultValues: {
-            seconds: seconds || oneDay,
+            seconds: seconds ?? oneDay,
         },
         onSubmit: async (data) => {
-            await setSnapshot([data.value.seconds]);
+            const { seconds } = data.value
+            await setSnapshot([seconds]);
             form.reset({
-                seconds: data.value.seconds,
+                seconds,
             });
         },
     });

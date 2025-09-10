@@ -18,7 +18,7 @@ export const useSetSnapshot = () =>
             isStagable: true,
             onSuccess: (seconds, status) => {
                 if (status.type == "executed") {
-                    queryClient.setQueryData(QueryKey.snapshotSeconds(), seconds);
+                    queryClient.setQueryData(QueryKey.snapshotSeconds(), seconds[0]);
                 }
             },
         },
