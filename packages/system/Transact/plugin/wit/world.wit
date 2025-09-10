@@ -78,6 +78,7 @@ interface auth {
 world imports {
     import intf;
     import auth;
+    import network;
 }
 
 //      HOOK WORLDS
@@ -102,6 +103,13 @@ world hook-user-auth {
         /// Provides proof of the user claim. 
         on-user-auth-proof: func(account-name: string, transaction-hash: list<u8>) -> result<option<proof>, error>;
     }
+}
+
+interface network {
+    use host:types/types.{error};
+
+    /// Set snapshot interval period network wide
+    set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
 world hook-action-auth {

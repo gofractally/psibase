@@ -8,6 +8,7 @@ import { Branding } from "./pages/branding";
 import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
 import { PendingTransactions } from "./pages/pending-transactions";
+import { Settings } from "./pages/settings";
 
 export const router = createBrowserRouter([
     {
@@ -55,6 +56,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <PendingTransaction />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "settings",
+                element: (
+                    <ProtectedRoute>
+                        <Settings />
                     </ProtectedRoute>
                 ),
             },

@@ -8,6 +8,7 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 const QueryKey = {
     currentUser: () => ["currentUser"] as const,
     branding: () => ["branding"] as const,
+    snapshotSeconds: () => ["snapshotSeconds"] as const,
     brandingFiles: () => ["brandingFiles"] as const,
     chainId: () => ["chainId"] as const,
     connectedAccounts: () => ["connectedAccounts"] as const,
