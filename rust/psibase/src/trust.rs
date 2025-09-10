@@ -119,8 +119,7 @@ macro_rules! define_trust {
 
             pub fn assert_authorized(fn_name: FunctionName) -> Result<(), Error> {
                 if !authorize(fn_name)? {
-                    let err_msg = format!("Unauthorized call to: {}", fn_name.as_str());
-                    panic!("{}", err_msg);
+                    panic!("Unauthorized call to: {}", fn_name.as_str());
                 }
 
                 Ok(())
