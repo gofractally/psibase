@@ -1,13 +1,13 @@
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 
+#include <psibase/fileUtil.hpp>
+#include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
 
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include <catch2/catch_message.hpp>
 
@@ -118,32 +118,6 @@ bool psibase::TraceResult::failed(std::string_view expected)
    return false;
 }
 
-std::vector<char> psibase::readWholeFile(std::string_view filename)
-{
-   auto fail = [&] { check(false, "read " + std::string(filename) + " failed"); };
-   int  fd   = ::open(std::string(filename).c_str(), O_RDONLY);
-   if (fd < 0)
-      fail();
-   struct stat stat;
-   if (::fstat(fd, &stat) < 0)
-      fail();
-   if (stat.st_size > std::numeric_limits<std::size_t>::max())
-      fail();
-   std::vector<char> result(static_cast<std::size_t>(stat.st_size));
-   char*             pos       = result.data();
-   std::size_t       remaining = result.size();
-   while (remaining)
-   {
-      auto count = ::read(fd, pos, remaining);
-      if (count < 0)
-         fail();
-      remaining -= count;
-      pos += count;
-   }
-   ::close(fd);
-   return result;
-}
-
 void psibase::expect(TransactionTrace t, const std::string& expected, bool always_show)
 {
    std::string error = t.error ? *t.error : "";
@@ -169,28 +143,70 @@ namespace
          return;
       auto serviceRoot = std::getenv("PSIBASE_DATADIR");
       check(serviceRoot != nullptr, "Cannot find local service directory");
-      auto servicesDir = std::string{serviceRoot} + "/services";
+      auto                     packagesDir = std::string{serviceRoot} + "/packages";
+      DirectoryRegistry        registry{packagesDir};
+      std::vector<std::string> packageNames{"XDefault"};
+      auto                     packages = registry.resolve(packageNames);
+      std::vector<HttpRequest> requests;
       tester::raw::checkoutSubjective(self.nativeHandle());
-      for (auto account : {AccountNumber{"x-admin"}, AccountNumber{"x-http"},
-                           AccountNumber{"x-run"}, AccountNumber{"x-transact"}})
+      for (const auto& package : packages)
       {
-         auto code = readWholeFile(servicesDir + "/" + account.str() + ".wasm");
+         for (const auto& [account, header, serviceInfo] : package.services)
+         {
+            auto file = package.archive.getEntry(header);
 
-         auto    codeHash = sha256(code.data(), code.size());
-         CodeRow codeRow{
-             .codeNum  = account,
-             .flags    = CodeRow::isPrivileged,
-             .codeHash = codeHash,
-         };
-         self.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
-         CodeByHashRow codeByHashRow{
-             .codeHash = codeHash,
-             .code{code.begin(), code.end()},
-         };
-         self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+            std::vector<std::uint8_t> code(file.uncompressedSize());
+            file.read({reinterpret_cast<char*>(code.data()), code.size()});
+
+            auto    codeHash = sha256(code.data(), code.size());
+            CodeRow codeRow{
+                .codeNum  = account,
+                .flags    = serviceInfo.parseFlags(),
+                .codeHash = codeHash,
+            };
+            self.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+            CodeByHashRow codeByHashRow{
+                .codeHash = codeHash,
+                .code     = std::move(code),
+            };
+            self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+         }
+
+         std::string rootHost = "psibase";
+
+         for (const auto& [account, header] : package.data)
+         {
+            auto file             = package.archive.getEntry(header);
+            auto [path, mimeType] = package.dataFileInfo(header.filename);
+
+            requests.push_back(HttpRequest{
+                .host        = account.str() + "." + rootHost,
+                .rootHost    = rootHost,
+                .method      = "PUT",
+                .target      = std::string(path),
+                .contentType = std::string(mimeType),
+                .body        = file.read(),
+            });
+         }
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");
+
+      for (const auto& request : requests)
+      {
+         auto reply = self.http(request);
+         if (reply.status != HttpStatus::ok)
+         {
+            auto message = std::format("PUT {} returned {}", request.target,
+                                       static_cast<std::uint16_t>(reply.status));
+            if (reply.contentType.starts_with("text/"))
+            {
+               message += ": ";
+               message.append(reply.body.data(), reply.body.size());
+            }
+            abortMessage(message);
+         }
+      }
    }
 
 }  // namespace
