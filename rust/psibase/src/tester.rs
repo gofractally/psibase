@@ -8,6 +8,8 @@
 
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
+#[cfg(target_family = "wasm")]
+use crate::MicroSeconds;
 use crate::{
     check, create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
@@ -15,15 +17,13 @@ use crate::{
     Seconds, SignedTransaction, StatusRow, TimePointSec, TimePointUSec, ToKey, Transaction,
     TransactionTrace,
 };
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
 use futures::executor::block_on;
 use psibase_macros::account_raw;
 use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
-use std::fs::File;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -157,54 +157,76 @@ impl Chain {
         {
             return;
         }
-        let services_root: PathBuf = std::env::var_os("PSIBASE_DATADIR")
+
+        let packages_root: PathBuf = std::env::var_os("PSIBASE_DATADIR")
             .expect("Cannot find local service directory")
             .into();
-        let services_dir = services_root.join("services");
+        let packages_dir = packages_root.join("packages");
+        let registry = DirectoryRegistry::new(packages_dir);
+        let package_names = vec!["XDefault".to_string()];
+        let packages = block_on(registry.resolve(&package_names)).unwrap();
+        let mut requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
-        for account in ["x-admin", "x-http", "x-run", "x-transact"] {
-            let path = services_dir.clone().join(account.to_string() + ".wasm");
-            let mut code = Vec::new();
-            File::open(&path)
-                .with_context(|| format!("Cannot open {}", path.to_string_lossy()))
-                .unwrap()
-                .read_to_end(&mut code)
-                .unwrap();
+        for mut package in packages {
+            for (account, info, code) in package.services() {
+                let hash: [u8; 32] = Sha256::digest(&code).into();
+                let code_hash: Checksum256 = hash.into();
 
-            let hash: [u8; 32] = Sha256::digest(&code).into();
-            let code_hash: Checksum256 = hash.into();
+                let code_row = CodeRow {
+                    codeNum: *account,
+                    flags: info.parse_flags(),
+                    codeHash: code_hash.clone(),
+                    vmType: 0,
+                    vmVersion: 0,
+                };
+                let key = code_row.key();
+                self.kv_put(DbId::NativeSubjective, &key, &code_row);
+                let code_by_hash_row = CodeByHashRow {
+                    codeHash: code_hash,
+                    vmType: 0,
+                    vmVersion: 0,
+                    code: code.into(),
+                };
+                let key = code_by_hash_row.key();
+                self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
+            }
 
-            let code_row = CodeRow {
-                codeNum: AccountNumber::from_exact(account).unwrap(),
-                flags: CodeRow::IS_PRIVILEGED,
-                codeHash: code_hash.clone(),
-                vmType: 0,
-                vmVersion: 0,
-            };
-            let key = code_row.key();
-            self.kv_put(DbId::NativeSubjective, &key, &code_row);
-            let code_by_hash_row = CodeByHashRow {
-                codeHash: code_hash,
-                vmType: 0,
-                vmVersion: 0,
-                code: code.into(),
-            };
-            let key = code_by_hash_row.key();
-            self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
+            let root_host = "psibase";
+
+            for (account, path, file) in package.data() {
+                let Some(mime_type) = mime_guess::from_path(&path).first() else {
+                    panic!("Cannot determine Mime-Type for {}", path)
+                };
+                requests.push(HttpRequest {
+                    host: account.to_string() + "." + root_host,
+                    rootHost: root_host.to_string(),
+                    method: "PUT".to_string(),
+                    target: path,
+                    contentType: mime_type.to_string(),
+                    headers: Vec::new(),
+                    body: file.into(),
+                });
+            }
         }
         check(
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
             "Failed to commit changes",
         );
+        for request in requests {
+            let reply = self.http(&request).unwrap();
+            if reply.status != 200 {
+                panic!("PUT failed: {}", reply.text().unwrap());
+            }
+        }
     }
 
-    /// Advance the blockchain time by the specified number of seconds and start a new block.
+    /// Advance the blockchain time by the specified number of microseconds and start a new block.
     ///
     /// This method increments the current block time by `seconds` and starts a new block at that time.
     /// If no current block exists, it starts from a default time (e.g., 0 microseconds).
-    pub fn progress_seconds(&self, seconds: i64) {
+    pub fn start_block_after(&self, micro_seconds: MicroSeconds) {
         // Scope the immutable borrow to ensure it’s dropped before calling start_block_at
         let current_time = {
             let status = self.status.borrow();
@@ -213,10 +235,7 @@ impl Chain {
                 .map(|s| s.current.time)
                 .unwrap_or(TimePointUSec { microseconds: 0 })
         };
-        let new_time = TimePointUSec {
-            microseconds: current_time.microseconds + (seconds * 1_000_000),
-        };
-        self.start_block_at(new_time);
+        self.start_block_at(current_time + micro_seconds);
     }
 
     /// Start a new block

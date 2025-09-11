@@ -68,12 +68,10 @@ pub mod tables {
             psibase::services::tokens::Wrapper::call()
                 .getToken(self.token_id)
                 .precision
-                .try_into()
-                .unwrap()
         }
 
         pub fn add(decay_rate_per_million: u32, token_id: u32) -> Self {
-            let mut instance = Self::new(decay_rate_per_million, token_id);
+            let instance = Self::new(decay_rate_per_million, token_id);
             instance.save();
             instance
         }
@@ -101,7 +99,7 @@ pub mod tables {
         }
 
         /// Total available to be claimed now (vested - already claimed)
-        pub fn balance_claimable(&self) -> Quantity {
+        fn balance_claimable(&self) -> Quantity {
             self.total_vested()
                 .value
                 .saturating_sub(self.total_claimed.value)
@@ -110,13 +108,12 @@ pub mod tables {
 
         /// Deposit `amount` into the bucket.
         pub fn deposit(&mut self, amount: Quantity) {
+            self.total_deposited = (self.total_deposited.value - self.total_claimed.value).into();
+            self.total_claimed = 0.into();
             self.claimable_at_last_deposit = self.total_vested();
-            self.total_deposited = self
-                .total_deposited
-                .value
-                .saturating_add(amount.value)
-                .into();
+            self.total_deposited = (self.total_deposited.value + amount.value).into();
             self.last_deposit_timestamp = TransactSvc::call().currentBlock().time.seconds();
+
             self.save();
         }
 
@@ -132,14 +129,14 @@ pub mod tables {
         }
 
         /// Total unclaimed (vested + vesting).
-        pub fn unclaimed_total(&self) -> Quantity {
+        fn unclaimed_total(&self) -> Quantity {
             self.total_deposited
                 .value
                 .saturating_sub(self.total_claimed.value)
                 .into()
         }
 
-        pub fn total_vested(&self) -> Quantity {
+        fn total_vested(&self) -> Quantity {
             if self.total_deposited.value == 0 {
                 return self.claimable_at_last_deposit;
             }
@@ -157,7 +154,7 @@ pub mod tables {
                 .into()
         }
 
-        pub fn save(&mut self) {
+        fn save(&self) {
             StreamTable::new().put(&self).unwrap();
         }
 
@@ -173,19 +170,34 @@ pub mod tables {
 
 #[psibase::service(name = "token-stream", tables = "tables")]
 pub mod service {
-    use psibase::services::tokens::{Decimal, Memo};
+    use psibase::services::tokens::{Decimal, Memo, Quantity};
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::{get_sender, get_service, AccountNumber};
+    use psibase::{get_sender, AccountNumber};
 
     use crate::tables::Stream;
 
+    /// Lookup stream information
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    ///
+    /// # Returns
+    /// Option of stream information, will be None if no longer exists.
     #[action]
     fn get_stream(nft_id: u32) -> Option<Stream> {
         Stream::get(nft_id)
     }
 
+    /// Creates a token stream.
+    ///
+    /// # Arguments
+    /// * `half_life_seconds` - Half life of the vesting rate in seconds
+    /// * `token_id` - Token ID to be deposited into the stream.
+    ///
+    /// # Returns
+    /// The ID of the redeemer NFT which is also the unique ID of the stream.    
     #[action]
     fn create(half_life_seconds: u32, token_id: u32) -> u32 {
         psibase::services::tokens::Wrapper::call().getToken(token_id);
@@ -200,19 +212,24 @@ pub mod service {
         stream.nft_id
     }
 
+    /// Deposit into a token stream.
+    ///
+    /// * Requires pre-existing shared balance of the token assigned to the stream, whole balance will be billed.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    /// * `amount` - Amount to deposit.
     #[action]
-    fn deposit(nft_id: u32) {
+    fn deposit(nft_id: u32, amount: Quantity) {
         let mut stream = Stream::get_assert(nft_id);
         let sender = get_sender();
 
-        let shared_balance = Tokens::call().getSharedBal(stream.token_id, sender, get_service());
+        stream.deposit(amount);
 
-        stream.deposit(shared_balance);
-
-        Tokens::call_from(get_service()).debit(
+        Tokens::call().debit(
             stream.token_id,
             sender,
-            shared_balance,
+            amount,
             Memo::try_from(format!("Deposit into stream {}", nft_id)).unwrap(),
         );
 
@@ -220,14 +237,16 @@ pub mod service {
             nft_id,
             sender,
             "deposited".to_string(),
-            Decimal::new(
-                shared_balance,
-                Tokens::call().getToken(stream.token_id).precision,
-            )
-            .to_string(),
+            Decimal::new(amount, Tokens::call().getToken(stream.token_id).precision).to_string(),
         );
     }
 
+    /// Claim from a token stream.
+    ///
+    /// * Requires holding the redeemer NFT of the stream.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
     #[action]
     fn claim(nft_id: u32) {
         let mut stream = Stream::get_assert(nft_id);
@@ -255,6 +274,12 @@ pub mod service {
         );
     }
 
+    /// Delete a stream.
+    ///
+    /// * Requires stream to be empty.
+    ///
+    /// # Arguments
+    /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
     #[action]
     fn delete(nft_id: u32) {
         let stream = Stream::get_assert(nft_id);

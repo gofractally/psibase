@@ -43,7 +43,7 @@ pub mod Service {
     /// Creates a token stream.
     ///
     /// # Arguments
-    /// * `decay_rate_per_million` - Decay rate in parts-per-million. (1,000,000 ppm = 100%)
+    /// * `half_life_seconds` - Time (in seconds) until half of the total unvested balance is withdrawable
     /// * `token_id` - Token ID to be deposited into the stream.
     ///
     /// # Returns
@@ -59,8 +59,9 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    /// * `amount` - Amount to deposit.
     #[action]
-    fn deposit(nft_id: u32) {
+    fn deposit(nft_id: u32, amount: Quantity) {
         unimplemented!()
     }
 
@@ -87,13 +88,10 @@ pub mod Service {
     }
 
     #[event(history)]
-    pub fn created(decay_rate_per_million: u32, token_id: u32, creator: AccountNumber) {}
+    pub fn created(nft_id: u32, half_life_seconds: u32, token_id: u32, creator: AccountNumber) {}
 
     #[event(history)]
-    pub fn deposited(nft_id: u32, amount: Quantity, depositor: AccountNumber) {}
-
-    #[event(history)]
-    pub fn claimed(nft_id: u32, claimer: AccountNumber, amount: Quantity) {}
+    pub fn updated(nft_id: u32, actor: AccountNumber, tx_type: String, amount: String) {}
 }
 
 #[test]

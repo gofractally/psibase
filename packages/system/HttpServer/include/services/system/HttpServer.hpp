@@ -50,7 +50,7 @@ namespace SystemService
       static constexpr auto homepageService  = psibase::AccountNumber("homepage");
       using Tables                           = psibase::ServiceTables<RegServTable>;
 
-      using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
+      using Session = psibase::SessionTables<PendingRequestTable>;
 
       void sendProds(const psibase::Action& action);
 
@@ -89,5 +89,5 @@ namespace SystemService
                 method(recv, socket, data),
                 method(serve, socket, req))
 
-   PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Subjective)
+   PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Session)
 }  // namespace SystemService

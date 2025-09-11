@@ -1036,6 +1036,10 @@ namespace psibase
 
    /// Defines tables in the `temporary` database
    template <typename... Tables>
+   using SessionTables = DbTables<DbId::session, Tables...>;
+
+   /// Defines tables in the `temporary` database
+   template <typename... Tables>
    using TemporaryTables = DbTables<DbId::temporary, Tables...>;
 
    // An empty key that can be used for any singleton table

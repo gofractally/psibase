@@ -3,6 +3,7 @@ mod bindings;
 
 use std::str::FromStr;
 
+use bindings::exports::tokens::plugin::helpers::Guest as Helpers;
 use bindings::exports::tokens::plugin::intf::Guest as Intf;
 use bindings::exports::tokens::plugin::queries::Guest as Queries;
 use bindings::exports::tokens::plugin::transfer::Guest as Transfer;
@@ -11,28 +12,18 @@ use bindings::exports::tokens::plugin::types as Wit;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
+use psibase::{fracpack::Pack, services::tokens::Decimal};
 
 mod errors;
 use errors::ErrorType;
 use psibase::services::tokens::quantity::Quantity;
 use psibase::AccountNumber;
-use tokens::helpers::{identify_token_type, TokenType};
 
 pub mod query {
     pub mod fetch_token;
 }
 
 struct TokensPlugin;
-
-fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, Error> {
-    match identify_token_type(token_id) {
-        TokenType::Number(number) => Ok(number),
-        TokenType::Symbol(_str) => {
-            Err(ErrorType::NotImplemented("Symbol to token number not ready".into()).into())
-        }
-    }
-}
 
 impl Intf for TokensPlugin {
     fn create(precision: u8, max_issued_supply: Wit::Quantity) -> Result<(), Error> {
@@ -49,16 +40,10 @@ impl Intf for TokensPlugin {
     }
 
     fn burn(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let amount = Quantity::from_str(&amount, token.precision).unwrap();
-
         let packed_args = tokens::action_structs::burn {
-            amount,
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
-            token_id: token.id,
+            token_id,
         }
         .packed();
         add_action_to_transaction(tokens::action_structs::burn::ACTION_NAME, &packed_args)
@@ -70,25 +55,17 @@ impl Intf for TokensPlugin {
         memo: String,
         from: Wit::AccountNumber,
     ) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let amount = Quantity::from_str(&amount, token.precision).unwrap();
-
         let packed_args = tokens::action_structs::recall {
-            amount,
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             from: from.as_str().into(),
             memo: memo.try_into().unwrap(),
-            token_id: token.id,
+            token_id,
         }
         .packed();
         add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
     }
 
     fn map_symbol(token_id: Wit::TokenId, symbol: Wit::AccountNumber) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
         let packed_args = tokens::action_structs::mapSymbol {
             token_id,
             symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
@@ -98,24 +75,16 @@ impl Intf for TokensPlugin {
     }
 
     fn mint(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let amount = Quantity::from_str(&amount, token.precision).unwrap();
-
         let packed_args = tokens::action_structs::mint {
-            amount,
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
-            token_id: token.id,
+            token_id,
         }
         .packed();
         add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
 
     fn set_balance_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
         let packed_args = tokens::action_structs::setBalConf {
             enabled,
             index,
@@ -129,8 +98,6 @@ impl Intf for TokensPlugin {
     }
 
     fn del_balance_config(token_id: Wit::TokenId) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
         let packed_args = tokens::action_structs::delBalConf { token_id }.packed();
 
         add_action_to_transaction(
@@ -140,8 +107,6 @@ impl Intf for TokensPlugin {
     }
 
     fn set_token_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
         let packed_args = tokens::action_structs::setTokenConf {
             enabled,
             index,
@@ -163,6 +128,22 @@ impl Intf for TokensPlugin {
     }
 }
 
+impl Helpers for TokensPlugin {
+    fn decimal_to_u64(token_id: Wit::TokenId, amount: Wit::Quantity) -> Result<u64, Error> {
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        Quantity::from_str(&amount, token.precision)
+            .map(|amount| amount.value)
+            .map_err(|error| Error::from(ErrorType::ConversionError(error.to_string())))
+    }
+
+    fn u64_to_decimal(token_id: Wit::TokenId, amount: u64) -> Result<Wit::Quantity, Error> {
+        let token = query::fetch_token::fetch_token(token_id)?;
+
+        Ok(Decimal::new(amount.into(), token.precision).to_string())
+    }
+}
+
 impl Transfer for TokensPlugin {
     fn credit(
         token_id: Wit::TokenId,
@@ -170,17 +151,11 @@ impl Transfer for TokensPlugin {
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let amount = Quantity::from_str(&amount, token.precision).unwrap();
-
         let packed_args = tokens::action_structs::credit {
-            amount,
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
             debitor: debitor.as_str().into(),
-            token_id: token.id,
+            token_id,
         }
         .packed();
 
@@ -193,17 +168,11 @@ impl Transfer for TokensPlugin {
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let amount = Quantity::from_str(&amount, token.precision).unwrap();
-
         let packed_args = tokens::action_structs::debit {
-            amount,
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             creditor: creditor.as_str().into(),
             memo: memo.try_into().unwrap(),
-            token_id: token.id,
+            token_id,
         }
         .packed();
 
@@ -215,13 +184,9 @@ impl Transfer for TokensPlugin {
         creditor: Wit::AccountNumber,
         memo: String,
     ) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-
-        let token = query::fetch_token::fetch_token(token_id)?;
-
         let packed_args = tokens::action_structs::reject {
             creditor: creditor.as_str().into(),
-            token_id: token.id,
+            token_id,
             memo: memo.try_into().unwrap(),
         }
         .packed();
@@ -235,16 +200,11 @@ impl Transfer for TokensPlugin {
         amount: Wit::Quantity,
         memo: String,
     ) -> Result<(), Error> {
-        let token_id = token_id_to_number(token_id)?;
-        let token = query::fetch_token::fetch_token(token_id)?;
-
-        let amount = Quantity::from_str(&amount, token.precision).unwrap();
-
         let packed_args = tokens::action_structs::uncredit {
-            amount,
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
             debitor: debitor.as_str().into(),
-            token_id: token.id,
+            token_id,
         }
         .packed();
 
@@ -254,7 +214,6 @@ impl Transfer for TokensPlugin {
 
 impl Queries for TokensPlugin {
     fn token_owner(token_id: Wit::TokenId) -> Result<Wit::TokenDetail, Error> {
-        let token_id = token_id_to_number(token_id)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Ok(Wit::TokenDetail {

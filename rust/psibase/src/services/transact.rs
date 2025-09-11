@@ -213,7 +213,7 @@ pub mod auth_interface {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::CallbackType;
-    use crate::{Action, Checksum256, Hex, Seconds, Transaction};
+    use crate::{Action, Checksum256, Hex, Transaction};
     use fracpack::Nested;
 
     /// Only called once, immediately after the boot transaction.
@@ -254,7 +254,7 @@ mod service {
     /// A value of 0 will disable snapshots. This is a chain-wide
     /// setting because snapshots are signed by the block producers.
     #[action]
-    fn setSnapTime(seconds: Seconds) {
+    fn setSnapTime(seconds: u32) {
         unimplemented!()
     }
 

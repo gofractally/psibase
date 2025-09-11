@@ -293,8 +293,6 @@ struct test_chain
                                  std::make_shared<psibase::Sockets>(this->db)});
       state.shared_memory_cache.init(*sys);
       head = this->db.getHead();
-
-      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
    }
 
    test_chain(::state&                         state,
@@ -303,9 +301,14 @@ struct test_chain
               triedent::open_mode              mode)
        : test_chain{state, {path, config, mode}}
    {
+      if (mode != triedent::open_mode::read_only)
+         sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
    }
 
-   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()} {}
+   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()}
+   {
+      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
+   }
 
    bool setFork(const psibase::Checksum256& id)
    {
@@ -650,8 +653,11 @@ struct HttpSocket : psibase::AutoCloseSocket
       if (chain)
          logResponse();
    }
-   psibase::SocketInfo info() const override { return psibase::HttpSocketInfo{}; }
-   void                logResponse()
+   psibase::SocketInfo info() const override
+   {
+      return psibase::HttpSocketInfo{psibase::LocalEndpoint{}};
+   }
+   void logResponse()
    {
       auto view    = psio::view<const psibase::HttpReply>(psio::prevalidated{response});
       auto endTime = std::chrono::steady_clock::now();
@@ -1392,7 +1398,6 @@ struct callbacks
 
       psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
-      psibase::check(!bc.needGenesisAction, "Node is not connected to any psibase network.");
       psibase::SignedTransaction  trx;
       psibase::TransactionContext tc{bc, trx, trace, psibase::DbMode::rpc()};
 

@@ -1,5 +1,6 @@
 #include <services/user/Events.hpp>
 
+#include <psibase/dispatch.hpp>
 #include <services/user/EventIndex.hpp>
 #include "SchemaCache.hpp"
 
