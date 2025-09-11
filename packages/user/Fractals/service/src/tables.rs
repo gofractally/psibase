@@ -235,6 +235,7 @@ pub mod tables {
                 token_stream::Wrapper::call().get_stream(self.reward_stream_id),
                 "stream does not exist",
             );
+            let amount = token_stream::Wrapper::call().claim(stream.nft_id);
             stream.half_life_seconds;
             // how to figure out how much has got credited...?;
         }
