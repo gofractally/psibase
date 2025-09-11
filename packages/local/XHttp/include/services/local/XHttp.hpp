@@ -13,7 +13,7 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-http"};
 
-      using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
+      using Session = psibase::SessionTables<PendingRequestTable>;
 
       /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
       void send(std::int32_t socket, psio::view<const std::vector<char>> data);
@@ -32,5 +32,5 @@ namespace LocalService
                 method(autoClose, socket, value),
                 method(sendReply, socket, response))
 
-   PSIBASE_REFLECT_TABLES(XHttp, XHttp::Subjective)
+   PSIBASE_REFLECT_TABLES(XHttp, XHttp::Session)
 }  // namespace LocalService

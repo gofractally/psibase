@@ -300,7 +300,7 @@ namespace psibase
    {
       auto notifyType = NotifyType::nextTransaction;
       auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
-          *writer, psio::convert_to_key(notifyKey(notifyType)));
+          *writer, DbId::nativeSubjective, psio::convert_to_key(notifyKey(notifyType)));
       if (!notifyData)
          return {};
       if (!psio::fracpack_validate<NotifyRow>(*notifyData))
@@ -370,7 +370,7 @@ namespace psibase
       std::vector<Checksum256> tokens(trx.proofs.size());
       auto                     notifyType = NotifyType::preverifyTransaction;
       auto                     notifyData = systemContext.sharedDatabase.kvGetSubjective(
-          *writer, psio::convert_to_key(notifyKey(notifyType)));
+          *writer, DbId::nativeSubjective, psio::convert_to_key(notifyKey(notifyType)));
       if (!notifyData)
          return tokens;
       if (!psio::fracpack_validate<NotifyRow>(*notifyData))
@@ -708,8 +708,9 @@ namespace psibase
       {
          ConsensusChangeRow changeRow{status->consensus.next->blockNum, current.header.commitNum,
                                       current.header.blockNum};
-         systemContext.sharedDatabase.kvPutSubjective(
-             *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
+         systemContext.sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
+                                                      psio::convert_to_key(changeRow.key()),
+                                                      psio::to_frac(changeRow));
       }
 
       if (status->consensus.next)

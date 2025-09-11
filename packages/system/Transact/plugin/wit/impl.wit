@@ -3,11 +3,11 @@ package transact:plugin;
 interface admin {
     use host:types/types.{error};
 
-    /// Opens a new tx context. Adding actions using add-action-to-transaction will 
+    /// Opens a new tx context. Adding actions using add-action-to-transaction will
     /// refer to this open context.
     start-tx: func();
 
-    /// Closes the current transaction context, constructs and submits the final 
+    /// Closes the current transaction context, constructs and submits the final
     /// signed transaction.
     finish-tx: func() -> result<_, error>;
 }
@@ -35,6 +35,7 @@ world impl {
     export admin;
     export intf;
     export auth;
+    export network;
 
     import hook-handlers;
     export hooks;

@@ -194,6 +194,12 @@ pub struct ServiceInfo {
     pub schema: Option<Schema>,
 }
 
+impl ServiceInfo {
+    pub fn parse_flags(&self) -> u64 {
+        translate_flags(&self.flags).unwrap()
+    }
+}
+
 pub struct PackagedService<R: Read + Seek> {
     archive: zip::read::ZipArchive<R>,
     meta: Meta,
@@ -256,6 +262,7 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
             "isVerify" => CodeRow::IS_VERIFY,
             "runModeRpc" => CodeRow::RUN_MODE_CALLBACK,
             "runModeCallback" => CodeRow::RUN_MODE_CALLBACK,
+            "isReplacement" => CodeRow::IS_REPLACEMENT,
             _ => Err(Error::InvalidFlags)?,
         };
     }
@@ -737,6 +744,31 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
         Ok(())
+    }
+}
+
+impl<R: Read + Seek> PackagedService<R> {
+    pub fn services(&mut self) -> impl Iterator<Item = (&AccountNumber, &ServiceInfo, Vec<u8>)> {
+        let archive = &mut self.archive;
+        self.services.iter().map(|(account, index, info)| {
+            let mut file = archive.by_index(*index).unwrap();
+            (account, info, read(&mut file).unwrap())
+        })
+    }
+    pub fn data(&mut self) -> impl Iterator<Item = (&AccountNumber, String, Vec<u8>)> {
+        let archive = &mut self.archive;
+        let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
+        self.data.iter().map(move |(account, index)| {
+            let mut file = archive.by_index(*index).unwrap();
+            let file_name = file.name().to_string();
+            let path = data_re
+                .captures(&file_name)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str();
+            (account, path.to_string(), read(&mut file).unwrap())
+        })
     }
 }
 

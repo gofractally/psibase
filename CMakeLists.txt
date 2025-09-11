@@ -299,15 +299,7 @@ function(psinode_files target pfx)
     ALL
     DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
-    COMMAND mkdir -p ${pfx}/share/psibase/services
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist ${pfx}/share/psibase/services/x-admin
-    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm ${pfx}/share/psibase/services/x-admin.wasm
-    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm ${pfx}/share/psibase/services/x-http.wasm
-    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm ${pfx}/share/psibase/services/x-run.wasm
-    COMMAND cp -a ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm ${pfx}/share/psibase/services/x-transact.wasm
-    COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin/common
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts ${pfx}/share/psibase/services/x-admin/common/fonts
-    COMMAND cp -a ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js ${pfx}/share/psibase/services/x-admin/common/
+    COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
     COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/x-admin/packages
     )
@@ -316,13 +308,6 @@ endfunction()
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
-install(DIRECTORY packages/local/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-admin.wasm)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-http.wasm)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-run.wasm)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services RENAME x-transact.wasm)
-install(DIRECTORY packages/user/CommonApi/common/resources/fonts DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
-install(FILES packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin/common COMPONENT ServerData)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 
 # Build service packages
@@ -894,6 +879,59 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XAdmin.psi
+    NAME XAdmin
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Dashboard for node administrators"
+    SERVICE x-admin
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XAdmin-schema.json
+        FLAGS isPrivileged
+        SERVER x-admin
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
+        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
+    DEPENDS wasm XAdmin_js
+    PACKAGE_DEPENDS XHttp
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XHttp.psi
+    NAME XHttp
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Entry point for HTTP requests"
+    SERVICE x-http
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XHttp-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XRun.psi
+    NAME XRun
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Wrapper around the host API to dispatch asynchronous tasks"
+    SERVICE x-run
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XRun-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XTransact.psi
+    NAME XTransact
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Wrapper around the host API to apply transactions"
+    SERVICE x-transact
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XTransact-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
@@ -931,6 +969,14 @@ psibase_package(
     PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XDefault.psi
+    NAME XDefault
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Default set of local packages to install on a new server"
+    PACKAGE_DEPENDS XHttp XAdmin XRun XTransact
+)
+
 function(write_package_index target dir)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
     foreach(service IN LISTS ARGN)
@@ -947,7 +993,8 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage Workshop Config)
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage Workshop Config
+    XAdmin XDefault XHttp XRun XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -997,6 +1044,11 @@ install(
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
+          ${SERVICE_DIR}/XAdmin.psi
+          ${SERVICE_DIR}/XDefault.psi
+          ${SERVICE_DIR}/XHttp.psi
+          ${SERVICE_DIR}/XRun.psi
+          ${SERVICE_DIR}/XTransact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

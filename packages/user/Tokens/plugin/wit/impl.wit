@@ -6,6 +6,7 @@ world impl {
 
     export types;
     export intf;
+    export helpers;
     export transfer;
     export queries;
 }

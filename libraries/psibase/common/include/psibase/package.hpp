@@ -39,6 +39,8 @@ namespace psibase
       std::vector<std::string>     flags;
       std::optional<AccountNumber> server;
       std::optional<ServiceSchema> schema;
+
+      std::uint64_t parseFlags() const;
    };
    PSIO_REFLECT(ServiceInfo, flags, server, schema)
 
@@ -46,6 +48,9 @@ namespace psibase
    {
       explicit PackagedService(std::vector<char> buf);
       std::span<const AccountNumber> accounts() const;
+
+      // returns {target path, mime-type}
+      static std::pair<std::string_view, std::string_view> dataFileInfo(std::string_view path);
 
       void genesis(std::vector<GenesisService>& out);
       bool hasService(AccountNumber service) const;

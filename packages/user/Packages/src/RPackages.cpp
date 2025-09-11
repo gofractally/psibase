@@ -1,6 +1,8 @@
 #include <services/user/Packages.hpp>
 #include <services/user/RPackages.hpp>
 
+#include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthDelegate.hpp>
 

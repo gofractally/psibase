@@ -400,55 +400,15 @@ std::filesystem::path database_template_path()
    return installPrefix() / "share" / "psibase" / "services";
 }
 
-void load_subjective_services(Database& db)
+std::filesystem::path package_path()
 {
-   for (const auto& entry : std::filesystem::directory_iterator{database_template_path()})
-   {
-      auto filename = entry.path().filename();
-      if (filename.extension().string() == ".wasm")
-      {
-         auto account = AccountNumber{filename.stem().string()};
-         if (account != AccountNumber{})
-         {
-            PSIBASE_LOG(psibase::loggers::generic::get(), info)
-                << "Loading subjective service " << account.str();
-            std::ifstream             in(entry.path(), std::ios_base::binary);
-            std::vector<std::uint8_t> code(std::filesystem::file_size(entry.path()));
-            in.read(reinterpret_cast<char*>(code.data()), code.size());
-            if (!in)
-               throw std::runtime_error{"Failed to read " + entry.path().string()};
-
-            auto    codeHash = sha256(code.data(), code.size());
-            CodeRow codeRow{
-                .codeNum  = account,
-                .flags    = CodeRow::isPrivileged,
-                .codeHash = codeHash,
-            };
-            db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
-            CodeByHashRow codeByHashRow{
-                .codeHash = codeHash,
-                .code     = std::move(code),
-            };
-            db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
-         }
-      }
-   }
+   return installPrefix() / "share" / "psibase" / "packages";
 }
 
-void clear_environment(Database& db)
-{
-   auto       key       = psio::convert_to_key(envPrefix());
-   const auto prefixLen = key.size();
-   while (auto kv = db.kvGreaterEqualRaw(EnvRow::db, key, prefixLen))
-   {
-      key.assign(kv->key.pos, kv->key.end);
-      db.kvRemoveRaw(EnvRow::db, key);
-   }
-}
+void initialize_database(SystemContext& context, const std::string& template_);
 
 void load_environment(Database& db)
 {
-   clear_environment(db);
    for (const char* const* iter = ::environ; *iter; ++iter)
    {
       std::string_view entry{*iter};
@@ -1295,6 +1255,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
 }
 
 void run(const std::string&              db_path,
+         const std::string&              db_template,
          const DbConfig&                 db_conf,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
@@ -1351,39 +1312,18 @@ void run(const std::string&              db_path,
    }
 
    // If this is a new database, initialize subjective services
+   initialize_database(*system, db_template);
    {
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;
       auto               session = db.startWrite(system->sharedDatabase.createWriter());
       db.checkoutSubjective();
-      auto key = psio::convert_to_key(codePrefix());
-      if (!db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
-      {
-         load_subjective_services(db);
-      }
       load_environment(db);
       if (!db.commitSubjective(*system->sockets, autoClose))
       {
          throw std::runtime_error("Failed to initialize database");
       }
    }
-   psio::finally resetEnvironment{
-       [&]
-       {
-          // It's not important if this fails. We'll fix it the next time psinode starts
-          try
-          {
-             Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
-             SocketAutoCloseSet autoClose;
-             auto               session = db.startWrite(system->sharedDatabase.createWriter());
-             db.checkoutSubjective();
-             clear_environment(db);
-             db.commitSubjective(*system->sockets, autoClose);
-          }
-          catch (...)
-          {
-          }
-       }};
 
    // Manages the session and and unlinks all keys from prover on destruction
    struct PKCS11SessionManager
@@ -2210,6 +2150,7 @@ int main(int argc, char* argv[])
    }
 
    std::string                 db_path;
+   std::string                 db_template;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
    std::vector<std::string>    pkcs11_modules;
@@ -2248,6 +2189,8 @@ int main(int argc, char* argv[])
        "Limits the number of peers to be connected automatically");
    opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
        "Serve static content from directory using the specified virtual host name");
+   opt("database-template", po::value(&db_template)->default_value("XDefault", ""),
+       "Template to install when initializing a new database");
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
        "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: "
@@ -2358,9 +2301,9 @@ int main(int argc, char* argv[])
          restart.shutdownRequested = false;
          restart.shouldRestart     = true;
          restart.soft              = true;
-         run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
-             autoconnect, enable_incoming_p2p, hosts, listen, services, http_timeout,
-             service_threads, root_ca, tls_cert, tls_key, leeway_us, restart);
+         run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
+             pkcs11_modules, peers, autoconnect, enable_incoming_p2p, hosts, listen, services,
+             http_timeout, service_threads, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

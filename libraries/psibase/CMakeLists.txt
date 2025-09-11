@@ -1,11 +1,13 @@
 if(BUILD_STATIC)
     set(OPENSSL_USE_STATIC_LIBS TRUE)
+    set(ZLIB_USE_STATIC_LIBS)
 endif()
 find_package(OpenSSL REQUIRED Crypto)
+find_package(ZLIB REQUIRED)
 
 function(add suffix)
     add_library(psibase${suffix})
-    target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto)
+    target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix})
     target_sources(psibase${suffix} PRIVATE
         common/src/block.cpp
         common/src/crypto.cpp
@@ -17,6 +19,10 @@ function(add suffix)
         common/src/trace.cpp
         common/src/jwt.cpp
         common/src/serviceEntry.cpp
+        common/src/package.cpp
+        common/src/semver.cpp
+        common/src/zip.cpp
+        common/src/fileUtil.cpp
     )
 
     if(DEFINED IS_WASM)
@@ -122,9 +128,6 @@ function(add suffix)
         target_sources(psitestlib${suffix} PRIVATE
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
-            tester/src/package.cpp
-            tester/src/semver.cpp
-            tester/src/zip.cpp
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
             service/src/ossl.c
@@ -140,7 +143,6 @@ function(add suffix)
             PrivateKeyInfo${suffix}
             Catch2::Catch2
             boost
-            -lz
             -lc++
             -lc++abi
             -L${CMAKE_CURRENT_BINARY_DIR}
