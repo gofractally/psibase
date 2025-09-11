@@ -3,6 +3,7 @@ pub mod tables {
     use std::u64;
 
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::nft::NID;
     use psibase::services::token_stream::{self, Stream};
     use psibase::services::tokens::{self, Quantity, TID};
     use psibase::services::transact::Wrapper as TransactSvc;
@@ -13,6 +14,8 @@ pub mod tables {
 
     use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 
+    use psibase::services::token_stream::Wrapper as TokenStream;
+    use psibase::services::tokens::Wrapper as Tokens;
     use serde::{Deserialize, Serialize};
 
     use crate::helpers::parse_rank_to_accounts;
@@ -28,6 +31,7 @@ pub mod tables {
         pub mission: String,
         pub half_life_seconds: u32,
         pub token_id: TID,
+        pub token_stream_id: NID,
     }
 
     impl Fractal {
@@ -38,8 +42,24 @@ pub mod tables {
 
         fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
-            let token_id = psibase::services::tokens::Wrapper::call()
-                .create(4.try_into().unwrap(), 210000000000000.into());
+            let supply = Quantity::from(210000000000000);
+            let token_id = Tokens::call().create(4.try_into().unwrap(), supply);
+            let half_life_seconds = 999 as u32;
+
+            Tokens::call().mint(
+                token_id,
+                supply,
+                "Token setup".to_string().try_into().unwrap(),
+            );
+            Tokens::call().credit(
+                token_id,
+                "token-stream".into(),
+                supply,
+                "Token setup".to_string().try_into().unwrap(),
+            );
+
+            let token_stream_id = TokenStream::call().create(half_life_seconds, token_id);
+            TokenStream::call().deposit(token_stream_id, supply);
 
             Self {
                 account,
@@ -47,7 +67,8 @@ pub mod tables {
                 mission,
                 name,
                 token_id,
-                half_life_seconds: 1,
+                half_life_seconds,
+                token_stream_id,
             }
         }
 
@@ -229,15 +250,33 @@ pub mod tables {
             token_stream::Wrapper::call().deposit(stream.nft_id, amount);
         }
 
+        fn fine(&self) -> Option<Fine> {
+            Fine::get(self.fractal, self.account)
+        }
+
         pub fn claim(&mut self) {
-            // try to get amount;
             let stream = check_some(
                 token_stream::Wrapper::call().get_stream(self.reward_stream_id),
                 "stream does not exist",
             );
-            let amount = token_stream::Wrapper::call().claim(stream.nft_id);
-            stream.half_life_seconds;
-            // how to figure out how much has got credited...?;
+            let mut amount = token_stream::Wrapper::call().claim(stream.nft_id);
+            tokens::Wrapper::call().debit(
+                stream.token_id,
+                token_stream::SERVICE,
+                amount,
+                "Reward claim".to_string().try_into().unwrap(),
+            );
+
+            if let Some(fine) = self.fine() {
+                let amount_to_pay = Quantity::new(amount.value * fine.rate_ppm as u64 / 1000000);
+                amount = amount - amount_to_pay;
+            }
+            tokens::Wrapper::call().credit(
+                stream.token_id,
+                self.account,
+                amount,
+                "Reward claim".to_string().try_into().unwrap(),
+            )
         }
 
         fn save(&self) {
@@ -568,7 +607,7 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Fine {
         pub fractal: AccountNumber,
-        pub account: AccountNumber,
+        pub member: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub fine_remaining: Quantity,
         pub rate_ppm: u32,
@@ -577,19 +616,24 @@ pub mod tables {
     impl Fine {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.account)
+            (self.fractal, self.member)
+        }
+
+        pub fn get(fractal: AccountNumber, member: AccountNumber) -> Option<Self> {
+            let table = FineTable::new();
+            table.get_index_pk().get(&(fractal, member))
         }
 
         fn new(
             fractal: AccountNumber,
-            account: AccountNumber,
+            member: AccountNumber,
             amount: Quantity,
             rate_ppm: u32,
         ) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
 
             Self {
-                account,
+                member,
                 created_at: now,
                 fine_remaining: amount,
                 fractal,
