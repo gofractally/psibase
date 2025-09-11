@@ -68,12 +68,10 @@ pub mod tables {
             psibase::services::tokens::Wrapper::call()
                 .getToken(self.token_id)
                 .precision
-                .try_into()
-                .unwrap()
         }
 
         pub fn add(decay_rate_per_million: u32, token_id: u32) -> Self {
-            let mut instance = Self::new(decay_rate_per_million, token_id);
+            let instance = Self::new(decay_rate_per_million, token_id);
             instance.save();
             instance
         }
