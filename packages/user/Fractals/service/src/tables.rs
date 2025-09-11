@@ -38,8 +38,8 @@ pub mod tables {
 
         fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
-            let token_id =
-                tokens::service::Wrapper::call().create(4.into(), 210000000000000.into());
+            let token_id = psibase::services::tokens::Wrapper::call()
+                .create(4.try_into().unwrap(), 210000000000000.into());
 
             Self {
                 account,
@@ -226,7 +226,7 @@ pub mod tables {
                 amount,
                 "Award stream".to_string().try_into().unwrap(),
             );
-            token_stream::Wrapper::call().deposit(stream.nft_id);
+            token_stream::Wrapper::call().deposit(stream.nft_id, amount);
         }
 
         pub fn claim(&mut self) {
