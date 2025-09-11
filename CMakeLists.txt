@@ -136,7 +136,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode Symbol
-        Transact VerifySig XAdmin
+        Transact VerifySig XAdmin XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService XSocketListService)
     set(WASM_BYPRODUCTS)
@@ -886,7 +886,7 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
     DEPENDS wasm XAdmin_js
-    PACKAGE_DEPENDS XHttp
+    PACKAGE_DEPENDS XHttp XSites
 )
 
 psibase_package(
@@ -910,6 +910,17 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XRun-schema.json
         FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XSites.psi
+    NAME XSites
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages static content for local services"
+    SERVICE x-sites
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XSites.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSites-schema.json
     DEPENDS wasm
 )
 
@@ -968,7 +979,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XRun XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XRun XSites XTransact
 )
 
 function(write_package_index target dir)
@@ -988,7 +999,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop Config
-    XAdmin XDefault XHttp XRun XTransact)
+    XAdmin XDefault XHttp XRun XSites XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1041,6 +1052,7 @@ install(
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XRun.psi
+          ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTransact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
