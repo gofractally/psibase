@@ -8,8 +8,8 @@ pub mod tables {
     use psibase::services::tokens::{self, Quantity, TID};
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        abort_message, check_some, get_service, AccountNumber, Fracpack, Table, TimePointSec,
-        ToSchema,
+        abort_message, check, check_some, get_service, AccountNumber, Fracpack, Table,
+        TimePointSec, ToSchema,
     };
 
     use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
@@ -119,6 +119,12 @@ pub mod tables {
                 finish_by,
                 interval_seconds,
             )
+        }
+
+        pub fn set_half_life(&mut self, seconds: u32) {
+            check(seconds > 0, "seconds must be above 0");
+            self.half_life_seconds = seconds;
+            self.save();
         }
     }
 
@@ -260,6 +266,7 @@ pub mod tables {
                 "stream does not exist",
             );
             let mut amount = token_stream::Wrapper::call().claim(stream.nft_id);
+            check(amount.value > 0, "nothing to claim");
             tokens::Wrapper::call().debit(
                 stream.token_id,
                 token_stream::SERVICE,

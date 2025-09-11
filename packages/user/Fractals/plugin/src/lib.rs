@@ -77,6 +77,19 @@ impl Admin for FractallyPlugin {
         )
     }
 
+    fn set_half_life(fractal: String, seconds: u32) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let _latch = ProposeLatch::new(&fractal);
+
+        let packed_args = fractals::action_structs::set_half_life { seconds }.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_half_life::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn set_schedule(
         evaluation_type: u8,
         fractal: String,
@@ -118,6 +131,16 @@ impl User for FractallyPlugin {
         check_app_origin()?;
 
         unregister(&"fractals".to_string(), evaluation_id)
+    }
+
+    fn claim(fractal: String) -> Result<(), Error> {
+        check_app_origin()?;
+
+        let packed_args = fractals::action_structs::claim {
+            fractal: AccountNumber::from(fractal.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(fractals::action_structs::claim::ACTION_NAME, &packed_args)
     }
 
     fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<String>>, Error> {

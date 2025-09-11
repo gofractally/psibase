@@ -116,6 +116,24 @@ pub mod service {
         evaluation.schedule_next_evaluation();
     }
 
+    /// Claims the fractal members locked balance depending on it's progression
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal
+    #[action]
+    fn claim(fractal: AccountNumber) {
+        Member::get_assert(fractal, get_sender()).claim();
+    }
+
+    /// Sets the half life for fractal awards.
+    ///
+    /// # Arguments
+    /// * `seconds` - Half life in seconds.
+    #[action]
+    fn set_half_life(seconds: u32) {
+        Fractal::get_assert(get_sender()).set_half_life(seconds);
+    }
+
     /// Called when a user registers for an evaluation in a fractal.
     ///
     /// # Arguments
