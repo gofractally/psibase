@@ -4,12 +4,11 @@ interface types {
 
     type quantity = string;
     type precision = u8;
-    type token-id = string;
-    type token-number = u32;
+    type token-id = u32;
     type account-number = string;
 
     record token-detail {
-        id: token-number,
+        id: token-id,
         owner: string,
         precision: u8,
         symbol-id: string,
@@ -21,14 +20,14 @@ interface types {
         balance: string,
         creditor: string,
         debitor: string,
-        token-number: token-number,
+        token-number: token-id,
     }
 }
 
 interface intf {
     use host:types/types.{error};
     use types.{precision, quantity, token-id, account-number};
-    
+
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
     burn: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
     recall: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
@@ -41,7 +40,17 @@ interface intf {
 
     set-token-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
     set-user-config: func(index: u8, enabled: bool) -> result<_, error>;
-    
+
+}
+
+interface helpers {
+    use host:types/types.{error};
+    use types.{quantity, token-id};
+
+
+    decimal-to-u64: func(token-id: token-id, amount: quantity) -> result<u64, error>;
+    u64-to-decimal: func(token-id: token-id, amount: u64) -> result<quantity, error>;
+
 }
 
 interface queries {
@@ -66,4 +75,5 @@ world imports {
     import intf;
     import queries;
     import transfer;
+    import helpers;
 }
