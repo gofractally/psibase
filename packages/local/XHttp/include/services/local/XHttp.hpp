@@ -15,6 +15,26 @@ namespace LocalService
 
       using Session = psibase::SessionTables<PendingRequestTable>;
 
+      static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)
+      {
+         if (host.size() > rootHost.size() + 1 && host.ends_with(rootHost) &&
+             host[host.size() - rootHost.size() - 1] == '.')
+         {
+            std::string_view serviceName(host);
+            serviceName.remove_suffix(rootHost.size() + 1);
+            return psibase::AccountNumber{serviceName};
+         }
+         return {};
+      }
+      static psibase::AccountNumber getService(const psibase::HttpRequest& req)
+      {
+         return getService(req.host, req.rootHost);
+      }
+      static psibase::AccountNumber getService(psio::view<const psibase::HttpRequest> req)
+      {
+         return getService(req.host(), req.rootHost());
+      }
+
       /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
       void send(std::int32_t socket, psio::view<const std::vector<char>> data);
 
