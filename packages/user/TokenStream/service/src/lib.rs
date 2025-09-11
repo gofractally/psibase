@@ -101,7 +101,7 @@ pub mod tables {
         }
 
         /// Total available to be claimed now (vested - already claimed)
-        pub fn balance_claimable(&self) -> Quantity {
+        fn balance_claimable(&self) -> Quantity {
             self.total_vested()
                 .value
                 .saturating_sub(self.total_claimed.value)
@@ -131,14 +131,14 @@ pub mod tables {
         }
 
         /// Total unclaimed (vested + vesting).
-        pub fn unclaimed_total(&self) -> Quantity {
+        fn unclaimed_total(&self) -> Quantity {
             self.total_deposited
                 .value
                 .saturating_sub(self.total_claimed.value)
                 .into()
         }
 
-        pub fn total_vested(&self) -> Quantity {
+        fn total_vested(&self) -> Quantity {
             if self.total_deposited.value == 0 {
                 return self.claimable_at_last_deposit;
             }
@@ -156,7 +156,7 @@ pub mod tables {
                 .into()
         }
 
-        pub fn save(&mut self) {
+        fn save(&self) {
             StreamTable::new().put(&self).unwrap();
         }
 
