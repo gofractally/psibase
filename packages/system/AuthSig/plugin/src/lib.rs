@@ -34,13 +34,12 @@ psibase::define_trust! {
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Set the public key for your account
             - Sign transactions on your behalf
-            - Read the private key for a given public key
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign, sign_explicit],
-        Low => [generate_keypair, import_key],
-        High => [priv_from_pub, set_key],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der],
+        Low => [import_key, sign_explicit],
+        High => [set_key, sign],
     }
 }
 
@@ -92,19 +91,19 @@ impl KeyVault for AuthSig {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized(FunctionName::sign_explicit)?;
+        assert_authorized_with_whitelist(FunctionName::sign_explicit, vec!["auth-invite".into()])?;
         HostCrypto::sign_explicit(&hashed_message, &private_key)
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized(FunctionName::sign)?;
+        assert_authorized_with_whitelist(FunctionName::sign, vec!["transact".into()])?;
         HostCrypto::sign(&hashed_message, &public_key)
     }
 
     fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
-        authorize_with_whitelist(
+        assert_authorized_with_whitelist(
             FunctionName::import_key,
-            vec!["x-admin".into(), "invite".into()],
+            vec!["accounts".into(), "x-admin".into(), "invite".into()],
         )?;
         HostCrypto::import_key(&private_key)
     }
