@@ -247,8 +247,10 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    /// 
+    /// Returns quantity of amount claimed
     #[action]
-    fn claim(nft_id: u32) {
+    fn claim(nft_id: u32) -> Quantity {
         let mut stream = Stream::get_assert(nft_id);
         let claimed_amount = stream.claim();
 
@@ -272,6 +274,7 @@ pub mod service {
             )
             .to_string(),
         );
+        claimed_amount
     }
 
     /// Delete a stream.
