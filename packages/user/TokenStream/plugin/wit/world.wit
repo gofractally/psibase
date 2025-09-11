@@ -18,7 +18,7 @@ interface api {
     /// * `token-id`: Token ID to be deposited into the stream.
     /// * `amount`: Decimal amount of token to be deposited.
     /// * `memo`: Memo.
-    deposit: func(nft-id: u32, token-id: string, amount: string, memo: string) -> result<_, error>;
+    deposit: func(nft-id: u32, token-id: u32, amount: string, memo: string) -> result<_, error>;
 
     /// Claim vested tokens from a stream
     ///

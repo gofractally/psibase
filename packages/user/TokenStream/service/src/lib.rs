@@ -119,7 +119,6 @@ pub mod tables {
             self.save();
         }
 
-
         /// Claim everything currently claimable; returns the claimed amount.
         pub fn claim(&mut self) -> Quantity {
             let claimable = self
@@ -173,11 +172,11 @@ pub mod tables {
 
 #[psibase::service(name = "token-stream", tables = "tables")]
 pub mod service {
-    use psibase::services::tokens::{Decimal, Memo};
+    use psibase::services::tokens::{Decimal, Memo, Quantity};
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::{get_sender, get_service, AccountNumber};
+    use psibase::{get_sender, AccountNumber};
 
     use crate::tables::Stream;
 
@@ -221,19 +220,18 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    /// * `amount` - Amount to deposit.
     #[action]
-    fn deposit(nft_id: u32) {
+    fn deposit(nft_id: u32, amount: Quantity) {
         let mut stream = Stream::get_assert(nft_id);
         let sender = get_sender();
 
-        let shared_balance = Tokens::call().getSharedBal(stream.token_id, sender, get_service());
-
-        stream.deposit(shared_balance);
+        stream.deposit(amount);
 
         Tokens::call().debit(
             stream.token_id,
             sender,
-            shared_balance,
+            amount,
             Memo::try_from(format!("Deposit into stream {}", nft_id)).unwrap(),
         );
 
@@ -241,11 +239,7 @@ pub mod service {
             nft_id,
             sender,
             "deposited".to_string(),
-            Decimal::new(
-                shared_balance,
-                Tokens::call().getToken(stream.token_id).precision,
-            )
-            .to_string(),
+            Decimal::new(amount, Tokens::call().getToken(stream.token_id).precision).to_string(),
         );
     }
 

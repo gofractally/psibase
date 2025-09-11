@@ -23,7 +23,10 @@ pub struct Stream {
 #[crate::service(name = "token-stream", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
-    use crate::{services::token_stream::Stream, AccountNumber};
+    use crate::{
+        services::{token_stream::Stream, tokens::Quantity},
+        AccountNumber,
+    };
 
     /// Lookup stream information
     ///
@@ -56,8 +59,9 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
+    /// * `amount` - Amount to deposit.
     #[action]
-    fn deposit(nft_id: u32) {
+    fn deposit(nft_id: u32, amount: Quantity) {
         unimplemented!()
     }
 

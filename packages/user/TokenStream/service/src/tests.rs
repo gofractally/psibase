@@ -100,7 +100,7 @@ mod tests {
         fn deposit(&self, sender: AccountNumber, stream_nft_id: u32, amount: u64) {
             self.credit(sender, TOKEN_STREAM, amount);
             TokenStream::push_from(&self.chain, sender)
-                .deposit(stream_nft_id)
+                .deposit(stream_nft_id, amount.into())
                 .get()
                 .unwrap();
         }
@@ -179,7 +179,9 @@ mod tests {
         let id = create_stream(&chain, ALICE, TestHelper::HALF_LIFE, token_id);
 
         // Test zero deposit fails
-        let result = TokenStream::push_from(&chain, ALICE).deposit(id).get();
+        let result = TokenStream::push_from(&chain, ALICE)
+            .deposit(id, 0.into())
+            .get();
         assert!(result.is_err(), "Depositing zero should fail");
         assert_eq!(
             get_stream(&chain, id).total_deposited,
@@ -199,7 +201,7 @@ mod tests {
         // Make deposit
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 500);
         TokenStream::push_from(&chain, ALICE)
-            .deposit(id)
+            .deposit(id, 500.into())
             .get()
             .unwrap();
 
