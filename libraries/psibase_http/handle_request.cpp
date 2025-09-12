@@ -257,23 +257,6 @@ namespace psibase::http
          res.prepare_payload();
          return res;
       }
-
-      auto redirect(bhttp::status      status,
-                    beast::string_view location,
-                    beast::string_view msg,
-                    bool               allow_cors   = false,
-                    const char*        content_type = "text/html") const
-      {
-         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::location, location);
-         res.set(bhttp::field::content_type, content_type);
-         setCors(res, allow_cors);
-         setKeepAlive(res);
-         res.body() = std::vector(msg.begin(), msg.end());
-         res.prepare_payload();
-         return res;
-      }
    };
 
    template <typename F, typename E>
