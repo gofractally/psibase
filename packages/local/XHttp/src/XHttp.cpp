@@ -18,9 +18,9 @@ namespace
       return std::ranges::equal(std::string_view{header.name()}, h, {}, ::tolower, ::tolower);
    }
 
-   std::string getRootUrl(psio::view<const HttpRequest> req,
-                          std::uint32_t                 socket,
-                          std::optional<AccountNumber>  subdomain = {})
+   std::string getUrl(psio::view<const HttpRequest> req,
+                      std::uint32_t                 socket,
+                      std::optional<AccountNumber>  subdomain = {})
    {
       std::string              location;
       std::optional<SocketRow> socketRow;
@@ -53,7 +53,10 @@ namespace
             break;
          }
       }
-      location += '/';
+      if (subdomain)
+         location += '/';
+      else
+         location += req.target();
       return location;
    }
 
@@ -215,9 +218,9 @@ extern "C" [[clang::export_name("serve")]] void serve()
    }
    else if (req.rootHost() != req.host())
    {
-      if (!req.rootHost().empty() && (req.method() == "GET" || req.method() == "HEAD"))
+      if (!req.rootHost().empty())
       {
-         std::string location = getRootUrl(req, sock);
+         std::string location = getUrl(req, sock);
          auto        reply    = redirect(HttpStatus::found,
                                          R"(<html><body>This psibase server is hosted at {}.</body></html>)",
                                          location);
@@ -244,7 +247,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    {
       if (req.method() == "GET" || req.method() == "HEAD")
       {
-         std::string location = getRootUrl(req, sock, XAdmin::service);
+         std::string location = getUrl(req, sock, XAdmin::service);
          auto        reply    = redirect(
              HttpStatus::found,
              R"(<html><body>Node is not connected to any psibase network.  Visit {} for node setup.</body></html>)",
@@ -253,7 +256,10 @@ extern "C" [[clang::export_name("serve")]] void serve()
       }
       else
       {
-         sendNotFound(sock, req);
+         auto reply =
+             error(HttpStatus::serviceUnavailable,
+                   "<html><body>Node is not connected to any psibase network.</body></html>");
+         psibase::socketSend(sock, psio::to_frac(std::move(reply)));
       }
       return;
    }

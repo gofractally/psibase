@@ -99,6 +99,7 @@ namespace psibase
       notAcceptable        = 406,
       unsupportedMediaType = 415,
       internalServerError  = 500,
+      serviceUnavailable   = 503,
    };
 
    void from_json(HttpStatus& status, auto& stream)
