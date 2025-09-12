@@ -65,7 +65,7 @@ interface api {
     ///   granting the requesting application should they approve the request.
     /// - `whitelist`: A list of accounts who are pre-authorized to perform this action.
     ///   These accounts are not generally authorized at the specified `trust` level but will pass this check.
-    authorize: func(caller: string, level: trust-level, descriptions: descriptions, debug-label: string, whitelist: list<string>) -> result<bool, error>;
+    is-authorized: func(caller: string, level: trust-level, descriptions: descriptions, debug-label: string, whitelist: list<string>) -> result<bool, error>;
 }
 
 world imports {

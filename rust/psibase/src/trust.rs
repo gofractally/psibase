@@ -1,7 +1,7 @@
 // This macro helps reduce boilerplate in rust plugins related to defining trust settings.
 
 /// Using this macro in your plugin will automatically generate a `trust` module with
-/// an `authorize` function that calls the permissions plugin to facilitate user
+/// an `is_authorized` function that calls the permissions plugin to facilitate user
 /// prompts to grant permission to other plugins (callers) to call your plugin functions (callees).
 ///
 /// The `trust` module also exports a variable for each named function.
@@ -25,29 +25,28 @@
 ///         High trust grants the abilities of all lower trust levels, plus these abilities:
 ///             - Set the public key for your account
 ///             - Sign transactions on your behalf
-///             - Read the private key for a given public key
 ///         ",
 ///     }
 ///     functions {
 ///         None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign],
 ///         Low => [generate_keypair, import_key],
-///         High => [priv_from_pub, set_key],
+///         High => [set_key],
 ///     }
 /// }
 ///
 /// // ...
 ///
 /// fn generate_keypair() -> Result<String, CommonTypes::Error> {
-///     // Use `authorize_with_whitelist` to check that the caller has been given a sufficient trust level by the
+///     // Use `is_authorized_with_whitelist` to check that the caller has been given a sufficient trust level by the
 ///     // user to call this function on their behalf, or that the caller is in the specified whitelist.
-///     authorize_with_whitelist(trust::FunctionName::generate_keypair, vec!["invite".into()])?;
+///     is_authorized_with_whitelist(trust::FunctionName::generate_keypair, vec!["invite".into()])?;
 ///     // ...
 /// }
 ///
 /// fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
-///     // Use `authorize` to check that the caller has been given a sufficient trust level by the user to call this
+///     // Use `is_authorized` to check that the caller has been given a sufficient trust level by the user to call this
 ///     // function on their behalf.
-///     authorize(trust::FunctionName::sign)?;
+///     is_authorized(trust::FunctionName::sign)?;
 ///     // ...
 /// }
 ///
@@ -113,20 +112,20 @@ macro_rules! define_trust {
             }
 
 
-            pub fn authorize(fn_name: FunctionName) -> Result<bool, Error> {
-                authorize_with_whitelist(fn_name, vec![])
+            pub fn is_authorized(fn_name: FunctionName) -> Result<bool, Error> {
+                is_authorized_with_whitelist(fn_name, vec![])
             }
 
             pub fn assert_authorized(fn_name: FunctionName) -> Result<(), Error> {
-                if !authorize(fn_name)? {
+                if !is_authorized(fn_name)? {
                     panic!("Unauthorized call to: {}", fn_name.as_str());
                 }
 
                 Ok(())
             }
 
-            pub fn authorize_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<bool, Error> {
-                Permissions::authorize(
+            pub fn is_authorized_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<bool, Error> {
+                Permissions::is_authorized(
                     &get_sender(),
                     TrustRequirement::get_level(fn_name),
                     &TrustRequirement::get_descriptions(),
@@ -136,7 +135,7 @@ macro_rules! define_trust {
             }
 
             pub fn assert_authorized_with_whitelist(fn_name: FunctionName, whitelist: Vec<String>) -> Result<(), Error> {
-                if !authorize_with_whitelist(fn_name, whitelist)? {
+                if !is_authorized_with_whitelist(fn_name, whitelist)? {
                     let err_msg = format!("Unauthorized call to: {}", fn_name.as_str());
                     panic!("{}", err_msg);
                 }
