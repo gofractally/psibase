@@ -8,7 +8,7 @@ import { TokenId } from "@/lib/zod/TokenId";
 
 import { Token } from "./tokensPlugin/useBalances";
 
-const formSchema = (tokens: Token[]) =>
+export const formSchema = (tokens: Token[]) =>
     z
         .object({
             token: TokenId,

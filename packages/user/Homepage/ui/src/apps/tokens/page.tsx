@@ -1,30 +1,23 @@
 import { CreditTable } from "@/apps/tokens/components/credit-table";
-import { FormCreate } from "@/apps/tokens/components/forms/form-create";
-import FormTransfer from "@/apps/tokens/components/forms/form-transfer";
-import { ModalCreateToken } from "@/apps/tokens/components/modal-create-token";
 import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
-import {
-    updateBalanceCache,
-    useBalances,
-} from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { useCredit } from "@/apps/tokens/hooks/tokensPlugin/useCredit";
-import { useTokenForm } from "@/apps/tokens/hooks/useTokenForm";
+import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { useEffect, useMemo, useState } from "react";
-import { FormProvider } from "react-hook-form";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { Account } from "@/lib/zod/Account";
 
-import { toast } from "@shared/shadcn/ui/sonner";
+import { useAppForm } from "@shared/components/form/app-form";
+
+export const defaultTransferValues = {
+    amount: "",
+    token: "",
+    memo: "",
+    to: "",
+};
 
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
-    const {
-        data,
-        refetch: refetchUserBalances,
-        isLoading: isLoadingBalances,
-    } = useBalances(currentUserData);
+    const { data, isLoading: isLoadingBalances } = useBalances(currentUserData);
 
     const currentUser = isSuccess ? currentUserData : null;
 
@@ -32,115 +25,105 @@ export const TokensPage = () => {
     const tokens = useMemo(() => (data ? data.tokens : []), [data]);
     const isLoading = !isSuccess || isLoadingBalances;
 
-    const { isPending, mutateAsync: credit } = useCredit();
+    const form = useAppForm({
+        defaultValues: defaultTransferValues,
+        onSubmit: () => setTransferModal(true),
+        // validators: {
+        //     onChange: () => formSchema(tokens),
+        // },
+    });
 
-    const form = useTokenForm(tokens);
-
-    const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
-    function onSubmit() {
-        setTransferModal(true);
-    }
-
-    const selectedTokenId = form.watch("token");
+    const selectedTokenId = form.state.values.token;
     const selectedToken = tokens.find(
         (balance) => balance.id == Number(selectedTokenId),
     );
 
     useEffect(() => {
         if (!selectedTokenId && tokens.length > 0) {
-            form.setValue("token", tokens[0].id.toString());
+            form.setFieldValue("token", tokens[0].id.toString());
             return;
         }
     }, [form, selectedTokenId, tokens]);
 
-    const onSuccessfulTx = () => {
-        form.setValue("amount", "");
-        form.setValue("memo", "");
-        form.setValue("to", "");
-    };
-
-    const performTransfer = async () => {
-        const tokenId = form.watch("token");
-        const amount = form.watch("amount");
-        const memo = form.watch("memo")!;
-        const recipient = form.watch("to")!;
-
-        try {
-            await credit({ tokenId, receiver: recipient, amount, memo });
-            toast("Sent", {
-                description: `Sent ${amount} ${
-                    selectedToken?.label || selectedToken?.symbol
-                } to ${recipient}`,
-            });
-            onSuccessfulTx();
-            setTransferModal(false);
-            updateBalanceCache(
-                Account.parse(currentUser),
-                tokenId,
-                amount,
-                "Subtract",
-            );
-        } catch (e) {
-            toast("Error", {
-                description:
-                    e instanceof Error
-                        ? e.message
-                        : `Unrecognised error, see logs.`,
-            });
-        } finally {
-            refetchUserBalances();
-        }
-    };
-
     const isNoTokens = currentUser && tokens.length == 0;
+    const disableForm = isNoTokens || isLoading;
 
     return (
-        <FormProvider {...form}>
-            <div className="mx-auto h-screen w-screen max-w-screen-lg">
-                <div className="mx-auto flex max-w-screen-lg flex-col gap-3 p-4">
-                    {isNoTokens && (
-                        <NoTokensWarning
-                            onContinue={() => {
-                                setNewTokenModalOpen(true);
-                            }}
-                        />
-                    )}
-                    <ModalCreateToken
-                        open={isNewTokenModalOpen}
-                        onOpenChange={(e) => setNewTokenModalOpen(e)}
+        <div className="mx-auto h-screen w-screen max-w-screen-lg">
+            <div className="mx-auto flex max-w-screen-lg flex-col gap-3 p-4">
+                {isNoTokens && <NoTokensWarning onContinue={() => {}} />}
+                <form.AppForm>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            form.handleSubmit();
+                        }}
+                        className="mx-auto w-full space-y-8"
                     >
-                        <FormCreate
-                            onClose={() => {
-                                refetchUserBalances();
-                                setNewTokenModalOpen(false);
-                            }}
+                        <TransferModal
+                            form={form}
+                            onClose={() => setTransferModal(false)}
+                            open={isTransferModalOpen}
+                            selectedToken={selectedToken}
                         />
-                    </ModalCreateToken>
-                    <TransferModal
-                        isPending={isPending}
-                        onClose={() => setTransferModal(false)}
-                        open={isTransferModalOpen}
-                        onContinue={performTransfer}
-                        selectedToken={selectedToken}
-                    />
-                    <FormTransfer
+                        <>
+                            <form.AppField
+                                name="token"
+                                children={(field) => (
+                                    <field.TokenSelect tokens={tokens} />
+                                )}
+                            />
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <form.AppField
+                                    name="to"
+                                    children={(field) => (
+                                        <field.TextField
+                                            disabled={disableForm}
+                                        />
+                                    )}
+                                />
+                                <form.AppField
+                                    name="amount"
+                                    children={(field) => (
+                                        <field.TokenAmountInput
+                                            selectedToken={selectedToken}
+                                            disabled={disableForm}
+                                        />
+                                    )}
+                                />
+                            </div>
+                            <form.AppField
+                                name="memo"
+                                children={(field) => (
+                                    <field.TextField
+                                        disabled={disableForm}
+                                        label="Memo (optional)"
+                                        placeholder="Add a note about this transfer"
+                                    />
+                                )}
+                            />
+                            <div className="flex justify-end">
+                                <form.SubmitButton
+                                    labels={[
+                                        "Transfer",
+                                        "Transferring...",
+                                        "Transferred",
+                                    ]}
+                                />
+                            </div>
+                        </>
+                    </form>
+                </form.AppForm>
+                <div className="my-4">
+                    <CreditTable
                         isLoading={isLoading}
-                        tokens={tokens}
-                        selectedToken={selectedToken}
-                        setNewTokenModalOpen={setNewTokenModalOpen}
-                        onSubmit={() => onSubmit()}
+                        user={currentUser}
+                        balances={sharedBalances}
                     />
-                    <div className="my-4">
-                        <CreditTable
-                            isLoading={isLoading}
-                            user={currentUser}
-                            balances={sharedBalances}
-                        />
-                    </div>
                 </div>
             </div>
-        </FormProvider>
+        </div>
     );
 };

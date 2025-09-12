@@ -1979,6 +1979,7 @@ __metadata:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@react-spring/web": "npm:^10.0.1"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/node": "npm:^22.15.0"
