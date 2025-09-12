@@ -33,11 +33,14 @@ impl Fractal {
         Self {
             account,
             created_at: now,
-            mission,
             name,
-            token_id,
+            mission,
             half_life_seconds,
+            token_id,
             token_stream_id,
+            citizenship_fee: 0.into(),
+            tourist_fee: 0.into(),
+            worker_fee: 0.into(),
         }
     }
 

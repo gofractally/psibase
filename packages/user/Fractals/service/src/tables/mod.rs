@@ -1,9 +1,9 @@
 mod config;
 mod evaluation_instance;
-mod fine;
 mod fractal;
 mod member;
 mod score;
+mod tribute;
 
 #[psibase::service_tables]
 pub mod tables {
@@ -28,6 +28,9 @@ pub mod tables {
         pub name: String,
         pub mission: String,
         pub half_life_seconds: u32,
+        pub tourist_fee: Quantity,
+        pub worker_fee: Quantity,
+        pub citizenship_fee: Quantity,
         pub token_id: TID,
         pub token_stream_id: NID,
     }
@@ -116,20 +119,26 @@ pub mod tables {
         }
     }
 
-    #[table(name = "FineTable", index = 4)]
+    #[table(name = "TributeTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct Fine {
+    pub struct Tribute {
+        pub id: u32,
         pub fractal: AccountNumber,
         pub member: AccountNumber,
         pub created_at: psibase::TimePointSec,
-        pub fine_remaining: Quantity,
+        pub remaining: Quantity,
         pub rate_ppm: u32,
     }
 
-    impl Fine {
+    impl Tribute {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.member)
+        fn pk(&self) -> u32 {
+            self.id
+        }
+
+        #[secondary_key(1)]
+        fn by_fractal_membership(&self) -> (AccountNumber, AccountNumber, u32) {
+            (self.fractal, self.member, self.id)
         }
     }
 
@@ -152,22 +161,16 @@ pub mod tables {
     #[table(name = "AttestationTable", index = 6)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Attestation {
-        pub fractal: AccountNumber,
-        pub member: AccountNumber,
-        pub application_id: u32,
-    }
-
-    impl Attestation {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.member)
-        }
+        pub attestation_id: u32,
+        pub application_id: u32,
+        pub member: AccountNumber,
     }
 
     #[table(name = "ConfigTable", index = 7)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Config {
-        pub last_used_id: u64,
+        pub last_used_id: u32,
     }
 
     impl Config {

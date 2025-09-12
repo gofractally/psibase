@@ -2,7 +2,9 @@ use async_graphql::ComplexObject;
 use psibase::{check, check_some, AccountNumber, Table};
 
 use crate::tables::evaluation_instance::EvalType;
-use crate::tables::tables::{Fine, Fractal, FractalTable, Member, MemberTable, Score};
+use crate::tables::tables::{
+    Fractal, FractalTable, Member, MemberTable, Score, Tribute, TributeTable,
+};
 
 use psibase::services::token_stream::{self, Stream};
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
@@ -89,8 +91,11 @@ impl Member {
         token_stream::Wrapper::call().deposit(stream.nft_id, amount);
     }
 
-    fn fine(&self) -> Option<Fine> {
-        Fine::get(self.fractal, self.account)
+    fn tributes(&self) -> Vec<Tribute> {
+        TributeTable::new()
+            .get_index_by_fractal_membership()
+            .range((self.fractal, self.account, 0)..=(self.fractal, self.account, u32::MAX))
+            .collect()
     }
 
     pub fn claim(&mut self) {

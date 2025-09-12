@@ -3,7 +3,7 @@ use psibase::Table;
 use crate::tables::tables::{Config, ConfigTable};
 
 impl Config {
-    pub fn gen_id() -> u64 {
+    pub fn gen_id() -> u32 {
         let table = ConfigTable::new();
         let mut instance = table.get_index_pk().get(&{}).unwrap_or_default();
         let next_id = instance.last_used_id + 1;

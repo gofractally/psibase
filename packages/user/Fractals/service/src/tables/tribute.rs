@@ -2,21 +2,29 @@ use psibase::services::tokens::Quantity;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::{AccountNumber, Table};
 
-use crate::tables::tables::{Fine, FineTable};
+use crate::tables::tables::{Config, Tribute, TributeTable};
 
-impl Fine {
+impl Tribute {
+    pub fn get_by_id(id: u32) -> Option<Self> {
+        let table = TributeTable::new();
+        table.get_index_pk().get(&id)
+    }
+
     pub fn get(fractal: AccountNumber, member: AccountNumber) -> Option<Self> {
-        let table = FineTable::new();
-        table.get_index_pk().get(&(fractal, member))
+        let table = TributeTable::new();
+        table
+            .get_index_by_fractal_membership()
+            .get(&(fractal, member))
     }
 
     fn new(fractal: AccountNumber, member: AccountNumber, amount: Quantity, rate_ppm: u32) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
+            id: Config::gen_id(),
             member,
             created_at: now,
-            fine_remaining: amount,
+            remaining: amount,
             fractal,
             rate_ppm,
         }
@@ -34,7 +42,7 @@ impl Fine {
     }
 
     fn save(&self) {
-        let table = FineTable::new();
+        let table = TributeTable::new();
         table.put(&self).unwrap();
     }
 }
