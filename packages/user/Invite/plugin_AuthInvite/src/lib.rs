@@ -78,7 +78,7 @@ impl HookActionAuth for AuthInvite {
         InviteKeys::delete(); // Free local storage
 
         Ok(vec![Proof {
-            signature: KeyVault::sign(&transaction_hash, &private_key)?,
+            signature: KeyVault::sign_explicit(&transaction_hash, &private_key)?,
         }])
     }
 }

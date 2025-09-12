@@ -19,7 +19,7 @@ interface types {
 
     /// A standard error type plugins can use to propagate errors
     /// back up the callchain.
-    /// 
+    ///
     /// The producer field should not be relied upon for correctness.
     /// It is filled in by the plugin, which means it is possible to lie.
     /// Also it may be changed by a downstream plugin.
@@ -47,12 +47,15 @@ interface types {
     record post-request {
 
         /// The endpoint being posted to (e.g. `/graphql`)
-        endpoint: string, 
+        endpoint: string,
 
         /// The body of the post request
         /// New `body` types can be added to enable posting different payloads
         body: body-types,
     }
+
+    /// PEM type is just a string
+    type pem = string;
 }
 
 world imports {
