@@ -6,12 +6,9 @@ edition.workspace = true
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { version = "0.20.0", path = "../../../../../rust/psibase" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 pem = "3"
-seahash = "4.1"
 
 [lib]
 crate-type = ["cdylib"]
@@ -24,7 +21,6 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
-"transact:plugin" = { path = "../../../../system/Transact/plugin/wit/world.wit" }
 "host:common" = { path = "../common/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "permissions:plugin" = { path = "../../../Permissions/plugin/wit/world.wit" }

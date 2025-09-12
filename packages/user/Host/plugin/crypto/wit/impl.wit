@@ -3,7 +3,6 @@ package host:crypto;
 world impl {
     include host:common/imports;
     include supervisor:bridge/imports;
-    include transact:plugin/imports;
     include permissions:plugin/imports;
 
     export types;

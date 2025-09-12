@@ -21,23 +21,25 @@ use rand_core::OsRng;
 
 psibase::define_trust! {
     descriptions {
+        None => "
+        No trust grants these abilities:
+            - Create new keypairs
+            - Get the public key for a given private key
+            - Convert PEM to DER format
+        ",
         Low => "
         Low trust grants these abilities:
-            - Create new keypairs
             - Import existing keypairs
         ",
-        Medium => "",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Set the public key for your account
             - Sign transactions on your behalf
-            - Read the private key for a given public key
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der],
         Low => [import_key],
-        High => [set_key],
+        High => [sign, sign_explicit],
     }
 }
 

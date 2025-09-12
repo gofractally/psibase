@@ -1241,9 +1241,6 @@ dependencies = [
  "pem",
  "psibase",
  "rand_core 0.6.4",
- "seahash",
- "serde",
- "serde_json",
  "wit-bindgen-rt 0.28.0",
 ]
 
@@ -3281,10 +3278,7 @@ dependencies = [
  "p256",
  "pem",
  "psibase",
- "rand_core 0.6.4",
  "seahash",
- "serde",
- "serde_json",
  "wit-bindgen-rt 0.28.0",
 ]
 

@@ -6,10 +6,7 @@ edition.workspace = true
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { version = "0.20.0", path = "../../../../rust/psibase" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
-rand_core = { version = "0.6", features = ["getrandom"] }
 pem = "3"
 seahash = "4.1"
 
@@ -23,9 +20,7 @@ package = "webcrypto:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
-"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }

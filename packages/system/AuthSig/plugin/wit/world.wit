@@ -16,7 +16,7 @@ interface keyvault {
     /// Returns the DER encoded key
     to-der: func(key: pem) -> result<list<u8>, error>;
 
-    /// Signs a pre-hashed message with the specified DER-encoded private key
+    /// Signs a pre-hashed message with the private key corresponding to the specified DER-encoded public key
     sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
 
     /// Signs a pre-hashed message with the specified DER-encoded private key
