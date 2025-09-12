@@ -135,7 +135,8 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (std::string_view{req.target()} == "/native/p2p")
+
+   if (std::string_view{req.target()} == "/native/p2p")
    {
       return;
    }
