@@ -17,31 +17,22 @@ namespace LocalService
    using AdminAccountTable = psibase::Table<AdminAccountRow, &AdminAccountRow::account>;
    PSIO_REFLECT_TYPENAME(AdminAccountTable)
 
-   struct ContentRow
-   {
-      std::string                path            = {};
-      std::string                contentType     = {};
-      psibase::Checksum256       contentHash     = {};
-      std::vector<char>          content         = {};
-      std::optional<std::string> contentEncoding = std::nullopt;
-      std::optional<std::string> csp             = std::nullopt;
-      PSIO_REFLECT(ContentRow, path, contentType, contentHash, content, contentEncoding, csp)
-   };
-   using ContentTable = psibase::Table<ContentRow, &ContentRow::path>;
-   PSIO_REFLECT_TYPENAME(ContentTable)
-
    /// Service for node administration
    struct XAdmin : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-admin"};
-      using Subjective =
-          psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable, ContentTable>;
+      using Subjective = psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable>;
       /// Returns true if the account is a node admin
       bool isAdmin(psibase::AccountNumber account);
 
+      std::optional<psibase::HttpReply> checkAuth(const psibase::HttpRequest& req,
+                                                  std::optional<std::int32_t> socket);
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        req,
                                                  std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(XAdmin, method(isAdmin, account), method(serveSys, req, socket))
+   PSIO_REFLECT(XAdmin,
+                method(isAdmin, account),
+                method(checkAuth, req, socket),
+                method(serveSys, req, socket))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective)
 }  // namespace LocalService
