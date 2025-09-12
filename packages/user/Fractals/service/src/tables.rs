@@ -137,7 +137,8 @@ pub mod tables {
 
     #[derive(PartialEq)]
     pub enum MemberStatus {
-        Visa = 1,
+        Tourist = 0,
+        Worker = 1,
         Citizen = 2,
         Exiled = 3,
     }
@@ -147,7 +148,8 @@ pub mod tables {
     impl From<StatusU8> for MemberStatus {
         fn from(status: StatusU8) -> Self {
             match status {
-                1 => MemberStatus::Visa,
+                0 => MemberStatus::Tourist,
+                1 => MemberStatus::Worker,
                 2 => MemberStatus::Citizen,
                 3 => MemberStatus::Exiled,
                 _ => abort_message("invalid member status"),
@@ -164,6 +166,7 @@ pub mod tables {
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
         pub reward_stream_id: TID,
+        pub referrer: Option<AccountNumber>,
     }
 
     #[ComplexObject]
@@ -195,6 +198,7 @@ pub mod tables {
                 created_at: now,
                 member_status: status as StatusU8,
                 reward_stream_id: 0,
+                referrer: None,
             }
         }
 
@@ -607,6 +611,37 @@ pub mod tables {
         fn save(&self) {
             let table = ScoreTable::new();
             table.put(&self).expect("failed to save score");
+        }
+    }
+
+    #[table(name = "ApplicationTable", index = 5)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct Application {
+        pub fractal: AccountNumber,
+        pub member: AccountNumber,
+        pub created_at: psibase::TimePointSec,
+        pub applying_status: StatusU8,
+    }
+
+    impl Application {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.member)
+        }
+    }
+
+    #[table(name = "AttestationTable", index = 6)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct Attestation {
+        pub fractal: AccountNumber,
+        pub member: AccountNumber,
+        pub application_id: u32,
+    }
+
+    impl Attestation {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.member)
         }
     }
 
