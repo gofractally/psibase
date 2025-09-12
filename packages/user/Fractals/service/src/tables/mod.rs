@@ -128,6 +128,7 @@ pub mod tables {
         pub created_at: psibase::TimePointSec,
         pub remaining: Quantity,
         pub rate_ppm: u32,
+        pub recipient: AccountNumber,
     }
 
     impl Tribute {

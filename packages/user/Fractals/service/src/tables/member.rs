@@ -6,6 +6,7 @@ use crate::tables::tables::{
     Fractal, FractalTable, Member, MemberTable, Score, Tribute, TributeTable,
 };
 
+use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::token_stream::{self, Stream};
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -61,22 +62,19 @@ impl Member {
     fn get_or_create_stream(&mut self) -> Stream {
         let fractal = Fractal::get_assert(self.fractal);
         if self.reward_stream_id != 0 {
-            if let Some(stream) = token_stream::Wrapper::call().get_stream(self.reward_stream_id) {
+            if let Some(stream) = TokenStream::call().get_stream(self.reward_stream_id) {
                 if stream.half_life_seconds == fractal.half_life_seconds {
                     return stream;
                 }
             }
         }
 
-        let new_stream_id =
-            token_stream::Wrapper::call().create(fractal.half_life_seconds, fractal.token_id);
+        let new_stream_id = TokenStream::call().create(fractal.half_life_seconds, fractal.token_id);
 
         self.reward_stream_id = new_stream_id;
         self.save();
 
-        token_stream::Wrapper::call()
-            .get_stream(new_stream_id)
-            .unwrap()
+        TokenStream::call().get_stream(new_stream_id).unwrap()
     }
 
     pub fn award_stream(&mut self, amount: Quantity) {
@@ -88,7 +86,7 @@ impl Member {
             amount,
             "Award stream".to_string().try_into().unwrap(),
         );
-        token_stream::Wrapper::call().deposit(stream.nft_id, amount);
+        TokenStream::call().deposit(stream.nft_id, amount);
     }
 
     fn tributes(&self) -> Vec<Tribute> {
@@ -100,10 +98,11 @@ impl Member {
 
     pub fn claim(&mut self) {
         let stream = check_some(
-            token_stream::Wrapper::call().get_stream(self.reward_stream_id),
+            TokenStream::call().get_stream(self.reward_stream_id),
             "stream does not exist",
         );
-        let mut amount = token_stream::Wrapper::call().claim(stream.nft_id);
+
+        let amount = TokenStream::call().claim(stream.nft_id);
         check(amount.value > 0, "nothing to claim");
         Tokens::call().debit(
             stream.token_id,
@@ -112,16 +111,19 @@ impl Member {
             "Reward claim".to_string().try_into().unwrap(),
         );
 
-        if let Some(fine) = self.fine() {
-            let amount_to_pay = Quantity::new(amount.value * fine.rate_ppm as u64 / 1000000);
-            amount = amount - amount_to_pay;
+        let remaining_amount = self
+            .tributes()
+            .into_iter()
+            .fold(amount, |acc, mut tribute| tribute.payout(acc));
+
+        if remaining_amount.value > 0 {
+            Tokens::call().credit(
+                stream.token_id,
+                self.account,
+                remaining_amount.into(),
+                "Reward claim".to_string().try_into().unwrap(),
+            )
         }
-        Tokens::call().credit(
-            stream.token_id,
-            self.account,
-            amount,
-            "Reward claim".to_string().try_into().unwrap(),
-        )
     }
 
     fn save(&self) {
