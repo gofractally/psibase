@@ -1,5 +1,12 @@
 package psibase:x-admin;
 
+interface types {
+    record keypair {
+        public-key: string,
+        private-key: string,
+    }
+}
+
 interface boot {
     type package-contents = list<u8>;
     type pem = string;
@@ -19,6 +26,12 @@ interface boot {
     boot-transactions: func(producer: string, js-packages: list<package-contents>, block-signing-key: option<pem>, tx-signing-key: option<pem>, compression-level: u32) -> result<tuple<list<u8>, list<tuple<tx, u32, u32>>, list<string>>, string>;
 }
 
+interface crypto {
+    use types.{keypair};
+
+    generate-unmanaged-key: func() -> result<keypair, string>;
+}
+
 interface packages {
     resolve-packages: func(index-json-str: string, packages: list<string>) -> result<string, string>;
 }
@@ -29,6 +42,7 @@ interface util {
 
 world impl {
     export boot;
+    export crypto;
     export util;
     export packages;
 }

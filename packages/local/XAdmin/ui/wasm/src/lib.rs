@@ -4,11 +4,13 @@ use std::{io::Cursor, str::FromStr};
 
 use bindings::*;
 
+// use ::psibase::AnyPublicKey;
+use ::psibase::fracpack::{Pack, Unpack};
+use ::psibase::*;
 use exports::psibase::x_admin::boot::{Guest as Boot, *};
+use exports::psibase::x_admin::crypto::{Guest as Crypto, *};
 use exports::psibase::x_admin::packages::Guest as Packages;
 use exports::psibase::x_admin::util::Guest as Util;
-use psibase::fracpack::{Pack, Unpack};
-use psibase::*;
 
 const DEBUG_PRINT: bool = false;
 
@@ -96,6 +98,16 @@ impl Boot for XAdminPlugin {
         }
 
         Ok((boot_transactions, transactions, labels))
+    }
+}
+
+impl Crypto for XAdminPlugin {
+    fn generate_unmanaged_key() -> Result<Keypair, String> {
+        let keypair = generate_unmanaged_key()?;
+        Ok(Keypair {
+            public_key: keypair.public_key,
+            private_key: keypair.private_key,
+        })
     }
 }
 

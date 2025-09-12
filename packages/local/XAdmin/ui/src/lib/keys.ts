@@ -1,3 +1,5 @@
+import { boot } from "wasm-transpiled";
+
 function arrayBufferToHex(buffer: ArrayBuffer, separator: string = ""): string {
     return Array.from(new Uint8Array(buffer))
         .map((byte) => byte.toString(16).padStart(2, "0"))
@@ -43,15 +45,17 @@ export async function hexDERPublicKeyToCryptoKey(
 
 export async function generateP256Key(): Promise<CryptoKeyPair> {
     try {
-        return crypto.subtle.generateKey(
-            {
-                name: "ECDSA",
-                namedCurve: "P-256",
-            },
-            true, // Extractable for exporting
-            ["sign", "verify"],
-        );
-        plugin
+        // return crypto.subtle.generateKey(
+        //     {
+        //         name: "ECDSA",
+        //         namedCurve: "P-256",
+        //     },
+        //     true, // Extractable for exporting
+        //     ["sign", "verify"],
+        // );
+        const keypair = await boot.generate_unmanaged_key();
+        console.log("keypair from boot.generate_unmanaged_key():", keypair);
+        return keypair;
     } catch (error) {
         console.error("Error generating key pair:", error);
         throw error;
