@@ -1,9 +1,8 @@
 use async_graphql::ComplexObject;
 use psibase::{check, check_some, AccountNumber, Table};
 
-use crate::tables::tables::{
-    EvalType, EvaluationInstance, Fractal, FractalTable, Member, MemberTable,
-};
+use crate::tables::evaluation_instance::EvalType;
+use crate::tables::tables::{EvaluationInstance, Fractal, FractalTable, Member, MemberTable};
 
 use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
