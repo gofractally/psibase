@@ -1,3 +1,4 @@
+mod config;
 mod evaluation_instance;
 mod fine;
 mod fractal;
@@ -115,13 +116,30 @@ pub mod tables {
         }
     }
 
+    #[table(name = "FineTable", index = 4)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct Fine {
+        pub fractal: AccountNumber,
+        pub member: AccountNumber,
+        pub created_at: psibase::TimePointSec,
+        pub fine_remaining: Quantity,
+        pub rate_ppm: u32,
+    }
+
+    impl Fine {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.member)
+        }
+    }
+
     #[table(name = "ApplicationTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Application {
         pub fractal: AccountNumber,
         pub member: AccountNumber,
         pub created_at: psibase::TimePointSec,
-        pub applying_status: StatusU8,
+        pub applying_for: StatusU8,
     }
 
     impl Application {
@@ -146,20 +164,14 @@ pub mod tables {
         }
     }
 
-    #[table(name = "FineTable", index = 4)]
+    #[table(name = "ConfigTable", index = 7)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct Fine {
-        pub fractal: AccountNumber,
-        pub member: AccountNumber,
-        pub created_at: psibase::TimePointSec,
-        pub fine_remaining: Quantity,
-        pub rate_ppm: u32,
+    pub struct Config {
+        pub last_used_id: u64,
     }
 
-    impl Fine {
+    impl Config {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.member)
-        }
+        fn pk(&self) {}
     }
 }
