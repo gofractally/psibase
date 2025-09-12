@@ -40,7 +40,7 @@ export const useBalances = (
     username: z.infer<typeof Account> | undefined | null,
 ) =>
     useQuery<BalanceRes>({
-        queryKey: QueryKey.ui(username || "undefined"),
+        queryKey: QueryKey.tokenBalances(username),
         enabled: !!username,
         refetchInterval: 10000,
         queryFn: async () => {
