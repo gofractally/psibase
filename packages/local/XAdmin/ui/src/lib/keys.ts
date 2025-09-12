@@ -51,6 +51,7 @@ export async function generateP256Key(): Promise<CryptoKeyPair> {
             true, // Extractable for exporting
             ["sign", "verify"],
         );
+        plugin
     } catch (error) {
         console.error("Error generating key pair:", error);
         throw error;
