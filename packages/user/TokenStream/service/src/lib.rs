@@ -224,8 +224,6 @@ pub mod service {
         let mut stream = Stream::get_assert(nft_id);
         let sender = get_sender();
 
-        stream.deposit(amount);
-
         Tokens::call().debit(
             stream.token_id,
             sender,
@@ -233,6 +231,8 @@ pub mod service {
             Memo::try_from(format!("Deposit into stream {}", nft_id)).unwrap(),
         );
 
+        stream.deposit(amount);
+        
         Wrapper::emit().history().updated(
             nft_id,
             sender,
