@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin", "query-service"]
+
+[workspace.package]
+version = "0.20.0"
+rust-version = "1.64"
+edition = "2021"
+publish = false
+
+[package]
+name = "token-stream-pkg"                          # Crate name
+description = "Stream tokens by exponential decay"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[package.metadata.psibase]
+package-name = "TokenStream"
+services = ["token-stream"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.20.0"
+Sites = "0.20.0"
+Tokens = "0.20.0"
+
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+token-stream = { path = "service", version = "0.20.0" }
+r-token-stream = { path = "query-service", version = "0.20.0" }
+token-stream-plugin = { path = "plugin", version = "0.20.0" }

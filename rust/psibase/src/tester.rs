@@ -8,6 +8,8 @@
 
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
+#[cfg(target_family = "wasm")]
+use crate::MicroSeconds;
 use crate::{
     check, create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
@@ -218,6 +220,22 @@ impl Chain {
                 panic!("PUT failed: {}", reply.text().unwrap());
             }
         }
+    }
+
+    /// Advance the blockchain time by the specified number of microseconds and start a new block.
+    ///
+    /// This method increments the current block time by `seconds` and starts a new block at that time.
+    /// If no current block exists, it starts from a default time (e.g., 0 microseconds).
+    pub fn start_block_after(&self, micro_seconds: MicroSeconds) {
+        // Scope the immutable borrow to ensure it’s dropped before calling start_block_at
+        let current_time = {
+            let status = self.status.borrow();
+            status
+                .as_ref()
+                .map(|s| s.current.time)
+                .unwrap_or(TimePointUSec { microseconds: 0 })
+        };
+        self.start_block_at(current_time + micro_seconds);
     }
 
     /// Start a new block

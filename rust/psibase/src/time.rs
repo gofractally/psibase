@@ -306,6 +306,12 @@ impl Sub for MicroSeconds {
     }
 }
 
+impl From<Seconds> for MicroSeconds {
+    fn from(value: Seconds) -> Self {
+        Self::new(value.value * 1_000_000)
+    }
+}
+
 impl Add<MicroSeconds> for TimePointUSec {
     type Output = Self;
 

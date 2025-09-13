@@ -19,6 +19,7 @@
             "user/Evaluations/ui",
             "user/Config/ui",
             "user/Fractals/ui",
+            "user/TokenStream/ui",
             "user/Homepage/ui",
             "user/Identity/ui",
             "user/Packages/ui",
