@@ -34,5 +34,12 @@ class TestXAdmin(unittest.TestCase):
             transact.get_jwt_key('swordfish')
         key = transact.get_jwt_key(token)
 
+    @testutil.psinode_test
+    def test_native(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+
+        with a.get('/native/admin/config', service='foo') as reply:
+            self.assertEqual(reply.status_code, 404)
+
 if __name__ == '__main__':
     testutil.main()
