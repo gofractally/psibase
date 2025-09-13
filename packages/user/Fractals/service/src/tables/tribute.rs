@@ -1,4 +1,4 @@
-use psibase::services::tokens::Quantity;
+use psibase::services::tokens::{Memo, Quantity};
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::{AccountNumber, Table};
 
@@ -16,6 +16,7 @@ impl Tribute {
         amount: Quantity,
         rate_ppm: u32,
         recipient: AccountNumber,
+        memo: Memo,
     ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
@@ -27,6 +28,7 @@ impl Tribute {
             fractal,
             rate_ppm,
             recipient,
+            memo,
         }
     }
 
@@ -36,8 +38,9 @@ impl Tribute {
         amount: Quantity,
         rate_ppm: u32,
         recipient: AccountNumber,
+        memo: Memo,
     ) -> Self {
-        let new_instance = Self::new(fractal, account, amount, rate_ppm, recipient);
+        let new_instance = Self::new(fractal, account, amount, rate_ppm, recipient, memo);
         new_instance.save();
         new_instance
     }

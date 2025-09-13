@@ -12,9 +12,13 @@ impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
         let supply = Quantity::from(210000000000000);
+        // "21,000,000.0000"
         let token_id = Tokens::call().create(4.try_into().unwrap(), supply);
+        // Set to 3 months half life.
         let half_life_seconds = 999 as u32;
 
+        /// Move token creation AND token streaming deposit to another action.
+        ///
         Tokens::call().mint(
             token_id,
             supply,

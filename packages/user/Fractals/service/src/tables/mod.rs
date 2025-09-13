@@ -11,7 +11,7 @@ pub mod tables {
 
     use async_graphql::SimpleObject;
     use psibase::services::nft::NID;
-    use psibase::services::tokens::{Quantity, TID};
+    use psibase::services::tokens::{Memo, Quantity, TID};
     use psibase::{abort_message, AccountNumber, Fracpack, TimePointSec, ToSchema};
 
     use serde::{Deserialize, Serialize};
@@ -126,9 +126,18 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub member: AccountNumber,
         pub created_at: psibase::TimePointSec,
+        /// Remove the remaining so that it's unlimited always.
         pub remaining: Quantity,
+
+        // Move `remaining` to the Fine table
+        // Amounts here are unlimited, just use the percent.
+        /// Collecting on fines
+        /// Collecting on referral fees
+        /// Any kind of income tax.
         pub rate_ppm: u32,
         pub recipient: AccountNumber,
+        pub memo: Memo,
+        // its up to a member to create a invite link and the new guy to accept it for Applications
     }
 
     impl Tribute {
@@ -150,6 +159,7 @@ pub mod tables {
         pub member: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub applying_for: StatusU8,
+        pub memo: String,
     }
 
     impl Application {
