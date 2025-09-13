@@ -28,7 +28,7 @@ struct TokenStreamPlugin;
 
 impl Api for TokenStreamPlugin {
     fn create(half_life_seconds: u32, token_id: u32) -> Result<(), Error> {
-        trust::authorize(trust::FunctionName::create)?;
+        trust::assert_authorized(trust::FunctionName::create)?;
 
         let packed_args = token_stream::action_structs::create {
             half_life_seconds,
@@ -42,7 +42,7 @@ impl Api for TokenStreamPlugin {
     }
 
     fn deposit(nft_id: u32, token_id: u32, amount: String, memo: String) -> Result<(), Error> {
-        trust::authorize(trust::FunctionName::deposit)?;
+        trust::assert_authorized(trust::FunctionName::deposit)?;
 
         bindings::tokens::plugin::transfer::credit(
             token_id,
@@ -64,7 +64,7 @@ impl Api for TokenStreamPlugin {
     }
 
     fn claim(nft_id: u32) -> Result<(), Error> {
-        trust::authorize(trust::FunctionName::claim)?;
+        trust::assert_authorized(trust::FunctionName::claim)?;
 
         let packed_args = token_stream::action_structs::claim { nft_id }.packed();
 
@@ -75,7 +75,7 @@ impl Api for TokenStreamPlugin {
     }
 
     fn delete(nft_id: u32) -> Result<(), Error> {
-        trust::authorize(trust::FunctionName::delete)?;
+        trust::assert_authorized(trust::FunctionName::delete)?;
 
         let packed_args = token_stream::action_structs::delete { nft_id }.packed();
 
