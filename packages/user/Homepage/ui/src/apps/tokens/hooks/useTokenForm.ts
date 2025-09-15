@@ -1,5 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Account } from "@/lib/zod/Account";
@@ -7,6 +5,20 @@ import { zAmount } from "@/lib/zod/Amount";
 import { TokenId } from "@/lib/zod/TokenId";
 
 import { Token } from "./tokensPlugin/useBalances";
+
+export const zTransferForm = z.object({
+    token: TokenId,
+    to: Account,
+    amount: zAmount,
+    memo: z.string().max(50),
+});
+
+export const defaultTransferValues = {
+    amount: "",
+    token: "",
+    memo: "",
+    to: "",
+};
 
 export const formSchema = (tokens: Token[]) =>
     z
@@ -44,16 +56,3 @@ export const formSchema = (tokens: Token[]) =>
         );
 
 export type FormSchema = z.infer<ReturnType<typeof formSchema>>;
-
-export const useTokenForm = (tokens: Token[]) => {
-    return useForm<FormSchema>({
-        resolver: zodResolver(formSchema(tokens)),
-        defaultValues: {
-            amount: "",
-            token: "",
-            memo: "",
-            to: "",
-        },
-        mode: "all",
-    });
-};
