@@ -4,6 +4,8 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+// import { crypto } from "wasm-transpiled";
+
 // ShadCN UI Imports
 import { useToast } from "@/components/ui/use-toast";
 
@@ -184,6 +186,8 @@ export const CreatePage = () => {
                 if (!isDev) {
                     blockSigningPubKey = await createAndSetKey(keyDevice);
                     txSigningKeyPair = await generateP256Key();
+                    console.log("original code: txSigningKeyPair", txSigningKeyPair);
+                    // txSigningKeyPair = crypto.generateUnmanagedKeypair();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
