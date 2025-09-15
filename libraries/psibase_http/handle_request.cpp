@@ -257,23 +257,6 @@ namespace psibase::http
          res.prepare_payload();
          return res;
       }
-
-      auto redirect(bhttp::status      status,
-                    beast::string_view location,
-                    beast::string_view msg,
-                    bool               allow_cors   = false,
-                    const char*        content_type = "text/html") const
-      {
-         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
-         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
-         res.set(bhttp::field::location, location);
-         res.set(bhttp::field::content_type, content_type);
-         setCors(res, allow_cors);
-         setKeepAlive(res);
-         res.body() = std::vector(msg.begin(), msg.end());
-         res.prepare_payload();
-         return res;
-      }
    };
 
    template <typename F, typename E>
@@ -364,7 +347,9 @@ namespace psibase::http
       }
       virtual SocketInfo info() const override
       {
-         return HttpSocketInfo{.endpoint = session->remote_endpoint()};
+         return HttpSocketInfo{
+             .endpoint = session->remote_endpoint(),
+             .tls      = session->is_secure() ? std::optional{TLSInfo{}} : std::nullopt};
       }
 
       void runNativeHandler(auto&& request_handler, auto&& callback)
@@ -772,7 +757,6 @@ namespace psibase::http
          else
          {
             auto [host, port] = split_port(req_host);
-            auto service      = AccountNumber{};
 
             if (auto iter = server.http_config->services.find(host);
                 iter != server.http_config->services.end())
@@ -800,19 +784,9 @@ namespace psibase::http
                   return send(builder.ok(std::move(contents), file->second.content_type.c_str(),
                                          nullptr, true));
                }
-               else
-               {
-                  if (auto pos = host.find('.'); pos != std::string::npos)
-                  {
-                     service = AccountNumber{host.substr(0, pos)};
-                  }
-                  if (service == AccountNumber{})
-                  {
-                     return send(builder.notFound(req.target(), true));
-                  }
-               }
             }
 
+            // Find the most specific host name that matches the request
             std::string_view root_host;
             for (const auto& name : server.http_config->hosts)
             {
@@ -825,36 +799,10 @@ namespace psibase::http
                   }
                }
             }
-            if (root_host.empty())
+            // If there isn't a matching host, default to the first host
+            if (root_host.empty() && !server.http_config->hosts.empty())
             {
-               if (req_target.starts_with("/native/"))
-               {
-                  if (server.http_config->hosts.empty())
-                     root_host = server.http_config->hosts.front();
-               }
-               else if (server.http_config->hosts.empty())
-                  return send(builder.notFound(req.target(), true));
-               else
-               {
-                  std::string location;
-                  if (send.is_secure())
-                     location += "https://";
-                  else
-                     location += "http://";
-                  // Ideally, we want to choose a hostname that the client will
-                  // resolve to the same address that was used for this connection.
-                  // Unfortunately, it isn't really possible in the general case
-                  // because we don't have access to the client's DNS.
-                  location += server.http_config->hosts.front();
-                  location.append(port.data(), port.size());
-                  location.append(req_target.data(), req_target.size());
-                  return send(builder.redirect(bhttp::status::moved_permanently, location,
-                                               "<html><body>"
-                                               "This psibase server is hosted at <a href=\"" +
-                                                   location + "\">" + location +
-                                                   "</a>.</body></html>\n",
-                                               true));
-               }
+               root_host = server.http_config->hosts.front();
             }
 
             auto        startTime = steady_clock::now();
@@ -901,41 +849,6 @@ namespace psibase::http
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
-            if (service == AccountNumber{} && bc.needGenesisAction &&
-                !req_target.starts_with("/native/"))
-            {
-               std::string location;
-               if (send.is_secure())
-                  location += "https://";
-               else
-                  location += "http://";
-               l.lock();
-               auto suffix = '.' + data.rootHost;
-               auto pos =
-                   std::ranges::find_if(server.http_config->services, [&suffix](const auto& entry)
-                                        { return entry.first.ends_with(suffix); });
-               if ((req.method() == bhttp::verb::get || req.method() == bhttp::verb::head) &&
-                   pos != server.http_config->services.end())
-               {
-                  location.append(pos->first);
-                  l.unlock();
-                  location.append(port.data(), port.size());
-                  location.push_back('/');
-                  return send(builder.redirect(
-                      bhttp::status::found, location,
-                      "<html><body>Node is not connected to any psibase network.  "
-                      "Visit <a href=\"" +
-                          location + "\">" + location + "</a> for node setup.</body></html>\n",
-                      true));
-               }
-               else
-               {
-                  // No native service to redirect to. Just report an error
-                  l.unlock();
-                  return send(builder.error(bhttp::status::internal_server_error,
-                                            "Node is not connected to any psibase network.", true));
-               }
-            }
 
             SignedTransaction  trx;
             TransactionTrace   trace;
