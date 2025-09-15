@@ -25,7 +25,7 @@ import {
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useCredit } from "../hooks/tokensPlugin/useCredit";
-import { defaultTransferValues } from "../page";
+import { defaultTransferValues } from "../hooks/useTokenForm";
 
 export const TransferModal = withForm({
     defaultValues: defaultTransferValues,
@@ -50,7 +50,12 @@ export const TransferModal = withForm({
         const quantity = useMemo(() => {
             if (!selectedToken) return null;
             const { precision, id, symbol } = selectedToken;
-            return new Quantity(amount, precision, id, symbol);
+            try {
+                return new Quantity(amount, precision, id, symbol);
+            } catch (error) {
+                console.log(error);
+                return null;
+            }
         }, [amount, selectedToken]);
 
         const handleConfirm = async () => {
