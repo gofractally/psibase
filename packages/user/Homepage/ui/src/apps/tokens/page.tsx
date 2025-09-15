@@ -8,12 +8,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useAppForm } from "@shared/components/form/app-form";
 
-export const defaultTransferValues = {
-    amount: "",
-    token: "",
-    memo: "",
-    to: "",
-};
+import { defaultTransferValues, zTransferForm } from "./hooks/useTokenForm";
 
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
@@ -28,9 +23,9 @@ export const TokensPage = () => {
     const form = useAppForm({
         defaultValues: defaultTransferValues,
         onSubmit: () => setTransferModal(true),
-        // validators: {
-        //     onChange: () => formSchema(tokens),
-        // },
+        validators: {
+            onChange: zTransferForm,
+        },
     });
 
     const [isTransferModalOpen, setTransferModal] = useState(false);
