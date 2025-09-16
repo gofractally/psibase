@@ -11,14 +11,14 @@
 #[cfg(target_family = "wasm")]
 use crate::MicroSeconds;
 use crate::{
-    check, create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
-    AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
-    DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry,
-    Seconds, SignedTransaction, StatusRow, TimePointSec, TimePointUSec, ToKey, Transaction,
-    TransactionTrace,
+    check, create_boot_transactions, get_optional_result_bytes, get_result_bytes, services,
+    status_key, tester_raw, AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow,
+    CodeRow, DbId, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest, InnerTraceEnum,
+    PackageRegistry, Seconds, SignedTransaction, StatusRow, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
-use fracpack::{Pack, Unpack};
+use fracpack::{Pack, Unpack, UnpackOwned};
 use futures::executor::block_on;
 use psibase_macros::account_raw;
 use serde::de::DeserializeOwned;
@@ -254,7 +254,9 @@ impl Chain {
             }
         }
         unsafe { tester_raw::startBlock(self.chain_handle, time.microseconds) }
-        *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
+        *status = self
+            .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())
+            .unwrap();
         self.producing.replace(true);
     }
 
@@ -337,6 +339,24 @@ impl Chain {
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
     pub fn select_chain(&self) {
         tester_raw::tester_select_chain_for_db(self.chain_handle)
+    }
+
+    pub fn kv_get_bytes(&self, db: DbId, key: &[u8]) -> Option<Vec<u8>> {
+        let size =
+            unsafe { tester_raw::kvGet(self.chain_handle, db, key.as_ptr(), key.len() as u32) };
+        get_optional_result_bytes(size)
+    }
+
+    pub fn kv_get<V: UnpackOwned, K: ToKey>(
+        &self,
+        db: DbId,
+        key: &K,
+    ) -> Result<Option<V>, fracpack::Error> {
+        if let Some(v) = self.kv_get_bytes(db, &key.to_key()) {
+            Ok(Some(V::unpacked(&v)?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Set a key-value pair
