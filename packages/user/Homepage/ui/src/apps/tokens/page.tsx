@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { TokenAmountField } from "@shared/components/form/token-amount-field";
 
 import { defaultTransferValues, zTransferForm } from "./hooks/useTokenForm";
 
@@ -36,6 +37,7 @@ export const TokensPage = () => {
     );
 
     useEffect(() => {
+        // update token field value with default token once tokens loadz
         if (!selectedTokenId && tokens.length > 0) {
             form.setFieldValue("token", tokens[0].id.toString());
             return;
@@ -79,15 +81,25 @@ export const TokensPage = () => {
                                         />
                                     )}
                                 />
-                                <form.AppField
-                                    name="amount"
-                                    children={(field) => (
-                                        <field.TokenAmountInput
-                                            selectedToken={selectedToken}
-                                            disabled={disableForm}
-                                        />
-                                    )}
-                                />
+                                <form.Subscribe
+                                    selector={(state) => state.values.token}
+                                >
+                                    {(t) => {
+                                        const token = tokens.find(
+                                            (balance) =>
+                                                balance.id == Number(t),
+                                        );
+
+                                        return (
+                                            <TokenAmountField
+                                                form={form}
+                                                fields="amount"
+                                                precision={token?.precision}
+                                                disabled={disableForm}
+                                            />
+                                        );
+                                    }}
+                                </form.Subscribe>
                             </div>
                             <form.AppField
                                 name="memo"

@@ -51,17 +51,22 @@ export const TransferModal = withForm({
             if (!selectedToken) return null;
             const { precision, id, symbol } = selectedToken;
             try {
-                return new Quantity(amount, precision, id, symbol);
+                return new Quantity(amount.amount, precision, id, symbol);
             } catch (error) {
                 console.log(error);
                 return null;
             }
-        }, [amount, selectedToken]);
+        }, [amount.amount, selectedToken]);
 
         const handleConfirm = async () => {
             const { token, amount, memo, to } = form.state.values;
             try {
-                await credit({ tokenId: token, receiver: to, amount, memo });
+                await credit({
+                    tokenId: token,
+                    receiver: to,
+                    amount: amount.amount,
+                    memo,
+                });
                 toast("Sent", {
                     description: `Sent ${amount} ${
                         selectedToken?.label || selectedToken?.symbol
@@ -72,7 +77,7 @@ export const TransferModal = withForm({
                 updateBalanceCache(
                     Account.parse(currentUser),
                     token,
-                    amount,
+                    amount.amount,
                     "Subtract",
                 );
             } catch (e) {
