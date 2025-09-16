@@ -43,7 +43,7 @@ struct HostCrypto;
 
 impl KeyVault for HostCrypto {
     fn generate_unmanaged_keypair() -> Result<Keypair, HostTypes::Error> {
-        authorize(FunctionName::generate_unmanaged_keypair)?;
+        assert_authorized(FunctionName::generate_unmanaged_keypair)?;
 
         let signing_key = SigningKey::random(&mut OsRng);
         let verifying_key: &VerifyingKey = signing_key.verifying_key();
@@ -63,7 +63,7 @@ impl KeyVault for HostCrypto {
     }
 
     fn pub_from_priv(private_key: Pem) -> Result<Pem, HostTypes::Error> {
-        authorize(FunctionName::pub_from_priv)?;
+        assert_authorized(FunctionName::pub_from_priv)?;
 
         let pem = pem::Pem::try_from_pem_str(&private_key)?;
         let signing_key =
@@ -76,14 +76,14 @@ impl KeyVault for HostCrypto {
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, HostTypes::Error> {
-        authorize(FunctionName::to_der)?;
+        assert_authorized(FunctionName::to_der)?;
 
         let pem = pem::Pem::try_from_pem_str(&key)?;
         Ok(pem.contents().to_vec())
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        authorize(FunctionName::sign)?;
+        assert_authorized(FunctionName::sign)?;
 
         Ok(Supervisor::sign(&hashed_message, &public_key).unwrap())
     }
@@ -92,13 +92,13 @@ impl KeyVault for HostCrypto {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        authorize(FunctionName::sign_explicit)?;
+        assert_authorized(FunctionName::sign_explicit)?;
 
         Ok(Supervisor::sign_explicit(&hashed_message, &private_key)?)
     }
 
     fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
-        authorize_with_whitelist(
+        assert_authorized_with_whitelist(
             FunctionName::import_key,
             vec!["x-admin".into(), "invite".into(), "auth-sig".into()],
         )?;
