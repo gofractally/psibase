@@ -170,11 +170,11 @@ pub mod tables {
 
 #[psibase::service(name = "token-stream", tables = "tables")]
 pub mod service {
-    use psibase::services::tokens::{Decimal, Memo, Quantity};
+    use psibase::services::tokens::{Decimal, Quantity};
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::{get_sender, AccountNumber};
+    use psibase::{get_sender, AccountNumber, Memo};
 
     use crate::tables::Stream;
 
