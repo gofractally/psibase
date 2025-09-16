@@ -1,10 +1,11 @@
 pub const CREDENTIAL_SENDER: &str = "cred-sys";
+pub const VERIFY_SERVICE: &str = "verify-sys";
 
 #[psibase::service_tables]
 pub mod tables {
     use psibase::fracpack::{Pack, Unpack};
-    use psibase::Table;
     use psibase::{AccountNumber, ToSchema};
+    use psibase::{Table, TimePointSec};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -41,8 +42,10 @@ pub mod tables {
     #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Credential {
         pub id: u32,
-        pub owner: AccountNumber,
-        pub pubkey: Vec<u8>,
+        pub issuer: AccountNumber,
+        pub claim: Vec<u8>,
+        pub issuance_date: TimePointSec,
+        pub expiry_date: Option<TimePointSec>,
     }
 
     impl Credential {
@@ -52,8 +55,13 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_pubkey(&self) -> Vec<u8> {
-            self.pubkey.clone()
+        fn by_claim(&self) -> Vec<u8> {
+            self.claim.clone()
+        }
+
+        #[secondary_key(2)]
+        fn by_expiry_date(&self) -> (u32, Option<TimePointSec>) {
+            (self.id, self.expiry_date)
         }
     }
 }
@@ -63,14 +71,15 @@ pub mod service {
     use crate::tables::{Credential, CredentialId, CredentialTable, InitTable};
     use crate::CREDENTIAL_SENDER;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
-    use psibase::services::{auth_delegate, transact};
+    use psibase::services::{accounts, transact, transact::ServiceMethod};
     use psibase::*;
 
     #[action]
     fn init() {
-        auth_delegate::Wrapper::call().newAccount(
+        accounts::Wrapper::call().newAccount(
             AccountNumber::from(CREDENTIAL_SENDER),
-            AccountNumber::from("root"),
+            Wrapper::SERVICE,
+            false,
         );
     }
 
@@ -83,52 +92,152 @@ pub mod service {
         );
     }
 
-    /// Creates a credential with the given public key
+    #[action]
+    #[allow(non_snake_case)]
+    fn canAuthUserSys(user: AccountNumber) {
+        check(
+            user.to_string() == CREDENTIAL_SENDER,
+            &format!(
+                "only {} can use credentials as an auth service",
+                CREDENTIAL_SENDER
+            ),
+        );
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn checkAuthSys(
+        flags: u32,
+        _requester: AccountNumber,
+        sender: AccountNumber,
+        action: ServiceMethod,
+        _allowedActions: Vec<ServiceMethod>,
+        claims: Vec<Claim>,
+    ) {
+        use psibase::services::transact::auth_interface::*;
+
+        let auth_type = flags & REQUEST_MASK;
+
+        match auth_type {
+            RUN_AS_REQUESTER_REQ | RUN_AS_MATCHED_REQ => return,
+            RUN_AS_MATCHED_EXPANDED_REQ => check(false, "runAs: caller attempted to expand powers"),
+            RUN_AS_OTHER_REQ => check(false, "runAs: caller is not authorized"),
+            t if t != TOP_ACTION_REQ => check(false, "unsupported auth type"),
+            _ => {}
+        }
+
+        check(
+            sender.to_string() == CREDENTIAL_SENDER,
+            &format!("sender must be {}", CREDENTIAL_SENDER),
+        );
+
+        check(claims.len() == 1, "Must be exactly one claim");
+        let claim = &claims[0];
+
+        check(
+            claim.service == AccountNumber::from("verify-sig"),
+            "Claim must use verify-sig",
+        );
+
+        let credential = CredentialTable::new()
+            .get_index_by_claim()
+            .get(&claim.rawData);
+        check(credential.is_some(), "Claim uses an invalid credential");
+        let credential = credential.unwrap();
+
+        check(
+            action.service == credential.issuer,
+            "Can only call actions on the credential issuer service",
+        );
+
+        let now = transact::Wrapper::call().currentBlock().time.seconds();
+        check(
+            credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now,
+            "Credential expired",
+        );
+    }
+
+    /// Creates a credential
+    ///
+    /// Parameters:
+    /// - `claim`: The credential claim (e.g. public key)
+    /// - `expires`: The number of seconds until the credential expires
     ///
     /// This action is meant to be called inline by another service.
-    /// The owner service is the service that calls this action.
+    /// The caller service is the credential issuer.
     ///
-    /// The corresponding private key can be used to authorize the "cred-sys" account to call
-    ///   transactions containing actions on the owner service.
+    /// A transaction sent from the CREDENTIAL_SENDER account must have a proof for the
+    /// specified claim.
     #[action]
-    fn create(pubkey: SubjectPublicKeyInfo) -> u32 {
+    fn create(claim: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
         let table = CredentialTable::new();
 
-        let existing = table.get_index_by_pubkey().get(&pubkey.0);
+        let existing = table.get_index_by_claim().get(&claim.0);
         check_none(existing, "Credential already exists");
         let id = CredentialId::next_id();
+        let now = transact::Wrapper::call().currentBlock().time.seconds();
         table
             .put(&Credential {
                 id,
-                owner: get_sender(),
-                pubkey: pubkey.0.clone(),
+                issuer: get_sender(),
+                claim: claim.0.clone(),
+                issuance_date: now,
+                expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),
             })
             .unwrap();
 
         id
     }
 
-    /// Looks up the credential used to sign the active transaction, and consumes (deletes) it.
-    /// Can only be called by the credential's owner service.
+    /// Looks up the credential used to sign the active transaction, and consumes it.
+    /// Can only be called by the credential's issuer.
     #[action]
     fn consume_active() -> u32 {
-        let claims = transact::Wrapper::call().getTransaction().claims;
-        check(claims.len() == 1, "Must be exactly one claim");
-        let claim = &claims[0];
-
-        let active_key = claim.rawData.clone();
-
-        let table = CredentialTable::new();
-        let credential = table.get_index_by_pubkey().get(&active_key);
-        check(credential.is_some(), "Credential does not exist");
-
-        let credential = credential.unwrap();
-        check(
-            credential.owner == get_sender(),
-            "Only owner can consume credential",
-        );
-        let id = credential.id;
-        table.remove(&credential);
+        let id = get_active().expect("No active credential");
+        consume(id);
         id
+    }
+
+    /// Gets the `claim` of the specified credential
+    #[action]
+    fn get_claim(id: u32) -> SubjectPublicKeyInfo {
+        let table = CredentialTable::new();
+        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
+        credential.claim.into()
+    }
+
+    /// Gets the `id` of the active credential
+    #[action]
+    fn get_active() -> Option<u32> {
+        let claims = transact::Wrapper::call().getTransaction().claims;
+        let table = CredentialTable::new().get_index_by_claim();
+
+        let mut active_id = None;
+        let now = transact::Wrapper::call().currentBlock().time.seconds();
+        for claim in claims {
+            if let Some(credential) = table.get(&claim.rawData) {
+                check(
+                    active_id.is_none(),
+                    "Only one active credential is supported",
+                );
+                check(
+                    credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now,
+                    "Credential expired",
+                );
+                active_id = Some(credential.id);
+            }
+        }
+
+        active_id
+    }
+
+    /// Deletes the specified credential.
+    /// Can only be called by the credential's issuer.
+    #[action]
+    fn consume(id: u32) {
+        let table = CredentialTable::new();
+        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
+        check(credential.issuer == get_sender(), "Unauthorized");
+        table.remove(&credential);
     }
 }
