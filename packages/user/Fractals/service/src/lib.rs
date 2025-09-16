@@ -5,7 +5,10 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
 
-    use crate::tables::tables::{EvaluationInstance, Fractal, Member, MemberStatus};
+    use crate::tables::{
+        member::MemberStatus,
+        tables::{EvaluationInstance, Fractal, Member},
+    };
 
     use psibase::*;
 
