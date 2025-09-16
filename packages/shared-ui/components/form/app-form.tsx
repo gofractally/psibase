@@ -5,13 +5,12 @@ import { DurationSelect } from "./duration-select";
 import { NumberField } from "./number-field";
 import { SubmitButton } from "./submit-button";
 import { TextField } from "./text-field";
-import { TokenAmountInput } from "./token-amount-input";
 import { TokenSelect } from "./token-select";
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
     createFormHookContexts();
 
-const { useAppForm, withForm } = createFormHook({
+const { useAppForm, withForm, withFieldGroup } = createFormHook({
     fieldContext,
     formContext,
     fieldComponents: {
@@ -20,11 +19,10 @@ const { useAppForm, withForm } = createFormHook({
         DateTime: DateTimePicker24h,
         Duration: DurationSelect,
         TokenSelect,
-        TokenAmountInput,
     },
     formComponents: {
         SubmitButton,
     },
 });
 
-export { useAppForm, withForm };
+export { useAppForm, withForm, withFieldGroup };
