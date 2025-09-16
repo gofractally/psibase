@@ -1,58 +1,45 @@
 import { z } from "zod";
 
 import { Account } from "@/lib/zod/Account";
-import { zAmount } from "@/lib/zod/Amount";
 import { TokenId } from "@/lib/zod/TokenId";
 
-import { Token } from "./tokensPlugin/useBalances";
+export const createPrecisionSchema = (precision: number) => {
+    return z
+        .string()
+        .min(1, "Required")
+        .refine((val) => {
+            if (!/^\d*\.?\d*$/.test(val)) {
+                return false; // Check basic number format
+            }
+            const num = Number(val);
+            if (isNaN(num) || num <= 0) {
+                return false; // Check if it's zero or negative
+            }
+            return true;
+        }, "Must be a positive number")
+        .refine((val) => {
+            const parts = val.split(".");
+            if (parts.length === 1) {
+                return true; // If no decimal part, it's valid
+            }
+            return parts[1].length <= precision; // Check decimal precision
+        }, `Amount cannot have more than ${precision} decimal places`);
+};
 
 export const zTransferForm = z.object({
     token: TokenId,
     to: Account,
-    amount: zAmount,
+    amount: z.object({
+        amount: z.string(),
+    }),
     memo: z.string().max(50),
 });
 
 export const defaultTransferValues = {
-    amount: "",
+    amount: {
+        amount: "",
+    },
     token: "",
     memo: "",
     to: "",
 };
-
-export const formSchema = (tokens: Token[]) =>
-    z
-        .object({
-            token: TokenId,
-            to: Account,
-            amount: zAmount,
-            memo: z.string().max(50).optional(),
-        })
-        .refine(
-            ({ amount, token }) => {
-                if (!token || !amount) return true;
-                const selectedToken = tokens.find(
-                    (t) => t.id === Number(token),
-                );
-                if (!selectedToken) return true;
-                // Check decimal places don't exceed precision
-                const parts = amount.split(".");
-                if (parts.length === 1) {
-                    // No decimal part, so it's valid
-                    return true;
-                }
-                const decimalPart = parts[1];
-                return decimalPart.length <= selectedToken.precision;
-            },
-            ({ token }) => {
-                const selectedToken = tokens.find(
-                    (t) => t.id === Number(token),
-                );
-                return {
-                    message: `Amount cannot have more than ${selectedToken?.precision ?? 0} decimal places`,
-                    path: ["amount"],
-                };
-            },
-        );
-
-export type FormSchema = z.infer<ReturnType<typeof formSchema>>;
