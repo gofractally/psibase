@@ -83,7 +83,10 @@ impl KeyVault for HostCrypto {
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized(FunctionName::sign)?;
+        assert_authorized_with_whitelist(
+            FunctionName::sign,
+            vec!["transact".into(), "auth-sig".into()],
+        )?;
 
         Ok(Supervisor::sign(&hashed_message, &public_key).unwrap())
     }
@@ -92,7 +95,10 @@ impl KeyVault for HostCrypto {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized(FunctionName::sign_explicit)?;
+        assert_authorized_with_whitelist(
+            FunctionName::sign_explicit,
+            vec!["auth-sig".into(), "auth-invite".into()],
+        )?;
 
         Ok(Supervisor::sign_explicit(&hashed_message, &private_key)?)
     }
