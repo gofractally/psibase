@@ -4,10 +4,13 @@ import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { useEffect, useMemo, useState } from "react";
 
+import { supervisor } from "@/supervisor";
+
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useAppForm } from "@shared/components/form/app-form";
-import { TokenAmountField } from "@shared/components/form/token-amount-field";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 
 import { defaultTransferValues, zTransferForm } from "./hooks/useTokenForm";
 
@@ -73,13 +76,14 @@ export const TokensPage = () => {
                                 )}
                             />
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <form.AppField
-                                    name="to"
-                                    children={(field) => (
-                                        <field.TextField
-                                            disabled={disableForm}
-                                        />
-                                    )}
+                                <FieldAccountExisting
+                                    form={form}
+                                    fields="to"
+                                    label="Recipient"
+                                    description={undefined}
+                                    placeholder="Account"
+                                    disabled={disableForm}
+                                    supervisor={supervisor}
                                 />
                                 <form.Subscribe
                                     selector={(state) => state.values.token}
@@ -91,11 +95,12 @@ export const TokensPage = () => {
                                         );
 
                                         return (
-                                            <TokenAmountField
+                                            <FieldTokenAmount
                                                 form={form}
                                                 fields="amount"
                                                 precision={token?.precision}
                                                 disabled={disableForm}
+                                                description={undefined}
                                             />
                                         );
                                     }}
