@@ -2,6 +2,43 @@ import { z } from "zod";
 
 import { withFieldGroup } from "./app-form";
 
+/**
+ * A field for entering a token amount for use in a tanstack/react-form form
+ * Because this uses the `withFieldGroup` HOC, this must be nested in the form's schema as a field group:
+ *
+ * ```tsx
+ * const form = useAppForm({
+ *     defaultValues: {
+ *         to: "",
+ *         amount: {
+ *             amount: "", // must be nested
+ *         },
+ *     },
+ *     validators: z.object({
+ *         to: Account,
+ *         amount: z.object({
+ *             amount: z.string(), // field-level validation will run on top of this
+ *         }),
+ *     }),
+ *     ...
+ * });
+ * ```
+ *
+ * Then consume the field like so:
+ *
+ * ```tsx
+ * <TokenAmountField
+ *     form={form}
+ *     fields="amount"
+ *     precision={precision}
+ *     disabled={isDisabled}
+ * />
+ * ```
+ *
+ * @param precision - The precision of the token
+ * @param disabled - Whether the field is disabled
+ * @returns A field for entering a token amount
+ */
 export const TokenAmountField = withFieldGroup({
     defaultValues: {
         amount: "",
