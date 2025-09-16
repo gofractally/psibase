@@ -28,7 +28,9 @@ export const createPrecisionSchema = (precision: number) => {
 
 export const zTransferForm = z.object({
     token: TokenId,
-    to: Account,
+    to: z.object({
+        account: Account,
+    }),
     amount: z.object({
         amount: z.string(),
     }),
@@ -41,5 +43,7 @@ export const defaultTransferValues = {
     },
     token: "",
     memo: "",
-    to: "",
+    to: {
+        account: "",
+    },
 };

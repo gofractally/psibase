@@ -39,15 +39,16 @@ import { withFieldGroup } from "./app-form";
  * @param disabled - Whether the field is disabled
  * @returns A field for entering a token amount
  */
-export const TokenAmountField = withFieldGroup({
+export const FieldTokenAmount = withFieldGroup({
     defaultValues: {
         amount: "",
     },
     props: {
         precision: undefined as number | undefined,
         disabled: false,
+        description: undefined as string | undefined,
     },
-    render: function Render({ group, precision, disabled }) {
+    render: function Render({ group, precision, disabled, description }) {
         const p = (27.83658204756385).toFixed(precision ?? 0);
         return (
             <group.AppField
@@ -58,6 +59,7 @@ export const TokenAmountField = withFieldGroup({
                             disabled={disabled || precision === undefined}
                             label="Amount"
                             placeholder={`e.g., ${p}`}
+                            description={description}
                         />
                     );
                 }}
