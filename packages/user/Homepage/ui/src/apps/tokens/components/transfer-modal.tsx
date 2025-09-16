@@ -40,7 +40,7 @@ export const TransferModal = withForm({
         const { isPending, mutateAsync: credit } = useCredit();
 
         const [to, amount] = useStore(form.store, (state) => [
-            state.values.to,
+            state.values.to.account,
             state.values.amount,
         ]);
 
@@ -63,14 +63,14 @@ export const TransferModal = withForm({
             try {
                 await credit({
                     tokenId: token,
-                    receiver: to,
+                    receiver: to.account,
                     amount: amount.amount,
                     memo,
                 });
                 toast("Sent", {
-                    description: `Sent ${amount} ${
+                    description: `Sent ${amount.amount} ${
                         selectedToken?.label || selectedToken?.symbol
-                    } to ${to}`,
+                    } to ${to.account}`,
                 });
                 form.reset();
                 onClose();
