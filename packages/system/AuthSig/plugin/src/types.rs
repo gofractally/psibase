@@ -1,4 +1,4 @@
-use crate::bindings::host::crypto::types::Pem;
+use crate::bindings::host::types::types::Pem;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

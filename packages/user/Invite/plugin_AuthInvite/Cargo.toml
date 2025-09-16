@@ -22,5 +22,4 @@ package = "auth-invite:plugin"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
-"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }

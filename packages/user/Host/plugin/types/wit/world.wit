@@ -56,6 +56,13 @@ interface types {
 
     /// PEM type is just a string
     type pem = string;
+
+    /// This represents a keypair of the specified type.
+    /// The public and private keys are encoded in PEM format.
+    record keypair {
+        public-key: pem,
+        private-key: pem,
+    }
 }
 
 world imports {

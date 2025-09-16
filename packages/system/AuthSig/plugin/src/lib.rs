@@ -9,8 +9,8 @@ use trust::*;
 
 // Other plugins
 use bindings::host::crypto::keyvault as HostCrypto;
-use bindings::host::crypto::types::{Keypair, Pem};
 use bindings::host::types::types as HostTypes;
+use bindings::host::types::types::{Keypair, Pem};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces

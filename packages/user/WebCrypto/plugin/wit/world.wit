@@ -2,8 +2,7 @@ package web-crypto:plugin;
 
 /// Methods related to key management
 interface api {
-    use host:types/types.{error};
-    use host:crypto/types.{pem};
+    use host:types/types.{error, pem};
 
     /// Signs a pre-hashed message for the DER-encoded pubKey
     sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;

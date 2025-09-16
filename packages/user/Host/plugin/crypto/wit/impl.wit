@@ -5,6 +5,5 @@ world impl {
     include supervisor:bridge/imports;
     include permissions:plugin/imports;
 
-    export types;
     export keyvault;
 }

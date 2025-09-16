@@ -1,6 +1,6 @@
 use crate::bindings::host::common::{client as Client, server as Server};
-use crate::bindings::host::crypto::types::Pem;
 use crate::bindings::host::types::types as CommonTypes;
+use crate::bindings::host::types::types::Pem;
 use crate::errors::ErrorType::*;
 use crate::types::Response;
 

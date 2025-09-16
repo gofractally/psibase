@@ -7,8 +7,8 @@ use errors::ErrorType::*;
 mod types;
 use types::*;
 
-use bindings::exports::host::crypto::types::{Keypair, Pem};
 use bindings::host::types::types as HostTypes;
+use bindings::host::types::types::{Keypair, Pem};
 use bindings::supervisor::bridge::intf as Supervisor;
 use exports::host::crypto::keyvault::Guest as KeyVault;
 
@@ -21,15 +21,11 @@ use rand_core::OsRng;
 
 psibase::define_trust! {
     descriptions {
-        None => "
-        No trust grants these abilities:
-            - Create new keypairs
-            - Get the public key for a given private key
-            - Convert PEM to DER format
-        ",
+        None => "",
         Low => "
         Low trust grants these abilities:
             - Import existing keypairs
+            - Sign transaction with explicit private key provided
         ",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
@@ -38,8 +34,8 @@ psibase::define_trust! {
     }
     functions {
         None => [generate_unmanaged_keypair, pub_from_priv, to_der],
-        Low => [import_key],
-        High => [sign, sign_explicit],
+        Low => [import_key, sign_explicit],
+        High => [sign],
     }
 }
 

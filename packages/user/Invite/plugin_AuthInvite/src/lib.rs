@@ -7,8 +7,8 @@ use db::*;
 
 // Other plugins
 use bindings::auth_invite::plugin::types::InviteToken;
-use bindings::auth_sig::plugin::keyvault as KeyVault;
 use bindings::host::common::client as Client;
+use bindings::host::crypto::keyvault as KeyVault;
 use bindings::host::types::types::Error;
 use bindings::invite::plugin::advanced::deserialize;
 use bindings::transact::plugin::{hooks::*, types::*};

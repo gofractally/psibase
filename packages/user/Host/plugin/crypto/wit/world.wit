@@ -1,21 +1,8 @@
 package host:crypto;
 
-/// Common types used when dealing with auth service plugins
-interface types {
-    use host:types/types.{pem};
-
-    /// This represents a keypair of the specified type.
-    /// The public and private keys are encoded in PEM format.
-    record keypair {
-        public-key: pem,
-        private-key: pem,
-    }
-}
-
 /// Methods related to key management
 interface keyvault {
-    use host:types/types.{error, pem};
-    use types.{keypair};
+    use host:types/types.{error, pem, keypair};
 
     /// Generates a new keypair that is unmanaged (nothing is stored).
     /// The full keypair is returned to the caller.
@@ -42,6 +29,5 @@ interface keyvault {
 }
 
 world imports {
-    import types;
     import keyvault;
 }

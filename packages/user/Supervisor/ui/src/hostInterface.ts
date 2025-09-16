@@ -68,7 +68,7 @@ export interface HostInterface {
     // Show the active prompt to the user
     requestPrompt: () => void;
 
-    // Import a private key
+    // Import a private key; returns the public key (pem format)
     importKey(privateKey: string): string;
 
     // Sign with this private-key

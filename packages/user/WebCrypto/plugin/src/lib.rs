@@ -10,8 +10,8 @@ use types::*;
 
 use bindings::exports::web_crypto::plugin::api::Guest as Api;
 use bindings::host::common::client as Client;
-use bindings::host::crypto::types::Pem;
 use bindings::host::types::types as HostTypes;
+use bindings::host::types::types::Pem;
 
 // Third-party crates
 use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};

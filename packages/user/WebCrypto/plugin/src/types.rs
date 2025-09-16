@@ -1,5 +1,5 @@
-use crate::bindings::host::crypto::types::Pem;
 use crate::bindings::host::types::types as CommonTypes;
+use crate::bindings::host::types::types::Pem;
 use crate::errors::ErrorType::*;
 
 pub trait TryFromPemStr: Sized {

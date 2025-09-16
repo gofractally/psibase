@@ -1,5 +1,5 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
-use crate::bindings::host::crypto::types::Pem;
+use crate::bindings::host::types::types::Pem;
 use crate::types::*;
 
 fn get_hash(key: &Pem) -> String {
