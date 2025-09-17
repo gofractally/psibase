@@ -108,6 +108,9 @@ export const TokensPage = () => {
                                                 precision={token?.precision}
                                                 disabled={disableForm}
                                                 description={undefined}
+                                                validators={{
+                                                    onChangeListenTo: ["token"],
+                                                }}
                                             />
                                         );
                                     }}
