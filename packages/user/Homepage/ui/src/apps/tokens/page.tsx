@@ -72,7 +72,14 @@ export const TokensPage = () => {
                             <form.AppField
                                 name="token"
                                 children={(field) => (
-                                    <field.TokenSelect tokens={tokens} />
+                                    <field.SelectField
+                                        label="Token"
+                                        options={tokens.map((token) => ({
+                                            value: token.id.toString(),
+                                            label: token.label,
+                                        }))}
+                                        className="w-full"
+                                    />
                                 )}
                             />
                             <div className="grid gap-4 sm:grid-cols-2">
