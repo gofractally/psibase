@@ -1,0 +1,11 @@
+package difficulty:plugin;
+
+interface api {
+    use host:types/types.{error};
+    create: func(thing: string) -> result<_, error>;
+}
+
+
+world imports {
+    import api;
+}
