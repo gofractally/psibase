@@ -18,7 +18,6 @@ custom_error! { pub TokensError
     InvalidNumber = "Invalid Number",
     PrecisionOverflow = "Precision overflow",
     Overflow = "Overflow",
-    MemoTooLarge = "Memo must be 80 bytes or less"
 }
 
 pub type TID = u32;
