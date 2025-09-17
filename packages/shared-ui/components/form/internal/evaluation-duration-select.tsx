@@ -10,7 +10,7 @@ import {
     SelectValue,
 } from "@shared/shadcn/ui/select";
 
-import { useFieldContext } from "./app-form";
+import { useFieldContext } from "../app-form";
 
 const zDuration = z.enum(["Minutes", "Hours", "Days"]);
 
