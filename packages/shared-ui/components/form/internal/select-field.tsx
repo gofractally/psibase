@@ -8,7 +8,7 @@ import {
     Select as ShadcnSelect,
 } from "@shared/shadcn/ui/select";
 
-import { useFieldContext } from "./app-form";
+import { useFieldContext } from "../app-form";
 import { FieldErrors } from "./field-errors";
 
 interface SelectOption<T = string> {
