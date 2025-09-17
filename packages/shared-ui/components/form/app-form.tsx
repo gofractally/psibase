@@ -1,7 +1,7 @@
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
 
 import { DateTimePicker24h } from "./date-time-picker";
-import { DurationSelect } from "./duration-select";
+import { EvaluationDurationSelect } from "./evaluation-duration-select";
 import { NumberField } from "./number-field";
 import { SelectField } from "./select-field";
 import { SubmitButton } from "./submit-button";
@@ -18,7 +18,7 @@ const { useAppForm, withForm, withFieldGroup } = createFormHook({
         NumberField,
         SelectField,
         DateTime: DateTimePicker24h,
-        Duration: DurationSelect,
+        EvaluationDuration: EvaluationDurationSelect,
     },
     formComponents: {
         SubmitButton,
