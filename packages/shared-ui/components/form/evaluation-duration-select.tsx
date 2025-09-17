@@ -14,7 +14,7 @@ import { useFieldContext } from "./app-form";
 
 const zDuration = z.enum(["Minutes", "Hours", "Days"]);
 
-export const DurationSelect = ({
+export const EvaluationDurationSelect = ({
     label,
     defaultFrequency = "Minutes",
 }: {

@@ -109,25 +109,25 @@ export const ScheduleDialog = ({
                     <form.AppField
                         name="registerSeconds"
                         children={(field) => (
-                            <field.Duration label="Registration duration" />
+                            <field.EvaluationDuration label="Registration duration" />
                         )}
                     />
                     <form.AppField
                         name="deliberationSeconds"
                         children={(field) => (
-                            <field.Duration label="Deliberation duration" />
+                            <field.EvaluationDuration label="Deliberation duration" />
                         )}
                     />
                     <form.AppField
                         name="submissionSeconds"
                         children={(field) => (
-                            <field.Duration label="Submission duration" />
+                            <field.EvaluationDuration label="Submission duration" />
                         )}
                     />
                     <form.AppField
                         name="intervalSeconds"
                         children={(field) => (
-                            <field.Duration
+                            <field.EvaluationDuration
                                 label="Frequency"
                                 defaultFrequency="Days"
                             />
