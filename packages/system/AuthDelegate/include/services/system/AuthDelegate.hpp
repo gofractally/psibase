@@ -97,7 +97,6 @@ namespace SystemService
       psibase::AccountNumber getOwner(psibase::AccountNumber account);
 
      private:
-      Tables                        db{psibase::getReceiver()};
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
    PSIO_REFLECT(AuthDelegate,  //

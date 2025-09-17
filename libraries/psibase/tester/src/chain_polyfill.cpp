@@ -44,15 +44,51 @@ void psibase::raw::setRetval(const char* retval, std::uint32_t len)
    psibase::abortMessage("Tester does not support setRetval");
 }
 
-// PSIBASE_NATIVE(kvPut)
-// void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
 // PSIBASE_NATIVE(putSequential)
 // uint64_t putSequential(DbId db, const char* value, uint32_t valueLen);
-// PSIBASE_NATIVE(kvRemove) void kvRemove(DbId db, const char* key, uint32_t keyLen);
 
-uint32_t psibase::raw::kvGet(DbId db, const char* key, uint32_t keyLen)
+struct KvBucket
 {
-   return psibase::tester::raw::kvGet(psibase::tester::raw::getSelectedChain(), db, key, keyLen);
+   DbId              db;
+   std::vector<char> prefix;
+   KvMode            mode;
+   std::vector<char> key(const char* key, uint32_t len) const
+   {
+      std::vector<char> result;
+      result.reserve(prefix.size() + len);
+      result.insert(result.end(), prefix.begin(), prefix.end());
+      result.insert(result.end(), key, key + len);
+      return result;
+   }
+   KvHandle handle() const { return static_cast<KvHandle>(reinterpret_cast<std::uintptr_t>(this)); }
+   static const KvBucket* from(KvHandle handle)
+   {
+      return reinterpret_cast<const KvBucket*>(static_cast<std::uintptr_t>(handle));
+   }
+};
+
+KvHandle psibase::raw::kvOpen(DbId db, const char* prefix, uint32_t len, KvMode mode)
+{
+   return (new KvBucket{.db = db, .prefix{prefix, prefix + len}, .mode = mode})->handle();
+}
+
+KvHandle psibase::raw::kvOpenAt(KvHandle handle, const char* prefix, uint32_t len, KvMode mode)
+{
+   auto src = KvBucket::from(handle);
+   return (new KvBucket{.db = src->db, .prefix = src->key(prefix, len), .mode = mode})->handle();
+}
+
+void psibase::raw::kvClose(KvHandle handle)
+{
+   delete KvBucket::from(handle);
+}
+
+uint32_t psibase::raw::kvGet(KvHandle db, const char* key, uint32_t keyLen)
+{
+   const auto* bucket  = KvBucket::from(db);
+   auto        fullKey = bucket->key(key, keyLen);
+   return psibase::tester::raw::kvGet(psibase::tester::raw::getSelectedChain(), bucket->db,
+                                      fullKey.data(), fullKey.size());
 }
 
 uint32_t psibase::raw::getSequential(DbId db, uint64_t id)
@@ -60,39 +96,56 @@ uint32_t psibase::raw::getSequential(DbId db, uint64_t id)
    return psibase::tester::raw::getSequential(psibase::tester::raw::getSelectedChain(), db, id);
 }
 
-uint32_t psibase::raw::kvGreaterEqual(DbId        db,
+uint32_t psibase::raw::kvGreaterEqual(KvHandle    db,
                                       const char* key,
                                       uint32_t    keyLen,
                                       uint32_t    matchKeySize)
 {
-   return psibase::tester::raw::kvGreaterEqual(psibase::tester::raw::getSelectedChain(), db, key,
-                                               keyLen, matchKeySize);
+   const auto* bucket  = KvBucket::from(db);
+   auto        fullKey = bucket->key(key, keyLen);
+   return psibase::tester::raw::kvGreaterEqual(psibase::tester::raw::getSelectedChain(), bucket->db,
+                                               fullKey.data(), fullKey.size(),
+                                               bucket->prefix.size() + matchKeySize);
 }
 
-uint32_t psibase::raw::kvLessThan(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize)
+uint32_t psibase::raw::kvLessThan(KvHandle    db,
+                                  const char* key,
+                                  uint32_t    keyLen,
+                                  uint32_t    matchKeySize)
 {
-   return psibase::tester::raw::kvLessThan(psibase::tester::raw::getSelectedChain(), db, key,
-                                           keyLen, matchKeySize);
+   const auto* bucket  = KvBucket::from(db);
+   auto        fullKey = bucket->key(key, keyLen);
+   return psibase::tester::raw::kvLessThan(psibase::tester::raw::getSelectedChain(), bucket->db,
+                                           fullKey.data(), fullKey.size(),
+                                           bucket->prefix.size() + matchKeySize);
 }
 
-uint32_t psibase::raw::kvMax(DbId db, const char* key, uint32_t keyLen)
+uint32_t psibase::raw::kvMax(KvHandle db, const char* key, uint32_t keyLen)
 {
-   return psibase::tester::raw::kvMax(psibase::tester::raw::getSelectedChain(), db, key, keyLen);
+   const auto* bucket  = KvBucket::from(db);
+   auto        fullKey = bucket->key(key, keyLen);
+   return psibase::tester::raw::kvMax(psibase::tester::raw::getSelectedChain(), bucket->db,
+                                      fullKey.data(), fullKey.size());
 }
 
-void psibase::raw::kvPut(DbId        db,
+void psibase::raw::kvPut(KvHandle    db,
                          const char* key,
                          uint32_t    keyLen,
                          const char* value,
                          uint32_t    valueLen)
 {
-   psibase::tester::raw::kvPut(psibase::tester::raw::getSelectedChain(), db, key, keyLen, value,
-                               valueLen);
+   const auto* bucket  = KvBucket::from(db);
+   auto        fullKey = bucket->key(key, keyLen);
+   psibase::tester::raw::kvPut(psibase::tester::raw::getSelectedChain(), bucket->db, fullKey.data(),
+                               fullKey.size(), value, valueLen);
 }
 
-void psibase::raw::kvRemove(DbId db, const char* key, uint32_t keyLen)
+void psibase::raw::kvRemove(KvHandle db, const char* key, uint32_t keyLen)
 {
-   psibase::tester::raw::kvRemove(psibase::tester::raw::getSelectedChain(), db, key, keyLen);
+   const auto* bucket  = KvBucket::from(db);
+   auto        fullKey = bucket->key(key, keyLen);
+   psibase::tester::raw::kvRemove(psibase::tester::raw::getSelectedChain(), bucket->db,
+                                  fullKey.data(), fullKey.size());
 }
 
 std::int32_t psibase::raw::socketSend(std::int32_t fd, const void* data, std::size_t size)
@@ -116,3 +169,6 @@ void psibase::raw::abortSubjective()
 {
    return psibase::tester::raw::abortSubjective(psibase::tester::raw::getSelectedChain());
 }
+
+AccountNumber psibase::internal::sender;
+AccountNumber psibase::internal::receiver;

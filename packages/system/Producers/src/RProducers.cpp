@@ -26,21 +26,21 @@ struct ProducerQuery
    }
    ConsensusData consensus() const
    {
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      const auto& status = getOptionalStatus();
       if (!status)
          return {};
       return std::move(status->consensus.current.data);
    }
    std::optional<ConsensusData> nextConsensus() const
    {
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      const auto& status = getOptionalStatus();
       if (!status || !status->consensus.next)
          return {};
       return std::move(status->consensus.next->consensus.data);
    }
    std::optional<BlockNum> jointStart() const
    {
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      const auto& status = getOptionalStatus();
       if (!status || !status->consensus.next)
          return {};
       return status->consensus.next->blockNum;

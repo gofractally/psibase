@@ -71,7 +71,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
         let mut prefix = table_index.prefix;
         subkey.append_key(&mut prefix);
         TableQuery {
-            index: TableIndex::new(table_index.db_id, prefix, table_index.is_secondary),
+            index: TableIndex::new(&table_index.db, prefix, table_index.is_secondary),
             first: None,
             last: None,
             before: None,
@@ -223,7 +223,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
 
     fn get_value_from_bytes(&self, bytes: Vec<u8>) -> Option<Record> {
         if self.index.is_secondary {
-            kv_get(self.index.db_id, &RawKey::new(bytes)).unwrap()
+            kv_get(&self.index.db, &RawKey::new(bytes)).unwrap()
         } else {
             Some(Record::unpacked(&bytes[..]).unwrap())
         }
@@ -234,7 +234,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
             .begin
             .as_ref()
             .map_or(&self.index.prefix[..], |k| &k.data[..]);
-        let value = kv_greater_equal_bytes(self.index.db_id, key, self.index.prefix.len() as u32);
+        let value = kv_greater_equal_bytes(&self.index.db, key, self.index.prefix.len() as u32);
 
         if let Some(value) = value {
             self.begin = Some(RawKey::new(get_key_bytes()));
@@ -253,12 +253,12 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
     fn next_back(&mut self) -> Option<(&[u8], Record)> {
         let value = if let Some(back_key) = &self.end {
             kv_less_than_bytes(
-                self.index.db_id,
+                &self.index.db,
                 &back_key.data[..],
                 self.index.prefix.len() as u32,
             )
         } else {
-            kv_max_bytes(self.index.db_id, &self.index.prefix)
+            kv_max_bytes(&self.index.db, &self.index.prefix)
         };
 
         if let Some(value) = value {
@@ -314,7 +314,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
                 let mut has_previous_page = false;
                 let mut has_next_page = false;
                 if let Some(item) = items.first() {
-                    if kv_less_than_bytes(self.index.db_id, &item.0, self.index.prefix.len() as u32)
+                    if kv_less_than_bytes(&self.index.db, &item.0, self.index.prefix.len() as u32)
                         .is_some()
                     {
                         let found_key = RawKey::new(get_key_bytes());
@@ -325,7 +325,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
                 if let Some(item) = items.last() {
                     let mut k = item.0.clone();
                     k.push(0);
-                    if kv_greater_equal_bytes(self.index.db_id, &k, self.index.prefix.len() as u32)
+                    if kv_greater_equal_bytes(&self.index.db, &k, self.index.prefix.len() as u32)
                         .is_some()
                     {
                         let found_key = RawKey::new(get_key_bytes());

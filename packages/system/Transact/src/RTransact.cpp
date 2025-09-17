@@ -668,7 +668,7 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
 void RTransact::onBlock()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   auto stat = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   const auto stat = getOptionalStatus();
    check(stat && stat->head, "Head block should be set before calling onBlock");
 
    checkReverify(stat->head->blockId);
@@ -758,9 +758,9 @@ void RTransact::onVerify(std::uint64_t                      id,
    auto unverifiedTransactions = open<UnverifiedTransactionTable>();
    auto reverify               = open<ReverifySignaturesTable>();
    auto clients                = open<TraceClientTable>();
-   auto runVerifyId            = open<VerifyIdTable>().get({}).value_or(VerifyIdRecord{}).verifyId;
-   auto errorTxId              = std::optional<Checksum256>{};
-   auto broadcastTxId          = std::optional<Checksum256>{};
+   auto runVerifyId = open<VerifyIdTable>(KvMode::read).get({}).value_or(VerifyIdRecord{}).verifyId;
+   auto errorTxId   = std::optional<Checksum256>{};
+   auto broadcastTxId = std::optional<Checksum256>{};
    PSIBASE_SUBJECTIVE_TX
    {
       to<XRun>().finish(id);

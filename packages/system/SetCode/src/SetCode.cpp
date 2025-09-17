@@ -26,6 +26,7 @@ namespace SystemService
       }
 
       void decrementRefCount(CodeRefCountTable& refsTable,
+                             CodeByHashTable&   codeTable,
                              const Checksum256& codeHash,
                              std::uint8_t       vmType,
                              std::uint8_t       vmVersion)
@@ -37,7 +38,7 @@ namespace SystemService
          else
          {
             refsTable.remove(*prevCount);
-            kvRemove(CodeByHashRow::db, codeByHashKey(codeHash, vmType, vmVersion));
+            codeTable.erase(std::tuple(codeHash, vmType, vmVersion));
          }
       }
 
@@ -84,14 +85,17 @@ namespace SystemService
                          uint8_t           vmVersion,
                          std::vector<char> code)
    {
-      auto refsTable = Tables{}.open<CodeRefCountTable>();
+      auto refsTable       = Tables{}.open<CodeRefCountTable>();
+      auto native          = Native::tables();
+      auto codeTable       = native.open<CodeTable>();
+      auto codeByHashTable = native.open<CodeByHashTable>();
       // TODO: validate code here?
       // TODO: special rule for resource charging: pretend CodeByHashRow isn't shared
       // TODO: move numRefs to a different row?
       check(getSender() == service, "sender must match service account");
       check(vmType == 0 && vmVersion == 0, "unsupported type or version");
 
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
+      auto account = codeTable.get(service);
       if (!account)
       {
          account.emplace();
@@ -108,7 +112,8 @@ namespace SystemService
       // decrement old reference count
       if (account->codeHash != Checksum256{})
       {
-         decrementRefCount(refsTable, account->codeHash, account->vmType, account->vmVersion);
+         decrementRefCount(refsTable, codeByHashTable, account->codeHash, account->vmType,
+                           account->vmVersion);
       }
 
       incrementVerifySeq(account->flags);
@@ -117,9 +122,9 @@ namespace SystemService
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
       if (account->codeHash != Checksum256{} || account->flags)
-         kvPut(account->db, account->key(), *account);
+         codeTable.put(*account);
       else
-         kvRemove(account->db, account->key());
+         codeTable.remove(*account);
 
       if (!code.empty())
       {
@@ -129,7 +134,7 @@ namespace SystemService
                                    .vmType    = account->vmType,
                                    .vmVersion = account->vmVersion,
                                    .code{code.begin(), code.end()}};
-            kvPut(code_obj.db, code_obj.key(), code_obj);
+            codeByHashTable.put(code_obj);
          }
       }
    }  // setCode
@@ -162,11 +167,13 @@ namespace SystemService
 
       if (!incrementRefCount(refsTable, codeHash, vmType, vmVersion))
       {
+         auto          native          = Native::tables();
+         auto          codeByHashTable = native.open<CodeByHashTable>();
          CodeByHashRow code_obj{.codeHash  = codeHash,
                                 .vmType    = vmType,
                                 .vmVersion = vmVersion,
                                 .code{code.begin(), code.end()}};
-         kvPut(code_obj.db, code_obj.key(), code_obj);
+         codeByHashTable.put(code_obj);
       }
       stagedCode.put(row);
    }
@@ -181,7 +188,9 @@ namespace SystemService
       auto row = stagedCode.get(std::tuple(sender, id, service));
       check(row.has_value(), "staged code does not exist");
 
-      decrementRefCount(refsTable, row->codeHash, row->vmType, row->vmVersion);
+      auto native          = Native::tables();
+      auto codeByHashTable = native.open<CodeByHashTable>();
+      decrementRefCount(refsTable, codeByHashTable, row->codeHash, row->vmType, row->vmVersion);
       stagedCode.remove(*row);
    }
 
@@ -196,6 +205,8 @@ namespace SystemService
       auto tables     = Tables{};
       auto refsTable  = tables.open<CodeRefCountTable>();
       auto stagedCode = tables.open<StagedCodeTable>();
+      auto native     = Native::tables();
+      auto codeTable  = native.open<CodeTable>();
 
       check(vmType == 0 && vmVersion == 0, "unsupported type or version");
 
@@ -207,7 +218,7 @@ namespace SystemService
             "staged code does not match");
       stagedCode.remove(*staged);
 
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
+      auto account = codeTable.get(service);
       if (!account)
       {
          account.emplace();
@@ -221,7 +232,9 @@ namespace SystemService
       // decrement old reference count
       if (account->codeHash != Checksum256{})
       {
-         decrementRefCount(refsTable, account->codeHash, account->vmType, account->vmVersion);
+         auto codeByHashTable = native.open<CodeByHashTable>();
+         decrementRefCount(refsTable, codeByHashTable, account->codeHash, account->vmType,
+                           account->vmVersion);
       }
 
       incrementVerifySeq(account->flags);
@@ -229,13 +242,15 @@ namespace SystemService
       account->codeHash  = codeHash;
       account->vmType    = vmType;
       account->vmVersion = vmVersion;
-      kvPut(account->db, account->key(), *account);
+      codeTable.put(*account);
    }
 
    void SetCode::setFlags(psibase::AccountNumber service, uint64_t flags)
    {
       check(getSender() == getReceiver(), "incorrect sender");
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
+      auto native    = Native::tables();
+      auto codeTable = native.open<CodeTable>();
+      auto account   = codeTable.get(service);
       if (!account)
       {
          account.emplace();
@@ -245,14 +260,14 @@ namespace SystemService
 
       account->flags = flags;
       if (account->codeHash != Checksum256{} || account->flags)
-         kvPut(account->db, account->key(), *account);
+         codeTable.put(*account);
       else
-         kvRemove(account->db, account->key());
+         codeTable.remove(*account);
    }
 
    std::uint64_t SetCode::verifySeq()
    {
-      return open<VerifySequenceTable>().get({}).value_or(VerifySequenceRow{}).seq;
+      return open<VerifySequenceTable>(KvMode::read).get({}).value_or(VerifySequenceRow{}).seq;
    }
 
 }  // namespace SystemService
