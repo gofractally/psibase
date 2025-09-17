@@ -22,4 +22,4 @@ sha2 = { version = "0.10" }
 pem = { version = "3.0.4" }
 
 [dev-dependencies]
-staged-tx-pkg = { path = "..", version = "0.20.0" }
+staged-tx-pkg = { path = "..", version = "0.21.0" }
