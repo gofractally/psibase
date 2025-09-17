@@ -1235,7 +1235,7 @@ dependencies = [
 
 [[package]]
 name = "host-crypto"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "p256",
  "pem",
@@ -3273,7 +3273,7 @@ dependencies = [
 
 [[package]]
 name = "web-crypto"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "p256",
  "pem",
