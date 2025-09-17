@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <psibase/SocketInfo.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
 #include <set>

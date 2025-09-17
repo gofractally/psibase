@@ -27,7 +27,7 @@ extern "C" void start(AccountNumber this_service)
    check(this_service == TestServiceEntry::service,
          std::format("{} != {}", this_service.str(), TestServiceEntry::service.str()));
    ++start_called;
-   auto counter = TestServiceEntry{}.open<CallCounterTable>();
+   auto counter = TestServiceEntry{}.open<CallCounterTable>(KvMode::readWrite);
    auto row     = counter.get(CallCounterRow::start)
                   .value_or(CallCounterRow{.id = CallCounterRow::start, .count = 0});
    ++row.count;
@@ -47,7 +47,7 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
    check(act.method == MethodNumber{"call"}, "called: act.method = " + act.method.str());
    check(pl.memo == "Counting down", "memo: " + pl.memo);
    {
-      auto counter = TestServiceEntry{}.open<CallCounterTable>();
+      auto counter = TestServiceEntry{}.open<CallCounterTable>(KvMode::readWrite);
       auto row     = counter.get(CallCounterRow::called)
                      .value_or(CallCounterRow{.id = CallCounterRow::called, .count = 0});
       int depth = 3 - pl.number;

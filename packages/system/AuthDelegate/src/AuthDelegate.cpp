@@ -78,7 +78,7 @@ namespace SystemService
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)
    {
-      auto table  = db.open<AuthDelegateTable>();
+      auto table  = open<AuthDelegateTable>();
       auto record = table.getIndex<0>().get(owner);
       auto sender = getSender();
       if (sender == owner || record && record->owner == sender)
@@ -91,7 +91,7 @@ namespace SystemService
 
    psibase::AccountNumber AuthDelegate::getOwner(psibase::AccountNumber account)
    {
-      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(account);
+      auto row = open<AuthDelegateTable>(KvMode::read).getIndex<0>().get(account);
       check(row.has_value(), "account does not have an owning account");
       return row->owner;
    }
@@ -103,7 +103,7 @@ namespace SystemService
 
    void AuthDelegate::newAccount(psibase::AccountNumber name, psibase::AccountNumber owner)
    {
-      auto table  = db.open<AuthDelegateTable>();
+      auto table  = open<AuthDelegateTable>();
       auto record = table.getIndex<0>().get(name);
       if (record && record->owner == owner)
       {

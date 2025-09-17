@@ -778,7 +778,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1682,7 +1682,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1739,7 +1739,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1753,7 +1753,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1765,14 +1765,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "seahash",
 ]
@@ -1794,7 +1794,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-token-stream"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2408,7 +2408,7 @@ dependencies = [
 
 [[package]]
 name = "token-stream"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2420,7 +2420,7 @@ dependencies = [
 
 [[package]]
 name = "token-stream-pkg"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "r-token-stream",
  "token-stream",
@@ -2429,7 +2429,7 @@ dependencies = [
 
 [[package]]
 name = "token-stream-plugin"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "psibase",
  "serde",
