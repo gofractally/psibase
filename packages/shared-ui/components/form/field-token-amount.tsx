@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { FieldValidators } from "@tanstack/react-form";
+
 import { z } from "zod";
 
 import { withFieldGroup } from "./app-form";
@@ -32,11 +35,15 @@ import { withFieldGroup } from "./app-form";
  *     fields="amount"
  *     precision={precision}
  *     disabled={isDisabled}
+ *     description={undefined}
+ *     validators={{}}
  * />
  * ```
  *
  * @param precision - The precision of the token
  * @param disabled - Whether the field is disabled
+ * @param description - Optional description text (specify undefined to ignore)
+ * @param validators - Optional validators (specify `{}` to ignore)
  * @returns A field for entering a token amount
  */
 export const FieldTokenAmount = withFieldGroup({
@@ -47,9 +54,30 @@ export const FieldTokenAmount = withFieldGroup({
         precision: undefined as number | undefined,
         disabled: false,
         description: undefined as string | undefined,
+        validators: {} as FieldValidators<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
     },
-    render: function Render({ group, precision, disabled, description }) {
+    render: function Render({
+        group,
+        precision,
+        disabled,
+        description,
+        validators,
+    }) {
         const p = (27.83658204756385).toFixed(precision ?? 0);
+
         return (
             <group.AppField
                 name="amount"
@@ -64,7 +92,8 @@ export const FieldTokenAmount = withFieldGroup({
                     );
                 }}
                 validators={{
-                    onChange: zTokenAmount(precision ?? 0),
+                    onChangeAsync: zTokenAmount(precision ?? 0), // doing this async ensures precision is not stale
+                    ...validators,
                 }}
             />
         );

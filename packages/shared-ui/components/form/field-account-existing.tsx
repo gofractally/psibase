@@ -82,8 +82,7 @@ export const FieldAccountExisting = withFieldGroup({
                 }}
                 validators={{
                     onChange: zAccount,
-                    onChangeAsyncDebounceMs: 1000,
-                    onChangeAsync: async ({ value }) => {
+                    onSubmitAsync: async ({ value }) => {
                         const exists = await doesAccountExist(
                             value,
                             supervisor!,
