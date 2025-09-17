@@ -12,7 +12,7 @@ import {
 } from "@shared/shadcn/ui/popover";
 import { ScrollArea, ScrollBar } from "@shared/shadcn/ui/scroll-area";
 
-import { useFieldContext } from "./app-form";
+import { useFieldContext } from "../app-form";
 
 export function DateTimePicker24h({
     label = "No label",
