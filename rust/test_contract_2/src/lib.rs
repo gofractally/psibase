@@ -104,7 +104,7 @@ mod service {
     impl Query {
         /// Get the answer to `account`'s most recent calculation
         async fn answer(&self, account: AccountNumber) -> Option<Answer> {
-            AnswerTable::new().get_index_pk().get(&account)
+            AnswerTable::read().get_index_pk().get(&account)
         }
 
         /// Look up an event

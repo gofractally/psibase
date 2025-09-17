@@ -71,7 +71,7 @@ impl KeyVault for HostCrypto {
         assert_authorized(FunctionName::to_der)?;
 
         let pem = pem::Pem::try_from_pem_str(&key)?;
-        Ok(pem.contents().to_vec())
+        Ok(pem.into_contents())
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
@@ -80,7 +80,7 @@ impl KeyVault for HostCrypto {
             vec!["transact".into(), "auth-sig".into()],
         )?;
 
-        Ok(Supervisor::sign(&hashed_message, &public_key).unwrap())
+        Supervisor::sign(&hashed_message, &public_key)
     }
 
     fn sign_explicit(
@@ -92,7 +92,7 @@ impl KeyVault for HostCrypto {
             vec!["auth-sig".into(), "auth-invite".into()],
         )?;
 
-        Ok(Supervisor::sign_explicit(&hashed_message, &private_key)?)
+        Supervisor::sign_explicit(&hashed_message, &private_key)
     }
 
     fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {

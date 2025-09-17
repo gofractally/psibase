@@ -151,7 +151,7 @@ pub fn set_retval<T: Pack>(val: &T) {
     unsafe { native_raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }
 
-fn get_optional_result_bytes(size: u32) -> Option<Vec<u8>> {
+pub fn get_optional_result_bytes(size: u32) -> Option<Vec<u8>> {
     if size < u32::MAX {
         Some(get_result_bytes(size))
     } else {
@@ -159,13 +159,35 @@ fn get_optional_result_bytes(size: u32) -> Option<Vec<u8>> {
     }
 }
 
+#[derive(Debug)]
+pub struct KvHandle(native_raw::KvHandle);
+
+pub use native_raw::KvMode;
+
+impl KvHandle {
+    pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
+        KvHandle(unsafe { native_raw::kvOpen(db, prefix.as_ptr(), prefix.len() as u32, mode) })
+    }
+    pub fn subtree(&self, prefix: &[u8], mode: KvMode) -> KvHandle {
+        KvHandle(unsafe {
+            native_raw::kvOpenAt(self.0, prefix.as_ptr(), prefix.len() as u32, mode)
+        })
+    }
+}
+
+impl Drop for KvHandle {
+    fn drop(&mut self) {
+        unsafe { native_raw::kvClose(self.0) }
+    }
+}
+
 /// Set a key-value pair
 ///
 /// If key already exists, then replace the existing value.
-pub fn kv_put_bytes(db: DbId, key: &[u8], value: &[u8]) {
+pub fn kv_put_bytes(db: &KvHandle, key: &[u8], value: &[u8]) {
     unsafe {
         native_raw::kvPut(
-            db,
+            db.0,
             key.as_ptr(),
             key.len() as u32,
             value.as_ptr(),
@@ -177,7 +199,7 @@ pub fn kv_put_bytes(db: DbId, key: &[u8], value: &[u8]) {
 /// Set a key-value pair
 ///
 /// If key already exists, then replace the existing value.
-pub fn kv_put<K: ToKey, V: Pack>(db: DbId, key: &K, value: &V) {
+pub fn kv_put<K: ToKey, V: Pack>(db: &KvHandle, key: &K, value: &V) {
     kv_put_bytes(db, &key.to_key(), &value.packed())
 }
 
@@ -201,23 +223,26 @@ pub fn put_sequential<Type: Pack, V: Pack>(
 }
 
 /// Remove a key-value pair if it exists
-pub fn kv_remove_bytes(db: DbId, key: &[u8]) {
-    unsafe { native_raw::kvRemove(db, key.as_ptr(), key.len() as u32) }
+pub fn kv_remove_bytes(db: &KvHandle, key: &[u8]) {
+    unsafe { native_raw::kvRemove(db.0, key.as_ptr(), key.len() as u32) }
 }
 
 /// Remove a key-value pair if it exists
-pub fn kv_remove<K: ToKey>(db: DbId, key: &K) {
+pub fn kv_remove<K: ToKey>(db: &KvHandle, key: &K) {
     kv_remove_bytes(db, &key.to_key())
 }
 
 /// Get a key-value pair, if any
-pub fn kv_get_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
-    let size = unsafe { native_raw::kvGet(db, key.as_ptr(), key.len() as u32) };
+pub fn kv_get_bytes(db: &KvHandle, key: &[u8]) -> Option<Vec<u8>> {
+    let size = unsafe { native_raw::kvGet(db.0, key.as_ptr(), key.len() as u32) };
     get_optional_result_bytes(size)
 }
 
 /// Get a key-value pair, if any
-pub fn kv_get<V: UnpackOwned, K: ToKey>(db: DbId, key: &K) -> Result<Option<V>, fracpack::Error> {
+pub fn kv_get<V: UnpackOwned, K: ToKey>(
+    db: &KvHandle,
+    key: &K,
+) -> Result<Option<V>, fracpack::Error> {
     if let Some(v) = kv_get_bytes(db, &key.to_key()) {
         Ok(Some(V::unpacked(&v)?))
     } else {
@@ -231,9 +256,9 @@ pub fn kv_get<V: UnpackOwned, K: ToKey>(db: DbId, key: &K) -> Result<Option<V>, 
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_greater_equal_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
+pub fn kv_greater_equal_bytes(db: &KvHandle, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
     let size =
-        unsafe { native_raw::kvGreaterEqual(db, key.as_ptr(), key.len() as u32, match_key_size) };
+        unsafe { native_raw::kvGreaterEqual(db.0, key.as_ptr(), key.len() as u32, match_key_size) };
     get_optional_result_bytes(size)
 }
 
@@ -244,11 +269,11 @@ pub fn kv_greater_equal_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Opti
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
 pub fn kv_greater_equal<K: ToKey, V: UnpackOwned>(
-    db_id: DbId,
+    db: &KvHandle,
     key: &K,
     match_key_size: u32,
 ) -> Option<V> {
-    let bytes = kv_greater_equal_bytes(db_id, &key.to_key(), match_key_size);
+    let bytes = kv_greater_equal_bytes(db, &key.to_key(), match_key_size);
     bytes.map(|v| V::unpacked(&v[..]).unwrap())
 }
 
@@ -257,9 +282,9 @@ pub fn kv_greater_equal<K: ToKey, V: UnpackOwned>(
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_less_than_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
+pub fn kv_less_than_bytes(db: &KvHandle, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
     let size =
-        unsafe { native_raw::kvLessThan(db, key.as_ptr(), key.len() as u32, match_key_size) };
+        unsafe { native_raw::kvLessThan(db.0, key.as_ptr(), key.len() as u32, match_key_size) };
     get_optional_result_bytes(size)
 }
 
@@ -269,27 +294,27 @@ pub fn kv_less_than_bytes(db: DbId, key: &[u8], match_key_size: u32) -> Option<V
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
 pub fn kv_less_than<K: ToKey, V: UnpackOwned>(
-    db_id: DbId,
+    db: &KvHandle,
     key: &K,
     match_key_size: u32,
 ) -> Option<V> {
-    let bytes = kv_less_than_bytes(db_id, &key.to_key(), match_key_size);
+    let bytes = kv_less_than_bytes(db, &key.to_key(), match_key_size);
     bytes.map(|v| V::unpacked(&v[..]).unwrap())
 }
 
 /// Get the maximum key-value pair which has key as a prefix
 ///
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
-pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
-    let size = unsafe { native_raw::kvMax(db, key.as_ptr(), key.len() as u32) };
+pub fn kv_max_bytes(db: &KvHandle, key: &[u8]) -> Option<Vec<u8>> {
+    let size = unsafe { native_raw::kvMax(db.0, key.as_ptr(), key.len() as u32) };
     get_optional_result_bytes(size)
 }
 
 /// Get the maximum key-value pair which has key as a prefix
 ///
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
-pub fn kv_max<K: ToKey, V: UnpackOwned>(db_id: DbId, key: &K) -> Option<V> {
-    let bytes = kv_max_bytes(db_id, &key.to_key());
+pub fn kv_max<K: ToKey, V: UnpackOwned>(db: &KvHandle, key: &K) -> Option<V> {
+    let bytes = kv_max_bytes(db, &key.to_key());
     bytes.map(|v| V::unpacked(&v[..]).unwrap())
 }
 

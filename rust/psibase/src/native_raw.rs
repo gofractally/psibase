@@ -4,6 +4,25 @@
 //! available for services to use directly, but we recommend using
 //! the [Wrapped Native Functions](crate::native) instead.
 
+use crate::DbId;
+
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct KvHandle(u32);
+
+impl KvHandle {
+    pub const INVALID: KvHandle = KvHandle(u32::MAX);
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+pub enum KvMode {
+    None = 0,
+    Read = 1,
+    Write = 2,
+    ReadWrite = 3,
+}
+
 extern "C" {
     /// Copy `min(dest_size, resultSize - offset)` bytes from
     /// `result + offset` into `dest` and return `resultSize`
@@ -55,10 +74,44 @@ extern "C" {
     /// Set the currently-executing action's return value
     pub fn setRetval(retval: *const u8, len: u32);
 
+    /// Opens a key-value database
+    ///
+    /// The prefix will be added automatically to all accesses using the handle.
+    ///
+    /// Access control is checked at open:
+    /// - Native databases can only be opened by privileged services
+    /// - For regular databases, the first 8 bytes of the prefix must be the
+    ///   caller service (big endian)
+    /// - Some databases forbid reading or writing depending on the run mode
+    ///
+    /// The maximum number of handles that a service can have open
+    /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+    /// is exceeded, this function will abort.
+    ///
+    /// The handle is only usable by the current service. Use `exportHandles`
+    /// to pass it to another service.
+    pub fn kvOpen(db: DbId, prefix: *const u8, len: u32, mode: KvMode) -> KvHandle;
+
+    /// Opens a subtree of a key-value database
+    ///
+    /// - The prefix will be appended to any prefix that the source has
+    /// - The mode must be at least as restrictive as the source mode
+    ///
+    /// The maximum number of handles that a service can have open
+    /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+    /// is exceeded, this function will abort.
+    pub fn kvOpenAt(db: KvHandle, prefix: *const u8, len: u32, mode: KvMode) -> KvHandle;
+
+    /// Closes a key-value database
+    ///
+    /// If the handle was exported, all copies are unaffected and
+    /// will remain usable until they are also closed.
+    pub fn kvClose(handle: KvHandle);
+
     /// Set a key-value pair
     ///
     /// If key already exists, then replace the existing value.
-    pub fn kvPut(db: crate::DbId, key: *const u8, key_len: u32, value: *const u8, value_len: u32);
+    pub fn kvPut(db: KvHandle, key: *const u8, key_len: u32, value: *const u8, value_len: u32);
 
     /// Add a sequentially-numbered record
     ///
@@ -66,13 +119,13 @@ extern "C" {
     pub fn putSequential(db: crate::DbId, value: *const u8, value_len: u32) -> u64;
 
     /// Remove a key-value pair if it exists
-    pub fn kvRemove(db: crate::DbId, key: *const u8, key_len: u32);
+    pub fn kvRemove(db: KvHandle, key: *const u8, key_len: u32);
 
     /// Get a key-value pair, if any
     ///
     /// If key exists, then sets result to value and returns size. If key does not
     /// exist, returns `u32::MAX` and clears result. Use [getResult] to get result.
-    pub fn kvGet(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+    pub fn kvGet(db: KvHandle, key: *const u8, key_len: u32) -> u32;
 
     /// Get a sequentially-numbered record
     ///
@@ -87,12 +140,7 @@ extern "C" {
     /// matches the provided key, then sets result to value and returns size. Also
     /// sets key. Otherwise returns `u32::MAX` and clears result. Use [getResult] to get
     /// result and [getKey] to get found key.
-    pub fn kvGreaterEqual(
-        db: crate::DbId,
-        key: *const u8,
-        key_len: u32,
-        match_key_size: u32,
-    ) -> u32;
+    pub fn kvGreaterEqual(db: KvHandle, key: *const u8, key_len: u32, match_key_size: u32) -> u32;
 
     /// Get the key-value pair immediately-before provided key
     ///
@@ -100,14 +148,14 @@ extern "C" {
     /// matches the provided key, then sets result to value and returns size.
     /// Also sets key. Otherwise returns `u32::MAX` and clears result. Use [getResult]
     /// to get result and [getKey] to get found key.
-    pub fn kvLessThan(db: crate::DbId, key: *const u8, key_len: u32, match_key_size: u32) -> u32;
+    pub fn kvLessThan(db: KvHandle, key: *const u8, key_len: u32, match_key_size: u32) -> u32;
 
     /// Get the maximum key-value pair which has key as a prefix
     ///
     /// If one is found, then sets result to value and returns size. Also sets key.
     /// Otherwise returns `u32::MAX` and clears result. Use [getResult] to get result
     /// and [getKey] to get found key.
-    pub fn kvMax(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+    pub fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32;
 
     pub fn checkoutSubjective();
     pub fn commitSubjective() -> bool;

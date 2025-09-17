@@ -3,6 +3,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
+#include <psio/to_hex.hpp>
 
 #include <random>
 
@@ -36,42 +37,6 @@ namespace psibase
          return (self.code.flags & CodeRow::runMode) || self.dbMode.isSubjective;
       }
 
-      DbId getDbRead(NativeFunctions& self, uint32_t db, psio::input_stream key)
-      {
-         if (db == uint32_t(DbId::service) || db == uint32_t(DbId::native))
-         {
-            check(self.dbMode.isSubjective || self.dbMode.isSync,
-                  "database access disabled during proof verification");
-            return (DbId)db;
-         }
-         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::session) ||
-             db == uint32_t(DbId::temporary))
-         {
-            uint64_t prefix = self.code.codeNum.value;
-            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
-            check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
-                  "key prefix must match service for accessing the subjective database");
-            check(isSubjectiveContext(self),
-                  "subjective databases cannot be read in a deterministic context");
-            return (DbId)db;
-         }
-         if (db == uint32_t(DbId::writeOnly) || db == uint32_t(DbId::blockLog))
-         {
-            check(isSubjectiveContext(self),
-                  "subjective databases cannot be read in a deterministic context");
-            return (DbId)db;
-         }
-         if (db == uint32_t(DbId::nativeSubjective) || db == uint32_t(DbId::nativeSession))
-         {
-            check(isSubjectiveContext(self),
-                  "subjective databases cannot be read in a deterministic context");
-            check(self.code.flags & CodeRow::isPrivileged, "service may not read this db");
-            check(self.code.flags & ExecutionContext::isLocal, "service may not read this db");
-            return (DbId)db;
-         }
-         throw std::runtime_error("service may not read this db, or must use another intrinsic");
-      }
-
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
       {
          if (db == uint32_t(DbId::historyEvent) || db == uint32_t(DbId::uiEvent) ||
@@ -84,71 +49,37 @@ namespace psibase
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
 
-      bool keyHasServicePrefix(uint32_t db)
+      bool keyHasServicePrefix(DbId db)
       {
-         return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
-                db == uint32_t(DbId::subjective) || db == uint32_t(DbId::session) ||
-                db == uint32_t(DbId::temporary);
+         return db == DbId::service || db == DbId::writeOnly || db == DbId::subjective ||
+                db == DbId::session || db == DbId::temporary;
       }
 
       struct Writable
       {
-         DbId db;
          bool chargeable;
          bool refundable;
       };
 
-      Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
+      Writable getDbWrite(NativeFunctions& self, DbId db, psio::input_stream key)
       {
-         if (keyHasServicePrefix(db))
+         if (db == DbId::subjective || db == DbId::session || db == DbId::temporary ||
+             db == DbId::nativeSubjective || db == DbId::nativeSession)
          {
-            uint64_t prefix = self.code.codeNum.value;
-            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
-            check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
-                  "key prefix must match service during write");
-         };
-
-         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::session) ||
-             db == uint32_t(DbId::temporary))
-         {
-            check(isSubjectiveContext(self),
-                  "subjective databases cannot be written in a deterministic context");
-            check((self.code.flags & CodeRow::isPrivileged) ||
-                      (self.code.flags & ExecutionContext::isLocal),
-                  "service may not write this db");
-            return {(DbId)db, false, false};
+            return {false, false};
          }
 
-         if (db == uint32_t(DbId::nativeSubjective) || db == uint32_t(DbId::nativeSession))
+         if (db == DbId::writeOnly)
          {
-            check(isSubjectiveContext(self),
-                  "subjective databases cannot be written in a deterministic context");
-            check((self.code.flags & CodeRow::isPrivileged), "service may not write this db");
-            check((self.code.flags & ExecutionContext::isLocal), "service may not write this db");
-            return {(DbId)db, false, false};
+            return {!isSubjectiveContext(self), false};
          }
 
-         if (db == uint32_t(DbId::writeOnly))
+         if (db == DbId::service || db == DbId::native)
          {
-            check(self.dbMode.isSync, "writeOnly database cannot be written in an async context");
-            check(self.transactionContext.dbMode.isSubjective ||
-                      (self.code.flags & CodeRow::runMode) != CodeRow::runModeRpc,
-                  "subjective services may only write to DbId::subjective");
-            return {(DbId)db, !(self.code.flags & CodeRow::runMode), false};
+            return {true, true};
          }
-
-         if (db == uint32_t(DbId::service) || db == uint32_t(DbId::native))
-         {
-            check(!isSubjectiveContext(self), "database cannot be written in subjective context");
-            check(self.dbMode.isSync, "database cannot be written in async context");
-
-            if (db == uint32_t(DbId::native))
-               check(self.code.flags & CodeRow::isPrivileged,
-                     "service may not write this database");
-
-            return {(DbId)db, true, true};
-         }
-         throw std::runtime_error("service may not write this db (" + std::to_string(db) +
+         throw std::runtime_error("service may not write this db (" +
+                                  std::to_string(static_cast<std::uint32_t>(db)) +
                                   "), or must use another intrinsic");
       }
 
@@ -606,7 +537,117 @@ namespace psibase
       clearResult(*this);
    }
 
-   void NativeFunctions::kvPut(uint32_t                    db,
+   uint32_t NativeFunctions::kvOpen(uint32_t                    dbRaw,
+                                    eosio::vm::span<const char> prefix,
+                                    uint32_t                    mode)
+   {
+      check(prefix.size() <= transactionContext.config.maxKeySize, "key is too big");
+
+      auto db = static_cast<DbId>(dbRaw);
+
+      bool isRead  = false;
+      bool isWrite = false;
+      switch (mode)
+      {
+         case uint32_t(KvMode::read):
+            isRead = true;
+            break;
+         case uint32_t(KvMode::write):
+            isWrite = true;
+            break;
+         case uint32_t(KvMode::readWrite):
+            isRead  = true;
+            isWrite = true;
+            break;
+         default:
+            abortMessage("invalid mode");
+      }
+
+      // TODO: Once all services are updated, restrict reads of the service db, too.
+      if (keyHasServicePrefix(db) && ((db != DbId::service && db != DbId::writeOnly) || isWrite))
+      {
+         uint64_t service = code.codeNum.value;
+         std::reverse(reinterpret_cast<char*>(&service), reinterpret_cast<char*>(&service + 1));
+         if (prefix.size() < sizeof(service) || memcmp(prefix.data(), &service, sizeof(service)))
+            abortMessage("key prefix must match service db=" + std::to_string(dbRaw) +
+                         " prefix=" + psio::to_hex(prefix));
+      };
+
+      switch (db)
+      {
+         // Objective databases
+         case DbId::native:
+            check(!isWrite || (code.flags & CodeRow::isPrivileged),
+                  "service may not write this database");
+            [[fallthrough]];
+         case DbId::service:
+            check(dbMode.isSubjective || dbMode.isSync,
+                  "database access disabled during proof verification");
+            check(!isWrite || !isSubjectiveContext(*this),
+                  "database cannot be written in subjective context");
+            check(!isWrite || dbMode.isSync, "database cannot be written in async context");
+            break;
+         // Subjective databases that follow forks
+         case DbId::historyEvent:
+         case DbId::uiEvent:
+         case DbId::merkleEvent:
+         case DbId::blockLog:
+            check(!isWrite || (code.flags & CodeRow::isPrivileged),
+                  "service may not write this db");
+            [[fallthrough]];
+         case DbId::writeOnly:
+            check(!isRead || isSubjectiveContext(*this),
+                  "subjective databases cannot be read in a deterministic context");
+            check(!isWrite || dbMode.isSync, "database cannot be written in async context");
+            //check(
+            //    !isWrite || !isSubjectiveContext(*this) || (code.flags & CodeRow::isPrivileged),
+            //    "service may not write this db in a subjective context");
+            break;
+         // Chain independent databases
+         case DbId::nativeSubjective:
+         case DbId::nativeSession:
+            check(code.flags & CodeRow::isPrivileged, "service may not access this db");
+            check(code.flags & ExecutionContext::isLocal, "service may not access this db");
+            [[fallthrough]];
+         case DbId::subjective:
+         case DbId::session:
+         case DbId::temporary:
+            check(isSubjectiveContext(*this),
+                  "subjective databases cannot be accessed in a deterministic context");
+            check(!isWrite || (code.flags & CodeRow::isPrivileged) ||
+                      (code.flags & ExecutionContext::isLocal),
+                  "service may not write this db");
+            break;
+         default:
+            throw std::runtime_error("service may not read this db, or must use another intrinsic");
+      }
+
+      return static_cast<std::uint32_t>(
+          buckets.open(db, std::vector(prefix.begin(), prefix.end()), static_cast<KvMode>(mode),
+                       transactionContext.getWasmConfig().maxHandles));
+   }
+
+   uint32_t NativeFunctions::kvOpenAt(uint32_t                    handle,
+                                      eosio::vm::span<const char> prefix,
+                                      uint32_t                    mode)
+   {
+      const auto& bucket    = buckets[static_cast<KvHandle>(handle)];
+      auto        newPrefix = bucket.key(prefix);
+      check(newPrefix.size() <= transactionContext.config.maxKeySize, "key is too big");
+      check((static_cast<std::uint32_t>(bucket.mode) & mode) == mode,
+            "Cannot increase permissions");
+
+      return static_cast<std::uint32_t>(
+          buckets.open(bucket.db, newPrefix, static_cast<KvMode>(mode),
+                       transactionContext.getWasmConfig().maxHandles));
+   }
+
+   void NativeFunctions::kvClose(uint32_t handle)
+   {
+      buckets.close(static_cast<KvHandle>(handle));
+   }
+
+   void NativeFunctions::kvPut(uint32_t                    handle,
                                eosio::vm::span<const char> key,
                                eosio::vm::span<const char> value)
    {
@@ -614,45 +655,49 @@ namespace psibase
           *this,
           [&]
           {
-             check(key.size() <= transactionContext.config.maxKeySize, "key is too big");
-             check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
              clearResult(*this);
-             auto w = getDbWrite(*this, db, {key.data(), key.size()});
+             const auto& bucket = buckets[static_cast<KvHandle>(handle)];
+             if (!bucket.isWrite())
+                abortMessage("Cannot write to this db handle " + bucket.to_string());
+             auto fullKey = bucket.key(key);
+             check(fullKey.size() <= transactionContext.config.maxKeySize, "key is too big");
+             check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
+             auto w = getDbWrite(*this, bucket.db, fullKey);
              if (w.chargeable)
              {
                 auto& delta =
-                    getDelta(transactionContext.kvResourceDeltas, KvResourceKey{code.codeNum, db});
+                    getDelta(transactionContext.kvResourceDeltas,
+                             KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucket.db)});
                 delta.records += 1;
-                delta.keyBytes += key.size();
+                delta.keyBytes += fullKey.size();
                 delta.valueBytes += value.size();
                 if (w.refundable)
                 {
-                   auto existing = database.kvGetRaw(w.db, {key.data(), key.size()});
+                   auto existing = database.kvGetRaw(bucket.db, fullKey);
                    if (existing)
                    {
                       delta.records -= 1;
-                      delta.keyBytes -= key.size();
+                      delta.keyBytes -= fullKey.size();
                       delta.valueBytes -= existing->remaining();
                    }
                    // nativeConstrained is both refundable and chargeable
-                   if (db == uint32_t(DbId::native))
+                   if (bucket.db == DbId::native)
                    {
-                      verifyWriteConstrained(transactionContext, {key.data(), key.size()},
+                      verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
                    }
                 }
              }
-             else if (db == uint32_t(DbId::nativeSubjective))
+             else if (bucket.db == DbId::nativeSubjective)
              {
-                verifyWriteSubjective(database, {key.data(), key.size()},
-                                      {value.data(), value.size()});
+                verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
              }
-             else if (db == uint32_t(DbId::nativeSession))
+             else if (bucket.db == DbId::nativeSession)
              {
-                verifyWriteSession(database, {key.data(), key.size()},
-                                   {value.data(), value.size()});
+                verifyWriteSession(database, fullKey, {value.data(), value.size()});
              }
-             database.kvPutRaw(w.db, {key.data(), key.size()}, {value.data(), value.size()});
+             database.kvPutRaw(bucket.db, {fullKey.data(), fullKey.size()},
+                               {value.data(), value.size()});
           });
    }
 
@@ -694,42 +739,48 @@ namespace psibase
           });
    }  // putSequential()
 
-   void NativeFunctions::kvRemove(uint32_t db, eosio::vm::span<const char> key)
+   void NativeFunctions::kvRemove(uint32_t handle, eosio::vm::span<const char> key)
    {
       timeDbVoid(*this,
                  [&]
                  {
                     clearResult(*this);
-                    auto w = getDbWrite(*this, db, {key.data(), key.size()});
+                    const auto& bucket = buckets[static_cast<KvHandle>(handle)];
+                    if (!bucket.isWrite())
+                       abortMessage("Cannot write to this db handle " + bucket.to_string());
+                    auto fullKey = bucket.key(key);
+                    auto w       = getDbWrite(*this, bucket.db, fullKey);
                     if (w.refundable)
                     {
-                       if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
+                       if (auto existing = database.kvGetRaw(bucket.db, fullKey))
                        {
-                          auto& delta = getDelta(transactionContext.kvResourceDeltas,
-                                                 KvResourceKey{code.codeNum, db});
+                          auto& delta = getDelta(
+                              transactionContext.kvResourceDeltas,
+                              KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucket.db)});
                           delta.records -= 1;
-                          delta.keyBytes -= key.size();
+                          delta.keyBytes -= fullKey.size();
                           delta.valueBytes -= existing->remaining();
-                          if (db == uint32_t(DbId::native))
+                          if (bucket.db == DbId::native)
                           {
-                             verifyRemoveConstrained(transactionContext, {key.data(), key.size()},
-                                                     *existing);
+                             verifyRemoveConstrained(transactionContext, fullKey, *existing);
                           }
                        }
                     }
-                    database.kvRemoveRaw(w.db, {key.data(), key.size()});
+                    database.kvRemoveRaw(bucket.db, fullKey);
                  });
    }
 
-   uint32_t NativeFunctions::kvGet(uint32_t db, eosio::vm::span<const char> key)
+   uint32_t NativeFunctions::kvGet(uint32_t handle, eosio::vm::span<const char> key)
    {
       return timeDb(  //
           *this,
           [&]
           {
-             return setResult(*this,
-                              database.kvGetRaw(getDbRead(*this, db, {key.data(), key.size()}),
-                                                {key.data(), key.size()}));
+             const auto& bucket = buckets[static_cast<KvHandle>(handle)];
+             if (!bucket.isRead())
+                abortMessage("Cannot read from this db handle " + bucket.to_string());
+             auto fullKey = bucket.key(key);
+             return setResult(*this, database.kvGetRaw(bucket.db, fullKey));
           });
    }
 
@@ -744,7 +795,7 @@ namespace psibase
           });
    }
 
-   uint32_t NativeFunctions::kvGreaterEqual(uint32_t                    db,
+   uint32_t NativeFunctions::kvGreaterEqual(uint32_t                    handle,
                                             eosio::vm::span<const char> key,
                                             uint32_t                    matchKeySize)
    {
@@ -753,16 +804,20 @@ namespace psibase
           [&]
           {
              check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-             if (keyHasServicePrefix(db))
-                check(matchKeySize >= sizeof(AccountNumber::value),
+             const auto& bucket = buckets[static_cast<KvHandle>(handle)];
+             if (!bucket.isRead())
+                abortMessage("Cannot read from this db handle " + bucket.to_string());
+             auto fullKey       = bucket.key(key);
+             auto fullMatchSize = bucket.prefix.size() + matchKeySize;
+             if (keyHasServicePrefix(bucket.db))
+                check(fullMatchSize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
-             return setResult(
-                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db, {key.data(), key.size()}),
-                                                   {key.data(), key.size()}, matchKeySize));
+             return setResult(*this, bucket.trimResult(database.kvGreaterEqualRaw(
+                                         bucket.db, fullKey, fullMatchSize)));
           });
    }
 
-   uint32_t NativeFunctions::kvLessThan(uint32_t                    db,
+   uint32_t NativeFunctions::kvLessThan(uint32_t                    handle,
                                         eosio::vm::span<const char> key,
                                         uint32_t                    matchKeySize)
    {
@@ -771,26 +826,33 @@ namespace psibase
           [&]
           {
              check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-             if (keyHasServicePrefix(db))
-                check(matchKeySize >= sizeof(AccountNumber::value),
+             const auto& bucket = buckets[static_cast<KvHandle>(handle)];
+             if (!bucket.isRead())
+                abortMessage("Cannot read from this db handle " + bucket.to_string());
+             auto fullKey       = bucket.key(key);
+             auto fullMatchSize = bucket.prefix.size() + matchKeySize;
+             if (keyHasServicePrefix(bucket.db))
+                check(fullMatchSize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
-             return setResult(*this,
-                              database.kvLessThanRaw(getDbRead(*this, db, {key.data(), key.size()}),
-                                                     {key.data(), key.size()}, matchKeySize));
+             return setResult(*this, bucket.trimResult(database.kvLessThanRaw(bucket.db, fullKey,
+                                                                              fullMatchSize)));
           });
    }
 
-   uint32_t NativeFunctions::kvMax(uint32_t db, eosio::vm::span<const char> key)
+   uint32_t NativeFunctions::kvMax(uint32_t handle, eosio::vm::span<const char> key)
    {
       return timeDb(  //
           *this,
           [&]
           {
-             if (keyHasServicePrefix(db))
-                check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
-             return setResult(*this,
-                              database.kvMaxRaw(getDbRead(*this, db, {key.data(), key.size()}),
-                                                {key.data(), key.size()}));
+             const auto& bucket = buckets[static_cast<KvHandle>(handle)];
+             if (!bucket.isRead())
+                abortMessage("Cannot read from this db handle " + bucket.to_string());
+             auto fullKey = bucket.key(key);
+             if (keyHasServicePrefix(bucket.db))
+                check(fullKey.size() >= sizeof(AccountNumber::value),
+                      "key is shorter than 8 bytes");
+             return setResult(*this, bucket.trimResult(database.kvMaxRaw(bucket.db, fullKey)));
           });
    }
 

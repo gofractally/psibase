@@ -1,6 +1,6 @@
 [package]
 name = "test_fracpack_macros"
-version = "0.20.0"
+version = "0.21.0"
 edition = "2021"
 license = "MIT"
 description = "Macros to support psibase development"
@@ -12,7 +12,7 @@ proc-macro = true
 
 [dependencies]
 anyhow = "1.0"
-fracpack = { version = "0.20.0", path = "../fracpack" }
+fracpack = { version = "0.21.0", path = "../fracpack" }
 hex = "0.3.1"
 proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"

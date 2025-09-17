@@ -5,6 +5,7 @@
 #include <services/system/Producers.hpp>
 
 using namespace psibase;
+using namespace SystemService;
 
 namespace
 {
@@ -35,18 +36,14 @@ namespace
 
    std::size_t getNrProds()
    {
-      auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
-      check(status.has_value(), "status row invalid");
       return std::visit([&](const auto& c) { return c.producers.size(); },
-                        status->consensus.current.data);
+                        getStatus().consensus.current.data);
    }
 
    std::vector<Producer> getProducers()
    {
-      auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
-      check(status.has_value(), "status row invalid");
       return std::visit([](const auto& c) -> std::vector<Producer>
-                        { return std::move(c.producers); }, status->consensus.current.data);
+                        { return std::move(c.producers); }, getStatus().consensus.current.data);
    }
 
    using IndirectCheckFunc =
@@ -103,9 +100,10 @@ namespace SystemService
       }
       std::sort(accounts.begin(), accounts.end());
       accounts.erase(std::unique(accounts.begin(), accounts.end()), accounts.end());
+      auto codeTable = Native::tables(KvMode::read).open<CodeTable>();
       for (AccountNumber account : accounts)
       {
-         auto code = psibase::kvGet<CodeRow>(CodeRow::db, codeKey(account));
+         auto code = codeTable.get(account);
          check(!!code, "Unknown service account: " + account.str());
          check(code->flags & CodeRow::isVerify,
                "Service account " + account.str() + " cannot be used for block production");
@@ -115,7 +113,8 @@ namespace SystemService
    void Producers::setConsensus(psibase::ConsensusData consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      auto table  = Native::tables().open<StatusRow>();
+      auto status = table.get({});
       std::visit(
           [](const auto& c)
           {
@@ -129,13 +128,14 @@ namespace SystemService
       status->consensus.next = {{std::move(consensus), status->consensus.current.services,
                                  status->consensus.current.wasmConfig},
                                 status->current.blockNum};
-      psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
+      table.put(*status);
    }
 
    void Producers::setProducers(std::vector<psibase::Producer> prods)
    {
       check(getSender() == getReceiver(), "sender must match service account");
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      auto table  = Native::tables().open<StatusRow>();
+      auto status = table.get({});
       check(!prods.empty(), "There must be at least one producer");
       checkVerifyServices(prods);
       check(!!status, "Missing status row");
@@ -151,7 +151,7 @@ namespace SystemService
                status->consensus.current.data),
            status->consensus.current.services, status->consensus.current.wasmConfig},
           status->current.blockNum};
-      psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
+      table.put(*status);
    }
 
    std::vector<psibase::AccountNumber> Producers::getProducers()
@@ -164,10 +164,8 @@ namespace SystemService
    uint32_t Producers::getThreshold(AccountNumber account)
    {
       check(account == producerAccountWeak || account == producerAccountStrong, "Invalid account");
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      check(!!status, "Missing status row");
       auto threshold = std::visit([&](const auto& c) { return ::getThreshold(c, account); },
-                                  status->consensus.current.data);
+                                  getStatus().consensus.current.data);
 
       return threshold;
    }

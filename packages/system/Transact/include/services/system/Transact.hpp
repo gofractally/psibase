@@ -387,14 +387,14 @@ namespace SystemService
 #ifdef COMPILING_TESTS
       static std::optional<psibase::StatusRow> status;
       // The status row changes during test execution, so always read fresh
-      status = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+      status = psibase::Native::tables(psibase::KvMode::read).open<psibase::StatusTable>().get({});
       return status;
 #else
       // Most fields in the status row don't change during transaction execution.
       // Configuration may change, but most code doesn't read that. No fields change
       // during RPC.
       static const auto status =
-          psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+          psibase::Native::tables(psibase::KvMode::read).open<psibase::StatusTable>().get({});
       return status;
 #endif
    }
@@ -421,9 +421,10 @@ namespace SystemService
          return *summary;
 #endif
 
-      auto table = Transact::Tables(Transact::service).open<BlockSummaryTable>();
-      auto idx   = table.getIndex<0>();
-      summary    = idx.get(std::tuple<>{});
+      auto table =
+          Transact::Tables(Transact::service, psibase::KvMode::read).open<BlockSummaryTable>();
+      auto idx = table.getIndex<0>();
+      summary  = idx.get(std::tuple<>{});
       if (!summary)
          summary.emplace();
 

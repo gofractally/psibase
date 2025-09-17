@@ -71,11 +71,80 @@ namespace psibase
       /// Set the return value of the currently-executing action
       PSIBASE_NATIVE(setRetval) void setRetval(const char* retval, uint32_t len);
 
+      /// Opens a key-value database
+      ///
+      /// The prefix will be added automatically to all accesses using the handle.
+      ///
+      /// Access control is checked at open:
+      /// - Native databases can only be opened by privileged services
+      /// - For regular databases, the first 8 bytes of the prefix must be the
+      ///   caller service (big endian)
+      /// - Some databases forbid reading or writing depending on the run mode
+      ///
+      /// The maximum number of handles that a service can have open
+      /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+      /// is exceeded, this function will abort.
+      ///
+      /// The handle is only usable by the current service. Use `exportHandles`
+      /// to pass it to another service.
+      PSIBASE_NATIVE(kvOpen)
+      KvHandle kvOpen(DbId db, const char* prefix, uint32_t len, KvMode mode);
+
+      /// Opens a subtree of a key-value database
+      ///
+      /// - The prefix will be appended to any prefix that the source has
+      /// - The mode must be at least as restrictive as the source mode
+      ///
+      /// The maximum number of handles that a service can have open
+      /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+      /// is exceeded, this function will abort.
+      PSIBASE_NATIVE(kvOpenAt)
+      KvHandle kvOpenAt(KvHandle db, const char* prefix, uint32_t len, KvMode mode);
+
+      /// Closes a key-value database
+      ///
+      /// If the handle was exported, all copies are unaffected and
+      /// will remain usable until they are also closed.
+      PSIBASE_NATIVE(kvClose) void kvClose(KvHandle handle);
+
+      /// Copies handles across the next call or return.
+      ///
+      /// If exportHandles is called more than once, the value set by the
+      /// last call will be used. The export set is distinct from the import
+      /// set. When entering or returning to a service, the export set always
+      /// starts empty.
+      ///
+      /// Handles cannot be exported across a boundary that changes the run mode.
+      ///
+      /// `handles` must contain a fracpacked `vector<KvHandle>`.
+      PSIBASE_NATIVE(exportHandles) void exportHandles(const char* handles, uint32_t len);
+
+      /// Loads handles from the caller or the last callee.
+      ///
+      /// The result is a fracpacked `vector<KvHandle>`. Handles are
+      /// scoped to a single service, and their representation in this
+      /// service is not the same as the representation in the service
+      /// that provided them.
+      ///
+      /// This function clears the import set. Subsequent calls will
+      /// return an empty list.
+      ///
+      /// The maximum number of handles that a service can have open
+      /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+      /// is exceeded, this function will abort.
+      ///
+      /// Use [getResult] to get result.
+      PSIBASE_NATIVE(importHandles) uint32_t importHandles();
+
       /// Set a key-value pair
       ///
       /// If key already exists, then replace the existing value.
       PSIBASE_NATIVE(kvPut)
-      void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
+      void kvPut(KvHandle    db,
+                 const char* key,
+                 uint32_t    keyLen,
+                 const char* value,
+                 uint32_t    valueLen);
 
       /// Add a sequentially-numbered record
       ///
@@ -84,13 +153,13 @@ namespace psibase
       uint64_t putSequential(DbId db, const char* value, uint32_t valueLen);
 
       /// Remove a key-value pair if it exists
-      PSIBASE_NATIVE(kvRemove) void kvRemove(DbId db, const char* key, uint32_t keyLen);
+      PSIBASE_NATIVE(kvRemove) void kvRemove(KvHandle db, const char* key, uint32_t keyLen);
 
       /// Get a key-value pair, if any
       ///
       /// If key exists, then sets result to value and returns size. If key does not
       /// exist, returns `-1` and clears result. Use [getResult] to get result.
-      PSIBASE_NATIVE(kvGet) uint32_t kvGet(DbId db, const char* key, uint32_t keyLen);
+      PSIBASE_NATIVE(kvGet) uint32_t kvGet(KvHandle db, const char* key, uint32_t keyLen);
 
       /// Get a sequentially-numbered record
       ///
@@ -106,7 +175,7 @@ namespace psibase
       /// sets key. Otherwise returns `-1` and clears result. Use [getResult] to get
       /// result and [getKey] to get found key.
       PSIBASE_NATIVE(kvGreaterEqual)
-      uint32_t kvGreaterEqual(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
+      uint32_t kvGreaterEqual(KvHandle db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
       /// Get the key-value pair immediately-before provided key
       ///
@@ -115,14 +184,14 @@ namespace psibase
       /// Also sets key. Otherwise returns `-1` and clears result. Use [getResult]
       /// to get result and [getKey] to get found key.
       PSIBASE_NATIVE(kvLessThan)
-      uint32_t kvLessThan(DbId db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
+      uint32_t kvLessThan(KvHandle db, const char* key, uint32_t keyLen, uint32_t matchKeySize);
 
       /// Get the maximum key-value pair which has key as a prefix
       ///
       /// If one is found, then sets result to value and returns size. Also sets key.
       /// Otherwise returns `-1` and clears result. Use [getResult] to get result
       /// and [getKey] to get found key.
-      PSIBASE_NATIVE(kvMax) uint32_t kvMax(DbId db, const char* key, uint32_t keyLen);
+      PSIBASE_NATIVE(kvMax) uint32_t kvMax(KvHandle db, const char* key, uint32_t keyLen);
 
       /// Gets the current value of a clock in nanoseconds.
       ///
@@ -284,10 +353,84 @@ namespace psibase
       raw::setRetval(s.pos, s.remaining());
    }
 
+   /// Opens a key-value database
+   ///
+   /// The prefix will be added automatically to all accesses using the handle.
+   ///
+   /// Access control is checked at open:
+   /// - Native databases can only be opened by privileged services
+   /// - For regular databases, the first 8 bytes of the prefix must be the
+   ///   caller service (big endian)
+   /// - Some databases forbid reading or writing depending on the run mode
+   ///
+   /// The maximum number of handles that a service can have open
+   /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+   /// is exceeded, this function will abort.
+   ///
+   /// The handle is only usable by the current service. Use `exportHandles`
+   /// to pass it to another service.
+   inline KvHandle kvOpen(DbId db, psio::input_stream prefix, KvMode mode)
+   {
+      return raw::kvOpen(db, prefix.pos, prefix.remaining(), mode);
+   }
+
+   /// Opens a subtree of a key-value database
+   ///
+   /// - The prefix will be appended to any prefix that the source has
+   /// - The mode must be at least as restrictive as the source mode
+   ///
+   /// The maximum number of handles that a service can have open
+   /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+   /// is exceeded, this function will abort.
+   inline KvHandle kvOpen(KvHandle handle, psio::input_stream prefix, KvMode mode)
+   {
+      return raw::kvOpenAt(handle, prefix.pos, prefix.remaining(), mode);
+   }
+
+   /// Closes a key-value database
+   inline void kvClose(KvHandle handle)
+   {
+      raw::kvClose(handle);
+   }
+
+   /// Copies handles across the next call or return.
+   ///
+   /// If exportHandles is called more than once, the value set by the
+   /// last call will be used. The export set is distinct from the import
+   /// set. When entering or returning to a service, the export set always
+   /// starts empty.
+   ///
+   /// Handles cannot be exported across a boundary that changes the run mode.
+   inline void exportHandles(std::span<const KvHandle> handles)
+   {
+      auto packed = psio::to_frac(handles);
+      raw::exportHandles(packed.data(), packed.size());
+   }
+
+   /// Loads handles from the caller or the last callee.
+   ///
+   /// Handles are scoped to a single service, and their representation
+   /// in this service is not the same as the representation in the service
+   /// that provided them.
+   ///
+   /// This function clears the import set. Subsequent calls will
+   /// return an empty list.
+   ///
+   /// The maximum number of handles that a service can have open
+   /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
+   /// is exceeded, this function will abort.
+   inline std::vector<KvHandle> importHandles()
+   {
+      auto size = raw::importHandles();
+      if (size == -1)
+         return {};
+      return psio::from_frac<std::vector<KvHandle>>(getResult(size));
+   }
+
    /// Set a key-value pair
    ///
    /// If key already exists, then replace the existing value.
-   inline void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
+   inline void kvPutRaw(KvHandle db, psio::input_stream key, psio::input_stream value)
    {
       raw::kvPut(db, key.pos, key.remaining(), value.pos, value.remaining());
    }
@@ -296,18 +439,9 @@ namespace psibase
    ///
    /// If key already exists, then replace the existing value.
    template <typename K, NotOptional V>
-   void kvPut(DbId db, const K& key, const V& value)
+   void kvPut(KvHandle db, const K& key, const V& value)
    {
       kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
-   }
-
-   /// Set a key-value pair
-   ///
-   /// If key already exists, then replace the existing value.
-   template <typename K, NotOptional V>
-   void kvPut(const K& key, const V& value)
-   {
-      kvPut(DbId::service, key, value);
    }
 
    /// Add a sequentially-numbered record
@@ -345,27 +479,20 @@ namespace psibase
    }
 
    /// Remove a key-value pair if it exists
-   inline void kvRemoveRaw(DbId db, psio::input_stream key)
+   inline void kvRemoveRaw(KvHandle db, psio::input_stream key)
    {
       raw::kvRemove(db, key.pos, key.remaining());
    }
 
    /// Remove a key-value pair if it exists
    template <typename K>
-   void kvRemove(DbId db, const K& key)
+   void kvRemove(KvHandle db, const K& key)
    {
       kvRemoveRaw(db, psio::convert_to_key(key));
    }
 
-   /// Remove a key-value pair if it exists
-   template <typename K>
-   void kvRemove(const K& key)
-   {
-      kvRemove(DbId::service, key);
-   }
-
    /// Get size of stored value, if any
-   inline std::optional<uint32_t> kvGetSizeRaw(DbId db, psio::input_stream key)
+   inline std::optional<uint32_t> kvGetSizeRaw(KvHandle db, psio::input_stream key)
    {
       auto size = raw::kvGet(db, key.pos, key.remaining());
       if (size == -1)
@@ -375,20 +502,13 @@ namespace psibase
 
    /// Get size of stored value, if any
    template <typename K>
-   inline std::optional<uint32_t> kvGetSize(DbId db, const K& key)
+   inline std::optional<uint32_t> kvGetSize(KvHandle db, const K& key)
    {
       return kvGetSizeRaw(db, psio::convert_to_key(key));
    }
 
-   /// Get size of stored value, if any
-   template <typename K>
-   inline std::optional<uint32_t> kvGetSize(const K& key)
-   {
-      return kvGetSize(DbId::service, key);
-   }
-
    /// Get a key-value pair, if any
-   inline std::optional<std::vector<char>> kvGetRaw(DbId db, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvGetRaw(KvHandle db, psio::input_stream key)
    {
       auto size = raw::kvGet(db, key.pos, key.remaining());
       if (size == -1)
@@ -398,7 +518,7 @@ namespace psibase
 
    /// Get a key-value pair, if any
    template <typename V, typename K>
-   inline std::optional<V> kvGet(DbId db, const K& key)
+   inline std::optional<V> kvGet(KvHandle db, const K& key)
    {
       auto v = kvGetRaw(db, psio::convert_to_key(key));
       if (!v)
@@ -407,28 +527,14 @@ namespace psibase
       return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
-   /// Get a key-value pair, if any
-   template <typename V, typename K>
-   inline std::optional<V> kvGet(const K& key)
-   {
-      return kvGet<V>(DbId::service, key);
-   }
-
    /// Get a value, or the default if not found
    template <typename V, typename K>
-   inline V kvGetOrDefault(DbId db, const K& key)
+   inline V kvGetOrDefault(KvHandle db, const K& key)
    {
       auto obj = kvGet<V>(db, key);
       if (obj)
          return std::move(*obj);
       return {};
-   }
-
-   /// Get a value, or the default if not found
-   template <typename V, typename K>
-   inline V kvGetOrDefault(const K& key)
-   {
-      return kvGetOrDefault<V>(DbId::service, key);
    }
 
    /// Get a sequentially-numbered record, if available
@@ -484,7 +590,7 @@ namespace psibase
    /// If one is found, and the first `matchKeySize` bytes of the found key
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
-   inline std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
+   inline std::optional<std::vector<char>> kvGreaterEqualRaw(KvHandle           db,
                                                              psio::input_stream key,
                                                              uint32_t           matchKeySize)
    {
@@ -500,7 +606,7 @@ namespace psibase
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
    template <typename V, typename K>
-   inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
+   inline std::optional<V> kvGreaterEqual(KvHandle db, const K& key, uint32_t matchKeySize)
    {
       auto v = kvGreaterEqualRaw(db, psio::convert_to_key(key), matchKeySize);
       if (!v)
@@ -509,23 +615,12 @@ namespace psibase
       return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
-   /// Get the first key-value pair which is greater than or equal to `key`
-   ///
-   /// If one is found, and the first `matchKeySize` bytes of the found key
-   /// matches the provided key, then returns the value. Use [getKey] to
-   /// get the found key.
-   template <typename V, typename K>
-   inline std::optional<V> kvGreaterEqual(const K& key, uint32_t matchKeySize)
-   {
-      return kvGreaterEqual<V>(DbId::service, key, matchKeySize);
-   }
-
    /// Get the key-value pair immediately-before provided key
    ///
    /// If one is found, and the first `matchKeySize` bytes of the found key
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
-   inline std::optional<std::vector<char>> kvLessThanRaw(DbId               db,
+   inline std::optional<std::vector<char>> kvLessThanRaw(KvHandle           db,
                                                          psio::input_stream key,
                                                          uint32_t           matchKeySize)
    {
@@ -541,7 +636,7 @@ namespace psibase
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
    template <typename V, typename K>
-   inline std::optional<V> kvLessThan(DbId db, const K& key, uint32_t matchKeySize)
+   inline std::optional<V> kvLessThan(KvHandle db, const K& key, uint32_t matchKeySize)
    {
       auto v = kvLessThanRaw(db, psio::convert_to_key(key), matchKeySize);
       if (!v)
@@ -550,22 +645,11 @@ namespace psibase
       return psio::from_frac<V>(psio::prevalidated{*v});
    }
 
-   /// Get the key-value pair immediately-before provided key
-   ///
-   /// If one is found, and the first `matchKeySize` bytes of the found key
-   /// matches the provided key, then returns the value. Use [getKey] to
-   /// get the found key.
-   template <typename V, typename K>
-   inline std::optional<V> kvLessThan(const K& key, uint32_t matchKeySize)
-   {
-      return kvLessThan<V>(DbId::service, key, matchKeySize);
-   }
-
    /// Get the maximum key-value pair which has key as a prefix
    ///
    /// If one is found, then returns the value. Use [getKey] to
    /// get the found key.
-   inline std::optional<std::vector<char>> kvMaxRaw(DbId db, psio::input_stream key)
+   inline std::optional<std::vector<char>> kvMaxRaw(KvHandle db, psio::input_stream key)
    {
       auto size = raw::kvMax(db, key.pos, key.remaining());
       if (size == -1)
@@ -578,23 +662,13 @@ namespace psibase
    /// If one is found, then returns the value. Use [getKey] to
    /// get the found key.
    template <typename V, typename K>
-   inline std::optional<V> kvMax(DbId db, const K& key)
+   inline std::optional<V> kvMax(KvHandle db, const K& key)
    {
       auto v = kvMaxRaw(db, psio::convert_to_key(key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
       return psio::from_frac<V>(psio::prevalidated{*v});
-   }
-
-   /// Get the maximum key-value pair which has key as a prefix
-   ///
-   /// If one is found, then returns the value. Use [getKey] to
-   /// get the found key.
-   template <typename V, typename K>
-   inline std::optional<V> kvMax(const K& key)
-   {
-      return kvMax<V>(DbId::service, key);
    }
 
    /// Write `message` to console

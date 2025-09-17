@@ -18,7 +18,6 @@ use accounts::{
 
 use aes::plugin as aes;
 use auth_invite::plugin::intf as AuthInvite;
-use auth_sig::plugin::keyvault;
 use base64::plugin as base64;
 use bindings::invite::plugin::types::{Invite, InviteState};
 use chrono::{DateTime, SecondsFormat};
@@ -31,6 +30,7 @@ use exports::{
 };
 use hex;
 use host::common::{client as Client, server as Server};
+use host::crypto::keyvault;
 use host::types::types as HostTypes;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::{

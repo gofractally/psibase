@@ -343,7 +343,7 @@ namespace SystemService
 
       if (request.method == "GET" || request.method == "HEAD")
       {
-         Tables tables{};
+         Tables tables{getReceiver(), KvMode::read};
          auto   target = request.path();
 
          std::optional<SitesContentRow> content;
@@ -550,14 +550,14 @@ namespace SystemService
             target = "/index.html";
          }
 
-         auto content = Tables{}.open<SitesContentTable>().get(SitesContentKey{site, target});
+         auto content = open<SitesContentTable>(KvMode::read).get(SitesContentKey{site, target});
          return !!content;
       }
       else
       {
          // For traditional multi-page apps, we verify the path, and if it's not a static asset then we also
          // automatically check for `target/index.html`
-         auto index   = Tables{}.open<SitesContentTable>().getIndex<0>();
+         auto index   = open<SitesContentTable>(KvMode::read).getIndex<0>();
          auto content = index.get(SitesContentKey{site, target});
          if (!content)
          {
@@ -637,7 +637,7 @@ namespace SystemService
 
    std::optional<SitesContentRow> Sites::useDefaultProfile(const std::string& target)
    {
-      auto index = Tables{}.open<SitesContentTable>().getIndex<0>();
+      auto index = open<SitesContentTable>(KvMode::read).getIndex<0>();
 
       std::optional<SitesContentRow> content;
       if (target == "/" || target.starts_with("/default-profile/"))
@@ -650,7 +650,7 @@ namespace SystemService
 
    bool Sites::useSpa(const psibase::AccountNumber& account)
    {
-      auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
+      auto siteConfig = open<SiteConfigTable>(KvMode::read).get(account);
       return siteConfig && siteConfig->spa;
    }
 
@@ -664,7 +664,7 @@ namespace SystemService
       }
       else
       {
-         auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
+         auto siteConfig = open<SiteConfigTable>(KvMode::read).get(account);
          if (siteConfig && siteConfig->globalCsp)
          {
             cspHeader = *siteConfig->globalCsp;
@@ -675,8 +675,9 @@ namespace SystemService
 
    bool Sites::useCache(const AccountNumber& account)
    {
-      auto siteConfig = Tables{}.open<SiteConfigTable>().get(account).value_or(
-          SiteConfigRow{.account = getSender()});
+      auto siteConfig = open<SiteConfigTable>(KvMode::read)
+                            .get(account)
+                            .value_or(SiteConfigRow{.account = getSender()});
       return siteConfig.cache;
    }
 
@@ -699,7 +700,7 @@ namespace SystemService
 
          auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
-            auto tables = Sites::Tables{service};
+            auto tables = Sites::Tables{service, KvMode::read};
 
             // Get the site config, or return a default
             auto record = tables.open<SiteConfigTable>().get(account).value_or(
@@ -712,12 +713,12 @@ namespace SystemService
 
          auto getContent(AccountNumber account) const
          {
-            auto tables = Sites::Tables{service};
+            auto tables = Sites::Tables{service, KvMode::read};
 
             auto idx =
                 tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
 
-            return TransformedConnection(idx,
+            return TransformedConnection(std::move(idx),
                                          [](auto&& row)
                                          {
                                             row.csp = row.csp.value_or("");

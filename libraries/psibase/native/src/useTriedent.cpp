@@ -2,6 +2,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <psibase/Socket.hpp>
+#include <psibase/nativeTables.hpp>
 #include <triedent/database.hpp>
 
 namespace psibase

@@ -43,7 +43,7 @@ namespace SystemService
          else if (type != AuthInterface::topActionReq)
             abortMessage("unsupported auth type");
 
-         auto row = db.open<AuthTable>().getIndex<0>().get(sender);
+         auto row = open<AuthTable>(KvMode::read).getIndex<0>().get(sender);
 
          check(row.has_value(), "sender does not have a public key");
 
@@ -75,13 +75,13 @@ namespace SystemService
       void AuthSig::canAuthUserSys(psibase::AccountNumber user)
       {
          // Anyone with a public key in the AuthTable may use AuthSig
-         auto row = db.open<AuthTable>().getIndex<0>().get(user);
+         auto row = open<AuthTable>(KvMode::read).getIndex<0>().get(user);
          check(row.has_value(), "sender does not have a public key");
       }
 
       void AuthSig::setKey(SubjectPublicKeyInfo key)
       {
-         auto authTable = db.open<AuthTable>();
+         auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
 

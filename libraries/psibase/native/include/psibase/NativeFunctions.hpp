@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/BucketSet.hpp>
 #include <psibase/ExecutionContext.hpp>
 
 #include <eosio/vm/argument_proxy.hpp>
@@ -19,6 +20,8 @@ namespace psibase
 
       std::vector<char> result_key;
       std::vector<char> result_value;
+
+      BucketSet buckets;
 
       // TODO: delete range. Need some way for system services to enable/disable it
       //       since it's only compatible with some resource models
@@ -42,14 +45,21 @@ namespace psibase
       uint32_t getCurrentAction();
       uint32_t call(eosio::vm::span<const char> data);
       void     setRetval(eosio::vm::span<const char> data);
-      void kvPut(uint32_t db, eosio::vm::span<const char> key, eosio::vm::span<const char> value);
+      uint32_t kvOpen(uint32_t db, eosio::vm::span<const char> prefix, uint32_t mode);
+      uint32_t kvOpenAt(uint32_t handle, eosio::vm::span<const char> prefix, uint32_t mode);
+      void     kvClose(uint32_t handle);
+      void     kvPut(uint32_t                    handle,
+                     eosio::vm::span<const char> key,
+                     eosio::vm::span<const char> value);
       uint64_t putSequential(uint32_t db, eosio::vm::span<const char> value);
-      void     kvRemove(uint32_t db, eosio::vm::span<const char> key);
-      uint32_t kvGet(uint32_t db, eosio::vm::span<const char> key);
+      void     kvRemove(uint32_t handle, eosio::vm::span<const char> key);
+      uint32_t kvGet(uint32_t handle, eosio::vm::span<const char> key);
       uint32_t getSequential(uint32_t db, uint64_t indexNumber);
-      uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize);
-      uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize);
-      uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key);
+      uint32_t kvGreaterEqual(uint32_t                    handle,
+                              eosio::vm::span<const char> key,
+                              uint32_t                    matchKeySize);
+      uint32_t kvLessThan(uint32_t handle, eosio::vm::span<const char> key, uint32_t matchKeySize);
+      uint32_t kvMax(uint32_t handle, eosio::vm::span<const char> key);
       uint32_t kvGetTransactionUsage();
 
       void checkoutSubjective();

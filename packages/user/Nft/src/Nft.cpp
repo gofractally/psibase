@@ -30,7 +30,7 @@ Nft::Nft(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get({});
+      auto initRecord = open<InitTable>(KvMode::read).get({});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -180,7 +180,7 @@ void Nft::setUserConf(psibase::EnumElement flag, bool enable)
 
 NftRecord Nft::getNft(NID nftId)
 {
-   auto nftIdx    = Tables().open<NftTable>().getIndex<0>();
+   auto nftIdx    = open<NftTable>(KvMode::read).getIndex<0>();
    auto nftRecord = nftIdx.get(nftId);
    bool exists    = nftRecord.has_value();
 
@@ -205,7 +205,7 @@ NftRecord Nft::getNft(NID nftId)
 
 NftHolderRecord Nft::getNftHolder(AccountNumber account)
 {
-   auto nftHodler = Tables().open<NftHolderTable>().get(account);
+   auto nftHodler = open<NftHolderTable>(KvMode::read).get(account);
 
    if (nftHodler.has_value())
    {
@@ -222,7 +222,7 @@ NftHolderRecord Nft::getNftHolder(AccountNumber account)
 
 CreditRecord Nft::getCredRecord(NID nftId)
 {
-   auto creditRecord = Tables().open<CreditTable>().get(nftId);
+   auto creditRecord = open<CreditTable>(KvMode::read).get(nftId);
 
    if (creditRecord.has_value())
    {
@@ -242,12 +242,12 @@ CreditRecord Nft::getCredRecord(NID nftId)
 
 bool Nft::exists(NID nftId)
 {
-   return Tables().open<NftTable>().get(nftId).has_value();
+   return open<NftTable>(KvMode::read).get(nftId).has_value();
 }
 
 bool Nft::getUserConf(psibase::AccountNumber account, psibase::EnumElement flag)
 {
-   auto hodler = Tables().open<NftHolderTable>().get(account);
+   auto hodler = open<NftHolderTable>(KvMode::read).get(account);
    if (hodler.has_value() == false)
    {
       return false;
@@ -274,7 +274,7 @@ struct NftDetail
 };
 PSIO_REFLECT(NftDetail, id, owner, issuer);
 
-auto nftService = Nft::Tables{Nft::service};
+auto nftService = Nft::Tables{Nft::service, KvMode::read};
 struct NftQuery
 {
    auto allNfts() const

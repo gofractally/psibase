@@ -76,12 +76,12 @@ namespace psibase
       /// }
       /// ```
       template <DbId db, std::uint16_t table, typename DerivedService>
-      auto open(this const DerivedService&)
+      auto open(this const DerivedService&, KvMode mode = defaultMode(DerivedService::service))
       {
          using AllTables = decltype(psibase_get_tables((DerivedService*)nullptr));
          constexpr auto index =
              boost::mp11::mp_find_if<AllTables, detail::IsDb<db>::template fn>::value;
-         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service)
+         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service, mode)
              .template open<table>();
       }
 
@@ -96,12 +96,13 @@ namespace psibase
       /// }
       /// ```
       template <DbId db, typename T, typename DerivedService>
-      auto open(this const DerivedService&)
+      auto open(this const DerivedService&, KvMode mode = defaultMode(DerivedService::service))
       {
          using AllTables = decltype(psibase_get_tables((DerivedService*)nullptr));
          constexpr auto index =
              boost::mp11::mp_find_if<AllTables, detail::CanOpenTableDb<db, T>::template fn>::value;
-         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service).template open<T>();
+         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service, mode)
+             .template open<T>();
       }
 
       /// Open a table by table or record type
@@ -115,12 +116,13 @@ namespace psibase
       /// }
       /// ```
       template <typename T, typename DerivedService>
-      auto open(this const DerivedService&)
+      auto open(this const DerivedService&, KvMode mode = defaultMode(DerivedService::service))
       {
          using AllTables = decltype(psibase_get_tables((DerivedService*)nullptr));
          constexpr auto index =
              boost::mp11::mp_find_if<AllTables, detail::CanOpenTable<T>::template fn>::value;
-         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service).template open<T>();
+         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service, mode)
+             .template open<T>();
       }
 
       /// Emit events

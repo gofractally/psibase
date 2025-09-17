@@ -11,15 +11,15 @@ plugin = "plugin"
 postinstall = [{ sender = "registry", service = "registry", method = "init" }]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.20.0"
-Sites = "0.20.0"
+HttpServer = "0.21.0"
+Sites = "0.21.0"
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase", version = "0.20.0" }
+psibase = { path = "../../../../rust/psibase", version = "0.21.0" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "=7.0.17"
 serde_json = "1.0.120"
 url = "2.5.2"
 
 [dev-dependencies]
-registry-pkg = { path = "..", version = "0.20.0" }
+registry-pkg = { path = "..", version = "0.21.0" }

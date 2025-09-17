@@ -13,7 +13,9 @@ struct VerifyFlagsService : Service
    void sudo() { check(getSender() == sudoAccount, "wrong sender"); }
    void setRow()
    {
-      kvPutRaw(DbId::writeOnly, psio::convert_to_key(getReceiver()), std::vector<char>{});
+      auto handle = kvOpen(DbId::writeOnly, psio::convert_to_key(getReceiver()), KvMode::write);
+      kvPutRaw(handle, {}, std::vector<char>{});
+      kvClose(handle);
    }
    void recv() {}
 };
@@ -34,19 +36,22 @@ void VerifyFlagsService::verifySys(Checksum256       transactionHash,
       {
          PSIBASE_SUBJECTIVE_TX
          {
-            kvPutRaw(DbId::subjective, psio::convert_to_key(getReceiver()), {});
+            auto handle =
+                kvOpen(DbId::subjective, psio::convert_to_key(getReceiver()), KvMode::write);
+            kvClose(handle);
          }
       }
       else
       {
-         auto row = kvGetRaw(DbId::writeOnly, psio::convert_to_key(getReceiver()));
+         auto handle = kvOpen(DbId::writeOnly, psio::convert_to_key(getReceiver()), KvMode::read);
+         auto row    = kvGetRaw(handle, {});
          check(!row, "writeOnly row was set");
+         kvClose(handle);
       }
    }
    else if (flags & CodeRow::isPrivileged)
    {
-      ConfigRow row{};
-      kvPut(ConfigRow::db, row.key(), row);
+      Native::tables().open<ConfigTable>().put({});
    }
 }
 

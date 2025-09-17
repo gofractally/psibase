@@ -27,12 +27,7 @@ struct item
 
    std::optional<uint8_t> max;
 
-   auto getKey(AccountNumber thisService) const
-   {
-      auto k = psio::convert_to_key(thisService);
-      k.insert(k.end(), key.begin(), key.end());
-      return k;
-   }
+   auto getKey() const { return std::vector<char>{key.begin(), key.end()}; }
 };
 
 auto    none = std::nullopt;
@@ -61,15 +56,18 @@ void TestKV::test()
    auto thisService = getReceiver();
    if (enable_print)
       printf("kvPut\n");
+
+   auto handle = kvOpen(DbId::service, psio::convert_to_key(thisService), KvMode::readWrite);
+
    for (const auto& item : items)
       if (item.add)
-         kvPutRaw(DbId::service, item.getKey(thisService), psio::convert_to_bin(item.value));
+         kvPutRaw(handle, item.getKey(), psio::convert_to_bin(item.value));
 
    if (enable_print)
       printf("kvRemove\n");
    for (const auto& item : items)
       if (!item.keep)
-         kvRemoveRaw(DbId::service, item.getKey(thisService));
+         kvRemoveRaw(handle, item.getKey());
 
    auto run = [&](auto matchKeySize, auto expected, const auto& key, auto f)
    {
@@ -79,7 +77,7 @@ void TestKV::test()
             printf("skip ");
          return;
       }
-      auto result = f(DbId::service, key, matchKeySize + 4);
+      auto result = f(handle, key, matchKeySize);
       if (!result && !expected)
       {
          check(getKey().empty(), "getKey() not empty");
@@ -101,7 +99,7 @@ void TestKV::test()
       {
          if (item.value != *expected)
             continue;
-         check(item.getKey(thisService) == getKey(), "getKey() does not match");
+         check(item.getKey() == getKey(), "getKey() does not match");
          found = true;
       }
       check(found, "matching value missing in items");
@@ -113,15 +111,15 @@ void TestKV::test()
       printf("kvLessThan\n");
    for (const auto& item : items)
    {
-      auto key = item.getKey(thisService);
+      auto key = item.getKey();
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
-      run(4, item.lt4, key, kvLessThanRaw);
-      run(5, item.lt5, key, kvLessThanRaw);
-      run(6, item.lt6, key, kvLessThanRaw);
+      run(0, item.lt4, key, kvLessThanRaw);
+      run(1, item.lt5, key, kvLessThanRaw);
+      run(2, item.lt6, key, kvLessThanRaw);
       if (enable_print)
          printf("\n");
    }  // kvLessThan
@@ -130,15 +128,15 @@ void TestKV::test()
       printf("kvGreaterEqual\n");
    for (const auto& item : items)
    {
-      auto key = item.getKey(thisService);
+      auto key = item.getKey();
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
-      run(4, item.ge4, key, kvGreaterEqualRaw);
-      run(5, item.ge5, key, kvGreaterEqualRaw);
-      run(6, item.ge6, key, kvGreaterEqualRaw);
+      run(0, item.ge4, key, kvGreaterEqualRaw);
+      run(1, item.ge5, key, kvGreaterEqualRaw);
+      run(2, item.ge6, key, kvGreaterEqualRaw);
       if (enable_print)
          printf("\n");
    }  // kvGreaterEqual
@@ -147,14 +145,14 @@ void TestKV::test()
       printf("kvMax\n");
    for (const auto& item : items)
    {
-      auto key = item.getKey(thisService);
+      auto key = item.getKey();
       if (enable_print)
       {
          printf("    0x%02x ", item.value);
          fflush(stdout);
       }
       run(0, item.max, key,
-          [](DbId db, psio::input_stream key, size_t) { return kvMaxRaw(db, key); });
+          [](KvHandle db, psio::input_stream key, size_t) { return kvMaxRaw(db, key); });
       if (enable_print)
          printf("\n");
    }  // kvMax

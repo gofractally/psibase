@@ -720,9 +720,7 @@ fn process_mod(
         if let Some(tables) = tables {
             items.push(parse_quote! {
                 impl #psibase_mod::ServiceTablesWrapper for super::#tables::TablesWrapper {
-                    fn get_service() -> #psibase_mod::AccountNumber {
-                        #constant
-                    }
+                    const SERVICE: #psibase_mod::AccountNumber = #constant;
                 }
             });
         }

@@ -245,12 +245,14 @@ TEST_CASE("events")
 
 void clearDb(DbId db)
 {
-   auto key = std::vector<char>();
-   while (raw::kvGreaterEqual(db, key.data(), key.size(), 0) != -1)
+   auto key    = std::vector<char>();
+   auto handle = kvOpen(db, key, KvMode::readWrite);
+   while (raw::kvGreaterEqual(handle, key.data(), key.size(), 0) != -1)
    {
       key = getKey();
-      kvRemoveRaw(db, key);
+      kvRemoveRaw(handle, key);
    }
+   kvClose(handle);
 }
 
 TEST_CASE("events snapshot")

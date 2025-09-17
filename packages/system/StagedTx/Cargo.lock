@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1714,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "psibase",
  "serde",
@@ -1783,7 +1783,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1842,7 +1842,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1856,7 +1856,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1868,14 +1868,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "seahash",
 ]
@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "r-staged-tx"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2326,7 +2326,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "staged-tx"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "async-graphql",
  "pem",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-pkg"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "plugin",
  "r-staged-tx",

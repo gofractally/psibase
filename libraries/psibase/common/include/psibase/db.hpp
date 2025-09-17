@@ -164,6 +164,19 @@ namespace psibase
    inline constexpr uint32_t numIndependentDatabases =
        ((std::uint32_t)DbId::endIndependent) - ((std::uint32_t)DbId::beginIndependent);
 
+   enum class KvMode : std::uint8_t
+   {
+      none      = 0,
+      read      = 1,
+      write     = 2,
+      readWrite = 3,
+   };
+
+   enum KvHandle : std::uint32_t
+   {
+      invalid = 0xffffffffu,
+   };
+
    struct KvResourceKey
    {
       AccountNumber service = {};

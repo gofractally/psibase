@@ -14,7 +14,7 @@ void NotifyService::onBlock()
 
    PSIBASE_SUBJECTIVE_TX
    {
-      if (Subjective{getReceiver()}.open<FailTable>().get({}))
+      if (Subjective{getReceiver(), KvMode::read}.open<FailTable>().get({}))
       {
          abortMessage("as you wish");
       }
@@ -31,7 +31,7 @@ void NotifyService::onTrx(const psibase::Checksum256& /*id*/,
 
    PSIBASE_SUBJECTIVE_TX
    {
-      if (Subjective{getReceiver()}.open<FailTable>().get({}))
+      if (Subjective{getReceiver(), KvMode::read}.open<FailTable>().get({}))
       {
          abortMessage("as you wish");
       }

@@ -1,5 +1,7 @@
 #include <psibase/Socket.hpp>
 
+#include <psibase/nativeTables.hpp>
+
 using namespace psibase;
 
 static constexpr auto wasi_errno_acces  = 2;

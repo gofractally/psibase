@@ -98,9 +98,6 @@ namespace SystemService
 
          /// Create a new account using this auth service configured with the specified public key.
          void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);
-
-        private:
-         Tables db{psibase::getReceiver()};
       };
       PSIO_REFLECT(AuthSig,  //
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),

@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
-psibase = { version = "0.20.0", path = "../../../../rust/psibase" }
+psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
 p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
 pem = "3"
 seahash = "4.1"

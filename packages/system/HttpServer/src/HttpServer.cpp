@@ -28,7 +28,9 @@ namespace SystemService
 
       std::optional<RegisteredServiceRow> getServer(const AccountNumber& server)
       {
-         return HttpServer::Tables(HttpServer::service).open<RegServTable>().get(server);
+         return HttpServer::Tables(HttpServer::service, KvMode::read)
+             .open<RegServTable>()
+             .get(server);
       }
 
       AccountNumber getTargetService(const HttpRequest& req)

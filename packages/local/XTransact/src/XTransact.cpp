@@ -36,20 +36,19 @@ void XTransact::addCallback(TransactionCallbackType type, MethodNumber callback)
    auto sender = getSender();
    checkAuth(sender);
    auto notifyType = getNotifyType(type);
-   auto key        = notifyKey(notifyType);
-   if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+   auto table      = Native::subjective().open<NotifyTable>();
+   if (auto existing = table.get(notifyType))
    {
       if (!std::ranges::any_of(existing->actions, [&](const auto& act)
                                { return act.service == sender && act.method == callback; }))
       {
          existing->actions.push_back({.service = sender, .method = callback});
-         kvPut(DbId::nativeSubjective, key, *existing);
+         table.put(*existing);
       }
    }
    else
    {
-      kvPut(DbId::nativeSubjective, key,
-            NotifyRow{notifyType, {{.service = sender, .method = callback}}});
+      table.put(NotifyRow{notifyType, {{.service = sender, .method = callback}}});
    }
 }
 
@@ -58,18 +57,19 @@ void XTransact::removeCallback(TransactionCallbackType type, MethodNumber callba
    auto sender = getSender();
    checkAuth(sender);
    auto notifyType = getNotifyType(type);
+   auto table      = Native::subjective().open<NotifyTable>();
    auto key        = notifyKey(notifyType);
-   if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+   if (auto existing = table.get(notifyType))
    {
       std::erase_if(existing->actions, [&](const auto& act)
                     { return act.service == sender && act.method == callback; });
       if (existing->actions.empty())
       {
-         kvRemove(DbId::nativeSubjective, key);
+         table.remove(*existing);
       }
       else
       {
-         kvPut(DbId::nativeSubjective, key, *existing);
+         table.put(*existing);
       }
    }
 }

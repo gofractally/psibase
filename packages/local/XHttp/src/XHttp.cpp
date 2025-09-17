@@ -19,14 +19,14 @@ namespace
    }
 
    std::string getUrl(psio::view<const HttpRequest> req,
-                      std::uint32_t                 socket,
+                      std::int32_t                  socket,
                       std::optional<AccountNumber>  subdomain = {})
    {
       std::string              location;
       std::optional<SocketRow> socketRow;
       PSIBASE_SUBJECTIVE_TX
       {
-         socketRow = kvGet<SocketRow>(SocketRow::db, socketKey(socket));
+         socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
       }
       if (std::get<HttpSocketInfo>(socketRow.value().info).tls)
          location += "https://";
@@ -90,7 +90,7 @@ namespace
 
    bool chainIsBooted()
    {
-      auto row = kvGet<StatusRow>(StatusRow::db, statusKey());
+      auto row = Native::tables(KvMode::read).open<StatusTable>().get({});
       return row && row->head;
    }
 }  // namespace
@@ -156,6 +156,8 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    socketSend(socket, psio::to_frac(result));
 }
 
+#ifndef PSIBASE_GENERATE_SCHEMA
+
 extern "C" [[clang::export_name("serve")]] void serve()
 {
    auto act = getCurrentActionView();
@@ -163,15 +165,16 @@ extern "C" [[clang::export_name("serve")]] void serve()
    auto [sockview, req] = psio::view<const std::tuple<std::int32_t, HttpRequest>>(act->rawData());
    auto sock            = sockview.unpack();
 
-   auto owned = Temporary{act->service()}.open<PendingRequestTable>();
+   auto owned = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
 
    if (auto service = XHttp::getService(req); service != AccountNumber{})
    {
       // Handle local service subdomains
+      auto                   codeTable = Native::subjective(KvMode::read).open<CodeTable>();
       std::optional<CodeRow> row;
       PSIBASE_SUBJECTIVE_TX
       {
-         row = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
+         row = codeTable.get(service);
       }
       if (row && !(row->flags & CodeRow::isReplacement))
       {
@@ -188,7 +191,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
             }
             PSIBASE_SUBJECTIVE_TX
             {
-               row = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(XSites::service));
+               row = codeTable.get(XSites::service);
             }
             if (row)
             {
@@ -271,5 +274,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    act->method()  = MethodNumber("serve");
    psibase::call(act.data(), act.size());
 }  // serve()
+
+#endif
 
 PSIBASE_DISPATCH(XHttp)

@@ -52,11 +52,12 @@ namespace SystemService
       // TODO: Reduce numExecutionMemories on proofWasmConfigTable. Waiting for
       //       a fix to SystemContext caching, to prevent frequent allocating
       //       and freeing of ExecutionMemory instances.
+      auto      native = Native::tables(KvMode::write);
       ConfigRow config;
-      kvPut(config.db, config.key(), config);
+      native.open<ConfigTable>().put(config);
       WasmConfigRow wasmConfig;
-      kvPut(wasmConfig.db, wasmConfig.key(transactionWasmConfigTable), wasmConfig);
-      kvPut(wasmConfig.db, wasmConfig.key(proofWasmConfigTable), wasmConfig);
+      native.open<transactionWasmConfigTable>().put(wasmConfig);
+      native.open<proofWasmConfigTable>().put(wasmConfig);
    }
 
    // CAUTION: startBlock() is critical to chain operations. If it fails, the chain stops.
@@ -101,7 +102,7 @@ namespace SystemService
              stat.current.time - snapRow->lastSnapshot >= snapRow->snapshotInterval)
          {
             ScheduledSnapshotRow row{stat.current.blockNum};
-            kvPut(ScheduledSnapshotRow::db, row.key(), row);
+            Native::tables(KvMode::write).open<ScheduledSnapshotTable>().put(row);
             snapRow->lastSnapshot = stat.current.time;
             snap.put(*snapRow);
          }
@@ -184,9 +185,9 @@ namespace SystemService
       else
       {
          check(act.sender == AccountNumber{}, "Subjective callbacks must not have a sender");
+         auto table = Native::tables().open<NotifyTable>();
          auto ntype = getNotifyType(type);
-         auto key   = notifyKey(ntype);
-         auto value = kvGet<NotifyRow>(NotifyRow::db, key);
+         auto value = table.get(ntype);
          if (!value)
          {
             value = NotifyRow{.type = ntype};
@@ -194,7 +195,7 @@ namespace SystemService
          if (!std::ranges::contains(value->actions, act))
          {
             value->actions.push_back(std::move(act));
-            kvPut(NotifyRow::db, key, *value);
+            table.put(*value);
          }
       }
    }
@@ -224,18 +225,18 @@ namespace SystemService
       }
       else
       {
+         auto table = Native::tables().open<NotifyTable>();
          auto ntype = getNotifyType(type);
-         auto key   = notifyKey(ntype);
-         if (auto value = kvGet<NotifyRow>(NotifyRow::db, key))
+         if (auto value = table.get(ntype))
          {
             auto pos = std::ranges::find(value->actions, act);
             if (pos != value->actions.end())
             {
                value->actions.erase(pos);
                if (value->actions.empty())
-                  kvRemove(key);
+                  table.remove(*value);
                else
-                  kvPut(NotifyRow::db, key, *value);
+                  table.put(*value);
                return;
             }
          }
@@ -337,7 +338,7 @@ namespace SystemService
                               ServiceMethod{action.service, action.method}, allowedActions,
                               std::vector<Claim>{});
          }  // if (requester != account->authService)
-      }     // if(enforceAuth)
+      }  // if(enforceAuth)
 
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
@@ -382,9 +383,10 @@ namespace SystemService
    {
       bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
       {
-         auto statusTable  = Transact{}.open<TransactStatusTable>();
+         auto statusTable =
+             Transact{}.open<TransactStatusTable>(speculative ? KvMode::read : KvMode::readWrite);
          auto statusIdx    = statusTable.getIndex<0>();
-         auto summaryTable = Transact{}.open<BlockSummaryTable>();
+         auto summaryTable = Transact{}.open<BlockSummaryTable>(KvMode::read);
          auto summaryIdx   = summaryTable.getIndex<0>();
 
          const auto& stat = getStatus();
@@ -503,7 +505,7 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
-      auto tables        = Transact::Tables(Transact::service);
+      auto tables        = Transact::Tables(Transact::service, KvMode::readWrite);
       auto includedTable = tables.open<IncludedTrxTable>();
       auto includedIdx   = includedTable.getIndex<0>();
 
@@ -564,6 +566,8 @@ namespace SystemService
       processTransactionImpl(trx, speculative);
    }
 
+#ifndef PSIBASE_GENERATE_SCHEMA
+
    // Native code calls this on the Transact account
    //
    // All transactions pass through this function, so it's critical
@@ -597,6 +601,8 @@ namespace SystemService
       act->method()  = MethodNumber{"next"};
       setRetvalBytes(call(act.data_without_size_prefix()));
    }
+
+#endif
 
 }  // namespace SystemService
 

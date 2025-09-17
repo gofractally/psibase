@@ -9,12 +9,14 @@ void RemoveCode::removeCode(psibase::Checksum256 codeHash,
                             std::uint8_t         vmType,
                             std::uint8_t         vmVersion)
 {
-   kvRemove(CodeByHashRow::db, codeByHashKey(codeHash, vmType, vmVersion));
+   Native::tables(KvMode::write)
+       .open<CodeByHashTable>()
+       .erase(std::tuple(codeHash, vmType, vmVersion));
 }
 
 void RemoveCode::setCodeRow(psibase::CodeRow row)
 {
-   kvPut(CodeRow::db, row.key(), row);
+   Native::tables(KvMode::write).open<CodeTable>().put(row);
 }
 
 PSIBASE_DISPATCH(RemoveCode)
