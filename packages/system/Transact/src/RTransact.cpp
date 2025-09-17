@@ -1291,9 +1291,9 @@ void RTransact::requeue()
                auto data = txdata.get(item.id);
                check(!!data, "Missing transaction data");
 
-               scheduleVerify(item.id, data->trx, true, item.speculative);
-
                pending.remove(item);
+
+               scheduleVerify(item.id, data->trx, true, item.speculative);
             }
             nextSequence = item.sequence + 1;
          }
@@ -1424,7 +1424,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       {
          auto clients = open<TraceClientTable>();
          auto row     = clients.get(id).value_or(
-                 TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
          row.clients.push_back({*socket, json, query.flag()});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
