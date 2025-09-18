@@ -34,15 +34,17 @@ import { withFieldGroup } from "./app-form";
  *     form={form}
  *     fields="amount"
  *     precision={precision}
+ *     balance={balance}
  *     disabled={isDisabled}
- *     description={undefined}
+ *     description={null}
  *     validators={{}}
  * />
  * ```
  *
- * @param precision - The precision of the token
+ * @param precision - The precision of the token; null skips validation
+ * @param balance - The balance of the token; null skips validation
  * @param disabled - Whether the field is disabled
- * @param description - Optional description text (specify undefined to ignore)
+ * @param description - Optional description text (specify null to ignore)
  * @param validators - Optional validators (specify `{}` to ignore)
  * @returns A field for entering a token amount
  */
@@ -51,9 +53,10 @@ export const FieldTokenAmount = withFieldGroup({
         amount: "",
     },
     props: {
-        precision: undefined as number | undefined,
+        precision: null as number | null,
+        balance: null as number | null,
         disabled: false,
-        description: undefined as string | undefined,
+        description: null as string | null,
         validators: {} as FieldValidators<
             any,
             any,
@@ -72,6 +75,7 @@ export const FieldTokenAmount = withFieldGroup({
     render: function Render({
         group,
         precision,
+        balance,
         disabled,
         description,
         validators,
@@ -87,12 +91,12 @@ export const FieldTokenAmount = withFieldGroup({
                             disabled={disabled || precision === undefined}
                             label="Amount"
                             placeholder={`e.g., ${p}`}
-                            description={description}
+                            description={description ?? undefined}
                         />
                     );
                 }}
                 validators={{
-                    onChangeAsync: zTokenAmount(precision ?? 0), // doing this async ensures precision is not stale
+                    onChangeAsync: zTokenAmount({ precision, balance }), // doing this async ensures these values are not stale
                     ...validators,
                 }}
             />
@@ -100,7 +104,13 @@ export const FieldTokenAmount = withFieldGroup({
     },
 });
 
-const zTokenAmount = (precision: number) => {
+const zTokenAmount = ({
+    precision,
+    balance,
+}: {
+    precision: number | null;
+    balance: number | null;
+}) => {
     return z
         .string()
         .min(1, "Required")
@@ -115,10 +125,16 @@ const zTokenAmount = (precision: number) => {
             return true;
         }, "Must be a positive number")
         .refine((val) => {
+            if (precision === null) return true; // not checking precision if precision is not set
             const parts = val.split(".");
             if (parts.length === 1) {
                 return true; // If no decimal part, it's valid
             }
             return parts[1].length <= precision; // Check decimal precision
-        }, `Amount cannot have more than ${precision} decimal places`);
+        }, `Amount cannot have more than ${precision} decimal places`)
+        .refine((val) => {
+            if (balance === null) return true; // not checking balance if balance is not set
+            const num = Number(val);
+            return num <= balance; // Check if amount is less than balance
+        }, `Insufficient balance`);
 };

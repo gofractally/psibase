@@ -108,9 +108,10 @@ export const TokensPage = () => {
                             <FieldTokenAmount
                                 form={form}
                                 fields="amount"
-                                precision={selectedToken?.precision}
+                                precision={selectedToken?.precision ?? 0}
+                                balance={selectedToken?.balance?.amount ?? 0}
                                 disabled={disableForm}
-                                description={undefined}
+                                description={null}
                                 validators={{
                                     onChangeListenTo: ["token"],
                                 }}
