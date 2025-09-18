@@ -8,9 +8,13 @@ const getDecimals = (formatted: string): number =>
 export const AnimateNumber = ({
     n,
     precision,
+    className,
+    onClick,
 }: {
     n: number;
     precision: number;
+    className?: string;
+    onClick?: () => void;
 }) => {
     const { number } = useSpring({
         from: { number: 0 },
@@ -21,11 +25,21 @@ export const AnimateNumber = ({
 
     const finalPrecision = getDecimals(formatThousands(n, precision));
 
+    const numbers = () => {
+        return (
+            <animated.span className={className}>
+                {number.to((animatedNumber) =>
+                    formatThousands(animatedNumber, finalPrecision),
+                )}
+            </animated.span>
+        );
+    };
+
+    if (!onClick) return numbers();
+
     return (
-        <animated.span>
-            {number.to((animatedNumber) =>
-                formatThousands(animatedNumber, finalPrecision),
-            )}
-        </animated.span>
+        <button onClick={onClick} className={className}>
+            {numbers()}
+        </button>
     );
 };
