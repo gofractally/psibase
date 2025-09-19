@@ -337,6 +337,11 @@ namespace psibase
       impl->watchdog.setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog
 
+   const WasmConfigRow& TransactionContext::getWasmConfig() const
+   {
+      return impl->wasmConfig;
+   }
+
    eosio::vm::stack_manager& TransactionContext::getAltStack()
    {
       return impl->altStack;

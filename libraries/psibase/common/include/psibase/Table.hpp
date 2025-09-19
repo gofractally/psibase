@@ -18,6 +18,34 @@
 
 namespace psibase
 {
+   class UniqueKvHandle
+   {
+     public:
+      UniqueKvHandle() : value(KvHandle::invalid) {}
+      explicit UniqueKvHandle(KvHandle value) : value(value) {}
+      UniqueKvHandle(UniqueKvHandle&& other) : value(other.value)
+      {
+         other.value = KvHandle::invalid;
+      }
+      UniqueKvHandle& operator=(UniqueKvHandle&& other)
+      {
+         UniqueKvHandle tmp(std::move(other));
+         std::swap(value, tmp.value);
+         return *this;
+      }
+      ~UniqueKvHandle()
+      {
+         if (value != KvHandle::invalid)
+         {
+            kvClose(value);
+         }
+      }
+      operator KvHandle() const { return value; }
+
+     private:
+      KvHandle value;
+   };
+
    // Eventually replace uses with <=> once the standard library
    // catches up with C++20
    // Maybe not; char is signed
@@ -37,7 +65,7 @@ namespace psibase
    class kv_raw_iterator
    {
      public:
-      kv_raw_iterator(DbId                db,
+      kv_raw_iterator(KvHandle            db,
                       std::vector<char>&& key,
                       std::size_t         prefix_size,
                       bool                is_secondary,
@@ -138,7 +166,7 @@ namespace psibase
             key.resize(prefix_size);
          }
       }
-      DbId              db;
+      KvHandle          db;
       std::vector<char> key;
       std::size_t       prefix_size;
       bool              is_secondary = false;
@@ -163,7 +191,7 @@ namespace psibase
       ///
       /// You don't need this constructor in most cases; use [TableIndex::begin], [TableIndex::end],
       /// [TableIndex::lower_bound], or [TableIndex::upper_bound] instead.
-      KvIterator(DbId                db,
+      KvIterator(KvHandle            db,
                  std::vector<char>&& key,
                  std::size_t         prefixSize,
                  bool                isSecondary,
@@ -404,7 +432,15 @@ namespace psibase
       ///
       /// `prefix` identifies the range of database keys that the index occupies.
       TableIndex(DbId db, std::vector<char>&& prefix, bool is_secondary)
-          : db(db), prefix(std::move(prefix)), is_secondary(is_secondary)
+          : db(kvOpen(db, {}, KvMode::read)), prefix(std::move(prefix)), is_secondary(is_secondary)
+      {
+      }
+
+      /// Construct with prefix
+      ///
+      /// `prefix` identifies the range of database keys that the index occupies.
+      TableIndex(KvHandle db, std::vector<char>&& prefix, bool is_secondary)
+          : db(kvOpen(db, {}, KvMode::read)), prefix(std::move(prefix)), is_secondary(is_secondary)
       {
       }
 
@@ -499,6 +535,27 @@ namespace psibase
          return TableIndex<T, SubKey>(db, std::move(key), is_secondary);
       }
 
+      std::optional<T> first() const
+      {
+         auto b = begin();
+         auto e = end();
+         if (b != e)
+            return *b;
+         else
+            return {};
+      }
+
+      std::optional<T> last() const
+      {
+         auto e    = end();
+         auto prev = e;
+         --prev;
+         if (prev != e)
+            return *prev;
+         else
+            return {};
+      }
+
       /// Look up object by key
       ///
       /// If a matching key is found, then it returns a fresh object;
@@ -546,7 +603,7 @@ namespace psibase
             return psio::from_frac<T>(psio::prevalidated{buffer});
          }
       }
-      DbId              db;
+      UniqueKvHandle    db;
       std::vector<char> prefix;
       bool              is_secondary;
    };
@@ -557,7 +614,7 @@ namespace psibase
       static constexpr decltype(V) value = V;
    };
 
-   inline void kvInsertUnique(DbId        db,
+   inline void kvInsertUnique(KvHandle    db,
                               const char* key,
                               std::size_t key_len,
                               const char* value,
@@ -737,12 +794,35 @@ namespace psibase
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
       ///
       /// This version of the constructor copies the data within `prefix`.
-      Table(DbId db, KeyView prefix) : db(db), prefix(prefix.data.begin(), prefix.data.end()) {}
+      Table(DbId db, KeyView prefix, KvMode mode = KvMode::read) : db(kvOpen(db, prefix.data, mode))
+      {
+      }
 
       /// Construct table with prefix
       ///
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
-      Table(DbId db, std::vector<char>&& prefix) : db(db), prefix(std::move(prefix)) {}
+      Table(DbId db, std::vector<char>&& prefix, KvMode mode = KvMode::read)
+          : db(kvOpen(db, prefix, mode))
+      {
+      }
+
+      /// Construct table with prefix
+      ///
+      /// The prefix separates this table's data from other tables; see [Data format](#data-format).
+      ///
+      /// This version of the constructor copies the data within `prefix`.
+      Table(KvHandle db, KeyView prefix, KvMode mode = KvMode::read)
+          : db(kvOpen(db, prefix.data, mode))
+      {
+      }
+
+      /// Construct table with prefix
+      ///
+      /// The prefix separates this table's data from other tables; see [Data format](#data-format).
+      Table(KvHandle db, std::vector<char>&& prefix, KvMode mode = KvMode::read)
+          : db(kvOpen(db, prefix, mode))
+      {
+      }
 
       /// Store `value` into the table
       ///
@@ -839,6 +919,9 @@ namespace psibase
          return getIndex<0>().getView(std::forward<K>(key));
       }
 
+      std::optional<T> first() const { return getIndex<0>().first(); }
+      std::optional<T> last() const { return getIndex<0>().last(); }
+
      private:
       template <bool View, typename U>
       void putImpl(const U& value, std::span<const char> serialized)
@@ -913,7 +996,7 @@ namespace psibase
          KeyView key_base{{prefix.data(), prefix.size()}};
          return psio::composite_key(key_base, idx, k);
       }
-      DbId              db;
+      UniqueKvHandle    db;
       std::vector<char> prefix;
    };
 
@@ -933,6 +1016,11 @@ namespace psibase
    {
       using type = void;
    };
+
+   inline KvMode defaultMode(AccountNumber account)
+   {
+      return account == getReceiver() ? KvMode::readWrite : KvMode::read;
+   }
 
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
@@ -966,12 +1054,17 @@ namespace psibase
       /// Default constructor
       ///
       /// Assumes the desired service is running on the current action receiver account.
-      DbTables() : account(getReceiver()) {}
+      DbTables() : account(getReceiver()), mode(KvMode::readWrite) {}
 
       /// Constructor
       ///
       /// `account` is the account the service runs on.
-      explicit constexpr DbTables(AccountNumber account) : account(account) {}
+      explicit DbTables(AccountNumber account) : account(account), mode(defaultMode(account)) {}
+
+      /// Constructor
+      ///
+      /// `account` is the account the service runs on.
+      constexpr DbTables(AccountNumber account, KvMode mode) : account(account), mode(mode) {}
 
       /// Open by table number
       ///
@@ -984,8 +1077,8 @@ namespace psibase
       auto open() const
       {
          std::vector<char> key_prefix = psio::composite_key(account, Table);
-         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(Db,
-                                                                             std::move(key_prefix));
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(
+             Db, std::move(key_prefix), mode);
       }
 
       /// Open by table type
@@ -1020,6 +1113,7 @@ namespace psibase
       }
 
       AccountNumber account;  ///< the service runs on this account
+      KvMode        mode;
    };
 
    /// Defines tables in the `service` database
@@ -1044,5 +1138,61 @@ namespace psibase
 
    // An empty key that can be used for any singleton table
    using SingletonKey = CompositeKey<>;
+
+   /// Represents tables from another service
+   template <typename... Tables>
+   struct ExternTables
+   {
+      ExternTables(KvHandle handle, KvMode mode = KvMode::read) : handle(handle), mode(mode) {}
+
+      /// Open by table number
+      ///
+      /// This gets a table by number. The first table is 0.
+      ///
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<2>();`
+      ///
+      /// Returns a [Table].
+      template <std::uint16_t Table>
+      auto open() const
+      {
+         std::vector<char> key_prefix = psio::convert_to_key(Table);
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(
+             handle, std::move(key_prefix), mode);
+      }
+
+      /// Open by table type
+      ///
+      /// This gets a table by the table's type.
+      ///
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<MyTable>();`
+      ///
+      /// Returns a [Table].
+      template <TableType T, typename I = boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>>
+         requires(I::value < sizeof...(Tables))
+      auto open() const
+      {
+         return open<I::value>();
+      }
+
+      /// Open by record type
+      ///
+      /// This gets a table by the record type contained by the table.
+      ///
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<TableRecord>();`
+      ///
+      /// Returns a [Table].
+      template <typename RecordType,
+                typename I = boost::mp11::mp_find<
+                    boost::mp11::mp_list<typename get_value_type<Tables>::type...>,
+                    RecordType>>
+         requires(I::value < sizeof...(Tables))
+      auto open() const
+      {
+         return open<I::value>();
+      }
+
+      KvHandle handle;
+      KvMode   mode;
+   };
 
 }  // namespace psibase

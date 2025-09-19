@@ -32,8 +32,9 @@ namespace SystemService
 
          std::string codeHex() const
          {
-            auto codeByHasRow =
-                kvGet<CodeByHashRow>(CodeByHashRow::db, codeByHashKey(codeHash, vmType, vmVersion));
+            auto codeByHasRow = Native::tables(KvMode::read)
+                                    .open<CodeByHashTable>()
+                                    .get({codeHash, vmType, vmVersion});
             check(!!codeByHasRow, "Raw code not found");
             return to_hex((*codeByHasRow).code);
          }
@@ -74,7 +75,7 @@ namespace SystemService
    {
       auto code(AccountNumber account) const -> std::optional<CodeRecord>
       {
-         auto codeRow = kvGet<CodeRow>(CodeRow::db, codeKey(account));
+         auto codeRow = Native::tables(KvMode::read).open<CodeRow>().get(account);
          if (!codeRow)
             return std::nullopt;
          return toCodeRecord(std::move(*codeRow));

@@ -362,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "brotli-codec"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "brotli-codec-pkg"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "brotli-codec",
  "plugin",
@@ -804,7 +804,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1678,7 +1678,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "brotli",
  "brotli-codec",
@@ -1737,7 +1737,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1794,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1808,7 +1808,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1820,14 +1820,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "seahash",
 ]
