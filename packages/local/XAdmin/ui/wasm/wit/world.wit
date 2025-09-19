@@ -23,6 +23,10 @@ interface packages {
     resolve-packages: func(index-json-str: string, packages: list<string>) -> result<string, string>;
 }
 
+interface crypto {
+    generate-unmanaged-keypair: func() -> result<tuple<string, string>, string>;
+}
+
 interface util {
     deserialize-trace: func(buffer: list<u8>) -> result<string, string>;
 }
@@ -31,4 +35,5 @@ world impl {
     export boot;
     export util;
     export packages;
+    export crypto;
 }

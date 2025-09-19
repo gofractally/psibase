@@ -5,6 +5,7 @@ use std::{io::Cursor, str::FromStr};
 use bindings::*;
 
 use exports::psibase::x_admin::boot::{Guest as Boot, *};
+use exports::psibase::x_admin::crypto::Guest as Crypto;
 use exports::psibase::x_admin::packages::Guest as Packages;
 use exports::psibase::x_admin::util::Guest as Util;
 use psibase::fracpack::{Pack, Unpack};
@@ -96,6 +97,14 @@ impl Boot for XAdminPlugin {
         }
 
         Ok((boot_transactions, transactions, labels))
+    }
+}
+
+impl Crypto for XAdminPlugin {
+    fn generate_unmanaged_keypair() -> Result<(String, String), String> {
+        let (public_key, private_key) =
+            psibase::generate_unmanaged_keypair().map_err(|e| e.to_string())?;
+        Ok((public_key, private_key))
     }
 }
 
