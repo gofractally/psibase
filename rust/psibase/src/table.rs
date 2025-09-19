@@ -45,11 +45,15 @@ pub trait Table<Record: TableRecord>: Sized {
     fn handle(&self) -> &KvHandle;
 
     fn new() -> Self {
-        Self::with_mode(KvMode::ReadWrite)
+        Self::read_write()
     }
 
     fn read() -> Self {
         Self::with_mode(KvMode::Read)
+    }
+
+    fn read_write() -> Self {
+        Self::with_mode(KvMode::ReadWrite)
     }
 
     fn with_mode(mode: KvMode) -> Self {
