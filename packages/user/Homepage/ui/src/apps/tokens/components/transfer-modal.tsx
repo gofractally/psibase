@@ -1,20 +1,15 @@
 import type { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 
-import { updateBalanceCache } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { Quantity } from "@/apps/tokens/lib/quantity";
 import { useStore } from "@tanstack/react-form";
-import { useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useAvatar } from "@/hooks/use-avatar";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
 
 import { withForm } from "@shared/components/form/app-form";
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -22,9 +17,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-import { toast } from "@shared/shadcn/ui/sonner";
+import { Button } from "@shared/shadcn/ui/button";
 
-import { useCredit } from "../hooks/tokensPlugin/useCredit";
 import { defaultTransferValues } from "../hooks/useTokenForm";
 
 export const TransferModal = withForm({
@@ -33,15 +27,21 @@ export const TransferModal = withForm({
         open: false,
         onClose: () => {},
         selectedToken: undefined as Token | undefined,
+        onSubmit: () => {},
     },
-    render: function TransferModal({ form, open, onClose, selectedToken }) {
-        const queryClient = useQueryClient();
+    render: function TransferModal({
+        form,
+        open,
+        onClose,
+        selectedToken,
+        onSubmit,
+    }) {
         const { data: currentUser } = useCurrentUser();
-        const { isPending, mutateAsync: credit } = useCredit();
 
-        const [to, amount] = useStore(form.store, (state) => [
+        const [to, amount, isSubmitting] = useStore(form.store, (state) => [
             state.values.to.account,
             state.values.amount,
+            state.isSubmitting,
         ]);
 
         const { avatarSrc: fromAvatar } = useAvatar(currentUser);
@@ -57,42 +57,6 @@ export const TransferModal = withForm({
                 return null;
             }
         }, [amount.amount, selectedToken]);
-
-        const handleConfirm = async () => {
-            const { token, amount, memo, to } = form.state.values;
-            try {
-                await credit({
-                    tokenId: token,
-                    receiver: to.account,
-                    amount: amount.amount,
-                    memo,
-                });
-                toast("Sent", {
-                    description: `Sent ${amount.amount} ${
-                        selectedToken?.label || selectedToken?.symbol
-                    } to ${to.account}`,
-                });
-                form.reset();
-                onClose();
-                updateBalanceCache(
-                    Account.parse(currentUser),
-                    token,
-                    amount.amount,
-                    "Subtract",
-                );
-            } catch (e) {
-                toast("Error", {
-                    description:
-                        e instanceof Error
-                            ? e.message
-                            : `Unrecognised error, see logs.`,
-                });
-            } finally {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.tokenBalances(currentUser),
-                });
-            }
-        };
 
         if (!quantity) return <></>;
 
@@ -142,12 +106,14 @@ export const TransferModal = withForm({
                         <AlertDialogCancel onClick={() => onClose()}>
                             Cancel
                         </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleConfirm}
-                            disabled={isPending}
+
+                        <Button
+                            type="button"
+                            onClick={onSubmit}
+                            disabled={isSubmitting}
                         >
-                            {isPending ? "Sending..." : "Send"}
-                        </AlertDialogAction>
+                            {isSubmitting ? "Sending..." : "Confirm"}
+                        </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
