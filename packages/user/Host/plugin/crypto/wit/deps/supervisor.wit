@@ -3,8 +3,6 @@ package supervisor:bridge;
 interface intf {
     use host:types/types.{pem, error};
 
-    // The top-level app through which the app is accessing psibase
-    //
     /// Signs a pre-hashed message for the DER-encoded pubKey
     sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
 
