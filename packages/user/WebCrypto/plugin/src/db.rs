@@ -1,5 +1,5 @@
-use crate::bindings::auth_sig::plugin::types::Pem;
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::host::types::types::Pem;
 use crate::types::*;
 
 fn get_hash(key: &Pem) -> String {
@@ -19,7 +19,7 @@ impl ManagedKeys {
         Keyvalue::get(&get_hash(pubkey)).expect("ManagedKeys::get: Key not found")
     }
 
-    pub fn has(pubkey: &Pem) -> bool {
+    pub fn _has(pubkey: &Pem) -> bool {
         Keyvalue::get(&get_hash(pubkey)).is_some()
     }
 

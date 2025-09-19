@@ -2,7 +2,8 @@
 mod bindings;
 use bindings::*;
 
-use auth_sig::plugin::keyvault::to_der;
+use crate::host::crypto::keyvault as HostCrypto;
+
 use host::types::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 
@@ -20,7 +21,7 @@ impl From<Producer> for psibase::Producer {
     fn from(value: Producer) -> Self {
         let auth_claim = match value.auth_claim {
             ClaimType::PubkeyPem(pem) => {
-                let der = to_der(&pem).unwrap();
+                let der = HostCrypto::to_der(&pem).unwrap();
                 psibase::Claim {
                     service: AccountNumber::from("verify-sig"),
                     rawData: der.into(),

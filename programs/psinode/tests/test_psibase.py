@@ -339,23 +339,25 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_sign(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer'])
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         key = PrivateKey()
+        print(key.pkcs8())
         key_file = os.path.join(a.dir, 'key')
         pubkey_file = os.path.join(a.dir, 'key.pub')
         with open(key_file, 'w') as f:
             f.write(key.pkcs8())
         with open(pubkey_file, 'w') as f:
             f.write(key.spki())
-        a.run_psibase(['create', 'alice', '-k', pubkey_file] + a.node_args())
+        res = a.run_psibase(['create', 'alice', '-k', pubkey_file] + a.node_args())
+        print(res)
         a.wait(new_block())
         a.run_psibase(['modify', 'alice', '-i', '--sign', key_file] + a.node_args())
 
     @testutil.psinode_test
     def test_staged_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer'])
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         accounts = Accounts(a)
         auth_sig = AuthSig(a)

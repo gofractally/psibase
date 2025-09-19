@@ -44,6 +44,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
+    pluginId("webcrypto", "plugin"),
 ];
 
 // The supervisor facilitates all communication
@@ -207,6 +208,33 @@ export class Supervisor implements AppInterface {
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
         return this.context.stack.export();
+    }
+
+    importKey(privateKey: string): string {
+        // future: call out to SubtleCrypto
+        // future: store privateKey, indexed by pubKey
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "importKey", [
+                privateKey,
+            ]),
+        );
+    }
+
+    signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
+        // future: call out to SubtleCrypto
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "signExplicit", [
+                msg,
+                privateKey,
+            ]),
+        );
+    }
+
+    sign(msg: Uint8Array, publicKey: string): Uint8Array {
+        // future: call out to SubtleCrypto
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "sign", [msg, publicKey]),
+        );
     }
 
     // Manages callstack and calls plugins

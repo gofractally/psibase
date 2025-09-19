@@ -12,6 +12,7 @@ members = [
     "user/Base64/plugin",
     "user/ClientData/plugin",
     "user/Host/plugin/auth",
+    "user/Host/plugin/crypto",
     "user/Host/plugin/common",
     "user/Host/plugin/prompt",
     "user/Host/plugin/types",
@@ -21,6 +22,7 @@ members = [
     "user/Sites/plugin",
     "user/Packages/plugin",
     "user/Permissions/plugin",
+    "user/WebCrypto/plugin",
     "user/Workshop/plugin",
     "user/Config/plugin",
 ]

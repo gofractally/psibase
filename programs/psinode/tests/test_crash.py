@@ -42,7 +42,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_shutdown_all_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
-        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
+        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'AuthSig'])
         b = prods[1]
         c = prods[2]
 
@@ -76,7 +76,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_restart_after_disconnect(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer'])
+        testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer', 'AuthSig'])
 
         (a, b, c, d) = prods
         # Stop d, so we have no fault tolerance
@@ -98,7 +98,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_shutdown_all_bft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        a = testutil.boot_with_producers(prods, 'bft', packages=['Minimal', 'Explorer'])
+        a = testutil.boot_with_producers(prods, 'bft', packages=['Minimal', 'Explorer', 'AuthSig'])
         b = prods[1]
         c = prods[2]
         d = prods[3]
@@ -148,7 +148,7 @@ class TestCrash(unittest.TestCase):
 
         print(keys)
         print("booting chain")
-        a.boot(packages=['Minimal', 'Explorer'])
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
         print("setting producers")
         a.set_producers(keys, 'bft')
         p.wait(producers_are(prods))

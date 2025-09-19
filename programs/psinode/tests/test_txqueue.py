@@ -75,7 +75,7 @@ class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
     def test_signed(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'TokenUsers'])
+        testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'AuthSig', 'TokenUsers'])
         (a, b, c, d) = prods
 
         tokens = Tokens(a)
@@ -105,7 +105,7 @@ class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
     def test_restart_node(self, cluster):
         (a, b) = cluster.complete(*testutil.generate_names(2))
-        a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig', 'TokenUsers'])
 
         # Make sure that b is ready
         b.wait(new_block())
