@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstring>
 
 using namespace psibase;
 
@@ -216,6 +217,19 @@ namespace
       return result;
    }
 
+   std::uint8_t addressBits(const IPV4Address&)
+   {
+      return 32;
+   }
+   std::uint8_t addressBits(const IPV6Address&)
+   {
+      return 128;
+   }
+   std::uint8_t addressBits(const IPAddress& addr)
+   {
+      return std::visit([](const auto& addr) { return addressBits(addr); }, addr);
+   }
+
 }  // namespace
 
 std::optional<IPV4Address> psibase::parseIPV4Address(std::string_view s)
@@ -238,6 +252,16 @@ std::optional<IPV6Address> psibase::parseIPV6Address(std::string_view s)
    if (iter != end)
       result = std::nullopt;
    return result;
+}
+
+std::optional<IPAddress> psibase::parseIPAddress(std::string_view s)
+{
+   if (auto result = parseIPV4Address(s))
+      return std::move(*result);
+   else if (auto result = parseIPV6Address(s))
+      return std::move(*result);
+   else
+      return {};
 }
 
 bool psibase::isLoopback(const IPV4Endpoint& endpoint)
@@ -336,4 +360,82 @@ std::optional<SocketEndpoint> psibase::parseSocketEndpoint(std::string_view s)
       return std::move(*result);
    else
       return LocalEndpoint{std::string(s)};
+}
+
+bool psibase::IPAddressPrefix::contains(const IPV4Address& addr)
+{
+   if (auto v4 = std::get_if<IPV4Address>(&address))
+   {
+      auto prefixBytes = (prefixLen / 8);
+      auto prefixBits  = (prefixLen % 8);
+      if (std::memcmp(v4->bytes.data(), addr.bytes.data(), prefixBytes) != 0)
+      {
+         return false;
+      }
+      if (prefixBits != 0)
+      {
+         auto mask = 0xff00 >> prefixBits;
+         if ((addr.bytes[prefixBytes] & mask) != v4->bytes[prefixBytes])
+            return false;
+      }
+      return true;
+   }
+   return false;
+}
+
+bool psibase::IPAddressPrefix::contains(const IPV6Address& addr)
+{
+   if (auto v6 = std::get_if<IPV6Address>(&address))
+   {
+      auto prefixBytes = prefixLen / 8;
+      auto prefixBits  = prefixLen % 8;
+      if (std::memcmp(v6->bytes.data(), addr.bytes.data(), prefixBytes) != 0)
+      {
+         return false;
+      }
+      if (prefixBits != 0)
+      {
+         auto mask = 0xff00 >> prefixBits;
+         if ((addr.bytes[prefixBytes] & mask) != v6->bytes[prefixBytes])
+            return false;
+      }
+      if (v6->zone != 0 && v6->zone != addr.zone)
+         return false;
+      return true;
+   }
+   return false;
+}
+
+bool psibase::IPAddressPrefix::contains(const IPAddress& addr)
+{
+   return std::visit([this](const auto& addr) { return contains(addr); }, addr);
+}
+
+std::optional<IPAddressPrefix> psibase::parseIPAddressPrefix(std::string_view s)
+{
+   auto pos = s.find('/');
+   if (pos == std::string_view::npos)
+   {
+      if (auto addr = parseIPAddress(s))
+      {
+         std::uint8_t prefixLen = addressBits(*addr);
+         return IPAddressPrefix{std::move(*addr), prefixLen};
+      }
+   }
+   else
+   {
+      if (auto addr = parseIPAddress(s.substr(0, pos)))
+      {
+         const char*  iter = s.data() + pos + 1;
+         const char*  end  = s.data() + s.size();
+         std::uint8_t prefixLen;
+         auto         res = std::from_chars(iter, end, prefixLen);
+         if (res.ptr != end || res.ec != std::errc{})
+            return {};
+         if (prefixLen > addressBits(*addr))
+            return {};
+         return IPAddressPrefix{std::move(*addr), prefixLen};
+      }
+   }
+   return {};
 }

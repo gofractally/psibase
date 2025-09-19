@@ -99,6 +99,20 @@ namespace psibase
    bool isLoopback(const LocalEndpoint&);
    bool isLoopback(const SocketEndpoint&);
 
+   struct IPAddressPrefix
+   {
+      IPAddress address;
+      uint8_t   prefixLen;
+
+      bool contains(const IPV4Address& addr);
+      bool contains(const IPV6Address& addr);
+      bool contains(const IPAddress& addr);
+
+      PSIO_REFLECT(IPAddressPrefix, address, prefixLen)
+   };
+
+   std::optional<IPAddressPrefix> parseIPAddressPrefix(std::string_view s);
+
    struct TLSInfo
    {
       PSIO_REFLECT(TLSInfo)
