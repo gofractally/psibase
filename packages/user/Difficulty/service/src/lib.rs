@@ -1,11 +1,12 @@
 #[psibase::service_tables]
 pub mod tables {
-    use async_graphql::SimpleObject;
+    use psibase::services::difficulty::Wrapper;
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Quantity;
     use psibase::services::transact::Wrapper as TransactSvc;
-    use psibase::{check, get_sender};
-    use psibase::{check_some, Fracpack, Table, TimePointSec, ToSchema};
+    use psibase::{check, check_some, get_sender, Fracpack, Table, TimePointSec, ToSchema};
+
+    use async_graphql::SimpleObject;
 
     use serde::{Deserialize, Serialize};
 
@@ -55,6 +56,13 @@ pub mod tables {
             percent_change: u8,
         ) -> Self {
             let nft_id = Nft::call().mint();
+            let sender = get_sender();
+            Nft::call().credit(
+                nft_id,
+                sender,
+                "Difficulty item administration NFT".to_string(),
+            );
+
             let last_updated = TransactSvc::call().currentBlock().time.seconds();
 
             check(
@@ -71,6 +79,9 @@ pub mod tables {
                 percent_change,
             );
             new_instance.save();
+
+            Wrapper::emit().history().created(nft_id, sender);
+
             new_instance
         }
 
@@ -95,7 +106,6 @@ pub mod tables {
                     }
                     self.active_price = new_price.into();
                 }
-                self.save();
             }
             self.active_price
         }
@@ -115,15 +125,25 @@ pub mod tables {
             self.active_price
         }
 
-        pub fn increment(&mut self) -> Quantity {
+        fn check_sender_is_owner(&self) {
             check(
                 Nft::call().getNft(self.nft_id).owner == get_sender(),
                 "must be owner of difficulty",
             );
+        }
+
+        pub fn increment(&mut self) -> Quantity {
+            self.check_sender_is_owner();
             let price = self.check_price_decrease();
             self.counter += 1;
             self.check_price_increase();
+            self.save();
             price
+        }
+
+        pub fn delete(&self) {
+            self.check_sender_is_owner();
+            Self::table().remove(&self);
         }
 
         fn save(&self) {
@@ -142,27 +162,58 @@ pub mod tables {
 
 #[psibase::service(name = "difficulty", tables = "tables")]
 pub mod service {
-    use psibase::services::tokens::Quantity;
+    use psibase::{services::tokens::Quantity, AccountNumber};
 
     use crate::tables::Difficulty;
 
+    /// Creates a new difficulty instance
+    ///
+    /// # Arguments
+    /// * `window_seconds` - Seconds duration before decay occurs
+    /// * `target` - Difficulty target
+    /// * `floor_price` - Minimum price.
+    /// * `percent_change` - Percent to increment / decrement, 5 = 5%
     #[action]
     fn create(window_seconds: u32, target: u32, floor_price: Quantity, percent_change: u8) -> u32 {
         Difficulty::add(window_seconds, target, floor_price, percent_change).nft_id
     }
 
+    /// Get difficulty price
+    ///
+    /// # Arguments
+    /// * `nft_id` - Difficulty / NFT ID
+    ///
+    /// # Returns
+    /// Price of difficulty
     #[action]
     fn get_price(nft_id: u32) -> Quantity {
         Difficulty::get_assert(nft_id).check_price_decrease()
     }
 
+    /// Increment difficulty instance, potentially increasing difficulty
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - Difficulty / NFT ID
     #[action]
     fn increment(nft_id: u32) -> Quantity {
         Difficulty::get_assert(nft_id).increment()
     }
 
+    /// Delete difficulty instance
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - Difficulty / NFT ID
+    #[action]
+    fn delete(nft_id: u32) {
+        Difficulty::get_assert(nft_id).delete()
+    }
+
     #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
+    pub fn created(nft_id: u32, actor: AccountNumber) {}
 }
 
 #[cfg(test)]

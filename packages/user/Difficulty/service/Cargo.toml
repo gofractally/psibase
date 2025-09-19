@@ -9,9 +9,7 @@ publish.workspace = true
 server = "r-difficulty"
 plugin = "difficulty-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
-postinstall = [
-    { sender = "difficulty", service = "difficulty", method = "init", data = {} },
-]
+postinstall = []
 
 [dependencies]
 psibase = { version = "0.20.0", path = "../../../../rust/psibase" }

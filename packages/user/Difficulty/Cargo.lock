@@ -1844,6 +1844,7 @@ dependencies = [
  "difficulty",
  "psibase",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 
