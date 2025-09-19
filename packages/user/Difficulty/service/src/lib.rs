@@ -42,7 +42,7 @@ pub mod tables {
                 nft_id,
                 active_price: initial_price,
                 counter: 0,
-                floor_price: floor_price,
+                floor_price,
                 target_per_window,
                 window_seconds,
                 last_update,

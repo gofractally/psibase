@@ -39,12 +39,13 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Delete difficulty instance
+    /// Increment difficulty instance, potentially increasing difficulty
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
     /// * `nft_id` - Difficulty / NFT ID
+    /// * `amount` - Amount to increment the counter by
     #[action]
     fn delete(nft_id: u32) {
         unimplemented!()
