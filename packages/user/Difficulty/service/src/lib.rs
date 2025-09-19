@@ -90,10 +90,6 @@ pub mod tables {
 
         pub fn check_price_decrease(&mut self) -> Quantity {
             let now = TransactSvc::call().currentBlock().time.seconds();
-            check(
-                now.seconds >= self.last_update.seconds,
-                "time must not go backwards",
-            );
             let seconds_elapsed = (now.seconds - self.last_update.seconds) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
@@ -116,11 +112,12 @@ pub mod tables {
         fn check_price_increase(&mut self) -> Quantity {
             if self.counter > self.target_per_window {
                 let percent = 100u64 + self.percent_change as u64;
-                check(
-                    self.active_price.value <= u64::MAX / percent,
-                    "price increase would overflow u64",
-                );
-                self.active_price = ((self.active_price.value * percent) / 100u64).into();
+                let times_over_target = self.counter / self.target_per_window;
+                let mut price = self.active_price.value;
+                for _ in 0..times_over_target {
+                    price = ((price * percent) / 100u64).into();
+                }
+                self.active_price = price.into();
                 self.counter = 0;
                 self.last_update = TransactSvc::call().currentBlock().time.seconds();
                 self.save();
@@ -135,10 +132,10 @@ pub mod tables {
             );
         }
 
-        pub fn increment(&mut self) -> Quantity {
+        pub fn increment(&mut self, increment_amount: u32) -> Quantity {
             self.check_sender_is_owner();
             let price = self.check_price_decrease();
-            self.counter += 1;
+            self.counter += increment_amount;
             self.check_price_increase();
             self.save();
             price
@@ -175,7 +172,7 @@ pub mod service {
     /// * `initial_price` - Sets initial price
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target` - Difficulty target
-    /// * `floor_price` - Minimum price.
+    /// * `floor_price` - Minimum price
     /// * `percent_change` - Percent to increment / decrement, 5 = 5%
     #[action]
     fn create(
@@ -213,9 +210,10 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - Difficulty / NFT ID
+    /// * `amount` - Amount to increment the counter by
     #[action]
-    fn increment(nft_id: u32) -> Quantity {
-        Difficulty::get_assert(nft_id).increment()
+    fn increment(nft_id: u32, amount: u32) -> Quantity {
+        Difficulty::get_assert(nft_id).increment(amount)
     }
 
     /// Delete difficulty instance

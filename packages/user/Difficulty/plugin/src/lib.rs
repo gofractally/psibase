@@ -55,10 +55,10 @@ impl Api for DifficultyPlugin {
         )
     }
 
-    fn increment(nft_id: u32) -> Result<(), Error> {
+    fn increment(nft_id: u32, amount: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::increment)?;
 
-        let packed_args = difficulty::action_structs::increment { nft_id }.packed();
+        let packed_args = difficulty::action_structs::increment { nft_id, amount }.packed();
 
         add_action_to_transaction(
             difficulty::action_structs::increment::ACTION_NAME,

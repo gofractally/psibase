@@ -16,9 +16,9 @@ mod tests {
             .create(3000.into(), 60, 5, 500.into(), 5)
             .get()?;
 
-        // price does not increase after 4
+        // Price does not increase after 4
         for _ in 0..4 {
-            Wrapper::push_from(&chain, alice).increment(nft_id);
+            Wrapper::push_from(&chain, alice).increment(nft_id, 1);
         }
         assert_eq!(Wrapper::push(&chain).get_price(nft_id).get()?, 3000.into());
 
@@ -27,13 +27,19 @@ mod tests {
 
         assert_eq!(Wrapper::push(&chain).get_price(nft_id).get()?, 2850.into());
 
-        for _ in 0..6 {
-            Wrapper::push_from(&chain, alice).increment(nft_id);
-            chain.start_block_after(Seconds::new(2).into());
-        }
+        chain.start_block_after(Seconds::new(5).into());
+
+        Wrapper::push_from(&chain, alice).increment(nft_id, 6);
 
         // 6 sales increases the price by 5%
         assert_eq!(Wrapper::push(&chain).get_price(nft_id).get()?, 2992.into());
+
+        // 18 sales increases by 5% x 3
+        chain.start_block_after(Seconds::new(5).into());
+
+        Wrapper::push_from(&chain, alice).increment(nft_id, 18);
+
+        assert_eq!(Wrapper::push(&chain).get_price(nft_id).get()?, 3462.into());
 
         Ok(())
     }
