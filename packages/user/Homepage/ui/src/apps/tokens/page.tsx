@@ -111,7 +111,7 @@ export const TokensPage = () => {
                 {isNoTokens && <NoTokensWarning onContinue={() => {}} />}
                 <form.AppForm>
                     <form className="space-y-4">
-                        <Card>
+                        <GlowingCard>
                             <CardHeader>
                                 <CardTitle>Select a token</CardTitle>
                             </CardHeader>
@@ -150,8 +150,8 @@ export const TokensPage = () => {
                                     }}
                                 />
                             </CardContent>
-                        </Card>
-                        <Card>
+                        </GlowingCard>
+                        <GlowingCard>
                             <CardHeader>
                                 <CardTitle>Transfer details</CardTitle>
                             </CardHeader>
@@ -203,7 +203,7 @@ export const TokensPage = () => {
                                     </div>
                                 )}
                             </CardContent>
-                        </Card>
+                        </GlowingCard>
                     </form>
                 </form.AppForm>
                 <div className="my-4">
@@ -214,6 +214,17 @@ export const TokensPage = () => {
                     />
                 </div>
             </div>
+        </div>
+    );
+};
+
+const GlowingCard = ({ children }: { children: React.ReactNode }) => {
+    return (
+        <div className="group relative">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 blur-xl transition-all duration-500 group-hover:blur-2xl dark:from-purple-500/20 dark:to-blue-500/20" />
+            <Card className="relative z-10 border-gray-300 transition-colors duration-300 hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-700">
+                {children}
+            </Card>
         </div>
     );
 };
