@@ -15,6 +15,12 @@ import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { Button } from "@shared/shadcn/ui/button";
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { AnimateNumber } from "./components/AnimateNumber";
@@ -100,85 +106,104 @@ export const TokensPage = () => {
     };
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <div className="mx-auto flex max-w-screen-lg flex-col gap-3 p-4">
+        <div className="p-4">
+            <div className="mx-auto max-w-screen-md">
                 {isNoTokens && <NoTokensWarning onContinue={() => {}} />}
                 <form.AppForm>
-                    <form className="mx-auto w-full space-y-8">
-                        <TransferModal
-                            form={form}
-                            onClose={() => setTransferModal(false)}
-                            open={isTransferModalOpen}
-                            selectedToken={selectedToken}
-                            onSubmit={form.handleSubmit}
-                        />
-                        <form.AppField
-                            name="token"
-                            children={(field) => (
-                                <field.SelectField
-                                    label="Token"
-                                    options={tokens.map((token) => ({
-                                        value: token.id.toString(),
-                                        label: token.label,
-                                    }))}
-                                    className="w-full"
+                    <form className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Select a token</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <TransferModal
+                                    form={form}
+                                    onClose={() => setTransferModal(false)}
+                                    open={isTransferModalOpen}
+                                    selectedToken={selectedToken}
+                                    onSubmit={form.handleSubmit}
                                 />
-                            )}
-                        />
-                        <AnimateNumber
-                            n={selectedToken?.balance?.amount ?? 0}
-                            precision={selectedToken?.balance?.precision ?? 0}
-                            className="hover:underline"
-                            onClick={() => {
-                                form.setFieldValue("amount", {
-                                    amount:
-                                        selectedToken?.balance?.amount.toString() ??
-                                        "",
-                                });
-                            }}
-                        />
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <FieldAccountExisting
-                                form={form}
-                                fields="to"
-                                label="Recipient"
-                                description={undefined}
-                                placeholder="Account"
-                                disabled={disableForm}
-                                supervisor={supervisor}
-                            />
-                            <FieldTokenAmount
-                                form={form}
-                                fields="amount"
-                                precision={selectedToken?.precision ?? 0}
-                                balance={selectedToken?.balance?.amount ?? 0}
-                                disabled={disableForm}
-                                description={null}
-                                validators={{
-                                    onChangeListenTo: ["token"],
-                                }}
-                            />
-                        </div>
-                        <form.AppField
-                            name="memo"
-                            children={(field) => (
-                                <field.TextField
-                                    disabled={disableForm}
-                                    label="Memo (optional)"
-                                    placeholder="Add a note about this transfer"
+                                <form.AppField
+                                    name="token"
+                                    children={(field) => (
+                                        <field.SelectField
+                                            label="Token"
+                                            options={tokens.map((token) => ({
+                                                value: token.id.toString(),
+                                                label: token.label,
+                                            }))}
+                                        />
+                                    )}
                                 />
-                            )}
-                        />
-                        {!isTransferModalOpen && (
-                            <div className="flex justify-end">
-                                <Button
-                                    type="button"
-                                    onClick={onSubmitPreflight}
-                                >
-                                    {isPending ? "Sending..." : "Send"}
-                                </Button>
-                            </div>
-                        )}
+                                <AnimateNumber
+                                    n={selectedToken?.balance?.amount ?? 0}
+                                    precision={
+                                        selectedToken?.balance?.precision ?? 0
+                                    }
+                                    className="hover:underline"
+                                    onClick={() => {
+                                        form.setFieldValue("amount", {
+                                            amount:
+                                                selectedToken?.balance?.amount.toString() ??
+                                                "",
+                                        });
+                                    }}
+                                />
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Transfer details</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <FieldAccountExisting
+                                        form={form}
+                                        fields="to"
+                                        label="Recipient"
+                                        description={undefined}
+                                        placeholder="Account"
+                                        disabled={disableForm}
+                                        supervisor={supervisor}
+                                    />
+                                    <FieldTokenAmount
+                                        form={form}
+                                        fields="amount"
+                                        precision={
+                                            selectedToken?.precision ?? 0
+                                        }
+                                        balance={
+                                            selectedToken?.balance?.amount ?? 0
+                                        }
+                                        disabled={disableForm}
+                                        description={null}
+                                        validators={{
+                                            onChangeListenTo: ["token"],
+                                        }}
+                                    />
+                                </div>
+                                <form.AppField
+                                    name="memo"
+                                    children={(field) => (
+                                        <field.TextField
+                                            disabled={disableForm}
+                                            label="Memo (optional)"
+                                            placeholder="Add a note about this transfer"
+                                        />
+                                    )}
+                                />
+                                {!isTransferModalOpen && (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            type="button"
+                                            onClick={onSubmitPreflight}
+                                        >
+                                            {isPending ? "Sending..." : "Send"}
+                                        </Button>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </form>
                 </form.AppForm>
                 <div className="my-4">
