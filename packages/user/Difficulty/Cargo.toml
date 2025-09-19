@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin", "query-service"]
 
 [workspace.package]
-version = "0.20.0"
+version = "0.21.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -28,14 +28,14 @@ package-name = "Difficulty"
 services = ["difficulty"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.20.0"
-Sites = "0.20.0"
-Permissions = "0.20.0"
+HttpServer = "0.21.0"
+Sites = "0.21.0"
+Permissions = "0.21.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-difficulty = { path = "service", version = "0.20.0" }
-r-difficulty = { path = "query-service", version = "0.20.0" }
-difficulty-plugin = { path = "plugin", version = "0.20.0" }
+difficulty = { path = "service", version = "0.21.0" }
+r-difficulty = { path = "query-service", version = "0.21.0" }
+difficulty-plugin = { path = "plugin", version = "0.21.0" }

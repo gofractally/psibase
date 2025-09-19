@@ -11,8 +11,6 @@ use psibase::fracpack::Pack;
 
 use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 
-mod errors;
-
 define_trust! {
     descriptions {
         Low => "
