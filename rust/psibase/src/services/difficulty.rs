@@ -6,6 +6,7 @@ pub mod Service {
     /// Creates a new difficulty instance
     ///
     /// # Arguments
+    /// * `initial_price` - Sets initial price
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target` - Difficulty target
     /// * `floor_price` - Minimum price.

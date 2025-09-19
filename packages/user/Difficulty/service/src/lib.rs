@@ -31,6 +31,7 @@ pub mod tables {
 
         pub fn new(
             nft_id: u32,
+            initial_price: Quantity,
             window_seconds: u32,
             target_per_window: u32,
             floor_price: Quantity,
@@ -39,7 +40,7 @@ pub mod tables {
         ) -> Self {
             Self {
                 nft_id,
-                active_price: floor_price,
+                active_price: initial_price,
                 counter: 0,
                 floor_price: floor_price,
                 target_per_window,
@@ -50,6 +51,7 @@ pub mod tables {
         }
 
         pub fn add(
+            initial_price: Quantity,
             window_seconds: u32,
             target: u32,
             floor_price: Quantity,
@@ -72,6 +74,7 @@ pub mod tables {
 
             let new_instance = Self::new(
                 nft_id,
+                initial_price,
                 window_seconds,
                 target,
                 floor_price,
@@ -169,13 +172,27 @@ pub mod service {
     /// Creates a new difficulty instance
     ///
     /// # Arguments
+    /// * `initial_price` - Sets initial price
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target` - Difficulty target
     /// * `floor_price` - Minimum price.
     /// * `percent_change` - Percent to increment / decrement, 5 = 5%
     #[action]
-    fn create(window_seconds: u32, target: u32, floor_price: Quantity, percent_change: u8) -> u32 {
-        Difficulty::add(window_seconds, target, floor_price, percent_change).nft_id
+    fn create(
+        initial_price: Quantity,
+        window_seconds: u32,
+        target: u32,
+        floor_price: Quantity,
+        percent_change: u8,
+    ) -> u32 {
+        Difficulty::add(
+            initial_price,
+            window_seconds,
+            target,
+            floor_price,
+            percent_change,
+        )
+        .nft_id
     }
 
     /// Get difficulty price

@@ -32,6 +32,7 @@ struct DifficultyPlugin;
 impl Api for DifficultyPlugin {
     fn create(
         token_id: u32,
+        initial_price: String,
         floor_price: String,
         window_seconds: u32,
         percent_change: u8,
@@ -41,6 +42,7 @@ impl Api for DifficultyPlugin {
 
         let packed_args = difficulty::action_structs::create {
             window_seconds,
+            initial_price: decimal_to_u64(token_id, &initial_price)?.into(),
             floor_price: decimal_to_u64(token_id, &floor_price)?.into(),
             percent_change,
             target,
