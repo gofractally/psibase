@@ -9,8 +9,8 @@ edition = "2021"
 publish = false
 
 [package]
-name = "difficulty-pkg"                # Crate name
-description = "An example application"
+name = "difficulty-pkg"
+description = "General purpose Bitcoin inspired difficulty package"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
