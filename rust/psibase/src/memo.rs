@@ -1,19 +1,23 @@
+use crate::serialize_as_str;
+use custom_error::custom_error;
 use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
 use std::fmt;
 use std::str::FromStr;
 
-use crate::{serialize_as_str, services::tokens::TokensError};
+custom_error! { pub MemoError
+    MemoTooLarge = "Memo must be 80 bytes or less"
+}
 
 #[derive(Debug, Clone, ToSchema, Default, Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Memo(String);
 
 impl Memo {
-    pub fn new(value: String) -> Result<Self, TokensError> {
+    pub fn new(value: String) -> Result<Self, MemoError> {
         if value.len() <= 80 {
             Ok(Self(value))
         } else {
-            Err(TokensError::MemoTooLarge)
+            Err(MemoError::MemoTooLarge)
         }
     }
 }
@@ -25,7 +29,7 @@ impl fmt::Display for Memo {
 }
 
 impl TryFrom<String> for Memo {
-    type Error = TokensError;
+    type Error = MemoError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
@@ -33,7 +37,7 @@ impl TryFrom<String> for Memo {
 }
 
 impl FromStr for Memo {
-    type Err = TokensError;
+    type Err = MemoError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::new(s.to_string())
