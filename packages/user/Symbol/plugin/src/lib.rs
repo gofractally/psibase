@@ -2,13 +2,12 @@
 mod bindings;
 
 use bindings::exports::symbol::plugin::api::Guest as Api;
-use bindings::exports::symbol::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::{define_trust, AccountNumber};
 
 mod errors;
 use errors::ErrorType;
@@ -34,39 +33,18 @@ define_trust! {
 struct SymbolPlugin;
 
 impl Api for SymbolPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
+    fn purchase(symbol: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = symbol::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+        let packed_example_thing_args = symbol::action_structs::purchase {
+            symbol: AccountNumber::from(symbol.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(
+            symbol::action_structs::purchase::ACTION_NAME,
+            &packed_example_thing_args,
+        )
+        .unwrap();
         Ok(())
-    }
-}
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
-
-impl Queries for SymbolPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
-
-        let graphql_str = "query { exampleThing }";
-
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let examplething_val = 
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(examplething_val.data.example_thing)
     }
 }
 

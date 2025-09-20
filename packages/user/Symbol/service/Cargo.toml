@@ -9,9 +9,7 @@ publish.workspace = true
 server = "r-symbol"
 plugin = "symbol-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
-postinstall = [
-    { sender = "symbol", service = "symbol", method = "init", data = {} },
-]
+postinstall = []
 
 [dependencies]
 psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
