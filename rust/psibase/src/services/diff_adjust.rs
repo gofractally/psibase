@@ -7,14 +7,16 @@ pub mod Service {
     /// # Arguments
     /// * `initial_difficulty` - Sets initial difficulty
     /// * `window_seconds` - Seconds duration before decay occurs
-    /// * `target` - Rate limit target
+    /// * `target_min` - Minimum rate limit target
+    /// * `target_max` - Maximum rate limit target
     /// * `floor_difficulty` - Minimum price
     /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
     #[action]
     fn create(
         initial_difficulty: u64,
         window_seconds: u32,
-        target: u32,
+        target_min: u32,
+        target_max: u32,
         floor_difficulty: u64,
         percent_change: u32,
     ) -> u32 {
@@ -45,15 +47,16 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Update target
+    /// Update targets
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `target` - Target difficulty
+    /// * `target_min` - Minimum target difficulty
+    /// * `target_max` - Maximum target difficulty
     #[action]
-    fn up_target(nft_id: u32, target: u32) {
+    fn up_targets(nft_id: u32, target_min: u32, target_max: u32) {
         unimplemented!()
     }
 

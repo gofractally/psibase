@@ -19,7 +19,8 @@ pub mod tables {
         pub nft_id: u32,
         pub window_seconds: u32,
         pub counter: u32,
-        pub target_per_window: u32,
+        pub target_min: u32,
+        pub target_max: u32,
         pub floor_difficulty: u64,
         pub active_difficulty: u64,
         pub last_update: TimePointSec,
@@ -37,7 +38,8 @@ pub mod tables {
             consumer: AccountNumber,
             initial_difficulty: u64,
             window_seconds: u32,
-            target_per_window: u32,
+            target_min: u32,
+            target_max: u32,
             floor_difficulty: u64,
             last_update: TimePointSec,
             percent_change: u32,
@@ -47,7 +49,8 @@ pub mod tables {
                 active_difficulty: initial_difficulty,
                 counter: 0,
                 floor_difficulty,
-                target_per_window,
+                target_min,
+                target_max,
                 window_seconds,
                 last_update,
                 percent_change,
@@ -62,8 +65,13 @@ pub mod tables {
             );
         }
 
-        fn check_target(target: u32) {
-            check(target > 0, "target must be above 0");
+        fn check_targets(target_min: u32, target_max: u32) {
+            check(target_min > 0, "target_min must be above 0");
+            check(target_max > 0, "target_max must be above 0");
+            check(
+                target_min <= target_max,
+                "target_min must not exceed target_max",
+            );
         }
 
         fn check_window_seconds(seconds: u32) {
@@ -73,7 +81,8 @@ pub mod tables {
         pub fn add(
             initial_difficulty: u64,
             window_seconds: u32,
-            target: u32,
+            target_min: u32,
+            target_max: u32,
             floor_difficulty: u64,
             percent_change: u32,
         ) -> Self {
@@ -83,7 +92,7 @@ pub mod tables {
 
             let last_updated = TransactSvc::call().currentBlock().time.seconds();
 
-            Self::check_target(target);
+            Self::check_targets(target_min, target_max);
             Self::check_percent_change(percent_change);
             Self::check_window_seconds(window_seconds);
 
@@ -92,7 +101,8 @@ pub mod tables {
                 sender,
                 initial_difficulty,
                 window_seconds,
-                target,
+                target_min,
+                target_max,
                 floor_difficulty,
                 last_updated,
                 percent_change,
@@ -111,7 +121,7 @@ pub mod tables {
             let seconds_elapsed = (now.seconds - self.last_update.seconds) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
-                let below_target = self.counter < self.target_per_window;
+                let below_target = self.counter < self.target_min;
                 let seconds_remainder = seconds_elapsed % self.window_seconds;
                 self.counter = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
@@ -128,9 +138,9 @@ pub mod tables {
         }
 
         fn check_difficulty_increase(&mut self) -> u64 {
-            if self.counter > self.target_per_window {
+            if self.counter > self.target_max {
                 let percent = 1.0 + self.percent();
-                let times_over_target = self.counter / self.target_per_window;
+                let times_over_target = self.counter / self.target_max;
                 let mut difficulty = self.active_difficulty as f64;
                 for _ in 0..times_over_target {
                     difficulty = difficulty * percent;
@@ -171,10 +181,11 @@ pub mod tables {
             self.save();
         }
 
-        pub fn update_target(&mut self, target: u32) {
+        pub fn update_targets(&mut self, target_min: u32, target_max: u32) {
             self.check_sender_has_nft();
-            Self::check_target(target);
-            self.target_per_window = target;
+            Self::check_targets(target_min, target_max);
+            self.target_min = target_min;
+            self.target_max = target_max;
             self.save();
         }
 
@@ -227,21 +238,24 @@ pub mod service {
     /// # Arguments
     /// * `initial_difficulty` - Sets initial difficulty
     /// * `window_seconds` - Seconds duration before decay occurs
-    /// * `target` - Rate limit target
+    /// * `target_min` - Minimum rate limit target
+    /// * `target_max` - Maximum rate limit target
     /// * `floor_difficulty` - Minimum price
     /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
     #[action]
     fn create(
         initial_difficulty: u64,
         window_seconds: u32,
-        target: u32,
+        target_min: u32,
+        target_max: u32,
         floor_difficulty: u64,
         percent_change: u32,
     ) -> u32 {
         RateLimit::add(
             initial_difficulty,
             window_seconds,
-            target,
+            target_min,
+            target_max,
             floor_difficulty,
             percent_change,
         )
@@ -272,16 +286,17 @@ pub mod service {
         RateLimit::get_assert(nft_id).increment(amount)
     }
 
-    /// Update target
+    /// Update targets
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `target` - Target difficulty
+    /// * `target_min` - Minimum target difficulty
+    /// * `target_max` - Maximum target difficulty
     #[action]
-    fn up_target(nft_id: u32, target: u32) {
-        RateLimit::get_assert(nft_id).update_target(target);
+    fn up_targets(nft_id: u32, target_min: u32, target_max: u32) {
+        RateLimit::get_assert(nft_id).update_targets(target_min, target_max);
     }
 
     /// Update window
