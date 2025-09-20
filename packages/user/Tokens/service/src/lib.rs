@@ -6,7 +6,6 @@ pub mod service {
     use crate::tables::tables::*;
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::symbol::Service::Wrapper as Symbol;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::{AccountNumber, Memo};
 
@@ -66,56 +65,6 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> Token {
         Token::get_assert(token_id)
-    }
-
-    /// Lookup token details.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    ///
-    /// # Returns token information including current, burned supply and precision.
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        check_some(
-            Token::get_assert(token_id).symbol,
-            "token does not have symbol",
-        )
-    }
-
-    /// Map a symbol to a token.
-    ///
-    /// By default tokens are only identifiable by their TID, Symbols like "BTC" can be mapped as a permament one way lookup.
-    /// Symbol mapping is permament and only map per token is allowed.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        let mut token = Token::get_assert(token_id);
-
-        token.map_symbol(symbol);
-
-        let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
-            .getSymbol(symbol)
-            .ownerNft;
-        check(symbol_owner_nft != 0, "Symbol does not exist");
-
-        Nfts::call_from(Wrapper::SERVICE).debit(
-            symbol_owner_nft,
-            format!(
-                "Mapping symbol {} to token {}",
-                symbol.to_string(),
-                token_id
-            ),
-        );
-        Nfts::call_from(Wrapper::SERVICE).burn(symbol_owner_nft);
-
-        Wrapper::emit()
-            .history()
-            .symbol_mapped(token_id, get_sender(), symbol);
     }
 
     /// Get user balance configuration.
@@ -402,9 +351,6 @@ pub mod service {
 
     #[event(history)]
     pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
-
-    #[event(history)]
-    pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
 
     #[event(history)]
     pub fn credited(

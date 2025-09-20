@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "symbol-pkg"                      # Crate name
+name = "symbol-pkg"                  # Crate name
 description = "Token symbol mapping"
 version.workspace = true
 rust-version.workspace = true
@@ -30,7 +30,6 @@ services = ["symbol"]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.21.0"
 Sites = "0.21.0"
-Permissions = "0.21.0"
 
 [lib]
 crate-type = ["rlib"]

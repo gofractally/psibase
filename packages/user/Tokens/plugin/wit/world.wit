@@ -33,8 +33,6 @@ interface intf {
     recall: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
     mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
 
-    map-symbol: func(token-id: token-id, symbol: account-number) -> result<_, error>;
-
     set-balance-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
     del-balance-config: func(token-id: token-id) -> result<_, error>;
 

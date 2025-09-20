@@ -34,7 +34,6 @@ pub struct TokenRecord {
     pub issued_supply: Quantity,
     pub burned_supply: Quantity,
     pub max_issued_supply: Quantity,
-    pub symbol: Option<AccountNumber>,
 }
 
 #[derive(
@@ -194,32 +193,6 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> TokenRecord {
-        unimplemented!()
-    }
-
-    /// Lookup token symbol by token_id.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    ///
-    /// # Returns token symbol.
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        unimplemented!()
-    }
-
-    /// Map a symbol to a token.
-    ///
-    /// By default tokens are only identifiable by their TID, Symbols like "BTC" can be mapped as a permament one way lookup.
-    /// Symbol mapping is permament and only map per token is allowed.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
         unimplemented!()
     }
 

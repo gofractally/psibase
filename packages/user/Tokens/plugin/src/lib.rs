@@ -65,15 +65,6 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
     }
 
-    fn map_symbol(token_id: Wit::TokenId, symbol: Wit::AccountNumber) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::mapSymbol {
-            token_id,
-            symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(tokens::action_structs::mapSymbol::ACTION_NAME, &packed_args)
-    }
-
     fn mint(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
         let packed_args = tokens::action_structs::mint {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),

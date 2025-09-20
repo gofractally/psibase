@@ -4,7 +4,6 @@
 #include <psibase/psibase.hpp>
 
 #include <services/system/CommonTables.hpp>
-#include <services/user/symbolTables.hpp>
 #include <services/user/tokenErrors.hpp>
 #include <services/user/tokenTables.hpp>
 #include <services/user/tokenTypes.hpp>
@@ -153,16 +152,6 @@ namespace UserService
       /// * `memo`     - Memo
       void recall(TID tokenId, psibase::AccountNumber from, Quantity amount, Memo memo);
 
-      /// Map a symbol to a token.
-      ///
-      /// By default tokens are only identifiable by their TID, Symbols like "BTC" can be mapped as a permament one way lookup.
-      /// Symbol mapping is permament and only map per token is allowed.
-      ///
-      /// # Arguments
-      /// * `token_id` - Unique token identifier.
-      /// * `symbol` - Symbol e.g. "BTC"
-      void mapSymbol(TID tokenId, SID symbol);
-
       // Read-only interface:
 
       /// Lookup token details.
@@ -172,7 +161,6 @@ namespace UserService
       ///
       /// # Returns token information including current, burned supply and precision.
       TokenRecord getToken(TID tokenId);
-      SID         getTokenSym(TID tokenId);
 
       /// Get user balance.
       ///
@@ -281,12 +269,10 @@ namespace UserService
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
-      method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),
       method(getTokenConf, tokenId, index),
-      method(mapSymbol, tokenId, symbol),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,

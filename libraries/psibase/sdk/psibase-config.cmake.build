@@ -59,7 +59,6 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/packages/user/Explorer/include
         @ROOT_SOURCE_DIR@/packages/user/Nft/include
         @ROOT_SOURCE_DIR@/packages/user/Sites/include
-        @ROOT_SOURCE_DIR@/packages/user/Symbol/include
         @ROOT_SOURCE_DIR@/packages/user/Tokens/include
         @ROOT_SOURCE_DIR@/packages/user/Invite/include
     )

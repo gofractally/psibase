@@ -6,8 +6,6 @@
 #include <services/user/RTokens.hpp>
 #include <services/user/Tokens.hpp>
 
-#include "services/user/Symbol.hpp"
-
 using namespace psibase;
 using namespace psibase::benchmarking;
 using UserService::Tokens;
@@ -30,11 +28,12 @@ SCENARIO("Using system token")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.addAccount("alice"_a));
-      auto a     = alice.to<Tokens>();
-      auto bob   = t.from(t.addAccount("bob"_a));
+      auto alice         = t.from(t.addAccount("alice"_a));
+      auto a             = alice.to<Tokens>();
+      auto bob           = t.from(t.addAccount("bob"_a));
+      auto SymbolService = "symbol"_a;
 
-      auto     sysIssuer = t.from(Symbol::service).to<Tokens>();
+      auto     sysIssuer = t.from(SymbolService).to<Tokens>();
       Quantity userBalance{1'000'000'00e4};
 
       auto sysToken = Tokens::sysToken;
@@ -670,106 +669,6 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
    }
 }
 
-SCENARIO("Mapping a symbol to a token")
-{
-   GIVEN("Alice has created a token and created a symbol")
-   {
-      DefaultTestChain t;
-
-      auto alice = t.from(t.addAccount("alice"_a));
-      auto bob   = t.from(t.addAccount("bob"_a));
-      auto a     = alice.to<Tokens>();
-      auto b     = bob.to<Tokens>();
-
-      // Issue system tokens
-      auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
-      auto userBalance = 1'000'000e4;
-      auto sysToken    = Tokens::sysToken;
-      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, userBalance, memo);
-      sysIssuer.credit(sysToken, alice, userBalance, memo);
-
-      // Mint a second token
-      auto newToken = a.create(Precision{4}, userBalance).returnVal();
-      a.mint(newToken, userBalance, memo);
-
-      // Purchase the symbol and claim the owner NFT
-      auto symbolCost = alice.to<Symbol>().getPrice(3).returnVal();
-      a.credit(sysToken, Symbol::service, symbolCost, memo);
-      auto symbolId = "abc"_a;
-      auto create   = alice.to<Symbol>().create(symbolId, symbolCost);
-      CHECK(create.succeeded());
-      auto symbolRecord = alice.to<Symbol>().getSymbol(symbolId).returnVal();
-      auto nftId        = symbolRecord.ownerNft;
-
-      THEN("Bob is unable to map the symbol to the token")
-      {
-         CHECK(b.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
-      }
-      WHEN("Alice burns the symbol owner NFT")
-      {
-         alice.to<Nft>().burn(nftId);
-
-         THEN("Alice is unable to map the symbol to the token")
-         {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(nftDNE));
-         }
-      }
-      WHEN("Alice burns the token owner NFT")
-      {
-         auto tokenNft = a.getToken(newToken).returnVal().nft_id;
-         alice.to<Nft>().burn(tokenNft);
-
-         THEN("Alice is unable to map the symbol to the token")
-         {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(nftBurned));
-         }
-      }
-      THEN("Alice is unable to map a symbol to a nonexistent token")
-      {
-         TID invalidTokenId = 999;
-         CHECK(a.mapSymbol(invalidTokenId, symbolId).failed(tokenDNE));
-      }
-      THEN("Alice is unable to map a nonexistent symbol to a token")
-      {
-         SID invalidSymbolId = "zzz"_a;
-         CHECK(a.mapSymbol(newToken, invalidSymbolId).failed(symbolDNE));
-      }
-      THEN("Alice is able to map the symbol to the token")
-      {
-         alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         CHECK(a.mapSymbol(newToken, symbolId).succeeded());
-
-         AND_THEN("The token ID mapping exists")
-         {
-            CHECK(a.getTokenSym(newToken).returnVal() == symbolId);
-         }
-      }
-      WHEN("Alice maps the symbol to the token")
-      {
-         alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         a.mapSymbol(newToken, symbolId);
-
-         THEN("The symbol record is identical")
-         {
-            auto symbolRecord2 = alice.to<Symbol>().getSymbol(symbolId).returnVal();
-            CHECK(symbolRecord == symbolRecord2);
-         }
-
-         THEN("Alice may not map a new symbol to the same token")
-         {
-            a.credit(sysToken, Symbol::service, symbolCost, memo);
-            auto newSymbol = "bcd"_a;
-            alice.to<Symbol>().create(newSymbol, symbolCost);
-            auto newNft = alice.to<Symbol>().getSymbol(newSymbol).returnVal().ownerNft;
-
-            alice.to<Nft>().credit(newNft, Tokens::service, memo);
-            CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
-         }
-      }
-   }
-}
-
 TEST_CASE("Reading emitted events")
 {
    //CHECK(eventEmissionTestingSupported);
@@ -803,7 +702,9 @@ TEST_CASE("GraphQL Queries")
    auto a     = alice.to<Tokens>();
    auto bob   = t.from(t.addAccount("bob"_a));
 
-   auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
+   auto SymbolService = "symbol"_a;
+
+   auto sysIssuer   = t.from(SymbolService).to<Tokens>();
    auto userBalance = 1'000'000e4;
    auto sysToken    = Tokens::sysToken;
    sysIssuer.mint(sysToken, userBalance, memo);

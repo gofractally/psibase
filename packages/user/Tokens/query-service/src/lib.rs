@@ -17,10 +17,8 @@ mod service {
     pub fn token_id_to_number(token_id: String) -> u32 {
         match identify_token_type(token_id) {
             TokenType::Number(num) => num,
-            TokenType::Symbol(account) => {
-                Token::get_by_symbol(account)
-                    .expect("token by symbol not found")
-                    .id
+            TokenType::Symbol(_account) => {
+                unimplemented!()
             }
         }
     }

@@ -47,72 +47,57 @@ pub struct SymbolRecord {
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod Service {
-    use crate::services::symbol::{SymbolLengthRecord, SymbolRecord, SID};
-    use crate::{services::tokens::Quantity, AccountNumber, HttpReply, HttpRequest};
+    use crate::{services::tokens::Quantity, AccountNumber};
 
+    /// Purchase a symbol
+    ///
+    /// # Arguments
+    /// * `symbol` - Symbol to purchase
     #[action]
-    fn init() {
+    fn purchase(symbol: AccountNumber) -> u32 {
         unimplemented!()
     }
 
+    /// Start sale
+    ///
+    /// # Arguments
+    /// * `len` - Length of symbols to sell
+    /// * `initial_cost` - Initial cost of symbol length
+    /// * `window_seconds` - Window seconds before decay
+    /// * `target_min` - Minimum rate limit target
+    /// * `target_max` - Maximum rate limit target
+    /// * `floor_cost` - Minimum price of symbol length
+    /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
     #[action]
-    fn create(new_symbol: AccountNumber, max_debit: Quantity) {
+    fn start_sale(
+        len: u8,
+        initial_price: Quantity,
+        window_seconds: u32,
+        target_min: u32,
+        target_max: u32,
+        floor_price: Quantity,
+        percent_change: u32,
+    ) {
         unimplemented!()
     }
 
+    /// Get Token ID
+    ///
+    /// # Arguments
+    /// * `symbol` - Symbol to lookup by
+    ///
+    /// # Returns
+    /// Option of Token ID, none if not mapped
     #[action]
-    fn listSymbol(symbol: AccountNumber, price: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn buySymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn unlistSymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn exists(symbol: AccountNumber) -> bool {
-        unimplemented!()
-    }
-
-    #[action]
-    fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
-        unimplemented!()
-    }
-
-    #[action]
-    fn getPrice(num_chars: u8) -> Quantity {
-        unimplemented!()
-    }
-
-    #[action]
-    fn updatePrices() {
-        unimplemented!()
-    }
-
-    #[action]
-    fn getSymbolType(numChars: u8) -> SymbolLengthRecord {
-        unimplemented!()
-    }
-
-    #[action]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+    fn get_token_id(symbol: AccountNumber) -> Option<u32> {
         unimplemented!()
     }
 
     #[event(history)]
-    fn symCreated(symbol: SID, owner: AccountNumber, cost: Quantity) {
-        unimplemented!()
-    }
+    pub fn purchased(symbol: AccountNumber, actor: AccountNumber) {}
+
     #[event(history)]
-    fn symSold(symbol: SID, buyer: AccountNumber, seller: AccountNumber, cost: Quantity) {
-        unimplemented!()
-    }
+    pub fn mapped(symbol: AccountNumber, token_id: u32) {}
 }
 
 #[test]

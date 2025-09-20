@@ -40,7 +40,7 @@ SCENARIO("Minting & burning nfts")
          AND_THEN("The NFT exists")
          {
             NftRecord expected{
-                .id     = 2,         // Second minted NFT (first is the system token)
+                .id     = 1,         // Second minted NFT (first is the system token)
                 .issuer = alice.id,  //
                 .owner  = alice.id   //
             };

@@ -169,7 +169,6 @@ function(add suffix)
             ../../packages/user/Nft/include
             ../../packages/user/Packages/include
             ../../packages/user/Sites/include
-            ../../packages/user/Symbol/include
             ../../packages/user/Tokens/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
