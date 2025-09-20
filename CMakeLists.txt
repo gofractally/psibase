@@ -447,6 +447,11 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    PATH packages/user/Tokens
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH packages/user/Fractals
     DEPENDS ${Fractals_js_DEP}
@@ -790,19 +795,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    NAME Symbol
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
-    SERVICE symbol
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
-        INIT
-    DEPENDS wasm
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
     NAME Workshop
     VERSION ${PSIBASE_VERSION}.0
@@ -856,7 +848,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Initial token users"
     ACCOUNTS alice bob
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)"  "Accounts(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
