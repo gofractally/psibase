@@ -57,8 +57,8 @@ export const App = () => {
                 );
 
                 // The well-known path for the web platform is currently
-                //  `/plugin/web/prompt/<prompt-name>/index.html`
-                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}/index.html`;
+                //  `/plugin/web/prompt/<prompt-name>`
+                iframeUrl.pathname = `/plugin/web/prompt/${promptDetails.promptName}`;
 
                 setIframeUrl(iframeUrl.toString());
             } catch (e) {
@@ -82,7 +82,6 @@ export const App = () => {
                     activeApp !== "homepage"
                         ? new URL(siblingUrl(null, activeApp, returnPath, true))
                         : new URL(siblingUrl(null, null, null, true));
-
                 window.location.href = rootDomain.toString();
             }
         },
