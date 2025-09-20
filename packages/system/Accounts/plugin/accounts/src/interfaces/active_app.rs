@@ -57,7 +57,7 @@ impl ActiveApp for AccountsPlugin {
     }
 
     fn create_connection_token() -> Result<String, Error> {
-        println!("WARNING: create_connection_token is deprecated");
+        eprintln!("[WARNING] create_connection_token is deprecated");
         let app = get_assert_top_level_app("create_connection_token", &vec![])?;
         let origin = get_app_url(&app);
         Ok(Token::new_connection_token(ConnectionToken {
@@ -68,12 +68,15 @@ impl ActiveApp for AccountsPlugin {
     }
 
     fn connect_account() -> Result<(), Error> {
+        let sender = client::get_sender();
+
         assert!(
-            client::get_sender() == client::get_active_app(),
+            sender == client::get_active_app()
+                || sender == psibase::services::invite::SERVICE.to_string(),
             "Unauthorized",
         );
 
-        Prompt::prompt_user("connect", None)?;
+        Prompt::prompt("connect", None);
 
         Ok(())
     }
