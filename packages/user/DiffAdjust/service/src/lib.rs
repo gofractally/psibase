@@ -70,6 +70,8 @@ pub mod tables {
                 percent_change > 0 && percent_change < 100,
                 "percent must be between 0 - 100%",
             );
+            check(window_seconds > 0, "window seconds must be above 0");
+            check(target > 0, "target must be above 0");
 
             let new_instance = Self::new(
                 nft_id,
@@ -145,15 +147,22 @@ pub mod tables {
         }
 
         pub fn update_window(&mut self, seconds: u32) {
+            self.check_sender_has_nft();
             self.window_seconds = seconds;
+            self.save();
         }
 
         pub fn update_target(&mut self, target: u32) {
+            self.check_sender_has_nft();
             self.target_per_window = target;
+            self.save();
         }
 
-        pub fn update_floor(&mut self, difficulty: u64) {
-            self.floor_difficulty = difficulty;
+        pub fn update_floor(&mut self, floor_difficulty: u64) {
+            self.check_sender_has_nft();
+            self.floor_difficulty = floor_difficulty;
+            self.active_difficulty = self.active_difficulty.max(floor_difficulty);
+            self.save();
         }
 
         pub fn delete(&self) {
