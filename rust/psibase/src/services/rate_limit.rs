@@ -1,9 +1,9 @@
-#[crate::service(name = "difficulty", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "rate-limit", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
-    use crate::{services::tokens::Quantity, AccountNumber};
+    use crate::services::tokens::Quantity;
 
-    /// Creates a new difficulty instance
+    /// Creates a new rate limit instance
     ///
     /// # Arguments
     /// * `initial_price` - Sets initial price
@@ -16,43 +16,39 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Get difficulty price
+    /// Get RateLimit price
     ///
     /// # Arguments
-    /// * `nft_id` - Difficulty / NFT ID
+    /// * `nft_id` - RateLimit / NFT ID
     ///
     /// # Returns
-    /// Price of difficulty
+    /// Price of RateLimit
     #[action]
     fn get_price(nft_id: u32) -> Quantity {
         unimplemented!()
     }
 
-    /// Increment difficulty instance, potentially increasing difficulty
+    /// Increment RateLimit instance, potentially increasing difficulty
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
-    /// * `nft_id` - Difficulty / NFT ID
+    /// * `nft_id` - RateLimit / NFT ID
     #[action]
     fn increment(nft_id: u32) -> Quantity {
         unimplemented!()
     }
 
-    /// Increment difficulty instance, potentially increasing difficulty
+    /// Delete RateLimit instance
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
-    /// * `nft_id` - Difficulty / NFT ID
-    /// * `amount` - Amount to increment the counter by
+    /// * `nft_id` - RateLimit / NFT ID
     #[action]
     fn delete(nft_id: u32) {
         unimplemented!()
     }
-
-    #[event(history)]
-    pub fn created(nft_id: u32, actor: AccountNumber) {}
 }
 
 #[test]

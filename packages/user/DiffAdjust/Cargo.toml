@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["service", "plugin", "query-service"]
+members = ["service", "query-service"]
 
 [workspace.package]
 version = "0.21.0"
@@ -9,8 +9,8 @@ edition = "2021"
 publish = false
 
 [package]
-name = "difficulty-pkg"
-description = "General purpose Bitcoin inspired difficulty package"
+name = "diff-adjust-pkg"                               # Crate name
+description = "Bitcoin inspired difficulty adjustment"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -24,8 +24,8 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "Difficulty"
-services = ["difficulty"]
+package-name = "DiffAdjust"
+services = ["diff-adjust"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.21.0"
@@ -35,6 +35,5 @@ Sites = "0.21.0"
 crate-type = ["rlib"]
 
 [dependencies]
-difficulty = { path = "service", version = "0.21.0" }
-r-difficulty = { path = "query-service", version = "0.21.0" }
-difficulty-plugin = { path = "plugin", version = "0.21.0" }
+diff-adjust = { path = "service", version = "0.21.0" }
+r-diff-adjust = { path = "query-service", version = "0.21.0" }

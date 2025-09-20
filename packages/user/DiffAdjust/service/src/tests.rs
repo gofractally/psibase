@@ -5,7 +5,7 @@ mod tests {
     use crate::Wrapper;
     use psibase::*;
 
-    #[psibase::test_case(packages("Difficulty"))]
+    #[psibase::test_case(packages("DiffAdjust"))]
     fn test_set_thing(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
 

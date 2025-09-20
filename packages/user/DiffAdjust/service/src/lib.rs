@@ -1,6 +1,5 @@
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::services::difficulty::Wrapper;
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Quantity;
     use psibase::services::transact::Wrapper as TransactSvc;
@@ -10,9 +9,9 @@ pub mod tables {
 
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "DifficultyTable", index = 0)]
+    #[table(name = "RateLimitTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Difficulty {
+    pub struct RateLimit {
         #[primary_key]
         pub nft_id: u32,
         pub window_seconds: u32,
@@ -24,9 +23,9 @@ pub mod tables {
         pub percent_change: u8,
     }
 
-    impl Difficulty {
-        fn table() -> DifficultyTable {
-            DifficultyTable::new()
+    impl RateLimit {
+        fn table() -> RateLimitTable {
+            RateLimitTable::new()
         }
 
         pub fn new(
@@ -59,11 +58,7 @@ pub mod tables {
         ) -> Self {
             let nft_id = Nft::call().mint();
             let sender = get_sender();
-            Nft::call().credit(
-                nft_id,
-                sender,
-                "Difficulty item administration NFT".to_string(),
-            );
+            Nft::call().credit(nft_id, sender, "RateLimit administration NFT".to_string());
 
             let last_updated = TransactSvc::call().currentBlock().time.seconds();
 
@@ -82,8 +77,6 @@ pub mod tables {
                 percent_change,
             );
             new_instance.save();
-
-            Wrapper::emit().history().created(nft_id, sender);
 
             new_instance
         }
@@ -128,7 +121,7 @@ pub mod tables {
         fn check_sender_is_owner(&self) {
             check(
                 Nft::call().getNft(self.nft_id).owner == get_sender(),
-                "must be owner of difficulty",
+                "must be owner of rate limiter",
             );
         }
 
@@ -155,23 +148,23 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: u32) -> Self {
-            check_some(Self::get(nft_id), "difficulty of NFT ID does not exist")
+            check_some(Self::get(nft_id), "rate limit of NFT ID does not exist")
         }
     }
 }
 
-#[psibase::service(name = "difficulty", tables = "tables")]
+#[psibase::service(name = "diff-adjust", tables = "tables")]
 pub mod service {
-    use psibase::{services::tokens::Quantity, AccountNumber};
+    use psibase::services::tokens::Quantity;
 
-    use crate::tables::Difficulty;
+    use crate::tables::RateLimit;
 
-    /// Creates a new difficulty instance
+    /// Creates a new Rate limit
     ///
     /// # Arguments
     /// * `initial_price` - Sets initial price
     /// * `window_seconds` - Seconds duration before decay occurs
-    /// * `target` - Difficulty target
+    /// * `target` - Rate limit target
     /// * `floor_price` - Minimum price
     /// * `percent_change` - Percent to increment / decrement, 5 = 5%
     #[action]
@@ -182,7 +175,7 @@ pub mod service {
         floor_price: Quantity,
         percent_change: u8,
     ) -> u32 {
-        Difficulty::add(
+        RateLimit::add(
             initial_price,
             window_seconds,
             target,
@@ -192,43 +185,40 @@ pub mod service {
         .nft_id
     }
 
-    /// Get difficulty price
+    /// Get RateLimit price
     ///
     /// # Arguments
-    /// * `nft_id` - Difficulty / NFT ID
+    /// * `nft_id` - RateLimit / NFT ID
     ///
     /// # Returns
-    /// Price of difficulty
+    /// Price of RateLimit
     #[action]
     fn get_price(nft_id: u32) -> Quantity {
-        Difficulty::get_assert(nft_id).check_price_decrease()
+        RateLimit::get_assert(nft_id).check_price_decrease()
     }
 
-    /// Increment difficulty instance, potentially increasing difficulty
+    /// Increment RateLimit instance, potentially increasing RateLimit
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
-    /// * `nft_id` - Difficulty / NFT ID
+    /// * `nft_id` - RateLimit / NFT ID
     /// * `amount` - Amount to increment the counter by
     #[action]
     fn increment(nft_id: u32, amount: u32) -> Quantity {
-        Difficulty::get_assert(nft_id).increment(amount)
+        RateLimit::get_assert(nft_id).increment(amount)
     }
 
-    /// Delete difficulty instance
+    /// Delete RateLimit instance
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
-    /// * `nft_id` - Difficulty / NFT ID
+    /// * `nft_id` - RateLimit / NFT ID
     #[action]
     fn delete(nft_id: u32) {
-        Difficulty::get_assert(nft_id).delete()
+        RateLimit::get_assert(nft_id).delete()
     }
-
-    #[event(history)]
-    pub fn created(nft_id: u32, actor: AccountNumber) {}
 }
 
 #[cfg(test)]
