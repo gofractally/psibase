@@ -4,19 +4,50 @@ pub mod tables {
     use psibase::get_sender;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::nft::Wrapper as Nft;
-    use psibase::services::tokens::{Quantity, Wrapper as Tokens};
+    use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
     use psibase::{check, check_none, check_some, AccountNumber, Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
-    pub const SYSTEM_TOKEN: u32 = 1;
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {
+        pub token_id: TID,
+    }
 
-    #[table(name = "SymbolTable", index = 0)]
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+
+        fn new(token_id: TID) -> Self {
+            Self { token_id }
+        }
+
+        pub fn add(token_id: TID) -> Self {
+            let instance = Self::new(token_id);
+            instance.save();
+            instance
+        }
+
+        fn save(&self) {
+            InitTable::new().put(&self).unwrap();
+        }
+
+        pub fn get() -> Option<Self> {
+            InitTable::new().get_index_pk().get(&())
+        }
+
+        pub fn get_assert() -> Self {
+            check_some(Self::get(), "init not initialised")
+        }
+    }
+
+    #[table(name = "SymbolTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Symbol {
         #[primary_key]
         pub symbol: AccountNumber,
         pub nft_id: u32,
-        pub token_id: Option<u32>,
+        pub token_id: Option<TID>,
     }
 
     impl Symbol {
@@ -36,7 +67,7 @@ pub mod tables {
             SymbolTable::read().get_index_pk().get(&symbol)
         }
 
-        fn add(symbol: AccountNumber) -> Self {
+        pub fn add(symbol: AccountNumber) -> Self {
             let new_instance = Self::new(symbol);
             new_instance.save();
             new_instance
@@ -57,7 +88,7 @@ pub mod tables {
                 DiffAdjust::call().increment(sale_record.nft_id, 1).into();
 
             Tokens::call().debit(
-                SYSTEM_TOKEN,
+                InitRow::get_assert().token_id,
                 purchaser,
                 current_price,
                 "Symbol purchase".to_string().try_into().unwrap(),
@@ -93,7 +124,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "SymbolSaleTable", index = 1)]
+    #[table(name = "SymbolSaleTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct SymbolSale {
         #[primary_key]
@@ -140,8 +171,36 @@ pub mod tables {
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{Symbol, SymbolSale};
+    use crate::tables::{InitRow, Symbol, SymbolSale};
+    use psibase::services::nft::Wrapper as Nft;
+    use psibase::services::tokens::{Precision, Wrapper as Tokens};
     use psibase::{services::tokens::Quantity, *};
+
+    #[action]
+    fn init() {
+        if InitRow::get().is_none() {
+            Tokens::call().setUserConf(0, true);
+            Nft::call().setUserConf("manualDebit".into(), true);
+
+            let precision = Precision::new(4).unwrap();
+            let token_id = Tokens::call().create(precision, 1_000_000_000_0000.into());
+            let token_nft_id = Tokens::call().getToken(token_id).nft_id;
+            Nft::call().debit(token_nft_id, "Taking ownership of system token".to_string());
+
+            Tokens::call().setTokenConf(token_id, 0, false);
+            for len in 3..7 as u8 {
+                SymbolSale::add(len, 1000, 86400, 10, 15, 0, 100000);
+            }
+
+            Symbol::add("psi".into()).map_token(token_id);
+            InitRow::add(token_id);
+        }
+    }
+
+    #[pre_action(exclude(init))]
+    fn check_init() {
+        check(InitRow::get().is_some(), "service not inited");
+    }
 
     /// Purchase a symbol
     ///

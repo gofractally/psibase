@@ -6,7 +6,7 @@ mod service {
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::{services::tokens::Decimal, *};
     use serde::Deserialize;
-    use symbol::tables::{Symbol, SymbolSaleTable, SymbolTable, SYSTEM_TOKEN};
+    use symbol::tables::{InitRow, Symbol, SymbolSaleTable, SymbolTable};
 
     #[derive(Deserialize, SimpleObject)]
     struct PurchaseEvent {
@@ -35,7 +35,9 @@ mod service {
                 .map(|sale| {
                     Decimal::new(
                         DiffAdjust::call().get_price(sale.nft_id).into(),
-                        Tokens::call().getToken(SYSTEM_TOKEN).precision,
+                        Tokens::call()
+                            .getToken(InitRow::get_assert().token_id)
+                            .precision,
                     )
                 })
         }
