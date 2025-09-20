@@ -10,6 +10,8 @@ pub mod tables {
 
     use serde::{Deserialize, Serialize};
 
+    const ONE_MILLION: u32 = 1_000_000;
+
     #[table(name = "RateLimitTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RateLimit {
@@ -30,7 +32,7 @@ pub mod tables {
             RateLimitTable::new()
         }
 
-        pub fn new(
+        fn new(
             nft_id: u32,
             consumer: AccountNumber,
             initial_difficulty: u64,
@@ -53,6 +55,21 @@ pub mod tables {
             }
         }
 
+        fn check_percent_change(percent_ppm: u32) {
+            check(
+                percent_ppm > 0 && percent_ppm < ONE_MILLION,
+                "percent must be between 0 - 100%, 500000 = 50%",
+            );
+        }
+
+        fn check_target(target: u32) {
+            check(target > 0, "target must be above 0");
+        }
+
+        fn check_window_seconds(seconds: u32) {
+            check(seconds > 0, "window seconds must be above 0");
+        }
+
         pub fn add(
             initial_difficulty: u64,
             window_seconds: u32,
@@ -66,12 +83,9 @@ pub mod tables {
 
             let last_updated = TransactSvc::call().currentBlock().time.seconds();
 
-            check(
-                percent_change > 0 && percent_change < 1000000,
-                "percent must be between 0 - 100%, 500000 = 50%",
-            );
-            check(window_seconds > 0, "window seconds must be above 0");
-            check(target > 0, "target must be above 0");
+            Self::check_target(target);
+            Self::check_percent_change(percent_change);
+            Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
                 nft_id,
@@ -88,6 +102,10 @@ pub mod tables {
             new_instance
         }
 
+        fn percent(&self) -> f64 {
+            self.percent_change as f64 / ONE_MILLION as f64
+        }
+
         pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
             let seconds_elapsed = (now.seconds - self.last_update.seconds) as u32;
@@ -99,7 +117,7 @@ pub mod tables {
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
                     let mut new_difficulty = self.active_difficulty as f64;
-                    let factor = 1.0 - (self.percent_change as f64 / 1000000.0);
+                    let factor = 1.0 - self.percent();
                     for _ in 0..windows_elapsed {
                         new_difficulty = new_difficulty * factor;
                     }
@@ -111,7 +129,7 @@ pub mod tables {
 
         fn check_difficulty_increase(&mut self) -> u64 {
             if self.counter > self.target_per_window {
-                let percent = 1.0 as f64 + (self.percent_change as f64 / 1000000.0);
+                let percent = 1.0 as f64 + self.percent();
                 let times_over_target = self.counter / self.target_per_window;
                 let mut difficulty = self.active_difficulty as f64;
                 for _ in 0..times_over_target {
@@ -147,13 +165,23 @@ pub mod tables {
 
         pub fn update_window(&mut self, seconds: u32) {
             self.check_sender_has_nft();
+            Self::check_window_seconds(seconds);
+
             self.window_seconds = seconds;
             self.save();
         }
 
         pub fn update_target(&mut self, target: u32) {
             self.check_sender_has_nft();
+            Self::check_target(target);
             self.target_per_window = target;
+            self.save();
+        }
+
+        pub fn update_percent(&mut self, percent_ppm: u32) {
+            self.check_sender_has_nft();
+            Self::check_percent_change(percent_ppm);
+            self.percent_change = percent_ppm;
             self.save();
         }
 
@@ -201,7 +229,7 @@ pub mod service {
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target` - Rate limit target
     /// * `floor_difficulty` - Minimum price
-    /// * `percent_change` - Percent to increment / decrement, 5 = 5%
+    /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
     #[action]
     fn create(
         initial_difficulty: u64,
@@ -278,6 +306,18 @@ pub mod service {
     #[action]
     fn up_floor(nft_id: u32, difficulty: u64) {
         RateLimit::get_assert(nft_id).update_floor(difficulty);
+    }
+
+    /// Update percent change
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    /// * `percent_ppm` - Percent ppm 50000 = 5%
+    #[action]
+    fn up_percent(nft_id: u32, ppm: u32) {
+        RateLimit::get_assert(nft_id).update_percent(ppm);
     }
 
     /// Delete RateLimit instance

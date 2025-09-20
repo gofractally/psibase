@@ -9,14 +9,14 @@ pub mod Service {
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target` - Rate limit target
     /// * `floor_difficulty` - Minimum price
-    /// * `percent_change` - Percent to increment / decrement, 5 = 5%
+    /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
     #[action]
     fn create(
         initial_difficulty: u64,
         window_seconds: u32,
         target: u32,
         floor_difficulty: u64,
-        percent_change: u8,
+        percent_change: u32,
     ) -> u32 {
         unimplemented!()
     }
@@ -78,6 +78,18 @@ pub mod Service {
     /// * `difficulty` - Difficulty
     #[action]
     fn up_floor(nft_id: u32, difficulty: u64) {
+        unimplemented!()
+    }
+
+    /// Update percent change
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    /// * `percent_ppm` - Percent ppm 50000 = 5%
+    #[action]
+    fn up_percent(nft_id: u32, ppm: u32) {
         unimplemented!()
     }
 
