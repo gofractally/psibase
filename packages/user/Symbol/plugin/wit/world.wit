@@ -3,6 +3,8 @@ package symbol:plugin;
 interface api {
     use host:types/types.{error};
     purchase: func(symbol: string) -> result<_, error>;
+
+    start-sale: func(len: u8, initial-price: string, window-seconds: u32, target-min: string, target-max: string, floor-price: string, percent-change: u32) -> result<_, error>;
 }
 
 

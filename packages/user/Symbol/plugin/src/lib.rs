@@ -46,6 +46,18 @@ impl Api for SymbolPlugin {
         .unwrap();
         Ok(())
     }
+
+    fn start_sale(
+        len: u8,
+        initial_price: String,
+        window_seconds: u32,
+        target_min: String,
+        target_max: String,
+        floor_price: String,
+        percent_change: u32,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 bindings::export!(SymbolPlugin with_types_in bindings);
