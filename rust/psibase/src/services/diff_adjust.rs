@@ -1,4 +1,4 @@
-#[crate::service(name = "rate-limit", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "diff-adjust", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
 
