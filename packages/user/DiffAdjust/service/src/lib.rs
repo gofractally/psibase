@@ -2,9 +2,11 @@
 pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::transact::Wrapper as TransactSvc;
-    use psibase::{check, check_some, get_sender, Fracpack, Table, TimePointSec, ToSchema};
+    use psibase::{
+        check, check_some, get_sender, AccountNumber, Fracpack, Table, TimePointSec, ToSchema,
+    };
 
-    use async_graphql::SimpleObject;
+    use async_graphql::{ComplexObject, SimpleObject};
 
     use serde::{Deserialize, Serialize};
 
@@ -20,6 +22,7 @@ pub mod tables {
         pub active_difficulty: u64,
         pub last_update: TimePointSec,
         pub percent_change: u8,
+        pub consumer: AccountNumber,
     }
 
     impl RateLimit {
@@ -29,6 +32,7 @@ pub mod tables {
 
         pub fn new(
             nft_id: u32,
+            consumer: AccountNumber,
             initial_difficulty: u64,
             window_seconds: u32,
             target_per_window: u32,
@@ -45,6 +49,7 @@ pub mod tables {
                 window_seconds,
                 last_update,
                 percent_change,
+                consumer,
             }
         }
 
@@ -68,6 +73,7 @@ pub mod tables {
 
             let new_instance = Self::new(
                 nft_id,
+                sender,
                 initial_difficulty,
                 window_seconds,
                 target,
@@ -118,20 +124,24 @@ pub mod tables {
             self.active_difficulty
         }
 
-        fn check_sender_is_owner(&self) {
+        fn check_sender_has_nft(&self) {
             check(
                 Nft::call().getNft(self.nft_id).owner == get_sender(),
                 "must be owner of rate limiter",
             );
         }
 
+        fn check_sender_is_consumer(&self) {
+            check(self.consumer == get_sender(), "must be consumer");
+        }
+
         pub fn increment(&mut self, increment_amount: u32) -> u64 {
-            self.check_sender_is_owner();
-            let price = self.check_difficulty_decrease();
+            self.check_sender_is_consumer();
+            let difficulty = self.check_difficulty_decrease();
             self.counter += increment_amount;
             self.check_difficulty_increase();
             self.save();
-            price
+            difficulty
         }
 
         pub fn update_window(&mut self, seconds: u32) {
@@ -142,12 +152,12 @@ pub mod tables {
             self.target_per_window = target;
         }
 
-        pub fn update_floor(&mut self, target: u64) {
-            self.floor_difficulty = target.into()
+        pub fn update_floor(&mut self, difficulty: u64) {
+            self.floor_difficulty = difficulty;
         }
 
         pub fn delete(&self) {
-            self.check_sender_is_owner();
+            self.check_sender_has_nft();
             Self::table().remove(&self);
         }
 
@@ -163,6 +173,13 @@ pub mod tables {
             check_some(Self::get(nft_id), "rate limit of NFT ID does not exist")
         }
     }
+
+    #[ComplexObject]
+    impl RateLimit {
+        pub async fn admin(&self) -> AccountNumber {
+            Nft::call().getNft(self.nft_id).owner
+        }
+    }
 }
 
 #[psibase::service(name = "diff-adjust", tables = "tables")]
@@ -172,10 +189,10 @@ pub mod service {
     /// Creates a new Rate limit
     ///
     /// # Arguments
-    /// * `initial_price` - Sets initial price
+    /// * `initial_difficulty` - Sets initial difficulty
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target` - Rate limit target
-    /// * `floor_price` - Minimum price
+    /// * `floor_difficulty` - Minimum price
     /// * `percent_change` - Percent to increment / decrement, 5 = 5%
     #[action]
     fn create(
@@ -217,6 +234,42 @@ pub mod service {
     #[action]
     fn increment(nft_id: u32, amount: u32) -> u64 {
         RateLimit::get_assert(nft_id).increment(amount)
+    }
+
+    /// Update target
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    /// * `target` - Target difficulty
+    #[action]
+    fn up_target(nft_id: u32, target: u32) {
+        RateLimit::get_assert(nft_id).update_target(target);
+    }
+
+    /// Update window
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    /// * `seconds` - Seconds
+    #[action]
+    fn up_window(nft_id: u32, seconds: u32) {
+        RateLimit::get_assert(nft_id).update_window(seconds);
+    }
+
+    /// Update floor difficulty
+    ///
+    /// * Requires holding administration NFT.
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    /// * `difficulty` - Difficulty
+    #[action]
+    fn up_floor(nft_id: u32, difficulty: u64) {
+        RateLimit::get_assert(nft_id).update_floor(difficulty);
     }
 
     /// Delete RateLimit instance
