@@ -165,22 +165,22 @@ pub mod service {
     #[action]
     fn start_sale(
         len: u8,
-        initial_cost: Quantity,
+        initial_price: Quantity,
         window_seconds: u32,
         target_min: u32,
         target_max: u32,
-        floor_cost: Quantity,
+        floor_price: Quantity,
         percent_change: u32,
     ) {
         check(get_sender() == get_service(), "must be self");
 
         SymbolSale::add(
             len,
-            initial_cost.value,
+            initial_price.value,
             window_seconds,
             target_min,
             target_max,
-            floor_cost.value,
+            floor_price.value,
             percent_change,
         );
     }
