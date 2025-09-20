@@ -4,35 +4,42 @@ mod bindings;
 mod errors;
 use errors::ErrorType::*;
 
-// Other plugins
-use bindings::credentials::plugin::types::InviteToken;
-use bindings::host::common::client as Client;
-//use bindings::host::crypto::keyvault as KeyVault;
-use bindings::host::types::types::Error;
-use bindings::transact::plugin::{hooks::*, types::*};
-
-// Exported interfaces/types
-use bindings::exports::credentials::plugin::api::Guest as Api;
-use bindings::exports::transact_hook_action_auth::Guest as HookActionAuth;
+use auth_sig::plugin::keyvault::sign;
+use bindings::*;
+use exports::credentials::plugin::{api::Guest as Api, types::Credential};
+use exports::transact_hook_action_auth::Guest as HookActionAuth;
+use host::common::{client as Client, store as Store};
+use host::types::types::Error;
+use transact::plugin::{hooks::*, types::*};
 
 struct Credentials;
 
+const DB: Store::Database = Store::Database {
+    mode: Store::DbMode::NonTransactional,
+    duration: Store::StorageDuration::Ephemeral,
+};
+
+fn bucket() -> Store::Bucket {
+    Store::Bucket::new(DB, &Client::get_sender())
+}
+
 impl Api for Credentials {
-    fn notify(_token: InviteToken) -> Result<(), Error> {
-        // Store the credential private key in transient storage
-        //InviteKeys::add(&deserialize(&token)?);
+    fn sign_latch(credential: Credential) {
+        let bucket = bucket();
+        bucket.set("pub", &credential.p256_pub);
+        bucket.set("priv", &credential.p256_priv);
 
         hook_action_auth();
-
-        Ok(())
     }
 }
 
 impl HookActionAuth for Credentials {
-    fn on_action_auth_claims(_action: Action) -> Result<Vec<Claim>, Error> {
+    fn on_action_auth_claims(_: Action) -> Result<Vec<Claim>, Error> {
+        let pubkey = bucket().get("pub").expect("Missing credential");
+
         return Ok(vec![Claim {
             verify_service: credentials::VERIFY_SERVICE.to_string(),
-            raw_data: vec![], // TODO use pubkey here
+            raw_data: pubkey,
         }]);
     }
 
@@ -44,10 +51,10 @@ impl HookActionAuth for Credentials {
             return Err(Unauthorized("on_action_auth_proofs").into());
         }
 
-        //let private_key = InviteKeys::get_private_key(); //TODO: get private key from transient storage
+        let private_key = bucket().get("priv").expect("Missing credential");
 
         Ok(vec![Proof {
-            signature: vec![], // TODO: sign transaction hash with private key using host:crypto sign_explicit
+            signature: sign(&transaction_hash, &private_key)?,
         }])
     }
 }
