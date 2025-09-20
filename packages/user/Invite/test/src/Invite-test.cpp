@@ -3,6 +3,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthSig.hpp>
+#include <services/system/Credentials.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/VerifySig.hpp>
@@ -61,16 +62,16 @@ namespace
        "qgsA/4UaAk39mbIe9/5Cx3m+A4ihRANCAAQEhhN0gTGxIbMxT6ZKGPEN4Xu+m+Ox\n"
        "cGky3DiVxoHkPFfGo81ZkIDBk3NOMSFiw5hZiscqwtY464TFBKdc8evq\n"
        "-----END PRIVATE KEY-----\n");
+
+      uint32_t inviteId = 1;
 }  // namespace
 
 // Helper functions for tests
 auto createInvite = [](auto& user, const auto& pubKey)
-{ return user.createInvite(pubKey, std::nullopt, std::nullopt, std::nullopt, std::nullopt); };
+{ return user.createInvite(++inviteId, pubKey, 1, false, ""); };
 
 // - Auth
-//    - Alice cannot use AuthInvite
 //    - Accounts can still create new accounts
-//    - A regular user cannot create a new account
 SCENARIO("Auth")
 {
    GIVEN("Chain with initialized invite system")
@@ -81,11 +82,6 @@ SCENARIO("Auth")
       auto a        = alice.to<Accounts>();
       auto accounts = t.from(Accounts::service).to<Accounts>();
 
-      THEN("Alice cannot use AuthInvite")
-      {
-         auto setAuthServ = a.setAuthServ(AuthInvite::service);
-         CHECK(setAuthServ.failed(notWhitelisted));
-      }
       THEN("Accounts can still create new accounts")
       {
          auto newAcc = accounts.newAccount("bob", AuthAny::service, true);
@@ -106,7 +102,7 @@ SCENARIO("Creating an invite")
 
       auto alice   = t.from(t.addAccount("alice"_a));
       auto bob     = t.from(t.addAccount("bob"_a));
-      auto invited = t.from(Invite::payerAccount);
+      auto invited = t.from(Credentials::CREDENTIAL_SENDER);
 
       auto a = alice.to<Invite>();
       auto b = bob.to<Invite>();
@@ -125,73 +121,9 @@ SCENARIO("Creating an invite")
             CHECK(createInvite(a, thrdPub).succeeded());
          }
       }
-      THEN("Invited-sys cannot create an invite")
+      THEN("Credential account cannot create an invite")
       {
-         CHECK(createInvite(i, userPub).failed(restrictedActions));
-      }
-   }
-}
-
-// - Rejecting an invite
-//    - Invitee can reject an invite as invited-sys
-//    - Invitee can reject an invite as a normal user
-//    - Reject fails if:
-//       - It is already rejected
-//       - It is already accepted
-//       - Transaction is not signed with invite pubkey
-SCENARIO("Rejecting an invite")
-{
-   GIVEN("Chain with initialized invite system")
-   {
-      DefaultTestChain t;
-
-      auto alice   = t.from(t.addAccount("alice"_a));
-      auto bob     = t.from(t.addAccount("bob"_a));
-      auto invited = t.from(Invite::payerAccount);
-
-      // Define KeyList objects at the top level for reuse
-      auto userKeyList     = KeyList{{userPub, userPriv}};
-      auto invKeyList      = KeyList{{invPub, invPriv}};
-      auto thrdKeyList     = KeyList{{thrdPub, thrdPriv}};
-      auto combinedKeyList = KeyList{{userPub, userPriv}, {invPub, invPriv}};
-
-      t.setAuth<AuthSig::AuthSig>(alice.id, userPub);
-      t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
-
-      auto a = alice.with(userKeyList).to<Invite>();
-      auto b = bob.with(combinedKeyList).to<Invite>();
-      auto i = invited.with(invKeyList).to<Invite>();
-
-      WHEN("Alice creates an invite")
-      {
-         auto id = createInvite(a, invPub).returnVal();
-
-         THEN("Invitee can reject an invite as invited-sys")
-         {
-            CHECK(i.reject(id).succeeded());
-         }
-         THEN("Invitee can reject an invite as a normal user")
-         {
-            CHECK(b.reject(id).succeeded());
-         }
-         THEN("Reject fails if it is already rejected")
-         {
-            i.reject(id);
-            CHECK(i.reject(id).failed(alreadyRejected));
-         }
-         THEN("Reject fails if it is already accepted")
-         {
-            CHECK(b.accept(id).succeeded());
-            CHECK(b.reject(id).failed(alreadyAccepted));
-         }
-         THEN("Reject fails if transaction isn't signed with the invite public key")
-         {
-            auto reject = bob.with(userKeyList).to<Invite>().reject(id);
-            CHECK(reject.failed(missingInviteSig));
-
-            auto reject2 = invited.with({}).to<Invite>().reject(id);
-            CHECK(reject2.failed(missingInviteSig));
-         }
+         CHECK(createInvite(i, userPub).failed(canOnlyCallAcceptCreate));
       }
    }
 }
@@ -233,9 +165,8 @@ SCENARIO("Deleting an invite")
 }
 
 // - Expired invites
-//    - Expired invites can no longer be rejected or accepted
+//    - Expired invites can no longer be ccepted
 //    - Expired invites can be specifically deleted by the creator
-//    - Anyone can call an action to delete a batch of expired invites
 //       - In this case, only actually expired invites get deleted
 SCENARIO("Expired invites")
 {
@@ -266,30 +197,17 @@ SCENARIO("Expired invites")
          // Add another invite that is not close to expiring
          auto id2 = createInvite(b, thrdPub).returnVal();
 
-         THEN("It can be rejected")
-         {
-            CHECK(b.reject(id).succeeded());
-         }
-
          AND_WHEN("It expires")
          {
             t.startBlock(1000);
 
-            THEN("It cannot be rejected")
-            {
-               CHECK(b.reject(id).failed(inviteExpired));
-            }
             THEN("It cannot be accepted")
             {
-               CHECK(b.accept(id).failed(inviteExpired));
+               CHECK(b.accept().failed(inviteExpired));
             }
             THEN("It can be deleted by the creator")
             {
                CHECK(a.delInvite(id).succeeded());
-            }
-            THEN("It can be deleted by anyone")
-            {
-               CHECK(charlie.to<Invite>().delExpired(5).succeeded());
 
                AND_THEN("Only the expired invite was deleted")
                {
@@ -325,7 +243,7 @@ SCENARIO("Accepting an invite")
       auto alice   = t.from(t.addAccount("alice"_a));
       auto bob     = t.from(t.addAccount("bob"_a));
       auto charlie = t.from(t.addAccount("charlie"_a));
-      auto invited = t.from(Invite::payerAccount);
+      auto invited = t.from(Credentials::CREDENTIAL_SENDER);
 
       t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
       t.setAuth<AuthSig::AuthSig>(charlie.id, userPub);
@@ -344,46 +262,42 @@ SCENARIO("Accepting an invite")
 
          THEN("The invite can be accepted by a normal user")
          {
-            CHECK(b.accept(id).succeeded());
+            CHECK(b.accept().succeeded());
          }
-         THEN("An invite can be accepted by invited-sys in order to create a new account")
+         THEN("An invite can be accepted by credential account in order to create a new account")
          {
-            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).succeeded());
+            CHECK(i.acceptCreate("rebecca"_a, userPub).succeeded());
          }
          THEN("A normal user may not create a new account")
          {
-            CHECK(b.acceptCreate(id, "rebecca"_a, userPub).failed(mustUseInvitedSys));
+            CHECK(b.acceptCreate("rebecca"_a, userPub).failed(mustUseInviteCredential));
          }
-         THEN("Invited-sys may not accept without also creating a new account")
+         THEN("Credential account may not accept without also creating a new account")
          {
-            CHECK(i.accept(id).failed(restrictedActions));
+            CHECK(i.accept().failed(canOnlyCallAcceptCreate));
          }
          WHEN("An invite is accepted with an existing account")
          {
-            b.accept(id);
+            b.accept();
 
             THEN("An accepted invite can be accepted again with a different account")
             {
-               CHECK(c.accept(id).succeeded());
+               CHECK(c.accept().succeeded());
             }
             THEN("An accepted invite can be accepted again with a created account")
             {
-               CHECK(i.acceptCreate(id, "rebecca"_a, userPub).succeeded());
+               CHECK(i.acceptCreate("rebecca"_a, userPub).succeeded());
             }
-         }
-         THEN("Accepting fails if the inviteKey doesn't exist")
-         {
-            CHECK(a.accept(id + 1).failed(inviteDNE));
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
          {
-            CHECK(bob.with(userKeys).to<Invite>().accept(id).failed(missingInviteSig));
+            CHECK(bob.with(userKeys).to<Invite>().accept().failed(noActiveCredential));
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey proof")
          {
             // Manually constructing the transaction to avoid adding the proper proof
             transactor<Invite> service(bob, Invite::service);
-            auto               trx = t.makeTransaction({service.accept(id)});
+            auto               trx = t.makeTransaction({service.accept()});
             for (const auto& key : combinedKeyList)
             {
                trx.claims.push_back({
@@ -427,25 +341,14 @@ SCENARIO("Accepting an invite")
 
             CHECK(failed(accept, "proofs and claims must have same size"));
          }
-         THEN("Accepting fails if the invite is rejected")
-         {
-            // Reject the invite
-            i.reject(id);
-
-            // Try accept with create
-            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).failed(alreadyRejected));
-
-            // Try accept with existing user
-            CHECK(b.accept(id).failed(alreadyRejected));
-         }
          THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
          {
-            CHECK(i.acceptCreate(id, "rebecca"_a, invPub).failed(needUniquePubkey));
+            CHECK(i.acceptCreate("rebecca"_a, invPub).failed(needUniquePubkey));
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
-            i.acceptCreate(id, "rebecca"_a, userPub);
-            CHECK(i.acceptCreate(id, "jonathan"_a, userPub).failed(noNewAccToken));
+            i.acceptCreate("rebecca"_a, userPub);
+            CHECK(i.acceptCreate("jonathan"_a, userPub).failed(noNewAccToken));
          }
       }
    }

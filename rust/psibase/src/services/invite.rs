@@ -1,5 +1,5 @@
 pub use crate::services::auth_sig::SubjectPublicKeyInfo;
-use crate::{account, AccountNumber, TimePointSec};
+use crate::AccountNumber;
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -9,122 +9,90 @@ use serde::{Deserialize, Serialize};
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "InviteRecordInput")]
-
 /// An invite object
 pub struct InviteRecord {
-    /// Monotonically increasing ID of the invite
-    inviteId: u32,
+    /// The id of the invite (not sequential)
+    id: u32,
 
-    /// The public key of the invite. This uniquely identifies an invite and
-    ///   may also used to authenticate the transaction accepting the invite.
-    pubkey: SubjectPublicKeyInfo,
-
-    /// An optional secondary identifier for the invite
-    secondaryId: Option<u32>,
+    /// The id of the credential associated with the invite
+    cid: u32,
 
     /// The creator of the invite object
     inviter: AccountNumber,
 
-    /// The application that created the invite
-    app: Option<AccountNumber>,
+    /// Represents the number of accounts this invite can be used to create
+    numAccounts: u16,
 
-    /// The domain of the application that created the invite
-    appDomain: Option<String>,
+    /// A flag that represents whether to use hooks to notify the inviter when the invite is updated
+    useHooks: bool,
 
-    /// The last account to accept or reject the invite
-    actor: AccountNumber,
-
-    /// The time in seconds at which this invite expires
-    expiry: TimePointSec,
-
-    /// A flag that represents whether a new account may still be created by
-    ///   redeeming this invite
-    newAccountToken: bool,
-
-    /// An integer representing whether the invite is:
-    ///  - pending (0)
-    ///  - accepted (1)
-    ///  - rejected (2)
-    state: u8,
-
-    /// Encrypted invite secret
-    secret: Option<String>,
+    /// The encrypted secret used to redeem the invite
+    secret: String,
 }
-
-#[derive(Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "NewAccountRecordInput")]
-pub struct NewAccountRecord {
-    name: AccountNumber,
-    invitee: AccountNumber,
-}
-
-use crate as psibase;
-pub const PAYER_ACCOUNT: AccountNumber = account!("invited-sys");
 
 #[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
-    use crate::{AccountNumber, TimePointUSec};
+    use crate::AccountNumber;
 
     #[action]
     fn init() {
         unimplemented!()
     }
 
+    /// Creates and stores a new invite object that can be used to create a new account
+    /// Returns the ID of the newly created invite
+    ///
+    /// Parameters:
+    /// - `id` is the id of the invite (randomly generated)
+    /// - `inviteKey` is the public key of the invite.
+    /// - `numAccounts` is the number of accounts this invite can be used to create.
+    /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller the
+    ///   invite is updated.
+    /// - `secret` is an encrypted secret used to redeem the invite.
+    ///
+    /// If `useHooks` is true, the caller must be an account with a service deployed on it
+    /// that implements the InviteHooks interface.
     #[action]
     fn createInvite(
+        id: u32,
         inviteKey: SubjectPublicKeyInfo,
-        secondaryId: Option<u32>,
-        secret: Option<String>,
-        app: Option<AccountNumber>,
-        appDomain: Option<String>,
+        numAccounts: u16,
+        useHooks: bool,
+        secret: String,
     ) -> u32 {
         unimplemented!()
     }
 
+    /// Called by existing accounts to accept an invite without creating a new account
     #[action]
-    fn accept(inviteId: u32) {
+    fn accept() {
         unimplemented!()
     }
 
+    /// Called directly by an invite credential (not an account) to accept an invite and
+    /// simultaneously create the specified account authorized by the specified public key
     #[action]
-    fn acceptCreate(inviteId: u32, acceptedBy: AccountNumber, newAccountKey: SubjectPublicKeyInfo) {
+    fn acceptCreate(acceptedBy: AccountNumber, newAccountKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 
-    #[action]
-    fn reject(inviteId: u32) {
-        unimplemented!()
-    }
-
+    /// Delete the invite.
+    /// Can only be called by the invite creator.
     #[action]
     fn delInvite(inviteId: u32) {
         unimplemented!()
     }
 
-    #[action]
-    fn delExpired(maxDeleted: u32) {
-        unimplemented!()
-    }
-
-    #[event(history)]
-    pub fn updated(inviteId: u32, actor: AccountNumber, datetime: TimePointUSec, event: String) {
-        unimplemented!()
-    }
-
-    // For synchronous calls between services:
+    /// Called synchronously by other services to retrieve the specified invite record
     #[action]
     fn getInvite(inviteId: u32) -> Option<super::InviteRecord> {
         unimplemented!()
     }
-    #[action]
-    fn isExpired(inviteId: u32) -> bool {
-        unimplemented!()
-    }
-    #[action]
-    fn checkClaim(actor: AccountNumber, inviteId: u32) {
+
+    #[event(history)]
+    pub fn updated(inviteId: u32, actor: AccountNumber, event: String) {
         unimplemented!()
     }
 }

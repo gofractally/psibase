@@ -1,20 +1,32 @@
 use crate::*;
 
-use clientdata::plugin::keyvalue as clientdata;
-use psibase::fracpack::{Pack, Unpack};
-use types::InviteRecordSubset;
+use host::common::client as Client;
+use host::common::store as Store;
 
-pub struct InvitesTable {}
-impl InvitesTable {
-    pub fn add_invite(id: u32, invite: &InviteRecordSubset) {
-        clientdata::set(&id.to_string(), &invite.packed());
+use Store::*;
+
+const DB: Database = Database {
+    mode: DbMode::NonTransactional,
+    duration: StorageDuration::Session,
+};
+
+fn bucket() -> Bucket {
+    Bucket::new(DB, "invites")
+}
+
+pub struct InviteTokensTable {}
+impl InviteTokensTable {
+    pub fn import(token: String) {
+        bucket().set(&Client::get_sender(), token.as_bytes())
     }
 
-    pub fn get_invite(id: u32) -> Option<InviteRecordSubset> {
-        clientdata::get(&id.to_string()).map(|data| InviteRecordSubset::unpacked(&data).unwrap())
+    pub fn get_active_token() -> Option<String> {
+        bucket()
+            .get(&Client::get_active_app())
+            .map(|data| String::from_utf8(data).unwrap())
     }
 
-    pub fn delete_invite(id: u32) {
-        clientdata::delete(&id.to_string());
+    pub fn consume_active() {
+        bucket().delete(&Client::get_active_app());
     }
 }

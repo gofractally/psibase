@@ -6,7 +6,7 @@ world impl {
     import auth-sig:plugin/keyvault;
     include accounts:plugin/imports;
     include accounts:account-tokens/imports;
-    include auth-invite:plugin/imports;
+    include credentials:plugin/imports;
     include transact:plugin/hook-actions-sender;
     include aes:plugin/imports;
     include clientdata:plugin/imports;
@@ -14,5 +14,5 @@ world impl {
     
     export inviter;
     export invitee;
-    export advanced;
+    export redemption;
 }

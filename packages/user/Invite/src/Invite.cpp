@@ -1,31 +1,52 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthSig.hpp>
+#include <services/system/Credentials.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
-#include <services/user/AuthInvite.hpp>
 #include <services/user/Events.hpp>
 #include <services/user/Invite.hpp>
 #include <services/user/Nft.hpp>
 #include <services/user/REvents.hpp>
 #include <services/user/Tokens.hpp>
 
+#include <psibase/Actor.hpp>
 #include <psibase/Bitset.hpp>
-#include <vector>
+#include "services/user/InviteErrors.hpp"
 
 using namespace psibase;
 using namespace UserService;
 using namespace UserService::InviteNs;
 using namespace UserService::Errors;
 using namespace SystemService;
-using psio::view;
-using std::begin;
-using std::end;
-using std::find;
 using std::optional;
 using std::string;
-using std::vector;
+
+namespace
+{
+   constexpr std::chrono::seconds ONE_WEEK =
+       std::chrono::duration_cast<Seconds>(std::chrono::weeks(1));
+
+   void hookOnInvAccept(const InviteRecord& invite, AccountNumber accepter)
+   {
+      if (invite.useHooks)
+      {
+         Actor<InviteHooks> inviter{Invite::service, invite.inviter};
+         inviter.onInvAccept(invite.id, accepter);
+      }
+   }
+
+   void hookOnInvDelete(const InviteRecord& invite)
+   {
+      if (invite.useHooks)
+      {
+         Actor<InviteHooks> inviter{Invite::service, invite.inviter};
+         inviter.onInvDelete(invite.id);
+      }
+   }
+
+}  // namespace
 
 Invite::Invite(psio::shared_view_ptr<Action> action)
 {
@@ -34,6 +55,23 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
    {
       auto initRecord = Tables().open<InitTable>().get({});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
+   }
+
+   if (getSender() == Credentials::CREDENTIAL_SENDER)
+   {
+      if (m != "acceptCreate"_m)
+      {
+         string error = Credentials::CREDENTIAL_SENDER.str() + canOnlyCallAcceptCreate.data();
+         abortMessage(error);
+      }
+   }
+   else
+   {
+      if (m == "acceptCreate"_m)
+      {
+         string error = "Only " + Credentials::CREDENTIAL_SENDER.str() + " can call acceptCreate";
+         abortMessage(error);
+      }
    }
 }
 
@@ -48,142 +86,103 @@ void Invite::init()
    to<Nft>().setUserConf(manualDebit, true);
    to<Tokens>().setUserConf(Tokens::manualDebit, true);
 
-   // Create the invite payer account and set its auth contract
-   to<Accounts>().newAccount(payerAccount, AuthInvite::service, false);
-
    // Register event indices
    to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
+   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 1);
 }
 
-uint32_t Invite::createInvite(Spki                         inviteKey,
-                              std::optional<uint32_t>      secondaryId,
-                              std::optional<std::string>   secret,
-                              std::optional<AccountNumber> app,
-                              std::optional<std::string>   appDomain)
+// Extracts event emission, hook notifications, deleting the invite & consuming its credential if necessary
+void Invite::onInviteAccepted(const InviteRecord& invite, AccountNumber accepter)
 {
-   auto inviteTable = Tables().open<InviteTable>();
-   auto isNew       = inviteTable.getIndex<3>()
-                    .subindex<uint32_t>(SystemService::AuthSig::keyFingerprint(inviteKey))
-                    .empty();
-   check(isNew, inviteAlreadyExists.data());
-   auto inviter = getSender();
+   emit().history().updated(invite.id, accepter, InviteEventType::accepted);
+   hookOnInvAccept(invite, accepter);
 
-   auto secondsInWeek = std::chrono::duration_cast<Seconds>(std::chrono::weeks(1));
-   auto now           = to<Transact>().currentBlock().time;
-
-   auto     inviteIdTable = Tables().open<NextInviteIdTable>();
-   auto     nextIdRecord  = inviteIdTable.get({});
-   uint32_t nextId        = (nextIdRecord.has_value()) ? nextIdRecord->nextInviteId + 1 : 0;
-   inviteIdTable.put(NextInviteId{nextId});
-
-   InviteRecord newInvite{
-       .inviteId        = nextId,
-       .pubkey          = inviteKey,
-       .secondaryId     = secondaryId,
-       .inviter         = inviter,
-       .app             = app,
-       .appDomain       = appDomain,
-       .expiry          = std::chrono::time_point_cast<Seconds>(now) + secondsInWeek,
-       .newAccountToken = true,
-       .state           = InviteStates::pending,
-       .secret          = secret,
-   };
-   inviteTable.put(newInvite);
-
-   emit().history().updated(nextId, inviter, now, InviteEventType::created);
-
-   return nextId;
-}
-
-void Invite::accept(uint32_t inviteId)
-{
-   auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteId);
-   check(invite.has_value(), inviteDNE.data());
-
-   to<AuthInvite>().requireAuth(invite->pubkey);
-
-   auto acceptedBy = getSender();
-   check(acceptedBy != Invite::payerAccount,
-         "Call 'accept' with the accepting account as the sender.");
-   check(invite->state != InviteStates::rejected, "This invite was already rejected");
-
-   auto now = to<Transact>().currentBlock().time;
-   check(invite->expiry > now, inviteExpired.data());
-
-   invite->actor = acceptedBy;
-   invite->state = InviteStates::accepted;
-   inviteTable.put(*invite);
-
-   emit().history().updated(inviteId, acceptedBy, now, InviteEventType::accepted);
-}
-
-void Invite::acceptCreate(uint32_t inviteId, AccountNumber acceptedBy, Spki newAccountKey)
-{
-   auto sender      = getSender();
-   auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteId);
-   check(invite.has_value(), inviteDNE.data());
-   auto inviteKey = invite->pubkey;
-
-   to<AuthInvite>().requireAuth(inviteKey);
-
-   auto now = to<Transact>().currentBlock().time;
-   check(invite->expiry > now, inviteExpired.data());
-
-   check(invite->state != InviteStates::rejected, alreadyRejected.data());
-
-   bool accountExists = to<Accounts>().exists(acceptedBy);
-   check(not accountExists, "The acceptedBy account already exists");
-
-   check(sender == Invite::payerAccount, mustUseInvitedSys.data());
-   check(inviteKey != newAccountKey, needUniquePubkey.data());
-   check(invite->newAccountToken, noNewAccToken.data());
-   invite->newAccountToken = false;
-
-   // Create new account, and set key & auth
-   to<AuthSig::AuthSig>().newAccount(acceptedBy, newAccountKey);
-
-   invite->state = InviteStates::accepted;
-   invite->actor = acceptedBy;
-   inviteTable.put(*invite);
-
-   // Remember which account is responsible for inviting the new account
-   auto newAccTable = Tables().open<NewAccTable>();
-   auto newAcc      = newAccTable.get(acceptedBy);
-   check(not newAcc.has_value(), accAlreadyExists.data());
-   newAccTable.put(NewAccountRecord{acceptedBy, invite->inviter});
-
-   emit().history().updated(inviteId, acceptedBy, now, InviteEventType::accepted);
-}
-
-void Invite::reject(uint32_t inviteId)
-{
-   auto table  = Tables().open<InviteTable>();
-   auto invite = table.get(inviteId);
-   check(invite.has_value(), inviteDNE);
-   auto inviteKey = invite->pubkey;
-
-   to<AuthInvite>().requireAuth(inviteKey);
-   check(invite->state != InviteStates::accepted, alreadyAccepted.data());
-   check(invite->state != InviteStates::rejected, alreadyRejected.data());
-
-   auto now = to<Transact>().currentBlock().time;
-   check(invite->expiry > now, inviteExpired.data());
-
-   auto sender = getSender();
-   if (sender == Invite::payerAccount)
+   if (invite.numAccounts == 0)
    {
-      check(invite->newAccountToken == true,
-            "Only an existing account can be used to reject this invite");
-      invite->newAccountToken = false;
+      deleteInvite(invite);
+   }
+   else
+   {
+      Tables().open<InviteTable>().put(invite);
+   }
+}
+
+void Invite::deleteInvite(const InviteRecord& invite)
+{
+   Tables().open<InviteTable>().remove(invite);
+   to<Credentials>().consume(invite.cid);
+   emit().history().updated(invite.id, getSender(), InviteEventType::deleted);
+   hookOnInvDelete(invite);
+}
+
+uint32_t Invite::createInvite(uint32_t    inviteId,
+                              Spki        inviteKey,
+                              uint16_t    numAccounts,
+                              bool        useHooks,
+                              std::string secret)
+{
+   auto sender = getSender();
+
+   check(numAccounts > 0, "An invite must be able to create at least one account");
+   auto         inviteTable = Tables().open<InviteTable>();
+   InviteRecord invite{
+       .id          = inviteId,
+       .cid         = to<Credentials>().create(inviteKey, ONE_WEEK.count()),
+       .inviter     = getSender(),
+       .numAccounts = numAccounts,
+       .useHooks    = useHooks,
+       .secret      = secret,
+   };
+   inviteTable.put(invite);
+
+   if (useHooks)
+   {
+      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(invite.inviter));
+      check(
+          account.has_value(),
+          "To enable hooks, the invite creator must be a service that implements the 'InviteHooks' "
+          "interface");
    }
 
-   invite->state = InviteStates::rejected;
-   invite->actor = sender;
-   table.put(*invite);
+   emit().history().updated(invite.id, invite.inviter, InviteEventType::created);
 
-   emit().history().updated(inviteId, sender, now, InviteEventType::rejected);
+   return invite.id;
+}
+
+void Invite::accept()
+{
+   auto cid_opt = to<Credentials>().get_active();
+   check(cid_opt.has_value(), noActiveCredential.data());
+   uint32_t cid = cid_opt.value();
+
+   auto inviteTable = Tables().open<InviteTable>();
+   auto invite      = inviteTable.getIndex<2>().get(cid);
+   check(invite.has_value(), inviteDNE.data());
+   invite->numAccounts -= 1;
+
+   onInviteAccepted(*invite, getSender());
+}
+
+///////////////////////////////////// TODO
+// * Check invite doc comments for out of date info
+// * Add string_views for errors
+// * Fix unit tests
+
+void Invite::acceptCreate(AccountNumber newAccount, Spki newAccountKey)
+{
+   auto cid_opt = to<Credentials>().get_active();
+   check(cid_opt.has_value(), noActiveCredential.data());
+   uint32_t cid = cid_opt.value();
+
+   auto invite = Tables().open<InviteTable>().getIndex<2>().get(cid);
+   check(invite.has_value(), inviteDNE.data());
+   invite->numAccounts -= 1;
+
+   Spki claim = to<Credentials>().get_claim(cid);
+   check(claim != newAccountKey, needUniquePubkey.data());
+   to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
+
+   onInviteAccepted(*invite, newAccount);
 }
 
 void Invite::delInvite(uint32_t inviteId)
@@ -193,59 +192,13 @@ void Invite::delInvite(uint32_t inviteId)
    auto invite      = inviteTable.get(inviteId);
    check(invite.has_value(), inviteDNE.data());
    check(invite->inviter == sender, unauthDelete.data());
-   inviteTable.remove(*invite);
 
-   auto now = to<Transact>().currentBlock().time;
-   emit().history().updated(inviteId, sender, now, InviteEventType::deleted);
-}
-
-void Invite::delExpired(uint32_t maxDeleted)
-{
-   auto sender = getSender();
-   auto now    = to<Transact>().currentBlock().time;
-
-   auto table = Tables().open<InviteTable>();
-
-   uint32_t numChecked = 0;
-   uint32_t numDeleted = 0;
-   for (auto invite : table.getIndex<0>())
-   {
-      if (now >= invite.expiry)
-      {
-         table.remove(invite);
-         ++numDeleted;
-
-         emit().history().updated(invite.inviteId, sender, now, InviteEventType::deletedExpired);
-
-         if (numDeleted >= maxDeleted)
-            break;
-      }
-      ++numChecked;
-   }
+   deleteInvite(*invite);
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)
 {
    return Tables().open<InviteTable>().get(inviteId);
-}
-
-bool Invite::isExpired(uint32_t inviteId)
-{
-   auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteId);
-   check(invite.has_value(), inviteDNE.data());
-
-   auto now = to<Transact>().currentBlock().time;
-   return now >= invite->expiry;
-}
-
-void Invite::checkClaim(AccountNumber actor, uint32_t inviteId)
-{
-   auto invite = getInvite(inviteId);
-   check(invite.has_value(), "This invite does not exist. It may have been deleted after expiry.");
-   check(invite->state == InviteStates::accepted, "invite is not in accepted state");
-   check(invite->actor == actor, "only " + invite->actor.str() + " may accept this invite");
-   check(not isExpired(inviteId), "this invite is expired");
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)

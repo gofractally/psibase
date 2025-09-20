@@ -24,13 +24,10 @@ namespace UserService
       constexpr std::string_view whitelistIsSet = "Cannot modify blacklist while whitelist is set";
       constexpr std::string_view accAlreadyExists =
           "Account already exists. This should never happen.";
-
-      // AuthInvite
-      constexpr std::string_view restrictedService =
-          "invited-sys can only be used to call actions in Invite";
-      constexpr std::string_view restrictedActions = "invited-sys may only call specific actions.";
-      constexpr std::string_view notWhitelisted    = "Account not whitelisted by InviteAuthSys";
-      constexpr std::string_view missingInviteSig =
-          "Transaction does not include the invite key in its claims.";
+      constexpr std::string_view secretDNE = "Secret does not exist";
+      constexpr std::string_view mustUseInviteCredential =
+          "To create a new account, you must accept the invite using the invite credential";
+      constexpr std::string_view noActiveCredential      = "No active credential";
+      constexpr std::string_view canOnlyCallAcceptCreate = "can only call acceptCreate";
    }  // namespace Errors
 }  // namespace UserService

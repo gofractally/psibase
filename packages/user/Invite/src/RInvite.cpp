@@ -4,6 +4,9 @@
 
 namespace UserService
 {
+
+   // TODO - tell whether an invite is expired from a query
+
    namespace InviteNs
    {
       struct InviteEvent
@@ -18,29 +21,13 @@ namespace UserService
       struct Query
       {
          auto invites() const
-         {  //
+         {  // TODO: Paginate
             return Invite::Tables(Invite::service).open<InviteTable>().getIndex<0>();
-         }
-
-         auto inviter(psibase::AccountNumber user) const
-         {
-            return Invite::Tables(Invite::service).open<InviteNs::NewAccTable>().get(user);
          }
 
          auto inviteById(uint32_t inviteId) const
          {
             return Invite::Tables(Invite::service).open<InviteTable>().get(inviteId);
-         }
-
-         auto inviteById2(uint32_t secondaryId) const -> std::optional<InviteRecord>
-         {
-            auto idx = Invite::Tables(Invite::service)
-                           .open<InviteTable>()
-                           .getIndex<2>()
-                           .subindex(std::optional<uint32_t>{secondaryId});
-            if (idx.empty())
-               return std::nullopt;
-            return std::optional<InviteRecord>{*idx.begin()};
          }
 
          auto invitesByInviter(psibase::AccountNumber owner) const
@@ -68,9 +55,7 @@ namespace UserService
       };
       PSIO_REFLECT(Query,
                    method(invites),
-                   method(inviter, user),
                    method(inviteById, inviteId),
-                   method(inviteById2, secondaryId),
                    method(invitesByInviter, inviter),
                    method(history, inviteId, first, last, before, after))
 
