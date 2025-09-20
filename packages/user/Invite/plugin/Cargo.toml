@@ -32,7 +32,6 @@ world = "impl"
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "accounts:account-tokens" = { path = "../../../system/Accounts/plugin/account_tokens/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-"auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }

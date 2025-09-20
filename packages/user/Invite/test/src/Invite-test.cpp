@@ -8,7 +8,6 @@
 #include <services/system/VerifySig.hpp>
 #include <services/system/commonErrors.hpp>
 
-#include "services/user/AuthInvite.hpp"
 #include "services/user/Invite.hpp"
 
 using namespace UserService;

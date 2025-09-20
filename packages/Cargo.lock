@@ -336,14 +336,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "auth-invite"
-version = "0.20.0"
-dependencies = [
- "psibase",
- "wit-bindgen-rt 0.33.0",
-]
-
-[[package]]
 name = "auth-sig"
 version = "0.20.0"
 dependencies = [

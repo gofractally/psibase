@@ -131,7 +131,7 @@ if(DEFINED WASI_SDK_PREFIX)
     )
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
-    set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
+    set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
         CpuLimit Events Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
@@ -741,10 +741,6 @@ psibase_package(
         SERVER r-invite
         INIT
         DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
-    SERVICE auth-invite
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite-schema.json
-        DATA ${Plugins_OUTPUT_FILE_auth_invite} /plugin.wasm
     SERVICE r-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RInvite-schema.json

@@ -16,7 +16,6 @@ members = [
     "user/Host/plugin/prompt",
     "user/Host/plugin/types",
     "user/Invite/plugin",
-    "user/Invite/plugin_AuthInvite",
     "user/Kdf/plugin",
     "user/Sites/plugin",
     "user/Packages/plugin",
