@@ -21,7 +21,7 @@ pub mod tables {
         pub floor_difficulty: u64,
         pub active_difficulty: u64,
         pub last_update: TimePointSec,
-        pub percent_change: u8,
+        pub percent_change: u32,
         pub consumer: AccountNumber,
     }
 
@@ -38,7 +38,7 @@ pub mod tables {
             target_per_window: u32,
             floor_difficulty: u64,
             last_update: TimePointSec,
-            percent_change: u8,
+            percent_change: u32,
         ) -> Self {
             Self {
                 nft_id,
@@ -58,7 +58,7 @@ pub mod tables {
             window_seconds: u32,
             target: u32,
             floor_difficulty: u64,
-            percent_change: u8,
+            percent_change: u32,
         ) -> Self {
             let nft_id = Nft::call().mint();
             let sender = get_sender();
@@ -67,8 +67,8 @@ pub mod tables {
             let last_updated = TransactSvc::call().currentBlock().time.seconds();
 
             check(
-                percent_change > 0 && percent_change < 100,
-                "percent must be between 0 - 100%",
+                percent_change > 0 && percent_change < 1000000,
+                "percent must be between 0 - 100%, 500000 = 50%",
             );
             check(window_seconds > 0, "window seconds must be above 0");
             check(target > 0, "target must be above 0");
@@ -98,13 +98,12 @@ pub mod tables {
                 self.counter = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
-                    let mut new_difficulty = self.active_difficulty;
-                    let factor = 100u64 - self.percent_change as u64;
+                    let mut new_difficulty = self.active_difficulty as f64;
+                    let factor = 1.0 - (self.percent_change as f64 / 1000000.0);
                     for _ in 0..windows_elapsed {
-                        new_difficulty =
-                            (new_difficulty * factor / 100u64).max(self.floor_difficulty);
+                        new_difficulty = new_difficulty * factor;
                     }
-                    self.active_difficulty = new_difficulty.into();
+                    self.active_difficulty = (new_difficulty as u64).max(self.floor_difficulty);
                 }
             }
             self.active_difficulty
@@ -112,13 +111,13 @@ pub mod tables {
 
         fn check_difficulty_increase(&mut self) -> u64 {
             if self.counter > self.target_per_window {
-                let percent = 100u64 + self.percent_change as u64;
+                let percent = 1.0 as f64 + (self.percent_change as f64 / 1000000.0);
                 let times_over_target = self.counter / self.target_per_window;
-                let mut difficulty = self.active_difficulty;
+                let mut difficulty = self.active_difficulty as f64;
                 for _ in 0..times_over_target {
-                    difficulty = (difficulty * percent) / 100u64;
+                    difficulty = difficulty * percent;
                 }
-                self.active_difficulty = difficulty;
+                self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
                 self.counter = 0;
                 self.last_update = TransactSvc::call().currentBlock().time.seconds();
                 self.save();
@@ -209,7 +208,7 @@ pub mod service {
         window_seconds: u32,
         target: u32,
         floor_difficulty: u64,
-        percent_change: u8,
+        percent_change: u32,
     ) -> u32 {
         RateLimit::add(
             initial_difficulty,

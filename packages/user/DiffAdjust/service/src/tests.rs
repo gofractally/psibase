@@ -13,7 +13,7 @@ mod tests {
         chain.new_account(alice).unwrap();
 
         let nft_id = Wrapper::push_from(&chain, alice)
-            .create(3000, 60, 5, 500, 5)
+            .create(3000, 60, 5, 500, 50000)
             .get()?;
 
         // Price does not increase after 4
@@ -39,7 +39,7 @@ mod tests {
 
         Wrapper::push_from(&chain, alice).increment(nft_id, 18);
 
-        assert_eq!(Wrapper::push(&chain).get_price(nft_id).get()?, 3462);
+        assert_eq!(Wrapper::push(&chain).get_price(nft_id).get()?, 3463);
 
         Ok(())
     }
