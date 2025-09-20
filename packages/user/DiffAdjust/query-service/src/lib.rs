@@ -14,7 +14,7 @@ mod service {
                 .get_index_pk()
                 .get(&nft_id)
                 .map(|mut rateLimit| {
-                    rateLimit.check_price_decrease();
+                    rateLimit.check_difficulty_decrease();
                     rateLimit
                 })
         }

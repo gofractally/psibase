@@ -1,7 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
-    use psibase::services::tokens::Quantity;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{check, check_some, get_sender, Fracpack, Table, TimePointSec, ToSchema};
 
@@ -17,8 +16,8 @@ pub mod tables {
         pub window_seconds: u32,
         pub counter: u32,
         pub target_per_window: u32,
-        pub floor_price: Quantity,
-        pub active_price: Quantity,
+        pub floor_difficulty: u64,
+        pub active_difficulty: u64,
         pub last_update: TimePointSec,
         pub percent_change: u8,
     }
@@ -30,18 +29,18 @@ pub mod tables {
 
         pub fn new(
             nft_id: u32,
-            initial_price: Quantity,
+            initial_difficulty: u64,
             window_seconds: u32,
             target_per_window: u32,
-            floor_price: Quantity,
+            floor_difficulty: u64,
             last_update: TimePointSec,
             percent_change: u8,
         ) -> Self {
             Self {
                 nft_id,
-                active_price: initial_price,
+                active_difficulty: initial_difficulty,
                 counter: 0,
-                floor_price,
+                floor_difficulty,
                 target_per_window,
                 window_seconds,
                 last_update,
@@ -50,10 +49,10 @@ pub mod tables {
         }
 
         pub fn add(
-            initial_price: Quantity,
+            initial_difficulty: u64,
             window_seconds: u32,
             target: u32,
-            floor_price: Quantity,
+            floor_difficulty: u64,
             percent_change: u8,
         ) -> Self {
             let nft_id = Nft::call().mint();
@@ -69,10 +68,10 @@ pub mod tables {
 
             let new_instance = Self::new(
                 nft_id,
-                initial_price,
+                initial_difficulty,
                 window_seconds,
                 target,
-                floor_price,
+                floor_difficulty,
                 last_updated,
                 percent_change,
             );
@@ -81,7 +80,7 @@ pub mod tables {
             new_instance
         }
 
-        pub fn check_price_decrease(&mut self) -> Quantity {
+        pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
             let seconds_elapsed = (now.seconds - self.last_update.seconds) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
@@ -91,31 +90,32 @@ pub mod tables {
                 self.counter = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
-                    let mut new_price = self.active_price.value;
+                    let mut new_difficulty = self.active_difficulty;
                     let factor = 100u64 - self.percent_change as u64;
                     for _ in 0..windows_elapsed {
-                        new_price = (new_price * factor / 100u64).max(self.floor_price.value);
+                        new_difficulty =
+                            (new_difficulty * factor / 100u64).max(self.floor_difficulty);
                     }
-                    self.active_price = new_price.into();
+                    self.active_difficulty = new_difficulty.into();
                 }
             }
-            self.active_price
+            self.active_difficulty
         }
 
-        fn check_price_increase(&mut self) -> Quantity {
+        fn check_difficulty_increase(&mut self) -> u64 {
             if self.counter > self.target_per_window {
                 let percent = 100u64 + self.percent_change as u64;
                 let times_over_target = self.counter / self.target_per_window;
-                let mut price = self.active_price.value;
+                let mut difficulty = self.active_difficulty;
                 for _ in 0..times_over_target {
-                    price = ((price * percent) / 100u64).into();
+                    difficulty = (difficulty * percent) / 100u64;
                 }
-                self.active_price = price.into();
+                self.active_difficulty = difficulty;
                 self.counter = 0;
                 self.last_update = TransactSvc::call().currentBlock().time.seconds();
                 self.save();
             }
-            self.active_price
+            self.active_difficulty
         }
 
         fn check_sender_is_owner(&self) {
@@ -125,13 +125,25 @@ pub mod tables {
             );
         }
 
-        pub fn increment(&mut self, increment_amount: u32) -> Quantity {
+        pub fn increment(&mut self, increment_amount: u32) -> u64 {
             self.check_sender_is_owner();
-            let price = self.check_price_decrease();
+            let price = self.check_difficulty_decrease();
             self.counter += increment_amount;
-            self.check_price_increase();
+            self.check_difficulty_increase();
             self.save();
             price
+        }
+
+        pub fn update_window(&mut self, seconds: u32) {
+            self.window_seconds = seconds;
+        }
+
+        pub fn update_target(&mut self, target: u32) {
+            self.target_per_window = target;
+        }
+
+        pub fn update_floor(&mut self, target: u64) {
+            self.floor_difficulty = target.into()
         }
 
         pub fn delete(&self) {
@@ -155,8 +167,6 @@ pub mod tables {
 
 #[psibase::service(name = "diff-adjust", tables = "tables")]
 pub mod service {
-    use psibase::services::tokens::Quantity;
-
     use crate::tables::RateLimit;
 
     /// Creates a new Rate limit
@@ -169,17 +179,17 @@ pub mod service {
     /// * `percent_change` - Percent to increment / decrement, 5 = 5%
     #[action]
     fn create(
-        initial_price: Quantity,
+        initial_difficulty: u64,
         window_seconds: u32,
         target: u32,
-        floor_price: Quantity,
+        floor_difficulty: u64,
         percent_change: u8,
     ) -> u32 {
         RateLimit::add(
-            initial_price,
+            initial_difficulty,
             window_seconds,
             target,
-            floor_price,
+            floor_difficulty,
             percent_change,
         )
         .nft_id
@@ -193,8 +203,8 @@ pub mod service {
     /// # Returns
     /// Price of RateLimit
     #[action]
-    fn get_price(nft_id: u32) -> Quantity {
-        RateLimit::get_assert(nft_id).check_price_decrease()
+    fn get_price(nft_id: u32) -> u64 {
+        RateLimit::get_assert(nft_id).check_difficulty_decrease()
     }
 
     /// Increment RateLimit instance, potentially increasing RateLimit
@@ -205,7 +215,7 @@ pub mod service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `amount` - Amount to increment the counter by
     #[action]
-    fn increment(nft_id: u32, amount: u32) -> Quantity {
+    fn increment(nft_id: u32, amount: u32) -> u64 {
         RateLimit::get_assert(nft_id).increment(amount)
     }
 
