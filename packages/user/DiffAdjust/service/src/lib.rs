@@ -129,7 +129,7 @@ pub mod tables {
 
         fn check_difficulty_increase(&mut self) -> u64 {
             if self.counter > self.target_per_window {
-                let percent = 1.0 as f64 + self.percent();
+                let percent = 1.0 + self.percent();
                 let times_over_target = self.counter / self.target_per_window;
                 let mut difficulty = self.active_difficulty as f64;
                 for _ in 0..times_over_target {
