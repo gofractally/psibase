@@ -448,7 +448,7 @@ cargo_psibase_package(
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Symbol.psi
-    PATH packages/user/Tokens
+    PATH packages/user/Symbol
 )
 
 cargo_psibase_package(
