@@ -49,4 +49,4 @@ Naturally, an app appears on the web platform at the path where it serves its we
 
 ### Web platform - User prompts
 
-If your plugin requests a user prompt from the host, then your app must serve a corresponding webpage to handle the prompt at `/plugin/web/prompt/<prompt-name>/index.html`.
+If your plugin requests a user prompt from the host, then your app must serve a corresponding webpage to handle the prompt at `/plugin/web/prompt/<prompt-name>`.
