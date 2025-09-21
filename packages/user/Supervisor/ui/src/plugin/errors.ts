@@ -45,8 +45,22 @@ export interface RecoverableError {
     payload: RecoverableErrorPayload;
 }
 
-export const isRecoverableError = (e: any): e is RecoverableError => {
-    return (
+/*
+  If a recoverable error is returned by a component, the js glue code will wrap it in a 
+  thrown ComponentError object. Whereas if a recoverable error is thrown directly by js
+  imported into a component, it will in some cases *not* be wrapped in a ComponentError object 
+  (depending on the callstack up to the point of the throw).
+
+  In other words, to detect if the error is a recoverable error, and in order to support
+  errors thrown by js or returned as the Err variant of a Result object by a wasm component,
+  we must check for both the wrapped and unwrapped forms of the error.
+*/
+export const getRecoverableError = (
+    e: any,
+): RecoverableErrorPayload | undefined => {
+    if (isRecoverableErrorPayload(e)) {
+        return e;
+    } else if (
         typeof e === "object" &&
         e !== null &&
         "name" in e &&
@@ -57,7 +71,10 @@ export const isRecoverableError = (e: any): e is RecoverableError => {
         typeof e.payload === "object" &&
         e.payload !== null &&
         isRecoverableErrorPayload(e.payload)
-    );
+    ) {
+        return e.payload;
+    }
+    return undefined;
 };
 
 export const isRecoverableErrorPayload = (
