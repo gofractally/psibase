@@ -62,7 +62,7 @@ fn fetch_decrypt_secret(invite_id: u32, sym_key: Vec<u8>) -> String {
     String::from_utf8(cred_key).unwrap()
 }
 
-fn create_secret(private_data: &[u8]) -> (String, String) {
+fn create_secret(private_data: &[u8]) -> (Vec<u8>, String) {
     let mut key = [0u8; 16];
     OsRng.try_fill_bytes(&mut key).unwrap();
     let encrypted = aes::with_key::encrypt(
@@ -73,15 +73,12 @@ fn create_secret(private_data: &[u8]) -> (String, String) {
         private_data,
     );
 
-    (
-        base64::url::encode(&key),
-        base64::standard::encode(&encrypted),
-    )
+    (key.to_vec(), base64::standard::encode(&encrypted))
 }
 
-fn encode_invite_token(invite_id: u32, symmetric_key: String) -> String {
+fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
     let mut data = invite_id.to_le_bytes().to_vec();
-    data.extend_from_slice(&symmetric_key.as_bytes());
+    data.extend_from_slice(&symmetric_key);
     assert!(data.len() == 20, "encryption key must be 16 bytes");
     base64::url::encode(data.as_slice())
 }
