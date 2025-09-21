@@ -114,8 +114,8 @@ export const App = () => {
                 <iframe
                     src={iframeUrl}
                     style={{
-                        width: "50%",
-                        height: "50dvh",
+                        width: "100%",
+                        height: "100dvh",
                         border: "none",
                     }}
                 />
