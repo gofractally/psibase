@@ -35,7 +35,6 @@ export default defineConfig(({ command }) => ({
         rollupOptions: {
             input: {
                 main: path.resolve(serviceDir, "index.html"),
-                connect: path.resolve(serviceDir, "plugin/web/prompt/connect/index.html"),
             },
         },
     },
