@@ -135,7 +135,7 @@ impl Api for PermissionsPlugin {
         }
         .packed();
 
-        HostPrompt::prompt("permissions".into(), Some(&packed_context));
+        HostPrompt::prompt("permissions", Some(&packed_context));
 
         if is_authorized(&user, &caller, &callee, level) {
             return Ok(true);
