@@ -65,16 +65,16 @@ mod service {
         unimplemented!()
     }
 
+    /// Called directly by an invite credential (not an account) to create the specified
+    /// account which is authorized by the specified public key.
+    #[action]
+    fn createAccount(account: AccountNumber, accountKey: SubjectPublicKeyInfo) {
+        unimplemented!()
+    }
+    
     /// Called by existing accounts to accept an invite without creating a new account
     #[action]
     fn accept() {
-        unimplemented!()
-    }
-
-    /// Called directly by an invite credential (not an account) to accept an invite and
-    /// simultaneously create the specified account authorized by the specified public key
-    #[action]
-    fn acceptCreate(acceptedBy: AccountNumber, newAccountKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 

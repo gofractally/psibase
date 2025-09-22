@@ -13,8 +13,8 @@ namespace UserService
       {
          static constexpr std::string_view created        = "created";
          static constexpr std::string_view accepted       = "accepted";
+         static constexpr std::string_view accountRedeemed = "accountRedeemed";
          static constexpr std::string_view deleted        = "deleted";
-         static constexpr std::string_view deletedExpired = "deletedExpired";
       };
 
       /// An invite object

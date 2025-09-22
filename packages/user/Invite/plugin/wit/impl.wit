@@ -1,16 +1,36 @@
 package invite:plugin;
 
+/// An interface for the accounts app to plug into to redeem invites
+interface redemption {
+
+    /// If there is an active invite, returns `Some(x)` where `x`
+    ///   is a boolean representing whether this invite can be used
+    ///   to create an account.
+    /// If there is no active invite, returns None
+    get-active-invite: func() -> option<bool>;
+
+    /// Creates a new account using the invite
+    /// The new account is authorized with a keypair that is automatically generated. The
+    /// private key of the new keypair is returned to the caller.
+    /// 
+    /// Parameters
+    /// * `account`: The name of the new account being created
+    create-new-account: func(account: string) -> string;
+
+    /// Accepts an invite with an existing account (the currently logged-in account).
+    accept: func();
+}
+
 world impl {
     include host:common/imports;
     include transact:plugin/imports;
     import auth-sig:plugin/keyvault;
     include accounts:plugin/imports;
-    include accounts:account-tokens/imports;
     include credentials:plugin/imports;
     include transact:plugin/hook-actions-sender;
     include aes:plugin/imports;
-    include clientdata:plugin/imports;
     include base64:plugin/imports;
+    include permissions:plugin/imports;
     
     export inviter;
     export invitee;
