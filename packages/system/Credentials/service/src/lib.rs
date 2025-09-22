@@ -207,6 +207,14 @@ pub mod service {
         credential.claim.into()
     }
 
+    /// Gets the `expiry_date` of the specified credential
+    #[action]
+    fn get_expiry_date(id: u32) -> Option<TimePointSec> {
+        let table = CredentialTable::new();
+        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
+        credential.expiry_date
+    }
+
     /// Gets the `id` of the active credential
     #[action]
     fn get_active() -> Option<u32> {
