@@ -3,7 +3,7 @@ pub const CREDENTIAL_SENDER: &str = "cred-sys";
 #[crate::service(name = "credentials", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod service {
-    use crate::services::auth_sig::SubjectPublicKeyInfo;
+    use crate::{services::auth_sig::SubjectPublicKeyInfo, TimePointSec};
 
     /// Creates a credential
     ///
@@ -31,6 +31,12 @@ pub mod service {
     /// Gets the `claim` of the specified credential
     #[action]
     fn get_claim(id: u32) -> SubjectPublicKeyInfo {
+        unimplemented!()
+    }
+
+    /// Gets the `expiry_date` of the specified credential
+    #[action]
+    fn get_expiry_date(id: u32) -> Option<TimePointSec> {
         unimplemented!()
     }
 

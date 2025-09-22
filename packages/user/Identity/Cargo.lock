@@ -778,7 +778,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1217,7 +1217,7 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "async-graphql",
  "identity-pkg",
@@ -1229,7 +1229,7 @@ dependencies = [
 
 [[package]]
 name = "identity-pkg"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "identity",
  "plugin",
@@ -1660,7 +1660,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "identity",
  "identity-pkg",
@@ -1720,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1791,7 +1791,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1803,14 +1803,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "seahash",
 ]

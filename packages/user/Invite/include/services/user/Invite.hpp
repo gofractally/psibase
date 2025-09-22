@@ -64,12 +64,14 @@ namespace UserService
                                bool        useHooks,
                                std::string secret);
 
-         /// Called by existing accounts to accept an invite without creating a new account
-         void accept();
+         /// Called directly by an invite credential (not an account) to create the specified
+         /// account which is authorized by the specified public key.
+         void createAccount(psibase::AccountNumber account, Spki accountKey);
 
-         /// Called directly by an invite credential (not an account) to accept an invite and
-         /// simultaneously create the specified account authorized by the specified public key
-         void acceptCreate(psibase::AccountNumber acceptedBy, Spki newAccountKey);
+         /// The sender accepts an invite.
+         /// Calling this action also requires that the sender authorizes the transaction with the 
+         /// proof for the credential associated with an invite.
+         void accept();
 
          /// Delete the invite and its secret (if applicable).
          /// Can only be called by the invite creator.
@@ -89,18 +91,14 @@ namespace UserService
             struct Merkle {};
          };
          // clang-format on
-
-        private:
-         void onInviteAccepted(const InviteRecord& invite, psibase::AccountNumber accepter);
-         void deleteInvite(const InviteRecord& invite);
       };
 
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
          method(createInvite, inviteId, inviteKey, numAccounts, useHooks, secret),
+         method(createAccount, account, accountKey),
          method(accept),
-         method(acceptCreate, newAccount, newAccountKey),
          method(delInvite, inviteId),
          method(getInvite, inviteId),
       );

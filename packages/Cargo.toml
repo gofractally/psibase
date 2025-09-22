@@ -39,7 +39,7 @@ strip = true
 lto = true
 
 [workspace.package]
-version = "0.20.0"
+version = "0.21.0"
 edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"

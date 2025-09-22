@@ -1,6 +1,11 @@
 #include <psibase/psibase.hpp>
 #include <services/system/AuthSig.hpp>
+#include <services/system/Credentials.hpp>
 #include <services/user/Invite.hpp>
+#include "psibase/Actor.hpp"
+#include "psibase/Rpc.hpp"
+#include "psibase/serveGraphQL.hpp"
+#include "psibase/time.hpp"
 
 namespace UserService
 {
@@ -9,33 +14,71 @@ namespace UserService
 
    namespace InviteNs
    {
+      using namespace psibase;
+      using SystemService::Credentials;
+
       struct InviteEvent
       {
-         uint32_t               inviteId;
-         psibase::AccountNumber actor;
-         psibase::TimePointUSec datetime;
-         std::string            event;
+         uint32_t      inviteId;
+         AccountNumber actor;
+         TimePointUSec datetime;
+         std::string   event;
       };
       PSIO_REFLECT(InviteEvent, inviteId, actor, datetime, event);
 
+      struct InviteDetails
+      {
+         uint32_t      inviteId;
+         uint32_t      cid;
+         AccountNumber inviter;
+         uint16_t      numAccounts;
+         bool          useHooks;
+         std::string   secret;
+
+         auto expiryDate() const -> std::optional<TimePointSec>
+         {
+            return to<Credentials>().get_expiry_date(cid);
+         }
+      };
+      PSIO_REFLECT(InviteDetails,
+                   inviteId,
+                   cid,
+                   inviter,
+                   numAccounts,
+                   useHooks,
+                   secret,
+                   method(expiryDate));
+
+      auto toInviteDetails(const InviteRecord& invite)
+      {
+         return InviteDetails{
+             .inviteId    = invite.id,
+             .cid         = invite.cid,
+             .inviter     = invite.inviter,
+             .numAccounts = invite.numAccounts,
+             .useHooks    = invite.useHooks,
+             .secret      = invite.secret,
+         };
+      }
+
       struct Query
       {
-         auto invites() const
-         {  // TODO: Paginate
-            return Invite::Tables(Invite::service).open<InviteTable>().getIndex<0>();
+         auto inviteById(uint32_t inviteId) const -> std::optional<InviteDetails>
+         {
+            auto invite = Invite::Tables(Invite::service).open<InviteTable>().get(inviteId);
+            if (!invite.has_value())
+               return std::nullopt;
+
+            return toInviteDetails(invite.value());
          }
 
-         auto inviteById(uint32_t inviteId) const
+         auto invitesByInviter(AccountNumber owner) const
          {
-            return Invite::Tables(Invite::service).open<InviteTable>().get(inviteId);
-         }
-
-         auto invitesByInviter(psibase::AccountNumber owner) const
-         {
-            return Invite::Tables(Invite::service)
-                .open<InviteTable>()
-                .getIndex<1>()
-                .subindex<uint32_t>(owner);
+            return TransformedConnection(Invite::Tables(Invite::service)
+                                             .open<InviteTable>()
+                                             .getIndex<1>()
+                                             .subindex<uint32_t>(owner),
+                                         [](auto&& row) { return toInviteDetails(row); });
          }
 
          auto history(uint32_t                   inviteId,
@@ -44,7 +87,7 @@ namespace UserService
                       std::optional<std::string> before,
                       std::optional<std::string> after) const
          {
-            return psibase::EventQuery<InviteEvent>("history.invite.updated")
+            return EventQuery<InviteEvent>("history.invite.updated")
                 .condition(std::format("inviteId = {}", inviteId))
                 .first(first)
                 .last(last)
@@ -54,17 +97,16 @@ namespace UserService
          }
       };
       PSIO_REFLECT(Query,
-                   method(invites),
                    method(inviteById, inviteId),
                    method(invitesByInviter, inviter),
                    method(history, inviteId, first, last, before, after))
 
-      class RInvite : public psibase::Service
+      class RInvite : public Service
       {
         public:
-         static constexpr auto service = psibase::AccountNumber("r-invite");
+         static constexpr auto service = AccountNumber("r-invite");
 
-         auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>
+         auto serveSys(HttpRequest request) -> std::optional<HttpReply>
          {
             if (auto result = serveSimpleUI<Invite, true>(request))
                return result;

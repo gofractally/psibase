@@ -64,8 +64,9 @@ namespace
       SecondaryIndexTable secondary{
           DbId::writeOnly,
           psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
-      EventWrapper wrapper{nullptr};
-      bool         operator()(psibase::DbId db, std::uint64_t eventNum)
+      EventWrapper     wrapper{nullptr};
+      EventIndexHandle handle{KvMode::write};
+      bool             operator()(psibase::DbId db, std::uint64_t eventNum)
       {
          std::uint32_t sz = psibase::raw::getSequential(db, eventNum);
          if (sz == -1)
@@ -110,7 +111,7 @@ namespace
                to_key(parser, stream);
             }
             to_key(eventNum, stream);
-            psibase::raw::kvPut(DbId::writeOnly, key.data(), key.size(), nullptr, 0);
+            psibase::raw::kvPut(handle, key.data(), key.size(), nullptr, 0);
             key.clear();
          }
          return true;
@@ -135,7 +136,8 @@ namespace
    bool processIndex(std::uint32_t& maxSteps, PendingIndexRecord& item)
    {
       EventIndexTable id{item.db, item.service, item.event};
-      auto            key = psio::convert_to_key(id);
+      auto            handle = EventIndexHandle{KvMode::readWrite};
+      auto            key    = psio::convert_to_key(id);
       if (item.endKey != 0)
       {
          key.push_back(0xff);
@@ -155,7 +157,7 @@ namespace
             --maxSteps;
             key.push_back(0);
             std::uint32_t size =
-                psibase::raw::kvGreaterEqual(DbId::writeOnly, key.data(), key.size(), prefixLen);
+                psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen);
             if (size == -1)
             {
                return false;
@@ -198,7 +200,7 @@ namespace
                    to_key(parser, stream);
                 }
                 to_key(eventNum, stream);
-                psibase::raw::kvPut(DbId::writeOnly, subkey.data(), subkey.size(), nullptr, 0);
+                psibase::raw::kvPut(handle, subkey.data(), subkey.size(), nullptr, 0);
                 subkey.resize(prefixLen);
                 data.clear();
                 return true;
@@ -208,7 +210,8 @@ namespace
             // mark index as ready
             auto secondary = SecondaryIndexTable{
                 DbId::writeOnly,
-                psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum))};
+                psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)),
+                KvMode::readWrite};
             auto row = lookupIndexRecord(secondary, std::tuple(item.db, item.service, item.event));
             row.indexes.push_back(item.info);
             secondary.put(row);
@@ -220,7 +223,7 @@ namespace
          return processRows(
              [&]
              {
-                psibase::kvRemoveRaw(DbId::writeOnly, key);
+                psibase::kvRemoveRaw(handle, key);
                 return true;
              });
       }
@@ -275,10 +278,7 @@ namespace
       }
       // Find the first available sequence number
       {
-         auto end  = queue.getIndex<0>().end();
-         auto last = end;
-         --last;
-         if (last != end)
+         if (auto last = queue.getIndex<0>().last())
             queueRow.seq = (*last).seq + 1;
       }
       queue.put(queueRow);
@@ -306,14 +306,14 @@ void queueIndexChanges()
    auto dirtyTable = EventIndex{}.open<IndexDirtyTable>();
    auto queue      = EventIndex{}.open<PendingIndexTable>();
 
+   auto handle = EventIndexHandle{KvMode::read};
+
    std::uint64_t nextSeq;
    {
-      auto begin = queue.getIndex<0>().begin();
-      auto end   = queue.getIndex<0>().end();
-      if (begin == end)
-         nextSeq = 0;
+      if (auto last = queue.getIndex<0>().last())
+         nextSeq = last->seq + 1;
       else
-         nextSeq = (*--end).seq + 1;
+         nextSeq = 0;
    }
    for (auto dirty : dirtyTable.getIndex<0>())
    {
@@ -365,8 +365,8 @@ void queueIndexChanges()
                {
                   key.push_back(info.indexNum);
                }
-               std::uint32_t size = psibase::raw::kvGreaterEqual(DbId::writeOnly, key.data(),
-                                                                 key.size(), key.size());
+               std::uint32_t size =
+                   psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), key.size());
                if (!add)
                {
                   std::erase(existingRecord.indexes, info);
@@ -404,8 +404,8 @@ void queueIndexChanges()
 
 void EventIndex::sync()
 {
-   const auto dbStatus = psibase::kvGet<psibase::DatabaseStatusRow>(
-       psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
+   const auto dbStatus =
+       psibase::Native::tables(KvMode::read).open<psibase::DatabaseStatusTable>().get({});
    check(!!dbStatus, "DatabaseStatusRow not found");
 
    auto        table = EventIndex{}.open<DbIndexStatusTable>();

@@ -59,7 +59,7 @@ impl PermsAdmin for PermissionsPlugin {
     }
 }
 
-fn is_authorized(user: &str, caller: &str, callee: &str, trust: TrustLevel) -> bool {
+fn is_already_authorized(user: &str, caller: &str, callee: &str, trust: TrustLevel) -> bool {
     Permissions::get(user, caller, callee).map_or(false, |perm| perm >= trust)
 }
 
@@ -83,7 +83,7 @@ impl Api for PermissionsPlugin {
         AllowedCallers::set(callers);
     }
 
-    fn authorize(
+    fn is_authorized(
         caller: String,
         level: TrustLevel,
         descriptions: Descriptions,
@@ -122,7 +122,7 @@ impl Api for PermissionsPlugin {
         let user = Accounts::get_current_user().ok_or_else(|| {
             ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())
         })?;
-        if is_authorized(&user, &caller, &callee, level) {
+        if is_already_authorized(&user, &caller, &callee, level) {
             return Ok(true);
         }
 
@@ -137,7 +137,7 @@ impl Api for PermissionsPlugin {
 
         HostPrompt::prompt("permissions", Some(&packed_context));
 
-        if is_authorized(&user, &caller, &callee, level) {
+        if is_already_authorized(&user, &caller, &callee, level) {
             return Ok(true);
         }
         Ok(false)

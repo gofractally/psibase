@@ -1,10 +1,14 @@
+#![allow(non_snake_case)]
+
 #[allow(warnings)]
 mod bindings;
 use bindings::*;
 
 mod errors;
+use errors::ErrorType::*;
 
 mod types;
+use chrono::{DateTime, Utc};
 use types::*;
 
 mod db;
@@ -25,6 +29,7 @@ use host::types::types as HostTypes;
 use invite::plugin::{
     invitee::Guest as Invitee, inviter::Guest as Inviter, redemption::Guest as Redemption,
 };
+use psibase::define_trust;
 use psibase::{
     fracpack::Pack,
     services::credentials::CREDENTIAL_SENDER,
@@ -33,34 +38,28 @@ use psibase::{
 use rand::{rngs::OsRng, Rng, TryRngCore};
 use transact::plugin::{hooks::*, intf as Transact};
 
-use crate::bindings::credentials::plugin::types::Credential;
+use crate::{bindings::credentials::plugin::types::Credential, trust::is_authorized};
 
-// TODO - check auth on all functions
-struct InvitePlugin;
-
-fn fetch_decrypt_secret(invite_id: u32, sym_key: Vec<u8>) -> String {
-    let query = format!(
-        r#"query {{
-            inviteById(inviteId: "{id}") {{
-                secret,
-            }}
-        }}"#,
-        id = invite_id
-    );
-    let secret = SecretResponse::from_gql(Server::post_graphql_get_json(&query).unwrap())
-        .unwrap()
-        .secret;
-
-    let cred_key = aes::with_key::decrypt(
-        &aes::types::Key {
-            strength: aes::types::Strength::Aes128,
-            key_data: sym_key,
-        },
-        base64::standard::decode(&secret).unwrap().as_slice(),
-    )
-    .unwrap();
-    String::from_utf8(cred_key).unwrap()
+define_trust! {
+    descriptions {
+        Low => "
+        Low trust grants these abilities:
+            - Delete previously created invites
+        ",
+        Medium => "Medium trust grants all the abilities of low trust, plus these abilities:
+            - Generate new invites
+        ",
+        High => "",
+    }
+    functions {
+        None => [import_invite_token, prepare_new_invite],
+        Low => [delete_invite],
+        Medium => [generate_invite],
+        High => [],
+    }
 }
+
+struct InvitePlugin;
 
 fn create_secret(private_data: &[u8]) -> (Vec<u8>, String) {
     let mut key = [0u8; 16];
@@ -83,41 +82,33 @@ fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
     base64::url::encode(data.as_slice())
 }
 
-fn decode_invite_token(token: String) -> Result<(u32, Vec<u8>), HostTypes::Error> {
-    let data = base64::url::decode(&token)?;
-    assert!(data.len() == 20, "invalid token");
-    let invite_id = u32::from_le_bytes(data[..4].try_into().unwrap());
-    let symmetric_key = &data[4..];
-
-    Ok((invite_id, symmetric_key.to_vec()))
-}
-
-fn validate_invite_token(token: &str) -> Result<(), HostTypes::Error> {
-    let _ = decode_invite_token(token.to_string())?;
-    Ok(())
-}
-
 impl Invitee for InvitePlugin {
-    fn import_invite_token(token: String) -> Result<(), HostTypes::Error> {
-        validate_invite_token(&token)?;
-        InviteTokensTable::import(token);
-        Ok(())
+    fn import_invite_token(token: String) -> Result<u32, HostTypes::Error> {
+        if !is_authorized(trust::FunctionName::import_invite_token)? {
+            return Err(Unauthorized().into());
+        }
+        let imported = InviteTokensTable::import(token);
+        if imported.is_none() {
+            return Err(InviteNotValid().into());
+        }
+        Ok(imported.unwrap())
     }
 
-    fn consume_invite_token(token: String) -> Result<(), HostTypes::Error> {
-        validate_invite_token(&token)?;
-        InviteTokensTable::import(token);
-        // TODO - call connect() on accounts app.
-        Ok(())
-    }
+    // This is shorthand for calling `import-invite-token` and then immediately
+    // attempting to connect a new account to the caller app.
+    // fn consume_invite_token(token: String) -> Result<(), HostTypes::Error> {
+    //     assert!(Client::get_sender() == Client::get_active_app());
+    //     validate_invite_token(&token)?;
+    //     InviteTokensTable::import(token);
+    //     // TODO - call connect() on accounts app.
+    //     Ok(())
+    // }
 }
 
 fn use_active_invite() {
     hook_actions_sender();
 
-    let token = InviteTokensTable::get_active_token().expect("No active invite token");
-    let (invite_id, sym_key) = decode_invite_token(token).unwrap();
-    let cred_private_key = fetch_decrypt_secret(invite_id, sym_key);
+    let cred_private_key = InviteTokensTable::active_credential_key().unwrap();
     let cred_public_key = keyvault::pub_from_priv(&cred_private_key).unwrap();
 
     Credentials::sign_latch(&Credential {
@@ -127,13 +118,24 @@ fn use_active_invite() {
 }
 
 impl Redemption for InvitePlugin {
-    fn is_active_invite() -> bool {
-        let token = InviteTokensTable::get_active_token();
-        token.is_some()
+    fn get_active_invite() -> Option<bool> {
+        assert!(Client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+
+        let token = InviteTokensTable::active_invite_id();
+        if token.is_none() {
+            return None;
+        }
+
+        Some(InviteTokensTable::active_can_create_account())
     }
 
-    fn accept_with_new_account(account: String) -> String {
+    fn create_new_account(account: String) -> String {
         assert!(Client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+
+        assert!(
+            InviteTokensTable::active_can_create_account(),
+            "Active invite token cannot be used to create an account"
+        );
 
         use_active_invite();
 
@@ -141,16 +143,16 @@ impl Redemption for InvitePlugin {
         let new_acc_pubkey = keyvault::import_key(&new_account_keys.private_key).unwrap();
 
         Transact::add_action_to_transaction(
-            acceptCreate::ACTION_NAME,
-            &acceptCreate {
-                acceptedBy: psibase::AccountNumber::from_exact(&account).unwrap(),
-                newAccountKey: keyvault::to_der(&new_acc_pubkey).unwrap().into(),
+            createAccount::ACTION_NAME,
+            &createAccount {
+                account: psibase::AccountNumber::from_exact(&account).unwrap(),
+                accountKey: keyvault::to_der(&new_acc_pubkey).unwrap().into(),
             }
             .packed(),
         )
         .unwrap();
 
-        InviteTokensTable::consume_active();
+        InviteTokensTable::account_created();
 
         new_account_keys.private_key
     }
@@ -162,12 +164,15 @@ impl Redemption for InvitePlugin {
 
         Transact::add_action_to_transaction(accept::ACTION_NAME, &accept {}.packed()).unwrap();
 
-        InviteTokensTable::consume_active();
+        InviteTokensTable::accepted();
     }
 }
 
 impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, HostTypes::Error> {
+        if !is_authorized(trust::FunctionName::generate_invite)? {
+            return Err(Unauthorized().into());
+        }
         let (invite_token, details) = Self::prepare_new_invite()?;
 
         Transact::add_action_to_transaction(
@@ -186,6 +191,9 @@ impl Inviter for InvitePlugin {
     }
 
     fn prepare_new_invite() -> Result<(String, NewInviteDetails), HostTypes::Error> {
+        if !is_authorized(trust::FunctionName::prepare_new_invite)? {
+            return Err(Unauthorized().into());
+        }
         let keypair = keyvault::generate_unmanaged_keypair()?;
         let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
@@ -203,10 +211,14 @@ impl Inviter for InvitePlugin {
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {
+        if !is_authorized(trust::FunctionName::delete_invite)? {
+            return Err(Unauthorized().into());
+        }
+        let decoded = InviteTokensTable::decode_invite_token(token)?;
         Transact::add_action_to_transaction(
             delInvite::ACTION_NAME,
             &delInvite {
-                inviteId: decode_invite_token(token)?.0,
+                inviteId: decoded.0,
             }
             .packed(),
         )?;
@@ -221,7 +233,7 @@ impl HookActionsSender for InvitePlugin {
         method: String,
     ) -> Result<Option<String>, HostTypes::Error> {
         if service == InviteService::SERVICE.to_string()
-            && (method == acceptCreate::ACTION_NAME || method == accept::ACTION_NAME)
+            && (method == createAccount::ACTION_NAME || method == accept::ACTION_NAME)
         {
             return Ok(Some(CREDENTIAL_SENDER.to_string()));
         }

@@ -30,7 +30,7 @@ use exports::transact::plugin::{
 use psibase::services::transact::action_structs::setSnapTime;
 
 // Third-party crates
-use psibase::{fracpack::Pack, Seconds};
+use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
 use serde::Deserialize;
 use serde_json::from_str;

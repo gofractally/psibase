@@ -8,6 +8,7 @@
 #include <services/system/Spki.hpp>
 #include <services/system/VerifySig.hpp>
 #include <services/system/commonErrors.hpp>
+#include "services/user/InviteErrors.hpp"
 
 #include "services/user/Invite.hpp"
 
@@ -63,7 +64,7 @@ namespace
        "cGky3DiVxoHkPFfGo81ZkIDBk3NOMSFiw5hZiscqwtY464TFBKdc8evq\n"
        "-----END PRIVATE KEY-----\n");
 
-      uint32_t inviteId = 1;
+   uint32_t inviteId = 1;
 }  // namespace
 
 // Helper functions for tests
@@ -114,7 +115,7 @@ SCENARIO("Creating an invite")
 
          AND_THEN("Alice cannot create another invite with the same key")
          {
-            CHECK(createInvite(a, invPub).failed(inviteAlreadyExists));
+            CHECK(createInvite(a, invPub).failed("Credential already exists"));
          }
          AND_THEN("Alice can create another invite with a different key")
          {
@@ -123,7 +124,7 @@ SCENARIO("Creating an invite")
       }
       THEN("Credential account cannot create an invite")
       {
-         CHECK(createInvite(i, userPub).failed(canOnlyCallAcceptCreate));
+         CHECK(createInvite(i, userPub).failed(canOnlyCallCreateAccount));
       }
    }
 }
@@ -203,7 +204,7 @@ SCENARIO("Expired invites")
 
             THEN("It cannot be accepted")
             {
-               CHECK(b.accept().failed(inviteExpired));
+               CHECK(b.accept().failed("Credential expired"));
             }
             THEN("It can be deleted by the creator")
             {
@@ -244,9 +245,11 @@ SCENARIO("Accepting an invite")
       auto bob     = t.from(t.addAccount("bob"_a));
       auto charlie = t.from(t.addAccount("charlie"_a));
       auto invited = t.from(Credentials::CREDENTIAL_SENDER);
+      auto rebecca = t.from(t.addAccount("rebecca"_a));
 
       t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
       t.setAuth<AuthSig::AuthSig>(charlie.id, userPub);
+      t.setAuth<AuthSig::AuthSig>(rebecca.id, userPub);
 
       auto userKeys        = KeyList{{userPub, userPriv}};
       auto combinedKeyList = KeyList{{userPub, userPriv}, {invPub, invPriv}};
@@ -256,6 +259,7 @@ SCENARIO("Accepting an invite")
       auto b = bob.with(combinedKeyList).to<Invite>();
       auto c = charlie.with(combinedKeyList).to<Invite>();
       auto i = invited.with(invitedKeys).to<Invite>();
+      auto r = rebecca.with(combinedKeyList).to<Invite>();
       WHEN("Alice creates an invite")
       {
          auto id = createInvite(a, invPub).returnVal();
@@ -264,17 +268,22 @@ SCENARIO("Accepting an invite")
          {
             CHECK(b.accept().succeeded());
          }
-         THEN("An invite can be accepted by credential account in order to create a new account")
+         THEN("An invite can be used to create a new account")
          {
-            CHECK(i.acceptCreate("rebecca"_a, userPub).succeeded());
+            CHECK(i.createAccount("rebecca"_a, userPub).succeeded());
+            AND_THEN(
+                "The invite can be accepted by the new account (tx also signed using credential)")
+            {
+               CHECK(r.accept().succeeded());
+            }
          }
          THEN("A normal user may not create a new account")
          {
-            CHECK(b.acceptCreate("rebecca"_a, userPub).failed(mustUseInviteCredential));
+            CHECK(b.createAccount("rebecca"_a, userPub).failed(mustUseInviteCredential));
          }
-         THEN("Credential account may not accept without also creating a new account")
+         THEN("Credential account may not accept an invite")
          {
-            CHECK(i.accept().failed(canOnlyCallAcceptCreate));
+            CHECK(i.accept().failed(canOnlyCallCreateAccount));
          }
          WHEN("An invite is accepted with an existing account")
          {
@@ -286,7 +295,8 @@ SCENARIO("Accepting an invite")
             }
             THEN("An accepted invite can be accepted again with a created account")
             {
-               CHECK(i.acceptCreate("rebecca"_a, userPub).succeeded());
+               CHECK(i.createAccount("rebecca"_a, userPub).succeeded());
+               CHECK(r.accept().succeeded());
             }
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
@@ -343,12 +353,12 @@ SCENARIO("Accepting an invite")
          }
          THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
          {
-            CHECK(i.acceptCreate("rebecca"_a, invPub).failed(needUniquePubkey));
+            CHECK(i.createAccount("rebecca"_a, invPub).failed(needUniquePubkey));
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
-            i.acceptCreate("rebecca"_a, userPub);
-            CHECK(i.acceptCreate("jonathan"_a, userPub).failed(noNewAccToken));
+            i.createAccount("rebecca"_a, userPub);
+            CHECK(i.createAccount("jonathan"_a, userPub).failed(outOfNewAccounts));
          }
       }
    }

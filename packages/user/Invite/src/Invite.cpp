@@ -13,6 +13,7 @@
 
 #include <psibase/Actor.hpp>
 #include <psibase/Bitset.hpp>
+#include "psibase/nativeTables.hpp"
 #include "services/user/InviteErrors.hpp"
 
 using namespace psibase;
@@ -22,18 +23,19 @@ using namespace UserService::Errors;
 using namespace SystemService;
 using std::optional;
 using std::string;
+using std::chrono::duration_cast;
+using std::chrono::seconds;
+using std::chrono::weeks;
 
 namespace
 {
-   constexpr std::chrono::seconds ONE_WEEK =
-       std::chrono::duration_cast<Seconds>(std::chrono::weeks(1));
+   constexpr seconds ONE_WEEK = duration_cast<Seconds>(weeks(1));
 
    void hookOnInvAccept(const InviteRecord& invite, AccountNumber accepter)
    {
       if (invite.useHooks)
       {
-         Actor<InviteHooks> inviter{Invite::service, invite.inviter};
-         inviter.onInvAccept(invite.id, accepter);
+         Actor<InviteHooks>{Invite::service, invite.inviter}.onInvAccept(invite.id, accepter);
       }
    }
 
@@ -41,8 +43,7 @@ namespace
    {
       if (invite.useHooks)
       {
-         Actor<InviteHooks> inviter{Invite::service, invite.inviter};
-         inviter.onInvDelete(invite.id);
+         Actor<InviteHooks>{Invite::service, invite.inviter}.onInvDelete(invite.id);
       }
    }
 
@@ -59,17 +60,17 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
 
    if (getSender() == Credentials::CREDENTIAL_SENDER)
    {
-      if (m != "acceptCreate"_m)
+      if (m != "createAccount"_m)
       {
-         string error = Credentials::CREDENTIAL_SENDER.str() + canOnlyCallAcceptCreate.data();
+         string error = Credentials::CREDENTIAL_SENDER.str() + canOnlyCallCreateAccount.data();
          abortMessage(error);
       }
    }
    else
    {
-      if (m == "acceptCreate"_m)
+      if (m == "createAccount"_m)
       {
-         string error = "Only " + Credentials::CREDENTIAL_SENDER.str() + " can call acceptCreate";
+         string error = "Only " + Credentials::CREDENTIAL_SENDER.str() + " can call createAccount";
          abortMessage(error);
       }
    }
@@ -91,30 +92,6 @@ void Invite::init()
    to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 1);
 }
 
-// Extracts event emission, hook notifications, deleting the invite & consuming its credential if necessary
-void Invite::onInviteAccepted(const InviteRecord& invite, AccountNumber accepter)
-{
-   emit().history().updated(invite.id, accepter, InviteEventType::accepted);
-   hookOnInvAccept(invite, accepter);
-
-   if (invite.numAccounts == 0)
-   {
-      deleteInvite(invite);
-   }
-   else
-   {
-      Tables().open<InviteTable>().put(invite);
-   }
-}
-
-void Invite::deleteInvite(const InviteRecord& invite)
-{
-   Tables().open<InviteTable>().remove(invite);
-   to<Credentials>().consume(invite.cid);
-   emit().history().updated(invite.id, getSender(), InviteEventType::deleted);
-   hookOnInvDelete(invite);
-}
-
 uint32_t Invite::createInvite(uint32_t    inviteId,
                               Spki        inviteKey,
                               uint16_t    numAccounts,
@@ -123,7 +100,9 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
 {
    auto sender = getSender();
 
-   check(numAccounts > 0, "An invite must be able to create at least one account");
+   // TODO: Debit from the sender according to how many
+   // new accounts are being authorized by the invite
+
    auto         inviteTable = Tables().open<InviteTable>();
    InviteRecord invite{
        .id          = inviteId,
@@ -137,9 +116,9 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
 
    if (useHooks)
    {
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(invite.inviter));
+      auto service = Native::tables(KvMode::read).open<CodeTable>().get(invite.inviter);
       check(
-          account.has_value(),
+          service.has_value(),
           "To enable hooks, the invite creator must be a service that implements the 'InviteHooks' "
           "interface");
    }
@@ -147,6 +126,26 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
    emit().history().updated(invite.id, invite.inviter, InviteEventType::created);
 
    return invite.id;
+}
+
+void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
+{
+   auto cid_opt = to<Credentials>().get_active();
+   check(cid_opt.has_value(), noActiveCredential.data());
+   uint32_t cid = cid_opt.value();
+
+   auto inviteTable = Tables().open<InviteTable>();
+   auto invite      = inviteTable.getIndex<2>().get(cid);
+   check(invite.has_value(), inviteDNE.data());
+   check(invite->numAccounts > 0, outOfNewAccounts.data());
+   invite->numAccounts -= 1;
+   inviteTable.put(*invite);
+
+   Spki claim = to<Credentials>().get_claim(cid);
+   check(claim != newAccountKey, needUniquePubkey.data());
+   to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
+
+   emit().history().updated(invite->id, newAccount, InviteEventType::accountRedeemed);
 }
 
 void Invite::accept()
@@ -158,32 +157,16 @@ void Invite::accept()
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.getIndex<2>().get(cid);
    check(invite.has_value(), inviteDNE.data());
-   invite->numAccounts -= 1;
 
-   onInviteAccepted(*invite, getSender());
+   auto accepter = getSender();
+   emit().history().updated(invite->id, accepter, InviteEventType::accepted);
+   hookOnInvAccept(*invite, accepter);
 }
 
 ///////////////////////////////////// TODO
 // * Check invite doc comments for out of date info
 // * Add string_views for errors
 // * Fix unit tests
-
-void Invite::acceptCreate(AccountNumber newAccount, Spki newAccountKey)
-{
-   auto cid_opt = to<Credentials>().get_active();
-   check(cid_opt.has_value(), noActiveCredential.data());
-   uint32_t cid = cid_opt.value();
-
-   auto invite = Tables().open<InviteTable>().getIndex<2>().get(cid);
-   check(invite.has_value(), inviteDNE.data());
-   invite->numAccounts -= 1;
-
-   Spki claim = to<Credentials>().get_claim(cid);
-   check(claim != newAccountKey, needUniquePubkey.data());
-   to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
-
-   onInviteAccepted(*invite, newAccount);
-}
 
 void Invite::delInvite(uint32_t inviteId)
 {
@@ -193,7 +176,10 @@ void Invite::delInvite(uint32_t inviteId)
    check(invite.has_value(), inviteDNE.data());
    check(invite->inviter == sender, unauthDelete.data());
 
-   deleteInvite(*invite);
+   inviteTable.remove(*invite);
+   to<Credentials>().consume(invite->cid);
+   emit().history().updated(invite->id, getSender(), InviteEventType::deleted);
+   hookOnInvDelete(*invite);
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)

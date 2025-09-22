@@ -2,6 +2,7 @@
 
 #include <psibase/psibase.hpp>
 #include <services/system/AuthSig.hpp>
+#include "psibase/time.hpp"
 
 namespace SystemService
 {
@@ -31,6 +32,9 @@ namespace SystemService
       /// Gets the `id` of the active credential
       std::optional<uint32_t> get_active();
 
+      /// Gets the `expiry_date` of the specified credential
+      std::optional<psibase::TimePointSec> get_expiry_date(uint32_t id);
+
       /// Gets the `claim` of the specified credential
       SystemService::AuthSig::SubjectPublicKeyInfo get_claim(uint32_t id);
 
@@ -45,6 +49,7 @@ namespace SystemService
       method(consume_active),
       method(get_active),
       method(get_claim, id),
+      method(get_expiry_date, id),
       method(consume, id),
    );
    // clang-format on

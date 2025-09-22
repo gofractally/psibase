@@ -62,6 +62,8 @@ namespace psibase
       // This may be called multiple times with different limits; the most-recent limit applies.
       void setWatchdog(CpuClock::duration watchdogLimit);
 
+      const WasmConfigRow& getWasmConfig() const;
+
       // Returns the alt stack for wasm execution.
       eosio::vm::stack_manager& getAltStack();
 

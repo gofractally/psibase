@@ -19,17 +19,13 @@ PUB=`openssl pkey -pubout -outform DER <<< "$PRV" | xxd -p -c0`
 
 openssl pkey -pubout -outform PEM <<< "$PRV" > key.pem
 
-jq -c > setup.json <<EOF
-[
-    {"sender":"root","service":"auth-sig","method":"newaccount","data":{"name":"$NAME","key":"$PUB"}},
-    {"sender":"root","service":"packages","method":"setsources","data":{"sources":[{"account":"$NAME"}]}}
-]
-EOF
+jq -n -c --arg name "$NAME" --arg key "$PUB" > setup.json '[
+    {"sender":"root","service":"auth-sig","method":"newaccount","data":{"name":$name,"key":$key}},
+    {"sender":"root","service":"packages","method":"setsources","data":{"sources":[{"account":$name}]}}
+]'
 
-jq -c > credentials.json <<EOF
-{
-    "url": "$URL",
-    "account": "$NAME",
-    "key": `jq -R -s <<< $PRV`
-}
-EOF
+jq -n -c --arg url "$URL" --arg account "$NAME" --arg key "$PRV" > credentials.json '{
+    "url": $url,
+    "account": $account,
+    "key": $key
+}'

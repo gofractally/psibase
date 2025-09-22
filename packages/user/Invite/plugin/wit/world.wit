@@ -67,32 +67,10 @@ interface invitee {
     /// After importing an invite token, any attempt to connect an account
     /// to the calling app will automatically use the invite that was 
     /// imported.
-    import-invite-token: func(token: string) -> result<_, error>;
-
-    /// This is shorthand for calling `import-invite-token` and then immediately
-    /// attempting to connect a new account to the caller app.
-    consume-invite-token: func(token: string) -> result<_, error>;
-}
-
-/// An interface for the accounts app to plug into to redeem invites
-interface redemption {
-    /// Checks if there is an invite active
-    is-active-invite: func() -> bool;
-
-    /// Creates a new account and accepts the active invite with it.
-    /// The new account is authorized with a keypair that is automatically generated. The
-    /// private key of the new keypair is returned to the caller.
-    /// 
-    /// Parameters
-    /// * `account`: The name of the new account being created
-    accept-with-new-account: func(account: string) -> string;
-
-    /// Accepts an invite with an existing account (the currently logged-in account).
-    accept: func();
+    import-invite-token: func(token: string) -> result<u32, error>;
 }
 
 world imports {
-    import redemption;
     import inviter;
     import invitee;
 }

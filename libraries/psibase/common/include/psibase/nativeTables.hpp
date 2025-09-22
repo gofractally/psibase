@@ -2,6 +2,7 @@
 
 #include <psibase/SnapshotHeader.hpp>
 #include <psibase/SocketInfo.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
@@ -41,6 +42,7 @@ namespace psibase
       static auto           key() -> KeyPrefixType;
       PSIO_REFLECT(StatusRow, chainId, current, head, consensus)
    };
+   using StatusTable = Table<StatusRow, SingletonKey{}>;
 
    struct ConfigRow
    {
@@ -52,17 +54,20 @@ namespace psibase
       static auto key() -> KeyPrefixType;
       PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
    };
+   using ConfigTable = Table<ConfigRow, SingletonKey{}>;
 
    struct WasmConfigRow
    {
       uint32_t  numExecutionMemories = 32;
       VMOptions vmOptions;
+      uint32_t  maxHandles = 64;
 
       static constexpr auto db = psibase::DbId::native;
 
       static auto key(NativeTableNum TableNum) -> KeyPrefixType;
       PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
    };
+   using WasmConfigTable = Table<WasmConfigRow, SingletonKey{}>;
 
    using CodeKeyType = std::tuple<std::uint16_t, std::uint8_t, AccountNumber>;
    auto codePrefix() -> KeyPrefixType;
@@ -93,6 +98,7 @@ namespace psibase
       auto                  key() const -> CodeKeyType;
       PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
    };
+   using CodeTable = Table<CodeRow, &CodeRow::codeNum>;
 
    using CodeByHashKeyType =
        std::tuple<std::uint16_t, std::uint8_t, Checksum256, std::uint8_t, std::uint8_t>;
@@ -116,6 +122,9 @@ namespace psibase
       auto                  key() const -> CodeByHashKeyType;
       PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, code)
    };
+   using CodeByHashTable = Table<
+       CodeByHashRow,
+       CompositeKey<&CodeByHashRow::codeHash, &CodeByHashRow::vmType, &CodeByHashRow::vmVersion>{}>;
 
    auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
        -> std::vector<CodeByHashKeyType>;
@@ -139,6 +148,7 @@ namespace psibase
                    nextMerkleEventNumber,
                    blockMerkleEventNumber)
    };
+   using DatabaseStatusTable = Table<DatabaseStatusRow, SingletonKey{}>;
 
    // Notifications are sent by native code
    //
@@ -174,6 +184,7 @@ namespace psibase
       auto                  key() const -> NotifyKeyType;
       PSIO_REFLECT(NotifyRow, type, actions)
    };
+   using NotifyTable = Table<NotifyRow, &NotifyRow::type>;
 
    using BlockDataKeyType = std::tuple<std::uint16_t, std::uint8_t, Checksum256>;
    auto blockDataPrefix() -> KeyPrefixType;
@@ -188,6 +199,7 @@ namespace psibase
       auto                  key() const -> BlockDataKeyType;
       PSIO_REFLECT(BlockDataRow, blockId, auxConsensusData);
    };
+   using BlockDataTable = Table<BlockDataRow, &BlockDataRow::blockId>;
 
    using ConsensusChangeKeyType = std::tuple<std::uint16_t, std::uint8_t, BlockNum>;
    /// Indicates the blocks that change consensus
@@ -203,6 +215,7 @@ namespace psibase
       auto                  key() const -> ConsensusChangeKeyType;
       PSIO_REFLECT(ConsensusChangeRow, start, commit, end);
    };
+   using ConsensusChangeTable = Table<ConsensusChangeRow, &ConsensusChangeRow::start>;
 
    struct SnapshotStateItem
    {
@@ -225,6 +238,7 @@ namespace psibase
       auto                  key() const -> SnapshotKeyType;
       PSIO_REFLECT(SnapshotRow, id, state, other)
    };
+   using SnapshotTable = Table<SnapshotRow, &SnapshotRow::id>;
 
    using ScheduledSnapshotKeyType = std::tuple<std::uint16_t, std::uint8_t, BlockNum>;
    auto scheduledSnapshotKey(BlockNum num) -> ScheduledSnapshotKeyType;
@@ -236,6 +250,7 @@ namespace psibase
       auto                  key() const -> ScheduledSnapshotKeyType;
       PSIO_REFLECT(ScheduledSnapshotRow, blockNum)
    };
+   using ScheduledSnapshotTable = Table<ScheduledSnapshotRow, &ScheduledSnapshotRow::blockNum>;
 
    // If this row is present it indicates the height the block log starts at.
    using LogTruncateKeyType = KeyPrefixType;
@@ -248,6 +263,7 @@ namespace psibase
       auto              key() const -> LogTruncateKeyType;
       PSIO_REFLECT(LogTruncateRow, start)
    };
+   using LogTruncateTable = Table<LogTruncateRow, SingletonKey{}>;
 
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
    auto socketPrefix() -> KeyPrefixType;
@@ -264,6 +280,7 @@ namespace psibase
       auto              key() const -> SocketKeyType;
       PSIO_REFLECT(SocketRow, fd, info)
    };
+   using SocketTable = Table<SocketRow, &SocketRow::fd>;
 
    enum class RunMode : std::uint8_t
    {
@@ -379,6 +396,7 @@ namespace psibase
       auto              key() const -> RunKeyType;
       PSIO_REFLECT(RunRow, id, mode, maxTime, action, continuation)
    };
+   using RunTable = Table<RunRow, &RunRow::id>;
 
    using EnvKeyType = std::tuple<std::uint16_t, std::uint8_t, std::string>;
    auto envPrefix() -> KeyPrefixType;
@@ -390,6 +408,40 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> EnvKeyType;
       PSIO_REFLECT(EnvRow, name, value);
+   };
+   using EnvTable = Table<EnvRow, &EnvRow::name>;
+
+   struct Native
+   {
+      using Tables = ExternTables<void,
+                                  StatusTable,
+                                  CodeTable,
+                                  CodeByHashTable,
+                                  DatabaseStatusTable,
+                                  WasmConfigTable,
+                                  WasmConfigTable,
+                                  ConfigTable,
+                                  NotifyTable,
+                                  BlockDataTable,
+                                  ConsensusChangeTable,
+                                  SnapshotTable,
+                                  ScheduledSnapshotTable,
+                                  LogTruncateTable,
+                                  SocketTable,
+                                  RunTable,
+                                  EnvTable>;
+      static Tables tables(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{kvOpen(DbId::native, {}, mode), mode};
+      }
+      static Tables subjective(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{kvOpen(DbId::nativeSubjective, {}, mode), mode};
+      }
+      static Tables session(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{kvOpen(DbId::nativeSession, {}, mode), mode};
+      }
    };
 
 }  // namespace psibase
