@@ -70,6 +70,12 @@ impl FromStr for AccountNumber {
     }
 }
 
+impl From<String> for AccountNumber {
+    fn from(s: String) -> Self {
+        AccountNumber::from_str(&s).unwrap()
+    }
+}
+
 impl From<&str> for AccountNumber {
     fn from(s: &str) -> Self {
         AccountNumber::from_str(s).unwrap()
