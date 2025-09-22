@@ -379,6 +379,9 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
       rhf_t::add<&ExecutionContextImpl::call>("env", "call");
       rhf_t::add<&ExecutionContextImpl::setRetval>("env", "setRetval");
+      rhf_t::add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
+      rhf_t::add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
+      rhf_t::add<&ExecutionContextImpl::kvClose>("env", "kvClose");
       rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
       rhf_t::add<&ExecutionContextImpl::putSequential>("env", "putSequential");
       rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");

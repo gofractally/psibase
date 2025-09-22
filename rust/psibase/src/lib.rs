@@ -14,6 +14,7 @@ mod http;
 mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;
+pub mod memo;
 mod method_number;
 pub mod native;
 pub mod native_raw;
@@ -53,6 +54,7 @@ pub use hex::*;
 pub use http::*;
 #[cfg(not(target_family = "wasm"))]
 pub use local_socket::*;
+pub use memo::*;
 pub use method_number::*;
 pub use native::*;
 pub use native_tables::*;

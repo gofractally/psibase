@@ -143,6 +143,7 @@ struct EventCursor : sqlite3_vtab_cursor
    std::vector<char> end;
    std::vector<char> data;
    std::size_t       prefixLen;
+   EventIndexHandle  handle{KvMode::read};
    EventCursor(const EventVTab& vtab) : key(vtab.key()), prefixLen(key.size() + 1) {}
    EventVTab* vtab() { return static_cast<EventVTab*>(pVtab); }
    int        setEof()
@@ -154,7 +155,7 @@ struct EventCursor : sqlite3_vtab_cursor
    std::uint64_t eventId() const { return keyToEventId(key, prefixLen); }
    void          seek()
    {
-      auto sz = psibase::raw::kvGreaterEqual(DbId::writeOnly, key.data(), key.size(), prefixLen);
+      auto sz = psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen);
       if (sz == 0xffffffffu)
       {
          setEof();

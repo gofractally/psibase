@@ -8,7 +8,13 @@ using namespace TestService;
 void SetWasmConfig::setWasmCfg(NativeTableNum table, WasmConfigRow row)
 {
    check(getSender() == getReceiver(), "Wrong sender");
-   psibase::kvPut(WasmConfigRow::db, row.key(table), row);
+   auto native = Native::tables(KvMode::write);
+   if (table == transactionWasmConfigTable)
+      native.open<transactionWasmConfigTable>().put(row);
+   else if (table == proofWasmConfigTable)
+      native.open<proofWasmConfigTable>().put(row);
+   else
+      abortMessage("Not a wasm config table");
 }
 
 PSIBASE_DISPATCH(SetWasmConfig)

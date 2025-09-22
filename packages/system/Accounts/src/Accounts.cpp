@@ -21,13 +21,11 @@ namespace SystemService
       check(!statusIndex.get(std::tuple{}), "already started");
 
       uint32_t totalAccounts = 0;
-      auto     codeIndex     = psibase::TableIndex<psibase::CodeRow, std::tuple<>>{
-          psibase::CodeRow::db, psio::convert_to_key(codePrefix()), false};
+      auto     codeTable     = Native::tables(KvMode::read).open<CodeTable>();
       if constexpr (enable_print)
          writeConsole("initial accounts: ");
-      for (auto it = codeIndex.begin(); it != codeIndex.end(); ++it)
+      for (auto code : codeTable.getIndex<0>())
       {
-         auto code = *it;
          if constexpr (enable_print)
          {
             writeConsole(code.codeNum.str());
@@ -108,7 +106,7 @@ namespace SystemService
 
    std::optional<Account> Accounts::getAccount(AccountNumber name)
    {
-      Tables tables{getReceiver()};
+      Tables tables{getReceiver(), KvMode::read};
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
       return accountIndex.get(name);

@@ -7,8 +7,8 @@ pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
-    use psibase::services::tokens::{Memo, Precision, Quantity};
-    use psibase::AccountNumber;
+    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::{AccountNumber, Memo};
 
     use psibase::*;
 

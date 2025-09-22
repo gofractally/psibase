@@ -38,7 +38,7 @@ use psibase::{
 use rand::{rngs::OsRng, Rng, TryRngCore};
 use transact::plugin::{hooks::*, intf as Transact};
 
-use crate::{bindings::credentials::plugin::types::Credential, trust::authorize};
+use crate::{bindings::credentials::plugin::types::Credential, trust::is_authorized};
 
 define_trust! {
     descriptions {
@@ -84,7 +84,9 @@ fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
 
 impl Invitee for InvitePlugin {
     fn import_invite_token(token: String) -> Result<u32, HostTypes::Error> {
-        authorize(trust::FunctionName::import_invite_token)?;
+        if !is_authorized(trust::FunctionName::import_invite_token)? {
+            return Err(Unauthorized().into());
+        }
         let imported = InviteTokensTable::import(token);
         if imported.is_none() {
             return Err(InviteNotValid().into());
@@ -168,7 +170,9 @@ impl Redemption for InvitePlugin {
 
 impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, HostTypes::Error> {
-        authorize(trust::FunctionName::generate_invite)?;
+        if !is_authorized(trust::FunctionName::generate_invite)? {
+            return Err(Unauthorized().into());
+        }
         let (invite_token, details) = Self::prepare_new_invite()?;
 
         Transact::add_action_to_transaction(
@@ -187,7 +191,9 @@ impl Inviter for InvitePlugin {
     }
 
     fn prepare_new_invite() -> Result<(String, NewInviteDetails), HostTypes::Error> {
-        authorize(trust::FunctionName::prepare_new_invite)?;
+        if !is_authorized(trust::FunctionName::prepare_new_invite)? {
+            return Err(Unauthorized().into());
+        }
         let keypair = keyvault::generate_unmanaged_keypair()?;
         let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
@@ -205,7 +211,9 @@ impl Inviter for InvitePlugin {
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {
-        authorize(trust::FunctionName::delete_invite)?;
+        if !is_authorized(trust::FunctionName::delete_invite)? {
+            return Err(Unauthorized().into());
+        }
         let decoded = InviteTokensTable::decode_invite_token(token)?;
         Transact::add_action_to_transaction(
             delInvite::ACTION_NAME,
