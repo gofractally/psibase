@@ -21,13 +21,20 @@ namespace UserService
 
    void to_key(const EventIndexTable& obj, auto& stream)
    {
-      psio::to_key(psibase::AccountNumber{"event-index"}, stream);
-      psio::to_key(eventIndexesNum, stream);
       psio::to_key(obj.db, stream);
       psio::to_key(obj.service, stream);
       psio::to_key(obj.event, stream);
    }
 
    std::uint64_t keyToEventId(const std::vector<char>& key, std::size_t prefixLen = 0);
+
+   struct EventIndexHandle
+   {
+      explicit EventIndexHandle(psibase::KvMode mode);
+      EventIndexHandle(const EventIndexHandle&) = delete;
+      ~EventIndexHandle();
+      operator psibase::KvHandle() const { return value; }
+      psibase::KvHandle value;
+   };
 
 }  // namespace UserService

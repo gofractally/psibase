@@ -3,8 +3,8 @@ pub mod tables {
     use crate::service::TID;
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
-    use psibase::services::tokens::{Decimal, Memo, Precision, Quantity};
-    use psibase::{check, check_none, check_some, get_sender, AccountNumber, TableRecord};
+    use psibase::services::tokens::{Decimal, Precision, Quantity};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber, TableRecord, Memo};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ pub mod tables {
         }
 
         pub fn get(id: TID) -> Option<Self> {
-            TokenTable::new().get_index_pk().get(&id)
+            TokenTable::read().get_index_pk().get(&id)
         }
 
         pub fn get_assert(id: TID) -> Self {
@@ -58,7 +58,7 @@ pub mod tables {
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
-            let mut tokens: Vec<Token> = TokenTable::new()
+            let mut tokens: Vec<Token> = TokenTable::read()
                 .get_index_by_symbol()
                 .range((Some(symbol), 0 as u32)..=(Some(symbol), u32::MAX))
                 .collect();
@@ -231,7 +231,9 @@ pub mod tables {
         }
 
         pub fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
-            BalanceTable::new().get_index_pk().get(&(account, token_id))
+            BalanceTable::read()
+                .get_index_pk()
+                .get(&(account, token_id))
         }
 
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
@@ -378,7 +380,7 @@ pub mod tables {
         }
 
         fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
-            SharedBalanceTable::new()
+            SharedBalanceTable::read()
                 .get_index_pk()
                 .get(&(creditor, debitor, token_id))
         }
@@ -522,7 +524,7 @@ pub mod tables {
         }
 
         fn get(account: AccountNumber, token_id: TID) -> Option<Self> {
-            BalanceConfigTable::new()
+            BalanceConfigTable::read()
                 .get_index_pk()
                 .get(&(account, token_id))
         }
@@ -582,7 +584,7 @@ pub mod tables {
         }
 
         fn get(account: AccountNumber) -> Option<Self> {
-            UserConfigTable::new().get_index_pk().get(&account)
+            UserConfigTable::read().get_index_pk().get(&account)
         }
 
         pub fn get_or_new(account: AccountNumber) -> Self {

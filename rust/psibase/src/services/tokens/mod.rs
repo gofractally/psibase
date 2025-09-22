@@ -1,10 +1,8 @@
 pub mod decimal;
-pub mod memo;
 pub mod precision;
 pub mod quantity;
 
 pub use decimal::Decimal;
-pub use memo::Memo;
 pub use precision::Precision;
 pub use quantity::Quantity;
 
@@ -20,7 +18,6 @@ custom_error! { pub TokensError
     InvalidNumber = "Invalid Number",
     PrecisionOverflow = "Precision overflow",
     Overflow = "Overflow",
-    MemoTooLarge = "Memo must be 80 bytes or less"
 }
 
 pub type TID = u32;
@@ -74,8 +71,8 @@ pub struct Balance {
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
-    use super::{Memo, Quantity, TokenRecord, TID};
-    use crate::{services::tokens::Precision, AccountNumber};
+    use super::{Quantity, TokenRecord, TID};
+    use crate::{services::tokens::Precision, AccountNumber, Memo};
 
     #[action]
     fn init() {

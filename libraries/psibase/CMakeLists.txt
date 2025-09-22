@@ -191,6 +191,7 @@ function(add suffix)
             common/include)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
+            native/src/BucketSet.cpp
             native/src/ConfigFile.cpp
             native/src/ExecutionContext.cpp
             native/src/ForkDb.cpp

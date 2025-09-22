@@ -8,6 +8,8 @@ pub struct Decimal {
     precision: Precision,
 }
 
+serialize_as_str!(Decimal, "decimal");
+
 impl Decimal {
     pub fn new(quantity: Quantity, precision: Precision) -> Self {
         Self {
@@ -53,8 +55,6 @@ impl FromStr for Decimal {
         Ok(Decimal::new(quantity, precision))
     }
 }
-
-serialize_as_str!(Decimal, "decimal");
 
 #[cfg(test)]
 mod tests {

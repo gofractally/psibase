@@ -30,6 +30,7 @@ namespace LocalService
       }
 
       void decrementRefCount(CodeRefCountTable& refsTable,
+                             CodeByHashTable&   codeTable,
                              const Checksum256& codeHash,
                              std::uint8_t       vmType,
                              std::uint8_t       vmVersion)
@@ -41,7 +42,7 @@ namespace LocalService
          else
          {
             refsTable.remove(*prevCount);
-            kvRemove(DbId::nativeSubjective, codeByHashKey(codeHash, vmType, vmVersion));
+            codeTable.erase(std::tuple(codeHash, vmType, vmVersion));
          }
       }
 
@@ -66,13 +67,13 @@ namespace LocalService
 
       void initRefCounts()
       {
-         auto refs = XAdmin{}.open<CodeRefCountTable>();
+         auto refs      = XAdmin{}.open<CodeRefCountTable>();
+         auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
          PSIBASE_SUBJECTIVE_TX
          {
             if (refs.getIndex<0>().empty())
             {
-               for (auto row : TableIndex<CodeRow, AccountNumber>{
-                        DbId::nativeSubjective, psio::convert_to_key(codePrefix()), false})
+               for (auto row : codeTable.getIndex<0>())
                {
                   incrementRefCount(refs, row.codeHash, row.vmType, row.vmVersion);
                }
@@ -82,7 +83,7 @@ namespace LocalService
 
       bool chainIsBooted()
       {
-         auto row = kvGet<StatusRow>(StatusRow::db, statusKey());
+         auto row = Native::tables(KvMode::read).open<StatusTable>().get({});
          return row && row->head;
       }
 
@@ -95,9 +96,10 @@ namespace LocalService
       if (socket)
       {
          std::optional<SocketRow> row;
+         auto                     native = Native::session(KvMode::read);
          PSIBASE_SUBJECTIVE_TX
          {
-            row = kvGet<SocketRow>(SocketRow::db, socketKey(*socket));
+            row = native.open<SocketTable>().get(*socket);
          }
          check(row.has_value(), "Missing socket row");
          check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
@@ -110,7 +112,7 @@ namespace LocalService
          std::optional<EnvRow> env;
          PSIBASE_SUBJECTIVE_TX
          {
-            env = kvGet<EnvRow>(EnvRow::db, envKey("PSIBASE_ADMIN_IP"));
+            env = native.open<EnvTable>().get(std::string("PSIBASE_ADMIN_IP"));
          }
          if (env)
          {
@@ -207,11 +209,14 @@ namespace LocalService
                    .body        = toVec("Content-Type must be application/wasm\n"),
                };
             }
-            Checksum256 codeHash  = sha256(req.body.data(), req.body.size());
-            auto        refsTable = open<CodeRefCountTable>();
+            auto codeHash        = sha256(req.body.data(), req.body.size());
+            auto refsTable       = open<CodeRefCountTable>();
+            auto native          = Native::subjective(KvMode::readWrite);
+            auto codeByHashTable = native.open<CodeByHashTable>();
+            auto codeTable       = native.open<CodeTable>();
             PSIBASE_SUBJECTIVE_TX
             {
-               auto account = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
+               auto account = codeTable.get(service);
                if (!account)
                {
                   account.emplace();
@@ -228,7 +233,7 @@ namespace LocalService
                // decrement old reference count
                if (account->codeHash != Checksum256{})
                {
-                  decrementRefCount(refsTable, account->codeHash, account->vmType,
+                  decrementRefCount(refsTable, codeByHashTable, account->codeHash, account->vmType,
                                     account->vmVersion);
                }
 
@@ -236,7 +241,7 @@ namespace LocalService
                account->flags     = CodeRow::isPrivileged;
                account->vmType    = vmType;
                account->vmVersion = vmVersion;
-               kvPut(DbId::nativeSubjective, account->key(), *account);
+               codeTable.put(*account);
 
                if (!incrementRefCount(refsTable, codeHash, vmType, vmVersion))
                {
@@ -244,20 +249,22 @@ namespace LocalService
                                          .vmType    = account->vmType,
                                          .vmVersion = account->vmVersion,
                                          .code{req.body.begin(), req.body.end()}};
-                  kvPut(DbId::nativeSubjective, code_obj.key(), code_obj);
+                  codeByHashTable.put(code_obj);
                }
             }
             return HttpReply{};
          }
          else if (req.method == "GET")
          {
+            auto native          = Native::subjective(KvMode::read);
+            auto codeByHashTable = native.open<CodeByHashTable>();
+            auto codeTable       = native.open<CodeTable>();
             PSIBASE_SUBJECTIVE_TX
             {
-               if (auto account = kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service)))
+               if (auto account = codeTable.get(service))
                {
-                  auto code = kvGet<CodeByHashRow>(
-                      DbId::nativeSubjective,
-                      codeByHashKey(account->codeHash, account->vmType, account->vmVersion));
+                  auto code = codeByHashTable.get(
+                      std::tuple(account->codeHash, account->vmType, account->vmVersion));
                   check(code.has_value(), "CodeByHashRow is missing");
                   return HttpReply{.contentType = "application/wasm",
                                    .body{code->code.begin(), code->code.end()}};

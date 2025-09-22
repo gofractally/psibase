@@ -99,6 +99,12 @@ namespace psibase
    bool isLoopback(const LocalEndpoint&);
    bool isLoopback(const SocketEndpoint&);
 
+   struct TLSInfo
+   {
+      PSIO_REFLECT(TLSInfo)
+      friend bool operator==(const TLSInfo&, const TLSInfo&) = default;
+   };
+
    struct ProducerMulticastSocketInfo
    {
       PSIO_REFLECT(ProducerMulticastSocketInfo)
@@ -108,7 +114,8 @@ namespace psibase
    struct HttpSocketInfo
    {
       std::optional<SocketEndpoint> endpoint;
-      PSIO_REFLECT(HttpSocketInfo, endpoint)
+      std::optional<TLSInfo>        tls;
+      PSIO_REFLECT(HttpSocketInfo, endpoint, tls)
       friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
    };
 

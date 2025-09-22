@@ -24,6 +24,7 @@ std::uint64_t XRun::post(RunMode mode, Action action, MicroSeconds maxTime, Meth
 {
    checkAuth(getSender());
    check(action.sender == getSender(), "Wrong sender");
+   auto   table = Native::subjective().open<RunTable>();
    RunRow row{
        .id           = 0,
        .mode         = mode,
@@ -31,9 +32,9 @@ std::uint64_t XRun::post(RunMode mode, Action action, MicroSeconds maxTime, Meth
        .action       = std::move(action),
        .continuation = {.service = getSender(), .method = callback},
    };
-   if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
+   if (auto prev = table.last())
       row.id = prev->id + 1;
-   kvPut(RunRow::db, row.key(), row);
+   table.put(row);
    return row.id;
 }
 
@@ -49,18 +50,18 @@ std::uint64_t XRun::verify(Checksum256       transactionHash,
                   .service = args.claim.service,
                   .method  = MethodNumber("verifySys"),
                   .rawData = psio::to_frac(args)};
-
-   RunRow row{
-       .id           = 0,
-       .mode         = RunMode::verify,
-       .maxTime      = maxTime,
-       .action       = std::move(act),
-       .continuation = {.service = getSender(), .method = callback},
+   auto       table = Native::subjective().open<RunTable>();
+   RunRow     row{
+           .id           = 0,
+           .mode         = RunMode::verify,
+           .maxTime      = maxTime,
+           .action       = std::move(act),
+           .continuation = {.service = getSender(), .method = callback},
    };
-   if (auto prev = kvMax<RunRow>(RunRow::db, runPrefix()))
+   if (auto prev = table.last())
       row.id = prev->id + 1;
 
-   kvPut(RunRow::db, row.key(), row);
+   table.put(row);
 
    return row.id;
 }
@@ -68,9 +69,9 @@ std::uint64_t XRun::verify(Checksum256       transactionHash,
 void XRun::cancel(std::uint64_t id, MethodNumber callback)
 {
    checkAuth(getSender());
-   auto key = runKey(id);
+   auto table = Native::subjective().open<RunTable>();
    {
-      auto row = kvGet<RunRow>(RunRow::db, key);
+      auto row = table.get(id);
       check(row && row->continuation.service == getSender(),
             "A service can only cancel its own runs");
    }
@@ -82,16 +83,16 @@ void XRun::cancel(std::uint64_t id, MethodNumber callback)
        .action       = {.sender = getSender(), .service = Nop::service},
        .continuation = {.service = getSender(), .method = callback},
    };
-   kvPut(RunRow::db, key, row);
+   table.put(row);
 }
 
 void XRun::finish(std::uint64_t id)
 {
    checkAuth(getSender());
-   auto key = runKey(id);
-   auto row = kvGet<RunRow>(RunRow::db, key);
+   auto table = Native::subjective().open<RunTable>();
+   auto row   = table.get(id);
    check(row && row->continuation.service == getSender(), "A service can only finish its own runs");
-   kvRemove(RunRow::db, key);
+   table.remove(*row);
 }
 
 PSIBASE_DISPATCH(XRun)

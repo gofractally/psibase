@@ -132,7 +132,7 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
-        CpuLimit Events Explorer Invite Nft
+        CpuLimit Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode Symbol
@@ -315,7 +315,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.20)
+set(PSIBASE_VERSION 0.21)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -427,6 +427,12 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/TokenStream.psi
+    PATH packages/user/TokenStream
+    DEPENDS ${TokenStream_js_DEP}
 )
 
 cargo_psibase_package(
@@ -948,7 +954,7 @@ psibase_package(
     DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials
                     Docs Evaluations Events Fractals Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop Config
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact Homepage Workshop Config
 )
 
 psibase_package(
@@ -958,7 +964,7 @@ psibase_package(
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials
                     Docs Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop Config
+                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage Workshop Config
 )
 
 
@@ -1003,7 +1009,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials DevDefault ProdDefault
     Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage Workshop Config
     XAdmin XDefault XHttp XRun XSites XTransact)
 
 install(
@@ -1050,6 +1056,7 @@ install(
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/Tokens.psi
+          ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/Workshop.psi
