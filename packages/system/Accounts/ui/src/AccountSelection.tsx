@@ -1,14 +1,11 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useStore } from "@tanstack/react-form";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import debounce from "debounce";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { useAcceptInvite } from "@/hooks/useAcceptInvite";
-import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
 import { useDecodeInviteToken } from "@/hooks/useDecodeInviteToken";
 import { useDecodeToken } from "@/hooks/useDecodeToken";
@@ -24,17 +21,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@shared/shadcn/ui/form";
-import { Input } from "@shared/shadcn/ui/input";
 
 import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
+// import { AccountAvailabilityStatus } from "./AccountAvailabilityStatus";
 import { AccountsList } from "./AccountsList";
 import { ActiveSearch } from "./ActiveSearch";
 import { LoadingCard } from "./LoadingCard";
@@ -43,7 +32,9 @@ import {
     InviteExpiredCard,
     InviteRejectedCard,
 } from "./TokenErrorUIs";
+import { useAppForm } from "./form/app-form";
 import { useLogout } from "./hooks/use-logout";
+import { assertAccountAvailable } from "./hooks/useAccountStatus";
 import { useCreateAccount } from "./hooks/useCreateAccount";
 import { useImportAccount } from "./hooks/useImportAccount";
 import { useRejectInvite } from "./hooks/useRejectInvite";
@@ -52,10 +43,6 @@ dayjs.extend(relativeTime);
 
 const capitaliseFirstLetter = (str: string) =>
     str[0].toUpperCase() + str.slice(1);
-
-const formSchema = z.object({
-    username: z.string().min(1).max(50),
-});
 
 export const AccountSelection = () => {
     const [searchParams] = useSearchParams();
@@ -66,50 +53,45 @@ export const AccountSelection = () => {
         throw new Error("No token was found in the URL");
     }
 
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
+    const form = useAppForm({
         defaultValues: {
             username: "",
         },
+
+        onSubmit: async (data) => {
+            try {
+                const app = inviteToken
+                    ? inviteToken.app
+                    : connectionToken!.app;
+                if (isCreatingAccount) {
+                    await createAccount(data.value.username);
+                } else {
+                    // Import existing account
+                    await importAccount(data.value.username);
+                    if (!connectionToken) {
+                        throw new Error("Invalid connectionToken");
+                    }
+                    // Login and set auth cookie
+                    await handleLogin(data.value.username, app);
+                }
+            } catch (error) {
+                console.error("❌ Error in logging in:", error);
+                await logout();
+                return;
+            }
+            setIsModalOpen(false);
+        },
     });
+
+    const theState = useStore(form.store, (state) => state);
+
+    console.log(theState, "state");
 
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const [isCreatingAccount, setIsCreatingAccount] = useState(true);
 
-    const { isDirty, isSubmitting } = form.formState;
-
-    const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        try {
-            const app = inviteToken ? inviteToken.app : connectionToken!.app;
-            if (isCreatingAccount) {
-                // createAccount handles logout, acceptWithNewAccount, and importAccount
-                await createAccount(values.username);
-                void (await acceptInvite({
-                    app,
-                    accountName: values.username,
-                    token: z.string().parse(token),
-                }));
-            } else {
-                // Import existing account
-                await importAccount(values.username);
-                if (!connectionToken) {
-                    throw new Error("Invalid connectionToken");
-                }
-                // Login and set auth cookie
-                await handleLogin(values.username, app);
-            }
-        } catch (error) {
-            console.error("❌ Error in logging in:", error);
-            await logout();
-            return;
-        }
-        setIsModalOpen(false);
-    };
-
-    const username = form.watch("username");
-
-    const [debouncedAccount, setDebouncedAccount] = useState<string>();
+    const isSubmitting = false;
 
     const { data: accounts, isLoading: isFetching } = useGetAllAccounts();
 
@@ -117,33 +99,16 @@ export const AccountSelection = () => {
 
     const isNoAccounts = accounts ? accounts.length == 0 : false;
 
-    const { data: status, isLoading: debounceIsLoading } =
-        useAccountStatus(debouncedAccount);
-
-    const isProcessing = debounceIsLoading || username !== debouncedAccount;
-
-    const accountStatus = isProcessing ? "Loading" : status;
-
     const isAccountsLoading = isFetching && !accounts;
     const [selectedAccountId, setSelectedAccountId] = useState<string>("");
-
-    useEffect(() => {
-        const debouncedCb = debounce((formValue) => {
-            setDebouncedAccount(formValue.username);
-        }, 1000);
-
-        const subscription = form.watch(debouncedCb);
-
-        return () => subscription.unsubscribe();
-    }, [form]);
 
     const [activeSearch, setActiveSearch] = useState("");
     const accountsToRender = activeSearch
         ? (accounts || []).filter((account: { account: string }) =>
-              account.account
-                  .toLowerCase()
-                  .includes(activeSearch.toLowerCase()),
-          )
+            account.account
+                .toLowerCase()
+                .includes(activeSearch.toLowerCase()),
+        )
         : accounts || [];
 
     const selectedAccount = (accountsToRender || []).find(
@@ -153,9 +118,6 @@ export const AccountSelection = () => {
     const { data: decodedToken, isLoading: isLoadingToken } =
         useDecodeToken(token);
     const isInvite = decodedToken?.tag === "invite-token";
-
-    const disableModalSubmit: boolean =
-        accountStatus !== (isInvite ? "Available" : "Taken");
 
     const onAccountSelection = async (accountId: string) => {
         setSelectedAccountId(accountId);
@@ -194,8 +156,8 @@ export const AccountSelection = () => {
             ? capitaliseFirstLetter(inviteToken.app)
             : ""
         : connectionToken
-          ? capitaliseFirstLetter(connectionToken.app)
-          : "";
+            ? capitaliseFirstLetter(connectionToken.app)
+            : "";
 
     const isExpired = inviteToken
         ? inviteToken.expiry.valueOf() < new Date().valueOf()
@@ -221,7 +183,8 @@ export const AccountSelection = () => {
     const { mutateAsync: acceptInvite, isPending: isAccepting } =
         useAcceptInvite();
 
-    const isTxInProgress = isRejecting || isAccepting || isLoggingIn;
+    const isTxInProgress =
+        isRejecting || isAccepting || isLoggingIn || isCreatingAccount;
 
     if (isLoadingInvite) {
         return <LoadingCard />;
@@ -283,48 +246,63 @@ export const AccountSelection = () => {
                 connect to the ${appName} app.`
                                     : "Import a pre-existing account prior to accepting / denying an invite."}
                             </DialogDescription>
-                            <Form {...form}>
-                                <form
-                                    onSubmit={form.handleSubmit(onSubmit)}
-                                    className="mt-2 w-full space-y-6"
-                                >
-                                    <FormField
-                                        control={form.control}
-                                        name="username"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <div className="flex w-full justify-between ">
-                                                    <FormLabel>
-                                                        Username
-                                                    </FormLabel>
-                                                    {isDirty && (
-                                                        <AccountAvailabilityStatus
-                                                            accountStatus={
-                                                                accountStatus
-                                                            }
-                                                            isCreatingAccount={
-                                                                isCreatingAccount
-                                                            }
-                                                        />
-                                                    )}
-                                                </div>
-                                                <FormControl>
-                                                    <Input {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    void form.handleSubmit();
+                                }}
+                                className="mt-2 w-full space-y-6"
+                            >
+                                <form.AppField
+                                    name="username"
+                                    asyncDebounceMs={1000}
+                                    validators={{
+                                        onChangeAsync: async (value) => {
+                                            await assertAccountAvailable(
+                                                value.value,
+                                            );
+                                        },
+                                    }}
+                                    children={(field) => {
+                                        console.log(
+                                            field.state.meta,
+                                            "is meta",
+                                        );
+                                        const isValidating = field.state.meta.isValidating;
+                                        const errorMessage = field.state.meta.errors.length >
+                                            0 ? (
+                                                field.state.meta
+                                                    .errors[0]! as Error
+                                            ).message : '';
+
+                                        return (
+                                            <field.TextField
+                                                label="Username"
+                                                showError={false}
+                                                rightLabel={
+                                                    <AccountAvailabilityStatus
+                                                        accountStatus={
+                                                            isValidating ? 'Loading' : errorMessage ? errorMessage == 'Taken' ? 'Taken' : "Invalid" : 'Available'
+                                                        }
+                                                        isCreatingAccount={
+                                                            isCreatingAccount
+                                                        }
+                                                    />
+                                                }
+                                            />
+                                        );
+                                    }}
+                                />
+                                <form.AppForm>
+                                    <form.SubmitButton
+                                        labels={[
+                                            "Create account",
+                                            "Creating account...",
+                                            "Created account",
+                                        ]}
                                     />
-                                    <Button
-                                        type="submit"
-                                        disabled={disableModalSubmit}
-                                    >
-                                        {isCreatingAccount
-                                            ? `${isSubmitting ? "Accepting" : "Accept"} invite`
-                                            : `Import account`}
-                                    </Button>
-                                </form>
-                            </Form>
+                                </form.AppForm>
+                            </form>
                         </DialogHeader>
                     </DialogContent>
                     <div className="mx-auto max-w-lg">
@@ -333,8 +311,8 @@ export const AccountSelection = () => {
                                 {isInitialLoading
                                     ? "Loading..."
                                     : isInvite
-                                      ? `Select an account to accept invite to `
-                                      : `Select an account to login to  `}
+                                        ? `Select an account to accept invite to `
+                                        : `Select an account to login to  `}
                             </div>
                         </div>
                         <ActiveSearch
@@ -373,8 +351,8 @@ export const AccountSelection = () => {
                                     {isSubmitting
                                         ? "Loading..."
                                         : isInvite
-                                          ? "Accept invite"
-                                          : "Login"}
+                                            ? "Accept invite"
+                                            : "Login"}
                                 </Button>
                             </div>
                         )}

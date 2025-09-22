@@ -1578,9 +1578,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/accounts-ui@workspace:system/Accounts/ui"
   dependencies:
-    "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@tailwindcss/vite": "npm:^4.1.8"
+    "@tanstack/react-form": "npm:^1.23.0"
     "@tanstack/react-query": "npm:^5.52.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
@@ -1590,7 +1590,6 @@ __metadata:
     lucide-react: "npm:^0.429.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-hook-form: "npm:^7.58.1"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
     vite: "npm:^5.4.1"
@@ -3867,6 +3866,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/devtools-event-client@npm:^0.2.5":
+  version: 0.2.5
+  resolution: "@tanstack/devtools-event-client@npm:0.2.5"
+  checksum: 10c0/3fb7a171d63bc27fb683bbdb274ac9bb00cee01b70fe74d2a8d62f49243468991182d622901dba8b4aa79a26783ba03e55c7498eba78bd52795e926125c1be59
+  languageName: node
+  linkType: hard
+
 "@tanstack/form-core@npm:1.12.3":
   version: 1.12.3
   resolution: "@tanstack/form-core@npm:1.12.3"
@@ -3882,6 +3888,17 @@ __metadata:
   dependencies:
     "@tanstack/store": "npm:^0.7.4"
   checksum: 10c0/e56a82ad59679d02bb0f3a0e3a4f95296edf1d71949b77c6b7ae07cb64fc709fd5b9edda9a6648af6acb06f57aaa6a8d62ee0940db44cffe4bfaaa7a62ee89f5
+  languageName: node
+  linkType: hard
+
+"@tanstack/form-core@npm:1.23.0":
+  version: 1.23.0
+  resolution: "@tanstack/form-core@npm:1.23.0"
+  dependencies:
+    "@tanstack/devtools-event-client": "npm:^0.2.5"
+    "@tanstack/store": "npm:^0.7.5"
+    uuid: "npm:^13.0.0"
+  checksum: 10c0/9b6e99c88827334e4633930caddd926ca44c38e1a9684a13d52313bf89f7a67374cf98b44229859a47271c1b0b02a70fb0a79ff0cc51b8b890fdb8f0e5cd65cf
   languageName: node
   linkType: hard
 
@@ -3949,6 +3966,24 @@ __metadata:
     "@tanstack/react-start":
       optional: true
   checksum: 10c0/d7c71fd919adeea9bb17cef9492103dd23ce5ee367ff0967fb02ba1816bad2dab0a8c52d22d22688bcc2de17fc170ca32f723f9b3a72d520b2de3f1340033c92
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-form@npm:^1.23.0":
+  version: 1.23.0
+  resolution: "@tanstack/react-form@npm:1.23.0"
+  dependencies:
+    "@tanstack/form-core": "npm:1.23.0"
+    "@tanstack/react-store": "npm:^0.7.5"
+    decode-formdata: "npm:^0.9.0"
+    devalue: "npm:^5.3.2"
+  peerDependencies:
+    "@tanstack/react-start": ^1.130.10
+    react: ^17.0.0 || ^18.0.0 || ^19.0.0
+  peerDependenciesMeta:
+    "@tanstack/react-start":
+      optional: true
+  checksum: 10c0/2f894971ce2d49c587aea059360f09863ce61b023e322b4bb92bc6d37e67778500116d4f3aba95680944031f6b6f7858535a19e0ac751e72c89c9d456406842c
   languageName: node
   linkType: hard
 
@@ -4032,6 +4067,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/react-store@npm:^0.7.5":
+  version: 0.7.7
+  resolution: "@tanstack/react-store@npm:0.7.7"
+  dependencies:
+    "@tanstack/store": "npm:0.7.7"
+    use-sync-external-store: "npm:^1.5.0"
+  peerDependencies:
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 10c0/12f5119492503aeac0bb45fc41bda140630ccbb6b5b92ebc5dbc1bf0e32728820dbb9455821850aa87bdc15793d4efbf98fa0ff04bb85363fe4d77c03547f13e
+  languageName: node
+  linkType: hard
+
 "@tanstack/react-table@npm:^8.20.4":
   version: 8.21.3
   resolution: "@tanstack/react-table@npm:8.21.3"
@@ -4055,6 +4103,13 @@ __metadata:
   version: 0.7.4
   resolution: "@tanstack/store@npm:0.7.4"
   checksum: 10c0/084aa3cf9a2b49bf9b1fb44872cb6fe4a05f8e6fc1bf584f1f30e6e0d89558b9003830562ece7794df85e1fc106542f3f50d71f0ea682deb11846576c1d33595
+  languageName: node
+  linkType: hard
+
+"@tanstack/store@npm:0.7.7, @tanstack/store@npm:^0.7.5":
+  version: 0.7.7
+  resolution: "@tanstack/store@npm:0.7.7"
+  checksum: 10c0/bf90fa957bd97336d7dbc0d7b87379b5fe4baea030efef8a93fe4e49ac1c8bc929247d1a9f84b16a1642e386b67fe53be14df8d5415efdf85f83733ccdf8877a
   languageName: node
   linkType: hard
 
@@ -12567,6 +12622,15 @@ __metadata:
   bin:
     uuid: dist/bin/uuid
   checksum: 10c0/eab18c27fe4ab9fb9709a5d5f40119b45f2ec8314f8d4cf12ce27e4c6f4ffa4a6321dc7db6c515068fa373c075b49691ba969f0010bf37f44c37ca40cd6bf7fe
+  languageName: node
+  linkType: hard
+
+"uuid@npm:^13.0.0":
+  version: 13.0.0
+  resolution: "uuid@npm:13.0.0"
+  bin:
+    uuid: dist-node/bin/uuid
+  checksum: 10c0/950e4c18d57fef6c69675344f5700a08af21e26b9eff2bf2180427564297368c538ea11ac9fb2e6528b17fc3966a9fd2c5049361b0b63c7d654f3c550c9b3d67
   languageName: node
   linkType: hard
 

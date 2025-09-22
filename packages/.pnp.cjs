@@ -2418,10 +2418,10 @@ const RAW_RUNTIME_STATE =
       ["workspace:system/Accounts/ui", {\
         "packageLocation": "./system/Accounts/ui/",\
         "packageDependencies": [\
-          ["@hookform/resolvers", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.1.1"],\
           ["@psibase/accounts-ui", "workspace:system/Accounts/ui"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@tailwindcss/vite", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:4.1.11"],\
+          ["@tanstack/react-form", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:1.23.0"],\
           ["@tanstack/react-query", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:5.81.2"],\
           ["@types/react", "npm:19.1.8"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.6"],\
@@ -2431,7 +2431,6 @@ const RAW_RUNTIME_STATE =
           ["lucide-react", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:0.429.0"],\
           ["react", "npm:19.1.0"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.0"],\
-          ["react-hook-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:7.58.1"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.1"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
           ["vite", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:5.4.19"],\
@@ -5555,6 +5554,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["@tanstack/devtools-event-client", [\
+      ["npm:0.2.5", {\
+        "packageLocation": "../.caches/yarn/@tanstack-devtools-event-client-npm-0.2.5-206ef0c6d0-3fb7a171d6.zip/node_modules/@tanstack/devtools-event-client/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.2.5"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["@tanstack/form-core", [\
       ["npm:1.12.3", {\
         "packageLocation": "../.caches/yarn/@tanstack-form-core-npm-1.12.3-b9c4dc443d-3f49f95f98.zip/node_modules/@tanstack/form-core/",\
@@ -5569,6 +5577,16 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@tanstack/form-core", "npm:1.19.3"],\
           ["@tanstack/store", "npm:0.7.4"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:1.23.0", {\
+        "packageLocation": "../.caches/yarn/@tanstack-form-core-npm-1.23.0-294caa364d-9b6e99c888.zip/node_modules/@tanstack/form-core/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.2.5"],\
+          ["@tanstack/form-core", "npm:1.23.0"],\
+          ["@tanstack/store", "npm:0.7.7"],\
+          ["uuid", "npm:13.0.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -5620,6 +5638,13 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
+      ["npm:1.23.0", {\
+        "packageLocation": "../.caches/yarn/@tanstack-react-form-npm-1.23.0-2fe9d99e42-2f894971ce.zip/node_modules/@tanstack/react-form/",\
+        "packageDependencies": [\
+          ["@tanstack/react-form", "npm:1.23.0"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
       ["virtual:6e514df2b8e0228a074e8360b39b08ff0e103bbd83e4ecec21d330903af5b53b76a3e96423e106c3219ef6e0fd1519477fccf3409868ad92de5b68d8e405d103#npm:1.12.3", {\
         "packageLocation": "./.yarn/__virtual__/@tanstack-react-form-virtual-df17d23a6d/2/.caches/yarn/@tanstack-react-form-npm-1.12.3-29bc435088-97fd2849ee.zip/node_modules/@tanstack/react-form/",\
         "packageDependencies": [\
@@ -5652,6 +5677,27 @@ const RAW_RUNTIME_STATE =
           ["@tanstack/react-form", "virtual:d218e5f3d4216aaa908fc8ceaaa5f455662c2db910e961bfbbbccb1dcd7b297cbc7d6b31d892745238221b5bb12af089d96b5a575a1067cb2994183d9e125ea9#npm:1.19.3"],\
           ["@tanstack/react-start", null],\
           ["@tanstack/react-store", "virtual:cbe04708657d10872aa0048dc0d242f2e7c91f93e61d8e3ce8fa8a95d23566164d89f03999e092b2de56513ca5d509e440793f220e231fe102ed05830fc0630b#npm:0.7.4"],\
+          ["@types/react", "npm:19.1.8"],\
+          ["@types/tanstack__react-start", null],\
+          ["decode-formdata", "npm:0.9.0"],\
+          ["devalue", "npm:5.3.2"],\
+          ["react", "npm:19.1.0"]\
+        ],\
+        "packagePeers": [\
+          "@tanstack/react-start",\
+          "@types/react",\
+          "@types/tanstack__react-start",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:1.23.0", {\
+        "packageLocation": "./.yarn/__virtual__/@tanstack-react-form-virtual-59e7b02257/2/.caches/yarn/@tanstack-react-form-npm-1.23.0-2fe9d99e42-2f894971ce.zip/node_modules/@tanstack/react-form/",\
+        "packageDependencies": [\
+          ["@tanstack/form-core", "npm:1.23.0"],\
+          ["@tanstack/react-form", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:1.23.0"],\
+          ["@tanstack/react-start", null],\
+          ["@tanstack/react-store", "virtual:59e7b02257b8f218c19d1c2871a911b3802ef9ba5eeaa1d75dce6c927105c3415c0a1170ee269ef2921ec953ddc900a3009cc8851ad25e992a5b28ffbaff09cf#npm:0.7.7"],\
           ["@types/react", "npm:19.1.8"],\
           ["@types/tanstack__react-start", null],\
           ["decode-formdata", "npm:0.9.0"],\
@@ -5787,6 +5833,32 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
+      ["npm:0.7.7", {\
+        "packageLocation": "../.caches/yarn/@tanstack-react-store-npm-0.7.7-21e183dd50-12f5119492.zip/node_modules/@tanstack/react-store/",\
+        "packageDependencies": [\
+          ["@tanstack/react-store", "npm:0.7.7"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:59e7b02257b8f218c19d1c2871a911b3802ef9ba5eeaa1d75dce6c927105c3415c0a1170ee269ef2921ec953ddc900a3009cc8851ad25e992a5b28ffbaff09cf#npm:0.7.7", {\
+        "packageLocation": "./.yarn/__virtual__/@tanstack-react-store-virtual-df8ab7abc7/2/.caches/yarn/@tanstack-react-store-npm-0.7.7-21e183dd50-12f5119492.zip/node_modules/@tanstack/react-store/",\
+        "packageDependencies": [\
+          ["@tanstack/react-store", "virtual:59e7b02257b8f218c19d1c2871a911b3802ef9ba5eeaa1d75dce6c927105c3415c0a1170ee269ef2921ec953ddc900a3009cc8851ad25e992a5b28ffbaff09cf#npm:0.7.7"],\
+          ["@tanstack/store", "npm:0.7.7"],\
+          ["@types/react", "npm:19.1.8"],\
+          ["@types/react-dom", null],\
+          ["react", "npm:19.1.0"],\
+          ["react-dom", null],\
+          ["use-sync-external-store", "virtual:5daf64896df92f23ca7e09721cb5db2e56cef3a6ae421c8dbf76be898f65e9ee6fbb03c5a4efae3f30d5def126487856d58a6234b3339e857e076c35a1becb86#npm:1.5.0"]\
+        ],\
+        "packagePeers": [\
+          "@types/react-dom",\
+          "@types/react",\
+          "react-dom",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["virtual:cbe04708657d10872aa0048dc0d242f2e7c91f93e61d8e3ce8fa8a95d23566164d89f03999e092b2de56513ca5d509e440793f220e231fe102ed05830fc0630b#npm:0.7.4", {\
         "packageLocation": "./.yarn/__virtual__/@tanstack-react-store-virtual-7919d625fc/2/.caches/yarn/@tanstack-react-store-npm-0.7.4-aeb450e942-2f99b6f283.zip/node_modules/@tanstack/react-store/",\
         "packageDependencies": [\
@@ -5865,6 +5937,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/@tanstack-store-npm-0.7.4-53d8e12e9a-084aa3cf9a.zip/node_modules/@tanstack/store/",\
         "packageDependencies": [\
           ["@tanstack/store", "npm:0.7.4"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:0.7.7", {\
+        "packageLocation": "../.caches/yarn/@tanstack-store-npm-0.7.7-1368904e6c-bf90fa957b.zip/node_modules/@tanstack/store/",\
+        "packageDependencies": [\
+          ["@tanstack/store", "npm:0.7.7"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -16474,6 +16553,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/uuid-npm-10.0.0-4872b46ff8-eab18c27fe.zip/node_modules/uuid/",\
         "packageDependencies": [\
           ["uuid", "npm:10.0.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:13.0.0", {\
+        "packageLocation": "../.caches/yarn/uuid-npm-13.0.0-29831a4f1f-950e4c18d5.zip/node_modules/uuid/",\
+        "packageDependencies": [\
+          ["uuid", "npm:13.0.0"]\
         ],\
         "linkType": "HARD"\
       }]\

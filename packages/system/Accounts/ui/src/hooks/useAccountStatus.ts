@@ -1,8 +1,6 @@
 import { supervisor } from "@/main";
-import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-const AccountNameStatus = z.enum(["Available", "Taken", "Invalid", "Loading"]);
 const GetAccountReturn = z
     .object({
         accountNum: z.string(),
@@ -11,9 +9,9 @@ const GetAccountReturn = z
     })
     .optional();
 
-const isAccountAvailable = async (
+export const assertAccountAvailable = async (
     accountName: string,
-): Promise<z.infer<typeof AccountNameStatus>> => {
+): Promise<true> => {
     try {
         const res = GetAccountReturn.parse(
             await supervisor.functionCall({
@@ -24,17 +22,15 @@ const isAccountAvailable = async (
             }),
         );
 
-        return AccountNameStatus.parse(res ? "Taken" : "Available");
+        if (res) {
+            throw new Error("Taken");
+        }
+
+        return true;
     } catch (e) {
-        console.error(e);
-        return AccountNameStatus.parse("Invalid");
+        if (e instanceof Error && e.message === "Taken") {
+            throw e;
+        }
+        throw new Error("Invalid");
     }
 };
-
-export const useAccountStatus = (debouncedAccount: string | undefined) =>
-    useQuery<z.infer<typeof AccountNameStatus>>({
-        queryKey: ["userAccount", debouncedAccount],
-        queryFn: async () => isAccountAvailable(debouncedAccount!),
-        enabled: !!debouncedAccount,
-        initialData: "Loading",
-    });

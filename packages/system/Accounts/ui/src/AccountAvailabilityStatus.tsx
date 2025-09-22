@@ -1,7 +1,5 @@
 import { Check, LoaderCircle, UserX } from "lucide-react";
 
-import { FormLabel } from "@shared/shadcn/ui/form";
-
 export const AccountAvailabilityStatus = ({
     accountStatus,
     isCreatingAccount,
@@ -9,7 +7,7 @@ export const AccountAvailabilityStatus = ({
     accountStatus: string;
     isCreatingAccount: boolean;
 }) => (
-    <FormLabel className="text-muted-foreground">
+    <div className="data-[error=true]:text-destructive text-muted-foreground">
         {isCreatingAccount &&
             (accountStatus === "Available" ? (
                 <div className="flex gap-1">
@@ -46,5 +44,5 @@ export const AccountAvailabilityStatus = ({
                 />{" "}
             </div>
         )}
-    </FormLabel>
+    </div>
 );
