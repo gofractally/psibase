@@ -13,6 +13,7 @@
 
 #include <psibase/Actor.hpp>
 #include <psibase/Bitset.hpp>
+#include "psibase/nativeTables.hpp"
 #include "services/user/InviteErrors.hpp"
 
 using namespace psibase;
@@ -115,9 +116,9 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
 
    if (useHooks)
    {
-      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(invite.inviter));
+      auto service = Native::tables(KvMode::read).open<CodeTable>().get(invite.inviter);
       check(
-          account.has_value(),
+          service.has_value(),
           "To enable hooks, the invite creator must be a service that implements the 'InviteHooks' "
           "interface");
    }

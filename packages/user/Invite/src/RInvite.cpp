@@ -1,7 +1,7 @@
 #include <psibase/psibase.hpp>
 #include <services/system/AuthSig.hpp>
-#include <services/user/Invite.hpp>
 #include <services/system/Credentials.hpp>
+#include <services/user/Invite.hpp>
 #include "psibase/Actor.hpp"
 #include "psibase/Rpc.hpp"
 #include "psibase/serveGraphQL.hpp"
@@ -19,38 +19,45 @@ namespace UserService
 
       struct InviteEvent
       {
-         uint32_t               inviteId;
+         uint32_t      inviteId;
          AccountNumber actor;
          TimePointUSec datetime;
-         std::string            event;
+         std::string   event;
       };
       PSIO_REFLECT(InviteEvent, inviteId, actor, datetime, event);
 
-      struct InviteDetails {
-         uint32_t inviteId;
-         uint32_t cid;
+      struct InviteDetails
+      {
+         uint32_t      inviteId;
+         uint32_t      cid;
          AccountNumber inviter;
-         uint16_t numAccounts;
-         bool useHooks;
-         std::string secret;
-         
-         auto expiryDate() const -> std::optional<TimePointSec> {
+         uint16_t      numAccounts;
+         bool          useHooks;
+         std::string   secret;
+
+         auto expiryDate() const -> std::optional<TimePointSec>
+         {
             return to<Credentials>().get_expiry_date(cid);
          }
-
       };
-      PSIO_REFLECT(InviteDetails, inviteId, cid, inviter, numAccounts, useHooks, secret, method(expiryDate));
+      PSIO_REFLECT(InviteDetails,
+                   inviteId,
+                   cid,
+                   inviter,
+                   numAccounts,
+                   useHooks,
+                   secret,
+                   method(expiryDate));
 
-
-      auto toInviteDetails(const InviteRecord& invite)   
+      auto toInviteDetails(const InviteRecord& invite)
       {
          return InviteDetails{
-            .inviteId = invite.id,
-            .cid = invite.cid,
-            .inviter = invite.inviter,
-            .numAccounts = invite.numAccounts,
-            .useHooks = invite.useHooks,
-            .secret = invite.secret,
+             .inviteId    = invite.id,
+             .cid         = invite.cid,
+             .inviter     = invite.inviter,
+             .numAccounts = invite.numAccounts,
+             .useHooks    = invite.useHooks,
+             .secret      = invite.secret,
          };
       }
 
@@ -67,14 +74,11 @@ namespace UserService
 
          auto invitesByInviter(AccountNumber owner) const
          {
-            auto idx = Invite::Tables(Invite::service)
-                .open<InviteTable>()
-                .getIndex<1>()
-                .subindex<uint32_t>(owner);
-
-               return TransformedConnection(idx, [](auto&& row) {
-                  return toInviteDetails(row);
-               });
+            return TransformedConnection(Invite::Tables(Invite::service)
+                                             .open<InviteTable>()
+                                             .getIndex<1>()
+                                             .subindex<uint32_t>(owner),
+                                         [](auto&& row) { return toInviteDetails(row); });
          }
 
          auto history(uint32_t                   inviteId,
