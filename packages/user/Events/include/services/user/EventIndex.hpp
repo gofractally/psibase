@@ -12,7 +12,7 @@ namespace UserService
    struct EventIndex : psibase::Service
    {
       static constexpr psibase::AccountNumber service{"event-index"};
-      static constexpr auto                   serviceFlags = psibase::CodeRow::runModeCallback;
+      static constexpr auto                   serviceFlags = 0;
 
       /// Mark the table as having a pending index update
       void update(psibase::DbId db, psibase::AccountNumber service, psibase::MethodNumber event);

@@ -24,6 +24,7 @@ function(add suffix)
     service(NotifyService "${suffix}" src/NotifyService.cpp)
     service(SetWasmConfig "${suffix}" src/SetWasmConfig.cpp)
     service(XSudo "${suffix}" src/XSudo.cpp)
+    service(AsRpc "${suffix}" src/AsRpc.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" src/MockCpuLimit.cpp)

@@ -2,6 +2,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
+#include <services/test/AsRpc.hpp>
 #include <services/test/SubjectiveDb.hpp>
 #include <services/test/XSudo.hpp>
 
@@ -83,15 +84,17 @@ TEST_CASE("local service sudo")
 {
    DefaultTestChain t;
    auto             callee = AccountNumber{"callee"};
-   t.addService(callee, "Nop.wasm", CodeRow::runModeRpc);
+   t.addService(callee, "Nop.wasm");
+   t.addService(AsRpc::service, "AsRpc.wasm", AsRpc::flags);
    t.startBlock();
    // sanity check
-   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})));
+   REQUIRE(t.to<AsRpc>().asRpc(Action{.sender = AsRpc::service, .service = callee}).succeeded());
 
    addLocalService(t, AccountNumber{"callee"}, "Nop.wasm", 0);
    t.startBlock();
-   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})),
-          "Cannot substitute");
+   CHECK(t.to<AsRpc>()
+             .asRpc(Action{.sender = AsRpc::service, .service = callee})
+             .failed("cannot sudo"));
 
    auto sudo = AccountNumber{"sudo"};
    t.addService(sudo, "XSudo.wasm", XSudo::flags);

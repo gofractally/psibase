@@ -29,7 +29,12 @@ void Events::addIndex(psibase::DbId          db,
    }
    row->indexes.push_back(SecondaryIndexInfo{column});
    secondary.put(*row);
-   to<EventIndex>().update(db, service, event);
+   to<EventIndex>().with_flags(CallFlags::runModeCallback).update(db, service, event);
+}
+
+void Events::sync()
+{
+   to<EventIndex>().with_flags(CallFlags::runModeCallback).sync();
 }
 
 PSIBASE_DISPATCH(UserService::EventConfig)

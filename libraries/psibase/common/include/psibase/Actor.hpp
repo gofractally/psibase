@@ -50,9 +50,9 @@ namespace psibase
    };
 
    template <typename R>
-   auto fraccall(std::span<const char> packed_action)
+   auto fraccall(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
    {
-      auto result_size = raw::call(packed_action.data(), packed_action.size());
+      auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
       if constexpr (not std::is_same_v<void, R>)
       {
          psio::shared_view_ptr<R> result(psio::size_tag{result_size});
@@ -63,10 +63,10 @@ namespace psibase
    }
 
    template <typename T>
-   auto fraccall(const Action& a)
+   auto fraccall(const Action& a, CallFlags flags = CallFlags::none)
    {
       auto packed_action = psio::convert_to_frac(a);
-      return fraccall<T>(psio::convert_to_frac(a));
+      return fraccall<T>(psio::convert_to_frac(a), flags);
    }
 
    template <typename T>
@@ -127,10 +127,14 @@ namespace psibase
     */
    struct sync_call_proxy
    {
-      sync_call_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
+      sync_call_proxy(AccountNumber s, AccountNumber r, CallFlags flags = CallFlags::none)
+          : sender(s), receiver(r), flags(flags)
+      {
+      }
 
       AccountNumber sender;
       AccountNumber receiver;
+      CallFlags     flags;
 
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
@@ -139,16 +143,20 @@ namespace psibase
                         .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
-             act.data_without_size_prefix());
+             act.data_without_size_prefix(), flags);
       }
    };
 
    struct sync_call_unpack_proxy
    {
-      sync_call_unpack_proxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
+      sync_call_unpack_proxy(AccountNumber s, AccountNumber r, CallFlags flags = CallFlags::none)
+          : sender(s), receiver(r), flags(flags)
+      {
+      }
 
       AccountNumber sender;
       AccountNumber receiver;
+      CallFlags     flags;
 
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
@@ -158,10 +166,10 @@ namespace psibase
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
             return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
-                       act.data_without_size_prefix())
+                       act.data_without_size_prefix(), flags)
                 .unpack();
          else
-            psibase::fraccall<void>(act.data_without_size_prefix());
+            psibase::fraccall<void>(act.data_without_size_prefix(), flags);
       }
    };
 
@@ -393,12 +401,18 @@ namespace psibase
       using Base = typename psio::reflect<T>::template proxy<sync_call_unpack_proxy>;
       using Base::Base;
 
-      auto from(AccountNumber other) const { return Actor(other, Base::receiver); }
+      auto from(AccountNumber other) const { return Actor(other, Base::receiver, Base::flags); }
 
       template <typename Other>
       auto to(AccountNumber otherReceiver = Other::service) const
       {
-         return Actor<Other>(Base::psio_get_proxy().sender, AccountNumber(otherReceiver));
+         return Actor<Other>(Base::psio_get_proxy().sender, AccountNumber(otherReceiver),
+                             Base::psio_get_proxy().flags);
+      }
+
+      auto with_flags(CallFlags flags)
+      {
+         return Actor{Base::psio_get_proxy().sender, Base::psio_get_proxy().receiver, flags};
       }
 
       auto* operator->() const { return this; }
@@ -407,7 +421,8 @@ namespace psibase
       auto view() const
       {
          return typename psio::reflect<T>::template proxy<sync_call_proxy>{
-             Base::psio_get_proxy().sender, Base::psio_get_proxy().receiver};
+             Base::psio_get_proxy().sender, Base::psio_get_proxy().receiver,
+             Base::psio_get_proxy().flags};
       }
    };
 
@@ -416,19 +431,24 @@ namespace psibase
    {
       AccountNumber sender;
       AccountNumber receiver;
+      CallFlags     flags;
 
-      Actor(AccountNumber s = AccountNumber(), AccountNumber r = AccountNumber())
-          : sender(s), receiver(r)
+      Actor(AccountNumber s     = AccountNumber(),
+            AccountNumber r     = AccountNumber(),
+            CallFlags     flags = CallFlags::none)
+          : sender(s), receiver(r), flags(flags)
       {
       }
 
-      auto from(AccountNumber other) const { return Actor(other, receiver); }
+      auto from(AccountNumber other) const { return Actor(other, receiver, flags); }
 
       template <typename Other>
       auto to(uint64_t otherReceiver) const
       {
-         return Actor<Other>(sender, AccountNumber(otherReceiver));
+         return Actor<Other>(sender, AccountNumber(otherReceiver), flags);
       }
+
+      auto with_flags(CallFlags flags) { return Actor{sender, receiver, flags}; }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
@@ -505,6 +525,9 @@ namespace psibase
       /// This returns a new `Actor` object instead of modifying this.
       template <typename Other>
       Actor<Other> to(AccountNumber otherReceiver = Other::service) const;
+
+      /// Set flags for calls
+      Actor<T> with_flags(CallFlags flags);
 
       /// Return this
       Actor<T>* operator->() const;
