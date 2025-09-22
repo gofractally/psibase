@@ -351,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "branding"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "async-graphql",
  "branding-pkg",
@@ -363,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "branding-pkg"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "branding",
  "plugin",
@@ -1677,7 +1677,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "branding",
  "branding-pkg",
