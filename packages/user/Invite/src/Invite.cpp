@@ -13,7 +13,9 @@
 
 #include <psibase/Actor.hpp>
 #include <psibase/Bitset.hpp>
+#include "psibase/db.hpp"
 #include "psibase/nativeTables.hpp"
+#include "psibase/serviceState.hpp"
 #include "services/user/InviteErrors.hpp"
 
 using namespace psibase;
@@ -54,7 +56,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get({});
+      auto initRecord = Tables(getReceiver(), KvMode::read).open<InitTable>().get({});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 
@@ -184,7 +186,7 @@ void Invite::delInvite(uint32_t inviteId)
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)
 {
-   return Tables().open<InviteTable>().get(inviteId);
+   return Tables(getReceiver(), KvMode::read).open<InviteTable>().get(inviteId);
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)
