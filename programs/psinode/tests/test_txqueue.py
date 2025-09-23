@@ -105,7 +105,7 @@ class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
     def test_restart_node(self, cluster):
         (a, b) = cluster.complete(*testutil.generate_names(2))
-        a.boot(packages=['Minimal', 'Explorer', 'AuthSig', 'TokenUsers'])
+        a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
 
         # Make sure that b is ready
         b.wait(new_block())
