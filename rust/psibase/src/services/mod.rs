@@ -3,7 +3,6 @@
 pub mod accounts;
 pub mod auth_cred;
 pub mod auth_delegate;
-pub mod auth_invite;
 pub mod auth_sig;
 pub mod brotli_codec;
 pub mod chainmail;
