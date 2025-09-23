@@ -18,7 +18,7 @@ class TestBlockSigning(unittest.TestCase):
         prods = cluster.complete(*testutil.generate_names(4))
 
         print("booting chain")
-        prods[0].boot(packages=['Minimal', 'Explorer'])
+        prods[0].boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         print("Setting up automatic reconnection")
         with prods[3].get('/native/admin/config', service='x-admin') as reply:

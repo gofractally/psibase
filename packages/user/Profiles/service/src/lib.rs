@@ -39,7 +39,6 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getProfile(account: AccountNumber) -> Option<Profile> {
-        let table = ProfileTable::new();
-        table.get_index_pk().get(&account)
+        ProfileTable::read().get_index_pk().get(&account)
     }
 }

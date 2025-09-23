@@ -1,0 +1,32 @@
+package host:crypto;
+
+/// Methods related to key management
+interface keyvault {
+    use host:types/types.{error, pem, keypair};
+
+    /// Generates a new keypair that is unmanaged (nothing is stored).
+    /// The full keypair is returned to the caller.
+    generate-unmanaged-keypair: func() -> result<keypair, error>;
+
+    /// Returns the public key corresponding to the specified
+    /// private key.
+    pub-from-priv: func(private-key: pem) -> result<pem, error>;
+
+    /// Returns the DER encoded key
+    to-der: func(key: pem) -> result<list<u8>, error>;
+
+    /// Signs a pre-hashed message with the private key corresponding
+    ///   to the specified DER-encoded public key
+    sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
+
+    /// Signs a pre-hashed message with the specified DER-encoded private key
+    sign-explicit: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
+
+    /// Imports a PEM-encoded private key into the keyvault.
+    /// Returns the corresponding public key in PEM format.
+    import-key: func(private-key: pem) -> result<pem, error>;
+}
+
+world imports {
+    import keyvault;
+}
