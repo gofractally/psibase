@@ -10,8 +10,10 @@ type SubmitButtonLabels = [
 
 export const SubmitButton = ({
     labels = ["Save", "Saving...", "Saved"],
+    onClick,
 }: {
     labels?: SubmitButtonLabels;
+    onClick?: () => void;
 }) => {
     const form = useFormContext();
     const [label, submittingLabel, submittedLabel] = labels;
@@ -26,7 +28,11 @@ export const SubmitButton = ({
         >
             {([isValid, isSubmitting, isSubmitSuccessful]) => {
                 return (
-                    <Button type="submit" disabled={!isValid || isSubmitting}>
+                    <Button
+                        type={onClick ? "button" : "submit"}
+                        disabled={!isValid || isSubmitting}
+                        onClick={onClick}
+                    >
                         {isSubmitting
                             ? submittingLabel
                             : isSubmitSuccessful

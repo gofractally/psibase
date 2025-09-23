@@ -1,3 +1,5 @@
+import { Trigger } from "@radix-ui/react-select";
+
 import { cn } from "@shared/lib/utils";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -23,6 +25,7 @@ interface Props<T = string> {
     placeholder?: string;
     disabled?: boolean;
     className?: string;
+    triggerComponent?: React.ReactNode;
 }
 
 export const SelectField = <T extends string | number = string>({
@@ -31,6 +34,7 @@ export const SelectField = <T extends string | number = string>({
     placeholder = "Select an option",
     disabled = false,
     className,
+    triggerComponent,
 }: Props<T>) => {
     const field = useFieldContext<T>();
 
@@ -58,9 +62,18 @@ export const SelectField = <T extends string | number = string>({
                 }}
                 disabled={disabled}
             >
-                <SelectTrigger className={className} id={field.name}>
-                    <SelectValue placeholder={placeholder} />
-                </SelectTrigger>
+                {triggerComponent ? (
+                    <Trigger
+                        data-slot="select-trigger"
+                        className="focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex w-fit rounded-md outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {triggerComponent}
+                    </Trigger>
+                ) : (
+                    <SelectTrigger className={className} id={field.name}>
+                        <SelectValue placeholder={placeholder} />
+                    </SelectTrigger>
+                )}
                 <SelectContent>
                     {options.map((option) => (
                         <SelectItem

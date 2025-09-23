@@ -13,6 +13,7 @@
         "@dicebear/core": "^9.2.2",
         "@hookform/resolvers": "^5.1.1",
         "@psibase/common-lib": "workspace:*",
+        "@radix-ui/react-select": "^2.2.5",
         "@react-spring/web": "^10.0.1",
         "@tanstack/react-form": "^1.19.3",
         "@tanstack/react-pacer": "^0.16.1",
