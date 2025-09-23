@@ -38,6 +38,7 @@ import { withFieldGroup } from "./app-form";
  *     disabled={isDisabled}
  *     description={null}
  *     validators={{}}
+ *     onMaxAmountClick={null}
  * />
  * ```
  *
@@ -46,6 +47,7 @@ import { withFieldGroup } from "./app-form";
  * @param disabled - Whether the field is disabled
  * @param description - Optional description text (specify null to ignore)
  * @param validators - Optional validators (specify `{}` to ignore)
+ * @param onMaxAmountClick - Optional function to call when the max amount button is clicked; set to `null` to omit Max button
  * @returns A field for entering a token amount
  */
 export const FieldTokenAmount = withFieldGroup({
@@ -71,6 +73,9 @@ export const FieldTokenAmount = withFieldGroup({
             any,
             any
         >,
+        onMaxAmountClick: null as
+            | ((e: React.MouseEvent<HTMLButtonElement>) => void)
+            | null,
     },
     render: function Render({
         group,
@@ -79,27 +84,48 @@ export const FieldTokenAmount = withFieldGroup({
         disabled,
         description,
         validators,
+        onMaxAmountClick,
     }) {
         const p = (27.83658204756385).toFixed(precision ?? 0);
 
+        const handleSetMaxAmount = (e: React.MouseEvent<HTMLButtonElement>) => {
+            if (!onMaxAmountClick) return;
+            e.preventDefault();
+            onMaxAmountClick?.(e);
+            group.validateField("amount", "change");
+        };
+
         return (
-            <group.AppField
-                name="amount"
-                children={(field) => {
-                    return (
-                        <field.TextField
-                            disabled={disabled || precision === undefined}
-                            label="Amount"
-                            placeholder={`e.g., ${p}`}
-                            description={description ?? undefined}
-                        />
-                    );
-                }}
-                validators={{
-                    onChangeAsync: zTokenAmount({ precision, balance }), // doing this async ensures these values are not stale
-                    ...validators,
-                }}
-            />
+            <div className="relative">
+                {onMaxAmountClick && (
+                    <button
+                        className="absolute right-0 top-0 select-none text-sm leading-none opacity-50 hover:cursor-pointer disabled:hidden"
+                        onClick={handleSetMaxAmount}
+                        disabled={
+                            disabled || balance === 0 || precision === undefined
+                        }
+                    >
+                        Max
+                    </button>
+                )}
+                <group.AppField
+                    name="amount"
+                    children={(field) => {
+                        return (
+                            <field.TextField
+                                disabled={disabled || precision === undefined}
+                                label="Amount"
+                                placeholder={`e.g., ${p}`}
+                                description={description ?? undefined}
+                            />
+                        );
+                    }}
+                    validators={{
+                        onChangeAsync: zTokenAmount({ precision, balance }), // doing this async ensures these values are not stale
+                        ...validators,
+                    }}
+                />
+            </div>
         );
     },
 });

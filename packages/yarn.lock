@@ -1978,6 +1978,7 @@ __metadata:
     "@dicebear/core": "npm:^9.2.2"
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
+    "@radix-ui/react-select": "npm:^2.2.5"
     "@react-spring/web": "npm:^10.0.1"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
