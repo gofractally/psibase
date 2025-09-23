@@ -86,7 +86,7 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table = InitTable::new();
+        let table = InitTable::read();
         check(
             table.get_index_pk().get(&()).is_some(),
             "service not inited",
@@ -140,7 +140,7 @@ pub mod service {
             "Claim must use verify-sig",
         );
 
-        let credential = CredentialTable::new()
+        let credential = CredentialTable::read()
             .get_index_by_claim()
             .get(&claim.rawData);
         check(credential.is_some(), "Claim uses an invalid credential");
@@ -202,24 +202,29 @@ pub mod service {
     /// Gets the `claim` of the specified credential
     #[action]
     fn get_claim(id: u32) -> SubjectPublicKeyInfo {
-        let table = CredentialTable::new();
-        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
-        credential.claim.into()
+        CredentialTable::read()
+            .get_index_pk()
+            .get(&id)
+            .expect("Credential DNE")
+            .claim
+            .into()
     }
 
     /// Gets the `expiry_date` of the specified credential
     #[action]
     fn get_expiry_date(id: u32) -> Option<TimePointSec> {
-        let table = CredentialTable::new();
-        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
-        credential.expiry_date
+        CredentialTable::read()
+            .get_index_pk()
+            .get(&id)
+            .expect("Credential DNE")
+            .expiry_date
     }
 
     /// Gets the `id` of the active credential
     #[action]
     fn get_active() -> Option<u32> {
         let claims = transact::Wrapper::call().getTransaction().claims;
-        let table = CredentialTable::new().get_index_by_claim();
+        let table = CredentialTable::read().get_index_by_claim();
 
         let mut active_id = None;
         let now = transact::Wrapper::call().currentBlock().time.seconds();

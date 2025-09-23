@@ -15,7 +15,6 @@ mod db;
 use db::*;
 
 use aes::plugin as aes;
-use auth_sig::plugin::keyvault;
 use base64::plugin as base64;
 use bindings::invite::plugin::types::NewInviteDetails;
 use credentials::plugin::api as Credentials;
@@ -23,8 +22,8 @@ use exports::{
     invite::{self},
     transact_hook_actions_sender::Guest as HookActionsSender,
 };
-use host::common::client as Client;
-use host::common::server as Server;
+use host::common::{client as Client, server as Server};
+use host::crypto::keyvault;
 use host::types::types as HostTypes;
 use invite::plugin::{
     invitee::Guest as Invitee, inviter::Guest as Inviter, redemption::Guest as Redemption,

@@ -23,8 +23,8 @@ interface redemption {
 
 world impl {
     include host:common/imports;
+    include host:crypto/imports;
     include transact:plugin/imports;
-    import auth-sig:plugin/keyvault;
     include accounts:plugin/imports;
     include credentials:plugin/imports;
     include transact:plugin/hook-actions-sender;

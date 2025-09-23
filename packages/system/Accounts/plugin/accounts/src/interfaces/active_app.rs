@@ -39,12 +39,11 @@ impl ActiveApp for AccountsPlugin {
     fn logout() -> Result<(), Error> {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
         let apps_table = AppsTable::new(&app);
-        let user = apps_table.get_logged_in_user();
 
-        let user = user.expect("Get current user failed");
-        HostAuth::log_out_user(&user, &app);
-
-        apps_table.logout();
+        if let Some(user) = apps_table.get_logged_in_user() {
+            HostAuth::log_out_user(&user, &app);
+            apps_table.logout();
+        }
 
         Ok(())
     }
