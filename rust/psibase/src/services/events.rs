@@ -7,6 +7,11 @@ mod service {
     fn addIndex(db_id: DbId, service: AccountNumber, event: MethodNumber, column: u8) {
         unimplemented!()
     }
+
+    #[action]
+    fn sync() {
+        unimplemented!()
+    }
 }
 
 #[test]
