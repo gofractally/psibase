@@ -75,7 +75,7 @@ class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
     def test_signed(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'TokenUsers'])
+        testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'AuthSig', 'TokenUsers'])
         (a, b, c, d) = prods
 
         tokens = Tokens(a)

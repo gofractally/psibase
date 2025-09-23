@@ -7,20 +7,20 @@ interface server {
 
     /// Used to post graphql to the server and get a JSON response back
     /// The graphql payload is automatically posted to the app's own `/graphql` endpoint.
-    /// 
+    ///
     /// Parameters
     /// * `graphql`: The graphql data for the request
     post-graphql-get-json: func(graphql: string) -> result<string, error>;
 
     /// Used to make a post request to the app's own http server.
-    /// 
+    ///
     /// Parameters
     /// * `request`: The required details of the post request
     post: func(request: post-request) -> result<body-types, error>;
 
     /// Used to call a GET endpoint on the app's own http server to retrieve a JSON
     /// payload.
-    /// 
+    ///
     /// Parameters
     /// * `endpoint` - The subpath being requested (e.g. `/common/tapos/head` or `/api/some-request`)
     get-json: func(endpoint: string) -> result<string, error>;
@@ -57,9 +57,9 @@ interface admin {
 }
 
 /// A keyvalue interface that provides key-value operations.
-/// 
-/// Once a write operation completes, all subsequent read operations will return the value that 
-/// was written. Another client running in a different context may or may not immediately see the 
+///
+/// Once a write operation completes, all subsequent read operations will return the value that
+/// was written. Another client running in a different context may or may not immediately see the
 /// result.
 interface store {
     /// Database mode - Related to the conditions under which database writes will or will not succeed
@@ -101,7 +101,7 @@ interface store {
         ///
         /// The value is returned as an option. If the key-value pair exists in the
         /// store, it returns `Ok(value)`. If the key does not exist in the
-        /// store, it returns `Ok(none)`. 
+        /// store, it returns `Ok(none)`.
         get: func(key: string) -> option<list<u8>>;
 
         /// Set the value associated with the key in the store. If the key already
@@ -111,12 +111,12 @@ interface store {
         set: func(key: string, value: list<u8>);
 
         /// Delete the key-value pair associated with the key in the store.
-        /// 
+        ///
         /// If the key does not exist in the store, it does nothing.
         delete: func(key: string);
 
         /// Check if the key exists in the store.
-        /// 
+        ///
         /// If the key exists in the store, it returns `Ok(true)`. If the key does
         /// not exist in the store, it returns `Ok(false)`.
         exists: func(key: string) -> bool;
@@ -126,7 +126,7 @@ interface store {
     /// Ephemeral and Non-Transactional databases are never flushed.
     ///
     /// This method can only be called by the transact plugin.
-    flush-transactional-data: func(); 
+    flush-transactional-data: func();
 
     /// Clears all data from all buffers.
     /// Should be called at the start of every plugin execution context.

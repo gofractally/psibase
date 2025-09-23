@@ -39,15 +39,15 @@ namespace UserService
          {
             return to<Credentials>().get_expiry_date(cid);
          }
+         PSIO_REFLECT(InviteDetails,
+                      inviteId,
+                      cid,
+                      inviter,
+                      numAccounts,
+                      useHooks,
+                      secret,
+                      method(expiryDate));
       };
-      PSIO_REFLECT(InviteDetails,
-                   inviteId,
-                   cid,
-                   inviter,
-                   numAccounts,
-                   useHooks,
-                   secret,
-                   method(expiryDate));
 
       auto toInviteDetails(const InviteRecord& invite)
       {
@@ -63,21 +63,22 @@ namespace UserService
 
       struct Query
       {
-         auto inviteById(uint32_t inviteId) const -> std::optional<InviteDetails>
+         auto inviteById(uint32_t inviteId) const
          {
-            auto invite = Invite::Tables(Invite::service).open<InviteTable>().get(inviteId);
+            auto invite =
+                Invite::Tables(Invite::service, KvMode::read).open<InviteTable>().get(inviteId);
             if (!invite.has_value())
-               return std::nullopt;
+               return std::optional<InviteDetails>{};
 
-            return toInviteDetails(invite.value());
+            return std::optional<InviteDetails>(toInviteDetails(invite.value()));
          }
 
-         auto invitesByInviter(AccountNumber owner) const
+         auto invitesByInviter(AccountNumber inviter) const
          {
-            return TransformedConnection(Invite::Tables(Invite::service)
+            return TransformedConnection(Invite::Tables(Invite::service, KvMode::read)
                                              .open<InviteTable>()
                                              .getIndex<1>()
-                                             .subindex<uint32_t>(owner),
+                                             .subindex<uint32_t>(inviter),
                                          [](auto&& row) { return toInviteDetails(row); });
          }
 
@@ -108,7 +109,7 @@ namespace UserService
 
          auto serveSys(HttpRequest request) -> std::optional<HttpReply>
          {
-            if (auto result = serveSimpleUI<Invite, true>(request))
+            if (auto result = serveSimpleUI<Invite, false>(request))
                return result;
 
             if (auto result = serveGraphQL(request, Query{}))
