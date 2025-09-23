@@ -10,7 +10,7 @@ mod service {
     #[Object]
     impl Query {
         async fn rateLimit(&self, nft_id: u32) -> Option<RateLimit> {
-            RateLimitTable::new()
+            RateLimitTable::read()
                 .get_index_pk()
                 .get(&nft_id)
                 .map(|mut rateLimit| {

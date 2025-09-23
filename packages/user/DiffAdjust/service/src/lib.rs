@@ -29,10 +29,6 @@ pub mod tables {
     }
 
     impl RateLimit {
-        fn table() -> RateLimitTable {
-            RateLimitTable::new()
-        }
-
         fn new(
             nft_id: u32,
             consumer: AccountNumber,
@@ -205,15 +201,17 @@ pub mod tables {
 
         pub fn delete(&self) {
             self.check_sender_has_nft();
-            Self::table().remove(&self);
+            RateLimitTable::read_write().remove(&self);
         }
 
         fn save(&self) {
-            Self::table().put(&self).expect("failed to save");
+            RateLimitTable::read_write()
+                .put(&self)
+                .expect("failed to save");
         }
 
         pub fn get(nft_id: u32) -> Option<Self> {
-            Self::table().get_index_pk().get(&nft_id)
+            RateLimitTable::read().get_index_pk().get(&nft_id)
         }
 
         pub fn get_assert(nft_id: u32) -> Self {
