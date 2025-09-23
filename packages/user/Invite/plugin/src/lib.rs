@@ -38,7 +38,10 @@ use psibase::{
 use rand::{rngs::OsRng, Rng, TryRngCore};
 use transact::plugin::{hooks::*, intf as Transact};
 
-use crate::{bindings::credentials::plugin::types::Credential, trust::is_authorized};
+use crate::{
+    bindings::credentials::plugin::types::Credential,
+    trust::{is_authorized, is_authorized_with_whitelist},
+};
 
 define_trust! {
     descriptions {
@@ -170,7 +173,10 @@ impl Redemption for InvitePlugin {
 
 impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, HostTypes::Error> {
-        if !is_authorized(trust::FunctionName::generate_invite)? {
+        if !is_authorized_with_whitelist(
+            trust::FunctionName::generate_invite,
+            vec!["homepage".into()],
+        )? {
             return Err(Unauthorized().into());
         }
         let (invite_token, details) = Self::prepare_new_invite()?;
