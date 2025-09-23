@@ -14,7 +14,7 @@ export const AnimateNumber = ({
     n: number;
     precision: number;
     className?: string;
-    onClick?: () => void;
+    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) => {
     const { number } = useSpring({
         from: { number: 0 },
