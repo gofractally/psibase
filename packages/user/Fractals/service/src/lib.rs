@@ -6,8 +6,8 @@ pub mod tables;
 pub mod service {
 
     use crate::tables::{
-        member::MemberStatus,
-        tables::{EvaluationInstance, Fractal, Member},
+        fractal_member::MemberStatus,
+        tables::{EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GID},
     };
 
     use psibase::*;
@@ -24,7 +24,13 @@ pub mod service {
         psibase::services::auth_delegate::Wrapper::call().newAccount(fractal_account, sender);
 
         Fractal::add(fractal_account, name, mission);
-        Member::add(fractal_account, sender, MemberStatus::Citizen);
+        let discovery_guild = Guild::add(
+            fractal_account,
+            sender,
+            "Discovery".to_string().try_into().unwrap(),
+        );
+        GuildMember::add(fractal_account, discovery_guild.id, sender);
+        FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -32,11 +38,10 @@ pub mod service {
     /// Starts an evaluation for the specified fractal and evaluation type.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `evaluation_type` - The type of evaluation to start.
+    /// * `guild` - The ID of the guild.
     #[action]
-    fn start_eval(fractal: AccountNumber, evaluation_type: u8) {
-        let evaluation = EvaluationInstance::get_assert(fractal, evaluation_type.into());
+    fn start_eval(guild: GID) {
+        let evaluation = EvaluationInstance::get_assert(guild);
 
         evaluation.set_pending_scores(0);
 
@@ -54,13 +59,16 @@ pub mod service {
         let sender = get_sender();
 
         check(sender != fractal, "a fractal cannot join itself");
-        check_none(Member::get(fractal, sender), "you are already a member");
+        check_none(
+            FractalMember::get(fractal, sender),
+            "you are already a member",
+        );
         check_none(
             Fractal::get(sender),
             "a fractal cannot join another fractal",
         );
 
-        Member::add(fractal, sender, MemberStatus::Citizen);
+        FractalMember::add(fractal, sender, MemberStatus::Citizen);
 
         Wrapper::emit().history().joined_fractal(fractal, sender);
     }
@@ -114,7 +122,7 @@ pub mod service {
 
         Wrapper::emit()
             .history()
-            .evaluation_finished(evaluation.fractal, evaluation.evaluation_id);
+            .evaluation_finished(evaluation.guild, evaluation.evaluation_id);
 
         evaluation.schedule_next_evaluation();
     }
@@ -128,15 +136,9 @@ pub mod service {
     fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
-        let member = check_some(
-            Member::get(evaluation.fractal, account),
-            "account is not a member of fractal",
-        );
-        let status = MemberStatus::from(member.member_status);
-
-        check(
-            status == MemberStatus::Citizen,
-            "must be a citizen to participate",
+        check_some(
+            GuildMember::get(evaluation.guild, account),
+            "account must be member of guild",
         );
     }
 
@@ -193,11 +195,12 @@ pub mod service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(fractal_account: AccountNumber, evaluation_id: u32) {}
+    pub fn evaluation_finished(guild: GID, evaluation_id: u32) {}
 
     #[event(history)]
     pub fn scheduled_evaluation(
         fractal_account: AccountNumber,
+        guild: GID,
         evaluation_id: u32,
         registration: u32,
         deliberation: u32,

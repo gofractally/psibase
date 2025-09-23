@@ -60,16 +60,10 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn start(fractal: String, evaluation_type: u8) -> Result<(), Error> {
+    fn start(guild_id: u64) -> Result<(), Error> {
         check_app_origin()?;
 
-        let _latch = ProposeLatch::new(&fractal);
-
-        let packed_args = fractals::action_structs::start_eval {
-            fractal: AccountNumber::from(fractal.as_str()),
-            evaluation_type,
-        }
-        .packed();
+        let packed_args = fractals::action_structs::start_eval { guild: guild_id }.packed();
 
         add_action_to_transaction(
             fractals::action_structs::start_eval::ACTION_NAME,

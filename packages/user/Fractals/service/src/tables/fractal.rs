@@ -1,8 +1,9 @@
 use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
-use crate::tables::evaluation_instance::EvalType;
-use crate::tables::tables::{EvaluationInstance, Fractal, FractalTable, Member, MemberTable};
+use crate::tables::tables::{
+    EvaluationInstance, Fractal, FractalMember, FractalMemberTable, FractalTable, GID,
+};
 
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -23,8 +24,7 @@ impl Fractal {
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
-        let table = FractalTable::new();
-        table.get_index_pk().get(&(fractal))
+        FractalTable::read().get_index_pk().get(&(fractal))
     }
 
     pub fn get_assert(fractal: AccountNumber) -> Self {
@@ -32,13 +32,13 @@ impl Fractal {
     }
 
     fn save(&self) {
-        let table = FractalTable::new();
-        table.put(&self).expect("failed to save");
+        FractalTable::read_write()
+            .put(&self)
+            .expect("failed to save");
     }
 
-    pub fn members(&self) -> Vec<Member> {
-        let table = MemberTable::new();
-        table
+    pub fn members(&self) -> Vec<FractalMember> {
+        FractalMemberTable::read()
             .get_index_pk()
             .range(
                 (self.account, AccountNumber::new(0))
@@ -49,7 +49,7 @@ impl Fractal {
 
     pub fn set_schedule(
         &self,
-        eval_type: EvalType,
+        guild: GID,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -57,8 +57,7 @@ impl Fractal {
         interval_seconds: u32,
     ) {
         EvaluationInstance::set_evaluation_schedule(
-            self.account,
-            eval_type,
+            guild,
             registration,
             deliberation,
             submission,

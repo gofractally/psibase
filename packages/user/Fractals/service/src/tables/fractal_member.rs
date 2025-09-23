@@ -1,7 +1,6 @@
 use psibase::{abort_message, check_some, AccountNumber, Table};
 
-use crate::tables::evaluation_instance::EvalType;
-use crate::tables::tables::{Fractal, FractalTable, Member, MemberTable, Score};
+use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
 use async_graphql::ComplexObject;
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -27,7 +26,7 @@ impl From<StatusU8> for MemberStatus {
 }
 
 #[ComplexObject]
-impl Member {
+impl FractalMember {
     pub async fn fractal_details(&self) -> Fractal {
         FractalTable::with_service(crate::Wrapper::SERVICE)
             .get_index_pk()
@@ -36,7 +35,7 @@ impl Member {
     }
 }
 
-impl Member {
+impl FractalMember {
     fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
         Self {
@@ -50,20 +49,13 @@ impl Member {
     pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
         let new_instance = Self::new(fractal, account, status);
         new_instance.save();
-
-        new_instance.initialize_score(EvalType::Repuation);
-        new_instance.initialize_score(EvalType::Favor);
-
         new_instance
     }
 
-    pub fn initialize_score(&self, eval_type: EvalType) {
-        Score::add(self.fractal, eval_type, self.account);
-    }
-
-    pub fn get(fractal: AccountNumber, account: AccountNumber) -> Option<Member> {
-        let table = MemberTable::new();
-        table.get_index_pk().get(&(fractal, account))
+    pub fn get(fractal: AccountNumber, account: AccountNumber) -> Option<FractalMember> {
+        FractalMemberTable::read()
+            .get_index_pk()
+            .get(&(fractal, account))
     }
 
     pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
@@ -71,7 +63,8 @@ impl Member {
     }
 
     fn save(&self) {
-        let table = MemberTable::new();
-        table.put(&self).expect("failed to save");
+        FractalMemberTable::read_write()
+            .put(&self)
+            .expect("failed to save");
     }
 }
