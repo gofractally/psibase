@@ -237,9 +237,7 @@ impl HookActionsSender for InvitePlugin {
         service: String,
         method: String,
     ) -> Result<Option<String>, HostTypes::Error> {
-        if service == InviteService::SERVICE.to_string()
-            && (method == createAccount::ACTION_NAME || method == accept::ACTION_NAME)
-        {
+        if service == InviteService::SERVICE.to_string() && method == createAccount::ACTION_NAME {
             return Ok(Some(CREDENTIAL_SENDER.to_string()));
         }
 
