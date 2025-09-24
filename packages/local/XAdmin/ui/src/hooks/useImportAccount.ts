@@ -18,8 +18,6 @@ export const useImportAccount = () =>
             const supervisor = getSupervisor();
 
             if (privateKey) {
-                // const key = await exportKeyToPEM(privateKey, "PRIVATE KEY");
-
                 void (await supervisor.functionCall({
                     method: "importKey",
                     params: [privateKey],
