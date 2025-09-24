@@ -37,10 +37,10 @@ impl HookActionAuth for Credentials {
     fn on_action_auth_claims(_: Action) -> Result<Vec<Claim>, Error> {
         let pubkey = bucket().get("pub").expect("Missing credential");
 
-        return Ok(vec![Claim {
-            verify_service: credentials::VERIFY_SERVICE.to_string(),
-            raw_data: pubkey,
-        }]);
+            return Ok(vec![Claim {
+                verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+                raw_data: pubkey.unwrap(),
+            }]);
     }
 
     fn on_action_auth_proofs(

@@ -1,5 +1,4 @@
 pub const CREDENTIAL_SENDER: &str = "cred-sys";
-pub const VERIFY_SERVICE: &str = "verify-sys";
 
 #[psibase::service_tables]
 pub mod tables {
@@ -136,7 +135,7 @@ pub mod service {
         let claim = &claims[0];
 
         check(
-            claim.service == AccountNumber::from("verify-sig"),
+            claim.service == psibase::services::verify_sig::SERVICE,
             "Claim must use verify-sig",
         );
 
