@@ -19,7 +19,7 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-import { defaultTransferValues } from "../hooks/useTokenForm";
+import { defaultTransferValues } from "../lib/transfer-form-schema";
 
 export const TransferModal = withForm({
     defaultValues: defaultTransferValues,
