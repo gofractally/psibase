@@ -5,6 +5,7 @@ use errors::ErrorType::*;
 mod helpers;
 use helpers::*;
 mod types;
+
 use trust::*;
 
 // Other plugins
@@ -22,6 +23,8 @@ use psibase::services::auth_sig::action_structs as MyService;
 
 use psibase::fracpack::Pack;
 
+use crate::errors::ErrorType;
+
 psibase::define_trust! {
     descriptions {
         Low => "
@@ -29,7 +32,9 @@ psibase::define_trust! {
             - Create new keypairs
             - Import existing keypairs
         ",
-        Medium => "",
+        Medium => "Medium trust grants the abilities of all lower trust levels, plus these abilities:
+            - Create new accounts
+        ",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Set the public key for your account
@@ -39,6 +44,7 @@ psibase::define_trust! {
     functions {
         None => [generate_unmanaged_keypair, pub_from_priv, to_der],
         Low => [import_key, sign_explicit],
+        Medium => [create_account],
         High => [set_key, sign],
     }
 }
@@ -122,6 +128,29 @@ impl Actions for AuthSig {
         )?;
 
         Ok(())
+    }
+
+    fn create_account(new_account_name: String) -> Result<String, HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::create_account, vec!["accounts".into()])?;
+
+        let name = psibase::AccountNumber::from_exact(&new_account_name)
+            .map_err(|_| ErrorType::InvalidAccountName(&new_account_name))?;
+
+        let keypair = HostCrypto::generate_unmanaged_keypair()?;
+        let key = HostCrypto::to_der(&keypair.public_key)?;
+
+        Transact::add_action_to_transaction(
+            MyService::newAccount::ACTION_NAME,
+            &MyService::newAccount {
+                name,
+                key: key.into(),
+            }
+            .packed(),
+        )?;
+
+        HostCrypto::import_key(&keypair.private_key)?;
+
+        Ok(keypair.private_key)
     }
 }
 
