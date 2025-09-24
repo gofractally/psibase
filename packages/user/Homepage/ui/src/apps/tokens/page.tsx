@@ -79,6 +79,15 @@ export const TokensPage = () => {
         onSubmit: handleConfirm,
         validators: {
             onChange: zTransferForm,
+            onBlur: ({ value }) => {
+                if (value.to.account === currentUser) {
+                    return {
+                        fields: {
+                            "to.account": "Cannot send to yourself",
+                        },
+                    };
+                }
+            },
         },
     });
 
