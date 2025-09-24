@@ -263,4 +263,15 @@ impl InviteTokensTable {
         }
         Some(details.unwrap().private_key)
     }
+
+    pub fn reject_active() {
+        let active_token = Self::get_active_token();
+        if active_token.is_none() {
+            return;
+        }
+
+        let (invite_id, _) = active_token.unwrap();
+        Self::delete_fixed_details(invite_id);
+        Self::delete_active();
+    }
 }
