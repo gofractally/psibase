@@ -81,7 +81,7 @@ export const App = () => {
                 const rootDomain =
                     activeApp !== "homepage"
                         ? new URL(siblingUrl(null, activeApp, returnPath, true))
-                        : new URL(siblingUrl(null, null, null, true));
+                        : new URL(siblingUrl(null, null, returnPath, true));
                 window.location.href = rootDomain.toString();
             }
         },
