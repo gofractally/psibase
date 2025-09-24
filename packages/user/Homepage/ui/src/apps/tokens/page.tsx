@@ -23,7 +23,10 @@ import { toast } from "@shared/shadcn/ui/sonner";
 
 import { AnimateNumber } from "./components/AnimateNumber";
 import { useCredit } from "./hooks/tokensPlugin/useCredit";
-import { defaultTransferValues, zTransferForm } from "./hooks/useTokenForm";
+import {
+    defaultTransferValues,
+    zTransferForm,
+} from "./lib/transfer-form-schema";
 
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
