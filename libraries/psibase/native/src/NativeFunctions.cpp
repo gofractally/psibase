@@ -657,6 +657,28 @@ namespace psibase
       buckets.close(static_cast<KvHandle>(handle));
    }
 
+   void NativeFunctions::exportHandles(eosio::vm::span<const char> data)
+   {
+      using Handles = std::vector<KvHandle>;
+      check(psio::fracpack_validate_strict<Handles>(data), "Expected list of handles");
+      auto handles = psio::view<const Handles>{psio::prevalidated{data}};
+      check(handles.size() <= transactionContext.getWasmConfig().maxHandles,
+            "Too many handles exported");
+      transactionContext.exportedHandles.clear();
+      transactionContext.exportedHandles.reserve(handles.size());
+      for (auto handle : handles)
+      {
+         transactionContext.exportedHandles.push_back(buckets[handle]);
+      }
+   }
+
+   uint32_t NativeFunctions::importHandles()
+   {
+      return setResult(*this,
+                       psio::to_frac(buckets.add(std::move(transactionContext.importedHandles),
+                                                 transactionContext.getWasmConfig().maxHandles)));
+   }
+
    void NativeFunctions::kvPut(uint32_t                    handle,
                                eosio::vm::span<const char> key,
                                eosio::vm::span<const char> value)

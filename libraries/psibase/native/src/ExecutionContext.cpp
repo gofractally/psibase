@@ -320,6 +320,12 @@ namespace psibase
          currentActContext = prev;
       }
 
+      void onTransferControl(std::uint64_t callerFlags)
+      {
+         transactionContext.importedHandles.clear();
+         std::swap(transactionContext.exportedHandles, transactionContext.importedHandles);
+      }
+
    };  // ExecutionContextImpl
 
    ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
@@ -356,6 +362,8 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
       rhf_t::add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
       rhf_t::add<&ExecutionContextImpl::kvClose>("env", "kvClose");
+      rhf_t::add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
+      rhf_t::add<&ExecutionContextImpl::importHandles>("env", "importHandles");
       rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
       rhf_t::add<&ExecutionContextImpl::putSequential>("env", "putSequential");
       rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
@@ -386,6 +394,8 @@ namespace psibase
 
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
+      impl->onTransferControl(callerFlags);
+
       if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
       {
          check((impl->code.flags & (isLocal | CodeRow::isReplacement)) != isLocal,
@@ -397,6 +407,7 @@ namespace psibase
                                   actionContext.action.service.value,
                                   actionContext.action.sender.value);
       });
+      impl->onTransferControl(callerFlags);
    }
 
    void ExecutionContext::execServe(ActionContext& actionContext)
