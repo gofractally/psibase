@@ -27,6 +27,8 @@ world = "impl"
 "transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:account-tokens" = { path = "../account_tokens/wit/world.wit" }
+"invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
+"auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize"]
