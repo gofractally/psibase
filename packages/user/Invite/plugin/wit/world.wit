@@ -64,10 +64,21 @@ interface invitee {
     use types.{invite};
 
     /// Imports the invite token
-    /// After importing an invite token, any attempt to connect an account
-    /// to the calling app will automatically use the invite that was 
-    /// imported.
+    /// 
+    /// This will make the invite available for the active application.
+    /// When an invite is available, the next account connected to the
+    ///   active application will "accept" the invite.
+    /// Invites also usually allow the accepter to create a new account if 
+    ///   they don't yet have one.
     import-invite-token: func(token: string) -> result<u32, error>;
+
+    /// Returns whether or not an invite is available for the active application
+    is-active-invite: func() -> bool;
+
+    /// If there is an invite available for the active application, reject it.
+    /// This will make it unavailable on this device unless and until it 
+    ///   is re-imported.
+    reject-active-invite: func();
 }
 
 world imports {

@@ -39,7 +39,10 @@ use transact::plugin::{hooks::*, intf as Transact};
 
 use crate::{
     bindings::credentials::plugin::types::Credential,
-    trust::{is_authorized, is_authorized_with_whitelist},
+    trust::{
+        assert_authorized, assert_authorized_with_whitelist, is_authorized,
+        is_authorized_with_whitelist,
+    },
 };
 
 define_trust! {
@@ -50,12 +53,13 @@ define_trust! {
         ",
         Medium => "Medium trust grants all the abilities of low trust, plus these abilities:
             - Generate new invites
+            - Reject active invites
         ",
         High => "",
     }
     functions {
-        None => [import_invite_token, prepare_new_invite],
-        Low => [delete_invite],
+        None => [import_invite_token, prepare_new_invite, is_active_invite],
+        Low => [delete_invite, reject_active_invite],
         Medium => [generate_invite],
         High => [],
     }
@@ -105,6 +109,24 @@ impl Invitee for InvitePlugin {
     //     // TODO - call connect() on accounts app.
     //     Ok(())
     // }
+
+    /// Returns whether or not an invite from someone is active for the caller
+    /// application
+    fn is_active_invite() -> bool {
+        assert_authorized(trust::FunctionName::is_active_invite).unwrap();
+        InviteTokensTable::active_invite_id().is_some()
+    }
+
+    /// If there is an active invite, reject it
+    fn reject_active_invite() {
+        assert_authorized_with_whitelist(
+            trust::FunctionName::reject_active_invite,
+            vec![Client::get_active_app()],
+        )
+        .unwrap();
+
+        InviteTokensTable::reject_active();
+    }
 }
 
 fn use_active_invite() {
