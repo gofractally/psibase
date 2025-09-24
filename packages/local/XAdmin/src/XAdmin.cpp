@@ -122,19 +122,16 @@ namespace LocalService
             {
                auto pos     = addrs.find(prev, ',');
                auto addrStr = addrs.substr(prev, pos);
-               if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
+               if (auto prefix = parseIPAddressPrefix(addrStr))
                {
-                  if (auto addr = parseIPV4Address(addrStr))
+                  if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
                   {
-                     if (v4->address == addr)
+                     if (prefix->contains(v4->address))
                         return {};
                   }
-               }
-               else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
-               {
-                  if (auto addr = parseIPV6Address(addrStr))
+                  else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
                   {
-                     if (v6->address == addr)
+                     if (prefix->contains(v6->address))
                         return {};
                   }
                }

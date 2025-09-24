@@ -1,0 +1,9 @@
+package host:crypto;
+
+world impl {
+    include host:common/imports;
+    include supervisor:bridge/imports;
+    include permissions:plugin/imports;
+
+    export keyvault;
+}
