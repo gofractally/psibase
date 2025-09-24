@@ -100,6 +100,7 @@ export const FieldTokenAmount = withFieldGroup({
                 {onMaxAmountClick && (
                     <button
                         className="absolute right-0 top-0 select-none text-sm leading-none opacity-50 hover:cursor-pointer disabled:hidden"
+                        type="button"
                         onClick={handleSetMaxAmount}
                         disabled={
                             disabled || balance === 0 || precision === undefined
