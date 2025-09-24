@@ -2,9 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { crypto } from "wasm-transpiled";
 import { z } from "zod";
-
-// import { crypto } from "wasm-transpiled";
 
 // ShadCN UI Imports
 import { useToast } from "@/components/ui/use-toast";
@@ -183,11 +182,19 @@ export const CreatePage = () => {
             try {
                 let blockSigningPubKey: CryptoKey | undefined; // server block signing pubkey
                 let txSigningKeyPair: CryptoKeyPair | undefined; // bp account tx signing key
+                let cryptoTxSigningKeyPair: [string, string] | undefined; // bp account tx signing key
                 if (!isDev) {
                     blockSigningPubKey = await createAndSetKey(keyDevice);
                     txSigningKeyPair = await generateP256Key();
-                    console.log("original code: txSigningKeyPair", txSigningKeyPair);
-                    // txSigningKeyPair = crypto.generateUnmanagedKeypair();
+                    console.log(
+                        "original keypair: txSigningKeyPair",
+                        txSigningKeyPair,
+                    );
+                    cryptoTxSigningKeyPair = crypto.generateUnmanagedKeypair();
+                    console.log(
+                        "new keypair: cryptoTxSigningKeyPair",
+                        cryptoTxSigningKeyPair,
+                    );
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -201,7 +208,7 @@ export const CreatePage = () => {
                     packages: requiredPackages,
                     producerName: bpName,
                     blockSigningPubKey,
-                    txSigningPubKey: txSigningKeyPair?.publicKey,
+                    txSigningPubKeyPem: cryptoTxSigningKeyPair?.[0],
                     compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
@@ -225,8 +232,7 @@ export const CreatePage = () => {
                                     navigate("/Dashboard");
 
                                     importAccount({
-                                        privateKey:
-                                            txSigningKeyPair?.privateKey,
+                                        privateKey: cryptoTxSigningKeyPair?.[1],
                                         account: bpName,
                                     });
                                 }, 1000);

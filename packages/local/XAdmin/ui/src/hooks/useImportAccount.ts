@@ -1,10 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { exportKeyToPEM } from "@/lib/keys";
 import { queryKeys } from "@/lib/queryKeys";
 
 type ImportKeyParams = {
-    privateKey?: CryptoKey;
+    privateKey?: string;
     account: string;
 };
 
@@ -19,11 +18,11 @@ export const useImportAccount = () =>
             const supervisor = getSupervisor();
 
             if (privateKey) {
-                const key = await exportKeyToPEM(privateKey, "PRIVATE KEY");
+                // const key = await exportKeyToPEM(privateKey, "PRIVATE KEY");
 
                 void (await supervisor.functionCall({
                     method: "importKey",
-                    params: [key],
+                    params: [privateKey],
                     service: "auth-sig",
                     intf: "keyvault",
                 }));
