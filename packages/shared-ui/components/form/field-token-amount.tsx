@@ -120,10 +120,12 @@ export const FieldTokenAmount = withFieldGroup({
                             />
                         );
                     }}
-                    validators={{
-                        onChangeAsync: zTokenAmount({ precision, balance }), // doing this async ensures these values are not stale
-                        ...validators,
-                    }}
+                    validators={
+                        {
+                            onChangeAsync: zTokenAmount({ precision, balance }), // doing this async ensures these values are not stale
+                            ...validators,
+                        } as any
+                    }
                 />
             </div>
         );
