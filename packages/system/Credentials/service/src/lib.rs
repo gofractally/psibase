@@ -104,6 +104,15 @@ pub mod service {
         );
     }
 
+    fn now() -> TimePointSec {
+        let native = KvHandle::new(psibase::DbId::Native, &[], KvMode::Read);
+        let status = kv_get::<psibase::StatusRow, _>(&native, &psibase::status_key())
+            .unwrap()
+            .unwrap();
+
+        status.current.time.seconds()
+    }
+
     #[action]
     #[allow(non_snake_case)]
     fn checkAuthSys(
@@ -150,9 +159,8 @@ pub mod service {
             "Can only call actions on the credential issuer service",
         );
 
-        let now = transact::Wrapper::call().currentBlock().time.seconds();
         check(
-            credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now,
+            credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now(),
             "Credential expired",
         );
     }
