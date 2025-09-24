@@ -25,7 +25,6 @@ psibase::define_trust! {
         Low => "
         Low trust grants these abilities:
             - Import existing keypairs
-            - Sign transaction with explicit private key provided
         ",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
@@ -33,8 +32,8 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der],
-        Low => [import_key, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit],
+        Low => [import_key],
         High => [sign],
     }
 }
