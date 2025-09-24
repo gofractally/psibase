@@ -109,7 +109,10 @@ export const TokensPage = () => {
     const isNoTokens = currentUser && tokens.length == 0;
     const disableForm = isNoTokens || isLoading;
 
-    const onSubmitPreflight = async () => {
+    const onSubmitPreflight = async (
+        e: React.MouseEvent<HTMLButtonElement>,
+    ) => {
+        e.preventDefault();
         const res = await form.validateAllFields("submit");
         if (res.length > 0) return;
         setTransferModal(true);

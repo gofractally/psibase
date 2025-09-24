@@ -38,7 +38,7 @@ export const AnimateNumber = ({
     if (!onClick) return numbers();
 
     return (
-        <button onClick={onClick} className={className}>
+        <button onClick={onClick} className={className} type="button">
             {numbers()}
         </button>
     );

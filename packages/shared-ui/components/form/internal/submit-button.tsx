@@ -13,7 +13,7 @@ export const SubmitButton = ({
     onClick,
 }: {
     labels?: SubmitButtonLabels;
-    onClick?: () => void;
+    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) => {
     const form = useFormContext();
     const [label, submittingLabel, submittedLabel] = labels;
@@ -29,7 +29,7 @@ export const SubmitButton = ({
             {([isValid, isSubmitting, isSubmitSuccessful]) => {
                 return (
                     <Button
-                        type={onClick ? "button" : "submit"}
+                        type="submit"
                         disabled={!isValid || isSubmitting}
                         onClick={onClick}
                     >
