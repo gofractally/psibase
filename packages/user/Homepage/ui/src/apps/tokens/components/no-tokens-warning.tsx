@@ -2,30 +2,49 @@ import { TriangleAlert } from "lucide-react";
 
 import { Button } from "@shared/shadcn/ui/button";
 
+export const NoTokensWarning = () => {
+    return (
+        <EmptyBlock
+            title="Head's up!"
+            description="You currently have no token balances or tokens to administer. Receive some tokens to continue."
+        />
+    );
+};
+
 interface Props {
-    onContinue: () => void;
+    title: string;
+    description?: string;
+    buttonLabel?: string;
+    onButtonClick?: () => void;
 }
 
-export const NoTokensWarning = ({ onContinue }: Props) => {
+export const EmptyBlock = ({
+    description,
+    title,
+    buttonLabel,
+    onButtonClick,
+}: Props) => {
     return (
-        <div className="relative flex w-full justify-between rounded-lg border p-4">
-            <div className="my-auto flex gap-2">
-                <div className="my-auto h-full">
-                    <TriangleAlert className="h-4 w-4 text-yellow-500" />
-                </div>
-                <div>
-                    <div className="">Heads up!</div>
-                    <div className="text-muted-foreground text-sm">
-                        You currently have no token balances or tokens to
-                        administer.
-                    </div>
-                    <div className="text-muted-foreground text-sm">
-                        Receive some tokens or create a token to continue.
-                    </div>
-                </div>
-            </div>
-            <div className="my-auto">
-                <Button onClick={() => onContinue()}>Create token</Button>
+        <div className="flex h-[450px] shrink-0 items-center justify-center rounded-md border border-dashed">
+            <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
+                <TriangleAlert className="h-12 w-12 text-yellow-500" />
+                <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+                {description && (
+                    <p className="text-muted-foreground mt-2 text-sm">
+                        {description}
+                    </p>
+                )}
+                {onButtonClick && (
+                    <Button
+                        size="lg"
+                        className="mt-4"
+                        onClick={() => {
+                            onButtonClick();
+                        }}
+                    >
+                        {buttonLabel || ""}
+                    </Button>
+                )}
             </div>
         </div>
     );
