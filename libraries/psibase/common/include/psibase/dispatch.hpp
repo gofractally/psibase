@@ -2,6 +2,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/api.hpp>
+#include <psibase/export.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
@@ -42,6 +43,14 @@ namespace psibase
          auto s = find_view_span(v);
          check(s.data() != nullptr, "Cannot handle extensions in returned view");
          raw::setRetval(s.data(), s.size());
+      }
+      else if constexpr (hasExport<R>)
+      {
+         std::vector<KvHandle> handles;
+         auto                  result = (service.*method)(static_cast<decltype(args)>(args)...);
+         psio::shared_view_ptr<exportType<R>> p(psibaseExport(result, handles));
+         raw::setRetval(p.data(), p.size());
+         exportHandles(handles);
       }
       else
       {

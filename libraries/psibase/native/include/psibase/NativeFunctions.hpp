@@ -48,6 +48,8 @@ namespace psibase
       uint32_t kvOpen(uint32_t db, eosio::vm::span<const char> prefix, uint32_t mode);
       uint32_t kvOpenAt(uint32_t handle, eosio::vm::span<const char> prefix, uint32_t mode);
       void     kvClose(uint32_t handle);
+      void     exportHandles(eosio::vm::span<const char> data);
+      uint32_t importHandles();
       void     kvPut(uint32_t                    handle,
                      eosio::vm::span<const char> key,
                      eosio::vm::span<const char> value);

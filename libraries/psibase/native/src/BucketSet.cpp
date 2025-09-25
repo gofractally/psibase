@@ -46,6 +46,39 @@ KvHandle BucketSet::open(DbId db, std::vector<char> prefix, KvMode mode, std::ui
    return static_cast<KvHandle>(buckets.size() - 1);
 }
 
+std::vector<KvHandle> BucketSet::add(std::vector<Bucket>&& src, std::uint32_t limit)
+{
+   std::vector<KvHandle> result;
+   auto                  srcIter  = src.begin();
+   auto                  srcEnd   = src.end();
+   auto                  destIter = buckets.begin();
+   auto                  destEnd  = buckets.end();
+   while (srcIter != srcEnd)
+   {
+      while (destIter != destEnd && *destIter)
+      {
+         ++destIter;
+      }
+      if (destIter == destEnd)
+      {
+         check(srcEnd - srcIter <= limit - buckets.size(), "Too many database handles");
+         while (srcIter != srcEnd)
+         {
+            result.push_back(static_cast<KvHandle>(buckets.size()));
+            buckets.push_back(*srcIter);
+            ++srcIter;
+         }
+         break;
+      }
+      *destIter = std::move(*srcIter);
+      result.push_back(static_cast<KvHandle>(destIter - buckets.begin()));
+      ++srcIter;
+      ++destIter;
+   }
+   src.clear();
+   return result;
+}
+
 void BucketSet::close(KvHandle handle)
 {
    auto idx = static_cast<std::size_t>(handle);
