@@ -171,6 +171,7 @@ pub mod tables {
 
         pub fn update_window(&mut self, seconds: u32) {
             self.check_sender_has_nft();
+            self.check_difficulty_decrease();
             Self::check_window_seconds(seconds);
 
             self.window_seconds = seconds;
@@ -180,6 +181,7 @@ pub mod tables {
         pub fn update_targets(&mut self, target_min: u32, target_max: u32) {
             self.check_sender_has_nft();
             Self::check_targets(target_min, target_max);
+            self.check_difficulty_decrease();
             self.target_min = target_min;
             self.target_max = target_max;
             self.save();
@@ -187,6 +189,7 @@ pub mod tables {
 
         pub fn update_percent(&mut self, percent_ppm: u32) {
             self.check_sender_has_nft();
+            self.check_difficulty_decrease();
             Self::check_percent_change(percent_ppm);
             self.percent_change = percent_ppm;
             self.save();
@@ -194,6 +197,7 @@ pub mod tables {
 
         pub fn update_floor(&mut self, floor_difficulty: u64) {
             self.check_sender_has_nft();
+            self.check_difficulty_decrease();
             self.floor_difficulty = floor_difficulty;
             self.active_difficulty = self.active_difficulty.max(floor_difficulty);
             self.save();
