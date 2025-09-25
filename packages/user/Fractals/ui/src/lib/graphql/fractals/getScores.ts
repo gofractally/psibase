@@ -1,30 +1,32 @@
 import { z } from "zod";
 
-import { Account, zAccount } from "@/lib/zod/Account";
-import { zEvalType } from "@/lib/zod/EvaluationType";
+import { zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
 
 export const zScore = z.object({
-    account: zAccount,
-    evalType: zEvalType,
-    pending: z.number().nullable(),
+    fractal: zAccount,
+    guild: z.number().int(),
+    member: zAccount,
     value: z.number(),
+    pending: z.number().nullable(),
 });
 
 export type Score = z.infer<typeof zScore>;
 
-export const getScores = async (fractalAccount: Account) => {
+export const getScores = async (guildId: number) => {
     const member = await graphql(
         `
     {
-        scores(fractal: "${fractalAccount}") {
+        scores(guildId: ${guildId}) {
             nodes {
-                account
-                evalType
-                pending
+                fractal
+                guild
+                member
                 value
-        } }
+                pending
+            } 
+        }
     }`,
     );
 

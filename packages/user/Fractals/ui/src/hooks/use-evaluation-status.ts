@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
-import { EvalType } from "@/lib/zod/EvaluationType";
 
 import { useEvaluationInstance } from "./fractals/use-evaluation-instance";
 import { useFractal } from "./fractals/use-fractal";
@@ -10,7 +9,7 @@ import { useCurrentUser } from "./use-current-user";
 
 export const useEvaluationStatus = (
     now: number,
-    type: EvalType = EvalType.Reputation,
+    guildId: number | undefined,
 ): EvaluationStatus | undefined => {
     const {
         data,
@@ -18,7 +17,7 @@ export const useEvaluationStatus = (
         error: fractalError,
     } = useFractal();
 
-    const { evaluation, evaluationInstance } = useEvaluationInstance(type);
+    const { evaluation, guild } = useEvaluationInstance(guildId);
 
     const { data: currentUser } = useCurrentUser();
 
@@ -30,10 +29,10 @@ export const useEvaluationStatus = (
         error: usersAndGroupsError,
     } = useUsersAndGroups(
         pingUsersAndGroups ? 1000 : 10000,
-        evaluationInstance?.evaluationId,
+        guild?.evalInstance?.evaluationId,
     );
 
-    const isNoScheduledEvaluation = !evaluationInstance;
+    const isNoScheduledEvaluation = !guild?.evalInstance;
 
     if (isNoScheduledEvaluation) {
         return undefined;

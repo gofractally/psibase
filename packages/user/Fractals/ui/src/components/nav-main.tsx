@@ -2,6 +2,7 @@ import {
     CalendarCheck,
     CalendarClock,
     Contact,
+    LucideIcon,
     Search,
     Users,
 } from "lucide-react";
@@ -17,8 +18,23 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
+import { useFractal } from "@/hooks/fractals/use-fractal";
 
-const browseMenu = [
+interface MenuItem {
+    groupLabel: string;
+    path: string;
+    menus: {
+        title: string;
+        icon: LucideIcon,
+        path: string;
+    }[],
+    button?: {
+        label: string;
+        onClick: () => void;
+    }
+}
+
+const browseMenu: MenuItem[] = [
     {
         groupLabel: "Global",
         path: "",
@@ -32,7 +48,9 @@ const browseMenu = [
     },
 ];
 
-export const fractalMenus = [
+
+
+export const staticFractalMenus: MenuItem[] = [
     {
         groupLabel: "Membership",
         path: "membership",
@@ -72,6 +90,27 @@ export function NavMain() {
 
     const fractalName = useCurrentFractal();
 
+    const { data } = useFractal(fractalName);
+
+    const fractalMenus = [
+        ...staticFractalMenus,
+        {
+            groupLabel: "Guilds",
+            path: "guild",
+            menus: data?.guilds.nodes.map(guild => ({
+                title: guild.displayName,
+                icon: CalendarClock,
+                path: guild.id,
+            })),
+            button: {
+                label: "Create Guild",
+                onClick: () => {
+
+                }
+            }
+        },
+    ]
+
     const isBrowse = !location.pathname.startsWith("/fractal");
 
     const menus = isBrowse ? browseMenu : fractalMenus;
@@ -82,7 +121,7 @@ export function NavMain() {
                 <SidebarGroup>
                     <SidebarGroupLabel>{item.groupLabel}</SidebarGroupLabel>
                     <SidebarMenu>
-                        {item.menus.map((menu) => (
+                        {item.menus?.map((menu) => (
                             <NavLink
                                 to={
                                     isBrowse
@@ -106,6 +145,10 @@ export function NavMain() {
                                 )}
                             </NavLink>
                         ))}
+                        {item.button && <button onClick={() => {
+
+                        }} className="border text-sm rounded-sm border-dashed border-muted-foreground/50 py-3 hover:border-primary">Create Guild</button>}
+
                     </SidebarMenu>
                 </SidebarGroup>
             ))}

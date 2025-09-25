@@ -60,7 +60,7 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn start(guild_id: u64) -> Result<(), Error> {
+    fn start(guild_id: u32) -> Result<(), Error> {
         check_app_origin()?;
 
         let packed_args = fractals::action_structs::start_eval { guild: guild_id }.packed();

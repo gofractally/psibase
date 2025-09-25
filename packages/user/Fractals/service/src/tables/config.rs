@@ -18,7 +18,7 @@ impl Config {
             })
     }
 
-    pub fn gen_id(&mut self) -> u64 {
+    pub fn gen_id(&mut self) -> u32 {
         self.last_id = self.last_id + 1;
         self.save();
         self.last_id

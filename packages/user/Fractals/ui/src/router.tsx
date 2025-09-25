@@ -13,6 +13,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
 import { Browse } from "./pages/global/browse";
+import { Guild } from "./pages/fractal/guild";
 
 export const router = createBrowserRouter([
     {
@@ -44,6 +45,16 @@ export const router = createBrowserRouter([
                     <ProtectedRoute>
                         <AppExists>
                             <MyMembership />
+                        </AppExists>
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: ":fractalName/guild/:guildId",
+                element: (
+                    <ProtectedRoute>
+                        <AppExists>
+                            <Guild />
                         </AppExists>
                     </ProtectedRoute>
                 ),

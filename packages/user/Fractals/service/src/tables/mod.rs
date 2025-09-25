@@ -7,7 +7,6 @@ mod guild_member;
 
 #[psibase::service_tables]
 pub mod tables {
-    use std::u64;
 
     use async_graphql::SimpleObject;
     use psibase::{AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
@@ -74,7 +73,7 @@ pub mod tables {
     #[table(name = "ConfigTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Config {
-        pub last_id: u64,
+        pub last_id: u32,
     }
 
     impl Config {
@@ -82,23 +81,31 @@ pub mod tables {
         fn pk(&self) {}
     }
 
-    pub type GID = u64;
+    pub type GID = u32;
 
     #[table(name = "GuildTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Guild {
         #[primary_key]
         pub id: GID,
+        pub slug: AccountNumber,
         pub fractal: AccountNumber,
-        pub rep: Option<AccountNumber>,
         pub display_name: Memo,
+        pub rep: Option<AccountNumber>,
         pub bio: Memo,
+        pub description: String,
     }
 
     impl Guild {
         #[secondary_key(1)]
         pub fn by_fractal(&self) -> (AccountNumber, GID) {
             (self.fractal, self.id)
+        }
+
+        #[secondary_key(2)]
+        pub fn by_slug(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.slug)
         }
     }
 
@@ -108,8 +115,8 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub guild: GID,
         pub member: AccountNumber,
-        pub value: u32,
-        pub pending: Option<u32>,
+        pub score: u32,
+        pub pending_score: Option<u32>,
     }
 
     impl GuildMember {

@@ -1,20 +1,33 @@
+use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Memo, Table};
 
-use crate::tables::tables::{Config, Guild, GuildTable, GID};
+use crate::tables::tables::{Config, EvaluationInstance, Guild, GuildTable, GID};
 
 impl Guild {
-    fn new(fractal: AccountNumber, rep: AccountNumber, display_name: Memo) -> Self {
+    fn new(
+        fractal: AccountNumber,
+        rep: AccountNumber,
+        display_name: Memo,
+        slug: AccountNumber,
+    ) -> Self {
         Self {
             id: Config::get_assert().gen_id(),
             fractal,
             bio: "".to_string().try_into().unwrap(),
             display_name,
             rep: Some(rep),
+            description: "".to_string(),
+            slug,
         }
     }
 
-    pub fn add(fractal: AccountNumber, rep: AccountNumber, display_name: Memo) -> Self {
-        let new_instance = Self::new(fractal, rep, display_name);
+    pub fn add(
+        fractal: AccountNumber,
+        rep: AccountNumber,
+        display_name: Memo,
+        slug: AccountNumber,
+    ) -> Self {
+        let new_instance = Self::new(fractal, rep, display_name, slug);
         new_instance.save();
         new_instance
     }
@@ -29,5 +42,12 @@ impl Guild {
 
     fn save(&self) {
         GuildTable::read_write().put(&self).expect("failed to save");
+    }
+}
+
+#[ComplexObject]
+impl Guild {
+    pub async fn eval_instance(&self) -> Option<EvaluationInstance> {
+        EvaluationInstance::get(self.id)
     }
 }

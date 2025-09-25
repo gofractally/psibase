@@ -28,6 +28,7 @@ pub mod service {
             fractal_account,
             sender,
             "Discovery".to_string().try_into().unwrap(),
+            "discovery".into(),
         );
         GuildMember::add(fractal_account, discovery_guild.id, sender);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);

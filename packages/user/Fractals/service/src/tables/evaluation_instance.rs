@@ -8,7 +8,7 @@ use crate::{
 };
 
 impl EvaluationInstance {
-    fn get(guild: GID) -> Option<Self> {
+    pub fn get(guild: GID) -> Option<Self> {
         EvaluationInstanceTable::read().get_index_pk().get(&guild)
     }
 

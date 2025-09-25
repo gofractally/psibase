@@ -1,21 +1,17 @@
-import { EvalType } from "@/lib/zod/EvaluationType";
-
 import { useEvaluation } from "./use-evaluation";
 import { useFractal } from "./use-fractal";
 
-export const useEvaluationInstance = (type: EvalType = EvalType.Reputation) => {
+export const useEvaluationInstance = (guildId: number | undefined) => {
     const { data: fractal } = useFractal();
 
-    const evaluationInstance = fractal?.evaluations.find(
-        (evaluation) => evaluation.evalType == type,
-    );
+    const guild = fractal?.guilds.nodes.find((guild) => guild.id == guildId);
 
     const { data: evaluation } = useEvaluation(
-        evaluationInstance?.evaluationId,
+        guild?.evalInstance?.evaluationId,
     );
 
     return {
         evaluation,
-        evaluationInstance,
+        guild,
     };
 };

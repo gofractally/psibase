@@ -9,8 +9,8 @@ impl GuildMember {
             fractal,
             guild,
             member,
-            pending: None,
-            value: 0,
+            pending_score: None,
+            score: 0,
         }
     }
 
@@ -29,13 +29,13 @@ impl GuildMember {
     }
 
     pub fn set_pending_score(&mut self, incoming_score: u32) {
-        self.pending = Some(incoming_score);
+        self.pending_score = Some(incoming_score);
         self.save();
     }
 
     pub fn save_pending_score(&mut self) {
-        self.pending.take().map(|pending_score| {
-            self.value = calculate_ema_u32(pending_score, self.value, Fraction::new(1, 6));
+        self.pending_score.take().map(|pending_score| {
+            self.score = calculate_ema_u32(pending_score, self.score, Fraction::new(1, 6));
             self.save();
         });
     }

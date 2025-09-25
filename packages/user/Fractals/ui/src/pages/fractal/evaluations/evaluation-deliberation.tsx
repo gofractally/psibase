@@ -18,6 +18,7 @@ import { Account } from "@/lib/zod/Account";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { useGuildId } from "@/hooks/use-guild-id";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -113,10 +114,11 @@ const GroupStatus = () => {
     const { groupNumber } = usePageParams();
 
     const now = useNowUnix();
-    const status = useEvaluationStatus(now);
+    const guildId = useGuildId();
+    const status = useEvaluationStatus(now, guildId);
 
     const isAttesting = useWatchAttest(status);
-    const isClosing = useWatchClose(status);
+    const isClosing = useWatchClose(guildId, status);
 
     let description = "";
     let variant: "default" | "destructive" | "secondary" | "outline" =
