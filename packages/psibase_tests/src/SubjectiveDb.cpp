@@ -18,7 +18,7 @@ namespace
 void SubjectiveDb::write(std::string key, std::string value)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).write(key, value);
+      return recurse().withFlags(CallFlags::runModeRpc).write(key, value);
    PSIBASE_SUBJECTIVE_TX
    {
       Tables{}.open<SubjectiveTable>().put({key, value});
@@ -28,7 +28,7 @@ void SubjectiveDb::write(std::string key, std::string value)
 std::optional<std::string> SubjectiveDb::read(std::string key)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).read(key);
+      return recurse().withFlags(CallFlags::runModeRpc).read(key);
    PSIBASE_SUBJECTIVE_TX
    {
       if (auto result = Tables{}.open<SubjectiveTable>().getIndex<0>().get(key))
@@ -40,7 +40,7 @@ std::optional<std::string> SubjectiveDb::read(std::string key)
 void SubjectiveDb::testRFail1(std::string key, bool txBefore, int op)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).testRFail1(key, txBefore, op);
+      return recurse().withFlags(CallFlags::runModeRpc).testRFail1(key, txBefore, op);
    if (txBefore)
    {
       PSIBASE_SUBJECTIVE_TX {}
@@ -59,7 +59,7 @@ void SubjectiveDb::testRFail1(std::string key, bool txBefore, int op)
 void SubjectiveDb::testRFail2(AccountNumber account, std::string key, int op)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).testRFail2(account, key, op);
+      return recurse().withFlags(CallFlags::runModeRpc).testRFail2(account, key, op);
    auto index = Tables{account}.open<SubjectiveTable>().getIndex<0>();
    PSIBASE_SUBJECTIVE_TX
    {
@@ -78,7 +78,7 @@ void SubjectiveDb::testWFail1(std::string key, std::string value)
 {
    if (!isRpc())
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testWFail1(key, value);
+      return recurse().withFlags(CallFlags::runModeRpc).testWFail1(key, value);
    }
    Tables{}.open<SubjectiveTable>().put({key, value});
 }
@@ -86,7 +86,7 @@ void SubjectiveDb::testWFail1(std::string key, std::string value)
 void SubjectiveDb::abort(std::string key, std::string value, int op)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).abort(key, value, op);
+      return recurse().withFlags(CallFlags::runModeRpc).abort(key, value, op);
    PSIBASE_SUBJECTIVE_TX
    {
       Tables{}.open<SubjectiveTable>().put({key, value});
@@ -102,7 +102,7 @@ void SubjectiveDb::abort(std::string key, std::string value, int op)
 void SubjectiveDb::nested(std::string key, std::string value1, std::string value2)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nested(key, value1, value2);
+      return recurse().withFlags(CallFlags::runModeRpc).nested(key, value1, value2);
    auto table = Tables{}.open<SubjectiveTable>();
    PSIBASE_SUBJECTIVE_TX
    {
@@ -118,7 +118,7 @@ void SubjectiveDb::nested(std::string key, std::string value1, std::string value
 void SubjectiveDb::nestFail1a(bool commit)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nestFail1a(commit);
+      return recurse().withFlags(CallFlags::runModeRpc).nestFail1a(commit);
    psibase::checkoutSubjective();
    recurse().to<SubjectiveDb>().nestFail1b(commit);
 }
@@ -126,7 +126,7 @@ void SubjectiveDb::nestFail1a(bool commit)
 void SubjectiveDb::nestFail1b(bool commit)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nestFail1b(commit);
+      return recurse().withFlags(CallFlags::runModeRpc).nestFail1b(commit);
    if (commit)
       psibase::commitSubjective();
    else
@@ -136,7 +136,7 @@ void SubjectiveDb::nestFail1b(bool commit)
 void SubjectiveDb::nestFail2a(bool commit)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nestFail2a(commit);
+      return recurse().withFlags(CallFlags::runModeRpc).nestFail2a(commit);
    recurse().to<SubjectiveDb>().nestFail2b();
    if (commit)
       psibase::commitSubjective();
@@ -147,14 +147,14 @@ void SubjectiveDb::nestFail2a(bool commit)
 void SubjectiveDb::nestFail2b()
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nestFail2b();
+      return recurse().withFlags(CallFlags::runModeRpc).nestFail2b();
    psibase::checkoutSubjective();
 }
 
 void SubjectiveDb::nestFail3a(bool commit1, bool commit2)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nestFail3a(commit1, commit2);
+      return recurse().withFlags(CallFlags::runModeRpc).nestFail3a(commit1, commit2);
    psibase::checkoutSubjective();
    recurse().to<SubjectiveDb>().nestFail3b(commit2);
    if (commit1)
@@ -166,7 +166,7 @@ void SubjectiveDb::nestFail3a(bool commit1, bool commit2)
 void SubjectiveDb::nestFail3b(bool commit)
 {
    if (!isRpc())
-      return recurse().with_flags(CallFlags::runModeRpc).nestFail3b(commit);
+      return recurse().withFlags(CallFlags::runModeRpc).nestFail3b(commit);
    if (commit)
       psibase::commitSubjective();
    else

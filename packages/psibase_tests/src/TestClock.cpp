@@ -25,7 +25,7 @@ void TestClock::testReal(bool indirect)
 {
    if (indirect)
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testReal(false);
+      return recurse().withFlags(CallFlags::runModeRpc).testReal(false);
    }
    struct timespec time;
    auto            err = ::clock_gettime(CLOCK_REALTIME, &time);
@@ -37,7 +37,7 @@ void TestClock::testMono(bool indirect)
 {
    if (indirect)
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testMono(false);
+      return recurse().withFlags(CallFlags::runModeRpc).testMono(false);
    }
    struct timespec time1;
    auto            err = ::clock_gettime(CLOCK_MONOTONIC, &time1);
@@ -56,7 +56,7 @@ void TestClock::testCpu(bool indirect)
 {
    if (indirect)
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testCpu(false);
+      return recurse().withFlags(CallFlags::runModeRpc).testCpu(false);
    }
    struct timespec time1;
    auto            err = ::clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time1);
@@ -75,7 +75,7 @@ void TestClock::testSystem(bool indirect)
 {
    if (indirect)
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testSystem(false);
+      return recurse().withFlags(CallFlags::runModeRpc).testSystem(false);
    }
    std::chrono::system_clock::now();
 }
@@ -88,7 +88,7 @@ void TestClock::testSteady(bool indirect)
 {
    if (indirect)
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testSteady(false);
+      return recurse().withFlags(CallFlags::runModeRpc).testSteady(false);
    }
    auto t1 = std::chrono::steady_clock::now();
    auto t2 = std::chrono::steady_clock::now();
@@ -99,7 +99,7 @@ void TestClock::testHiRes(bool indirect)
 {
    if (indirect)
    {
-      return recurse().with_flags(CallFlags::runModeRpc).testHiRes(false);
+      return recurse().withFlags(CallFlags::runModeRpc).testHiRes(false);
    }
    std::chrono::high_resolution_clock::now();
 }

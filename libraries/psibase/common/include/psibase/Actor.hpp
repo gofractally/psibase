@@ -410,7 +410,7 @@ namespace psibase
                              Base::psio_get_proxy().flags);
       }
 
-      auto with_flags(CallFlags flags)
+      auto withFlags(CallFlags flags)
       {
          return Actor{Base::psio_get_proxy().sender, Base::psio_get_proxy().receiver, flags};
       }
@@ -448,7 +448,7 @@ namespace psibase
          return Actor<Other>(sender, AccountNumber(otherReceiver), flags);
       }
 
-      auto with_flags(CallFlags flags) { return Actor{sender, receiver, flags}; }
+      auto withFlags(CallFlags flags) { return Actor{sender, receiver, flags}; }
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
@@ -527,7 +527,7 @@ namespace psibase
       Actor<Other> to(AccountNumber otherReceiver = Other::service) const;
 
       /// Set flags for calls
-      Actor<T> with_flags(CallFlags flags);
+      Actor<T> withFlags(CallFlags flags);
 
       /// Return this
       Actor<T>* operator->() const;

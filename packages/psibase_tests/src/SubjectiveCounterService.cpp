@@ -38,7 +38,7 @@ PSIBASE_REFLECT_TABLES(SubjectiveCounterService, SubjectiveCounterService::Table
 
 std::uint32_t SubjectiveCounterService::inc(std::string key, std::uint32_t id)
 {
-   return to<SubjectiveCounterService>().with_flags(CallFlags::runModeRpc).incImpl(key, id);
+   return to<SubjectiveCounterService>().withFlags(CallFlags::runModeRpc).incImpl(key, id);
 }
 
 std::uint32_t SubjectiveCounterService::incImpl(std::string key, std::uint32_t id)
