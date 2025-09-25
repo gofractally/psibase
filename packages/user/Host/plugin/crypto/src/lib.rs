@@ -46,7 +46,7 @@ impl KeyVault for HostCrypto {
         assert_authorized(FunctionName::generate_unmanaged_keypair)?;
 
         let (public_key, private_key) =
-            psibase::generate_unmanaged_keypair().map_err(|e| CryptoError(e.to_string()))?;
+            psibase::generate_keypair().map_err(|e| CryptoError(e.to_string()))?;
 
         Ok(Keypair {
             public_key,
