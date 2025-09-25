@@ -12,7 +12,7 @@ export const useProducers = () => {
         queryKey: queryKeys.producers,
         queryFn: async () => {
             if (
-                ["startup", "needgenesis"].includes(status?.[0] ?? "") ||
+                (!!status && ["startup", "needgenesis"].includes(status[0])) ||
                 !!statusError
             ) {
                 return [];
