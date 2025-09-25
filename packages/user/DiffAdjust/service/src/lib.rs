@@ -293,7 +293,7 @@ pub mod service {
     /// * `target_min` - Minimum target difficulty
     /// * `target_max` - Maximum target difficulty
     #[action]
-    fn up_targets(nft_id: u32, target_min: u32, target_max: u32) {
+    fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
         RateLimit::get_assert(nft_id).update_targets(target_min, target_max);
     }
 
@@ -305,7 +305,7 @@ pub mod service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `seconds` - Seconds
     #[action]
-    fn up_window(nft_id: u32, seconds: u32) {
+    fn set_window(nft_id: u32, seconds: u32) {
         RateLimit::get_assert(nft_id).update_window(seconds);
     }
 
@@ -317,7 +317,7 @@ pub mod service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `difficulty` - Difficulty
     #[action]
-    fn up_floor(nft_id: u32, difficulty: u64) {
+    fn set_floor(nft_id: u32, difficulty: u64) {
         RateLimit::get_assert(nft_id).update_floor(difficulty);
     }
 
@@ -329,7 +329,7 @@ pub mod service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `percent_ppm` - Percent ppm 50000 = 5%
     #[action]
-    fn up_percent(nft_id: u32, ppm: u32) {
+    fn set_percent(nft_id: u32, ppm: u32) {
         RateLimit::get_assert(nft_id).update_percent(ppm);
     }
 
