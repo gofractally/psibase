@@ -8,12 +8,12 @@ namespace SystemService
    using SitesContentKey = std::tuple<psibase::AccountNumber, std::string>;
    struct SitesContentRow
    {
-      psibase::AccountNumber     account         = {};
-      std::string                path            = {};
-      std::string                contentType     = {};
-      psibase::Checksum256       contentHash     = {};
-      std::optional<std::string> contentEncoding = std::nullopt;
-      std::optional<std::string> csp             = std::nullopt;
+      psibase::AccountNumber     account;
+      std::string                path;
+      std::string                contentType;
+      psibase::Checksum256       contentHash;
+      std::optional<std::string> contentEncoding;
+      std::optional<std::string> csp;
 
       using Key = psibase::CompositeKey<&SitesContentRow::account, &SitesContentRow::path>;
    };
@@ -44,11 +44,11 @@ namespace SystemService
    struct SiteConfigRow
    {
       psibase::AccountNumber     account;
-      bool                       spa       = false;
-      bool                       cache     = true;
-      std::optional<std::string> globalCsp = std::nullopt;
+      bool                       spa;
+      bool                       doNotCache;
+      std::optional<std::string> globalCsp;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
+   PSIO_REFLECT(SiteConfigRow, account, spa, doNotCache, globalCsp)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO_REFLECT_TYPENAME(SiteConfigTable)
 

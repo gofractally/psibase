@@ -629,9 +629,9 @@ namespace SystemService
 
    void Sites::enableCache(bool enable)
    {
-      auto table = Tables{}.open<SiteConfigTable>();
-      auto row   = table.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
-      row.cache  = enable;
+      auto table     = Tables{}.open<SiteConfigTable>();
+      auto row       = table.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
+      row.doNotCache = !enable;
       table.put(row);
    }
 
@@ -678,7 +678,7 @@ namespace SystemService
       auto siteConfig = open<SiteConfigTable>(KvMode::read)
                             .get(account)
                             .value_or(SiteConfigRow{.account = getSender()});
-      return siteConfig.cache;
+      return !siteConfig.doNotCache;
    }
 
    namespace
@@ -686,11 +686,11 @@ namespace SystemService
       struct SiteConfig
       {
          psibase::AccountNumber account;
-         bool                   spa       = false;
-         bool                   cache     = true;
-         std::string            globalCsp = "";
+         bool                   spa        = false;
+         bool                   doNotCache = false;
+         std::string            globalCsp  = "";
       };
-      PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
+      PSIO_REFLECT(SiteConfig, account, spa, doNotCache, globalCsp)
 
       struct Query
       {
@@ -705,10 +705,10 @@ namespace SystemService
             // Get the site config, or return a default
             auto record = tables.open<SiteConfigTable>().get(account).value_or(
                 SiteConfigRow{.account = account});
-            return SiteConfig{.account   = record.account,
-                              .spa       = record.spa,
-                              .cache     = record.cache,
-                              .globalCsp = record.globalCsp.value_or("")};
+            return SiteConfig{.account    = record.account,
+                              .spa        = record.spa,
+                              .doNotCache = record.doNotCache,
+                              .globalCsp  = record.globalCsp.value_or("")};
          }
 
          auto getContent(AccountNumber account) const
