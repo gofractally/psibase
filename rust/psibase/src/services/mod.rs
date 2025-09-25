@@ -8,6 +8,7 @@ pub mod brotli_codec;
 pub mod chainmail;
 pub mod common_api;
 pub mod cpu_limit;
+pub mod credentials;
 pub mod evaluations;
 pub mod events;
 pub mod fractals;

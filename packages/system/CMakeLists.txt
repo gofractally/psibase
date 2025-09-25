@@ -50,6 +50,7 @@ function(add suffix)
         AuthAny/include
         AuthSig/include
         CpuLimit/include
+        Credentials/service/cpp/include
         Producers/include
         HttpServer/include
         SetCode/include
