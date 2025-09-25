@@ -395,6 +395,7 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       impl->onTransferControl(callerFlags);
+      auto cleanup = psio::finally{[&] { impl->onTransferControl(callerFlags); }};
 
       if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
       {
@@ -407,7 +408,6 @@ namespace psibase
                                   actionContext.action.service.value,
                                   actionContext.action.sender.value);
       });
-      impl->onTransferControl(callerFlags);
    }
 
    void ExecutionContext::execServe(ActionContext& actionContext)
