@@ -32,7 +32,6 @@ pub mod service {
     use async_graphql::SimpleObject;
     use serde::{Deserialize, Serialize};
 
-    // Tables (match C++ order: SitesContent, SiteConfig, SitesData, SitesDataRef)
     #[table(name = "SitesContentTable", index = 0)]
     #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
     #[fracpack(fracpack_mod = "fracpack")]
@@ -59,7 +58,7 @@ pub mod service {
         #[primary_key]
         pub account: AccountNumber,
         pub spa: bool,
-        pub cache: bool,
+        pub doNotCache: bool,
         pub globalCsp: Option<String>,
     }
 
@@ -145,7 +144,7 @@ pub mod service {
         unimplemented!()
     }
 
-    /// Enables/disables caching of responses (Enabled by default)
+    /// Enables/disables HTTP caching of responses (Enabled by default)
     /// Cache strategy:
     /// - `If-None-Match` header is checked against the hash of the content
     /// - The hash is stored in the `ETag` header
