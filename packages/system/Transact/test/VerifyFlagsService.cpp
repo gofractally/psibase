@@ -30,26 +30,7 @@ void VerifyFlagsService::verifySys(Checksum256       transactionHash,
                                    std::vector<char> proof)
 {
    auto flags = psio::from_frac<std::uint64_t>(proof);
-   if (flags & CodeRow::runMode)
-   {
-      if (flags & CodeRow::isPrivileged)
-      {
-         PSIBASE_SUBJECTIVE_TX
-         {
-            auto handle =
-                kvOpen(DbId::subjective, psio::convert_to_key(getReceiver()), KvMode::write);
-            kvClose(handle);
-         }
-      }
-      else
-      {
-         auto handle = kvOpen(DbId::writeOnly, psio::convert_to_key(getReceiver()), KvMode::read);
-         auto row    = kvGetRaw(handle, {});
-         check(!row, "writeOnly row was set");
-         kvClose(handle);
-      }
-   }
-   else if (flags & CodeRow::isPrivileged)
+   if (flags & CodeRow::isPrivileged)
    {
       Native::tables().open<ConfigTable>().put({});
    }

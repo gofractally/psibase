@@ -329,6 +329,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns true if executing a transaction
+    #[action]
+    fn isTransaction() -> bool {
+        unimplemented!()
+    }
+
     /// Get the current block header
     #[action]
     fn currentBlock() -> crate::BlockHeader {

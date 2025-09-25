@@ -21,10 +21,9 @@ namespace TestService
 
    struct SubjectiveDb : psibase::Service
    {
-      using Tables                  = psibase::SubjectiveTables<SubjectiveTable>;
-      static constexpr auto service = psibase::AccountNumber{"subjective"};
-      static constexpr auto serviceFlags =
-          psibase::CodeRow::runModeRpc | psibase::CodeRow::isPrivileged;
+      using Tables                            = psibase::SubjectiveTables<SubjectiveTable>;
+      static constexpr auto      service      = psibase::AccountNumber{"subjective"};
+      static constexpr auto      serviceFlags = psibase::CodeRow::isPrivileged;
       void                       write(std::string key, std::string value);
       std::optional<std::string> read(std::string key);
 

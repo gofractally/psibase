@@ -592,7 +592,7 @@ psibase_package(
     SERVICE cpu-limit
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit-schema.json
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
     DEPENDS wasm
 )
 
@@ -719,7 +719,6 @@ psibase_package(
     SERVICE event-index
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
-        FLAGS runModeCallback
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
@@ -1086,7 +1085,7 @@ psibase_package(
     SERVICE psubjective
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
         SERVER psubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
@@ -1129,7 +1128,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService-schema.json
         SERVER s-counter
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )

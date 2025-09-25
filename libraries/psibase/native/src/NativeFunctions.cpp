@@ -34,7 +34,7 @@ namespace psibase
 
       bool isSubjectiveContext(NativeFunctions& self)
       {
-         return (self.code.flags & CodeRow::runMode) || self.dbMode.isSubjective;
+         return self.dbMode.isSubjective;
       }
 
       DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
@@ -501,7 +501,7 @@ namespace psibase
    //        can only indicate failure.
    //      * Consensus config: number of wasm memories for a parallel execution
    //      * Node config: number of parallel executions happening at the same time
-   uint32_t NativeFunctions::call(eosio::vm::span<const char> data)
+   uint32_t NativeFunctions::call(eosio::vm::span<const char> data, std::uint64_t flagsRaw)
    {
       auto saved          = currentActContext->transactionContext.remainingStack;
       auto remainingStack = currentExecContext->remainingStack();
@@ -511,6 +511,15 @@ namespace psibase
 
       // TODO: don't unpack rawData
       check(psio::fracpack_validate_strict<Action>(data), "call: invalid data format");
+      auto flags = static_cast<CallFlags>(flagsRaw);
+      if (flags == CallFlags::runModeRpc || flags == CallFlags::runModeCallback)
+      {
+         check(dbMode.isSync && !dbMode.isSubjective, "Can only change run mode in a transaction");
+      }
+      else if (flags != CallFlags::none)
+      {
+         abortMessage("Invalid call flags: " + std::to_string(flagsRaw));
+      }
       auto act         = psio::from_frac<Action>(psio::prevalidated{data});
       auto callerFlags = code.flags;
       if (act.sender != code.codeNum)
@@ -524,7 +533,8 @@ namespace psibase
       auto& inner_action_trace =
           std::get<ActionTrace>(currentActContext->actionTrace.innerTraces.back().inner);
       // TODO: avoid reserialization
-      currentActContext->transactionContext.execCalledAction(callerFlags, act, inner_action_trace);
+      currentActContext->transactionContext.execCalledAction(callerFlags, act, inner_action_trace,
+                                                             flags);
       setResult(*this, inner_action_trace.rawRetval);
 
       currentActContext->transactionContext.remainingStack = saved;

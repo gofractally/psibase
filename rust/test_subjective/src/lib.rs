@@ -19,6 +19,9 @@ mod service {
 
     #[action]
     fn inc() -> i32 {
+        if services::transact::Wrapper::call().isTransaction() {
+            return Wrapper::rpc().inc();
+        }
         let key = 0;
         subjective_tx! {
             let subjective_table = SubjectiveTable::new();
@@ -30,6 +33,9 @@ mod service {
     }
     #[action]
     fn b() {
+        if services::transact::Wrapper::call().isTransaction() {
+            return Wrapper::rpc().b();
+        }
         let key = 0;
         subjective_tx! {
             let subjective_table = SubjectiveTable::new();
@@ -44,10 +50,7 @@ mod service {
 #[psibase::test_case(packages("TestSubjective"))]
 fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
     psibase::services::setcode::Wrapper::push(&chain)
-        .setFlags(
-            SERVICE,
-            psibase::CodeRow::RUN_MODE_RPC | psibase::CodeRow::IS_PRIVILEGED,
-        )
+        .setFlags(SERVICE, psibase::CodeRow::IS_PRIVILEGED)
         .get()?;
     assert_eq!(Wrapper::push(&chain).inc().get()?, 1);
     chain.start_block();
