@@ -4,10 +4,10 @@ import { z } from "zod";
 
 export const useUnmanagedKeyPair = () =>
     useQuery({
-        queryKey: ["generateUnmanagedKeypair"],
+        queryKey: ["generateKeypair"],
         queryFn: async () => {
             const res = await supervisor.functionCall({
-                method: "generateUnmanagedKeypair",
+                method: "generateKeypair",
                 params: [],
                 service: "auth-sig",
                 intf: "keyvault",

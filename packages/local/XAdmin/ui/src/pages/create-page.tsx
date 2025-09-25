@@ -183,7 +183,7 @@ export const CreatePage = () => {
                 let txSigningKeyPair: [string, string] | undefined; // bp account tx signing key
                 if (!isDev) {
                     blockSigningPubKey = await createAndSetKey(keyDevice);
-                    txSigningKeyPair = crypto.generateUnmanagedKeypair();
+                    txSigningKeyPair = crypto.generateKeypair();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>

@@ -699,7 +699,7 @@ pub fn sign_transaction(
     })
 }
 
-pub fn generate_unmanaged_keypair() -> Result<(String, String), anyhow::Error> {
+pub fn generate_keypair() -> Result<(String, String), anyhow::Error> {
     let signing_key = SigningKey::random(&mut OsRng);
     let verifying_key: &VerifyingKey = signing_key.verifying_key();
 

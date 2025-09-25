@@ -101,9 +101,8 @@ impl Boot for XAdminPlugin {
 }
 
 impl Crypto for XAdminPlugin {
-    fn generate_unmanaged_keypair() -> Result<(String, String), String> {
-        let (public_key, private_key) =
-            psibase::generate_unmanaged_keypair().map_err(|e| e.to_string())?;
+    fn generate_keypair() -> Result<(String, String), String> {
+        let (public_key, private_key) = psibase::generate_keypair().map_err(|e| e.to_string())?;
         Ok((public_key, private_key))
     }
 }
