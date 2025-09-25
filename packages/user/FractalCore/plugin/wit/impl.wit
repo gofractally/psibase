@@ -1,0 +1,10 @@
+package fractal-core:plugin;
+
+world impl {
+    include host:common/imports;
+    include transact:plugin/imports;
+    include permissions:plugin/imports;
+
+    export api;
+    export queries;
+}
