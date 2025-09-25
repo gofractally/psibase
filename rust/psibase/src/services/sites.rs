@@ -1,49 +1,8 @@
 #![allow(non_snake_case)]
-use crate::{AccountNumber, Checksum256, Hex};
-use async_graphql::SimpleObject;
-use fracpack::ToSchema;
-use serde::{Deserialize, Serialize};
+use crate::AccountNumber;
 
 #[allow(dead_code)]
 type SitesContentKey = (AccountNumber, String);
-
-// TODO: Update structs
-#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "SitesContentRowInput")]
-struct SitesContentRow {
-    account: AccountNumber,
-    path: String,
-    contentType: String,
-    contentHash: Checksum256,
-    contentEncoding: Option<String>,
-    csp: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "SiteConfigRowInput")]
-struct SiteConfigRow {
-    account: AccountNumber,
-    spa: bool,
-    cache: bool,
-    globalCsp: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-struct SitesDataRow {
-    hash: Checksum256,
-    data: Hex<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-struct SitesDataRefRow {
-    hash: Checksum256,
-    refs: u32,
-}
-
 /// Decompress content
 ///
 /// `DecompressorInterface` is implemented by services that can decompress content
@@ -67,8 +26,60 @@ impl DecompressorInterface {
 
 #[crate::service(name = "sites", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
-mod service {
-    use crate::{http::HttpRequest, Checksum256, Hex};
+pub mod service {
+    use crate::fracpack::{Pack, ToSchema, Unpack};
+    use crate::{http::HttpRequest, AccountNumber, Checksum256, Hex};
+    use async_graphql::SimpleObject;
+    use serde::{Deserialize, Serialize};
+
+    // Tables (match C++ order: SitesContent, SiteConfig, SitesData, SitesDataRef)
+    #[table(name = "SitesContentTable", index = 0)]
+    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct SitesContentRow {
+        pub account: AccountNumber,
+        pub path: String,
+        pub contentType: String,
+        pub contentHash: Checksum256,
+        pub contentEncoding: Option<String>,
+        pub csp: Option<String>,
+    }
+
+    impl SitesContentRow {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, String) {
+            (self.account, self.path.clone())
+        }
+    }
+
+    #[table(name = "SiteConfigTable", index = 1)]
+    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct SiteConfigRow {
+        #[primary_key]
+        pub account: AccountNumber,
+        pub spa: bool,
+        pub cache: bool,
+        pub globalCsp: Option<String>,
+    }
+
+    #[table(name = "SitesDataTable", index = 2)]
+    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct SitesDataRow {
+        #[primary_key]
+        pub hash: Checksum256,
+        pub data: Vec<u8>,
+    }
+
+    #[table(name = "SitesDataRefTable", index = 3)]
+    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct SitesDataRefRow {
+        #[primary_key]
+        pub hash: Checksum256,
+        pub refs: u32,
+    }
 
     /// Serves a request by looking up the content uploaded to the specified subdomain
     #[action]
