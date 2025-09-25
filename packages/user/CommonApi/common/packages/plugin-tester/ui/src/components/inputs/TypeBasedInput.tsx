@@ -86,7 +86,7 @@ export const TypeBasedInput = ({
             <NumberInput
                 {...commonProps}
                 value={actualValue as number}
-                type={resolvedType as string}
+                type={typeName}
             />
         );
     if (inputType === "boolean")
