@@ -24,7 +24,7 @@ interface packages {
 }
 
 interface crypto {
-    generate-unmanaged-keypair: func() -> result<tuple<string, string>, string>;
+    generate-keypair: func() -> result<tuple<string, string>, string>;
 }
 
 interface util {
