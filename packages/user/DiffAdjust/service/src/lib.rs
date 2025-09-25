@@ -54,9 +54,9 @@ pub mod tables {
             }
         }
 
-        fn check_percent_change(percent_ppm: u32) {
+        fn check_percent_change(ppm: u32) {
             check(
-                percent_ppm > 0 && percent_ppm < ONE_MILLION,
+                ppm > 0 && ppm < ONE_MILLION,
                 "percent must be between 0 - 100%, 500000 = 50%",
             );
         }
