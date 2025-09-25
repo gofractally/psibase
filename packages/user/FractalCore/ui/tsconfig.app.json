@@ -1,8 +1,9 @@
 {
-  "extends": "../../../tsconfig.app.json",
-  "compilerOptions": {
-    "tsBuildInfoFile": ".tmp/tsconfig.app.tsbuildinfo",
-    "baseUrl": "./"
-  },
-  "include": ["src"]
+    "extends": "../../../tsconfig.app.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": ".tmp/tsconfig.app.tsbuildinfo",
+        "lib": ["ESNext", "DOM", "DOM.Iterable"],
+        "baseUrl": "./"
+    },
+    "include": ["src"]
 }

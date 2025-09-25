@@ -1,3 +1,10 @@
+import { LogIn, LogOut, Moon, Settings, Sun, UserPlus } from "lucide-react";
+
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useLogout } from "@/hooks/use-logout";
+
+import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -11,13 +18,17 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-import { Settings, LogOut, Sun, Moon, UserPlus } from "lucide-react";
 
-import { Button } from "@shared/shadcn/ui/button";
 import { useTheme } from "./theme-provider";
 
 export const SettingsDropdown = () => {
     const { setTheme } = useTheme();
+
+    const { mutate: logout } = useLogout();
+    const { data: currentUser } = useCurrentUser();
+    const { mutateAsync: login } = useCreateConnectionToken();
+
+    const isLoggedIn = !!currentUser;
 
     return (
         <>
@@ -63,10 +74,25 @@ export const SettingsDropdown = () => {
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
 
-                    <DropdownMenuItem disabled>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Log out</span>
-                    </DropdownMenuItem>
+                    {isLoggedIn ? (
+                        <DropdownMenuItem
+                            onClick={() => {
+                                logout();
+                            }}
+                        >
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Log out</span>
+                        </DropdownMenuItem>
+                    ) : (
+                        <DropdownMenuItem
+                            onClick={() => {
+                                login();
+                            }}
+                        >
+                            <LogIn className="mr-2 h-4 w-4" />
+                            <span>Log in</span>
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
         </>

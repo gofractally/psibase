@@ -1,29 +1,33 @@
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/queryClient";
+import { useMutation } from "@tanstack/react-query";
+
+import { supervisor } from "@/supervisor";
+
+import QueryKey from "@/lib/queryKeys";
+import { zAccount } from "@/lib/zod/Account";
+
 import { toast } from "@shared/shadcn/ui/sonner";
-import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
-const supervisor = getSupervisor();
-
-export const useSelectAccount = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation<void, Error, string>({
-        mutationKey: ["selectAccount"],
+export const useSelectAccount = () =>
+    useMutation<void, Error, string>({
+        mutationKey: QueryKey.selectAccount(),
         mutationFn: async (accountName: string) => {
             void (await supervisor.functionCall({
                 method: "login",
-                params: [z.string().parse(accountName)],
+                params: [zAccount.parse(accountName)],
                 service: "accounts",
                 intf: "activeApp",
             }));
         },
-        onSuccess: () => {
-            queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+        onSuccess: (_, accountName) => {
+            queryClient.setQueryData(QueryKey.currentUser(), () => accountName);
         },
         onError: (error) => {
-            toast.error(error.message);
+            if (error instanceof Error) {
+                toast.error(error.message);
+            } else {
+                toast.error("Unrecognised error, please see log");
+                console.error(error);
+            }
         },
     });
-};

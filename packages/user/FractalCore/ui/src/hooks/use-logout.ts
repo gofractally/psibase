@@ -1,24 +1,31 @@
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { supervisor } from "@/supervisor";
 
-const supervisor = getSupervisor();
+import QueryKey from "@/lib/queryKeys";
+
+import { useExpectCurrentUser } from "./use-expect-current-user";
 
 export const useLogout = () => {
     const queryClient = useQueryClient();
+    const [, setExpectCurrentUser] = useExpectCurrentUser();
 
     return useMutation({
-        mutationKey: ["logout"],
-        mutationFn: async () => {
-            return supervisor.functionCall({
+        mutationKey: QueryKey.logout(),
+        mutationFn: async () =>
+            supervisor.functionCall({
                 method: "logout",
                 params: [],
                 service: "accounts",
                 intf: "activeApp",
-            });
-        },
+            }),
         onSuccess: () => {
-            queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+            setExpectCurrentUser(false);
+            queryClient.setQueryData(QueryKey.currentUser(), null);
+        },
+        onError: (error) => {
+            const message = "Error logging out";
+            console.error(message, error);
         },
     });
 };
