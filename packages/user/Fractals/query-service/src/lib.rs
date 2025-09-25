@@ -102,14 +102,14 @@ mod service {
 
         async fn evaluation_finishes(
             &self,
-            fractal: AccountNumber,
+            guild: u32,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
             EventQuery::new("history.fractals.evaluation_finished")
-                .condition(format!("fractal_account = '{}'", fractal))
+                .condition(format!("guild = '{}'", guild))
                 .first(first)
                 .last(last)
                 .before(before)
@@ -119,14 +119,14 @@ mod service {
 
         async fn scheduled_evaluations(
             &self,
-            fractal: AccountNumber,
+            guild: u32,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, ScheduledEvaluation>> {
             EventQuery::new("history.fractals.scheduled_evaluation")
-                .condition(format!("fractal_account = '{}'", fractal))
+                .condition(format!("guild = '{}'", guild))
                 .first(first)
                 .last(last)
                 .before(before)

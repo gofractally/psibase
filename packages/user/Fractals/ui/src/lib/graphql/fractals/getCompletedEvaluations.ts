@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
-import { Account } from "@/lib/zod/Account";
 
 export const zCompletedEvaluation = z.object({
     evaluationId: z.number(),
@@ -14,13 +13,13 @@ export const zCompletedEvaluation = z.object({
 
 export type CompletedEvaluation = z.infer<typeof zCompletedEvaluation>;
 
-const getCompletedEvaluationIds = async (fractalAccount: Account) => {
+const getCompletedEvaluationIds = async (guildId: number) => {
     const gql = `{
-        evaluationFinishes(fractal: "${fractalAccount}") {
+        evaluationFinishes(guild: ${guildId}) {
             nodes {
                 evaluationId
-            }     
-        } 
+            }
+        }
     }`;
 
     const evaluations = await graphql(gql);
@@ -40,9 +39,9 @@ const getCompletedEvaluationIds = async (fractalAccount: Account) => {
     return response.evaluationFinishes.nodes.map((node) => node.evaluationId);
 };
 
-const getEvaluationsMetadata = async (fractalAccount: Account) => {
+const getEvaluationsMetadata = async (guildId: number) => {
     const gql = `{
-        scheduledEvaluations(fractal: "${fractalAccount}") {
+        scheduledEvaluations(guild: ${guildId}) {
             nodes {
                 evaluationId
                 registration
@@ -75,10 +74,10 @@ const getEvaluationsMetadata = async (fractalAccount: Account) => {
 };
 
 export const getCompletedEvaluations = async (
-    fractalAccount: Account,
+    guildId: number,
 ): Promise<CompletedEvaluation[]> => {
-    const evaluationIds = await getCompletedEvaluationIds(fractalAccount);
-    const evaluationsMetadata = await getEvaluationsMetadata(fractalAccount);
+    const evaluationIds = await getCompletedEvaluationIds(guildId);
+    const evaluationsMetadata = await getEvaluationsMetadata(guildId);
 
     return evaluationIds
         .map((evaluationId) => {

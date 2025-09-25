@@ -1,5 +1,4 @@
 import {
-    CalendarCheck,
     CalendarClock,
     Contact,
     LucideIcon,
@@ -67,22 +66,7 @@ export const staticFractalMenus: MenuItem[] = [
             },
         ],
     },
-    {
-        groupLabel: "Evaluations",
-        path: "evaluations",
-        menus: [
-            {
-                title: "Active & upcoming",
-                icon: CalendarClock,
-                path: "",
-            },
-            {
-                title: "Completed",
-                icon: CalendarCheck,
-                path: "completed",
-            },
-        ],
-    },
+
 ] as const;
 
 export function NavMain() {
@@ -102,12 +86,7 @@ export function NavMain() {
                 icon: CalendarClock,
                 path: guild.id,
             })),
-            button: {
-                label: "Create Guild",
-                onClick: () => {
 
-                }
-            }
         },
     ]
 
