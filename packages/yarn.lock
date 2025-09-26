@@ -1974,8 +1974,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/homepage-ui@workspace:user/Homepage/ui"
   dependencies:
-    "@dicebear/collection": "npm:^9.2.2"
-    "@dicebear/core": "npm:^9.2.2"
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@radix-ui/react-select": "npm:^2.2.5"

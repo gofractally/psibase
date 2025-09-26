@@ -64,7 +64,7 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
         }
     };
 
-    const { avatarSrc, type } = useAvatar(currentUser);
+    const { avatarSrc, type } = useAvatar({ account: currentUser });
     const removeImage = async () => {
         await removeAvatar();
     };
