@@ -11,10 +11,10 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,

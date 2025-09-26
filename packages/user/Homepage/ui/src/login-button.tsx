@@ -1,6 +1,6 @@
 import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
-import { createIdenticon } from "@/lib/createIdenticon";
 
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -9,7 +9,6 @@ import {
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
 
-import { useChainId } from "./hooks/use-chain-id";
 import { useConnectedAccounts } from "./hooks/use-connected-accounts";
 import { useSelectAccount } from "./hooks/use-select-account";
 
@@ -21,8 +20,6 @@ export const LoginButton = () => {
 
     const { isPending: isConnectingToAccount, mutate: onSelect } =
         useSelectAccount();
-
-    const { data: chainId } = useChainId();
 
     return isNoOptions ? (
         <Button
@@ -48,11 +45,7 @@ export const LoginButton = () => {
                             key={account}
                             onClick={() => onSelect(account)}
                         >
-                            <img
-                                className="mr-2 h-4 w-4 rounded-none"
-                                src={createIdenticon(chainId + account)}
-                            />
-                            <span>{account}</span>
+                            <Account account={account} />
                         </DropdownMenuItem>
                     ))}
                 <DropdownMenuItem onClick={() => onSelect("-other")}>
@@ -60,5 +53,15 @@ export const LoginButton = () => {
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+};
+
+const Account = ({ account }: { account: string }) => {
+    const { avatarSrc } = useAvatar(account);
+    return (
+        <>
+            <img className="mr-2 h-4 w-4 rounded-none" src={avatarSrc} />
+            <span>{account}</span>
+        </>
     );
 };

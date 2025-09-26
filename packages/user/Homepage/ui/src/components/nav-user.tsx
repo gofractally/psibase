@@ -20,9 +20,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCanExportAccount } from "@/hooks/use-can-export-account";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -32,6 +30,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { Account } from "@/lib/zod/Account";
 
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
@@ -98,7 +97,6 @@ export function NavUser() {
     const { data: currentUser, isFetched: isFetchedLoggedInuser } =
         useCurrentUser();
 
-    const { isFetched: isFetchedChainId } = useChainId();
     const { mutateAsync: logout } = useLogout();
     const navigate = useNavigate();
 
@@ -148,11 +146,8 @@ export function NavUser() {
     const isUsingOnlyOption =
         connectedAccounts.length == 1 && connectedAccounts[0] === currentUser;
     const isLoading =
-        !(
-            isFetchedLoggedInuser &&
-            isFetchedConnectedAccounts &&
-            isFetchedChainId
-        ) || isConnectingToAccount;
+        !(isFetchedLoggedInuser && isFetchedConnectedAccounts) ||
+        isConnectingToAccount;
 
     return (
         <Dialog open={showModal} onOpenChange={setShowModal}>

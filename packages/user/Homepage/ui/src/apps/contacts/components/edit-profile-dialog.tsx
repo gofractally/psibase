@@ -2,11 +2,11 @@ import { Trash, Upload } from "lucide-react";
 
 import { FormProfile } from "@/components/form-profile";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCacheBust } from "@/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogDescription } from "@shared/shadcn/ui/dialog";
 import { DialogTitle } from "@shared/shadcn/ui/dialog";
