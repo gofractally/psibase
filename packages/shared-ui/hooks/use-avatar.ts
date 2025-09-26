@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { generateAvatar } from "@shared/lib/create-identicon";
+import { AvatarType, generateAvatar } from "@shared/lib/create-identicon";
 
 import { useCacheBust } from "./use-cache-bust";
 
@@ -36,10 +36,15 @@ export const AvatarState = z.object({
     type: Type,
 });
 
-export const useAvatar = (
-    user: string | null | undefined,
-    chainId: string = "2282d80c-1c8c-43b9-808d-13e3e8d580c7",
-) => {
+export const useAvatar = ({
+    account,
+    type = "identicon",
+    chainId = "2282d80c-1c8c-43b9-808d-13e3e8d580c7",
+}: {
+    account?: string | null;
+    type?: AvatarType;
+    chainId?: string;
+}) => {
     const { bustData, bustedUser } = useCacheBust();
 
     const [avatarState, setAvatarState] = useState<z.infer<typeof AvatarState>>(
@@ -50,7 +55,7 @@ export const useAvatar = (
     );
 
     const loadAvatar = async (forceNoCache: boolean = false) => {
-        if (!user) {
+        if (!account) {
             setAvatarState({
                 avatarSrc: defaultAvatar,
                 type: "default",
@@ -58,8 +63,8 @@ export const useAvatar = (
             return;
         }
 
-        const bustParam = bustedUser === user ? `?bust=${bustData}` : "";
-        const initialUrl = generateAvatarUrl(user) + bustParam;
+        const bustParam = bustedUser === account ? `?bust=${bustData}` : "";
+        const initialUrl = generateAvatarUrl(account) + bustParam;
 
         const isImageExists = await checkImageExists(initialUrl, forceNoCache);
 
@@ -71,7 +76,7 @@ export const useAvatar = (
         } else if (chainId) {
             setAvatarState({
                 type: "generated",
-                avatarSrc: generateAvatar(chainId, user),
+                avatarSrc: generateAvatar(chainId, account, type),
             });
         } else {
             setAvatarState({
@@ -87,7 +92,7 @@ export const useAvatar = (
 
     useEffect(() => {
         loadAvatar();
-    }, [user, chainId, bustData, bustedUser]);
+    }, [account, chainId, bustData, bustedUser]);
 
     return { ...avatarState, forceRefresh };
 };

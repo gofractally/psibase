@@ -1,10 +1,10 @@
+import type { Token } from "./hooks/tokensPlugin/useBalances";
+
 import { CreditTable } from "@/apps/tokens/components/credit-table";
 import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { updateBalanceCache } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { glass } from "@dicebear/collection";
-import { createAvatar } from "@dicebear/core";
 import { Icon as SelectIcon } from "@radix-ui/react-select";
 import { useStore } from "@tanstack/react-form";
 import { ChevronDown } from "lucide-react";
@@ -18,6 +18,7 @@ import { Account } from "@/lib/zod/Account";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -143,15 +144,6 @@ export const TokensPage = () => {
                                             <form.AppField
                                                 name="token"
                                                 children={(field) => {
-                                                    const tokenLabel =
-                                                        selectedToken?.label ??
-                                                        "UNKNOWN";
-                                                    const tokenIcon =
-                                                        createAvatar(glass, {
-                                                            seed: tokenLabel,
-                                                            size: 40,
-                                                        }).toDataUri();
-
                                                     return (
                                                         <field.SelectField
                                                             options={tokens.map(
@@ -161,53 +153,20 @@ export const TokensPage = () => {
                                                                 }),
                                                             )}
                                                             triggerComponent={
-                                                                <div className="flex select-none items-center gap-2 p-1">
-                                                                    <img
-                                                                        src={
-                                                                            tokenIcon
-                                                                        }
-                                                                        alt="Token"
-                                                                        className="rounded-full border-2 border-white shadow-sm dark:border-slate-700"
-                                                                    />
-                                                                    <span className="font-mono text-3xl font-medium">
-                                                                        {
-                                                                            tokenLabel
-                                                                        }
-                                                                    </span>
-                                                                    <SelectIcon
-                                                                        asChild
-                                                                    >
-                                                                        <ChevronDown className="size-4 opacity-50" />
-                                                                    </SelectIcon>
-                                                                </div>
+                                                                <TokenSelectTrigger
+                                                                    selectedToken={
+                                                                        selectedToken
+                                                                    }
+                                                                />
                                                             }
                                                         />
                                                     );
                                                 }}
                                             />
-                                            <div className="@lg:items-end flex flex-col items-center">
-                                                <span className="text-foreground/75 select-none text-xs font-medium">
-                                                    Available
-                                                </span>
-                                                <span className="text-foreground/90 font-mono text-xl font-medium">
-                                                    <AnimateNumber
-                                                        n={
-                                                            selectedToken
-                                                                ?.balance
-                                                                ?.amount ?? 0
-                                                        }
-                                                        precision={
-                                                            selectedToken
-                                                                ?.balance
-                                                                ?.precision ?? 0
-                                                        }
-                                                        className="hover:cursor-pointer hover:underline"
-                                                        onClick={
-                                                            handleSetMaxAmount
-                                                        }
-                                                    />
-                                                </span>
-                                            </div>
+                                            <AvailableBalance
+                                                selectedToken={selectedToken}
+                                                onClick={handleSetMaxAmount}
+                                            />
                                         </div>
                                     </CardContent>
                                 </GlowingCard>
@@ -290,6 +249,49 @@ const GlowingCard = ({ children }: { children: React.ReactNode }) => {
             <Card className="relative z-10 border-gray-300 transition-colors duration-300 hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-700">
                 {children}
             </Card>
+        </div>
+    );
+};
+
+const TokenSelectTrigger = ({ selectedToken }: { selectedToken?: Token }) => {
+    const tokenLabel = selectedToken?.label ?? "UNKNOWN";
+    const { avatarSrc } = useAvatar({ account: tokenLabel, type: "glass" });
+
+    return (
+        <div className="flex select-none items-center gap-2 p-1">
+            <img
+                src={avatarSrc}
+                alt="Token"
+                className="rounded-full border-2 border-white shadow-sm dark:border-slate-700"
+            />
+            <span className="font-mono text-3xl font-medium">{tokenLabel}</span>
+            <SelectIcon asChild>
+                <ChevronDown className="size-4 opacity-50" />
+            </SelectIcon>
+        </div>
+    );
+};
+
+const AvailableBalance = ({
+    selectedToken,
+    onClick,
+}: {
+    selectedToken?: Token;
+    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}) => {
+    return (
+        <div className="@lg:items-end flex flex-col items-center">
+            <span className="text-foreground/75 select-none text-xs font-medium">
+                Available
+            </span>
+            <span className="text-foreground/90 font-mono text-xl font-medium">
+                <AnimateNumber
+                    n={selectedToken?.balance?.amount ?? 0}
+                    precision={selectedToken?.balance?.precision ?? 0}
+                    className="hover:cursor-pointer hover:underline"
+                    onClick={onClick}
+                />
+            </span>
         </div>
     );
 };

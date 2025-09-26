@@ -45,8 +45,8 @@ export const TransferModal = withForm({
             state.isSubmitting,
         ]);
 
-        const { avatarSrc: fromAvatar } = useAvatar(currentUser);
-        const { avatarSrc: toAvatar } = useAvatar(to);
+        const { avatarSrc: fromAvatar } = useAvatar({ account: currentUser });
+        const { avatarSrc: toAvatar } = useAvatar({ account: to });
 
         const quantity = useMemo(() => {
             if (!selectedToken) return null;

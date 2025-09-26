@@ -77,7 +77,7 @@ function AccountMenuItem({
     isConnectingToAccount: boolean;
     connectToAccount: (account: string) => void;
 }) {
-    const { avatarSrc } = useAvatar(account);
+    const { avatarSrc } = useAvatar({ account });
 
     return (
         <DropdownMenuItem
@@ -101,7 +101,7 @@ export function NavUser() {
     const navigate = useNavigate();
 
     const { data: profile } = useProfile(currentUser);
-    const { avatarSrc } = useAvatar(currentUser);
+    const { avatarSrc } = useAvatar({ account: currentUser });
 
     const onLogout = async () => {
         await logout();
