@@ -299,7 +299,7 @@ function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
-    DEPENDS ${XAdmin_js_DEP} wasm
+    DEPENDS XAdmin_js wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
@@ -903,7 +903,7 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
-    DEPENDS wasm ${XAdmin_js_DEP}
+    DEPENDS wasm XAdmin_js
     PACKAGE_DEPENDS XHttp XSites
 )
 
