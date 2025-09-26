@@ -79,11 +79,7 @@ export const TokensPage = () => {
         defaultValues: defaultTransferValues,
         onSubmit: handleConfirm,
         validators: {
-            onChange: ({ formApi }) => {
-                return formApi.parseValuesWithSchema(
-                    zTransferForm(currentUser),
-                );
-            },
+            onChange: zTransferForm(currentUser),
         },
     });
 
