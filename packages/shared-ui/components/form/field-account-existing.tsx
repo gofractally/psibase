@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { Supervisor } from "@psibase/common-lib";
 
-import { useAvatar } from "@shared/hooks/use-avatar";
+import { Avatar } from "@shared/components/avatar";
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { withFieldGroup } from "./app-form";
@@ -159,8 +159,6 @@ const UserStartContent = ({
     isValid: boolean;
     isValidating: boolean;
 }) => {
-    const { avatarSrc } = useAvatar({ account: value });
-
     return (
         <div className="mx-1.5 flex h-5 w-5 items-center justify-center">
             {isValidating ? (
@@ -168,10 +166,10 @@ const UserStartContent = ({
             ) : userNotFound ? (
                 <UserX size={16} className="text-destructive" />
             ) : isValid ? (
-                <img
-                    className="h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm dark:border-slate-700"
-                    src={avatarSrc}
-                    alt="From account"
+                <Avatar
+                    account={value}
+                    className="h-5 w-5"
+                    alt="Recipient avatar"
                 />
             ) : (
                 <User size={16} />
