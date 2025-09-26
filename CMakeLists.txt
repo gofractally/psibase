@@ -970,7 +970,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs Evaluations Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
 
