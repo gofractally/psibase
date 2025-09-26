@@ -548,6 +548,28 @@ namespace
    return pushTransaction(signTransaction(std::move(trx), keys));
 }
 
+void psibase::TestChain::pushBlock(const SignedBlock& block)
+{
+   auto& header = block.block.header;
+   tester::raw::getFork(id, block.block.header.previous);
+   tester::raw::startBlock(id, header.time.time_since_epoch().count(), header.producer.value,
+                           header.term, header.commitNum);
+   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   producing = true;
+   for (auto& trx : block.block.transactions)
+   {
+      expect(pushTransaction(trx));
+   }
+   finishBlock();
+   BlockInfo info{header};
+   if (info.blockId != status->head->blockId)
+   {
+      abortMessage(std::format("block header does not match: {} != {}",
+                               psio::convert_to_json(info.header),
+                               psio::convert_to_json(status->head->header)));
+   }
+}
+
 std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction()
 {
    if (auto row = kvGet<NotifyRow>(DbId::nativeSubjective, notifyKey(NotifyType::nextTransaction)))

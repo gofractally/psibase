@@ -1325,7 +1325,16 @@ struct callbacks
          psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
                         "Genesis block may not have proofs");
 
-         chain.blockContext->pushTransaction(std::move(signedTrx), trace, std::nullopt);
+         if (signedTrx.subjectiveData)
+         {
+            chain.blockContext->isProducing = false;
+            auto resetProducing = psio::finally{[&] { chain.blockContext->isProducing = true; }};
+            chain.blockContext->replayTransaction(std::move(signedTrx), trace);
+         }
+         else
+         {
+            chain.blockContext->pushTransaction(std::move(signedTrx), trace, std::nullopt);
+         }
       }
       catch (const std::exception& e)
       {
