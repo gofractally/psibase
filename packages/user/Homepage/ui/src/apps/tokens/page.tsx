@@ -15,10 +15,10 @@ import { supervisor } from "@/supervisor";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Account } from "@/lib/zod/Account";
 
+import { Avatar } from "@shared/components/avatar";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
-import { useAvatar } from "@shared/hooks/use-avatar";
 import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -255,15 +255,10 @@ const GlowingCard = ({ children }: { children: React.ReactNode }) => {
 
 const TokenSelectTrigger = ({ selectedToken }: { selectedToken?: Token }) => {
     const tokenLabel = selectedToken?.label ?? "UNKNOWN";
-    const { avatarSrc } = useAvatar({ account: tokenLabel, type: "glass" });
 
     return (
         <div className="flex select-none items-center gap-2 p-1">
-            <img
-                src={avatarSrc}
-                alt="Token"
-                className="rounded-full border-2 border-white shadow-sm dark:border-slate-700"
-            />
+            <Avatar account={tokenLabel} type="glass" />
             <span className="font-mono text-3xl font-medium">{tokenLabel}</span>
             <SelectIcon asChild>
                 <ChevronDown className="size-4 opacity-50" />

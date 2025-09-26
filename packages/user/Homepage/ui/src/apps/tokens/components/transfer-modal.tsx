@@ -7,8 +7,8 @@ import { useMemo } from "react";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 
+import { Avatar } from "@shared/components/avatar";
 import { withForm } from "@shared/components/form/app-form";
-import { useAvatar } from "@shared/hooks/use-avatar";
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -45,9 +45,6 @@ export const TransferModal = withForm({
             state.isSubmitting,
         ]);
 
-        const { avatarSrc: fromAvatar } = useAvatar({ account: currentUser });
-        const { avatarSrc: toAvatar } = useAvatar({ account: to });
-
         const quantity = useMemo(() => {
             if (!selectedToken) return null;
             const { precision, id, symbol } = selectedToken;
@@ -78,9 +75,9 @@ export const TransferModal = withForm({
                         {/* From Account */}
                         <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-1 dark:border-slate-700 dark:bg-slate-800">
                             <div className="flex-shrink-0">
-                                <img
-                                    className="h-12 w-12 rounded-full border-2 border-white object-cover shadow-sm dark:border-slate-700"
-                                    src={fromAvatar}
+                                <Avatar
+                                    account={currentUser || ""}
+                                    className="h-12 w-12"
                                     alt="From account"
                                 />
                             </div>
@@ -102,9 +99,9 @@ export const TransferModal = withForm({
                         {/* To Account */}
                         <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-1 dark:border-slate-700 dark:bg-slate-800">
                             <div className="flex-shrink-0">
-                                <img
-                                    className="h-12 w-12 rounded-full border-2 border-white object-cover shadow-sm dark:border-slate-700"
-                                    src={toAvatar}
+                                <Avatar
+                                    account={to}
+                                    className="h-12 w-12"
                                     alt="To account"
                                 />
                             </div>

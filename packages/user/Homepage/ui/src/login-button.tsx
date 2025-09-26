@@ -1,6 +1,6 @@
 import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 
-import { useAvatar } from "@shared/hooks/use-avatar";
+import { Avatar } from "@shared/components/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -57,10 +57,9 @@ export const LoginButton = () => {
 };
 
 const Account = ({ account }: { account: string }) => {
-    const { avatarSrc } = useAvatar({ account });
     return (
         <>
-            <img className="mr-2 h-4 w-4 rounded-none" src={avatarSrc} />
+            <Avatar account={account} className="mr-2 h-4 w-4" />
             <span>{account}</span>
         </>
     );
