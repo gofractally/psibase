@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { FractalRes, getFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
-import { Account, zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
-import { useCurrentFractal } from "../use-current-fractal";
+import { useFractalAccount } from "./use-fractal-account";
 
 const queryFn = async (account: string) => {
     try {
@@ -16,13 +16,13 @@ const queryFn = async (account: string) => {
     }
 };
 
-export const useFractal = (account?: Account | undefined | null) => {
-    const currentFractal = useCurrentFractal();
-    const accountSelected = account || currentFractal;
+export const useFractal = () => {
+    const currentFractal = useFractalAccount();
 
+    console.log({ currentFractal });
     return useQuery<FractalRes>({
-        queryKey: QueryKey.fractal(accountSelected),
-        enabled: Boolean(accountSelected),
-        queryFn: () => queryFn(accountSelected!),
+        queryKey: QueryKey.fractal(currentFractal),
+        enabled: Boolean(currentFractal),
+        queryFn: () => queryFn(currentFractal!),
     });
 };

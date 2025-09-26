@@ -1,4 +1,4 @@
-use psibase::{abort_message, check_some, AccountNumber, Table};
+use psibase::{abort_message, check, check_some, AccountNumber, Table};
 
 use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
@@ -60,6 +60,21 @@ impl FractalMember {
 
     pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
         check_some(Self::get(fractal, account), "member does not exist")
+    }
+
+    pub fn is_citizen(&self) -> bool {
+        MemberStatus::Citizen == self.member_status.into()
+    }
+
+    pub fn has_visa(&self) -> bool {
+        MemberStatus::Visa == self.member_status.into()
+    }
+
+    pub fn check_has_visa_or_citizenship(&self) {
+        check(
+            self.has_visa() || self.is_citizen(),
+            "must have visa or citizenship",
+        );
     }
 
     fn save(&self) {

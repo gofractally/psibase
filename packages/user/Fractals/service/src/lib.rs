@@ -24,6 +24,7 @@ pub mod service {
         psibase::services::auth_delegate::Wrapper::call().newAccount(fractal_account, sender);
 
         Fractal::add(fractal_account, name, mission);
+        FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
         let discovery_guild = Guild::add(
             fractal_account,
             sender,
@@ -31,7 +32,6 @@ pub mod service {
             "discovery".into(),
         );
         GuildMember::add(fractal_account, discovery_guild.id, sender);
-        FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -187,6 +187,20 @@ pub mod service {
         check_is_eval();
         EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .award_group_scores(group_number, group_result);
+    }
+
+    #[action]
+    fn create_guild(
+        fractal: AccountNumber,
+        rep: AccountNumber,
+        display_name: Memo,
+        slug: AccountNumber,
+    ) {
+        check(
+            FractalMember::get_assert(fractal, get_sender()).is_citizen(),
+            "must be a citizen to create a guild",
+        );
+        Guild::add(fractal, rep, display_name, slug);
     }
 
     #[event(history)]

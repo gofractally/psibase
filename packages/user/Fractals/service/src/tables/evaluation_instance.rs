@@ -1,11 +1,12 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
-use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GID};
+use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable, GID};
 use crate::{
     helpers::parse_rank_to_accounts,
     tables::tables::{EvaluationInstance, EvaluationInstanceTable},
 };
+use async_graphql::ComplexObject;
 
 impl EvaluationInstance {
     pub fn get(guild: GID) -> Option<Self> {
@@ -197,5 +198,15 @@ impl EvaluationInstance {
         self.guild_members().into_iter().for_each(|mut account| {
             account.save_pending_score();
         });
+    }
+}
+
+#[ComplexObject]
+impl EvaluationInstance {
+    pub async fn guild_instance(&self) -> Guild {
+        GuildTable::new()
+            .get_index_pk()
+            .get(&self.evaluation_id)
+            .unwrap()
     }
 }

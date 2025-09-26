@@ -1,4 +1,6 @@
 import { zAccount } from "./zod/Account";
 
-export const fractalsService = zAccount.parse("fractals");
+export const fractalService = window.location.hostname;
+console.log({ fractalService });
+
 export const evaluationsService = zAccount.parse("evaluations");

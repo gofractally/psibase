@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -23,7 +23,7 @@ export const useUnregister = () =>
 
             void (await getSupervisor().functionCall({
                 method: "unregister",
-                service: fractalsService,
+                service: fractalService,
                 intf: "user",
                 params: [params.evaluationId],
             }));

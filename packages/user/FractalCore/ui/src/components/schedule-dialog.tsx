@@ -3,7 +3,6 @@ import dayjs from "dayjs";
 import { useAppForm } from "@/components/form/app-form";
 
 import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -13,6 +12,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 interface Props {
     isOpen: boolean;
@@ -29,7 +29,7 @@ export const ScheduleDialog = ({
 }: Props) => {
     const { mutateAsync: setSchedule } = useSetSchedule();
 
-    const fractal = useCurrentFractal();
+    const fractal = useFractalAccount();
 
     const form = useAppForm({
         defaultValues: {

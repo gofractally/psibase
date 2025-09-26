@@ -4,17 +4,17 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
-import { useCurrentFractal } from "../use-current-fractal";
+import { useFractalAccount } from "./use-fractal-account";
 
 const zParams = z.object({
     evaluationId: z.number(),
 });
 
 export const useCloseEvaluation = () => {
-    const fractal = useCurrentFractal();
+    const fractal = useFractalAccount();
 
     return useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
@@ -24,7 +24,7 @@ export const useCloseEvaluation = () => {
                 void (await supervisor.functionCall({
                     method: "closeEval",
                     params: [evaluationId],
-                    service: fractalsService,
+                    service: fractalService,
                     intf: "admin",
                 }));
             } catch (e) {

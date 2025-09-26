@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
 const zParams = z.object({
@@ -20,7 +20,7 @@ export const usePropose = () =>
 
             const pars = {
                 method: "propose",
-                service: fractalsService,
+                service: fractalService,
                 intf: "user",
                 params: [evaluationId, groupNumber, proposal],
             };

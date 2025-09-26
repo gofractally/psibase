@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { zFractal } from "@/lib/graphql/fractals/getFractal";
@@ -28,7 +27,8 @@ import {
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
 
-import { CreateFractalModal } from "./create-fractal-modal";
+import { CreateGuildModal } from "./create-fractal-modal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -37,26 +37,26 @@ export function AppSwitcher() {
 
     const { data: currentUser } = useCurrentUser();
     const { data: memberships, error } = useMemberships(currentUser);
-    const fractals = memberships
+    const guilds = memberships
         ? memberships.map((membership) => membership.fractalDetails)
         : [];
 
-    console.log({ fractals, error });
+    console.log({ fractals: guilds, error });
     const { data: chainId } = useChainId();
 
-    const [showCreateFractalModal, setShowCreateFractalModal] = useState(false);
+    const [showCreateFractalModal, setShowCreateGuildModal] = useState(false);
 
-    const currentFractal = useCurrentFractal();
+    const currentFractal = useFractalAccount();
 
-    const { data: fractal } = useFractal(currentFractal);
+    const { data: fractal } = useFractal();
 
     return (
         <SidebarMenu>
-            <CreateFractalModal
-                openChange={(e) => setShowCreateFractalModal(e)}
+            <CreateGuildModal
+                openChange={(e) => setShowCreateGuildModal(e)}
                 show={showCreateFractalModal}
             />
-            <SidebarGroupLabel>My fractals</SidebarGroupLabel>
+            <SidebarGroupLabel>Guilds</SidebarGroupLabel>
             <SidebarMenuItem>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -109,12 +109,12 @@ export function AppSwitcher() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
 
-                        {fractals && fractals?.length > 0 && (
+                        {guilds && guilds?.length > 0 && (
                             <DropdownMenuLabel className="text-muted-foreground text-xs">
                                 Fractals
                             </DropdownMenuLabel>
                         )}
-                        {fractals?.map((fractal) => {
+                        {guilds?.map((fractal) => {
                             const metadata = zFractal.safeParse(
                                 queryClient.getQueryData(
                                     QueryKey.fractal(fractal.account),
@@ -150,20 +150,20 @@ export function AppSwitcher() {
                                 </DropdownMenuItem>
                             );
                         })}
-                        {fractals && fractals.length > 0 && (
+                        {guilds && guilds.length > 0 && (
                             <DropdownMenuSeparator />
                         )}
                         <DropdownMenuItem
                             className="gap-2 p-2"
                             onClick={() => {
-                                setShowCreateFractalModal(true);
+                                setShowCreateGuildModal(true);
                             }}
                         >
                             <div className="bg-background flex size-6 items-center justify-center rounded-md border">
                                 <Plus className="size-4" />
                             </div>
                             <div className="text-muted-foreground font-medium">
-                                Create fractal
+                                Create Guild
                             </div>
                         </DropdownMenuItem>
                     </DropdownMenuContent>

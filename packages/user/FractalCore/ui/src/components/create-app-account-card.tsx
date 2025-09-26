@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
 import {
     Card,
@@ -9,16 +8,17 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 
-import { CreateFractalModal } from "./create-fractal-modal";
+import { CreateGuildModal } from "./create-fractal-modal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const CreateAppAccountCard = () => {
-    const currentFractal = useCurrentFractal();
+    const currentFractal = useFractalAccount();
 
     const [showModal, setShowModal] = useState(false);
 
     return (
         <Card>
-            <CreateFractalModal
+            <CreateGuildModal
                 show={showModal}
                 openChange={(e) => {
                     setShowModal(e);

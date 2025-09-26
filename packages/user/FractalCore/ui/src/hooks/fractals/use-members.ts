@@ -4,10 +4,10 @@ import { getMembers } from "@/lib/graphql/fractals/getMembers";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
-import { useCurrentFractal } from "../use-current-fractal";
+import { useFractalAccount } from "./use-fractal-account";
 
 export const useMembers = (accountParam?: OptionalAccount) => {
-    const currentFractal = useCurrentFractal();
+    const currentFractal = useFractalAccount();
     const account = accountParam || currentFractal;
 
     return useQuery({

@@ -1,5 +1,4 @@
 import {
-    CalendarClock,
     Contact,
     LucideIcon,
     Search,
@@ -17,7 +16,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
-import { useFractal } from "@/hooks/fractals/use-fractal";
 
 interface MenuItem {
     groupLabel: string;
@@ -74,21 +72,11 @@ export function NavMain() {
 
     const fractalName = useCurrentFractal();
 
-    const { data } = useFractal(fractalName);
 
     const fractalMenus = [
         ...staticFractalMenus,
-        {
-            groupLabel: "Guilds",
-            path: "guild",
-            menus: data?.guilds.nodes.map(guild => ({
-                title: guild.displayName,
-                icon: CalendarClock,
-                path: guild.id,
-            })),
-
-        },
     ]
+
 
     const isBrowse = !location.pathname.startsWith("/fractal");
 

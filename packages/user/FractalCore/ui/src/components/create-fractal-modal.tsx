@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
-    useCreateFractal,
-    zParams as zCreateFractalSchema,
+    useCreateGuild,
+    zParams as zCreateGuild,
 } from "@/hooks/fractals/use-create-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { isAccountAvailable } from "@/hooks/use-account-status";
@@ -18,14 +18,14 @@ import {
 
 import { useAppForm } from "./form/app-form";
 
-export const CreateFractalModal = ({
+export const CreateGuildModal = ({
     show,
     openChange,
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { mutateAsync: createFractal } = useCreateFractal();
+    const { mutateAsync: createGuild } = useCreateGuild();
 
     const { data: currentUser } = useCurrentUser();
     const { refetch } = useMemberships(currentUser);
@@ -34,18 +34,23 @@ export const CreateFractalModal = ({
 
     const form = useAppForm({
         defaultValues: {
-            account: "",
-            mission: "",
+            slug: "",
             name: "",
+            bio: "",
         },
-        onSubmit: async (data) => {
-            await createFractal(data.value);
+        onSubmit: async ({ value: { name, slug, bio } }) => {
+            await createGuild({
+                name,
+                slug,
+                bio,
+                description: ""
+            });
             openChange(false);
-            navigate(`/fractal/${data.value.account}`);
+            navigate(`/guild/${slug}`);
             refetch();
         },
         validators: {
-            onChange: zCreateFractalSchema,
+            onChange: zCreateGuild,
         },
     });
 

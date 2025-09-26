@@ -216,6 +216,12 @@ mod service {
                 .get(&guild_id)
         }
 
+        async fn eval_by_id(&self, evaluation_id: u32) -> Option<EvaluationInstance> {
+            EvaluationInstanceTable::with_service(fractals::SERVICE)
+                .get_index_by_evaluation()
+                .get(&evaluation_id)
+        }
+
         async fn fractals(
             &self,
             first: Option<i32>,
@@ -264,6 +270,27 @@ mod service {
             TableQuery::subindex::<AccountNumber>(
                 FractalMemberTable::with_service(fractals::SERVICE).get_index_by_member(),
                 &(member),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
+        async fn guild_memberships(
+            &self,
+            fractal: AccountNumber,
+            member: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
+            TableQuery::subindex::<AccountNumber>(
+                GuildMemberTable::with_service(fractals::SERVICE).get_index_by_fractal(),
+                &(fractal, member),
             )
             .first(first)
             .last(last)

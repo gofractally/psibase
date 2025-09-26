@@ -7,8 +7,6 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
-
 import { cn } from "@shared/lib/utils";
 import {
     SidebarGroup,
@@ -18,6 +16,7 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 interface MenuItem {
     groupLabel: string;
@@ -47,8 +46,6 @@ const browseMenu: MenuItem[] = [
     },
 ];
 
-
-
 export const staticFractalMenus: MenuItem[] = [
     {
         groupLabel: "Membership",
@@ -72,22 +69,25 @@ export const staticFractalMenus: MenuItem[] = [
 export function NavMain() {
     const location = useLocation();
 
-    const fractalName = useCurrentFractal();
+    const fractalName = useFractalAccount();
 
-    const { data } = useFractal(fractalName);
+    const { data } = useFractal();
 
-    const fractalMenus = [
-        ...staticFractalMenus,
+    const dynamic: MenuItem | undefined = data ?
         {
             groupLabel: "Guilds",
             path: "guild",
-            menus: data?.guilds.nodes.map(guild => ({
+            menus: data!.guilds.nodes.map(guild => ({
                 title: guild.displayName,
                 icon: CalendarClock,
-                path: guild.id,
-            })),
+                path: guild.id.toString(),
+            }))
+        }
+        : undefined;
 
-        },
+    const fractalMenus: MenuItem[] = [
+        ...staticFractalMenus,
+        ...(dynamic ? [dynamic] : []),
     ]
 
     const isBrowse = !location.pathname.startsWith("/fractal");

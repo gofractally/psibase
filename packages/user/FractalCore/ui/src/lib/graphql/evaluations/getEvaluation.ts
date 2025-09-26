@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
 import { zAccount } from "@/lib/zod/Account";
 import { zUnix } from "@/lib/zod/Unix";
@@ -26,7 +26,7 @@ export const getEvaluation = async (id: number) => {
     const evaluation = await graphql(
         `
     {
-        getEvaluation(owner: "${fractalsService}", evaluationId: ${id}) {     
+        getEvaluation(owner: "${fractalService}", evaluationId: ${id}) {     
             id,
             createdAt,
             owner,

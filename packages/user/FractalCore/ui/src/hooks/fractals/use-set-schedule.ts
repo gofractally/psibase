@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
@@ -52,7 +52,7 @@ export const useSetSchedule = () =>
                     intervalSeconds,
                     forceDelete,
                 ],
-                service: fractalsService,
+                service: fractalService,
                 intf: "admin",
             });
         },

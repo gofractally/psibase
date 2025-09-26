@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -13,24 +13,25 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { zAccountNameStatus } from "../use-account-status";
 
 export const zParams = z.object({
-    account: zAccount,
+    slug: zAccount,
     name: z.string().min(1, { message: "Name is required." }),
-    mission: z.string().min(1, { message: "Mission is required." }),
+    bio: z.string().min(1, { message: "Mission is required." }),
+    description: z.string(),
 });
 
-export const useCreateFractal = () =>
+export const useCreateGuild = () =>
     useMutation<undefined, Error, z.infer<typeof zParams>>({
-        mutationKey: QueryKey.createFractal(),
+        mutationKey: QueryKey.createGuild(),
         mutationFn: async (params) => {
-            const { account, mission, name } = zParams.parse(params);
+            const { slug: account, bio, name } = zParams.parse(params);
             await supervisor.functionCall({
-                method: "createFractal",
-                params: [account, name, mission],
-                service: fractalsService,
+                method: "createGuild",
+                params: [account, name, bio],
+                service: fractalService,
                 intf: "admin",
             });
         },
-        onSuccess: (_, { account }) => {
+        onSuccess: (_, { slug: account }) => {
             queryClient.setQueryData(
                 QueryKey.userAccount(account),
                 () => zAccountNameStatus.Enum.Taken,

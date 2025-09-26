@@ -56,6 +56,7 @@ pub mod tables {
 
     #[table(name = "EvaluationInstanceTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct EvaluationInstance {
         #[primary_key]
         pub guild: GID,
@@ -123,6 +124,11 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (GID, AccountNumber) {
             (self.guild, self.member)
+        }
+
+        #[secondary_key(1)]
+        fn by_fractal(&self) -> (AccountNumber, AccountNumber, GID) {
+            (self.fractal, self.member, self.guild)
         }
     }
 }

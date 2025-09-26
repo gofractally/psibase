@@ -2,9 +2,7 @@ import dayjs from "dayjs";
 
 import { useMembers } from "@/hooks/fractals/use-members";
 import { useScores } from "@/hooks/fractals/use-scores";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { getMemberLabel } from "@/lib/getMemberLabel";
-import { EvalType } from "@/lib/zod/EvaluationType";
 
 import { cn } from "@shared/lib/utils";
 import {
@@ -15,6 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 const formatScore = (num: number): string => {
     // Would it be neat to make the score a flat integer out of 100?
@@ -22,7 +21,7 @@ const formatScore = (num: number): string => {
 };
 
 export const AllMembers = () => {
-    const currentFractal = useCurrentFractal();
+    const currentFractal = useFractalAccount();
 
     const { data: members } = useMembers(currentFractal);
     const { data: scores } = useScores();
@@ -31,8 +30,7 @@ export const AllMembers = () => {
         .map((member) => {
             const score = scores?.find(
                 (score) =>
-                    score.account == member.account &&
-                    score.evalType == EvalType.Reputation,
+                    score.member == member.account
             );
             return {
                 ...member,

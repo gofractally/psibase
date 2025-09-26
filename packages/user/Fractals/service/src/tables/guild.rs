@@ -1,7 +1,9 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Memo, Table};
+use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::tables::tables::{Config, EvaluationInstance, Guild, GuildTable, GID};
+use crate::tables::tables::{
+    Config, EvaluationInstance, Fractal, FractalMember, Guild, GuildTable, GID,
+};
 
 impl Guild {
     fn new(
@@ -27,6 +29,12 @@ impl Guild {
         display_name: Memo,
         slug: AccountNumber,
     ) -> Self {
+        check_none(
+            GuildTable::new().get_index_by_slug().get(&(fractal, slug)),
+            "slug already in use",
+        );
+        FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();
+
         let new_instance = Self::new(fractal, rep, display_name, slug);
         new_instance.save();
         new_instance
@@ -49,5 +57,9 @@ impl Guild {
 impl Guild {
     pub async fn eval_instance(&self) -> Option<EvaluationInstance> {
         EvaluationInstance::get(self.id)
+    }
+
+    pub async fn fractal_instance(&self) -> Fractal {
+        Fractal::get_assert(self.fractal)
     }
 }

@@ -1,10 +1,9 @@
-import { createBrowserRouter, redirect } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 
 import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
 import { Completed } from "@/pages/fractal/evaluations/completed";
 import { AllMembers } from "@/pages/fractal/membership/all-members";
 import { MyMembership } from "@/pages/fractal/membership/my-membership";
-import { Loader } from "@/pages/loader";
 
 import { Layout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -14,37 +13,13 @@ import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result"
 import { Guild } from "./pages/fractal/guild";
 
 export const router = createBrowserRouter([
+
     {
         path: "/",
-        element: <Loader />,
-    },
-    {
-        path: "/membership",
-        element: (
-            <ProtectedRoute>
-                <MyMembership />
-            </ProtectedRoute>
-        ),
-    },
-    {
-        path: ":fractalName/guild/:guildId",
-        element: (
-            <ProtectedRoute>
-                <Guild />
-            </ProtectedRoute>
-        ),
-    },
-    {
-        path: "/fractal",
         element: <Layout />,
         children: [
             {
-                path: ":fractalName",
-                index: true,
-                loader: () => redirect("membership"),
-            },
-            {
-                path: ":fractalName/membership",
+                path: "/",
                 element: (
                     <ProtectedRoute>
                         <MyMembership />
@@ -52,7 +27,15 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/guild/:guildId",
+                path: "/membership",
+                element: (
+                    <ProtectedRoute>
+                        <MyMembership />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/guild/:guildId",
                 element: (
                     <ProtectedRoute>
                         <Guild />
@@ -60,7 +43,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/membership/members",
+                path: "/membership/members",
                 element: (
                     <ProtectedRoute>
                         <AllMembers />
@@ -68,7 +51,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/evaluations",
+                path: "/evaluations",
                 element: (
                     <ProtectedRoute>
                         <ActiveAndUpcoming />
@@ -76,7 +59,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/evaluations/completed",
+                path: "/evaluations/completed",
                 element: (
                     <ProtectedRoute>
                         <Completed />
@@ -84,7 +67,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/evaluations/completed/:evaluationId",
+                path: "/evaluations/completed/:evaluationId",
                 element: (
                     <ProtectedRoute>
                         <EvaluationResult />
@@ -92,7 +75,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: ":fractalName/evaluations/:evaluationId/group/:groupNumber",
+                path: "/evaluations/:evaluationId/group/:groupNumber",
                 element: (
                     <ProtectedRoute>
                         <EvaluationDeliberation />

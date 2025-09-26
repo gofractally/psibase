@@ -4,12 +4,12 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import { paths } from "@/lib/paths";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { useCurrentFractal } from "../use-current-fractal";
+import { useFractalAccount } from "./use-fractal-account";
 import { updateAttestation } from "./use-users-and-groups";
 
 export const zParams = z.object({
@@ -19,14 +19,14 @@ export const zParams = z.object({
 
 export const useAttest = () => {
     const navigate = useNavigate();
-    const fractal = useCurrentFractal();
+    const fractal = useFractalAccount();
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
             await toast.promise(
                 getSupervisor().functionCall({
                     method: "attest",
-                    service: fractalsService,
+                    service: fractalService,
                     intf: "user",
                     params: [params.evaluationId, params.groupNumber],
                 }),

@@ -13,7 +13,7 @@ use psibase::fracpack::Pack;
 
 mod errors;
 mod helpers;
-use psibase::AccountNumber;
+use psibase::{AccountNumber, Memo};
 
 use bindings::evaluations::plugin::admin::close;
 use bindings::evaluations::plugin::user::{
@@ -46,7 +46,7 @@ impl Admin for FractallyPlugin {
     }
 
     fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {
-        check_app_origin()?;
+        check_app_origin(fractals::SERVICE)?;
 
         let packed_args = fractals::action_structs::create_fractal {
             fractal_account: account.parse().unwrap(),
@@ -61,7 +61,7 @@ impl Admin for FractallyPlugin {
     }
 
     fn start(guild_id: u32) -> Result<(), Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
 
         let packed_args = fractals::action_structs::start_eval { guild: guild_id }.packed();
 
@@ -80,7 +80,7 @@ impl Admin for FractallyPlugin {
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
-        check_app_origin()?;
+        check_app_origin(fractal.as_str().into())?;
 
         let _latch = ProposeLatch::new(&fractal);
 
@@ -103,19 +103,42 @@ impl Admin for FractallyPlugin {
 
 impl User for FractallyPlugin {
     fn register(evaluation_id: u32) -> Result<(), Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
 
         register(&"fractals".to_string(), evaluation_id)
     }
 
     fn unregister(evaluation_id: u32) -> Result<(), Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
 
         unregister(&"fractals".to_string(), evaluation_id)
     }
 
+    fn create_guild(
+        fractal: String,
+        representative: String,
+        display_name: String,
+        slug: String,
+    ) -> Result<(), Error> {
+        let fractal: AccountNumber = fractal.as_str().into();
+        check_app_origin(fractal)?;
+
+        let packed_args = fractals::action_structs::create_guild {
+            fractal,
+            rep: representative.as_str().into(),
+            display_name: Memo::try_from(display_name).unwrap(),
+            slug: slug.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::create_guild::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<String>>, Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
 
         match get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
             None => Ok(None),
@@ -137,19 +160,22 @@ impl User for FractallyPlugin {
     }
 
     fn attest(evaluation_id: u32, group_number: u32) -> Result<(), Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
+
+        // lookup the evaluation, make sure the evaluation fractal
+        // matches the sender.
 
         attest(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn get_group_users(evaluation_id: u32, group_number: u32) -> Result<Vec<String>, Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
 
         get_group_users(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn propose(evaluation_id: u32, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
 
         let all_users: Vec<AccountNumber> =
             get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
@@ -171,12 +197,10 @@ impl User for FractallyPlugin {
     }
 
     fn join(fractal: String) -> Result<(), Error> {
-        check_app_origin()?;
+        let fractal = AccountNumber::from(fractal.as_str());
 
-        let packed_args = fractals::action_structs::join {
-            fractal: AccountNumber::from(fractal.as_str()),
-        }
-        .packed();
+        check_app_origin(fractal)?;
+        let packed_args = fractals::action_structs::join { fractal }.packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
 }

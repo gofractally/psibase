@@ -9,7 +9,6 @@ import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance"
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useNowUnix } from "@/hooks/use-now-unix";
@@ -25,9 +24,10 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 import { useGuildId } from "@/hooks/use-guild-id";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const ActiveAndUpcoming = () => {
-    const currentFractal = useCurrentFractal();
+    const currentFractal = useFractalAccount();
     const guildId = useGuildId();
 
     const { data: currentUser } = useCurrentUser();

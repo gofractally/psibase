@@ -10,7 +10,6 @@ import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useChainId } from "@/hooks/use-chain-id";
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { getMemberLabel } from "@/lib/getMemberLabel";
@@ -25,9 +24,10 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const MyMembership = () => {
-    const fractalAccount = useCurrentFractal();
+    const fractalAccount = useFractalAccount();
 
     const {
         data: currentUser,
@@ -39,7 +39,7 @@ export const MyMembership = () => {
         data: fractal,
         isLoading: isLoadingFractal,
         error: errorFractal,
-    } = useFractal(fractalAccount);
+    } = useFractal();
 
     const {
         data: membership,
@@ -52,6 +52,8 @@ export const MyMembership = () => {
         isLoading: isLoadingChainId,
         error: errorChainId,
     } = useChainId();
+
+    console.log({ errorFractal, errorMembership, errorChainId }, 'x', { fractal, membership })
 
     const isLoading =
         isLoadingCurrentUser ||
@@ -148,8 +150,8 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         membership == null
             ? "Not a member"
             : membership
-              ? getMemberLabel(membership.memberStatus)
-              : "Loading...";
+                ? getMemberLabel(membership.memberStatus)
+                : "Loading...";
     return (
         <Card>
             <CardHeader>
@@ -210,11 +212,10 @@ const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
                     </div>
                     <div>
                         <h3 className="text-lg font-semibold">
-                            Join this fractal
+                            Apply to Join
                         </h3>
                         <p className="text-muted-foreground mt-1 text-sm">
-                            Become a member to participate in evaluations and
-                            contribute to the community.
+                            Create an application to join this fractal.
                         </p>
                     </div>
                     <Button
@@ -228,7 +229,7 @@ const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
                         className="w-full sm:w-auto"
                     >
                         {isPending && <Loader2 className="animate-spin" />}
-                        Join Fractal
+                        Apply
                     </Button>
                 </div>
             </CardContent>

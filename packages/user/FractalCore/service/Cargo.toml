@@ -10,6 +10,7 @@ server = "r-fractal-core"
 plugin = "fractal-core-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
+    { sender = "fractal-core", service = "sites", method = "enablespa", data = { enable = true } },
     { sender = "fractal-core", service = "fractal-core", method = "init", data = {} },
 ]
 

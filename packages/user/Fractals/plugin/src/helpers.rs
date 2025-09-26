@@ -67,10 +67,10 @@ fn get_sender_app() -> Result<AccountNumber, ErrorType> {
     AccountNumber::from_str(&sender_string).map_err(|_| ErrorType::InvalidAccountNumber)
 }
 
-pub fn check_app_origin() -> Result<(), ErrorType> {
+pub fn check_app_origin(account: AccountNumber) -> Result<(), ErrorType> {
     let sender = get_sender_app()?;
 
-    if sender != psibase::services::fractals::SERVICE {
+    if sender != account {
         return Err(ErrorType::InvalidSender(sender.to_string()).into());
     }
     Ok(())

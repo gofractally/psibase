@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalsService } from "@/lib/constants";
+import { fractalService } from "@/lib/constants";
 import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
@@ -19,7 +19,7 @@ export const useProposal = (
                 const res = await supervisor.functionCall({
                     method: "getProposal",
                     params: [evaluationId, groupNumber],
-                    service: fractalsService,
+                    service: fractalService,
                     intf: "user",
                 });
 
