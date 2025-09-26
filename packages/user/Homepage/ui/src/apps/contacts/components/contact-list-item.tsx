@@ -1,6 +1,6 @@
-import { useAvatar } from "@/hooks/use-avatar";
 import { useProfile } from "@/hooks/use-profile";
 
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { cn } from "@shared/lib/utils";
 import { AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Avatar } from "@shared/shadcn/ui/avatar";
