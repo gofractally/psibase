@@ -89,7 +89,7 @@ SCENARIO("Auth")
       }
       THEN("Accounts can still create new accounts")
       {
-         auto newAcc = accounts.newAccount("bob", AuthAny::service, true);
+         auto newAcc = accounts.newAccount("bobbobbobbob", AuthAny::service, true);
          CHECK(newAcc.succeeded());
       }
    }
