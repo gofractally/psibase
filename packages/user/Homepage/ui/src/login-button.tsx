@@ -57,7 +57,7 @@ export const LoginButton = () => {
 };
 
 const Account = ({ account }: { account: string }) => {
-    const { avatarSrc } = useAvatar(account);
+    const { avatarSrc } = useAvatar({ account });
     return (
         <>
             <img className="mr-2 h-4 w-4 rounded-none" src={avatarSrc} />

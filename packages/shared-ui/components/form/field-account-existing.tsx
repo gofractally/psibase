@@ -159,7 +159,7 @@ const UserStartContent = ({
     isValid: boolean;
     isValidating: boolean;
 }) => {
-    const { avatarSrc } = useAvatar(value);
+    const { avatarSrc } = useAvatar({ account: value });
 
     return (
         <div className="mx-1.5 flex h-5 w-5 items-center justify-center">
