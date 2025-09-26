@@ -74,6 +74,7 @@ namespace psibase
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
                            bool                                     enableUndo = true,
                            bool                                     commit     = true);
+      void replayTransaction(SignedTransaction&& trx, TransactionTrace& trace);
 
       // The action has the same database access rules as queries
       void execAsyncAction(Action&& action);

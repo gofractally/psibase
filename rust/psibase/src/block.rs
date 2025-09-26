@@ -274,6 +274,15 @@ pub enum ConsensusData {
     BFT(BftConsensus),
 }
 
+impl ConsensusData {
+    pub fn producers(&self) -> &Vec<Producer> {
+        match self {
+            ConsensusData::CFT(cft) => &cft.producers,
+            ConsensusData::BFT(bft) => &bft.producers,
+        }
+    }
+}
+
 #[derive(
     Debug,
     Clone,
@@ -320,23 +329,23 @@ pub struct BlockHeaderAuthAccount {
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Consensus {
-    data: ConsensusData,
-    services: Vec<BlockHeaderAuthAccount>,
-    wasmConfig: WasmConfigRow,
+    pub data: ConsensusData,
+    pub services: Vec<BlockHeaderAuthAccount>,
+    pub wasmConfig: WasmConfigRow,
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PendingConsensus {
-    consensus: Consensus,
-    blockNum: BlockNum,
+    pub consensus: Consensus,
+    pub blockNum: BlockNum,
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct JointConsensus {
-    current: Consensus,
-    next: Option<PendingConsensus>,
+    pub current: Consensus,
+    pub next: Option<PendingConsensus>,
 }
 
 #[derive(

@@ -829,6 +829,14 @@ namespace psibase
       current.transactions.push_back(std::move(trx));
    }
 
+   void BlockContext::replayTransaction(SignedTransaction&& trx, TransactionTrace& trace)
+   {
+      assert(!isProducing);
+      check(!!trx.subjectiveData, "Missing subjective data");
+      exec(trx, trace, std::nullopt, false, true);
+      current.transactions.push_back(std::move(trx));
+   }
+
    void BlockContext::execAsyncAction(Action&& action)
    {
       SignedTransaction  trx;
