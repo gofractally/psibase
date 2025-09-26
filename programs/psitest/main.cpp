@@ -347,7 +347,10 @@ struct test_chain
       db     = {};
    }
 
-   void startBlock(std::optional<psibase::BlockTime> time = std::nullopt)
+   void startBlock(std::optional<psibase::BlockTime> time,
+                   psibase::AccountNumber            producer,
+                   psibase::TermNum                  term,
+                   psibase::BlockNum                 commitNum)
    {
       // TODO: undo control
       finishBlock();
@@ -360,43 +363,6 @@ struct test_chain
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
-      auto producer = psibase::AccountNumber("firstproducer");
-      auto status =
-          blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
-      if (status.has_value())
-      {
-         if (status->consensus.next)
-         {
-            std::visit(
-                [&](const auto& c)
-                {
-                   if (!c.producers.empty())
-                   {
-                      producer = c.producers.front().name;
-                   }
-                },
-                status->consensus.next->consensus.data);
-         }
-         if (!status->consensus.next ||
-             status->current.commitNum < status->consensus.next->blockNum)
-         {
-            std::visit(
-                [&](const auto& c)
-                {
-                   if (!c.producers.empty())
-                   {
-                      producer = c.producers.front().name;
-                   }
-                },
-                status->consensus.current.data);
-         }
-      }
-
-      // These are not the correct values if we want the chain to actually
-      // sync correctly, but it's sufficient for the tester to test services.
-      auto term      = status ? status->current.term : 0;
-      auto commitNum = status ? status->head.value().header.blockNum : 0;
-
       blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();
    }
@@ -404,7 +370,7 @@ struct test_chain
    void start_if_needed()
    {
       if (!blockContext)
-         startBlock();
+         psibase::abortMessage("Not building a block");
    }
 
    void finishBlock()
@@ -1277,11 +1243,15 @@ struct callbacks
       c.db = {};
    }
 
-   void testerStartBlock(uint32_t chain_index, int64_t time_us)
+   void testerStartBlock(uint32_t          chain_index,
+                         int64_t           time_us,
+                         uint64_t          producer,
+                         psibase::TermNum  term,
+                         psibase::BlockNum commitNum)
    {
       assert_chain(chain_index)
-          .startBlock(time_us ? std::optional{psibase::BlockTime{psibase::MicroSeconds{time_us}}}
-                              : std::nullopt);
+          .startBlock(psibase::BlockTime{psibase::MicroSeconds{time_us}},
+                      psibase::AccountNumber{producer}, term, commitNum);
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }

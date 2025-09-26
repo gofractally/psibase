@@ -300,13 +300,35 @@ void psibase::TestChain::startBlock(BlockTime tp)
 {
    if (producing)
       finishBlock();
+
+   auto producer = AccountNumber{"firstproducer"};
+   if (status)
+   {
+      auto getFirstProducer = [&](const auto& c)
+      {
+         if (!c.producers.empty())
+         {
+            producer = c.producers.front().name;
+         }
+      };
+      if (status->consensus.next)
+         std::visit(getFirstProducer, status->consensus.next->consensus.data);
+      if (!status->consensus.next || status->current.commitNum < status->consensus.next->blockNum)
+         std::visit(getFirstProducer, status->consensus.current.data);
+   }
+
+   auto term      = status ? status->current.term : 0;
+   auto commitNum = status ? status->head.value().header.blockNum : 0;
+
    // Guarantee that there is a recent block for fillTapos to use.
    if (status && status->head->header.time + Seconds(1) < tp)
    {
-      tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count());
+      tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count(), producer.value,
+                              term, commitNum);
       finishBlock();
+      commitNum = status->head.value().header.blockNum;
    }
-   tester::raw::startBlock(id, tp.time_since_epoch().count());
+   tester::raw::startBlock(id, tp.time_since_epoch().count(), producer.value, term, commitNum);
    status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
 }
