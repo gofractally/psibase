@@ -5,10 +5,10 @@ import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
 import { useMemo } from "react";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { withForm } from "@shared/components/form/app-form";
+import { useAvatar } from "@shared/hooks/use-avatar";
 import {
     AlertDialog,
     AlertDialogCancel,

@@ -2,42 +2,30 @@ import { Button } from "@shared/shadcn/ui/button";
 
 import { useFormContext } from "../app-form";
 
-type SubmitButtonLabels = [
-    label: string,
-    submittingLabel: string,
-    submittedLabel: string,
-];
+type SubmitButtonLabels = [label: string, submittingLabel: string];
 
 export const SubmitButton = ({
-    labels = ["Save", "Saving...", "Saved"],
+    labels = ["Save", "Saving..."],
     onClick,
 }: {
     labels?: SubmitButtonLabels;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) => {
     const form = useFormContext();
-    const [label, submittingLabel, submittedLabel] = labels;
+    const [label, submittingLabel] = labels;
 
     return (
         <form.Subscribe
-            selector={(state) => [
-                state.isValid,
-                state.isSubmitting,
-                state.isSubmitSuccessful,
-            ]}
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
         >
-            {([isValid, isSubmitting, isSubmitSuccessful]) => {
+            {([canSubmit, isSubmitting]) => {
                 return (
                     <Button
                         type="submit"
-                        disabled={!isValid || isSubmitting}
+                        disabled={!canSubmit || isSubmitting}
                         onClick={onClick}
                     >
-                        {isSubmitting
-                            ? submittingLabel
-                            : isSubmitSuccessful
-                              ? submittedLabel
-                              : label}
+                        {isSubmitting ? submittingLabel : label}
                     </Button>
                 );
             }}
