@@ -3,9 +3,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useChainId } from "@/hooks/use-chain-id";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { generateAvatar } from "@/lib/createIdenticon";
+import { generateAvatar } from "@shared/lib/create-identicon";
 
 import { useCacheBust } from "./use-cache-bust";
 
@@ -38,11 +36,10 @@ export const AvatarState = z.object({
     type: Type,
 });
 
-export const useAvatar = (user?: string | null | undefined) => {
-    const { data: currentUser } = useCurrentUser();
-    const focusedUser = user || currentUser;
-
-    const { data: chainId } = useChainId();
+export const useAvatar = (
+    user: string | null | undefined,
+    chainId: string = "2282d80c-1c8c-43b9-808d-13e3e8d580c7",
+) => {
     const { bustData, bustedUser } = useCacheBust();
 
     const [avatarState, setAvatarState] = useState<z.infer<typeof AvatarState>>(
@@ -53,7 +50,7 @@ export const useAvatar = (user?: string | null | undefined) => {
     );
 
     const loadAvatar = async (forceNoCache: boolean = false) => {
-        if (!focusedUser) {
+        if (!user) {
             setAvatarState({
                 avatarSrc: defaultAvatar,
                 type: "default",
@@ -61,8 +58,8 @@ export const useAvatar = (user?: string | null | undefined) => {
             return;
         }
 
-        const bustParam = bustedUser === focusedUser ? `?bust=${bustData}` : "";
-        const initialUrl = generateAvatarUrl(focusedUser) + bustParam;
+        const bustParam = bustedUser === user ? `?bust=${bustData}` : "";
+        const initialUrl = generateAvatarUrl(user) + bustParam;
 
         const isImageExists = await checkImageExists(initialUrl, forceNoCache);
 
@@ -74,7 +71,7 @@ export const useAvatar = (user?: string | null | undefined) => {
         } else if (chainId) {
             setAvatarState({
                 type: "generated",
-                avatarSrc: generateAvatar(chainId, focusedUser),
+                avatarSrc: generateAvatar(chainId, user),
             });
         } else {
             setAvatarState({
@@ -90,7 +87,7 @@ export const useAvatar = (user?: string | null | undefined) => {
 
     useEffect(() => {
         loadAvatar();
-    }, [focusedUser, chainId, bustData, bustedUser]);
+    }, [user, chainId, bustData, bustedUser]);
 
     return { ...avatarState, forceRefresh };
 };
