@@ -1828,7 +1828,7 @@ __metadata:
     react-qr-code: "npm:^2.0.15"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
-    usehooks-ts: "npm:^3.1.0"
+    usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     zod: "npm:^3.23.8"
   languageName: unknown
@@ -11320,6 +11320,8 @@ __metadata:
   dependencies:
     "@babel/template": "npm:^7.27.2"
     "@bytecodealliance/jco": "npm:^1.3.1"
+    "@dicebear/collection": "npm:^9.2.2"
+    "@dicebear/core": "npm:^9.2.2"
     "@eslint/js": "npm:^9.9.0"
     "@hookform/resolvers": "npm:^5.1.1"
     "@radix-ui/react-accordion": "npm:^1.2.11"
@@ -11398,6 +11400,7 @@ __metadata:
     tw-animate-css: "npm:^1.3.4"
     typescript: "npm:^5.7.3"
     typescript-eslint: "npm:^8.33.1"
+    usehooks-ts: "npm:^3.1.1"
     vaul: "npm:^1.1.2"
     vite: "npm:^5.4.1"
     vite-plugin-dts: "npm:^4.5.0"
@@ -12717,7 +12720,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"usehooks-ts@npm:^3.1.0, usehooks-ts@npm:^3.1.1":
+"usehooks-ts@npm:^3.1.1":
   version: 3.1.1
   resolution: "usehooks-ts@npm:3.1.1"
   dependencies:

@@ -1,7 +1,10 @@
+import { User, UserX } from "lucide-react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { Supervisor } from "@psibase/common-lib";
 
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { withFieldGroup } from "./app-form";
@@ -67,26 +70,45 @@ export const FieldAccountExisting = withFieldGroup({
         placeholder,
         supervisor,
     }) {
+        const [isValidating, setIsValidating] = useState(false);
         return (
             <group.AppField
                 name="account"
                 children={(field) => {
+                    const userNotFound = field.state.meta.errors.includes(
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        "Account does not exist" as any,
+                    );
                     return (
                         <field.TextField
                             disabled={disabled}
                             label={label}
                             placeholder={placeholder}
                             description={description}
+                            startContent={
+                                <UserStartContent
+                                    userNotFound={userNotFound}
+                                    value={field.state.value}
+                                    isValid={field.state.meta.isValid}
+                                    isValidating={isValidating}
+                                />
+                            }
                         />
                     );
                 }}
                 validators={{
-                    onChange: zAccount,
-                    onSubmitAsync: async ({ value }) => {
+                    onChange: ({ fieldApi }) => {
+                        setIsValidating(true);
+                        const errors = fieldApi.parseValueWithSchema(zAccount);
+                        if (errors) return errors;
+                    },
+                    onChangeAsyncDebounceMs: 500,
+                    onChangeAsync: async ({ value }) => {
                         const exists = await doesAccountExist(
                             value,
                             supervisor!,
                         );
+                        setIsValidating(false);
                         if (exists) return;
                         return "Account does not exist";
                     },
@@ -124,4 +146,36 @@ export const doesAccountExist = async (
         console.error(e);
         return false;
     }
+};
+
+const UserStartContent = ({
+    userNotFound,
+    value,
+    isValid,
+    isValidating,
+}: {
+    userNotFound: boolean;
+    value: string;
+    isValid: boolean;
+    isValidating: boolean;
+}) => {
+    const { avatarSrc } = useAvatar(value);
+
+    return (
+        <div className="mx-1.5 flex h-5 w-5 items-center justify-center">
+            {isValidating ? (
+                <User size={16} />
+            ) : userNotFound ? (
+                <UserX size={16} className="text-destructive" />
+            ) : isValid ? (
+                <img
+                    className="h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm dark:border-slate-700"
+                    src={avatarSrc}
+                    alt="From account"
+                />
+            ) : (
+                <User size={16} />
+            )}
+        </div>
+    );
 };

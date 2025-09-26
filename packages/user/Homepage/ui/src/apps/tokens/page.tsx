@@ -78,15 +78,10 @@ export const TokensPage = () => {
         defaultValues: defaultTransferValues,
         onSubmit: handleConfirm,
         validators: {
-            onChange: zTransferForm,
-            onBlur: ({ value }) => {
-                if (value.to.account === currentUser) {
-                    return {
-                        fields: {
-                            "to.account": "Cannot send to yourself",
-                        },
-                    };
-                }
+            onChange: ({ formApi }) => {
+                return formApi.parseValuesWithSchema(
+                    zTransferForm(currentUser),
+                );
             },
         },
     });
@@ -113,8 +108,8 @@ export const TokensPage = () => {
         e: React.MouseEvent<HTMLButtonElement>,
     ) => {
         e.preventDefault();
-        const res = await form.validateAllFields("submit");
-        if (res.length > 0) return;
+        const errors = await form.validateAllFields("submit");
+        if (errors.length > 0) return;
         setTransferModal(true);
     };
 
@@ -123,6 +118,7 @@ export const TokensPage = () => {
         form.setFieldValue("amount", {
             amount: selectedToken?.balance?.amount.toString() ?? "",
         });
+        form.validateField("amount.amount", "change");
     };
 
     return (
@@ -171,7 +167,7 @@ export const TokensPage = () => {
                                                                             tokenIcon
                                                                         }
                                                                         alt="Token"
-                                                                        className="rounded-full"
+                                                                        className="rounded-full border-2 border-white shadow-sm dark:border-slate-700"
                                                                     />
                                                                     <span className="font-mono text-3xl font-medium">
                                                                         {
@@ -264,7 +260,6 @@ export const TokensPage = () => {
                                                     labels={[
                                                         "Send",
                                                         "Sending...",
-                                                        "Send",
                                                     ]}
                                                     onClick={onSubmitPreflight}
                                                 />

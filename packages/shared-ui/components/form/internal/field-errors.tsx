@@ -7,7 +7,7 @@ type FieldErrorsProps = {
 };
 
 export const FieldErrors = ({ meta }: FieldErrorsProps) => {
-    if (!meta.isTouched || !meta.isBlurred) return null;
+    if (!meta.isTouched) return null;
 
     return meta.errors.map(parseError).map((error, index) => (
         <p key={index} className="text-destructive text-sm">
