@@ -6,7 +6,6 @@ import {
     zParams as zCreateGuild,
 } from "@/hooks/fractals/use-create-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
-import { isAccountAvailable } from "@/hooks/use-account-status";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import {
@@ -17,6 +16,9 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 import { useAppForm } from "./form/app-form";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { getGuildBySlug } from "@/lib/graphql/fractals/getGuildBySlug";
+
 
 export const CreateGuildModal = ({
     show,
@@ -26,9 +28,11 @@ export const CreateGuildModal = ({
     openChange: (show: boolean) => void;
 }) => {
     const { mutateAsync: createGuild } = useCreateGuild();
+    const fractalAccount = useFractalAccount();
 
     const { data: currentUser } = useCurrentUser();
     const { refetch } = useMemberships(currentUser);
+
 
     const navigate = useNavigate();
 
@@ -64,7 +68,7 @@ export const CreateGuildModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Create a new fractal</DialogTitle>
+                    <DialogTitle>Create a guild</DialogTitle>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -75,35 +79,32 @@ export const CreateGuildModal = ({
                         <form.AppField
                             name="name"
                             children={(field) => (
-                                <field.TextField label="Fractal name" />
+                                <field.TextField label="Guild name" />
                             )}
                         />
                         <form.AppField
-                            name="mission"
+                            name="bio"
                             children={(field) => (
-                                <field.TextField label="Mission" />
+                                <field.TextField label="Bio" />
                             )}
                         />
                         <form.AppField
-                            name="account"
+                            name="slug"
                             validators={{
                                 onChangeAsyncDebounceMs: 1000,
                                 onChangeAsync: async ({ value }) => {
-                                    const status =
-                                        await isAccountAvailable(value);
-                                    if (status === "Taken") {
-                                        return "Account name is already taken";
+                                    const guild =
+                                        await getGuildBySlug(fractalAccount, value);
+                                    console.log({ guild })
+                                    if (guild) {
+                                        return "Slug is already taken";
                                     }
-                                    if (status === "Invalid") {
-                                        return "Invalid account name";
-                                    }
-                                    return undefined;
                                 },
                             }}
                             children={(field) => (
                                 <field.TextField
-                                    label="Account name"
-                                    description="Unique identifier"
+                                    label="Slug"
+                                    description="Unique identifier in Fractal"
                                 />
                             )}
                         />
@@ -111,9 +112,9 @@ export const CreateGuildModal = ({
                         <form.AppForm>
                             <form.SubmitButton
                                 labels={[
-                                    "Create fractal",
-                                    "Creating fractal...",
-                                    "Created fractal",
+                                    "Create Guild",
+                                    "Creating Guild...",
+                                    "Created Guild",
                                 ]}
                             />
                         </form.AppForm>

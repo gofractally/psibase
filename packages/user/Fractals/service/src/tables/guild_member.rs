@@ -1,7 +1,8 @@
+use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{GuildMember, GuildMemberTable, GID};
+use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GID};
 
 impl GuildMember {
     fn new(fractal: AccountNumber, guild: GID, member: AccountNumber) -> Self {
@@ -44,5 +45,12 @@ impl GuildMember {
         GuildMemberTable::read_write()
             .put(&self)
             .expect("failed to save");
+    }
+}
+
+#[ComplexObject]
+impl GuildMember {
+    pub async fn guild(&self) -> Guild {
+        Guild::get_assert(self.guild)
     }
 }

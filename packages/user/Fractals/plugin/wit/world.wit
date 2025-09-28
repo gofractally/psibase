@@ -19,7 +19,7 @@ interface user {
 
     join: func(fractal: string) -> result<_, error>;
 
-    create-guild: func(fractal: string, representative: string, display-name: string, slug: string) -> result<_, error>;
+    create-guild: func(fractal: string, display-name: string, slug: string) -> result<_, error>;
 
     attest: func(evaluation-id: u32, group-number: u32) -> result<_, error>;
     propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;

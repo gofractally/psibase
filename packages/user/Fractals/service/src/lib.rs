@@ -190,17 +190,12 @@ pub mod service {
     }
 
     #[action]
-    fn create_guild(
-        fractal: AccountNumber,
-        rep: AccountNumber,
-        display_name: Memo,
-        slug: AccountNumber,
-    ) {
+    fn create_guild(fractal: AccountNumber, display_name: Memo, slug: AccountNumber) {
         check(
             FractalMember::get_assert(fractal, get_sender()).is_citizen(),
             "must be a citizen to create a guild",
         );
-        Guild::add(fractal, rep, display_name, slug);
+        Guild::add(fractal, get_sender(), display_name, slug);
     }
 
     #[event(history)]

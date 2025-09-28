@@ -7,7 +7,7 @@ mod service {
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalMember, FractalMemberTable,
         FractalTable, Guild, GuildMember, GuildMemberTable, GuildTable,
     };
-    use psibase::*;
+    use psibase::{services::accounts::Account, *};
     use serde::{Deserialize, Deserializer};
     use serde_aux::field_attributes::deserialize_number_from_string;
 
@@ -208,6 +208,16 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn guild_by_slug(
+            &self,
+            fractal: AccountNumber,
+            slug: AccountNumber,
+        ) -> Option<Guild> {
+            GuildTable::with_service(fractals::SERVICE)
+                .get_index_by_slug()
+                .get(&(fractal, slug))
         }
 
         async fn eval_instance(&self, guild_id: u32) -> Option<EvaluationInstance> {

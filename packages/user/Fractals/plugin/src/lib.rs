@@ -114,18 +114,12 @@ impl User for FractallyPlugin {
         unregister(&"fractals".to_string(), evaluation_id)
     }
 
-    fn create_guild(
-        fractal: String,
-        representative: String,
-        display_name: String,
-        slug: String,
-    ) -> Result<(), Error> {
+    fn create_guild(fractal: String, display_name: String, slug: String) -> Result<(), Error> {
         let fractal: AccountNumber = fractal.as_str().into();
         check_app_origin(fractal)?;
 
         let packed_args = fractals::action_structs::create_guild {
             fractal,
-            rep: representative.as_str().into(),
             display_name: Memo::try_from(display_name).unwrap(),
             slug: slug.as_str().into(),
         }

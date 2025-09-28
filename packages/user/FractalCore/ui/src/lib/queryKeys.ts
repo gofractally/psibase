@@ -11,6 +11,10 @@ export type OptionalNumber = number | undefined | null;
 const QueryKey = {
     fractals: () => ["fractals"] as const,
     memberships: (user: OptionalAccount) => ["memberships", user] as const,
+    guildMemberships: (fractal: OptionalAccount, user: OptionalAccount) =>
+        ["guildMembers", fractal, user] as const,
+    fractalBySlug: (fractal: OptionalAccount, slug: OptionalAccount) =>
+        ["fractalBySlug", fractal, slug] as const,
     currentUser: () => ["currentUser"] as const,
     chainId: () => ["chainId"] as const,
     connectedAccounts: () => ["connectedAccounts"] as const,

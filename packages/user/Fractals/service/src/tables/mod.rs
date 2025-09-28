@@ -91,6 +91,7 @@ pub mod tables {
         #[primary_key]
         pub id: GID,
         pub slug: AccountNumber,
+        #[graphql(skip)]
         pub fractal: AccountNumber,
         pub display_name: Memo,
         pub rep: Option<AccountNumber>,
@@ -112,8 +113,10 @@ pub mod tables {
 
     #[table(name = "GuildMemberTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct GuildMember {
         pub fractal: AccountNumber,
+        #[graphql(skip)]
         pub guild: GID,
         pub member: AccountNumber,
         pub score: u32,

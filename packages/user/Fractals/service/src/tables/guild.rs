@@ -59,7 +59,7 @@ impl Guild {
         EvaluationInstance::get(self.id)
     }
 
-    pub async fn fractal_instance(&self) -> Fractal {
+    pub async fn fractal(&self) -> Fractal {
         Fractal::get_assert(self.fractal)
     }
 }
