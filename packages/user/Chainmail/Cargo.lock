@@ -408,7 +408,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainmail"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "async-graphql",
  "chainmail_package",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "chainmail_package"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "chainmail",
  "plugin",
@@ -1675,7 +1675,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "chainmail",
  "chainmail_package",

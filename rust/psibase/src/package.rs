@@ -260,8 +260,6 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
         result |= match flag.as_str() {
             "isPrivileged" => CodeRow::IS_PRIVILEGED,
             "isVerify" => CodeRow::IS_VERIFY,
-            "runModeRpc" => CodeRow::RUN_MODE_CALLBACK,
-            "runModeCallback" => CodeRow::RUN_MODE_CALLBACK,
             "isReplacement" => CodeRow::IS_REPLACEMENT,
             _ => Err(Error::InvalidFlags)?,
         };

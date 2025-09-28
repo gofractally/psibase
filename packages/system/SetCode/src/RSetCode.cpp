@@ -49,15 +49,6 @@ namespace SystemService
             result.push_back("isPrivileged");
          if (flags & CodeRow::isVerify)
             result.push_back("isVerify");
-         switch (flags & CodeRow::runMode)
-         {
-            case CodeRow::runModeRpc:
-               result.push_back("runModeRpc");
-               break;
-            case CodeRow::runModeCallback:
-               result.push_back("runModeCallback");
-               break;
-         }
          return result;
       }
 

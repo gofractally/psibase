@@ -349,10 +349,8 @@ version = "0.21.0"
 dependencies = [
  "indoc",
  "lazy_static",
- "p256",
  "pem",
  "psibase",
- "rand_core 0.6.4",
  "seahash",
  "serde",
  "serde_json",
@@ -1232,6 +1230,17 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+ "wit-bindgen-rt 0.28.0",
+]
+
+[[package]]
+name = "host-crypto"
+version = "0.21.0"
+dependencies = [
+ "p256",
+ "pem",
+ "psibase",
+ "rand_core 0.6.4",
  "wit-bindgen-rt 0.28.0",
 ]
 
@@ -3260,6 +3269,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a05d73b933a847d6cccdda8f838a22ff101ad9bf93e33684f39c1f5f0eece3d"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "web-crypto"
+version = "0.21.0"
+dependencies = [
+ "p256",
+ "pem",
+ "psibase",
+ "seahash",
+ "wit-bindgen-rt 0.28.0",
 ]
 
 [[package]]

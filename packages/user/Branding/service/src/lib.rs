@@ -51,14 +51,18 @@ mod service {
     #[Object]
     impl Query {
         async fn network_name(&self) -> String {
-            let curr_val = NetworkNameTable::new().get_index_pk().get(&());
+            let curr_val = NetworkNameTable::read().get_index_pk().get(&());
             curr_val.unwrap_or_default().name
         }
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn serveSys(request: HttpRequest, _socket: Option<i32>, _user: Option<AccountNumber>) -> Option<HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        _user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
         None.or_else(|| serve_graphql(&request, Query))
     }
 }

@@ -1,0 +1,20 @@
+package supervisor:bridge;
+
+interface intf {
+    use host:types/types.{pem, error};
+
+    /// Signs a pre-hashed message with the private key corresponding
+    ///   to the specified DER-encoded public key
+    sign: func(hashed-message: list<u8>, public-key: list<u8>) -> result<list<u8>, error>;
+
+    /// Signs a pre-hashed message with the specified DER-encoded private key
+    sign-explicit: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
+
+    /// Imports a PEM-encoded private key into the keyvault.
+    /// Returns the corresponding public key in PEM format.
+    import-key: func(private-key: pem) -> result<pem, error>;
+}
+
+world imports {
+    import intf;
+}

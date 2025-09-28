@@ -359,6 +359,11 @@ namespace SystemService
       return psio::view<const Transaction>(psio::prevalidated{trxData});
    }
 
+   bool Transact::isTransaction() const
+   {
+      return trxData.data() != nullptr;
+   }
+
    psibase::BlockHeader Transact::currentBlock() const
    {
       return getStatus().current;
@@ -470,7 +475,7 @@ namespace SystemService
          if (first && !readOnly)
          {
             flags |= AuthInterface::firstAuthFlag;
-            Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service);
+            Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
             cpuLimit.setCpuLimit(act.sender());
          }
          if (readOnly)
@@ -514,7 +519,7 @@ namespace SystemService
 
       bool enforceAuth = checkTapos(id, tapos, speculative);
 
-      Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service);
+      Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
 
       for (auto act : trx.actions())
@@ -529,11 +534,11 @@ namespace SystemService
          auto data = find_view_span(act);
          if (data.data() != nullptr)
          {
-            psibase::raw::call(data.data(), data.size());
+            psibase::raw::call(data.data(), data.size(), CallFlags::none);
          }
          else
          {
-            psibase::call(act.unpack());
+            psibase::call(act.unpack(), CallFlags::none);
          }
       }
 

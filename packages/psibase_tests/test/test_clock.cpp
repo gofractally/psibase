@@ -14,12 +14,12 @@ TEST_CASE("test clock")
 
    auto clockService = t.from(TestClock::service).to<TestClock>();
 
-   CHECK(clockService.testReal().succeeded());
-   CHECK(clockService.testMono().succeeded());
-   CHECK(clockService.testCpu().succeeded());
+   CHECK(clockService.testReal(true).succeeded());
+   CHECK(clockService.testMono(true).succeeded());
+   CHECK(clockService.testCpu(true).succeeded());
 
-   CHECK(clockService.testSystem().succeeded());
+   CHECK(clockService.testSystem(true).succeeded());
    //CHECK(clockService.testUtc().succeeded());
-   CHECK(clockService.testSteady().succeeded());
-   CHECK(clockService.testHiRes().succeeded());
+   CHECK(clockService.testSteady(true).succeeded());
+   CHECK(clockService.testHiRes(true).succeeded());
 }

@@ -18,7 +18,6 @@ use accounts::{
 
 use aes::plugin as aes;
 use auth_invite::plugin::intf as AuthInvite;
-use auth_sig::plugin::keyvault;
 use base64::plugin as base64;
 use bindings::invite::plugin::types::{Invite, InviteState};
 use chrono::{DateTime, SecondsFormat};
@@ -31,6 +30,7 @@ use exports::{
 };
 use hex;
 use host::common::{client as Client, server as Server};
+use host::crypto::keyvault;
 use host::types::types as HostTypes;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::{
@@ -102,12 +102,16 @@ impl Invitee for InvitePlugin {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
 
+        let account_keypair = keyvault::generate_unmanaged_keypair()?;
+        // TODO: add UI to save private key to password manager
+        keyvault::import_key(&account_keypair.private_key)?;
+
         Transact::add_action_to_transaction(
             acceptCreate::ACTION_NAME,
             &acceptCreate {
                 inviteId: invite.invite_id,
                 acceptedBy: accepted_by,
-                newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?.into(),
+                newAccountKey: keyvault::to_der(&account_keypair.public_key)?.into(),
             }
             .packed(),
         )?;

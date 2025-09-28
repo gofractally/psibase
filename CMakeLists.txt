@@ -287,6 +287,8 @@ add_rs_component_workspace(packages/:Plugins
     host-prompt
     host-types
     host-auth
+    host-crypto
+    web-crypto
     transact
     workshop
     config
@@ -297,7 +299,7 @@ function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
-    DEPENDS XAdmin_js wasm
+    DEPENDS ${XAdmin_js_DEP} wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
@@ -405,6 +407,16 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/WebCrypto.psi
+    NAME WebCrypto
+    DESCRIPTION "Plugin that provides a shim for browser's SubtleCrypto api"
+    VERSION ${PSIBASE_VERSION}.0
+    SERVICE webcrypto
+        DATA ${Plugins_OUTPUT_FILE_web_crypto} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+)
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Host.psi
     NAME Host
     DESCRIPTION "Plugin that acts as the bridge to the host environment"
@@ -415,6 +427,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
@@ -586,7 +599,7 @@ psibase_package(
     SERVICE cpu-limit
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit-schema.json
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
     DEPENDS wasm
 )
 
@@ -662,7 +675,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -713,7 +726,6 @@ psibase_package(
     SERVICE event-index
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
-        FLAGS runModeCallback
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
@@ -742,7 +754,7 @@ psibase_package(
     NAME Invite
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json
@@ -898,7 +910,7 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
-    DEPENDS wasm XAdmin_js
+    DEPENDS wasm ${XAdmin_js_DEP}
     PACKAGE_DEPENDS XHttp XSites
 )
 
@@ -956,7 +968,7 @@ psibase_package(
     DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Evaluations Events Fractals FractalCore Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact Homepage Workshop Config
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
 
 psibase_package(
@@ -966,7 +978,7 @@ psibase_package(
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractals FractalCore Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage Workshop Config
+                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
 
 
@@ -1011,7 +1023,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
     XAdmin XDefault XHttp XRun XSites XTransact)
 
 install(
@@ -1061,6 +1073,7 @@ install(
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
@@ -1080,7 +1093,7 @@ psibase_package(
     SERVICE psubjective
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
         SERVER psubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
@@ -1123,7 +1136,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService-schema.json
         SERVER s-counter
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )

@@ -365,8 +365,7 @@ TEST_CASE("Test push_transaction")
       // - allowSudo
       // - canSetTimeLimit
       auto alice = t.addAccount("alice");
-      auto flags = GENERATE(values({CodeRow::isPrivileged, CodeRow::runModeRpc,
-                                    CodeRow::runModeRpc | CodeRow::isPrivileged}));
+      auto flags = GENERATE(values({CodeRow::isPrivileged}));
       INFO("flags: " << std::hex << flags);
       t.startBlock();
       auto verifyFlags = t.addService(AccountNumber{"verify-flags"}, "VerifyFlagsService.wasm",

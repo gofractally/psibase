@@ -18,8 +18,8 @@ package = "auth-invite:plugin"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
-"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }

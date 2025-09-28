@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.21.0"
+version = "0.21.1"
 rust-version = "1.64"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
@@ -44,5 +44,5 @@ lto = true
 crate-type = ["rlib"]
 
 [dependencies]
-chainmail = { path = "service", version = "0.21.0" }
-plugin = { path = "plugin", version = "0.21.0" }
+chainmail = { path = "service", version = "0.21.1" }
+plugin = { path = "plugin", version = "0.21.1" }

@@ -119,10 +119,6 @@ namespace psibase
             result |= CodeRow::isPrivileged;
          else if (flag == "isVerify")
             result |= CodeRow::isVerify;
-         else if (flag == "runModeRpc")
-            result |= CodeRow::runModeRpc;
-         else if (flag == "runModeCallback")
-            result |= CodeRow::runModeCallback;
          else if (flag == "isReplacement")
             result |= CodeRow::isReplacement;
          else

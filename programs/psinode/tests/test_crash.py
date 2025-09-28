@@ -148,7 +148,7 @@ class TestCrash(unittest.TestCase):
 
         print(keys)
         print("booting chain")
-        a.boot(packages=['Minimal', 'Explorer'])
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
         print("setting producers")
         a.set_producers(keys, 'bft')
         p.wait(producers_are(prods))
