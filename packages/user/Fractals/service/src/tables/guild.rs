@@ -2,7 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
-    Config, EvaluationInstance, Fractal, FractalMember, Guild, GuildTable, GID,
+    Config, EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildTable, GID,
 };
 
 impl Guild {
@@ -37,6 +37,8 @@ impl Guild {
 
         let new_instance = Self::new(fractal, rep, display_name, slug);
         new_instance.save();
+
+        GuildMember::add(fractal, new_instance.id, rep);
         new_instance
     }
 

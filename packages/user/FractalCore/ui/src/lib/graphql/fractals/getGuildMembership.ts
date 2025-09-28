@@ -1,31 +1,27 @@
 import { z } from "zod";
 
 import { Account, zAccount } from "@/lib/zod/Account";
-import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "../../graphql";
 
-export const zMember = z
-    .object({
-        fractal: zAccount,
-        createdAt: zDateTime,
-        fractalDetails: z.object({
-            account: zAccount,
-        }),
-    })
-    .array();
+export const zGuildList = z.object({
+    slug: zAccount,
+    displayName: z.string(),
+});
 
-export type Membership = z.infer<typeof zMember>;
+export type Membership = z.infer<typeof zGuildList>;
 
-export const getMemberships = async (account: Account): Promise<Membership> => {
+export const getGuildMemberships = async (
+    fractal: Account,
+    member: Account,
+) => {
     const res = await graphql(`
         {
-            memberships(member: "${account}") {
+            guildMemberships(fractal: "${fractal}", member: "${member}") {
                 nodes {
-                    fractal
-                    createdAt
-                    fractalDetails {
-                        account
+                    guild {
+                        slug
+                        displayName
                     }
                 }
             }
@@ -34,9 +30,14 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
 
     return z
         .object({
-            memberships: z.object({
-                nodes: zMember,
+            guildMemberships: z.object({
+                nodes: z
+                    .object({
+                        guild: zGuildList,
+                    })
+                    .array(),
             }),
         })
-        .parse(res).memberships.nodes;
+        .parse(res)
+        .guildMemberships.nodes.map((membership) => membership.guild);
 };

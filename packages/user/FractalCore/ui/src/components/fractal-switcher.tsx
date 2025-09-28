@@ -1,15 +1,11 @@
-import { queryClient } from "@/queryClient";
 import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
-import { zFractal } from "@/lib/graphql/fractals/getFractal";
-import QueryKey from "@/lib/queryKeys";
 
 import {
     DropdownMenu,
@@ -29,6 +25,7 @@ import {
 
 import { CreateGuildModal } from "./create-fractal-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -36,9 +33,13 @@ export function AppSwitcher() {
     const navigate = useNavigate();
 
     const { data: currentUser } = useCurrentUser();
-    const { data: memberships, error } = useMemberships(currentUser);
+    const fractalAccount = useFractalAccount();
+
+    const { data: memberships, error } = useGuildMemberships(fractalAccount, currentUser);
+
+    console.log({ memberships, error })
     const guilds = memberships
-        ? memberships.map((membership) => membership.fractalDetails)
+        ? memberships
         : [];
 
     console.log({ fractals: guilds, error });
@@ -111,41 +112,35 @@ export function AppSwitcher() {
 
                         {guilds && guilds?.length > 0 && (
                             <DropdownMenuLabel className="text-muted-foreground text-xs">
-                                Fractals
+                                My Guilds
                             </DropdownMenuLabel>
                         )}
-                        {guilds?.map((fractal) => {
-                            const metadata = zFractal.safeParse(
-                                queryClient.getQueryData(
-                                    QueryKey.fractal(fractal.account),
-                                ),
-                            );
+                        {guilds?.map((guild) => {
+
                             const displayName =
-                                metadata.success &&
-                                metadata.data &&
-                                metadata.data.name;
+                                guild.displayName;
 
                             const src = createIdenticon(
-                                chainId + fractal.account,
+                                chainId + fractalAccount + guild.slug,
                             );
 
                             return (
                                 <DropdownMenuItem
-                                    key={fractal.account}
+                                    key={guild.slug}
                                     className="flex items-center justify-between gap-2 p-2"
                                 >
                                     <div
                                         className="flex flex-1 items-center gap-2"
                                         onClick={() =>
                                             navigate(
-                                                `/fractal/${fractal.account}`,
+                                                `/guild/${guild.slug}`,
                                             )
                                         }
                                     >
                                         <div className="flex size-6 items-center justify-center rounded-sm border">
                                             <img src={src} />
                                         </div>
-                                        {displayName || fractal.account}
+                                        {displayName}
                                     </div>
                                 </DropdownMenuItem>
                             );
