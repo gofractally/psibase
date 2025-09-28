@@ -18,8 +18,6 @@ const queryFn = async (account: string) => {
 
 export const useFractal = () => {
     const currentFractal = useFractalAccount();
-
-    console.log({ currentFractal });
     return useQuery<FractalRes>({
         queryKey: QueryKey.fractal(currentFractal),
         enabled: Boolean(currentFractal),

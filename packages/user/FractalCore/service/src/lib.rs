@@ -26,23 +26,16 @@ pub mod tables {
 
 #[psibase::service(name = "fractal-core", tables = "tables")]
 pub mod service {
-    use crate::tables::{ExampleThing, ExampleThingTable, InitRow, InitTable};
+    use crate::tables::{ExampleThing, ExampleThingTable, InitTable};
     use psibase::*;
 
     #[action]
     fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-
-        // Initial service configuration
-        let thing_table = ExampleThingTable::new();
-        if thing_table.get_index_pk().get(&()).is_none() {
-            thing_table
-                .put(&ExampleThing {
-                    thing: String::from("default thing"),
-                })
-                .unwrap();
-        }
+        // psibase::services::fractals::Wrapper::call().create_fractal(
+        //     "a".into(),
+        //     "Firsty".to_string(),
+        //     "save the whales bro".to_string(),
+        // )
     }
 
     #[pre_action(exclude(init))]

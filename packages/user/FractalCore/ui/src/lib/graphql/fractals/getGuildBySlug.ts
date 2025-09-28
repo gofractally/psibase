@@ -14,7 +14,7 @@ export const zGuild = z.object({
 export const getGuildBySlug = async (fractal: Account, slug: Account) => {
     const res = await graphql(`
         {
-            guildBySlug(fractal:"${fractal}", slug:"${slug}}") {
+            guildBySlug(fractal:"${fractal}", slug:"${slug}") {
                 id
                 displayName
                 rep

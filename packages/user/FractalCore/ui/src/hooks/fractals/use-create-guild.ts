@@ -9,20 +9,23 @@ import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
+import { useFractalAccount } from "./use-fractal-account";
+
 export const zParams = z.object({
     slug: zAccount,
     name: z.string().min(1, { message: "Name is required." }),
-    bio: z.string().min(1, { message: "Mission is required." }),
 });
 
-export const useCreateGuild = () =>
-    useMutation<undefined, Error, z.infer<typeof zParams>>({
+export const useCreateGuild = () => {
+    const fractalAccount = useFractalAccount();
+    return useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationKey: QueryKey.createGuild(),
         mutationFn: async (params) => {
-            const { slug, bio, name } = zParams.parse(params);
+            const { slug, name } = zParams.parse(params);
+
             await supervisor.functionCall({
                 method: "createGuild",
-                params: [slug, name, bio],
+                params: [fractalAccount, name, slug],
                 service: fractalService,
                 intf: "user",
             });
@@ -39,3 +42,4 @@ export const useCreateGuild = () =>
             }
         },
     });
+};

@@ -20,7 +20,6 @@ const zFractalRes = z.object({
     guilds: z.object({
         nodes: z
             .object({
-                fractal: zAccount,
                 id: z.number(),
                 rep: zAccount.optional(),
                 displayName: z.string(),
@@ -50,7 +49,6 @@ export const getFractal = async (owner: Account) => {
         }
         guilds(fractal: "${owner}") {
             nodes {
-                fractal
                 id
                 rep
                 displayName

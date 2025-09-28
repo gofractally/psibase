@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::bindings::host::common::client as Client;
+use crate::bindings::host::common::client::{self as Client, get_active_app};
 use crate::errors::ErrorType;
 use psibase::AccountNumber;
 
@@ -70,7 +70,7 @@ fn get_sender_app() -> Result<AccountNumber, ErrorType> {
 pub fn check_app_origin(account: AccountNumber) -> Result<(), ErrorType> {
     let sender = get_sender_app()?;
 
-    if sender != account {
+    if sender != account && sender != psibase::services::fractals::SERVICE {
         return Err(ErrorType::InvalidSender(sender.to_string()).into());
     }
     Ok(())

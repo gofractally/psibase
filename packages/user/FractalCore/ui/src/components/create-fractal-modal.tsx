@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
     useCreateGuild,
     zParams as zCreateGuild,
-} from "@/hooks/fractals/use-create-fractal";
+} from "@/hooks/fractals/use-create-guild";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
@@ -40,14 +40,12 @@ export const CreateGuildModal = ({
         defaultValues: {
             slug: "",
             name: "",
-            bio: "",
+
         },
-        onSubmit: async ({ value: { name, slug, bio } }) => {
+        onSubmit: async ({ value: { name, slug, } }) => {
             await createGuild({
                 name,
                 slug,
-                bio,
-                description: ""
             });
             openChange(false);
             navigate(`/guild/${slug}`);
@@ -79,13 +77,7 @@ export const CreateGuildModal = ({
                         <form.AppField
                             name="name"
                             children={(field) => (
-                                <field.TextField label="Guild name" />
-                            )}
-                        />
-                        <form.AppField
-                            name="bio"
-                            children={(field) => (
-                                <field.TextField label="Bio" />
+                                <field.TextField label="Name" />
                             )}
                         />
                         <form.AppField
@@ -95,16 +87,15 @@ export const CreateGuildModal = ({
                                 onChangeAsync: async ({ value }) => {
                                     const guild =
                                         await getGuildBySlug(fractalAccount, value);
-                                    console.log({ guild })
                                     if (guild) {
-                                        return "Slug is already taken";
+                                        return "Slug is already in use";
                                     }
                                 },
                             }}
                             children={(field) => (
                                 <field.TextField
                                     label="Slug"
-                                    description="Unique identifier in Fractal"
+                                    description="Unique identifier inside the fractal"
                                 />
                             )}
                         />
