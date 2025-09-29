@@ -6,6 +6,7 @@ import { graphql } from "../../graphql";
 
 export const zGuildList = z.object({
     slug: zAccount,
+    id: z.number().int(),
     displayName: z.string(),
 });
 
@@ -20,6 +21,7 @@ export const getGuildMemberships = async (
             guildMemberships(fractal: "${fractal}", member: "${member}") {
                 nodes {
                     guild {
+                        id
                         slug
                         displayName
                     }
@@ -38,6 +40,5 @@ export const getGuildMemberships = async (
                     .array(),
             }),
         })
-        .parse(res)
-        .guildMemberships.nodes.map((membership) => membership.guild);
+        .parse(res).guildMemberships.nodes;
 };

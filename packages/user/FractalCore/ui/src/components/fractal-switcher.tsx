@@ -1,8 +1,7 @@
 import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
@@ -26,6 +25,7 @@ import {
 import { CreateGuildModal } from "./create-fractal-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -35,21 +35,18 @@ export function AppSwitcher() {
     const { data: currentUser } = useCurrentUser();
     const fractalAccount = useFractalAccount();
 
-    const { data: memberships, error } = useGuildMemberships(fractalAccount, currentUser);
+    const { data: memberships, } = useGuildMemberships(fractalAccount, currentUser);
 
-    console.log({ memberships, error })
-    const guilds = memberships
-        ? memberships
-        : [];
+    const { guildId } = useParams();
 
-    console.log({ fractals: guilds, error });
+    const { data: currentGuild } = useGuildBySlug(fractalAccount, guildId)
+
     const { data: chainId } = useChainId();
 
     const [showCreateFractalModal, setShowCreateGuildModal] = useState(false);
 
     const currentFractal = useFractalAccount();
 
-    const { data: fractal } = useFractal();
 
     return (
         <SidebarMenu>
@@ -69,21 +66,19 @@ export function AppSwitcher() {
                                 <img
                                     className="size-4"
                                     src={createIdenticon(
-                                        chainId + currentFractal,
+                                        chainId + currentFractal + currentGuild?.id,
                                     )}
                                 />
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">
-                                    {fractal
-                                        ? fractal?.fractal?.name
-                                        : currentFractal || "Explore"}
+                                    {currentGuild
+                                        ? currentGuild.displayName
+                                        : guildId || "Explore"}
                                 </span>
-                                {fractal && (
-                                    <span className="truncate text-xs">
-                                        {currentFractal}
-                                    </span>
-                                )}
+                                <span className="truncate text-xs">
+                                    {guildId}
+                                </span>
                             </div>
                             <ChevronsUpDown className="ml-auto" />
                         </SidebarMenuButton>
@@ -100,7 +95,7 @@ export function AppSwitcher() {
                         <DropdownMenuItem className="flex items-center justify-between gap-2 p-2">
                             <div
                                 className="flex flex-1 items-center gap-2"
-                                onClick={() => navigate(`/browse`)}
+                                onClick={() => navigate(`/`)}
                             >
                                 <div className="flex size-6 items-center justify-center rounded-sm">
                                     <Search />
@@ -110,30 +105,30 @@ export function AppSwitcher() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
 
-                        {guilds && guilds?.length > 0 && (
+                        {memberships && memberships?.length > 0 && (
                             <DropdownMenuLabel className="text-muted-foreground text-xs">
                                 My Guilds
                             </DropdownMenuLabel>
                         )}
-                        {guilds?.map((guild) => {
+                        {memberships?.map((membership) => {
 
                             const displayName =
-                                guild.displayName;
+                                membership.guild.displayName;
 
                             const src = createIdenticon(
-                                chainId + fractalAccount + guild.slug,
+                                chainId + fractalAccount + membership.guild.id,
                             );
 
                             return (
                                 <DropdownMenuItem
-                                    key={guild.slug}
+                                    key={membership.guild.id}
                                     className="flex items-center justify-between gap-2 p-2"
                                 >
                                     <div
                                         className="flex flex-1 items-center gap-2"
                                         onClick={() =>
                                             navigate(
-                                                `/guild/${guild.slug}`,
+                                                `/guild/${membership.guild.slug}`,
                                             )
                                         }
                                     >
@@ -145,7 +140,7 @@ export function AppSwitcher() {
                                 </DropdownMenuItem>
                             );
                         })}
-                        {guilds && guilds.length > 0 && (
+                        {memberships && memberships.length > 0 && (
                             <DropdownMenuSeparator />
                         )}
                         <DropdownMenuItem
