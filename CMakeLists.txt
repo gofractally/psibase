@@ -132,11 +132,11 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
-        CpuLimit Events EventIndex Explorer Invite Nft
+        CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode Symbol
-        Transact VerifySig XAdmin XHttp XRun XSites XTransact
+        Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService XSocketListService)
     set(WASM_BYPRODUCTS)
@@ -337,7 +337,7 @@ psibase_package(
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -592,6 +592,18 @@ psibase_package(
     SERVICE cpu-limit
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Db.psi
+    NAME Db
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages service access to the KV database"
+    SERVICE db
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Db.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Db-schema.json
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -908,6 +920,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XDb.psi
+    NAME XDb
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages access to subjective databases"
+    SERVICE x-db
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XDb.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDb-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XHttp.psi
     NAME XHttp
     VERSION ${PSIBASE_VERSION}.0
@@ -959,7 +983,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Db
                     Docs Evaluations Events Fractals Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
@@ -969,7 +993,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Db
                     Docs Evaluations Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
@@ -980,7 +1004,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Minimum packages for a functional chain"
-    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
+    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Db Packages Producers HttpServer
                     SetCode Transact
 )
 
@@ -989,7 +1013,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Packages used in the tester"
-    PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS AuthSig BrotliCodec Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
 psibase_package(
@@ -997,7 +1021,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XRun XSites XTransact
 )
 
 function(write_package_index target dir)
@@ -1014,10 +1038,10 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Db DevDefault ProdDefault
     Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
-    XAdmin XDefault XHttp XRun XSites XTransact)
+    XAdmin XDb XDefault XHttp XRun XSites XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1035,6 +1059,7 @@ install(
           ${SERVICE_DIR}/DevDefault.psi
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
+          ${SERVICE_DIR}/Db.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
@@ -1069,6 +1094,7 @@ install(
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
+          ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XRun.psi

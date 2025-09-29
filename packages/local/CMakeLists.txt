@@ -17,6 +17,7 @@ endfunction()
 add_library(services_local INTERFACE)
 target_mapped_include_directories(services_local INTERFACE
     XAdmin/include
+    XDb/include
     XHttp/include
     XRun/include
     XSites/include
@@ -25,6 +26,7 @@ target_mapped_include_directories(services_local INTERFACE
 
 if(DEFINED IS_WASM)
     add_subdirectory(XAdmin)
+    add_subdirectory(XDb)
     add_subdirectory(XHttp)
     add_subdirectory(XRun)
     add_subdirectory(XSites)
