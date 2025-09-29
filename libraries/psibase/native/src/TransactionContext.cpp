@@ -283,6 +283,7 @@ namespace psibase
                                  }};
          };
 
+         exportedHandles.clear();
          if (blockContext.isProducing)
          {
             auto mode = scopedChangeMode();
@@ -309,6 +310,7 @@ namespace psibase
             check(subjective && nextSubjectiveRead < subjective->size(), "missing subjective data");
             atrace.rawRetval = (*subjective)[nextSubjectiveRead++];
          }
+         importedHandles.clear();
       }
    }
 

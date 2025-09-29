@@ -16,6 +16,8 @@ function(add suffix)
     service(TestMemo "${suffix}" src/TestMemo.cpp)
     service(TestServiceEntry "${suffix}" src/TestServiceEntry.cpp)
     service(TestTable "${suffix}" src/TestTable.cpp)
+    service(TestExport "${suffix}" src/TestExport.cpp)
+    service(TestImport "${suffix}" src/TestImport.cpp)
 
     service(AbortService "${suffix}" src/AbortService.cpp)
     service(EmitEvents "${suffix}" src/EmitEvents.cpp)
