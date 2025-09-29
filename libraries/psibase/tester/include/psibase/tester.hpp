@@ -350,6 +350,11 @@ namespace psibase
       [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
 
       /**
+       * Switches to the block before the new block, and then applies it.
+       */
+      void pushBlock(const SignedBlock& block);
+
+      /**
        * Runs the nextTransaction callback to find the
        * next transaction and pushes it. If there was
        * a transaction, returns its trace.
