@@ -7,7 +7,7 @@ pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
-    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{AccountNumber, Memo};
 
     use psibase::*;
@@ -49,9 +49,12 @@ pub mod service {
         );
         let new_token = Token::add(precision, max_issued_supply);
 
-        Wrapper::emit()
-            .history()
-            .created(new_token.id, get_sender(), precision, max_issued_supply);
+        Wrapper::emit().history().created(
+            new_token.id,
+            get_sender(),
+            precision,
+            Decimal::new(max_issued_supply, precision).to_string(),
+        );
 
         new_token.id
     }
@@ -261,11 +264,17 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
-        Token::get_assert(token_id).recall(amount, from);
+        let mut token = Token::get_assert(token_id);
 
-        Wrapper::emit()
-            .history()
-            .recalled(token_id, amount, get_sender(), from, memo);
+        token.recall(amount, from);
+
+        Wrapper::emit().history().recalled(
+            token_id,
+            Decimal::new(amount, token.precision).to_string(),
+            get_sender(),
+            from,
+            memo,
+        );
     }
 
     /// Burn tokens.
@@ -279,11 +288,16 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn burn(token_id: TID, amount: Quantity, memo: Memo) {
-        Token::get_assert(token_id).burn(amount);
+        let mut token = Token::get_assert(token_id);
 
-        Wrapper::emit()
-            .history()
-            .burned(token_id, get_sender(), amount, memo);
+        token.burn(amount);
+
+        Wrapper::emit().history().burned(
+            token_id,
+            get_sender(),
+            Decimal::new(amount, token.precision).to_string(),
+            memo,
+        );
     }
 
     /// Mint tokens.
@@ -298,9 +312,15 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn mint(token_id: TID, amount: Quantity, memo: Memo) {
-        Token::get_assert(token_id).mint(amount);
+        let mut token = Token::get_assert(token_id);
 
-        Wrapper::emit().history().minted(token_id, amount, memo);
+        token.mint(amount);
+
+        Wrapper::emit().history().minted(
+            token_id,
+            Decimal::new(amount, token.precision).to_string(),
+            memo,
+        );
     }
 
     /// Credit
@@ -319,9 +339,13 @@ pub mod service {
         let creditor = get_sender();
         SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
 
-        Wrapper::emit()
-            .history()
-            .credited(token_id, creditor, debitor, amount, memo);
+        Wrapper::emit().history().credited(
+            token_id,
+            creditor,
+            debitor,
+            Decimal::new(amount, Token::get_assert(token_id).precision).to_string(),
+            memo,
+        );
     }
 
     /// Uncredit
@@ -341,9 +365,13 @@ pub mod service {
 
         SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
 
-        Wrapper::emit()
-            .history()
-            .uncredited(token_id, creditor, debitor, amount, memo);
+        Wrapper::emit().history().uncredited(
+            token_id,
+            creditor,
+            debitor,
+            Decimal::new(amount, Token::get_assert(token_id).precision).to_string(),
+            memo,
+        );
     }
 
     /// Debit
@@ -381,27 +409,27 @@ pub mod service {
     #[event(history)]
     pub fn recalled(
         token_id: TID,
-        amount: Quantity,
-        burner: AccountNumber,
-        from: AccountNumber,
+        amount: String,
+        recaller: AccountNumber,
+        recallee: AccountNumber,
         memo: Memo,
     ) {
     }
 
     #[event(history)]
-    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
+    pub fn burned(token_id: TID, sender: AccountNumber, amount: String, memo: Memo) {}
 
     #[event(history)]
     pub fn created(
         token_id: TID,
         sender: AccountNumber,
         precision: Precision,
-        max_issued_supply: Quantity,
+        max_issued_supply: String,
     ) {
     }
 
     #[event(history)]
-    pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
+    pub fn minted(token_id: TID, amount: String, memo: Memo) {}
 
     #[event(history)]
     pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
@@ -411,7 +439,7 @@ pub mod service {
         token_id: TID,
         creditor: AccountNumber,
         debitor: AccountNumber,
-        amount: Quantity,
+        amount: String,
         memo: Memo,
     ) {
     }
@@ -421,7 +449,7 @@ pub mod service {
         token_id: TID,
         creditor: AccountNumber,
         debitor: AccountNumber,
-        amount: Quantity,
+        amount: String,
         memo: Memo,
     ) {
     }
@@ -431,7 +459,7 @@ pub mod service {
         token_id: TID,
         creditor: AccountNumber,
         debitor: AccountNumber,
-        amount: Quantity,
+        amount: String,
         memo: Memo,
     ) {
     }

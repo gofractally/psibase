@@ -1,9 +1,11 @@
+mod events;
+
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
 
     use async_graphql::{connection::Connection, *};
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::{nft::Wrapper as Nfts, tokens::TID};
 
     use psibase::*;
     use tokens::{
@@ -12,6 +14,11 @@ mod service {
             Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
             UserConfig, UserConfigTable,
         },
+    };
+
+    use crate::events::{
+        BurnedEvent, CreatedEvent, CreditedEvent, DebitedEvent, MintedEvent, RecalledEvent,
+        RejectedEvent, UncreditedEvent,
     };
 
     pub fn token_id_to_number(token_id: String) -> u32 {
@@ -131,6 +138,161 @@ mod service {
                     nft.owner == user
                 })
                 .collect()
+        }
+
+        async fn creditedEvents(
+            &self,
+            token_id: TID,
+            creditor: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, CreditedEvent>> {
+            EventQuery::new("history.tokens.credited")
+                .condition(format!(
+                    "token_id = {} AND creditor = '{}'",
+                    token_id, creditor
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn debitedEvents(
+            &self,
+            token_id: TID,
+            debitor: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, DebitedEvent>> {
+            EventQuery::new("history.tokens.debited")
+                .condition(format!(
+                    "token_id = {} AND debitor = '{}'",
+                    token_id, debitor
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn uncreditedEvents(
+            &self,
+            token_id: TID,
+            creditor: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, UncreditedEvent>> {
+            EventQuery::new("history.tokens.uncredited")
+                .condition(format!(
+                    "token_id = {} AND creditor = '{}'",
+                    token_id, creditor
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn rejectedEvents(
+            &self,
+            token_id: TID,
+            debitor: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, RejectedEvent>> {
+            EventQuery::new("history.tokens.rejected")
+                .condition(format!(
+                    "token_id = {} AND debitor = '{}'",
+                    token_id, debitor
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn recalledEvents(
+            &self,
+            token_id: TID,
+            from: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, RecalledEvent>> {
+            EventQuery::new("history.tokens.recalled")
+                .condition(format!("token_id = {} AND from = '{}'", token_id, from))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn burnedEvents(
+            &self,
+            token_id: TID,
+            sender: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, BurnedEvent>> {
+            EventQuery::new("history.tokens.burned")
+                .condition(format!("token_id = {} AND sender = '{}'", token_id, sender))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn mintedEvents(
+            &self,
+            token_id: TID,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, MintedEvent>> {
+            EventQuery::new("history.tokens.minted")
+                .condition(format!("token_id = {}", token_id))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn createdEvents(
+            &self,
+            token_id: TID,
+            sender: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, CreatedEvent>> {
+            EventQuery::new("history.tokens.created")
+                .condition(format!("token_id = {} AND sender = '{}'", token_id, sender))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
         }
     }
 

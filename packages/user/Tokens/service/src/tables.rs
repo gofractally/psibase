@@ -437,7 +437,7 @@ pub mod tables {
                 self.token_id,
                 self.creditor,
                 self.debitor,
-                quantity,
+                Decimal::new(quantity, Token::get_assert(self.token_id).precision).to_string(),
                 memo,
             );
             self.sub_balance(quantity);
