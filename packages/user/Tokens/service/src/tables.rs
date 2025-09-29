@@ -433,26 +433,30 @@ pub mod tables {
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
             check(quantity.value > 0, "debit quantity must be greater than 0");
 
-            crate::Wrapper::emit().history().debited(
+            crate::Wrapper::emit().history().balChanged(
                 self.token_id,
                 self.creditor,
                 self.debitor,
+                "debit".to_string(),
                 Decimal::new(quantity, Token::get_assert(self.token_id).precision).to_string(),
                 memo,
             );
+
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
         }
 
         pub fn reject(&mut self, memo: Memo) {
             if self.balance.value > 0 {
-                crate::Wrapper::emit().history().rejected(
+                let balance = self.balance;
+                crate::Wrapper::emit().history().balChanged(
                     self.token_id,
                     self.creditor,
                     self.debitor,
+                    "reject".to_string(),
+                    Decimal::new(balance, Token::get_assert(self.token_id).precision).to_string(),
                     memo,
                 );
-                let balance = self.balance;
                 self.sub_balance(balance);
                 Balance::get_or_new(self.debitor, self.token_id).add_balance(balance);
             }
