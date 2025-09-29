@@ -108,7 +108,7 @@ class Foo:
 class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_push(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
         def make_input(account):
             return json.dumps(
@@ -130,7 +130,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_install(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
@@ -140,7 +140,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo = Foo()
@@ -160,7 +160,7 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
 
     def do_test_upgrade(self, cluster, command, v2=False):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo = Foo()
@@ -196,7 +196,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_info(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         info = a.run_psibase(['info', 'Explorer'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
         self.assertIn('status: not installed', info)
         self.assertIn('Explorer', info)
@@ -242,7 +242,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_list(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         # A non-existent account should be an error
@@ -301,7 +301,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_search(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
 
         foo = Foo()
 
@@ -323,7 +323,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_configure_sources(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
@@ -338,7 +338,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_sign(self, cluster):
-        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
+        a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         key = PrivateKey()
