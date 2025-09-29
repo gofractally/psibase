@@ -1240,7 +1240,6 @@ dependencies = [
  "p256",
  "pem",
  "psibase",
- "rand_core 0.6.4",
  "wit-bindgen-rt 0.28.0",
 ]
 
