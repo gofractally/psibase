@@ -15,7 +15,7 @@ def has_file(node):
 class TestBlockSigning(unittest.TestCase):
     @testutil.psinode_test
     def test_missing_key(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(MIN_ACCOUNT_LENGTH))
+        prods = cluster.complete(*testutil.generate_names(4))
 
         print("booting chain")
         prods[0].boot(packages=['Minimal', 'Explorer', 'AuthSig'])

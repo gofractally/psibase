@@ -9,7 +9,7 @@ import unittest
 class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_crash_cft(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))
+        prods = cluster.complete(*testutil.generate_names(3))
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
         b = cluster.nodes['b']
 
@@ -41,7 +41,7 @@ class TestCrash(unittest.TestCase):
 
     @testutil.psinode_test
     def test_shutdown_all_cft(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))
+        prods = cluster.complete(*testutil.generate_names(3))
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
         b = prods[1]
         c = prods[2]
@@ -75,7 +75,7 @@ class TestCrash(unittest.TestCase):
 
     @testutil.psinode_test
     def test_restart_after_disconnect(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))
+        prods = cluster.complete(*testutil.generate_names(4)
         testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer'])
 
         (a, b, c, d) = prods
@@ -97,7 +97,7 @@ class TestCrash(unittest.TestCase):
 
     @testutil.psinode_test
     def test_shutdown_all_bft(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))
+        prods = cluster.complete(*testutil.generate_names(4))
         a = testutil.boot_with_producers(prods, 'bft', packages=['Minimal', 'Explorer'])
         b = prods[1]
         c = prods[2]
@@ -137,7 +137,7 @@ class TestCrash(unittest.TestCase):
 
     @testutil.psinode_test
     def test_unlock_bft(self, cluster):
-        prods = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH), softhsm=testutil.libsofthsm2())
+        prods = cluster.complete(*testutil.generate_names(4), softhsm=testutil.libsofthsm2())
         (a, b, c, d) = prods
         keys = []
         for p in prods:
