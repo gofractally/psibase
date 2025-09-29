@@ -108,7 +108,7 @@ class Foo:
 class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_push(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer'])
         def make_input(account):
             return json.dumps(
@@ -130,17 +130,17 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_install(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer'])
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        a.graphql('tokens', '''query { userBalances(user: "alicealice") { edges { node { symbol tokenId balance precision } } } }''')
         # Installing packages that are already installed should do nothing
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
 
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo = Foo()
@@ -160,7 +160,7 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
 
     def do_test_upgrade(self, cluster, command, v2=False):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo = Foo()
@@ -196,7 +196,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_info(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         info = a.run_psibase(['info', 'Explorer'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
         self.assertIn('status: not installed', info)
         self.assertIn('Explorer', info)
@@ -242,7 +242,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_list(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         # A non-existent account should be an error
@@ -301,7 +301,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_search(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
 
         foo = Foo()
 
@@ -323,7 +323,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_configure_sources(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
@@ -338,7 +338,7 @@ class TestPsibase(unittest.TestCase):
 
     @testutil.psinode_test
     def test_sign(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        a = cluster.complete(*testutil.generate_names(testutil.MIN_ACCOUNT_LENGTH))[0]
         a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         key = PrivateKey()
@@ -349,14 +349,15 @@ class TestPsibase(unittest.TestCase):
             f.write(key.pkcs8())
         with open(pubkey_file, 'w') as f:
             f.write(key.spki())
-        res = a.run_psibase(['create', 'alice', '-k', pubkey_file] + a.node_args())
+        res = a.run_psibase(['create', 'alicealice', '-k', pubkey_file] + a.node_args())
         print(res)
         a.wait(new_block())
-        a.run_psibase(['modify', 'alice', '-i', '--sign', key_file] + a.node_args())
+        a.run_psibase(['modify', 'alicealice', '-i', '--sign', key_file] + a.node_args())
 
     @testutil.psinode_test
     def test_staged_install(self, cluster):
-        a = cluster.complete(*testutil.generate_names(1))[0]
+        prods = testutil.generate_names(1)
+        a = cluster.complete(*prods)[0]
         a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         accounts = Accounts(a)
@@ -366,22 +367,31 @@ class TestPsibase(unittest.TestCase):
         key = PrivateKey()
         key_file = os.path.join(a.dir, 'key')
 
-        accounts.new_account('b')
-        auth_sig.set_key('a', key)
+        account_b =  'bobbobbobbob'
+        accounts.new_account(account_b)
+        auth_sig.set_key(prods[0], key)
         a.wait(new_block())
 
-        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', 'b'])
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', account_b])
         a.wait(new_block())
 
         # This should fail because the transaction was only proposed
         with self.assertRaises(requests.HTTPError):
-            a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+            query = f'''query {{ userBalances(user: "{prods[0]}") {{ edges {{ node {{ symbol tokenId balance precision }} }} }} }}'''
+            print("query:", query)
+            a.graphql('tokens', query)
 
-        for tx in staged_tx.get_staged(proposer='b'):
-            staged_tx.accept('a', tx, keys=[key])
+        print("1")
+        for tx in staged_tx.get_staged(proposer=account_b):
+            staged_tx.accept(prods[0], tx, keys=[key])
 
+        print("2")
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        print("3")
+        query = f'''query {{ userBalances(user: "{prods[0]}") {{ edges {{ node {{ symbol tokenId balance precision }} }} }} }}'''
+        print("query:", query)
+        a.graphql('tokens', query)
+        print("4")
 
     def assertResponse(self, response, expected):
         response.raise_for_status()

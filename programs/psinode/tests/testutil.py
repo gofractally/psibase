@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import requests
 
+MIN_ACCOUNT_LENGTH = 10
+
 def psinode_test(f):
     def result(self):
         with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_size=256*1024*1024) as cluster:
@@ -32,7 +34,10 @@ def psinode_test(f):
 
 def generate_names(n):
     letters = 'abcdefghijklmnopqrstuvwxyz'
-    return list(letters[0:n])
+    num_letters = MIN_ACCOUNT_LENGTH - 3
+    num_numbers = MIN_ACCOUNT_LENGTH - num_letters
+    numbers = ''.join(str(i) for i in range(1, num_numbers + 1))
+    return [letter * num_letters + numbers for letter in letters[0:n]]
 
 def boot_with_producers(nodes, algorithm=None, timeout=10, packages=[]):
     p = nodes[0]
