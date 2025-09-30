@@ -482,14 +482,14 @@ class TestPsibase(unittest.TestCase):
         key = PrivateKey()
         key_file = os.path.join(a.dir, "key")
 
-        accounts.new_account("b")
+        accounts.new_account("bbbbbbb123")
         auth_sig.set_key("aaaaaaa123", key)
         a.wait(new_block())
 
         a.run_psibase(
             ["install"]
             + a.node_args()
-            + ["Symbol", "Tokens", "TokenUsers", "--proposer", "b"]
+            + ["Symbol", "Tokens", "TokenUsers", "--proposer", "bbbbbbb123"]
         )
         a.wait(new_block())
 
@@ -502,7 +502,7 @@ class TestPsibase(unittest.TestCase):
             )
 
         print("2")
-        for tx in staged_tx.get_staged(proposer="b"):
+        for tx in staged_tx.get_staged(proposer="bbbbbbb123"):
             staged_tx.accept("aaaaaaa123", tx, keys=[key])
         print("3")
 
