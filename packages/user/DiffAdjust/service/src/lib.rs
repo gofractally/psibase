@@ -187,11 +187,11 @@ pub mod tables {
             self.save();
         }
 
-        pub fn update_percent(&mut self, percent_ppm: u32) {
+        pub fn update_percent(&mut self, ppm: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
-            Self::check_percent_change(percent_ppm);
-            self.percent_change = percent_ppm;
+            Self::check_percent_change(ppm);
+            self.percent_change = ppm;
             self.save();
         }
 
@@ -331,7 +331,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `percent_ppm` - Percent ppm 50000 = 5%
+    /// * `ppm` - PPM 50000 = 5%
     #[action]
     fn set_percent(nft_id: u32, ppm: u32) {
         RateLimit::get_assert(nft_id).update_percent(ppm);
