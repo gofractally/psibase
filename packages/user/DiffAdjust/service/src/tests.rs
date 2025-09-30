@@ -16,7 +16,7 @@ mod tests {
             .create(3000, 60, 5, 6, 500, 50000)
             .get()?;
 
-        // Price does not increase after 4
+        // Difficulty does not increase after 4
         for _ in 0..4 {
             Wrapper::push_from(&chain, alice).increment(nft_id, 1);
         }
@@ -31,7 +31,7 @@ mod tests {
 
         Wrapper::push_from(&chain, alice).increment(nft_id, 7);
 
-        // 6 sales increases the price by 5%
+        // 6 sales increases the Difficulty by 5%
         assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 2992);
 
         // 18 sales increases by 5% x 3
