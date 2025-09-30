@@ -349,11 +349,11 @@ SCENARIO("Accepting an invite")
          }
          THEN("An invite can be accepted by invited-sys in order to create a new account")
          {
-            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).succeeded());
+            CHECK(i.acceptCreate(id, "rebecca123"_a, userPub).succeeded());
          }
          THEN("A normal user may not create a new account")
          {
-            CHECK(b.acceptCreate(id, "rebecca"_a, userPub).failed(mustUseInvitedSys));
+            CHECK(b.acceptCreate(id, "rebecca123"_a, userPub).failed(mustUseInvitedSys));
          }
          THEN("Invited-sys may not accept without also creating a new account")
          {
@@ -369,7 +369,7 @@ SCENARIO("Accepting an invite")
             }
             THEN("An accepted invite can be accepted again with a created account")
             {
-               CHECK(i.acceptCreate(id, "rebecca"_a, userPub).succeeded());
+               CHECK(i.acceptCreate(id, "rebecca123"_a, userPub).succeeded());
             }
          }
          THEN("Accepting fails if the inviteKey doesn't exist")
@@ -445,7 +445,7 @@ SCENARIO("Accepting an invite")
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
-            i.acceptCreate(id, "rebecca"_a, userPub);
+            CHECK(i.acceptCreate(id, "rebecca"_a, userPub)).succeeded();
             CHECK(i.acceptCreate(id, "jonathan"_a, userPub).failed(noNewAccToken));
          }
       }
