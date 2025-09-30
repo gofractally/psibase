@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-xlarge
     env:
       can-publish: ${{ !! secrets.publish-package-login }}
     strategy:
