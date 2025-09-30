@@ -7,8 +7,6 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-diff-adjust"
-data = []
-postinstall = []
 
 [dependencies]
 psibase = { version = "0.21.0", path = "../../../../rust/psibase" }

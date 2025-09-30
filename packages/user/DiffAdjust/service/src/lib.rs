@@ -278,7 +278,7 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing RateLimit
     ///
-    /// * Requires holding administration NFT.
+    /// * Requires sender to be consumer account.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID

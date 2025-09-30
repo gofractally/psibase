@@ -37,7 +37,7 @@ pub mod Service {
 
     /// Increment RateLimit instance, potentially increasing RateLimit
     ///
-    /// * Requires holding administration NFT.
+    /// * Requires sender to be consumer account.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
@@ -90,7 +90,7 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `percent_ppm` - Percent ppm 50000 = 5%
+    /// * `ppm` - Percent ppm 50000 = 5%
     #[action]
     fn set_percent(nft_id: u32, ppm: u32) {
         unimplemented!()
