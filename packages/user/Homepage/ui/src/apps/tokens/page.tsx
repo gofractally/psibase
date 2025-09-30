@@ -1,4 +1,6 @@
 import type { Token } from "./hooks/tokensPlugin/useBalances";
+import type { Quantity } from "./lib/quantity";
+import type { SelectOption } from "@shared/components/form/internal/select-field";
 
 import { CreditTable } from "@/apps/tokens/components/credit-table";
 import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
@@ -144,16 +146,28 @@ export const TokensPage = () => {
                                                         <field.SelectField
                                                             options={tokens.map(
                                                                 (token) => ({
-                                                                    value: token.id.toString(),
+                                                                    value: {
+                                                                        id: token.id.toString(),
+                                                                        balance:
+                                                                            token.balance,
+                                                                    },
                                                                     label: token.label,
                                                                 }),
                                                             )}
-                                                            triggerComponent={
+                                                            keyExtractor={(
+                                                                option,
+                                                            ) =>
+                                                                option.value.id
+                                                            }
+                                                            TriggerComponent={
                                                                 <TokenSelectTrigger
                                                                     selectedToken={
                                                                         selectedToken
                                                                     }
                                                                 />
+                                                            }
+                                                            OptionComponent={
+                                                                TokenSelectOption
                                                             }
                                                         />
                                                     );
@@ -233,6 +247,34 @@ export const TokensPage = () => {
                         </div>
                     </>
                 )}
+            </div>
+        </div>
+    );
+};
+
+const TokenSelectOption = ({
+    option,
+}: {
+    option: SelectOption<{ id: string; balance?: Quantity }>;
+}) => {
+    return (
+        <div className="flex min-w-56 items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+                <Avatar
+                    account={option.label}
+                    type="glass"
+                    className="size-5"
+                />
+                <span className="font-mono text-lg font-medium">
+                    {option.label}
+                </span>
+            </div>
+            <div>
+                <span className="text-muted-foreground text-xs">
+                    {option.value.balance?.format({
+                        includeLabel: false,
+                    })}
+                </span>
             </div>
         </div>
     );
