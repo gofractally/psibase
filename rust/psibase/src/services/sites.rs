@@ -32,7 +32,6 @@ pub mod service {
     use async_graphql::SimpleObject;
     use serde::{Deserialize, Serialize};
 
-    // Tables (match C++ order: SitesContent, SiteConfig, SitesData, SitesDataRef)
     #[table(name = "SitesContentTable", index = 0)]
     #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack)]
     #[fracpack(fracpack_mod = "fracpack")]
