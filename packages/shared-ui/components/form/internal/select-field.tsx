@@ -13,7 +13,7 @@ import {
 import { useFieldContext } from "../app-form";
 import { FieldErrors } from "./field-errors";
 
-interface SelectOption<T = string> {
+export interface SelectOption<T = string> {
     value: T;
     label: string;
     disabled?: boolean;
@@ -25,16 +25,24 @@ interface Props<T = string> {
     placeholder?: string;
     disabled?: boolean;
     className?: string;
-    triggerComponent?: React.ReactNode;
+    TriggerComponent?: React.ReactNode;
+    OptionComponent?: ({
+        option,
+    }: {
+        option: SelectOption<T>;
+    }) => React.ReactNode;
+    keyExtractor?: (option: SelectOption<T>) => string;
 }
 
-export const SelectField = <T extends string | number = string>({
+export const SelectField = <T = string,>({
     options,
     label,
     placeholder = "Select an option",
     disabled = false,
     className,
-    triggerComponent,
+    TriggerComponent,
+    OptionComponent,
+    keyExtractor = (option: SelectOption<T>) => String(option.value),
 }: Props<T>) => {
     const field = useFieldContext<T>();
 
@@ -55,19 +63,19 @@ export const SelectField = <T extends string | number = string>({
                 onValueChange={(value) => {
                     // Convert back to the original type
                     const convertedValue =
-                        typeof options[0]?.value === "number"
+                        typeof keyExtractor(options[0]) === "number"
                             ? (Number(value) as T)
                             : (value as T);
                     field.handleChange(convertedValue);
                 }}
                 disabled={disabled}
             >
-                {triggerComponent ? (
+                {TriggerComponent ? (
                     <Trigger
                         data-slot="select-trigger"
                         className="focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex w-fit rounded-md outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {triggerComponent}
+                        {TriggerComponent}
                     </Trigger>
                 ) : (
                     <SelectTrigger className={className} id={field.name}>
@@ -77,11 +85,11 @@ export const SelectField = <T extends string | number = string>({
                 <SelectContent>
                     {options.map((option) => (
                         <SelectItem
-                            key={option.value.toString()}
-                            value={option.value.toString()}
+                            key={keyExtractor(option)}
+                            value={keyExtractor(option)}
                             disabled={option.disabled}
                         >
-                            {option.label}
+                            {OptionComponent?.({ option }) ?? option.label}
                         </SelectItem>
                     ))}
                 </SelectContent>
