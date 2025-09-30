@@ -4,11 +4,19 @@ import { type Producer, getProducers } from "@/lib/graphql/getProducers";
 import { queryKeys } from "@/lib/queryKeys";
 
 import { useConfig } from "./useConfig";
+import { useStatuses } from "./useStatuses";
 
 export const useProducers = () => {
+    const { data: status, error: statusError } = useStatuses();
     return useQuery<Producer[]>({
         queryKey: queryKeys.producers,
         queryFn: async () => {
+            if (
+                (!!status && ["startup", "needgenesis"].includes(status[0])) ||
+                !!statusError
+            ) {
+                return [];
+            }
             try {
                 return await getProducers();
             } catch (error) {

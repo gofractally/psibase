@@ -248,46 +248,20 @@ namespace psibase
          if (dbMode.isSubjective)
          {
             // Check subjective first, then objective
+            auto ca = database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
+            if (ca.has_value() && ca->codeHash != Checksum256{})
             {
-               auto ca = database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
-               if (ca.has_value() && ca->codeHash != Checksum256{})
-               {
-                  ca->flags &= CodeRow::localServiceFlags;
-                  ca->flags |= ExecutionContext::isLocal;
-                  return {std::move(*ca), DbId::nativeSubjective};
-               }
+               ca->flags &= CodeRow::localServiceFlags;
+               ca->flags |= ExecutionContext::isLocal;
+               return {std::move(*ca), DbId::nativeSubjective};
             }
-            auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
-            check(ca.has_value(), "unknown service account: " + service.str());
-            check(ca->codeHash != Checksum256{}, "service account has no code");
-            ca->flags &= CodeRow::chainServiceFlags;
-            return {std::move(*ca), DbId::native};
          }
-         else
-         {
-            // Use objective service unless it has the isSubjective flag
-            auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
-            check(ca.has_value(), "unknown service account: " + service.str());
-            check(ca->codeHash != Checksum256{}, "service account has no code");
-            ca->flags &= CodeRow::chainServiceFlags;
-            auto runMode = ca->flags & CodeRow::runMode;
-            if (runMode && !dbMode.verifyOnly)
-            {
-               check((ca->flags & CodeRow::runMode) <= CodeRow::runModeCallback, "Invalid runMode");
-               auto subjectiveCode =
-                   database.kvGet<CodeRow>(DbId::nativeSubjective, codeKey(service));
-               if (subjectiveCode.has_value() && subjectiveCode->codeHash != Checksum256{})
-               {
-                  if (!(subjectiveCode->flags & CodeRow::isReplacement))
-                     abortMessage("Cannot substitute subjective service for " + service.str());
-                  subjectiveCode->flags &= CodeRow::localServiceFlags;
-                  subjectiveCode->flags |= (ca->flags & ~CodeRow::localServiceFlags);
-                  subjectiveCode->flags |= ExecutionContext::isLocal;
-                  return {std::move(*subjectiveCode), DbId::nativeSubjective};
-               }
-            }
-            return {std::move(*ca), DbId::native};
-         }
+         // Use objective service
+         auto ca = database.kvGet<CodeRow>(DbId::native, codeKey(service));
+         check(ca.has_value(), "unknown service account: " + service.str());
+         check(ca->codeHash != Checksum256{}, "service account has no code");
+         ca->flags &= CodeRow::chainServiceFlags;
+         return {std::move(*ca), DbId::native};
       }
 
       void init()
@@ -346,6 +320,12 @@ namespace psibase
          currentActContext = prev;
       }
 
+      void onTransferControl(std::uint64_t callerFlags)
+      {
+         transactionContext.importedHandles.clear();
+         std::swap(transactionContext.exportedHandles, transactionContext.importedHandles);
+      }
+
    };  // ExecutionContextImpl
 
    ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
@@ -382,6 +362,8 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
       rhf_t::add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
       rhf_t::add<&ExecutionContextImpl::kvClose>("env", "kvClose");
+      rhf_t::add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
+      rhf_t::add<&ExecutionContextImpl::importHandles>("env", "importHandles");
       rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
       rhf_t::add<&ExecutionContextImpl::putSequential>("env", "putSequential");
       rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
@@ -412,14 +394,8 @@ namespace psibase
 
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
-      // Prevents a poison block
-      if (callerFlags & CodeRow::runMode && !actionContext.transactionContext.dbMode.isSubjective)
-      {
-         check(impl->code.flags & CodeRow::runMode,
-               "subjective services may not call non-subjective ones");
-         check((callerFlags & CodeRow::runMode) == (impl->code.flags & CodeRow::runMode),
-               "subjective services that call each other must have the same replay mode");
-      }
+      impl->onTransferControl(callerFlags);
+      auto cleanup = psio::finally{[&] { impl->onTransferControl(callerFlags); }};
 
       if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
       {
@@ -427,48 +403,11 @@ namespace psibase
                "on-chain service cannot sudo when calling a node-local service");
       }
 
-      auto& bc = impl->transactionContext.blockContext;
-      if ((impl->code.flags & CodeRow::runMode) && !bc.isProducing)
-      {
-         if ((impl->code.flags & CodeRow::runMode) == CodeRow::runModeCallback)
-         {
-            try
-            {
-               impl->exec(actionContext, [&] {  //
-                  (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
-                                           actionContext.action.service.value,
-                                           actionContext.action.sender.value);
-               });
-            }
-            catch (...)
-            {
-               // If the service is called again, reinitialize it, to prevent corruption
-               // from resuming after abrupt termination.
-               impl->initialized = false;
-               if ((callerFlags & CodeRow::runMode) == CodeRow::runModeCallback)
-                  throw;
-            }
-            // Don't override the return value if the caller is also subjective
-            if (callerFlags & CodeRow::runMode)
-            {
-               return;
-            }
-         }
-         auto&       ctx = impl->transactionContext;
-         const auto& tx  = ctx.signedTransaction;
-         check(ctx.nextSubjectiveRead < tx.subjectiveData->size(), "missing subjective data");
-         actionContext.actionTrace.rawRetval = (*tx.subjectiveData)[ctx.nextSubjectiveRead++];
-         return;
-      }
-
       impl->exec(actionContext, [&] {  //
          (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
                                   actionContext.action.service.value,
                                   actionContext.action.sender.value);
       });
-
-      if ((impl->code.flags & CodeRow::runMode) && !(callerFlags & CodeRow::runMode))
-         impl->transactionContext.subjectiveData.push_back(actionContext.actionTrace.rawRetval);
    }
 
    void ExecutionContext::execServe(ActionContext& actionContext)

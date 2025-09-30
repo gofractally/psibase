@@ -115,6 +115,7 @@ impl Caller for JustSchema {
 pub struct ServiceCaller {
     pub sender: AccountNumber,
     pub service: AccountNumber,
+    pub flags: u64,
 }
 
 impl Caller for ServiceCaller {
@@ -129,7 +130,7 @@ impl Caller for ServiceCaller {
             rawData: args.packed().into(),
         }
         .packed();
-        unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
+        unsafe { native_raw::call(act.as_ptr(), act.len() as u32, self.flags) };
     }
 
     fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
@@ -140,7 +141,9 @@ impl Caller for ServiceCaller {
             rawData: args.packed().into(),
         }
         .packed();
-        let ret = get_result_bytes(unsafe { native_raw::call(act.as_ptr(), act.len() as u32) });
+        let ret = get_result_bytes(unsafe {
+            native_raw::call(act.as_ptr(), act.len() as u32, self.flags)
+        });
         Ret::unpacked(&ret).unwrap()
     }
 }

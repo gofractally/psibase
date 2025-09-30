@@ -299,7 +299,7 @@ function(psinode_files target pfx)
     add_custom_target(
     ${target}
     ALL
-    DEPENDS XAdmin_js wasm
+    DEPENDS ${XAdmin_js_DEP} wasm
     COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
     COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin
     COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
@@ -592,7 +592,7 @@ psibase_package(
     SERVICE cpu-limit
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CpuLimit-schema.json
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
     DEPENDS wasm
 )
 
@@ -668,7 +668,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -719,7 +719,6 @@ psibase_package(
     SERVICE event-index
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
-        FLAGS runModeCallback
     SERVICE r-events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
@@ -904,7 +903,7 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
-    DEPENDS wasm XAdmin_js
+    DEPENDS wasm ${XAdmin_js_DEP}
     PACKAGE_DEPENDS XHttp XSites
 )
 
@@ -971,7 +970,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs Evaluations Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
 
@@ -1086,7 +1085,7 @@ psibase_package(
     SERVICE psubjective
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
         SERVER psubjective
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
@@ -1129,7 +1128,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService-schema.json
         SERVER s-counter
-        FLAGS runModeRpc isPrivileged
+        FLAGS isPrivileged
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
