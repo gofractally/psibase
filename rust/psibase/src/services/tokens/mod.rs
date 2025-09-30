@@ -370,55 +370,28 @@ mod service {
     }
 
     #[event(history)]
-    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
+    pub fn configured(token_id: TID, action: String, memo: Memo) {}
 
     #[event(history)]
-    pub fn created(
+    pub fn supplyChanged(
         token_id: TID,
-        sender: AccountNumber,
-        precision: Precision,
-        max_issued_supply: Quantity,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
-
-    #[event(history)]
-    pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
-
-    #[event(history)]
-    pub fn credited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
+        counter_party: AccountNumber,
+        action: String,
+        amount: String,
         memo: Memo,
     ) {
     }
 
     #[event(history)]
-    pub fn uncredited(
+    pub fn balChanged(
         token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
+        account: AccountNumber,
+        counter_party: AccountNumber,
+        action: String,
+        amount: String,
         memo: Memo,
     ) {
     }
-
-    #[event(history)]
-    pub fn debited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-        memo: Memo,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: Memo) {}
 }
 
 #[test]
