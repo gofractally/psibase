@@ -9,5 +9,4 @@ world impl {
 
 
     export api;
-    export queries;
 }

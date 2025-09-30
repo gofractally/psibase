@@ -7,12 +7,7 @@ interface api {
     join: func() -> result<_, error>;
 }
 
-interface queries {
-    use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
-}
 
 world imports {
     import api;
-    import queries;
 }
