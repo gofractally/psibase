@@ -122,12 +122,13 @@ pub mod tables {
                 self.counter = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
-                    let mut new_difficulty = self.active_difficulty as f64;
+                    let mut new_difficulty = self.active_difficulty;
                     let factor = 1.0 - self.percent();
                     for _ in 0..windows_elapsed {
-                        new_difficulty = new_difficulty * factor;
+                        let temp = new_difficulty as f64 * factor;
+                        new_difficulty = (temp as u64).max(self.floor_difficulty);
                     }
-                    self.active_difficulty = (new_difficulty as u64).max(self.floor_difficulty);
+                    self.active_difficulty = new_difficulty;
                 }
             }
             self.active_difficulty
