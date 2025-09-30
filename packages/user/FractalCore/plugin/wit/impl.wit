@@ -4,6 +4,9 @@ world impl {
     include host:common/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
+    include fractals:plugin/imports;
+    include staged-tx:plugin/imports;
+
 
     export api;
     export queries;

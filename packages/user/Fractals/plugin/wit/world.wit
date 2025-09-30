@@ -17,7 +17,7 @@ interface admin {
 interface user {
     use host:types/types.{error};
 
-    join: func(fractal: string) -> result<_, error>;
+    join: func() -> result<_, error>;
 
     create-guild: func(fractal: string, display-name: string, slug: string) -> result<_, error>;
 

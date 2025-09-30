@@ -12,6 +12,27 @@ pub mod service {
 
     use psibase::*;
 
+    /// TEMP ACTION
+    #[action]
+    fn init() {
+        ///
+        let fractal_core: AccountNumber = "fractal-core".into();
+        let a_account: AccountNumber = "a".into();
+        Fractal::add(
+            fractal_core,
+            "Fractal Core".to_string(),
+            "mission".to_string(),
+        );
+        FractalMember::add(fractal_core, "a".into(), MemberStatus::Citizen);
+        let discovery_guild = Guild::add(
+            fractal_core,
+            a_account,
+            "Discovery".to_string().try_into().unwrap(),
+            "discovery".into(),
+        );
+        GuildMember::add(fractal_core, discovery_guild.id, a_account);
+    }
+
     /// Creates a new account and fractal.
     ///
     /// # Arguments
@@ -41,8 +62,8 @@ pub mod service {
     /// # Arguments
     /// * `guild` - The ID of the guild.
     #[action]
-    fn start_eval(guild: GID) {
-        let evaluation = EvaluationInstance::get_assert(guild);
+    fn start_eval(guild_id: GID) {
+        let evaluation = EvaluationInstance::get_assert(guild_id);
 
         evaluation.set_pending_scores(0);
 

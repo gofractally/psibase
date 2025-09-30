@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::bindings::host::common::client::{self as Client, get_active_app};
+use crate::bindings::host::common::client::{self as Client};
 use crate::errors::ErrorType;
 use psibase::AccountNumber;
 

@@ -22,6 +22,7 @@ use bindings::evaluations::plugin::user::{
 
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 
+use crate::bindings::host::common::client::get_active_app;
 use crate::helpers::check_app_origin;
 struct ProposeLatch;
 
@@ -36,6 +37,10 @@ impl Drop for ProposeLatch {
     fn drop(&mut self) {
         set_propose_latch(None).unwrap();
     }
+}
+
+fn active_app() -> AccountNumber {
+    get_active_app().as_str().into()
 }
 
 struct FractallyPlugin;
@@ -63,7 +68,7 @@ impl Admin for FractallyPlugin {
     fn start(guild_id: u32) -> Result<(), Error> {
         // check_app_origin()?;
 
-        let packed_args = fractals::action_structs::start_eval { guild: guild_id }.packed();
+        let packed_args = fractals::action_structs::start_eval { guild_id }.packed();
 
         add_action_to_transaction(
             fractals::action_structs::start_eval::ACTION_NAME,
@@ -190,10 +195,10 @@ impl User for FractallyPlugin {
         propose(&"fractals".to_string(), evaluation_id, group_number, &res)
     }
 
-    fn join(fractal: String) -> Result<(), Error> {
-        let fractal = AccountNumber::from(fractal.as_str());
-
+    fn join() -> Result<(), Error> {
+        let fractal = active_app();
         check_app_origin(fractal)?;
+
         let packed_args = fractals::action_structs::join { fractal }.packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }

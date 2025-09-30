@@ -13,6 +13,25 @@ use psibase::fracpack::Pack;
 mod errors;
 use errors::ErrorType;
 
+use bindings::staged_tx::plugin::proposer::set_propose_latch;
+
+struct ProposeLatch;
+
+impl ProposeLatch {
+    fn new(app: &str) -> Self {
+        set_propose_latch(Some(app)).unwrap();
+        Self
+    }
+}
+
+impl Drop for ProposeLatch {
+    fn drop(&mut self) {
+        set_propose_latch(None).unwrap();
+    }
+}
+
+use bindings::fractals::plugin::user::register;
+
 define_trust! {
     descriptions {
         Low => "
@@ -27,18 +46,23 @@ define_trust! {
     }
     functions {
         Low => [get_example_thing],
-        High => [set_example_thing],
+        High => [start_eval],
     }
 }
 
 struct FractalCorePlugin;
 
 impl Api for FractalCorePlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = fractal_core::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
-        Ok(())
+    fn start_eval(guild_id: u32) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::start_eval)?;
+
+        bindings::fractals::plugin::admin::start(guild_id)
+    }
+
+    fn join() -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::start_eval)?;
+
+        bindings::fractals::plugin::user::join()
     }
 }
 
@@ -63,7 +87,7 @@ impl Queries for FractalCorePlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val = 
+        let examplething_val =
             examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)

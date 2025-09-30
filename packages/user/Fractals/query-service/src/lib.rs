@@ -7,7 +7,7 @@ mod service {
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalMember, FractalMemberTable,
         FractalTable, Guild, GuildMember, GuildMemberTable, GuildTable,
     };
-    use psibase::{services::accounts::Account, *};
+    use psibase::*;
     use serde::{Deserialize, Deserializer};
     use serde_aux::field_attributes::deserialize_number_from_string;
 
