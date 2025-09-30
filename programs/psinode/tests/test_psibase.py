@@ -325,7 +325,7 @@ class TestPsibase(unittest.TestCase):
         a.boot(packages=["Minimal", "Explorer", "Sites", "BrotliCodec"])
 
         # A non-existent account should be an error
-        for source in ["neminis", "http://neminis.a/"]:
+        for source in ["neminis", "http://neminis.aaaaaaa123/"]:
             status = a.run_psibase(
                 ["list", "--package-source", source] + a.node_args(),
                 encoding="utf-8",
@@ -337,7 +337,7 @@ class TestPsibase(unittest.TestCase):
             self.assertIn("account 'neminis' does not exist", status.stderr)
 
         # An existing account is okay even if it wasn't intended as a package repo
-        for source in ["transact", "http://transact.a"]:
+        for source in ["transact", "http://transact.aaaaaaa123"]:
             l = a.run_psibase(
                 ["list", "--available", "--package-source", "transact"] + a.node_args(),
                 stdout=subprocess.PIPE,
