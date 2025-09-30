@@ -351,6 +351,10 @@ SCENARIO("Accepting an invite")
          {
             CHECK(i.acceptCreate(id, "rebecca123"_a, userPub).succeeded());
          }
+         THEN("An invite cannot be accepted with an account name less than 10 chars in length")
+         {
+            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).failed(accountNameTooShort));
+         }
          THEN("A normal user may not create a new account")
          {
             CHECK(b.acceptCreate(id, "rebecca123"_a, userPub).failed(mustUseInvitedSys));
@@ -445,8 +449,8 @@ SCENARIO("Accepting an invite")
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
-            CHECK(i.acceptCreate(id, "rebecca"_a, userPub)).succeeded();
-            CHECK(i.acceptCreate(id, "jonathan"_a, userPub).failed(noNewAccToken));
+            CHECK(i.acceptCreate(id, "rebecca123"_a, userPub).succeeded());
+            CHECK(i.acceptCreate(id, "jonathan12"_a, userPub).failed(noNewAccToken));
          }
       }
    }
