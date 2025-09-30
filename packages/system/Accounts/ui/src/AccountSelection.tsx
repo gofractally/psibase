@@ -83,6 +83,9 @@ export const AccountSelection = () => {
         try {
             const app = inviteToken ? inviteToken.app : connectionToken!.app;
             if (isCreatingAccount) {
+                if (!inviteToken) {
+                    throw new Error(`Expected invite token loaded`);
+                }
                 // createAccount handles logout, acceptWithNewAccount, and importAccount
                 await createAccount(values.username);
                 void (await acceptInvite({
@@ -90,6 +93,7 @@ export const AccountSelection = () => {
                     accountName: values.username,
                     token: z.string().parse(token),
                 }));
+                window.location.href = inviteToken?.appDomain;
             } else {
                 // Import existing account
                 await importAccount(values.username);

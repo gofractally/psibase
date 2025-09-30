@@ -20,4 +20,4 @@ serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.120"
 
 [dev-dependencies]
-branding-pkg = { path = "..", version = "0.21.0" }
+branding-pkg = { path = "..", version = "0.21.1" }

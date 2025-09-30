@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "profiles",
  "profiles-pkg",
@@ -1700,7 +1700,7 @@ dependencies = [
 
 [[package]]
 name = "profiles"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "async-graphql",
  "profiles-pkg",
@@ -1712,7 +1712,7 @@ dependencies = [
 
 [[package]]
 name = "profiles-pkg"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "plugin",
  "profiles",
@@ -1827,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "r-profiles"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "async-graphql",
  "profiles",

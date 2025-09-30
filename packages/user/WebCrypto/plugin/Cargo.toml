@@ -1,0 +1,26 @@
+[package]
+name = "web-crypto"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
+psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
+p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
+pem = "3"
+seahash = "4.1"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "webcrypto:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
+"host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
+"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }

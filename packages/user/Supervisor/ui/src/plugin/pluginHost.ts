@@ -211,4 +211,16 @@ export class PluginHost implements HostInterface {
             throw err;
         }
     }
+
+    importKey(privateKey: string): string {
+        return this.supervisor.importKey(privateKey);
+    }
+
+    signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
+        return this.supervisor.signExplicit(msg, privateKey);
+    }
+
+    sign(msg: Uint8Array, publicKey: string): Uint8Array {
+        return this.supervisor.sign(msg, publicKey);
+    }
 }

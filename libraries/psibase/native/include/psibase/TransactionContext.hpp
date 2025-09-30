@@ -2,6 +2,7 @@
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/BlockContext.hpp>
+#include <psibase/BucketSet.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 
@@ -33,6 +34,9 @@ namespace psibase
       std::vector<std::vector<char>>      subjectiveData;
       size_t                              nextSubjectiveRead = 0;
 
+      std::vector<Bucket> importedHandles;
+      std::vector<Bucket> exportedHandles;
+
       // sockets that will be closed when the transaction context finishes
       SocketAutoCloseSet ownedSockets;
 
@@ -51,6 +55,10 @@ namespace psibase
 
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
+      void execCalledAction(uint64_t      callerFlags,
+                            const Action& act,
+                            ActionTrace&  atrace,
+                            CallFlags     flags);
       void execServe(const Action& act, ActionTrace& atrace);
       void execExport(std::string_view fn, const Action& action, ActionTrace& atrace);
 

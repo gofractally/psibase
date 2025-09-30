@@ -26,7 +26,8 @@ namespace psibase
       std::vector<Bucket> buckets;
 
       KvHandle open(DbId db, std::vector<char> prefix, KvMode mode, std::uint32_t limit);
-      void     close(KvHandle handle);
+      std::vector<KvHandle> add(std::vector<Bucket>&& buckets, std::uint32_t limit);
+      void                  close(KvHandle handle);
 
       const Bucket& operator[](KvHandle handle) const;
    };

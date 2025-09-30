@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.21.0"
+version = "0.21.1"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -35,6 +35,6 @@ Sites = "0.21.0"
 crate-type = ["rlib"]
 
 [dependencies]
-profiles = { path = "service", version = "0.21.0" }
-r-profiles = { path = "query-service", version = "0.21.0" }
-plugin = { path = "plugin", version = "0.21.0" }
+profiles = { path = "service", version = "0.21.1" }
+r-profiles = { path = "query-service", version = "0.21.1" }
+plugin = { path = "plugin", version = "0.21.1" }

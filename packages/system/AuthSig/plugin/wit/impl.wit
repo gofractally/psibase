@@ -4,6 +4,7 @@ world impl {
     include accounts:plugin/imports;
     include transact:plugin/imports;
     include host:common/imports;
+    include host:crypto/imports;
     include clientdata:plugin/imports;
     include permissions:plugin/imports;
 

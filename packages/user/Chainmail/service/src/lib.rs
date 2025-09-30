@@ -49,7 +49,7 @@ mod service {
     /// by emiting an `archived` event
     #[action]
     fn archive(msg_id: u64) {
-        let saved_messages_table = SavedMessageTable::new();
+        let saved_messages_table = SavedMessageTable::read();
         if let Some(rec) = saved_messages_table.get_index_pk().get(&msg_id) {
             unsave(
                 msg_id,
@@ -136,7 +136,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SavedMessage>, async_graphql::Error> {
-            let saved_msgs_table = SavedMessageTable::new();
+            let saved_msgs_table = SavedMessageTable::read();
             TableQuery::subindex::<AccountNumber>(
                 saved_msgs_table.get_index_by_receiver(),
                 &receiver,
