@@ -9,7 +9,7 @@ pub mod Service {
     /// * `window_seconds` - Seconds duration before decay occurs
     /// * `target_min` - Minimum rate limit target
     /// * `target_max` - Maximum rate limit target
-    /// * `floor_difficulty` - Minimum price
+    /// * `floor_difficulty` - Minimum difficulty
     /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
     #[action]
     fn create(
@@ -23,15 +23,15 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Get RateLimit price
+    /// Get RateLimit difficulty
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
     ///
     /// # Returns
-    /// Price of RateLimit
+    /// Difficulty of RateLimit
     #[action]
-    fn get_price(nft_id: u32) -> u64 {
+    fn get_diff(nft_id: u32) -> u64 {
         unimplemented!()
     }
 
