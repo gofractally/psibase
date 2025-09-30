@@ -24,11 +24,11 @@ const DB: Store::Database = Store::Database {
 };
 
 fn public_keys() -> Store::Bucket {
-    Store::Bucket::new(DB, "claims")
+    Store::Bucket::new(DB, "pubkeys")
 }
 
 fn private_keys() -> Store::Bucket {
-    Store::Bucket::new(DB, "proofs")
+    Store::Bucket::new(DB, "privkeys")
 }
 
 impl Api for Credentials {
