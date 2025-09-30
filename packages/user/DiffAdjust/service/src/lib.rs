@@ -170,7 +170,7 @@ pub mod tables {
             difficulty
         }
 
-        pub fn update_window(&mut self, seconds: u32) {
+        pub fn set_window(&mut self, seconds: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
             Self::check_window_seconds(seconds);
@@ -179,7 +179,7 @@ pub mod tables {
             self.save();
         }
 
-        pub fn update_targets(&mut self, target_min: u32, target_max: u32) {
+        pub fn set_targets(&mut self, target_min: u32, target_max: u32) {
             self.check_sender_has_nft();
             Self::check_targets(target_min, target_max);
             self.check_difficulty_decrease();
@@ -188,7 +188,7 @@ pub mod tables {
             self.save();
         }
 
-        pub fn update_percent(&mut self, ppm: u32) {
+        pub fn set_percent(&mut self, ppm: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
             Self::check_percent_change(ppm);
@@ -196,7 +196,7 @@ pub mod tables {
             self.save();
         }
 
-        pub fn update_floor(&mut self, floor_difficulty: u64) {
+        pub fn set_floor(&mut self, floor_difficulty: u64) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
             self.floor_difficulty = floor_difficulty;
@@ -299,7 +299,7 @@ pub mod service {
     /// * `target_max` - Maximum target difficulty
     #[action]
     fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
-        RateLimit::get_assert(nft_id).update_targets(target_min, target_max);
+        RateLimit::get_assert(nft_id).set_targets(target_min, target_max);
     }
 
     /// Update window
@@ -311,7 +311,7 @@ pub mod service {
     /// * `seconds` - Seconds
     #[action]
     fn set_window(nft_id: u32, seconds: u32) {
-        RateLimit::get_assert(nft_id).update_window(seconds);
+        RateLimit::get_assert(nft_id).set_window(seconds);
     }
 
     /// Update floor difficulty
@@ -323,7 +323,7 @@ pub mod service {
     /// * `difficulty` - Difficulty
     #[action]
     fn set_floor(nft_id: u32, difficulty: u64) {
-        RateLimit::get_assert(nft_id).update_floor(difficulty);
+        RateLimit::get_assert(nft_id).set_floor(difficulty);
     }
 
     /// Update percent change
@@ -335,7 +335,7 @@ pub mod service {
     /// * `ppm` - PPM 50000 = 5%
     #[action]
     fn set_percent(nft_id: u32, ppm: u32) {
-        RateLimit::get_assert(nft_id).update_percent(ppm);
+        RateLimit::get_assert(nft_id).set_percent(ppm);
     }
 
     /// Delete RateLimit instance
