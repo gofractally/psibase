@@ -153,10 +153,6 @@ pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
                 .as_ref()
                 .and_then(|tables| tables.get(db))
                 .unwrap_or(&empty_tables);
-            if ltables.len() < rtables.len() {
-                panic!("Extra tables in {}", db);
-            }
-
             // Compare tables by their declared numeric `table` index
             let l_by_idx: std::collections::HashMap<u16, &TableInfo> =
                 ltables.iter().map(|t| (t.table, t)).collect();
@@ -164,10 +160,7 @@ pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
             for rtab in rtables {
                 let Some(ltab) = l_by_idx.get(&rtab.table) else {
                     let table_name = rtab.name.as_ref().map_or("<unnamed>", |n| n.as_str());
-                    panic!(
-                        "Missing table {}::{} (index {})",
-                        db, table_name, rtab.table
-                    );
+                    panic!("Extra table {}::{} (index {})", db, table_name, rtab.table);
                 };
 
                 let table_name = ltab
