@@ -59,8 +59,8 @@ pub mod tables {
         }
 
         #[secondary_key(2)]
-        fn by_expiry_date(&self) -> (u32, Option<TimePointSec>) {
-            (self.id, self.expiry_date)
+        fn by_expiry_date(&self) -> (Option<TimePointSec>, u32) {
+            (self.expiry_date, self.id)
         }
     }
 }
