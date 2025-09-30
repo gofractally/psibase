@@ -4,6 +4,9 @@
 #include <services/system/RTransact.hpp>
 #include <services/user/Nop.hpp>
 
+#include <format>
+#include <iostream>
+
 using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
@@ -60,6 +63,12 @@ std::uint64_t XRun::verify(Checksum256       transactionHash,
    };
    if (auto prev = table.last())
       row.id = prev->id + 1;
+
+   for (auto row : table.getIndex<0>())
+   {
+      std::cout << std::format("xrun: {}::{}", row.action.service.str(), row.action.method.str())
+                << std::endl;
+   }
 
    table.put(row);
 
