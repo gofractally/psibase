@@ -12,7 +12,7 @@ class TestCrash(unittest.TestCase):
     def test_crash_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
         a = testutil.boot_with_producers(prods, packages=["Minimal", "Explorer"])
-        b = cluster.nodes["b"]
+        b = cluster.nodes["bbbbbbb123"]
 
         a.wait(new_block())
         a.wait(irreversible(a.get_block_header()["blockNum"]))
