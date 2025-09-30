@@ -107,7 +107,7 @@ mod service {
     /// * `amount`   - Amount to uncredit from shared balance,
     /// * `memo`     - Memo
     #[action]
-    fn uncredit(tokenId: TID, debitor: AccountNumber, maxAmount: Quantity, memo: Memo) {
+    fn uncredit(tokenId: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -124,7 +124,7 @@ mod service {
     /// * `amount`   - Amount to debit / take from shared balance.
     /// * `memo`     - Memo
     #[action]
-    fn debit(tokenId: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {
+    fn debit(tokenId: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -357,16 +357,6 @@ mod service {
     #[action]
     fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
         unimplemented!()
-    }
-
-    #[event(history)]
-    pub fn recalled(
-        token_id: TID,
-        amount: Quantity,
-        burner: AccountNumber,
-        from: AccountNumber,
-        memo: Memo,
-    ) {
     }
 
     #[event(history)]
