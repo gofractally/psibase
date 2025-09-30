@@ -33,7 +33,7 @@ namespace psibase
          return false;
       if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})
          return false;
-      if (action.service == AccountNumber{"event-index"} && action.method == MethodNumber{"sync"})
+      if (action.service == AccountNumber{"events"} && action.method == MethodNumber{"sync"})
          return false;
       return true;
    }
@@ -59,7 +59,12 @@ namespace psibase
             if (isUserAction(at->action))
                top_traces.push_back(at);
       if (top_traces.size() & 1)
-         std::cout << prettyTrace(trimRawData(t)).c_str();
+      {
+         for (const ActionTrace* trace : top_traces)
+         {
+            std::cout << trace->action.service.str() << "::" << trace->action.method.str() << "\n";
+         }
+      }
       check(!(top_traces.size() & 1), "unexpected number of action traces");
       check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];
@@ -343,6 +348,11 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
+
+      /**
+       * Switches to the block before the new block, and then applies it.
+       */
+      void pushBlock(const SignedBlock& block);
 
       /**
        * Runs the nextTransaction callback to find the
