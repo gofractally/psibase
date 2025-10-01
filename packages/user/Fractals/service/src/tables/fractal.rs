@@ -48,7 +48,7 @@ impl Fractal {
 
 #[ComplexObject]
 impl Fractal {
-    async fn memberss(&self) -> Vec<FractalMember> {
+    async fn memberships(&self) -> Vec<FractalMember> {
         self.members()
     }
 }

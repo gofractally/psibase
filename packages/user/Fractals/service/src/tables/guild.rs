@@ -1,5 +1,5 @@
 use async_graphql::ComplexObject;
-use psibase::{check_none, check_some, services::accounts::Account, AccountNumber, Memo, Table};
+use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
     Config, EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable,
@@ -86,24 +86,24 @@ impl Guild {
         )
     }
 
-    // pub fn council_members(&self) -> Vec<GuildMember> {
-    //     let guild_members: Vec<GuildMember> = GuildMemberTable::new()
-    //         .get_index_by_score()
-    //         .range(
-    //             (self.id, 0, AccountNumber::new(0))
-    //                 ..=(self.id, u32::MAX, AccountNumber::new(u64::MAX)),
-    //         )
-    //         .rev()
-    //         .take(6)
-    //         .filter(|member| member.score != 0)
-    //         .collect();
+    pub fn council_members(&self) -> Vec<GuildMember> {
+        let guild_members: Vec<GuildMember> = GuildMemberTable::new()
+            .get_index_by_score()
+            .range(
+                (self.id, 0, AccountNumber::new(0))
+                    ..=(self.id, u32::MAX, AccountNumber::new(u64::MAX)),
+            )
+            .rev()
+            .take(6)
+            .filter(|member| member.score != 0)
+            .collect();
 
-    //     guild_members
-    // }
+        guild_members
+    }
 
-    // pub fn representative(&self) -> Option<GuildMember> {
-    //     self.rep.map(|rep| GuildMember::get_assert(self.id, rep))
-    // }
+    pub fn representative(&self) -> Option<GuildMember> {
+        self.rep.map(|rep| GuildMember::get_assert(self.id, rep))
+    }
 
     fn save(&self) {
         GuildTable::read_write().put(&self).expect("failed to save");
@@ -116,18 +116,18 @@ impl Guild {
         EvaluationInstance::get(self.id)
     }
 
-    // pub async fn fractal(&self) -> Fractal {
-    //     Fractal::get_assert(self.fractal)
-    // }
+    pub async fn fractal(&self) -> Fractal {
+        Fractal::get_assert(self.fractal)
+    }
 
-    // pub async fn council(&self) -> Vec<AccountNumber> {
-    //     self.council_members()
-    //         .into_iter()
-    //         .map(|member| member.member)
-    //         .collect()
-    // }
+    pub async fn council(&self) -> Vec<AccountNumber> {
+        self.council_members()
+            .into_iter()
+            .map(|member| member.member)
+            .collect()
+    }
 
-    // pub async fn rep(&self) -> Option<GuildMember> {
-    //     self.representative()
-    // }
+    pub async fn rep(&self) -> Option<GuildMember> {
+        self.representative()
+    }
 }
