@@ -1240,7 +1240,6 @@ dependencies = [
  "p256",
  "pem",
  "psibase",
- "rand_core 0.6.4",
  "wit-bindgen-rt 0.28.0",
 ]
 
@@ -2111,12 +2110,14 @@ dependencies = [
  "jwt",
  "lazy_static",
  "mime_guess",
+ "p256",
  "paste",
  "pem",
  "percent-encoding",
  "pkcs8",
  "psibase_macros",
  "psibase_names",
+ "rand_core 0.6.4",
  "regex",
  "reqwest",
  "ring",

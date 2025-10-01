@@ -41,22 +41,6 @@ export async function hexDERPublicKeyToCryptoKey(
     }
 }
 
-export async function generateP256Key(): Promise<CryptoKeyPair> {
-    try {
-        return crypto.subtle.generateKey(
-            {
-                name: "ECDSA",
-                namedCurve: "P-256",
-            },
-            true, // Extractable for exporting
-            ["sign", "verify"],
-        );
-    } catch (error) {
-        console.error("Error generating key pair:", error);
-        throw error;
-    }
-}
-
 export async function exportKeyToDER(
     key: CryptoKey,
     keyType: "PUBLIC KEY" | "PRIVATE KEY",
