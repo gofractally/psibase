@@ -3,7 +3,34 @@ pub const CREDENTIAL_SENDER: &str = "cred-sys";
 #[crate::service(name = "credentials", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod service {
-    use crate::{services::auth_sig::SubjectPublicKeyInfo, TimePointSec};
+    use crate::{
+        services::auth_sig::SubjectPublicKeyInfo, services::transact::ServiceMethod, AccountNumber,
+        Claim, TimePointSec,
+    };
+
+    #[action]
+    fn init() {
+        unimplemented!()
+    }
+
+    #[allow(non_snake_case)]
+    #[action]
+    fn canAuthUserSys(user: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[allow(non_snake_case)]
+    #[action]
+    fn checkAuthSys(
+        flags: u32,
+        requester: AccountNumber,
+        sender: AccountNumber,
+        action: ServiceMethod,
+        allowedActions: Vec<ServiceMethod>,
+        claims: Vec<Claim>,
+    ) {
+        unimplemented!()
+    }
 
     /// Creates a credential
     ///

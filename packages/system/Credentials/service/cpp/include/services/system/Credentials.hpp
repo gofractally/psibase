@@ -1,8 +1,10 @@
 #pragma once
 
+#include <psibase/block.hpp>
 #include <psibase/psibase.hpp>
+#include <psibase/time.hpp>
 #include <services/system/AuthSig.hpp>
-#include "psibase/time.hpp"
+#include <services/system/Transact.hpp>
 
 namespace SystemService
 {
@@ -10,6 +12,17 @@ namespace SystemService
    {
       static constexpr auto service           = psibase::AccountNumber("credentials");
       static constexpr auto CREDENTIAL_SENDER = psibase::AccountNumber("cred-sys");
+
+      void init();
+
+      void canAuthUserSys(psibase::AccountNumber user);
+
+      void checkAuthSys(uint32_t                    flags,
+                        psibase::AccountNumber      requester,
+                        psibase::AccountNumber      sender,
+                        ServiceMethod               action,
+                        std::vector<ServiceMethod>  allowedActions,
+                        std::vector<psibase::Claim> claims);
 
       /// Creates a credential
       ///
@@ -45,6 +58,9 @@ namespace SystemService
 
    // clang-format off
    PSIO_REFLECT(Credentials,
+      method(init),
+      method(canAuthUserSys, user),
+      method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
       method(create, pubkey, expires),
       method(consume_active),
       method(get_active),
