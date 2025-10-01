@@ -48,20 +48,25 @@ export const TokensPage = () => {
         value: typeof defaultTransferValues;
     }) => {
         try {
+            // Pad with 0 if the amount string starts with a dot (e.g., ".01" -> "0.01")
+            const paddedAmount = value.amount.amount.startsWith(".")
+                ? "0" + value.amount.amount
+                : value.amount.amount;
+
             updateBalanceCache(
                 Account.parse(currentUser),
                 value.token,
-                value.amount.amount,
+                paddedAmount,
                 "Subtract",
             );
             await credit({
                 tokenId: value.token,
                 receiver: value.to.account,
-                amount: value.amount.amount,
+                amount: paddedAmount,
                 memo: value.memo,
             });
             toast("Sent", {
-                description: `Sent ${value.amount.amount} ${
+                description: `Sent ${paddedAmount} ${
                     selectedToken?.label || selectedToken?.symbol
                 } to ${value.to.account}`,
             });
