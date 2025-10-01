@@ -71,14 +71,11 @@ export const FieldAccountExisting = withFieldGroup({
         supervisor,
     }) {
         const [isValidating, setIsValidating] = useState(false);
+        const [userNotFound, setUserNotFound] = useState(false);
         return (
             <group.AppField
                 name="account"
                 children={(field) => {
-                    const userNotFound = field.state.meta.errors.includes(
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        "Account does not exist" as any,
-                    );
                     return (
                         <field.TextField
                             disabled={disabled}
@@ -97,11 +94,7 @@ export const FieldAccountExisting = withFieldGroup({
                     );
                 }}
                 validators={{
-                    onChange: ({ fieldApi }) => {
-                        setIsValidating(true);
-                        const errors = fieldApi.parseValueWithSchema(zAccount);
-                        if (errors) return errors;
-                    },
+                    onChange: () => setIsValidating(true),
                     onChangeAsyncDebounceMs: 500,
                     onChangeAsync: async ({ value }) => {
                         const exists = await doesAccountExist(
@@ -109,6 +102,20 @@ export const FieldAccountExisting = withFieldGroup({
                             supervisor!,
                         );
                         setIsValidating(false);
+                        setUserNotFound(!exists);
+                        return;
+                    },
+                    onSubmit: ({ fieldApi }) => {
+                        const errors = fieldApi.parseValueWithSchema(zAccount);
+                        if (errors) return errors;
+                    },
+                    onSubmitAsync: async ({ value }) => {
+                        const exists = await doesAccountExist(
+                            value,
+                            supervisor!,
+                        );
+                        setIsValidating(false);
+                        setUserNotFound(!exists);
                         if (exists) return;
                         return "Account does not exist";
                     },

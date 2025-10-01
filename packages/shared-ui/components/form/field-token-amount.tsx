@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { FieldValidators } from "@tanstack/react-form";
-
+import { useRef } from "react";
 import { z } from "zod";
 
 import { withFieldGroup } from "./app-form";
@@ -37,7 +35,6 @@ import { withFieldGroup } from "./app-form";
  *     balance={balance}
  *     disabled={isDisabled}
  *     description={null}
- *     validators={{}}
  *     onMaxAmountClick={null}
  * />
  * ```
@@ -46,7 +43,6 @@ import { withFieldGroup } from "./app-form";
  * @param balance - The balance of the token; null skips validation
  * @param disabled - Whether the field is disabled
  * @param description - Optional description text (specify null to ignore)
- * @param validators - Optional validators (specify `{}` to ignore)
  * @param onMaxAmountClick - Optional function to call when the max amount button is clicked; set to `null` to omit Max button
  * @returns A field for entering a token amount
  */
@@ -59,20 +55,6 @@ export const FieldTokenAmount = withFieldGroup({
         balance: null as number | null,
         disabled: false,
         description: null as string | null,
-        validators: {} as FieldValidators<
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any,
-            any
-        >,
         onMaxAmountClick: null as
             | ((e: React.MouseEvent<HTMLButtonElement>) => void)
             | null,
@@ -83,10 +65,16 @@ export const FieldTokenAmount = withFieldGroup({
         balance,
         disabled,
         description,
-        validators,
         onMaxAmountClick,
     }) {
         const p = (27.83658204756385).toFixed(precision ?? 0);
+
+        const precisionRef = useRef(precision);
+        const balanceRef = useRef(balance);
+
+        // Keep refs updated with latest values
+        precisionRef.current = precision;
+        balanceRef.current = balance;
 
         const handleSetMaxAmount = (e: React.MouseEvent<HTMLButtonElement>) => {
             if (!onMaxAmountClick) return;
@@ -121,12 +109,17 @@ export const FieldTokenAmount = withFieldGroup({
                             />
                         );
                     }}
-                    validators={
-                        {
-                            onChangeAsync: zTokenAmount({ precision, balance }), // doing this async ensures these values are not stale
-                            ...validators,
-                        } as any
-                    }
+                    validators={{
+                        onSubmitAsync: async ({ fieldApi }) => {
+                            const errors = fieldApi.parseValueWithSchema(
+                                zTokenAmount({
+                                    precision: precisionRef.current,
+                                    balance: balanceRef.current,
+                                }),
+                            );
+                            if (errors) return errors;
+                        }, // doing this async AND using refs ensures these values are not stale
+                    }}
                 />
             </div>
         );
