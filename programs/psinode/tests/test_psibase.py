@@ -169,15 +169,19 @@ class TestPsibase(unittest.TestCase):
                 ]
             )
 
-        a.run_psibase(["push"] + a.node_args(), input=make_input("a1"), text=True)
-        a.run_psibase(["push", "-"] + a.node_args(), input=make_input("a2"), text=True)
+        a.run_psibase(
+            ["push"] + a.node_args(), input=make_input("bbbbb12345"), text=True
+        )
+        a.run_psibase(
+            ["push", "-"] + a.node_args(), input=make_input("ccccc12345"), text=True
+        )
         with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as f:
-            f.write(make_input("a3"))
+            f.write(make_input("ddddd12345"))
             f.flush()
             a.run_psibase(["push", f.name] + a.node_args())
 
         a.wait(new_block())
-        for account in ["a1", "a2", "a3"]:
+        for account in ["bbbbb12345", "ccccc12345", "ddddd12345"]:
             res = a.graphql(
                 "accounts",
                 'query { getAccount(accountName: "%s") { authService } }' % account,
