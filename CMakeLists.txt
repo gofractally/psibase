@@ -138,7 +138,8 @@ if(DEFINED WASI_SDK_PREFIX)
         RHttpServer RSetCode RTransact SetCode Symbol
         Transact VerifySig XAdmin XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
-        SubjectiveCounterService KeepSocketService XSocketListService)
+        SubjectiveCounterService KeepSocketService Loop
+        XSocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1147,6 +1148,17 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/Loop.psi
+    NAME Loop
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "This is the song that never ends"
+    SERVICE loop
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Loop.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Loop-schema.json
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XSocketList.psi
     NAME XSocketList
     VERSION ${PSIBASE_VERSION}.0
@@ -1159,7 +1171,7 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket XSocketList)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList)
 
 ExternalProject_Add(
     rust
