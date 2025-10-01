@@ -59,7 +59,12 @@ const useConfigPlugin = (
 
 const useProducersPlugin = (
     method: string,
-    meta: { loading: string; success: string; error: string },
+    meta: {
+        loading: string;
+        success: string;
+        error: string;
+        isStagable?: boolean;
+    },
 ) =>
     usePluginMutation(
         {
@@ -71,7 +76,7 @@ const useProducersPlugin = (
             error: meta.error,
             loading: meta.loading,
             success: meta.success,
-            isStagable: true,
+            isStagable: meta.isStagable ?? true,
         },
     );
 
@@ -84,6 +89,7 @@ export const BlockProduction = () => {
             loading: "Registering candidate",
             success: "Registered candidate",
             error: "Failed to register candidate",
+            isStagable: false,
         },
     );
     const { mutateAsync: setCurrent } = useConfigPlugin("setProducers", {
