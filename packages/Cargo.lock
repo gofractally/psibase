@@ -2078,7 +2078,10 @@ dependencies = [
 name = "producers"
 version = "0.21.0"
 dependencies = [
+ "hex 0.4.3",
  "psibase",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt 0.39.0",
 ]
 
