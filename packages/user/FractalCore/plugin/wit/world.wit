@@ -13,6 +13,9 @@ interface user {
     register: func(slug: string) -> result<_, error>;
     unregister: func(slug: string) -> result<_, error>;
 
+    get-group-users: func(guild-slug: string, group-number: u32) -> result<list<string>, error>;
+    get-proposal: func(guild-slug: string, group-number: u32) -> result<option<list<string>>, error>;
+
 
 
 }

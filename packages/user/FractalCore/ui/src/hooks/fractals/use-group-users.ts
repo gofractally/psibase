@@ -2,15 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalService } from "@/lib/constants";
-import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalAccount, OptionalNumber } from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
+import { useFractalAccount } from "./use-fractal-account";
+
 export const useGroupUsers = (
-    evaluationId: OptionalNumber,
+    evaluationId: OptionalAccount,
     groupNumber: OptionalNumber,
-) =>
-    useQuery({
+) => {
+    const fractal = useFractalAccount();
+    return useQuery({
         queryKey: QueryKey.groupUsers(evaluationId, groupNumber),
         enabled: !!(evaluationId && groupNumber),
         queryFn: async () => {
@@ -18,7 +20,7 @@ export const useGroupUsers = (
                 const res = await supervisor.functionCall({
                     method: "getGroupUsers",
                     params: [evaluationId, groupNumber],
-                    service: fractalService,
+                    service: fractal,
                     intf: "user",
                 });
                 return zAccount.array().parse(res);
@@ -29,3 +31,4 @@ export const useGroupUsers = (
             }
         },
     });
+};

@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -20,7 +19,7 @@ const mutationFn = async (fractal: string) => {
         await supervisor.functionCall({
             method: "join",
             params: [fractal],
-            service: fractalService,
+            service: fractal,
             intf: "user",
         });
     } catch (error) {

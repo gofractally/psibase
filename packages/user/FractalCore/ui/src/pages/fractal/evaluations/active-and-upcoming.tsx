@@ -23,12 +23,12 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useGuildId } from "@/hooks/use-guild-id";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const ActiveAndUpcoming = () => {
     const currentFractal = useFractalAccount();
-    const guildId = useGuildId();
+    const guildId = useGuildSlug();
 
     const { data: currentUser } = useCurrentUser();
     const { data, isPending: isFractalPending } = useFractal();
@@ -47,6 +47,8 @@ export const ActiveAndUpcoming = () => {
     const isCouncilMember = Boolean(
         data?.fractal?.council.includes(currentUser ?? ""),
     );
+
+    console.log({ isCouncilMember })
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -112,7 +114,7 @@ const EmptyState = ({
 };
 
 const EvaluationsTable = () => {
-    const { evaluation, guild } = useEvaluationInstance(useGuildId());
+    const { evaluation, guild } = useEvaluationInstance(useGuildSlug());
 
     const nextSchedules = useNextEvaluations(
         guild?.evalInstance?.evaluationId,

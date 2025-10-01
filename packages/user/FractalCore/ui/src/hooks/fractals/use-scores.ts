@@ -3,10 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { getScores } from "@/lib/graphql/fractals/getScores";
 import QueryKey from "@/lib/queryKeys";
 
-import { useGuildId } from "../use-guild-id";
+import { useGuildSlug } from "../use-guild-id";
 
 export const useScores = () => {
-    const guildId = useGuildId();
+    const guildId = useGuildSlug();
     return useQuery({
         queryKey: QueryKey.scores(guildId?.toString()),
         enabled: !!guildId,

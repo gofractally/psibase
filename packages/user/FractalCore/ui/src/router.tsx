@@ -35,7 +35,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: "/guild/:guildId",
+                path: "/guild/:guildSlug",
                 element: (
                     <ProtectedRoute>
                         <Guild />

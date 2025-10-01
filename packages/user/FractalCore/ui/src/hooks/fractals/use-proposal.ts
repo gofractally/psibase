@@ -4,22 +4,21 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalService } from "@/lib/constants";
-import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalAccount, OptionalNumber } from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
-export const useProposal = (
-    evaluationId: OptionalNumber,
-    groupNumber: OptionalNumber,
-) =>
-    useQuery({
-        queryKey: QueryKey.proposal(evaluationId, groupNumber),
+import { useFractalAccount } from "./use-fractal-account";
+
+export const useProposal = (groupNumber: OptionalNumber) => {
+    const fractalAccount = useFractalAccount();
+    return useQuery({
+        queryKey: QueryKey.proposal(fractalAccount, groupNumber),
         queryFn: async () => {
             try {
                 const res = await supervisor.functionCall({
                     method: "getProposal",
-                    params: [evaluationId, groupNumber],
-                    service: fractalService,
+                    params: [fractalAccount, groupNumber],
+                    service: fractalAccount,
                     intf: "user",
                 });
 
@@ -31,14 +30,15 @@ export const useProposal = (
             }
         },
     });
+};
 
 export const setCachedProposal = (
-    evaluationId: number,
+    fractalAccount: OptionalAccount,
     groupNumber: number,
     accounts: Account[],
 ) => {
     queryClient.setQueryData(
-        QueryKey.proposal(evaluationId, groupNumber),
+        QueryKey.proposal(fractalAccount, groupNumber),
         accounts,
     );
 };

@@ -1,6 +1,6 @@
 import { EvaluationStatus } from "@/lib/getStatus";
 
-import { useGuildId } from "../use-guild-id";
+import { useGuildSlug } from "../use-guild-id";
 import { useCloseEvaluation } from "./use-close-evaluation";
 import { useEvaluationInstance } from "./use-evaluation-instance";
 
@@ -12,7 +12,7 @@ export const useWatchClose = (status: EvaluationStatus | undefined) => {
         isSuccess,
     } = useCloseEvaluation();
 
-    const instanceData = useEvaluationInstance(useGuildId());
+    const instanceData = useEvaluationInstance(useGuildSlug());
 
     if (
         status &&

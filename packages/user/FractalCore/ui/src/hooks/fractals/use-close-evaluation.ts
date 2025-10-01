@@ -4,13 +4,13 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
+import { zGuildSlug } from "@/lib/zod/Wrappers";
 
 import { useFractalAccount } from "./use-fractal-account";
 
 const zParams = z.object({
-    evaluationId: z.number(),
+    guildSlug: zGuildSlug,
 });
 
 export const useCloseEvaluation = () => {
@@ -18,13 +18,13 @@ export const useCloseEvaluation = () => {
 
     return useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
-            const { evaluationId } = zParams.parse(params);
+            const { guildSlug } = zParams.parse(params);
 
             try {
                 void (await supervisor.functionCall({
                     method: "closeEval",
-                    params: [evaluationId],
-                    service: fractalService,
+                    params: [guildSlug],
+                    service: fractal,
                     intf: "admin",
                 }));
             } catch (e) {

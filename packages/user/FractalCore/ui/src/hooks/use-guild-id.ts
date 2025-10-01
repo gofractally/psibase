@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 
-export const useGuildId = (): number | undefined => {
-    const { guildId } = useParams();
-    return guildId ? Number(guildId) : undefined;
+export const useGuildSlug = (): number | undefined => {
+    const { guildSlug } = useParams();
+    return guildSlug ? Number(guildSlug) : undefined;
 };

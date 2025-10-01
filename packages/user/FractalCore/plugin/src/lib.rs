@@ -83,6 +83,14 @@ impl User for FractalCorePlugin {
         FractalsPlugin::user::join()
     }
 
+    fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
+        FractalsPlugin::user::get_group_users(&guild_slug, group_number)
+    }
+
+    fn get_proposal(guild_slug: String, group_number: u32) -> Result<Option<Vec<String>>, Error> {
+        FractalsPlugin::user::get_proposal(&guild_slug, group_number)
+    }
+
     fn start_eval(guild_slug: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::start_eval)?;
 

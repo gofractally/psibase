@@ -94,6 +94,7 @@ pub mod tables {
         #[graphql(skip)]
         pub fractal: AccountNumber,
         pub display_name: Memo,
+        #[graphql(skip)]
         pub rep: Option<AccountNumber>,
         pub bio: Memo,
         pub description: String,
@@ -132,6 +133,11 @@ pub mod tables {
         #[secondary_key(1)]
         fn by_fractal(&self) -> (AccountNumber, AccountNumber, GID) {
             (self.fractal, self.member, self.guild)
+        }
+
+        #[secondary_key(2)]
+        fn by_score(&self) -> (GID, u32, AccountNumber) {
+            (self.guild, self.score, self.member)
         }
     }
 }

@@ -21,7 +21,7 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
                 size="sm"
                 onClick={() => {
                     navigate(
-                        paths.fractal.evaluationGroup(
+                        paths.guild.evaluationGroup(
                             evaluationInstance.fractal,
                             evaluationInstance.evaluationId!,
                             status.groupNumber!,

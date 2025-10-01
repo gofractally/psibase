@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import { EvaluationStatus } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
-import { EvalType } from "@/lib/zod/EvaluationType";
 
 import { useFractal } from "./use-fractal";
 
@@ -21,12 +20,8 @@ export const useWatchStart = (status: EvaluationStatus | undefined) => {
 
         if (autoNavigate) {
             navigate(
-                paths.fractal.evaluationGroup(
+                paths.guild.evaluationGroup(
                     fractal!.fractal!.account,
-                    fractal!.evaluations.find(
-                        (evaluation) =>
-                            evaluation.evalType == EvalType.Reputation,
-                    )!.evaluationId,
                     status.groupNumber!,
                 ),
             );

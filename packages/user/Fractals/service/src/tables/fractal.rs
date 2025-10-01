@@ -48,7 +48,7 @@ impl Fractal {
 
 #[ComplexObject]
 impl Fractal {
-    pub async fn council(&self) -> Vec<AccountNumber> {
-        vec![psibase::services::auth_delegate::Wrapper::call().getOwner(self.account)]
+    async fn memberss(&self) -> Vec<FractalMember> {
+        self.members()
     }
 }

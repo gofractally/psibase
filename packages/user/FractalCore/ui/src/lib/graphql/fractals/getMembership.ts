@@ -29,7 +29,6 @@ export const getMembership = async (
             account
             createdAt
             memberStatus
-
         } 
     }`,
     );

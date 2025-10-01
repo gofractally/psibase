@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -25,8 +24,8 @@ export const useCreateGuild = () => {
 
             await supervisor.functionCall({
                 method: "createGuild",
-                params: [fractalAccount, name, slug],
-                service: fractalService,
+                params: [name, slug],
+                service: fractalAccount,
                 intf: "user",
             });
         },

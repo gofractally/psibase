@@ -4,8 +4,8 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { fractalService } from "@/lib/constants";
 import { paths } from "@/lib/paths";
+import { zGuildSlug } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -13,7 +13,7 @@ import { useFractalAccount } from "./use-fractal-account";
 import { updateAttestation } from "./use-users-and-groups";
 
 export const zParams = z.object({
-    evaluationId: z.number(),
+    guildSlug: zGuildSlug,
     groupNumber: z.number(),
 });
 
@@ -26,9 +26,9 @@ export const useAttest = () => {
             await toast.promise(
                 getSupervisor().functionCall({
                     method: "attest",
-                    service: fractalService,
+                    service: fractal,
                     intf: "user",
-                    params: [params.evaluationId, params.groupNumber],
+                    params: [params.guildSlug, params.groupNumber],
                 }),
                 {
                     error: (error) => {
@@ -43,10 +43,10 @@ export const useAttest = () => {
             // The UI doesn't know what the attestation is nor does it care, merely that one has been made by the current user
             // so the rest of the app knows that the user has done his duty in attesting the group results and doesn't need to render a
             // the real attestation will be over-written by the next graphql query
-            updateAttestation(params.evaluationId, [1, 2, 3, 4, 5, 6]);
+            updateAttestation(999999999999, [1, 2, 3, 4, 5, 6]);
         },
         onSuccess: () => {
-            navigate(paths.fractal.evaluations(fractal!));
+            navigate(paths.guild.evaluations(fractal!));
         },
     });
 };

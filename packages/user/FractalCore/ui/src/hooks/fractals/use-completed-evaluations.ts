@@ -6,10 +6,10 @@ import {
 } from "@/lib/graphql/fractals/getCompletedEvaluations";
 import QueryKey from "@/lib/queryKeys";
 
-import { useGuildId } from "../use-guild-id";
+import { useGuildSlug } from "../use-guild-id";
 
 export const useCompletedEvaluation = () => {
-    const guildId = useGuildId();
+    const guildId = useGuildSlug();
 
     return useQuery<CompletedEvaluation[]>({
         queryKey: QueryKey.completedEvaluations(),
