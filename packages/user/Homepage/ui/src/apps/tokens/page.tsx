@@ -29,6 +29,7 @@ import { useCredit } from "./hooks/tokensPlugin/useCredit";
 import {
     defaultTransferValues,
     zTransferForm,
+    zTransferFormMemo,
 } from "./lib/transfer-form-schema";
 
 export const TokensPage = () => {
@@ -90,7 +91,7 @@ export const TokensPage = () => {
         defaultValues: defaultTransferValues,
         onSubmit: handleConfirm,
         validators: {
-            onChange: zTransferForm(currentUser),
+            onSubmit: zTransferForm(currentUser),
         },
     });
 
@@ -116,8 +117,15 @@ export const TokensPage = () => {
         e: React.MouseEvent<HTMLButtonElement>,
     ) => {
         e.preventDefault();
-        const errors = await form.validateAllFields("submit");
-        if (errors.length > 0) return;
+
+        // this triggers the root level validation
+        const errors = await form.validate("submit");
+        if (Object.keys(errors).length > 0) return;
+
+        // this triggers the field level validation
+        const fieldErrors = await form.validateAllFields("submit");
+        if (fieldErrors.length > 0) return;
+
         setTransferModal(true);
     };
 
@@ -150,6 +158,18 @@ export const TokensPage = () => {
                                         <div className="@lg:flex-row flex flex-1 flex-col items-center justify-between gap-2">
                                             <form.AppField
                                                 name="token"
+                                                listeners={{
+                                                    onChange: () => {
+                                                        form.setFieldMeta(
+                                                            "amount.amount",
+                                                            (prev) => ({
+                                                                ...prev,
+                                                                errors: [],
+                                                                errorMap: {},
+                                                            }),
+                                                        );
+                                                    },
+                                                }}
                                                 children={(field) => {
                                                     return (
                                                         <field.SelectField
@@ -214,9 +234,6 @@ export const TokensPage = () => {
                                                 }
                                                 disabled={disableForm}
                                                 description={null}
-                                                validators={{
-                                                    onChangeListenTo: ["token"],
-                                                }}
                                                 onMaxAmountClick={
                                                     handleSetMaxAmount
                                                 }
@@ -231,6 +248,9 @@ export const TokensPage = () => {
                                                     placeholder="Add a note about this transfer"
                                                 />
                                             )}
+                                            validators={{
+                                                onChange: zTransferFormMemo,
+                                            }}
                                         />
                                         {!isTransferModalOpen && (
                                             <div className="flex justify-end">
