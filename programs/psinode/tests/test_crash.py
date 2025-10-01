@@ -11,44 +11,44 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_crash_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
-        a = testutil.boot_with_producers(prods, packages=["Minimal", "Explorer"])
-        b = cluster.nodes["bbbbbbb123"]
+        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
+        b = cluster.nodes['bbbbbbb123']
 
         a.wait(new_block())
-        a.wait(irreversible(a.get_block_header()["blockNum"]))
+        a.wait(irreversible(a.get_block_header()['blockNum']))
 
         # We expect irreversible to be behind by 2
-        print("checking blocks")
+        print('checking blocks')
         err = testutil.SuppressErrors(1)
         for i in range(5):
             header = a.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header["commitNum"] + 2, header["blockNum"])
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
 
         a.shutdown()
         b.wait(new_block())
-        b.wait(irreversible(b.get_block_header()["blockNum"]))
+        b.wait(irreversible(b.get_block_header()['blockNum']))
 
-        print("checking blocks")
+        print('checking blocks')
         err = testutil.SuppressErrors(1)
         for i in range(5):
             header = b.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header["commitNum"] + 2, header["blockNum"])
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
 
     @testutil.psinode_test
     def test_shutdown_all_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
-        a = testutil.boot_with_producers(prods, packages=["Minimal", "Explorer"])
+        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
         b = prods[1]
         c = prods[2]
 
         a.wait(new_block())
-        a.wait(irreversible(a.get_block_header()["blockNum"]))
+        a.wait(irreversible(a.get_block_header()['blockNum']))
 
         a.shutdown()
         b.shutdown()
@@ -63,22 +63,22 @@ class TestCrash(unittest.TestCase):
         b.connect(c)
 
         a.wait(new_block())
-        a.wait(irreversible(a.get_block_header()["blockNum"]))
+        a.wait(irreversible(a.get_block_header()['blockNum']))
 
-        print("checking blocks")
+        print('checking blocks')
         err = testutil.SuppressErrors(1)
         for i in range(5):
             header = b.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header["commitNum"] + 2, header["blockNum"])
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
 
     @testutil.psinode_test
     def test_restart_after_disconnect(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
         testutil.boot_with_producers(
-            prods, algorithm="cft", packages=["Minimal", "Explorer"]
+            prods, algorithm='cft', packages=['Minimal', 'Explorer']
         )
 
         (a, b, c, d) = prods
@@ -101,13 +101,13 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_shutdown_all_bft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        a = testutil.boot_with_producers(prods, "bft", packages=["Minimal", "Explorer"])
+        a = testutil.boot_with_producers(prods, 'bft', packages=['Minimal', 'Explorer'])
         b = prods[1]
         c = prods[2]
         d = prods[3]
 
         a.wait(new_block())
-        a.wait(irreversible(a.get_block_header()["blockNum"]))
+        a.wait(irreversible(a.get_block_header()['blockNum']))
 
         a.shutdown()
         b.shutdown()
@@ -127,15 +127,15 @@ class TestCrash(unittest.TestCase):
         c.connect(d)
 
         a.wait(new_block())
-        a.wait(irreversible(a.get_block_header()["blockNum"]))
+        a.wait(irreversible(a.get_block_header()['blockNum']))
 
-        print("checking blocks")
+        print('checking blocks')
         err = testutil.SuppressErrors(1)
         for i in range(5):
             header = b.get_block_header()
             print(header)
             with err:
-                self.assertEqual(header["commitNum"] + 2, header["blockNum"])
+                self.assertEqual(header['commitNum'] + 2, header['blockNum'])
             time.sleep(1)
 
     @testutil.psinode_test
@@ -148,25 +148,25 @@ class TestCrash(unittest.TestCase):
         for p in prods:
             device = p.unlock_softhsm()
             with p.post(
-                "/native/admin/keys",
-                service="x-admin",
-                json={"service": "verify-sig", "device": device},
+                '/native/admin/keys',
+                service='x-admin',
+                json={'service': 'verify-sig', 'device': device},
             ) as reply:
                 reply.raise_for_status()
-                keys.append({"name": p.producer, "auth": reply.json()[0]})
+                keys.append({'name': p.producer, 'auth': reply.json()[0]})
 
         print(keys)
-        print("booting chain")
-        a.boot(packages=["Minimal", "Explorer", "AuthSig"])
-        print("setting producers")
-        a.set_producers(keys, "bft")
+        print('booting chain')
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
+        print('setting producers')
+        a.set_producers(keys, 'bft')
         p.wait(producers_are(prods))
 
-        print("stopping nodes")
+        print('stopping nodes')
         c.shutdown()
         d.shutdown()
         a.wait(no_new_blocks())
-        print("restarting nodes")
+        print('restarting nodes')
         c.start()
         d.start()
         c.connect(a)
@@ -180,5 +180,5 @@ class TestCrash(unittest.TestCase):
         a.wait(new_block())
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     testutil.main()
