@@ -165,7 +165,7 @@ const UserStartContent = ({
                 <User size={16} />
             ) : userNotFound ? (
                 <UserX size={16} className="text-destructive" />
-            ) : isValid ? (
+            ) : isValid && value ? (
                 <Avatar
                     account={value}
                     className="h-5 w-5"

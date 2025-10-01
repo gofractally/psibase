@@ -65,7 +65,11 @@ export const TokensPage = () => {
                     selectedToken?.label || selectedToken?.symbol
                 } to ${value.to.account}`,
             });
-            form.reset();
+            // do not reset the token field
+            form.resetField("amount");
+            form.resetField("to");
+            form.resetField("memo");
+
             setTransferModal(false);
         } catch (e) {
             toast("Error", {
