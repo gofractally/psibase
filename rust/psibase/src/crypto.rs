@@ -1,3 +1,7 @@
+use p256::ecdsa::{SigningKey, VerifyingKey};
+use p256::pkcs8::{EncodePrivateKey, EncodePublicKey};
+use rand_core::OsRng;
+
 use custom_error::custom_error;
 use std::str::FromStr;
 
@@ -693,4 +697,16 @@ pub fn sign_transaction(
         transaction: transaction.into(),
         proofs,
     })
+}
+
+pub fn generate_keypair() -> Result<(String, String), anyhow::Error> {
+    let signing_key = SigningKey::random(&mut OsRng);
+    let verifying_key: &VerifyingKey = signing_key.verifying_key();
+
+    let private_key = signing_key.to_pkcs8_pem(sec1::LineEnding::LF)?.to_string();
+    let public_key = verifying_key
+        .to_public_key_pem(sec1::LineEnding::LF)?
+        .to_string();
+
+    Ok((public_key, private_key))
 }

@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { crypto } from "wasm-transpiled";
 import { z } from "zod";
 
 // ShadCN UI Imports
@@ -23,7 +24,6 @@ import { Steps } from "@/components/steps";
 import { bootChain } from "@/lib/bootChain";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
-import { generateP256Key } from "@/lib/keys";
 
 import {
     Card,
@@ -180,10 +180,10 @@ export const CreatePage = () => {
         const setKeysAndBoot = async () => {
             try {
                 let blockSigningPubKey: CryptoKey | undefined; // server block signing pubkey
-                let txSigningKeyPair: CryptoKeyPair | undefined; // bp account tx signing key
+                let txSigningKeyPair: [string, string] | undefined; // bp account tx signing key
                 if (!isDev) {
                     blockSigningPubKey = await createAndSetKey(keyDevice);
-                    txSigningKeyPair = await generateP256Key();
+                    txSigningKeyPair = crypto.generateKeypair();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -197,7 +197,7 @@ export const CreatePage = () => {
                     packages: requiredPackages,
                     producerName: bpName,
                     blockSigningPubKey,
-                    txSigningPubKey: txSigningKeyPair?.publicKey,
+                    txSigningPubKeyPem: txSigningKeyPair?.[0],
                     compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
@@ -221,8 +221,7 @@ export const CreatePage = () => {
                                     navigate("/Dashboard");
 
                                     importAccount({
-                                        privateKey:
-                                            txSigningKeyPair?.privateKey,
+                                        privateKey: txSigningKeyPair?.[1],
                                         account: bpName,
                                     });
                                 }, 1000);
