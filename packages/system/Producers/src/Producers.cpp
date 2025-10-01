@@ -154,6 +154,11 @@ namespace SystemService
       table.put(*status);
    }
 
+   void Producers::regCandidate(const std::string& endpoint, psibase::Claim claim)
+   {
+      Tables().open<CandidateInfoTable>().put(CandidateInfo{getSender(), endpoint, claim});
+   }
+
    std::vector<psibase::AccountNumber> Producers::getProducers()
    {
       return ::getProducers()                          //

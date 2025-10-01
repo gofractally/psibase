@@ -1,11 +1,23 @@
 #pragma once
 
 #include <psibase/Service.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/system/Transact.hpp>
 
 namespace SystemService
 {
+
+   struct CandidateInfo
+   {
+      psibase::AccountNumber account;
+      std::string            endpoint;
+      psibase::Claim         claim;
+   };
+   PSIO_REFLECT(CandidateInfo, account, endpoint, claim)
+   using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
+   PSIO_REFLECT_TYPENAME(CandidateInfoTable)
+
    // This service manages the active producers.
    // It must have native write permission
    class Producers : public psibase::Service
@@ -13,6 +25,8 @@ namespace SystemService
      public:
       static constexpr auto service      = psibase::AccountNumber("producers");
       static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
+
+      using Tables = psibase::ServiceTables<CandidateInfoTable>;
 
       /// `prods-weak` and `prods-strong` are accounts that represent authorization
       /// by the current block producers.  `prods-weak` is a quorum that is sufficient
@@ -34,6 +48,7 @@ namespace SystemService
 
       void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);
+      void regCandidate(const std::string& endpoint, psibase::Claim claim);
 
       std::vector<psibase::AccountNumber> getProducers();
 
@@ -82,6 +97,7 @@ namespace SystemService
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
                 method(setProducers, producers),
+                method(regCandidate, endpoint, claim),
                 method(getProducers),
                 method(getThreshold, account),
                 method(antiThreshold, account),
@@ -92,6 +108,6 @@ namespace SystemService
                 //
    )
 
-   PSIBASE_REFLECT_TABLES(Producers)
+   PSIBASE_REFLECT_TABLES(Producers, Producers::Tables)
 
 }  // namespace SystemService
