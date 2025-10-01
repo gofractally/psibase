@@ -50,6 +50,41 @@ impl Guild {
         check_some(Self::get(id), "guild does not exist")
     }
 
+    pub fn get_by_slug(fractal: AccountNumber, guild_slug: AccountNumber) -> Option<Self> {
+        GuildTable::read()
+            .get_index_by_slug()
+            .get(&(fractal, guild_slug))
+    }
+
+    pub fn get_assert_by_slug(fractal: AccountNumber, guild_slug: AccountNumber) -> Self {
+        check_some(
+            Self::get_by_slug(fractal, guild_slug),
+            "guild does not exist",
+        )
+    }
+
+    pub fn evaluation(&self) -> Option<EvaluationInstance> {
+        EvaluationInstance::get(self.id)
+    }
+
+    pub fn set_schedule(
+        &self,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+        interval_seconds: u32,
+    ) {
+        EvaluationInstance::set_evaluation_schedule(
+            self.id,
+            registration,
+            deliberation,
+            submission,
+            finish_by,
+            interval_seconds,
+        )
+    }
+
     fn save(&self) {
         GuildTable::read_write().put(&self).expect("failed to save");
     }

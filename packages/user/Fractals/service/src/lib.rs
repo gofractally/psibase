@@ -57,14 +57,20 @@ pub mod service {
         Wrapper::emit().history().created_fractal(fractal_account);
     }
 
+    #[action]
+    fn apply_guild(fractal_account: AccountNumber, slug: AccountNumber) {}
+
     /// Starts an evaluation for the specified fractal and evaluation type.
     ///
     /// # Arguments
-    /// * `guild` - The ID of the guild.
+    /// * `fractal_account` - The account number for the new fractal.
+    /// * `slug` - The slug of the guild.
     #[action]
-    fn start_eval(guild_id: GID) {
-        let evaluation = EvaluationInstance::get_assert(guild_id);
-
+    fn start_eval(fractal_account: AccountNumber, slug: AccountNumber) {
+        let evaluation = check_some(
+            Guild::get_assert_by_slug(fractal_account, slug).evaluation(),
+            "evaluation instance does not exist for guild",
+        );
         evaluation.set_pending_scores(0);
 
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
@@ -98,7 +104,7 @@ pub mod service {
     /// Sets the schedule for an evaluation type within a fractal.
     ///
     /// # Arguments
-    /// * `evaluation_type` - The type of evaluation.
+    /// * `guild_slug` - Guild slug.
     /// * `registration` - Unix seconds timestamp for the start of the registration phase.
     /// * `deliberation` - Unix seconds timestamp for the start of the deliberation phase.
     /// * `submission` - Unix seconds timestamp for the start of the submission phase.
@@ -106,15 +112,14 @@ pub mod service {
     /// * `interval_seconds` - Interval in seconds for recurring evaluations.
     #[action]
     fn set_schedule(
-        evaluation_type: u8,
+        guild_slug: AccountNumber,
         registration: u32,
         deliberation: u32,
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
     ) {
-        Fractal::get_assert(get_sender()).set_schedule(
-            evaluation_type.into(),
+        Guild::get_assert_by_slug(get_sender(), guild_slug).set_schedule(
             registration,
             deliberation,
             submission,

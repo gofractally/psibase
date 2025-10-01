@@ -6,5 +6,6 @@ plugin_error! {
     NoSender => "No sender app",
     InvalidSender(sender: String) => "Sender origin app must be fractals or fractal, received: {sender}",
     InvalidAccountNumber => "Invalid account number",
-
+    GraphQLParseError(msg: String) => "GraphQL parsing error: {msg}",
+    NoPendingEvaluation => "No pending evaluation for guild"
 }

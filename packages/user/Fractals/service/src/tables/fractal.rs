@@ -1,9 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
-use crate::tables::tables::{
-    EvaluationInstance, Fractal, FractalMember, FractalMemberTable, FractalTable, GID,
-};
+use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -45,25 +43,6 @@ impl Fractal {
                     ..=(self.account, AccountNumber::new(u64::MAX)),
             )
             .collect()
-    }
-
-    pub fn set_schedule(
-        &self,
-        guild: GID,
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-        interval_seconds: u32,
-    ) {
-        EvaluationInstance::set_evaluation_schedule(
-            guild,
-            registration,
-            deliberation,
-            submission,
-            finish_by,
-            interval_seconds,
-        )
     }
 }
 

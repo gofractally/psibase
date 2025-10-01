@@ -5,7 +5,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalMember, FractalMemberTable,
-        FractalTable, Guild, GuildMember, GuildMemberTable, GuildTable,
+        FractalTable, Guild, GuildMember, GuildMemberTable, GuildTable, GID,
     };
     use psibase::*;
     use serde::{Deserialize, Deserializer};
@@ -178,6 +178,12 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn guild(&self, guild_id: GID) -> Option<Guild> {
+            GuildTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&(guild_id))
         }
 
         async fn score_by_member(

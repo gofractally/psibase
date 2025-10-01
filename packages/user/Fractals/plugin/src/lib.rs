@@ -12,46 +12,30 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::fracpack::Pack;
 
 mod errors;
+mod graphql;
 mod helpers;
 use psibase::{AccountNumber, Memo};
 
 use bindings::evaluations::plugin::admin::close;
-use bindings::evaluations::plugin::user::{
-    attest, get_group_users, get_proposal, propose, register, unregister,
-};
+use bindings::evaluations::plugin::user as EvaluationsUser;
 
-use bindings::staged_tx::plugin::proposer::set_propose_latch;
-
-use crate::bindings::host::common::client::get_active_app;
-use crate::helpers::check_app_origin;
-struct ProposeLatch;
-
-impl ProposeLatch {
-    fn new(app: &str) -> Self {
-        set_propose_latch(Some(app)).unwrap();
-        Self
-    }
-}
-
-impl Drop for ProposeLatch {
-    fn drop(&mut self) {
-        set_propose_latch(None).unwrap();
-    }
-}
-
-fn active_app() -> AccountNumber {
-    get_active_app().as_str().into()
-}
+use crate::errors::ErrorType;
+use crate::graphql::fetch_guild_eval_instance;
+use crate::helpers::{check_app_origin, get_sender_app};
 
 struct FractallyPlugin;
 
 impl Admin for FractallyPlugin {
-    fn close_eval(evaluation_id: u32) -> Result<(), Error> {
+    fn close_eval(guild_slug: String) -> Result<(), Error> {
+        let evaluation_id =
+            fetch_guild_eval_instance(get_sender_app()?, guild_slug.as_str().into())?
+                .ok_or(ErrorType::NoPendingEvaluation)?;
+
         close(&"fractals".to_string(), evaluation_id)
     }
 
     fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {
-        check_app_origin(fractals::SERVICE)?;
+        check_app_origin()?;
 
         let packed_args = fractals::action_structs::create_fractal {
             fractal_account: account.parse().unwrap(),
@@ -65,10 +49,12 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn start(guild_id: u32) -> Result<(), Error> {
-        // check_app_origin()?;
-
-        let packed_args = fractals::action_structs::start_eval { guild_id }.packed();
+    fn start(guild_slug: String) -> Result<(), Error> {
+        let packed_args = fractals::action_structs::start_eval {
+            fractal_account: get_sender_app()?,
+            slug: guild_slug.as_str().into(),
+        }
+        .packed();
 
         add_action_to_transaction(
             fractals::action_structs::start_eval::ACTION_NAME,
@@ -77,20 +63,17 @@ impl Admin for FractallyPlugin {
     }
 
     fn set_schedule(
-        evaluation_type: u8,
-        fractal: String,
+        guild_slug: String,
         registration: u32,
         deliberation: u32,
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
-        check_app_origin(fractal.as_str().into())?;
-
-        let _latch = ProposeLatch::new(&fractal);
+        check_app_origin()?;
 
         let packed_args = fractals::action_structs::set_schedule {
-            evaluation_type,
+            guild_slug: guild_slug.as_str().into(),
             deliberation,
             finish_by,
             interval_seconds,
@@ -107,24 +90,25 @@ impl Admin for FractallyPlugin {
 }
 
 impl User for FractallyPlugin {
-    fn register(evaluation_id: u32) -> Result<(), Error> {
-        // check_app_origin()?;
+    fn register(guild_slug: String) -> Result<(), Error> {
+        let evaluation_id =
+            fetch_guild_eval_instance(get_sender_app()?, guild_slug.as_str().into())?
+                .ok_or(ErrorType::NoPendingEvaluation)?;
 
-        register(&"fractals".to_string(), evaluation_id)
+        EvaluationsUser::register(&"fractals".to_string(), evaluation_id)
     }
 
-    fn unregister(evaluation_id: u32) -> Result<(), Error> {
-        // check_app_origin()?;
+    fn unregister(guild_slug: String) -> Result<(), Error> {
+        let evaluation_id =
+            fetch_guild_eval_instance(get_sender_app()?, guild_slug.as_str().into())?
+                .ok_or(ErrorType::NoPendingEvaluation)?;
 
-        unregister(&"fractals".to_string(), evaluation_id)
+        EvaluationsUser::unregister(&"fractals".to_string(), evaluation_id)
     }
 
-    fn create_guild(fractal: String, display_name: String, slug: String) -> Result<(), Error> {
-        let fractal: AccountNumber = fractal.as_str().into();
-        check_app_origin(fractal)?;
-
+    fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
         let packed_args = fractals::action_structs::create_guild {
-            fractal,
+            fractal: get_sender_app()?,
             display_name: Memo::try_from(display_name).unwrap(),
             slug: slug.as_str().into(),
         }
@@ -136,17 +120,23 @@ impl User for FractallyPlugin {
         )
     }
 
-    fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<String>>, Error> {
-        // check_app_origin()?;
+    fn get_proposal(guild_slug: String, group_number: u32) -> Result<Option<Vec<String>>, Error> {
+        let slug: AccountNumber = guild_slug.as_str().into();
 
-        match get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
+
+        match EvaluationsUser::get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
             None => Ok(None),
             Some(rank_numbers) => {
-                let users: Vec<AccountNumber> =
-                    get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
-                        .iter()
-                        .map(|account| AccountNumber::from_str(account).unwrap())
-                        .collect();
+                let users: Vec<AccountNumber> = EvaluationsUser::get_group_users(
+                    &"fractals".to_string(),
+                    evaluation_id,
+                    group_number,
+                )?
+                .iter()
+                .map(|account| AccountNumber::from_str(account).unwrap())
+                .collect();
 
                 let res: Vec<String> = helpers::parse_rank_to_accounts(rank_numbers, users)
                     .into_iter()
@@ -158,26 +148,29 @@ impl User for FractallyPlugin {
         }
     }
 
-    fn attest(evaluation_id: u32, group_number: u32) -> Result<(), Error> {
-        // check_app_origin()?;
+    fn attest(guild_slug: String, group_number: u32) -> Result<(), Error> {
+        let slug: AccountNumber = guild_slug.as_str().into();
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
 
-        // lookup the evaluation, make sure the evaluation fractal
-        // matches the sender.
-
-        attest(&"fractals".to_string(), evaluation_id, group_number)
+        EvaluationsUser::attest(&"fractals".to_string(), evaluation_id, group_number)
     }
 
-    fn get_group_users(evaluation_id: u32, group_number: u32) -> Result<Vec<String>, Error> {
-        // check_app_origin()?;
+    fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
+        let slug: AccountNumber = guild_slug.as_str().into();
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
 
-        get_group_users(&"fractals".to_string(), evaluation_id, group_number)
+        EvaluationsUser::get_group_users(&"fractals".to_string(), evaluation_id, group_number)
     }
 
-    fn propose(evaluation_id: u32, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
-        // check_app_origin()?;
+    fn propose(guild_slug: String, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
+        let slug: AccountNumber = guild_slug.as_str().into();
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
 
         let all_users: Vec<AccountNumber> =
-            get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
+            EvaluationsUser::get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
                 .iter()
                 .map(|account| AccountNumber::from_str(account).unwrap())
                 .collect();
@@ -192,14 +185,14 @@ impl User for FractallyPlugin {
             .map(|num| num.to_string())
             .collect();
 
-        propose(&"fractals".to_string(), evaluation_id, group_number, &res)
+        EvaluationsUser::propose(&"fractals".to_string(), evaluation_id, group_number, &res)
     }
 
     fn join() -> Result<(), Error> {
-        let fractal = active_app();
-        check_app_origin(fractal)?;
-
-        let packed_args = fractals::action_structs::join { fractal }.packed();
+        let packed_args = fractals::action_structs::join {
+            fractal: get_sender_app()?,
+        }
+        .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
 }

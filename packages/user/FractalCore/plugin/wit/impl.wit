@@ -8,5 +8,6 @@ world impl {
     include staged-tx:plugin/imports;
 
 
-    export api;
+    export admin;
+    export user;
 }

@@ -1,18 +1,19 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::fractal_core::plugin::api::Guest as Api;
-use bindings::host::common::server as CommonServer;
+use bindings::exports::fractal_core::plugin::admin::Guest as Admin;
+use bindings::exports::fractal_core::plugin::user::Guest as User;
+
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::define_trust;
-use psibase::fracpack::Pack;
 
 mod errors;
-use errors::ErrorType;
 
+use bindings::fractals::plugin as FractalsPlugin;
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
+
+use crate::bindings::host::common::client::get_receiver;
 
 struct ProposeLatch;
 
@@ -28,8 +29,6 @@ impl Drop for ProposeLatch {
         set_propose_latch(None).unwrap();
     }
 }
-
-use bindings::fractals::plugin::user::register;
 
 define_trust! {
     descriptions {
@@ -51,17 +50,61 @@ define_trust! {
 
 struct FractalCorePlugin;
 
-impl Api for FractalCorePlugin {
-    fn start_eval(guild_id: u32) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::start_eval)?;
+impl Admin for FractalCorePlugin {
+    fn set_schedule(
+        guild_slug: String,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+        interval_seconds: u32,
+    ) -> Result<(), Error> {
+        let _latch = ProposeLatch::new(&get_receiver());
 
-        bindings::fractals::plugin::admin::start(guild_id)
+        FractalsPlugin::admin::set_schedule(
+            &guild_slug,
+            registration,
+            deliberation,
+            submission,
+            finish_by,
+            interval_seconds,
+        )
     }
 
+    fn close_eval(guild_slug: String) -> Result<(), Error> {
+        FractalsPlugin::admin::close_eval(&guild_slug)
+    }
+}
+
+impl User for FractalCorePlugin {
     fn join() -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::start_eval)?;
 
-        bindings::fractals::plugin::user::join()
+        FractalsPlugin::user::join()
+    }
+
+    fn start_eval(guild_slug: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::start_eval)?;
+
+        FractalsPlugin::admin::start(&guild_slug)
+    }
+
+    fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::start_eval)?;
+
+        FractalsPlugin::user::create_guild(&display_name, &slug)
+    }
+
+    fn attest(guild_slug: String, group_number: u32) -> Result<(), Error> {
+        FractalsPlugin::user::attest(&guild_slug, group_number)
+    }
+
+    fn register(slug: String) -> Result<(), Error> {
+        FractalsPlugin::user::register(&slug)
+    }
+
+    fn unregister(slug: String) -> Result<(), Error> {
+        FractalsPlugin::user::unregister(&slug)
     }
 }
 
