@@ -37,7 +37,7 @@ echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${CCACHE_CONFIGPATH}
 export SCCACHE_DIR=${WORKSPACE_ROOT}/.caches/sccache
 export SCCACHE_CACHE_ZSTD_LEVEL=5 # Default is 3
 export SCCACHE_IDLE_TIMEOUT=0
-export SCCACHE_CACHE_SIZE=1G
+export SCCACHE_CACHE_SIZE=1400M
 export RUSTC_WRAPPER=sccache
 
 # (Note for cargo-generate to be happy) Ensure there's a $USER environment variable set with username corresponding to the uid of the user running the container
