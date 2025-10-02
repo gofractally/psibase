@@ -302,9 +302,15 @@ namespace psibase
       auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
           *writer, DbId::nativeSubjective, psio::convert_to_key(notifyKey(notifyType)));
       if (!notifyData)
+      {
+         PSIBASE_LOG(trxLogger, debug) << "nextTransaction not set";
          return {};
+      }
       if (!psio::fracpack_validate<NotifyRow>(*notifyData))
+      {
+         PSIBASE_LOG(trxLogger, warning) << "invalid nextTransaction row";
          return {};
+      }
 
       auto actions = psio::view<const NotifyRow>(psio::prevalidated{*notifyData}).actions();
 
@@ -516,6 +522,7 @@ namespace psibase
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
          tc.execNonTrxAction(0, action, atrace);
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, debug) << "async continuation " << action.service.str()
                                        << "::" << action.method.str() << " succeeded";
       }
