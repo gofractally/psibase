@@ -11,11 +11,7 @@ export const useEvaluationStatus = (
     now: number,
     guildId: number | undefined,
 ): EvaluationStatus | undefined => {
-    const {
-        data,
-        isLoading: isLoadingFractal,
-        error: fractalError,
-    } = useFractal();
+    const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
 
     const { evaluation, guild } = useEvaluationInstance(guildId);
 
@@ -40,10 +36,6 @@ export const useEvaluationStatus = (
 
     const isLoading = isLoadingFractal || isLoadingUsersAndGroups;
 
-    const currentUserCanActOnBehalfOfFractal = Boolean(
-        data?.fractal?.council.includes(currentUser ?? ""),
-    );
-
     if (isLoading) return undefined;
     if (usersAndGroupsError || fractalError) {
         return undefined;
@@ -53,7 +45,6 @@ export const useEvaluationStatus = (
         evaluation!,
         currentUser!,
         usersAndGroups!,
-        currentUserCanActOnBehalfOfFractal,
         now,
     );
 

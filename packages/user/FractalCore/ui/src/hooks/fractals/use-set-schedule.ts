@@ -4,11 +4,10 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
-import { zEvalType } from "@/lib/zod/EvaluationType";
 import { zUnix } from "@/lib/zod/Unix";
+import { zGuildSlug } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -16,43 +15,39 @@ import { assertUser } from "../use-current-user";
 import { setDefaultMembership } from "./use-membership";
 
 const zParams = z.object({
-    evalType: zEvalType,
+    guildSlug: zGuildSlug,
     fractal: zAccount,
     registration: zUnix,
     deliberation: zUnix,
     submission: zUnix,
     finishBy: zUnix,
     intervalSeconds: z.number(),
-    forceDelete: z.boolean(),
 });
 
 export const useSetSchedule = () =>
     useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             const {
+                guildSlug,
                 fractal,
                 registration,
                 deliberation,
                 submission,
                 finishBy,
                 intervalSeconds,
-                forceDelete,
-                evalType,
             } = zParams.parse(params);
 
             await supervisor.functionCall({
                 method: "setSchedule",
                 params: [
-                    evalType,
-                    fractal,
+                    guildSlug,
                     registration,
                     deliberation,
                     submission,
                     finishBy,
                     intervalSeconds,
-                    forceDelete,
                 ],
-                service: fractalService,
+                service: fractal,
                 intf: "admin",
             });
         },

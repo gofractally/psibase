@@ -3,7 +3,6 @@ import dayjs from "dayjs";
 import { useAppForm } from "@/components/form/app-form";
 
 import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
-import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -13,6 +12,7 @@ import {
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 interface Props {
     isOpen: boolean;
@@ -30,6 +30,7 @@ export const ScheduleDialog = ({
     const { mutateAsync: setSchedule } = useSetSchedule();
 
     const fractal = useFractalAccount();
+    const guildSlug = useGuildSlug();
 
     const form = useAppForm({
         defaultValues: {
@@ -55,12 +56,11 @@ export const ScheduleDialog = ({
                 const finishBy = submission + submissionSeconds;
 
                 await setSchedule({
-                    evalType: zEvalType.enum.Reputation,
+                    guildSlug: guildSlug!,
                     registration,
                     deliberation,
                     submission,
                     finishBy,
-                    forceDelete: false,
                     fractal: fractal!,
                     intervalSeconds,
                 });

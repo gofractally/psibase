@@ -1,6 +1,6 @@
 import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, } from "react-router-dom";
 
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -26,6 +26,7 @@ import { CreateGuildModal } from "./create-fractal-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -37,9 +38,9 @@ export function AppSwitcher() {
 
     const { data: memberships, } = useGuildMemberships(fractalAccount, currentUser);
 
-    const { guildId } = useParams();
+    const guildSlug = useGuildSlug();
 
-    const { data: currentGuild } = useGuildBySlug(fractalAccount, guildId)
+    const { data: currentGuild } = useGuildBySlug(fractalAccount, guildSlug)
 
     const { data: chainId } = useChainId();
 
@@ -74,10 +75,10 @@ export function AppSwitcher() {
                                 <span className="truncate font-semibold">
                                     {currentGuild
                                         ? currentGuild.displayName
-                                        : guildId || "Explore"}
+                                        : guildSlug || "Explore"}
                                 </span>
                                 <span className="truncate text-xs">
-                                    {guildId}
+                                    {guildSlug}
                                 </span>
                             </div>
                             <ChevronsUpDown className="ml-auto" />

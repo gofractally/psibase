@@ -13,9 +13,16 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const Completed = () => {
-    const { data: evaluations } = useCompletedEvaluation();
+    const guildSlug = useGuildSlug();
+    const fractalAccount = useFractalAccount();
+    const { data: guild } = useGuildBySlug(fractalAccount, guildSlug);
+    const { data: evaluations } = useCompletedEvaluation(guild?.id);
+
     const navigate = useNavigate();
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">

@@ -19,6 +19,8 @@ import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -114,11 +116,13 @@ const GroupStatus = () => {
     const { groupNumber } = usePageParams();
 
     const now = useNowUnix();
-    const guildId = useGuildSlug();
-    const status = useEvaluationStatus(now, guildId);
+    const guildSlug = useGuildSlug();
+    const fractalAccount = useFractalAccount();
+    const { data: guild } = useGuildBySlug(fractalAccount, guildSlug)
+    const status = useEvaluationStatus(now, guild?.id);
 
     const isAttesting = useWatchAttest(status);
-    const isClosing = useWatchClose(guildId, status);
+    const isClosing = useWatchClose(status);
 
     let description = "";
     let variant: "default" | "destructive" | "secondary" | "outline" =

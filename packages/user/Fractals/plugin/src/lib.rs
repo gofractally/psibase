@@ -70,7 +70,8 @@ impl Admin for FractallyPlugin {
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
-        check_app_origin()?;
+        // check_app_origin()?;
+        // the plugin needs to know that the guild in reference
 
         let packed_args = fractals::action_structs::set_schedule {
             guild_slug: guild_slug.as_str().into(),

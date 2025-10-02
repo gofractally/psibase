@@ -4,13 +4,9 @@ import {
     CompletedEvaluation,
     getCompletedEvaluations,
 } from "@/lib/graphql/fractals/getCompletedEvaluations";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
 
-import { useGuildSlug } from "../use-guild-id";
-
-export const useCompletedEvaluation = () => {
-    const guildId = useGuildSlug();
-
+export const useCompletedEvaluation = (guildId: OptionalNumber) => {
     return useQuery<CompletedEvaluation[]>({
         queryKey: QueryKey.completedEvaluations(),
         queryFn: async () => {

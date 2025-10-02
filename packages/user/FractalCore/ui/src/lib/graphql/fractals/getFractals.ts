@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
+import { siblingUrl } from "@psibase/common-lib";
 
 export const zFractaListInstance = z.object({
     account: zAccount,
@@ -23,7 +24,7 @@ export const getFractals = async () => {
                 }
             }
         }
-    `);
+    `, siblingUrl(null, 'fractals', '/graphql'));
 
     return z
         .object({

@@ -87,7 +87,7 @@ impl Guild {
     }
 
     pub fn council_members(&self) -> Vec<GuildMember> {
-        let guild_members: Vec<GuildMember> = GuildMemberTable::new()
+        let guild_members: Vec<GuildMember> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
                 (self.id, 0, AccountNumber::new(0))

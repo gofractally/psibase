@@ -27,7 +27,7 @@ export const CurrentEvaluationCard = () => {
             )}
             {status?.type == "failed" && <Failed />}
             {status?.type == "registration" && <Register status={status} />}
-            {status?.type == "waitingStart" && <Start status={status} />}
+            {status?.type == "waitingStart" && <Start />}
             {status?.type == "deliberation" && <Deliberation status={status} />}
             {status?.type == "submission" && <Submission status={status} />}
             {status?.type == "finished" && (

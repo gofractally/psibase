@@ -25,7 +25,7 @@ const QueryKey = {
     branding: () => ["branding"] as const,
     logout: () => ["logout"] as const,
     members: (account: OptionalAccount) => ["members", account] as const,
-    scores: (fractal: OptionalAccount) => ["scores", fractal] as const,
+    scores: (guildId: OptionalNumber) => ["scores", guildId] as const,
     membership: (fractal: OptionalAccount, user: OptionalAccount) =>
         ["membership", fractal, user] as const,
     evaluation: (evaluationId: OptionalNumber) =>

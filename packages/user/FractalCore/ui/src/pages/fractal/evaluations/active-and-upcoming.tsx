@@ -25,10 +25,13 @@ import {
 } from "@shared/shadcn/ui/table";
 import { useGuildSlug } from "@/hooks/use-guild-id";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
 
 export const ActiveAndUpcoming = () => {
     const currentFractal = useFractalAccount();
-    const guildId = useGuildSlug();
+    const guildSlug = useGuildSlug();
+
+    const { data: guild } = useGuildBySlug(currentFractal, guildSlug);
 
     const { data: currentUser } = useCurrentUser();
     const { data, isPending: isFractalPending } = useFractal();
@@ -38,23 +41,19 @@ export const ActiveAndUpcoming = () => {
     );
 
     const now = useNowUnix();
-    const status = useEvaluationStatus(now, guildId);
+    const status = useEvaluationStatus(now, guild?.id);
 
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
     const isCitizen = membership?.memberStatus === MemberStatus.Citizen;
     const hasEvaluations = data && data?.guilds.nodes.length > 0;
-    const isCouncilMember = Boolean(
-        data?.fractal?.council.includes(currentUser ?? ""),
-    );
-
-    console.log({ isCouncilMember })
+    const isAuthority = guild && currentUser && (guild.rep?.member == currentUser || guild.council.includes(currentUser))
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
             <div className="flex h-9 items-center justify-between">
                 <h1 className="text-lg font-semibold">Active & upcoming</h1>
-                {isCouncilMember && (
+                {isAuthority && (
                     <ScheduleDialog
                         isOpen={isScheduleDialogOpen}
                         setIsOpen={setIsScheduleDialogOpen}
@@ -75,7 +74,7 @@ export const ActiveAndUpcoming = () => {
                     <EvaluationsTable />
                 ) : (
                     <EmptyState
-                        canSchedule={isCouncilMember}
+                        canSchedule={isAuthority}
                         isPending={isFractalPending || isMembershipPending}
                         onScheduleClick={() => {
                             setIsScheduleDialogOpen(true);

@@ -5,6 +5,7 @@ import { zDateTime } from "@/lib/zod/DateTime";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
 
 import { graphql } from "../../graphql";
+import { siblingUrl } from "@psibase/common-lib";
 
 export const zMember = z
     .object({
@@ -29,8 +30,9 @@ export const getMembership = async (
             account
             createdAt
             memberStatus
+
         } 
-    }`,
+    }`, siblingUrl(null, 'fractals', '/graphql')
     );
 
     return z

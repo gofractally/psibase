@@ -47,7 +47,6 @@ export type WaitingRegistration = z.infer<typeof zWaitingRegistration>;
 
 const zWaitingStart = z.object({
     type: z.literal("waitingStart"),
-    isOwner: z.boolean(),
 });
 
 export type WaitingStart = z.infer<typeof zWaitingStart>;
@@ -56,7 +55,6 @@ const zRegistrationPhase = z.object({
     type: z.literal("registration"),
     isRegistered: z.boolean(),
     deliberationStarts: zUnix,
-    isOwner: z.boolean(),
 });
 
 export type RegistrationPhase = z.infer<typeof zRegistrationPhase>;
@@ -113,7 +111,6 @@ export const getStatus = (
     evaluation: Evaluation,
     currentUser: Account,
     usersAndGroups: UsersAndGroups,
-    isOwner: boolean,
     currentTime: number,
 ): EvaluationStatus => {
     const { groups, results, users } = usersAndGroups;
@@ -132,13 +129,11 @@ export const getStatus = (
             type: "registration",
             isRegistered,
             deliberationStarts: evaluation.deliberationStarts,
-            isOwner,
         });
     } else if (timeStatus === DELIBERATION) {
         const awaitingStart = users.some((user) => !user.groupNumber);
         if (awaitingStart) {
             const res: z.infer<typeof zWaitingStart> = {
-                isOwner,
                 type: "waitingStart",
             };
             return res;

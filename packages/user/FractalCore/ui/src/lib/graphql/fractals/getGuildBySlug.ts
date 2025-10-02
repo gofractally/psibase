@@ -7,7 +7,8 @@ import { graphql } from "../../graphql";
 export const zGuild = z.object({
     id: z.number().int(),
     displayName: z.string(),
-    rep: zAccount.nullable(),
+    council: zAccount.array(),
+    rep: z.object({ member: zAccount }).nullable(),
     bio: z.string(),
 });
 
@@ -17,7 +18,10 @@ export const getGuildBySlug = async (fractal: Account, slug: Account) => {
             guildBySlug(fractal:"${fractal}", slug:"${slug}") {
                 id
                 displayName
-                rep
+                rep {
+                    member
+                }
+                council
                 bio
             }
         }

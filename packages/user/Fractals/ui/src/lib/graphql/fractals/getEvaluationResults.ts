@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import { zAccount } from "@/lib/zod/Account";
+import { siblingUrl } from "@psibase/common-lib";
 
 export const zGroupFinishes = z.object({
     groupNumber: z.number(),
@@ -33,7 +34,7 @@ export const getEvaluationResults = async (evaluationId: number) => {
         }
     }`;
 
-    const results = await graphql(gql);
+    const results = await graphql(gql, siblingUrl(null, 'fractals', '/graphql'));
 
     const response = z
         .object({
