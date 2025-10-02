@@ -8,7 +8,7 @@ export const useGuildBySlug = (
     slug: OptionalAccount,
 ) =>
     useQuery({
-        queryKey: QueryKey.fractalBySlug(fractal, slug),
+        queryKey: QueryKey.guildBySlug(fractal, slug),
         queryFn: async () => {
             return getGuildBySlug(fractal!, slug!);
         },

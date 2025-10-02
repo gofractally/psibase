@@ -5,6 +5,8 @@ import { useCloseEvaluation } from "./use-close-evaluation";
 import { useEvaluationInstance } from "./use-evaluation-instance";
 
 export const useWatchClose = (status: EvaluationStatus | undefined) => {
+    const guildSlug = useGuildSlug();
+
     const {
         mutateAsync: closeEvaluation,
         isError,
@@ -12,10 +14,11 @@ export const useWatchClose = (status: EvaluationStatus | undefined) => {
         isSuccess,
     } = useCloseEvaluation();
 
-    const instanceData = useEvaluationInstance(useGuildSlug());
+    const instanceData = useEvaluationInstance();
 
     if (
         status &&
+        guildSlug &&
         instanceData &&
         instanceData.evaluation &&
         status.type == "finished" &&
@@ -24,7 +27,7 @@ export const useWatchClose = (status: EvaluationStatus | undefined) => {
         !isSuccess
     ) {
         closeEvaluation({
-            evaluationId: instanceData.evaluation?.id,
+            guildSlug,
         });
     }
 

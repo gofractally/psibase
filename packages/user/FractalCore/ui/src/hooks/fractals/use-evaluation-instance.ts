@@ -1,10 +1,12 @@
+import { useGuildSlug } from "../use-guild-id";
+import { useGuildBySlug } from "../use-guild-slug-status";
 import { useEvaluation } from "./use-evaluation";
-import { useFractal } from "./use-fractal";
+import { useFractalAccount } from "./use-fractal-account";
 
-export const useEvaluationInstance = (guildId: number | undefined) => {
-    const { data: fractal } = useFractal();
-
-    const guild = fractal?.guilds.nodes.find((guild) => guild.id == guildId);
+export const useEvaluationInstance = () => {
+    const fractalAccount = useFractalAccount();
+    const guildSlug = useGuildSlug();
+    const { data: guild } = useGuildBySlug(fractalAccount, guildSlug);
 
     const { data: evaluation } = useEvaluation(
         guild?.evalInstance?.evaluationId,

@@ -36,7 +36,7 @@ export function AppSwitcher() {
     const { data: currentUser } = useCurrentUser();
     const fractalAccount = useFractalAccount();
 
-    const { data: memberships, } = useGuildMemberships(fractalAccount, currentUser);
+    const { data: memberships, } = useGuildMemberships(currentUser);
 
     const guildSlug = useGuildSlug();
 

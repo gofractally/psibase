@@ -1,6 +1,7 @@
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useRegister } from "@/hooks/fractals/use-register";
 import { useUnregister } from "@/hooks/fractals/use-unregister";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import { RegistrationPhase } from "@/lib/getStatus";
 import { humanize } from "@/lib/humanize";
@@ -8,7 +9,9 @@ import { humanize } from "@/lib/humanize";
 import { Button } from "@shared/shadcn/ui/button";
 
 export const Register = ({ status }: { status: RegistrationPhase }) => {
-    const { evaluation, evaluationInstance } = useEvaluationInstance();
+    const guildSlug = useGuildSlug();
+
+    const { evaluation, guild } = useEvaluationInstance();
 
     const { mutateAsync: register, isPending: isRegistering } = useRegister();
     const { mutateAsync: unregister, isPending: isUnregistering } =
@@ -25,7 +28,9 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     disabled={isUnregistering}
                     onClick={() => {
                         unregister({
-                            evaluationId: evaluationInstance!.evaluationId,
+                            evaluationId: guild!.evalInstance.evaluationId,
+                            guildSlug: guildSlug!,
+
                         });
                     }}
                 >
@@ -37,7 +42,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     disabled={isRegistering}
                     onClick={() => {
                         register({
-                            evaluationId: evaluationInstance!.evaluationId,
+                            slug: guildSlug!,
                         });
                     }}
                 >

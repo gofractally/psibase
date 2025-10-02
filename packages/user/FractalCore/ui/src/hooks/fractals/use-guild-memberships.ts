@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { getGuildMemberships } from "@/lib/graphql/fractals/getGuildMembership";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
 
-export const useGuildMemberships = (
-    fractal: OptionalAccount,
-    user: OptionalAccount,
-) =>
-    useQuery({
+import { useFractalAccount } from "./use-fractal-account";
+
+export const useGuildMemberships = (user: OptionalAccount) => {
+    const fractal = useFractalAccount();
+    return useQuery({
         queryKey: QueryKey.guildMemberships(fractal, user),
         enabled: !!fractal && !!user,
         queryFn: async () => {
@@ -20,3 +20,4 @@ export const useGuildMemberships = (
             }
         },
     });
+};

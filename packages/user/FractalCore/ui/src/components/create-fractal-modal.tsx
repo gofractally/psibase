@@ -31,7 +31,7 @@ export const CreateGuildModal = ({
     const fractalAccount = useFractalAccount();
 
     const { data: currentUser } = useCurrentUser();
-    const { refetch } = useGuildMemberships(fractalAccount, currentUser);
+    const { refetch } = useGuildMemberships(currentUser);
 
 
     const navigate = useNavigate();
@@ -40,7 +40,6 @@ export const CreateGuildModal = ({
         defaultValues: {
             slug: "",
             name: "",
-
         },
         onSubmit: async ({ value: { name, slug, } }) => {
             await createGuild({

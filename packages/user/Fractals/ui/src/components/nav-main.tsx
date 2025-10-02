@@ -2,7 +2,6 @@ import {
     Contact,
     LucideIcon,
     Search,
-    Users,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -57,11 +56,6 @@ export const staticFractalMenus: MenuItem[] = [
                 icon: Contact,
                 path: "",
             },
-            {
-                title: "All members",
-                icon: Users,
-                path: "members",
-            },
         ],
     },
 
@@ -93,7 +87,7 @@ export function NavMain() {
                                 to={
                                     isBrowse
                                         ? item.path
-                                        : `/fractal/${fractalName}/${item.path}/${menu.path}`
+                                        : `/fractal/${fractalName}`
                                 }
                                 end
                             >

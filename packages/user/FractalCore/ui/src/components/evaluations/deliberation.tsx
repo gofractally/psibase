@@ -6,14 +6,16 @@ import { DeliberationPhase } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 
 import { Button } from "@shared/shadcn/ui/button";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
     const { data: fractal } = useFractal();
     const navigate = useNavigate();
 
-    const { evaluationInstance } = useEvaluationInstance();
+    const guildSlug = useGuildSlug();
+    const { evaluation } = useEvaluationInstance();
 
-    if (!fractal || !evaluationInstance) return null;
+    if (!fractal || !evaluation) return null;
 
     return status.groupNumber && status.isParticipant ? (
         <div className="flex items-center gap-2">
@@ -22,8 +24,7 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
                 onClick={() => {
                     navigate(
                         paths.guild.evaluationGroup(
-                            evaluationInstance.fractal,
-                            evaluationInstance.evaluationId!,
+                            guildSlug!,
                             status.groupNumber!,
                         ),
                     );

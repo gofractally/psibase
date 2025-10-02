@@ -10,11 +10,11 @@ import { Register } from "./evaluations/register";
 import { Start } from "./evaluations/start";
 import { Submission } from "./evaluations/submission";
 import { WaitingRegistration } from "./evaluations/waiting-registration";
-import { useGuildSlug } from "@/hooks/use-guild-id";
 
 export const CurrentEvaluationCard = () => {
     const now = useNowUnix();
-    const status = useEvaluationStatus(now, useGuildSlug());
+
+    const status = useEvaluationStatus(now);
 
     useWatchStart(status);
     useWatchAttest(status);

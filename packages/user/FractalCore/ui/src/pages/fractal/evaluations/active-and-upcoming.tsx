@@ -41,13 +41,13 @@ export const ActiveAndUpcoming = () => {
     );
 
     const now = useNowUnix();
-    const status = useEvaluationStatus(now, guild?.id);
+    const status = useEvaluationStatus(now);
 
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
     const isCitizen = membership?.memberStatus === MemberStatus.Citizen;
     const hasEvaluations = data && data?.guilds.nodes.length > 0;
-    const isAuthority = guild && currentUser && (guild.rep?.member == currentUser || guild.council.includes(currentUser))
+    const isAuthority = !!(guild && currentUser && (guild.rep?.member == currentUser || guild.council.includes(currentUser)))
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -113,7 +113,7 @@ const EmptyState = ({
 };
 
 const EvaluationsTable = () => {
-    const { evaluation, guild } = useEvaluationInstance(useGuildSlug());
+    const { evaluation, guild } = useEvaluationInstance();
 
     const nextSchedules = useNextEvaluations(
         guild?.evalInstance?.evaluationId,

@@ -18,9 +18,9 @@ export const useCloseEvaluation = () => {
 
     return useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
-            const { guildSlug } = zParams.parse(params);
-
             try {
+                const { guildSlug } = zParams.parse(params);
+
                 void (await supervisor.functionCall({
                     method: "closeEval",
                     params: [guildSlug],
@@ -38,9 +38,12 @@ export const useCloseEvaluation = () => {
                 }
             }
         },
-        onSuccess: () => {
+        onSuccess: (_, { guildSlug }) => {
             queryClient.invalidateQueries({
                 queryKey: QueryKey.fractal(fractal),
+            });
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.guildBySlug(fractal, guildSlug),
             });
         },
     });

@@ -1,18 +1,18 @@
 import dayjs from "dayjs";
 
 import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
-import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFormatRelative } from "@/hooks/use-format-relative";
 import { SubmissionPhase } from "@/lib/getStatus";
 
 import { Button } from "@shared/shadcn/ui/button";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 export const Submission = ({ status }: { status: SubmissionPhase }) => {
     const { label } = useFormatRelative(status.submissionDeadline);
     const date = dayjs.unix(status.submissionDeadline).format("MMMM D HH:mm");
 
-    const { evaluationInstance } = useEvaluationInstance();
 
+    const guildSlug = useGuildSlug();
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();
 
     if (status.canCloseEarly) {
@@ -23,7 +23,7 @@ export const Submission = ({ status }: { status: SubmissionPhase }) => {
                     size="sm"
                     onClick={() => {
                         closeEvaluation({
-                            evaluationId: evaluationInstance!.evaluationId,
+                            guildSlug: guildSlug!,
                         });
                     }}
                 >

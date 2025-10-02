@@ -9,11 +9,10 @@ import { useCurrentUser } from "./use-current-user";
 
 export const useEvaluationStatus = (
     now: number,
-    guildId: number | undefined,
 ): EvaluationStatus | undefined => {
     const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
 
-    const { evaluation, guild } = useEvaluationInstance(guildId);
+    const { evaluation, guild } = useEvaluationInstance();
 
     const { data: currentUser } = useCurrentUser();
 

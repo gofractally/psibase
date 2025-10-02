@@ -2,21 +2,19 @@ import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
-import { Loader2, Plus } from "lucide-react";
 
 import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { getMemberLabel } from "@/lib/getMemberLabel";
+import { Button } from "@shared/shadcn/ui/button"
 
 import { Badge } from "@shared/shadcn/ui/badge";
-import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardContent,
@@ -25,6 +23,8 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { siblingUrl } from "@psibase/common-lib";
+
 
 export const MyMembership = () => {
     const fractalAccount = useCurrentFractal();
@@ -86,9 +86,6 @@ export const MyMembership = () => {
                             chainId={chainId}
                         />
                         <MembershipStatusCard membership={membership} />
-                        {membership == null && (
-                            <JoinFractalCard fractalAccount={fractalAccount} />
-                        )}
                     </>
                 )}
             </div>
@@ -109,19 +106,28 @@ const FractalOverviewCard = ({
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        <img
-                            src={createIdenticon(chainId + fractalAccount)}
-                            alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
-                            className="size-5"
-                        />
-                    </div>
-                    <div>
-                        <div className="text-xl font-semibold">
-                            {fractal?.fractal?.name || "Loading..."}
+                    <div className="flex justify-between w-full ">
+                        <div>
+                            <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
+                                <img
+                                    src={createIdenticon(chainId + fractalAccount)}
+                                    alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
+                                    className="size-5"
+                                />
+                            </div>
+                            <div>
+                                <div className="text-xl font-semibold">
+                                    {fractal?.fractal?.name || "Loading..."}
+                                </div>
+                                <div className="text-muted-foreground text-sm font-normal">
+                                    {fractalAccount}
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-muted-foreground text-sm font-normal">
-                            {fractalAccount}
+                        <div className="flex flex-col items-center justify-center">
+                            <Button onClick={() => {
+                                window.open(siblingUrl(null, fractalAccount))
+                            }}>Open</Button>
                         </div>
                     </div>
                 </CardTitle>
@@ -148,8 +154,8 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         membership == null
             ? "Not a member"
             : membership
-              ? getMemberLabel(membership.memberStatus)
-              : "Loading...";
+                ? getMemberLabel(membership.memberStatus)
+                : "Loading...";
     return (
         <Card>
             <CardHeader>
@@ -194,44 +200,4 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
     );
 };
 
-const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
-    const { mutateAsync: joinFractal, isPending, error } = useJoinFractal();
 
-    if (error) {
-        return <ErrorCard error={error} />;
-    }
-
-    return (
-        <Card className="border-dashed">
-            <CardContent className="pt-6">
-                <div className="flex flex-col items-center space-y-4 text-center">
-                    <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-full">
-                        <Plus className="text-muted-foreground h-6 w-6" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-semibold">
-                            Join this fractal
-                        </h3>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                            Become a member to participate in evaluations and
-                            contribute to the community.
-                        </p>
-                    </div>
-                    <Button
-                        onClick={() => {
-                            joinFractal({
-                                fractal: fractalAccount!,
-                            });
-                        }}
-                        size="lg"
-                        disabled={!fractalAccount || isPending}
-                        className="w-full sm:w-auto"
-                    >
-                        {isPending && <Loader2 className="animate-spin" />}
-                        Join Fractal
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};

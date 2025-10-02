@@ -1,6 +1,5 @@
-import { createBrowserRouter, redirect } from "react-router-dom";
+import { createBrowserRouter, } from "react-router-dom";
 
-import { AllMembers } from "@/pages/fractal/membership/all-members";
 import { MyMembership } from "@/pages/fractal/membership/my-membership";
 import { Loader } from "@/pages/loader";
 
@@ -31,25 +30,10 @@ export const router = createBrowserRouter([
         children: [
             {
                 path: ":fractalName",
-                index: true,
-                loader: () => redirect("membership"),
-            },
-            {
-                path: ":fractalName/membership",
                 element: (
                     <ProtectedRoute>
                         <AppExists>
                             <MyMembership />
-                        </AppExists>
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: ":fractalName/membership/members",
-                element: (
-                    <ProtectedRoute>
-                        <AppExists>
-                            <AllMembers />
                         </AppExists>
                     </ProtectedRoute>
                 ),

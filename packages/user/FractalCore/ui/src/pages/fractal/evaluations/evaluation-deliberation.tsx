@@ -19,8 +19,6 @@ import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { useGuildSlug } from "@/hooks/use-guild-id";
-import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -38,10 +36,11 @@ const usePageParams = () => {
 
 const useRanking = () => {
     const { evaluationId, groupNumber } = usePageParams();
+    const guildSlug = useGuildSlug();
 
     const { data: groupUsersData } = useGroupUsers(
-        Number(evaluationId),
-        Number(groupNumber),
+        guildSlug,
+        groupNumber,
     );
 
     const groupUsers = groupUsersData || [];
@@ -50,7 +49,7 @@ const useRanking = () => {
         data: currentProposal,
         isPending: isProposalPending,
         refetch: refetchProposal,
-    } = useProposal(Number(evaluationId), Number(groupNumber));
+    } = useProposal(Number(groupNumber));
     const proposal = currentProposal ?? [];
 
     const { cancel, maybeExecute: refreshProposal } = useAsyncDebouncer(
@@ -80,7 +79,7 @@ const useRanking = () => {
 
     const updateRankedNumbers = (accounts: Account[]) => {
         cancel();
-        setCachedProposal(Number(evaluationId), Number(groupNumber), accounts);
+        setCachedProposal(guildSlug!, Number(groupNumber), accounts);
         debounceAccounts(accounts);
     };
 
@@ -116,10 +115,8 @@ const GroupStatus = () => {
     const { groupNumber } = usePageParams();
 
     const now = useNowUnix();
-    const guildSlug = useGuildSlug();
-    const fractalAccount = useFractalAccount();
-    const { data: guild } = useGuildBySlug(fractalAccount, guildSlug)
-    const status = useEvaluationStatus(now, guild?.id);
+
+    const status = useEvaluationStatus(now);
 
     const isAttesting = useWatchAttest(status);
     const isClosing = useWatchClose(status);

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import QueryKey, { OptionalAccount, OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
 import { useFractalAccount } from "./use-fractal-account";
@@ -33,12 +33,12 @@ export const useProposal = (groupNumber: OptionalNumber) => {
 };
 
 export const setCachedProposal = (
-    fractalAccount: OptionalAccount,
+    guildSlug: string,
     groupNumber: number,
     accounts: Account[],
 ) => {
     queryClient.setQueryData(
-        QueryKey.proposal(fractalAccount, groupNumber),
+        QueryKey.proposal(guildSlug, groupNumber),
         accounts,
     );
 };
