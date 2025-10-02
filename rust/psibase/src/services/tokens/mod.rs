@@ -79,143 +79,155 @@ mod service {
         unimplemented!()
     }
 
-    /// Credit
+    /// Credit tokens to a debitor (recipient).
     ///
-    /// Send tokens to a shared balance between the creditor (sender) and the debitor (recipient)
-    /// By default, funds will then move automatically from the shared balance to the debitor unless manual debiting is enabled by the `debitor`.
-    /// `manual_debit` can be enabled using `setBalConf` or `setUserConf`
+    /// On credit, tokens are typically automatically debited by the debitor. However,
+    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
+    /// "shared balance".
+    ///
+    /// # Shared balance mechanics
+    /// When in the shared balance, the tokens can be:
+    /// * uncredited (transfer cancelled) by the creditor
+    /// * debited (transfer accepted) by the debitor
+    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `debitor`  - Debitor / recipient of shared balance.
-    /// * `amount`   - Amount to credit towards shared balance.
+    /// * `token_id` - Unique token identifier
+    /// * `debitor`  - Debitor / recipient
+    /// * `amount`   - Amount to credit
     /// * `memo`     - Memo
     #[action]
     fn credit(tokenId: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
-    /// Uncredit
+    /// Uncredit tokens that were credited into a shared balance
     ///
-    /// Refunds tokens from the shared balance between the creditor (sender) and the debitor, sending back to the creditor.
+    /// On credit, tokens are typically automatically debited by the debitor. However,
+    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
+    /// "shared balance".
     ///
-    /// This is mimics the behaviour as `reject` but is called by the `sender` instead of the `debitor`
+    /// # Shared balance mechanics
+    /// When in the shared balance, the tokens can be:
+    /// * uncredited (transfer cancelled) by the creditor
+    /// * debited (transfer accepted) by the debitor
+    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `debitor`  - Debitor / recipient of shared balance.
-    /// * `amount`   - Amount to uncredit from shared balance,
+    /// * `token_id` - Unique token identifier
+    /// * `debitor`  - Debitor / recipient
+    /// * `amount`   - Amount to uncredit
     /// * `memo`     - Memo
     #[action]
     fn uncredit(tokenId: TID, debitor: AccountNumber, maxAmount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
-    /// Debit
+    /// Debit tokens that were credited into a shared balance
     ///
-    /// Debits tokens from a shared balance between the creditor and the debitor (sender)
+    /// On credit, tokens are typically automatically debited by the debitor. However,
+    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
+    /// "shared balance".
     ///
-    /// By default, the debitor will automatically debit the amount towards the debitors balance.
-    /// `manual_debit` can be enabled using `setBalConf` or `setUserConf`
+    /// # Shared balance mechanics
+    /// When in the shared balance, the tokens can be:
+    /// * uncredited (transfer cancelled) by the creditor
+    /// * debited (transfer accepted) by the debitor
+    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `creditor` - User which previously sent balance towards debitor (sender).
-    /// * `amount`   - Amount to debit / take from shared balance.
+    /// * `token_id` - Unique token identifier
+    /// * `creditor` - User who credited the tokens
+    /// * `amount`   - Amount to debit
     /// * `memo`     - Memo
     #[action]
     fn debit(tokenId: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
-    /// Create a new token.
+    /// Create a new token
     ///
     /// # Arguments
     /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
-    /// * `max_issued_supply` - The permanent max issued supply of the token.
+    /// * `max_issued_supply` - The permanent max issued supply of the token
     ///
-    /// # Returns the unique token identifier aka TID (u32)
+    /// Returns the unique token identifier aka TID (u32)
     #[action]
     fn create(precision: Precision, max_issued_supply: Quantity) -> TID {
         unimplemented!()
     }
 
-    /// Burn tokens.
-    ///
-    /// Burns the token balance of the sender and increases the burned supply by the specific amount.
-    ///
+    /// Burn's the specified amount of the sender's specified tokens
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `amount`   - Amount of tokens to burn.
+    /// * `token_id` - Unique token identifier
+    /// * `amount`   - Amount of tokens to burn
     /// * `memo`     - Memo
     #[action]
     fn burn(tokenId: TID, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
-    /// Mint tokens.
+    /// Mint / Issue new tokens into existence
     ///
-    /// Mint / Issue new tokens into existence. Total issuance cannot exceed the max supply
-    ///
-    /// * Requires - Sender holds the Token owner NFT
+    /// Only the token owner can mint new tokens, and only if the total issuance
+    /// does not exceed the max issued supply.
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `amount`   - Amount of tokens to burn.
+    /// * `token_id` - Unique token identifier
+    /// * `amount`   - Amount of tokens to mint
     /// * `memo`     - Memo
     #[action]
     fn mint(tokenId: TID, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
-    /// Recall a user balance.
+    /// Recalls an amount of tokens from a user's balance and burns them
     ///
-    /// Remote burns a specific user balance and increases burned supply by the specified amount.
-    ///
-    /// * Requires - Sender holds the Token owner NFT
+    /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `from`     - User balance to be burned
-    /// * `amount`   - Amount of tokens to burn.
+    /// * `token_id` - Unique token identifier
+    /// * `from`     - User account from which to recall
+    /// * `amount`   - Amount of tokens to recall
     /// * `memo`     - Memo
     #[action]
     fn recall(tokenId: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
-    /// Lookup token details.
+    /// Lookup token details
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
+    /// * `token_id` - Unique token identifier
     ///
-    /// # Returns token information including current, burned supply and precision.
+    /// Returns token information including current, burned supply and precision
     #[action]
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> TokenRecord {
         unimplemented!()
     }
 
-    /// Lookup token symbol by token_id.
+    /// Lookup token symbol
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
+    /// * `token_id` - Unique token identifier
     ///
-    /// # Returns token symbol.
+    /// Returns token symbol
     #[action]
     #[allow(non_snake_case)]
     fn getTokenSym(token_id: TID) -> AccountNumber {
         unimplemented!()
     }
 
-    /// Map a symbol to a token.
+    /// Map a symbol to a token
     ///
-    /// By default tokens are only identifiable by their TID, Symbols like "BTC" can be mapped as a permament one way lookup.
-    /// Symbol mapping is permament and only map per token is allowed.
+    /// By default, tokens are only identifiable by their TID.
+    /// Symbols may be mapped to improve usability. Once a symbol
+    /// is mapped, it is permanent.
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
+    /// * `token_id` - Unique token identifier
     /// * `symbol` - Symbol e.g. "BTC"
     #[action]
     #[allow(non_snake_case)]
@@ -223,62 +235,87 @@ mod service {
         unimplemented!()
     }
 
-    /// Get user global configuration.
+    /// Get user's global configuration.
     ///
-    /// Settings apply to all tokens without a user balance configuration.
+    /// Settings apply to all tokens without a specific balance configuration.
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `index` - Position between 0 - 7
+    /// * `account`  - User account
+    /// * `index`    - Index of the configuration flag
+    ///                Valid values: [0,8)
+    ///                See `Configurations` for details
     ///
-    /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
+    /// Configurations:
+    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    ///                           the receiver.
+    /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
+    ///                           balance table, and will not need to be recreated on the next deposit.
+    ///
+    /// Returns a `bool` indicating whether the specified configuration flag is enabled.
     #[action]
     fn getUserConf(account: AccountNumber, index: u8) -> bool {
         unimplemented!()
     }
 
-    /// Set user global configuration of sender.
+    /// Set user global configuration of sender
     ///
     /// # Arguments
-    /// * `index` - Position between 0 - 7
-    /// * `enabled` - A `bool` indicating whether the specified configuration flag is enabled.
+    /// * `index`    - Index of the configuration flag
+    ///                Valid values: [0,8)
+    ///                See `Configurations` for details
+    /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
+    ///
+    /// Configurations:
+    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    ///                           the receiver.
+    /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
+    ///                           balance table, and will not need to be recreated on the next deposit.
     #[action]
     fn setUserConf(index: u8, enabled: bool) {
         unimplemented!()
     }
 
-    /// Get user balance configuration.
-    ///
-    /// Settings apply only to specific token.
+    /// Get user's token-specific balance configuration
     ///
     /// # Arguments
-    /// * `account` - User account.
-    /// * `token_id` - Unique token identifier.
-    /// * `index` - Position between 0 - 7
+    /// * `account`  - User account
+    /// * `token_id` - Unique token identifier
+    /// * `index`    - Index of the configuration flag
+    ///                Valid values: [0,8)
+    ///                See `Configurations` for details
     ///
+    /// Configurations:
+    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    ///                           the receiver.
+    /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
+    ///                           balance table, and will not need to be recreated on the next deposit.
     ///
-    /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
+    /// Returns a `bool` indicating whether the specified configuration flag is enabled.
     #[action]
     fn getBalConf(account: AccountNumber, token_id: TID, index: u8) -> bool {
         unimplemented!()
     }
 
-    /// Set balance configuration
-    ///
-    /// Set user balance configuration of sender.
+    /// Set user's token-specific balance configuration
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `index` - Position between 0 - 7
-    /// * `enabled` - A `bool` indicating whether the specified configuration flag is enabled.
+    /// * `token_id` - Unique token identifier
+    /// * `index`    - Index of the configuration flag
+    ///                Valid values: [0,8)
+    ///                See `Configurations` for details
+    /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
+    ///
+    /// Configurations:
+    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    ///                           the receiver.
+    /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
+    ///                           balance table, and will not need to be recreated on the next deposit.
     #[action]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
-    /// Delete balance configuration
-    ///
-    /// Delete the balance configuration of sender.
+    /// Delete the user's token-specific balance configuration
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier.
@@ -287,73 +324,82 @@ mod service {
         unimplemented!()
     }
 
-    /// Get token configuration.
-    ///
-    /// Determine settings e.g. unrecallable and untransferable
+    /// Get token configuration
     ///
     /// # Arguments
-    /// * `account` - User account.
-    /// * `token_id` - Unique token identifier.
-    /// * `index` - Position between 0 - 7
+    /// * `token_id` - Unique token identifier
+    /// * `index`    - Index of the configuration flag
+    ///                Valid values: [0,8)
+    ///                See `Configurations` for details
     ///
-    /// # Returns a `bool` indicating whether the specified configuration flag is enabled.
+    /// Configurations:
+    /// * 0: Untransferrable - If enabled, the token cannot be transferred
+    /// * 1: Unrecallable    - If enabled, the token cannot be recalled
+    ///
+    /// Returns a `bool` indicating whether the specified configuration flag is enabled
     #[action]
     fn getTokenConf(token_id: TID, index: u8) -> bool {
         unimplemented!()
     }
 
-    /// Reject
+    /// Rejects the shared balance between a creditor and a debitor
     ///
-    /// Returns the entire shared balance between the creditor and the debitor (sender), back to the creditor.
+    /// On credit, tokens are typically automatically debited by the debitor. However,
+    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
+    /// "shared balance".
     ///
-    /// This is mimics the behaviour as `uncredit` but is called by the `debitor` instead of the `creditor`
+    /// # Shared balance mechanics
+    /// When in the shared balance, the tokens can be:
+    /// * uncredited (transfer cancelled) by the creditor
+    /// * debited (transfer accepted) by the debitor
+    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `creditor`  - Debitor / recipient of shared balance.
+    /// * `token_id` - Unique token identifier
+    /// * `creditor`  - User who credited the tokens
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 
-    /// Set token configuration.
-    ///
-    /// * Requires - Sender holds the Token owner NFT
+    /// Set token configuration. Only the token owner can set the configuration.
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `index` - Position between 0 - 7
-    /// * `enabled` - A `bool` indicating whether the specified configuration flag is enabled.
+    /// * `token_id` - Unique token identifier
+    /// * `index`    - Index of the configuration flag
+    ///                Valid values: [0,8)
+    ///                See `Configurations` for details
+    /// * `enabled`  - A `bool` indicating whether the specified configuration flag is enabled.
+    ///
+    /// Configurations:
+    /// * 0: Untransferrable - If enabled, the token cannot be transferred
+    /// * 1: Unrecallable    - If enabled, the token cannot be recalled
     #[action]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         unimplemented!()
     }
 
-    /// Get user balance.
-    ///
-    /// Fetch token specific balance of user account
+    /// Get user token balance
     ///
     /// # Arguments
-    /// * `token_id` - Unique token identifier.
-    /// * `account` - User account.
+    /// * `token_id` - Unique token identifier
+    /// * `user` - User account
     ///
-    /// # Returns user balance
+    /// Returns quantity of tokens in the user's balance
     #[action]
     fn getBalance(token_id: TID, user: AccountNumber) -> Quantity {
         unimplemented!()
     }
 
-    /// Get shared balance.
-    ///
-    /// Fetch shared balance between the creditor and debitor.
+    /// Get shared balance between a creditor and debitor
     ///
     /// # Arguments
-    /// * `creditor` - Creditor account.
-    /// * `debitor` - Debitor account.
-    /// * `token_id` - Unique token identifier.
+    /// * `token_id` - Unique token identifier
+    /// * `creditor` - Creditor account
+    /// * `debitor` - Debitor account
     ///
-    /// # Returns user balance
+    /// Returns quantity of tokens in the shared balance
     #[action]
     fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
         unimplemented!()
