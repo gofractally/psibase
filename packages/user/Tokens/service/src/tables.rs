@@ -451,8 +451,8 @@ pub mod tables {
                 let balance = self.balance;
                 crate::Wrapper::emit().history().balChanged(
                     self.token_id,
-                    self.debitor,
                     self.creditor,
+                    self.debitor,
                     "rejected".to_string(),
                     fmt_amount(self.token_id, balance),
                     memo,
