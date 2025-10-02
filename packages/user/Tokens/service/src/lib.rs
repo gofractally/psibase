@@ -41,6 +41,7 @@ pub mod service {
             add_index("configured", 0);
             add_index("supplyChanged", 0);
             add_index("balChanged", 1);
+            add_index("balChanged", 2);
 
             UserConfig::get_or_new(Wrapper::SERVICE).set_flag(BalanceFlags::MANUAL_DEBIT, true);
         }
