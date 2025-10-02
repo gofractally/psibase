@@ -1892,6 +1892,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "serde",
+ "serde-aux",
  "serde_json",
  "tokens",
 ]
