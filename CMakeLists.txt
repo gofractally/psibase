@@ -186,14 +186,14 @@ ExternalProject_Add(
     DEPENDS             wasm
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     INSTALL_COMMAND     ""
 )
 ExternalProject_Add(
     md2man
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
@@ -251,7 +251,7 @@ ExternalProject_Add(
     cargo-psibase
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
@@ -1166,7 +1166,7 @@ ExternalProject_Add(
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
     BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND   CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_ALWAYS 1
     INSTALL_COMMAND ""
 )
