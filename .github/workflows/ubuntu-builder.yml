@@ -54,3 +54,9 @@ jobs:
         with:
           name: psidk-book
           path: psidk-book.tar.gz
+      - name: Upload ccache log
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccache-log
+          path: ${{ github.workspace }}/ccache.log
+          retention-days: 1
