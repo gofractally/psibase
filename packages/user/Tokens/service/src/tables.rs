@@ -1,6 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
-    use crate::service::TID;
+    use crate::service::{fmt_amount, TID};
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
@@ -435,10 +435,10 @@ pub mod tables {
 
             crate::Wrapper::emit().history().balChanged(
                 self.token_id,
-                self.creditor,
                 self.debitor,
-                "debit".to_string(),
-                Decimal::new(quantity, Token::get_assert(self.token_id).precision).to_string(),
+                self.creditor,
+                "debited".to_string(),
+                fmt_amount(self.token_id, quantity),
                 memo,
             );
 
@@ -453,8 +453,8 @@ pub mod tables {
                     self.token_id,
                     self.creditor,
                     self.debitor,
-                    "reject".to_string(),
-                    Decimal::new(balance, Token::get_assert(self.token_id).precision).to_string(),
+                    "rejected".to_string(),
+                    fmt_amount(self.token_id, balance),
                     memo,
                 );
                 self.sub_balance(balance);

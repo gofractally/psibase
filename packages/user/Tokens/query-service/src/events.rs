@@ -8,7 +8,7 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 pub struct SupplyEvent {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     token_id: TID,
-    counter_party: AccountNumber,
+    actor: AccountNumber,
     action: String,
     amount: String,
     memo: Memo,

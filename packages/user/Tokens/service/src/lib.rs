@@ -5,6 +5,7 @@ pub mod tables;
 pub mod service {
     use crate::tables::tables::*;
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
+    use psibase::services::events;
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
     use psibase::services::tokens::{Decimal, Precision, Quantity};
@@ -14,6 +15,10 @@ pub mod service {
 
     pub type TID = u32;
 
+    pub fn fmt_amount(token_id: TID, amount: Quantity) -> String {
+        Decimal::new(amount, Token::get_assert(token_id).precision).to_string()
+    }
+
     #[action]
     fn init() {
         let table = InitTable::new();
@@ -22,8 +27,22 @@ pub mod service {
             let init_instance = InitRow { last_used_id: 0 };
             table.put(&init_instance).unwrap();
 
-            Nfts::call_from(Wrapper::SERVICE)
-                .setUserConf(psibase::NamedBit::from("manualDebit"), true);
+            Nfts::call().setUserConf(psibase::NamedBit::from("manualDebit"), true);
+
+            let add_index = |method: &str, column: u8| {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            };
+
+            add_index("configured", 0);
+            add_index("supplyChanged", 0);
+            add_index("balChanged", 1);
+            add_index("balChanged", 2);
+
             UserConfig::get_or_new(Wrapper::SERVICE).set_flag(BalanceFlags::MANUAL_DEBIT, true);
         }
     }
@@ -49,16 +68,19 @@ pub mod service {
         );
         let new_token = Token::add(precision, max_issued_supply);
 
+        let tid = new_token.id;
         Wrapper::emit().history().configured(
-            new_token.id,
-            "create".to_string(),
-            Decimal::new(max_issued_supply, precision)
-                .to_string()
-                .try_into()
-                .unwrap(),
+            tid,
+            "created".to_string(),
+            Memo::new(format!(
+                "New token {} with max supply: {}",
+                tid,
+                fmt_amount(tid, max_issued_supply)
+            ))
+            .unwrap(),
         );
 
-        new_token.id
+        tid
     }
 
     /// Lookup token details.
@@ -103,12 +125,10 @@ pub mod service {
 
         token.map_symbol(symbol);
 
-        let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
-            .getSymbol(symbol)
-            .ownerNft;
+        let symbol_owner_nft = Symbol::call().getSymbol(symbol).ownerNft;
         check(symbol_owner_nft != 0, "Symbol does not exist");
 
-        Nfts::call_from(Wrapper::SERVICE).debit(
+        Nfts::call().debit(
             symbol_owner_nft,
             format!(
                 "Mapping symbol {} to token {}",
@@ -116,7 +136,13 @@ pub mod service {
                 token_id
             ),
         );
-        Nfts::call_from(Wrapper::SERVICE).burn(symbol_owner_nft);
+        Nfts::call().burn(symbol_owner_nft);
+
+        Wrapper::emit().history().configured(
+            token.id,
+            "named".to_string(),
+            Memo::new(format!("{}", symbol.to_string())).unwrap(),
+        );
     }
 
     /// Get user balance configuration.
@@ -215,11 +241,13 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
-        Token::get_assert(token_id).set_flag(index.into(), enabled);
+        let flag = index.into();
+        Token::get_assert(token_id).set_flag(flag, enabled);
+
         Wrapper::emit().history().configured(
             token_id,
-            "setTokenConf".to_string(),
-            format!("Index: {}, Enabled: {}", index, enabled)
+            "configured".to_string(),
+            format!("Flag: {}: {}", flag.to_string(), enabled)
                 .try_into()
                 .unwrap(),
         );
@@ -273,12 +301,26 @@ pub mod service {
 
         token.recall(amount, from);
 
-        Wrapper::emit().history().supplyChanged(
+        let actor = get_sender();
+        let recalled = "recalled".to_string();
+        let amount = fmt_amount(token_id, amount);
+        let event = Wrapper::emit().history();
+
+        event.balChanged(
             token_id,
-            from,
-            "recall".to_string(),
-            Decimal::new(amount, token.precision).to_string(),
-            memo,
+            from,  // We want this balance change event to show in `from`'s balChanged index
+            actor, // In this exceptional case, the actor is the counterparty
+            recalled.clone(),
+            amount.clone(),
+            memo.clone(),
+        );
+
+        event.supplyChanged(
+            token_id,
+            actor,
+            recalled,
+            amount,
+            Memo::new(format!("Recalled from {}", from)).unwrap(),
         );
     }
 
@@ -297,17 +339,23 @@ pub mod service {
 
         token.burn(amount);
 
-        Wrapper::emit().history().supplyChanged(
+        let actor = get_sender();
+        let burned = "burned".to_string();
+        let amount = fmt_amount(token_id, amount);
+        let event = Wrapper::emit().history();
+
+        event.balChanged(
             token_id,
-            get_sender(),
-            "burn".to_string(),
-            Decimal::new(amount, token.precision).to_string(),
-            memo,
+            actor,
+            actor,
+            burned.clone(),
+            amount.clone(),
+            memo.clone(),
         );
+
+        event.supplyChanged(token_id, actor, burned, amount, memo);
     }
 
-    /// Mint tokens.
-    ///
     /// Mint / Issue new tokens into existence. Total issuance cannot exceed the max issued supply
     ///
     /// * Requires - Sender holds the Token owner NFT
@@ -325,8 +373,8 @@ pub mod service {
         Wrapper::emit().history().supplyChanged(
             token_id,
             get_sender(),
-            "mint".to_string(),
-            Decimal::new(amount, token.precision).to_string(),
+            "minted".to_string(),
+            fmt_amount(token_id, amount),
             memo,
         );
     }
@@ -351,8 +399,8 @@ pub mod service {
             token_id,
             creditor,
             debitor,
-            "credit".to_string(),
-            Decimal::new(amount, Token::get_assert(token_id).precision).to_string(),
+            "credited".to_string(),
+            fmt_amount(token_id, amount),
             memo,
         );
     }
@@ -378,8 +426,8 @@ pub mod service {
             token_id,
             creditor,
             debitor,
-            "uncredit".to_string(),
-            Decimal::new(amount, Token::get_assert(token_id).precision).to_string(),
+            "uncredited".to_string(),
+            fmt_amount(token_id, amount),
             memo,
         );
     }
@@ -422,7 +470,7 @@ pub mod service {
     #[event(history)]
     pub fn supplyChanged(
         token_id: TID,
-        counter_party: AccountNumber,
+        actor: AccountNumber,
         action: String,
         amount: String,
         memo: Memo,
