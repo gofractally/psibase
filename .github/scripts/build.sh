@@ -22,14 +22,24 @@ fi
 
 cd ${WORKSPACE_ROOT}
 git submodule update --init --recursive
+
+# ccache
 export CCACHE_DIR=${WORKSPACE_ROOT}/.caches/ccache
-export SCCACHE_DIR=${WORKSPACE_ROOT}/.caches/sccache
 export CCACHE_CONFIGPATH=${WORKSPACE_ROOT}/ccache.conf
-echo max_size = 600M >${WORKSPACE_ROOT}/ccache.conf
-echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
+cat > "${CCACHE_CONFIGPATH}" <<'CC'
+max_size = 600M
+compression = true
+compression_level = 6
+CC
+echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${CCACHE_CONFIGPATH}
+
+# sccache
+export SCCACHE_DIR=${WORKSPACE_ROOT}/.caches/sccache
+export SCCACHE_CACHE_ZSTD_LEVEL=5 # Default is 3
 export SCCACHE_IDLE_TIMEOUT=0
 export SCCACHE_CACHE_SIZE=1G
 export RUSTC_WRAPPER=sccache
+
 # (Note for cargo-generate to be happy) Ensure there's a $USER environment variable set with username corresponding to the uid of the user running the container
 DOCKER="docker run --rm \
   -v ${WORKSPACE_ROOT}:${WORKSPACE_ROOT} \
