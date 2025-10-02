@@ -116,7 +116,12 @@ const PageContents = ({
                 paddedAmount,
                 "Add",
             );
-            toast("Error", {
+            setTransferModal(false);
+            toast.error("Token transfer failed", {
+                // dismissible: true,
+                closeButton: true,
+                richColors: true,
+                duration: Infinity,
                 description:
                     e instanceof Error
                         ? e.message
