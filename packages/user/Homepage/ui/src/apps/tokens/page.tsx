@@ -5,7 +5,7 @@ import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { updateBalanceCache } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { supervisor } from "@/supervisor";
 
@@ -139,13 +139,6 @@ const TokensPageContent = ({
         (balance) => balance.id == Number(selectedTokenId),
     );
 
-    useEffect(() => {
-        // update token field value with default token once tokens load
-        if (!selectedTokenId && tokens.length > 0) {
-            form.setFieldValue("token", tokens[0].id.toString());
-            return;
-        }
-    }, [form, selectedTokenId, tokens]);
     const disableForm = !currentUser || isLoading;
 
     const onSubmitPreflight = async (
