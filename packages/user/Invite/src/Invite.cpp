@@ -143,8 +143,8 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    invite->numAccounts -= 1;
    inviteTable.put(*invite);
 
-   Spki claim = to<Credentials>().get_claim(cid);
-   check(claim != newAccountKey, needUniquePubkey.data());
+   Spki pubkey = to<Credentials>().get_pubkey(cid);
+   check(pubkey != newAccountKey, needUniquePubkey.data());
    to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
 
    emit().history().updated(invite->id, newAccount, InviteEventType::accountRedeemed);
