@@ -183,7 +183,7 @@ endif()
 # Rust components with shared cache
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/gen-cpp-doc
-    COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    COMMAND cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     DEPENDS wasm
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
 )
@@ -191,21 +191,21 @@ add_custom_target(gen-cpp-doc ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/relea
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man
-    COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    COMMAND cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
 )
 add_custom_target(md2man ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
-    COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    COMMAND cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
 )
 add_custom_target(cargo-psibase ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-    COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    COMMAND cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
 )
 add_custom_target(rust ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase)
