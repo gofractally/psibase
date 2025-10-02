@@ -43,7 +43,7 @@ export const TokensPage = () => {
                 {isNoTokens ? (
                     <NoTokensWarning />
                 ) : (
-                    <TokensPageContent
+                    <PageContents
                         tokens={tokens}
                         currentUser={currentUser}
                         isLoading={!isSuccess || isLoadingBalances}
@@ -55,7 +55,7 @@ export const TokensPage = () => {
     );
 };
 
-const TokensPageContent = ({
+const PageContents = ({
     tokens,
     currentUser,
     isLoading,
@@ -174,32 +174,32 @@ const TokensPageContent = ({
     };
 
     return (
-        <>
-            <form.AppForm>
-                <form className="space-y-4">
-                    <GlowingCard>
-                        <TransferModal
-                            form={form}
-                            onClose={() => setTransferModal(false)}
-                            open={isTransferModalOpen}
+        <div className="space-y-4">
+            <TransferModal
+                form={form}
+                onClose={() => setTransferModal(false)}
+                open={isTransferModalOpen}
+                selectedToken={selectedToken}
+                onSubmit={form.handleSubmit}
+            />
+            <GlowingCard>
+                <CardContent className="@container space-y-2">
+                    {!isLoading && (
+                        <TokenSelector
+                            tokens={tokens}
                             selectedToken={selectedToken}
-                            onSubmit={form.handleSubmit}
+                            onChange={(tokenId) => {
+                                setSelectedTokenId(tokenId);
+                                clearAmountErrors();
+                            }}
+                            onClickAvailableBalance={handleSetMaxAmount}
                         />
-                        <CardContent className="@container space-y-2">
-                            {!isLoading && (
-                                <TokenSelector
-                                    tokens={tokens}
-                                    selectedToken={selectedToken}
-                                    onChange={(tokenId) => {
-                                        setSelectedTokenId(tokenId);
-                                        clearAmountErrors();
-                                    }}
-                                    onClickAvailableBalance={handleSetMaxAmount}
-                                />
-                            )}
-                        </CardContent>
-                    </GlowingCard>
-                    <GlowingCard>
+                    )}
+                </CardContent>
+            </GlowingCard>
+            <GlowingCard>
+                <form.AppForm>
+                    <form>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <FieldAccountExisting
@@ -245,17 +245,15 @@ const TokensPageContent = ({
                                 </div>
                             )}
                         </CardContent>
-                    </GlowingCard>
-                </form>
-            </form.AppForm>
-            <div className="my-4">
-                <CreditTable
-                    isLoading={isLoading}
-                    user={currentUser}
-                    balances={sharedBalances}
-                />
-            </div>
-        </>
+                    </form>
+                </form.AppForm>
+            </GlowingCard>
+            <CreditTable
+                isLoading={isLoading}
+                user={currentUser}
+                balances={sharedBalances}
+            />
+        </div>
     );
 };
 
