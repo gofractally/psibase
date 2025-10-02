@@ -12,10 +12,20 @@
 
 namespace psibase
 {
+   template <typename T>
+   struct ScopedAtomic
+   {
+      ScopedAtomic(std::atomic<T>& value) : location(value), saved(value.load()) {}
+      ~ScopedAtomic() { location.store(saved); }
+      std::atomic<T>& location;
+      T               saved;
+   };
+
    struct TransactionContextImpl
    {
       explicit TransactionContextImpl(SystemContext& context)
-          : watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
+          : vmTimedOut(eosio::vm::timed_run_has_timed_out),
+            watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
       {
       }
       void asyncTimeout();
@@ -25,6 +35,7 @@ namespace psibase
       // mutex protects timedOut and insertions in executionContexts
       std::mutex                                mutex    = {};
       bool                                      timedOut = false;
+      std::atomic<bool>&                        vmTimedOut;
       eosio::vm::stack_manager                  altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
       // alt execution contexts are used when executing in a different
@@ -62,6 +73,7 @@ namespace psibase
 
    void TransactionContext::execTransaction()
    {
+      ScopedAtomic saved{impl->vmTimedOut};
       // Prepare for execution
       auto& db         = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -176,7 +188,8 @@ namespace psibase
                                             Claim              claim,
                                             std::vector<char>  proof)
    {
-      auto& db         = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
@@ -214,7 +227,8 @@ namespace psibase
                                              const Action& action,
                                              ActionTrace&  atrace)
    {
-      auto& db             = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db      = blockContext.db;
       config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       auto wasmConfigTable = dbMode.verifyOnly ? proofWasmConfigTable : transactionWasmConfigTable;
       impl->wasmConfig =
@@ -317,7 +331,8 @@ namespace psibase
    // TODO: different wasmConfig, controlled by config file
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
-      auto& db         = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
@@ -343,7 +358,8 @@ namespace psibase
                                        const Action&    action,
                                        ActionTrace&     atrace)
    {
-      auto& db         = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
@@ -414,7 +430,8 @@ namespace psibase
    void TransactionContextImpl::asyncTimeout()
    {
       std::lock_guard<std::mutex> guard{mutex};
-      timedOut = true;
+      timedOut   = true;
+      vmTimedOut = true;
       for (auto& [_, ec] : executionContexts)
          ec.asyncTimeout();
    }

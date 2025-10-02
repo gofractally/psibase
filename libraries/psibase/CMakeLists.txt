@@ -164,6 +164,7 @@ function(add suffix)
             ../../packages/system/HttpServer/include
             ../../packages/system/SetCode/include
             ../../packages/system/StagedTx/service/cpp/include
+            ../../packages/system/Credentials/service/cpp/include
             ../../packages/system/Transact/include
             ../../packages/user/CommonApi/include
             ../../packages/user/Explorer/include

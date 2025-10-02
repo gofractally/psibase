@@ -1,9 +1,11 @@
+mod events;
+
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
 
     use async_graphql::{connection::Connection, *};
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::{nft::Wrapper as Nfts, tokens::TID};
 
     use psibase::*;
     use tokens::{
@@ -13,6 +15,8 @@ mod service {
             UserConfig, UserConfigTable,
         },
     };
+
+    use crate::events::{BalanceEvent, ConfigureEvent, SupplyEvent};
 
     pub fn token_id_to_number(token_id: String) -> u32 {
         match identify_token_type(token_id) {
@@ -131,6 +135,61 @@ mod service {
                     nft.owner == user
                 })
                 .collect()
+        }
+
+        async fn configurations(
+            &self,
+            token_id: TID,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, ConfigureEvent>> {
+            EventQuery::new("history.tokens.configured")
+                .condition(format!("token_id = {}", token_id))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn supplyChanges(
+            &self,
+            token_id: TID,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, SupplyEvent>> {
+            EventQuery::new("history.tokens.supplyChanged")
+                .condition(format!("token_id = {}", token_id))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn balChanges(
+            &self,
+            token_id: TID,
+            account: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+            EventQuery::new("history.tokens.balChanged")
+                .condition(format!(
+                    "token_id = {} AND account = '{}'",
+                    token_id, account
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
         }
     }
 
