@@ -157,7 +157,7 @@ export const updateBalanceCache = (
     operation: z.infer<typeof Operation>,
 ) => {
     queryClient.setQueryData(
-        QueryKey.ui(username || "undefined"),
+        QueryKey.tokenBalances(username),
         (balances: BalanceRes | undefined) => {
             if (
                 operation !== Operation.Enum.Add &&
