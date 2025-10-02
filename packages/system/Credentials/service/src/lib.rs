@@ -1,4 +1,4 @@
-pub const CREDENTIAL_SENDER: &str = "cred-sys";
+pub const CREDENTIAL_SENDER: psibase::AccountNumber = psibase::account!("cred-sys");
 
 #[psibase::service_tables]
 pub mod tables {
@@ -42,7 +42,7 @@ pub mod tables {
     pub struct Credential {
         pub id: u32,
         pub issuer: AccountNumber,
-        pub claim: Vec<u8>,
+        pub pubkey: Vec<u8>,
         pub issuance_date: TimePointSec,
         pub expiry_date: Option<TimePointSec>,
     }
@@ -54,13 +54,13 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_claim(&self) -> Vec<u8> {
-            self.claim.clone()
+        fn by_pubkey(&self) -> Vec<u8> {
+            self.pubkey.clone()
         }
 
         #[secondary_key(2)]
-        fn by_expiry_date(&self) -> (u32, Option<TimePointSec>) {
-            (self.id, self.expiry_date)
+        fn by_expiry_date(&self) -> (Option<TimePointSec>, u32) {
+            (self.expiry_date, self.id)
         }
     }
 }
@@ -96,7 +96,7 @@ pub mod service {
     #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
         check(
-            user.to_string() == CREDENTIAL_SENDER,
+            user == CREDENTIAL_SENDER,
             &format!(
                 "only {} can use credentials as an auth service",
                 CREDENTIAL_SENDER
@@ -136,7 +136,7 @@ pub mod service {
         }
 
         check(
-            sender.to_string() == CREDENTIAL_SENDER,
+            sender == CREDENTIAL_SENDER,
             &format!("sender must be {}", CREDENTIAL_SENDER),
         );
 
@@ -149,7 +149,7 @@ pub mod service {
         );
 
         let credential = CredentialTable::read()
-            .get_index_by_claim()
+            .get_index_by_pubkey()
             .get(&claim.rawData);
         check(credential.is_some(), "Claim uses an invalid credential");
         let credential = credential.unwrap();
@@ -168,19 +168,19 @@ pub mod service {
     /// Creates a credential
     ///
     /// Parameters:
-    /// - `claim`: The credential claim (e.g. public key)
+    /// - `pubkey`: The credential public key
     /// - `expires`: The number of seconds until the credential expires
     ///
     /// This action is meant to be called inline by another service.
     /// The caller service is the credential issuer.
     ///
-    /// A transaction sent from the CREDENTIAL_SENDER account must have a proof for the
-    /// specified claim.
+    /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
+    /// that matches the specified public key.
     #[action]
-    fn create(claim: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
+    fn create(pubkey: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
         let table = CredentialTable::new();
 
-        let existing = table.get_index_by_claim().get(&claim.0);
+        let existing = table.get_index_by_pubkey().get(&pubkey.0);
         check_none(existing, "Credential already exists");
         let id = CredentialId::next_id();
         let now = transact::Wrapper::call().currentBlock().time.seconds();
@@ -188,7 +188,7 @@ pub mod service {
             .put(&Credential {
                 id,
                 issuer: get_sender(),
-                claim: claim.0.clone(),
+                pubkey: pubkey.0.clone(),
                 issuance_date: now,
                 expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),
             })
@@ -206,14 +206,14 @@ pub mod service {
         id
     }
 
-    /// Gets the `claim` of the specified credential
+    /// Gets the `pubkey` of the specified credential
     #[action]
-    fn get_claim(id: u32) -> SubjectPublicKeyInfo {
+    fn get_pubkey(id: u32) -> SubjectPublicKeyInfo {
         CredentialTable::read()
             .get_index_pk()
             .get(&id)
             .expect("Credential DNE")
-            .claim
+            .pubkey
             .into()
     }
 
@@ -231,7 +231,7 @@ pub mod service {
     #[action]
     fn get_active() -> Option<u32> {
         let claims = transact::Wrapper::call().getTransaction().claims;
-        let table = CredentialTable::read().get_index_by_claim();
+        let table = CredentialTable::read().get_index_by_pubkey();
 
         let mut active_id = None;
         let now = transact::Wrapper::call().currentBlock().time.seconds();

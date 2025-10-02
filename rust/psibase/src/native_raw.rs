@@ -69,7 +69,7 @@ extern "C" {
     /// `action` must contain a fracpacked [crate::Action].
     ///
     /// Use [getResult] to get result.
-    pub fn call(action: *const u8, len: u32) -> u32;
+    pub fn call(action: *const u8, len: u32, flags: u64) -> u32;
 
     /// Set the currently-executing action's return value
     pub fn setRetval(retval: *const u8, len: u32);

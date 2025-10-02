@@ -6,21 +6,21 @@
 struct TestClock : psibase::Service
 {
    static constexpr auto     service      = psibase::AccountNumber{"clock-service"};
-   static constexpr uint64_t serviceFlags = psibase::CodeRow::runModeRpc;
+   static constexpr uint64_t serviceFlags = 0;
 
-   void testReal();
-   void testMono();
-   void testCpu();
-   void testSystem();
+   void testReal(bool indirect);
+   void testMono(bool indirect);
+   void testCpu(bool indirect);
+   void testSystem(bool indirect);
    //void testUtc();
-   void testSteady();
-   void testHiRes();
+   void testSteady(bool indirect);
+   void testHiRes(bool indirect);
 };
 
 PSIO_REFLECT(TestClock,
-             method(testReal),
-             method(testMono),
-             method(testCpu),
-             method(testSystem),
-             method(testSteady),
-             method(testHiRes))
+             method(testReal, indirect),
+             method(testMono, indirect),
+             method(testCpu, indirect),
+             method(testSystem, indirect),
+             method(testSteady, indirect),
+             method(testHiRes, indirect))

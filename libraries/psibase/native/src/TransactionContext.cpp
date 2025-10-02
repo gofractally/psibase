@@ -6,15 +6,26 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psio/finally.hpp>
 #include <psio/from_bin.hpp>
 #include <thread>
 
 namespace psibase
 {
+   template <typename T>
+   struct ScopedAtomic
+   {
+      ScopedAtomic(std::atomic<T>& value) : location(value), saved(value.load()) {}
+      ~ScopedAtomic() { location.store(saved); }
+      std::atomic<T>& location;
+      T               saved;
+   };
+
    struct TransactionContextImpl
    {
       explicit TransactionContextImpl(SystemContext& context)
-          : watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
+          : vmTimedOut(eosio::vm::timed_run_has_timed_out),
+            watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
       {
       }
       void asyncTimeout();
@@ -24,8 +35,14 @@ namespace psibase
       // mutex protects timedOut and insertions in executionContexts
       std::mutex                                mutex    = {};
       bool                                      timedOut = false;
+      std::atomic<bool>&                        vmTimedOut;
       eosio::vm::stack_manager                  altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
+      // alt execution contexts are used when executing in a different
+      // run mode. They are always run in a subjective mode, and
+      // may be reset when not currently executing.
+      bool                                      altMode         = false;
+      std::map<AccountNumber, ExecutionContext> altExecContexts = {};
       Watchdog                                  watchdog;
    };
 
@@ -56,6 +73,7 @@ namespace psibase
 
    void TransactionContext::execTransaction()
    {
+      ScopedAtomic saved{impl->vmTimedOut};
       // Prepare for execution
       auto& db         = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -170,7 +188,8 @@ namespace psibase
                                             Claim              claim,
                                             std::vector<char>  proof)
    {
-      auto& db         = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
@@ -208,7 +227,8 @@ namespace psibase
                                              const Action& action,
                                              ActionTrace&  atrace)
    {
-      auto& db             = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db      = blockContext.db;
       config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       auto wasmConfigTable = dbMode.verifyOnly ? proofWasmConfigTable : transactionWasmConfigTable;
       impl->wasmConfig =
@@ -249,10 +269,70 @@ namespace psibase
       }
    }
 
+   void TransactionContext::execCalledAction(uint64_t      callerFlags,
+                                             const Action& action,
+                                             ActionTrace&  atrace,
+                                             CallFlags     flags)
+   {
+      if (flags == CallFlags::none)
+      {
+         execCalledAction(callerFlags, action, atrace);
+      }
+      else
+      {
+         callerFlags |= ExecutionContext::callerSudo;
+         auto scopedChangeMode = [&]()
+         {
+            assert(!impl->altMode);
+            assert(dbMode.isSync);
+            assert(!dbMode.isSubjective);
+            impl->altMode       = true;
+            dbMode.isSync       = flags == CallFlags::runModeCallback;
+            dbMode.isSubjective = true;
+            return psio::finally{[this]
+                                 {
+                                    impl->altMode       = false;
+                                    dbMode.isSync       = true;
+                                    dbMode.isSubjective = false;
+                                 }};
+         };
+
+         exportedHandles.clear();
+         if (blockContext.isProducing)
+         {
+            auto mode = scopedChangeMode();
+            execCalledAction(callerFlags, action, atrace);
+            subjectiveData.push_back(atrace.rawRetval);
+         }
+         else
+         {
+            if (flags == CallFlags::runModeCallback)
+            {
+               try
+               {
+                  auto mode = scopedChangeMode();
+                  execCalledAction(callerFlags, action, atrace);
+               }
+               catch (...)
+               {
+                  // These can be cleared safely, because none of them
+                  // are currently running.
+                  impl->altExecContexts.clear();
+               }
+            }
+            auto& subjective = signedTransaction.subjectiveData;
+            check(subjective && nextSubjectiveRead < subjective->size(), "missing subjective data");
+            atrace.rawRetval = (*subjective)[nextSubjectiveRead++];
+         }
+         importedHandles.clear();
+      }
+   }
+
    // TODO: different wasmConfig, controlled by config file
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
-      auto& db         = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
@@ -278,7 +358,8 @@ namespace psibase
                                        const Action&    action,
                                        ActionTrace&     atrace)
    {
-      auto& db         = blockContext.db;
+      ScopedAtomic saved{impl->vmTimedOut};
+      auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
@@ -302,19 +383,46 @@ namespace psibase
 
    ExecutionContext& TransactionContext::getExecutionContext(AccountNumber service)
    {
-      auto it = impl->executionContexts.find(service);
-      if (it != impl->executionContexts.end())
+      auto& executionContexts = impl->altMode ? impl->altExecContexts : impl->executionContexts;
+      auto  it                = executionContexts.find(service);
+      if (it != executionContexts.end())
          return it->second;
       impl->watchdog.pause();
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running services");
-      auto& memory = blockContext.systemContext.executionMemories[impl->executionContexts.size()];
+      if (impl->executionContexts.size() + impl->altExecContexts.size() >=
+          blockContext.systemContext.executionMemories.size())
+      {
+         if (  // It's only on replay that we need to suppress subjective errors.
+             // Don't bother in speculative or block producing mode.
+             !blockContext.isProducing &&
+             // If we are running in altMode, it isn't safe to clear them,
+             // because some alt contexts might be running. We also don't need
+             // to handle it here, because the exception will be caught when
+             // exiting altMode, if it's needed.
+             !impl->altMode &&
+             // If there are no alt contexts, clearing them won't help.
+             !impl->altExecContexts.empty())
+         {
+            impl->altExecContexts.clear();
+         }
+         else
+         {
+            abortMessage("exceeded maximum number of running services");
+         }
+      }
+      // alt modules take memories from the back, to avoid
+      // interleaving with the regular modules, so they can
+      // be cleared safely.
+      auto  memidx = impl->altMode ? blockContext.systemContext.executionMemories.size() -
+                                        impl->altExecContexts.size() - 1
+                                   : impl->executionContexts.size();
+      auto& memory = blockContext.systemContext.executionMemories[memidx];
       ExecutionContext            execContext{*this, impl->wasmConfig.vmOptions, memory, service};
       std::lock_guard<std::mutex> guard{impl->mutex};
       if (impl->timedOut)
          throw TimeoutException{};
-      auto& result =
-          impl->executionContexts.insert({service, std::move(execContext)}).first->second;
+      auto& result = executionContexts.insert({service, std::move(execContext)}).first->second;
       impl->watchdog.resume();
       return result;
    }
@@ -322,7 +430,8 @@ namespace psibase
    void TransactionContextImpl::asyncTimeout()
    {
       std::lock_guard<std::mutex> guard{mutex};
-      timedOut = true;
+      timedOut   = true;
+      vmTimedOut = true;
       for (auto& [_, ec] : executionContexts)
          ec.asyncTimeout();
    }

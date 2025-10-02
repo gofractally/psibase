@@ -194,32 +194,3 @@ TEST_CASE("Verify service tracking")
    t.finishBlock();
    CHECK(getReported(t) == getActual(t));
 }
-
-TEST_CASE("No subjective verify")
-{
-   DefaultTestChain t;
-   {
-      auto          nopWasm  = readWholeFile("Nop.wasm");
-      auto          codeHash = sha256(nopWasm.data(), nopWasm.size());
-      CodeByHashRow codeByHash{
-          .codeHash = codeHash,
-          .code{nopWasm.begin(), nopWasm.end()},
-      };
-      t.kvPut(DbId::nativeSubjective, codeByHash.key(), codeByHash);
-      CodeRow code{
-          .codeNum  = VerifySig::service,
-          .flags    = CodeRow::isVerify,
-          .codeHash = codeHash,
-      };
-      t.kvPut(DbId::nativeSubjective, code.key(), code);
-   }
-   CHECK(t.from(SetCode::service)
-             .to<SetCode>()
-             .setFlags(VerifySig::service, CodeRow::runModeRpc | CodeRow::isVerify)
-             .succeeded());
-   t.startBlock();
-   auto alice = t.addAccount("alice", aliceKeys.first);
-   auto trx   = t.signTransaction(t.makeTransaction({{alice, AccountNumber{"nop"}}}), {aliceKeys});
-   trx.proofs[0].clear();
-   CHECK(Result<void>{t.pushTransaction(trx)}.failed("signature invalid"));
-}

@@ -343,6 +343,7 @@ fn process_mod(
                     #psibase_mod::ServiceCaller {
                         sender: #psibase_mod::get_service(),
                         service: Self::#constant,
+                        flags: 0,
                     }
                     .into()
                 }
@@ -354,6 +355,7 @@ fn process_mod(
                     #psibase_mod::ServiceCaller {
                         sender: #psibase_mod::get_service(),
                         service,
+                        flags: 0,
                     }
                     .into()
                 }
@@ -365,6 +367,7 @@ fn process_mod(
                     #psibase_mod::ServiceCaller {
                         sender,
                         service: Self::#constant,
+                        flags: 0,
                     }
                     .into()
                 }
@@ -375,7 +378,18 @@ fn process_mod(
                     service: #psibase_mod::AccountNumber)
                 -> #actions<#psibase_mod::ServiceCaller>
                 {
-                    #psibase_mod::ServiceCaller { sender, service }.into()
+                    #psibase_mod::ServiceCaller { sender, service,
+                        flags: 0, }.into()
+                }
+
+                #[doc = #call_doc]
+                pub fn rpc() -> #actions<#psibase_mod::ServiceCaller> {
+                    #psibase_mod::ServiceCaller {
+                        sender: #psibase_mod::get_service(),
+                        service: Self::#constant,
+                        flags: 1,
+                    }
+                    .into()
                 }
 
                 #[doc = #push_doc]
@@ -853,7 +867,7 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
                 panic!("setRetval not supported in tester");
             }
             #[no_mangle]
-            pub unsafe extern "C" fn call(action: *const u8, len: u32) -> u32 {
+            pub unsafe extern "C" fn call(action: *const u8, len: u32, flags: u64) -> u32 {
                 panic!("call not supported in tester");
             }
             #[no_mangle]

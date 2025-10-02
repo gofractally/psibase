@@ -1,8 +1,10 @@
 #pragma once
 
+#include <psibase/block.hpp>
 #include <psibase/psibase.hpp>
+#include <psibase/time.hpp>
 #include <services/system/AuthSig.hpp>
-#include "psibase/time.hpp"
+#include <services/system/Transact.hpp>
 
 namespace SystemService
 {
@@ -11,18 +13,29 @@ namespace SystemService
       static constexpr auto service           = psibase::AccountNumber("credentials");
       static constexpr auto CREDENTIAL_SENDER = psibase::AccountNumber("cred-sys");
 
+      void init();
+
+      void canAuthUserSys(psibase::AccountNumber user);
+
+      void checkAuthSys(uint32_t                    flags,
+                        psibase::AccountNumber      requester,
+                        psibase::AccountNumber      sender,
+                        ServiceMethod               action,
+                        std::vector<ServiceMethod>  allowedActions,
+                        std::vector<psibase::Claim> claims);
+
       /// Creates a credential
       ///
       /// Parameters:
-      /// - `claim`: The credential claim (e.g. public key)
+      /// - `pubkey`: The credential public key
       /// - `expires`: The number of seconds until the credential expires
       ///
       /// This action is meant to be called inline by another service.
       /// The caller service is the credential issuer.
       ///
-      /// A transaction sent from the CREDENTIAL_SENDER account must have a proof for the
-      /// specified claim.
-      uint32_t create(SystemService::AuthSig::SubjectPublicKeyInfo claim,
+      /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
+      /// that matches the specified public key.
+      uint32_t create(SystemService::AuthSig::SubjectPublicKeyInfo pubkey,
                       std::optional<uint32_t>                      expires);
 
       /// Looks up the credential used to sign the active transaction, and consumes it.
@@ -35,8 +48,8 @@ namespace SystemService
       /// Gets the `expiry_date` of the specified credential
       std::optional<psibase::TimePointSec> get_expiry_date(uint32_t id);
 
-      /// Gets the `claim` of the specified credential
-      SystemService::AuthSig::SubjectPublicKeyInfo get_claim(uint32_t id);
+      /// Gets the `pubkey` of the specified credential
+      SystemService::AuthSig::SubjectPublicKeyInfo get_pubkey(uint32_t id);
 
       /// Deletes the specified credential.
       /// Can only be called by the credential's issuer.
@@ -45,10 +58,13 @@ namespace SystemService
 
    // clang-format off
    PSIO_REFLECT(Credentials,
-      method(create, claim, expires),
+      method(init),
+      method(canAuthUserSys, user),
+      method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+      method(create, pubkey, expires),
       method(consume_active),
       method(get_active),
-      method(get_claim, id),
+      method(get_pubkey, id),
       method(get_expiry_date, id),
       method(consume, id),
    );

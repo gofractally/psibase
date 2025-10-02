@@ -44,18 +44,18 @@ namespace psibase
       return ptr;
    }
 
-   std::vector<char> call(const char* action, uint32_t len)
+   std::vector<char> call(const char* action, uint32_t len, CallFlags flags)
    {
-      return getResult(raw::call(action, len));
+      return getResult(raw::call(action, len, flags));
    }
 
-   std::vector<char> call(psio::input_stream action)
+   std::vector<char> call(psio::input_stream action, CallFlags flags)
    {
-      return getResult(raw::call(action.pos, action.remaining()));
+      return getResult(raw::call(action.pos, action.remaining(), flags));
    }
 
-   std::vector<char> call(const Action& action)
+   std::vector<char> call(const Action& action, CallFlags flags)
    {
-      return call(psio::convert_to_frac(action));
+      return call(psio::convert_to_frac(action), flags);
    }
 }  // namespace psibase

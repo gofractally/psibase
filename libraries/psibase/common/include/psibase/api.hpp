@@ -21,6 +21,42 @@ namespace psibase
    template <typename T>
    concept NotOptional = std::is_base_of<std::false_type, psio::is_std_optional<T>>::value;
 
+   enum class CallFlags : std::uint64_t
+   {
+      none = 0,
+
+      /// Switch to RPC mode.
+      ///
+      /// On the block producer, save the result. On replay, skip execution
+      /// and return the same result as the block producer.
+      ///
+      /// Can only be used in a transaction.
+      ///
+      /// All services called during subjective execution will be instantiated
+      /// in a separate namespace. Thus, if a service is called normally and
+      /// also during subjective execution, it will be instantiated twice.
+      ///
+      /// It is unspecified whether services that have been used in earlier
+      /// subjective calls in the same transaction will be instantiated again.
+      runModeRpc = 1,
+
+      /// Switch to callback mode.
+      ///
+      /// On the block producer, save the result. On replay, suppress errors,
+      /// ignore the return value, and return the same result as the block
+      /// producer.
+      ///
+      /// Can only be used in a transaction.
+      ///
+      /// All services called during subjective execution will be instantiated
+      /// in a separate namespace. Thus, if a service is called normally and
+      /// also during subjective execution, it will be instantiated twice.
+      ///
+      /// It is unspecified whether services that have been used in earlier
+      /// subjective calls in the same transaction will be instantiated again.
+      runModeCallback = 2,
+   };
+
    // These use mangled names instead of extern "C" to prevent collisions
    // with other libraries.
    namespace raw
@@ -66,7 +102,7 @@ namespace psibase
       /// `action` must contain a fracpacked [Action].
       ///
       /// Use [getResult] to get result.
-      PSIBASE_NATIVE(call) uint32_t call(const char* action, uint32_t len);
+      PSIBASE_NATIVE(call) uint32_t call(const char* action, uint32_t len, CallFlags flags);
 
       /// Set the return value of the currently-executing action
       PSIBASE_NATIVE(setRetval) void setRetval(const char* retval, uint32_t len);
@@ -327,17 +363,17 @@ namespace psibase
    psio::shared_view_ptr<Action> getCurrentActionView();
 
    /// Call a service and return its result
-   std::vector<char> call(const Action& action);
+   std::vector<char> call(const Action& action, CallFlags flags = CallFlags::none);
 
    /// Call a service and return its result
    ///
    /// `action` must contain a fracpacked [Action].
-   std::vector<char> call(const char* action, uint32_t len);
+   std::vector<char> call(const char* action, uint32_t len, CallFlags flags = CallFlags::none);
 
    /// Call a service and return its result
    ///
    /// `action` must contain a fracpacked [Action].
-   std::vector<char> call(psio::input_stream action);
+   std::vector<char> call(psio::input_stream action, CallFlags flags = CallFlags::none);
 
    /// Set the return value of the currently-executing action
    template <typename T>

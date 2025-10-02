@@ -3,21 +3,48 @@ pub const CREDENTIAL_SENDER: &str = "cred-sys";
 #[crate::service(name = "credentials", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod service {
-    use crate::{services::auth_sig::SubjectPublicKeyInfo, TimePointSec};
+    use crate::{
+        services::auth_sig::SubjectPublicKeyInfo, services::transact::ServiceMethod, AccountNumber,
+        Claim, TimePointSec,
+    };
+
+    #[action]
+    fn init() {
+        unimplemented!()
+    }
+
+    #[allow(non_snake_case)]
+    #[action]
+    fn canAuthUserSys(user: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[allow(non_snake_case)]
+    #[action]
+    fn checkAuthSys(
+        flags: u32,
+        requester: AccountNumber,
+        sender: AccountNumber,
+        action: ServiceMethod,
+        allowedActions: Vec<ServiceMethod>,
+        claims: Vec<Claim>,
+    ) {
+        unimplemented!()
+    }
 
     /// Creates a credential
     ///
     /// Parameters:
-    /// - `claim`: The credential claim (e.g. public key)
+    /// - `pubkey`: The credential public key
     /// - `expires`: The number of seconds until the credential expires
     ///
     /// This action is meant to be called inline by another service.
     /// The caller service is the credential issuer.
     ///
-    /// A transaction sent from the CREDENTIAL_SENDER account must have a proof for the
-    /// specified claim.
+    /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
+    /// that matches the specified public key.
     #[action]
-    fn create(claim: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
+    fn create(pubkey: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
         unimplemented!()
     }
 
@@ -28,9 +55,9 @@ pub mod service {
         unimplemented!()
     }
 
-    /// Gets the `claim` of the specified credential
+    /// Gets the `pubkey` of the specified credential
     #[action]
-    fn get_claim(id: u32) -> SubjectPublicKeyInfo {
+    fn get_pubkey(id: u32) -> SubjectPublicKeyInfo {
         unimplemented!()
     }
 
@@ -52,4 +79,9 @@ pub mod service {
     fn consume(id: u32) {
         unimplemented!()
     }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
 }

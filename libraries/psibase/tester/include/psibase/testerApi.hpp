@@ -49,7 +49,12 @@ namespace psibase::tester::raw
                             std::uint32_t args_packed_size);
    TESTER_NATIVE(socketRecv) std::uint32_t socketRecv(std::int32_t fd, std::size_t* size);
    TESTER_NATIVE(shutdownChain) void shutdownChain(uint32_t chain);
-   TESTER_NATIVE(startBlock) void startBlock(std::uint32_t chain_index, std::int64_t time_us);
+   TESTER_NATIVE(startBlock)
+   void startBlock(std::uint32_t chain_index,
+                   std::int64_t  time_us,
+                   std::uint64_t producer,
+                   TermNum       term,
+                   BlockNum      commitNum);
 
    [[noreturn]]
    TESTER_NATIVE(abortMessage) void abortMessage(const char* message, std::uint32_t len);

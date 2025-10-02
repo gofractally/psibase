@@ -19,6 +19,7 @@ impl StagedTxPolicy {
             service_caller: ServiceCaller {
                 sender: Wrapper::SERVICE,
                 service: get_auth_service(user)?,
+                flags: 0,
             },
         })
     }

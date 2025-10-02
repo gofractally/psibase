@@ -34,7 +34,7 @@ std::uint32_t psibase::raw::getCurrentAction()
    psibase::abortMessage("Tester does not support getCurrentAction");
 }
 
-std::uint32_t psibase::raw::call(const char* action, std::uint32_t len)
+std::uint32_t psibase::raw::call(const char* action, std::uint32_t len, CallFlags flags)
 {
    psibase::abortMessage("Tester does not support call");
 }

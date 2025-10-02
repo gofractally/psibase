@@ -59,8 +59,11 @@ namespace UserService
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
+
+      /// Forwards to event-index::sync
+      void sync();
    };
-   PSIO_REFLECT(EventConfig, method(addIndex, db, service, event, column))
+   PSIO_REFLECT(EventConfig, method(addIndex, db, service, event, column), method(sync))
    PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables)
 
    using Events = EventConfig;

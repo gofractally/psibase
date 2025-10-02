@@ -15,9 +15,8 @@ use exports::host::crypto::keyvault::Guest as KeyVault;
 use trust::*;
 
 // Third-party crates
-use p256::ecdsa::{SigningKey, VerifyingKey};
-use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
-use rand_core::OsRng;
+use p256::ecdsa::SigningKey;
+use p256::pkcs8::{DecodePrivateKey, EncodePublicKey, LineEnding};
 
 psibase::define_trust! {
     descriptions {
@@ -45,16 +44,8 @@ impl KeyVault for HostCrypto {
     fn generate_unmanaged_keypair() -> Result<Keypair, HostTypes::Error> {
         assert_authorized(FunctionName::generate_unmanaged_keypair)?;
 
-        let signing_key = SigningKey::random(&mut OsRng);
-        let verifying_key: &VerifyingKey = signing_key.verifying_key();
-
-        let private_key = signing_key
-            .to_pkcs8_pem(LineEnding::LF)
-            .map_err(|e| CryptoError(e.to_string()))?
-            .to_string();
-        let public_key = verifying_key
-            .to_public_key_pem(LineEnding::LF)
-            .map_err(|e| CryptoError(e.to_string()))?;
+        let (public_key, private_key) =
+            psibase::generate_keypair().map_err(|e| CryptoError(e.to_string()))?;
 
         Ok(Keypair {
             public_key,

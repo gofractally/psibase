@@ -347,6 +347,9 @@ namespace SystemService
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
+      /// Returns true if running a transaction
+      bool isTransaction() const;
+
       /// Get the current block header
       psibase::BlockHeader currentBlock() const;
 
@@ -373,6 +376,7 @@ namespace SystemService
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
                 method(getTransaction),
+                method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime))
