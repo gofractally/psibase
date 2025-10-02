@@ -1,15 +1,10 @@
-import type { Token } from "./hooks/tokensPlugin/useBalances";
-import type { Quantity } from "./lib/quantity";
-import type { SelectOption } from "@shared/components/form/internal/select-field";
+import type { SharedBalance, Token } from "./hooks/tokensPlugin/useBalances";
 
 import { CreditTable } from "@/apps/tokens/components/credit-table";
 import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { updateBalanceCache } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { Icon as SelectIcon } from "@radix-ui/react-select";
-import { useStore } from "@tanstack/react-form";
-import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { supervisor } from "@/supervisor";
@@ -17,14 +12,13 @@ import { supervisor } from "@/supervisor";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Account } from "@/lib/zod/Account";
 
-import { Avatar } from "@shared/components/avatar";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { AnimateNumber } from "./components/AnimateNumber";
+import { TokenSelector } from "./components/token-selector";
 import { useCredit } from "./hooks/tokensPlugin/useCredit";
 import {
     defaultTransferValues,
@@ -35,33 +29,70 @@ import {
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
     const { data, isLoading: isLoadingBalances } = useBalances(currentUserData);
-    const { mutateAsync: credit } = useCredit();
 
     const currentUser = isSuccess ? currentUserData : null;
 
     const sharedBalances = data ? data.sharedBalances : [];
     const tokens = useMemo(() => (data ? data.tokens : []), [data]);
-    const isLoading = !isSuccess || isLoadingBalances;
+
+    const isNoTokens = currentUser && tokens.length == 0;
+
+    return (
+        <div className="p-4">
+            <div className="mx-auto max-w-screen-md">
+                {isNoTokens ? (
+                    <NoTokensWarning />
+                ) : (
+                    <TokensPageContent
+                        tokens={tokens}
+                        currentUser={currentUser}
+                        isLoading={!isSuccess || isLoadingBalances}
+                        sharedBalances={sharedBalances}
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
+const TokensPageContent = ({
+    tokens,
+    currentUser,
+    isLoading,
+    sharedBalances,
+}: {
+    tokens: Token[];
+    currentUser: string | null;
+    isLoading: boolean;
+    sharedBalances: SharedBalance[];
+}) => {
+    const { mutateAsync: credit } = useCredit();
+
+    const [selectedTokenId, setSelectedTokenId] = useState<string>(
+        tokens[0].id.toString(),
+    );
 
     const handleConfirm = async ({
         value,
     }: {
         value: typeof defaultTransferValues;
     }) => {
-        try {
-            // Pad with 0 if the amount string starts with a dot (e.g., ".01" -> "0.01")
-            const paddedAmount = value.amount.amount.startsWith(".")
-                ? "0" + value.amount.amount
-                : value.amount.amount;
+        // Pad with 0 if the amount string starts with a dot (e.g., ".01" -> "0.01")
+        const paddedAmount = value.amount.amount.startsWith(".")
+            ? "0" + value.amount.amount
+            : value.amount.amount;
 
-            updateBalanceCache(
-                Account.parse(currentUser),
-                value.token,
-                paddedAmount,
-                "Subtract",
-            );
+        // Optimistically update the balance
+        updateBalanceCache(
+            Account.parse(currentUser),
+            selectedTokenId,
+            paddedAmount,
+            "Subtract",
+        );
+
+        try {
             await credit({
-                tokenId: value.token,
+                tokenId: selectedTokenId,
                 receiver: value.to.account,
                 amount: paddedAmount,
                 memo: value.memo,
@@ -78,6 +109,13 @@ export const TokensPage = () => {
 
             setTransferModal(false);
         } catch (e) {
+            // Rollback optimistic update on error
+            updateBalanceCache(
+                Account.parse(currentUser),
+                selectedTokenId,
+                paddedAmount,
+                "Add",
+            );
             toast("Error", {
                 description:
                     e instanceof Error
@@ -97,7 +135,6 @@ export const TokensPage = () => {
 
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
-    const selectedTokenId = useStore(form.store, (state) => state.values.token);
     const selectedToken = tokens.find(
         (balance) => balance.id == Number(selectedTokenId),
     );
@@ -109,9 +146,7 @@ export const TokensPage = () => {
             return;
         }
     }, [form, selectedTokenId, tokens]);
-
-    const isNoTokens = currentUser && tokens.length == 0;
-    const disableForm = isNoTokens || isLoading;
+    const disableForm = !currentUser || isLoading;
 
     const onSubmitPreflight = async (
         e: React.MouseEvent<HTMLButtonElement>,
@@ -137,175 +172,97 @@ export const TokensPage = () => {
         form.validateField("amount.amount", "change");
     };
 
-    return (
-        <div className="p-4">
-            <div className="mx-auto max-w-screen-md">
-                {isNoTokens ? (
-                    <NoTokensWarning />
-                ) : (
-                    <>
-                        <form.AppForm>
-                            <form className="space-y-4">
-                                <GlowingCard>
-                                    <TransferModal
-                                        form={form}
-                                        onClose={() => setTransferModal(false)}
-                                        open={isTransferModalOpen}
-                                        selectedToken={selectedToken}
-                                        onSubmit={form.handleSubmit}
-                                    />
-                                    <CardContent className="@container space-y-2">
-                                        <div className="@lg:flex-row flex flex-1 flex-col items-center justify-between gap-2">
-                                            <form.AppField
-                                                name="token"
-                                                listeners={{
-                                                    onChange: () => {
-                                                        form.setFieldMeta(
-                                                            "amount.amount",
-                                                            (prev) => ({
-                                                                ...prev,
-                                                                errors: [],
-                                                                errorMap: {},
-                                                            }),
-                                                        );
-                                                    },
-                                                }}
-                                                children={(field) => {
-                                                    return (
-                                                        <field.SelectField
-                                                            options={tokens.map(
-                                                                (token) => ({
-                                                                    value: {
-                                                                        id: token.id.toString(),
-                                                                        balance:
-                                                                            token.balance,
-                                                                    },
-                                                                    label: token.label,
-                                                                }),
-                                                            )}
-                                                            keyExtractor={(
-                                                                option,
-                                                            ) =>
-                                                                option.value.id
-                                                            }
-                                                            TriggerComponent={
-                                                                <TokenSelectTrigger
-                                                                    selectedToken={
-                                                                        selectedToken
-                                                                    }
-                                                                />
-                                                            }
-                                                            OptionComponent={
-                                                                TokenSelectOption
-                                                            }
-                                                        />
-                                                    );
-                                                }}
-                                            />
-                                            <AvailableBalance
-                                                selectedToken={selectedToken}
-                                                onClick={handleSetMaxAmount}
-                                            />
-                                        </div>
-                                    </CardContent>
-                                </GlowingCard>
-                                <GlowingCard>
-                                    <CardContent className="space-y-4">
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <FieldAccountExisting
-                                                form={form}
-                                                fields="to"
-                                                label="Recipient"
-                                                description={undefined}
-                                                placeholder="Account"
-                                                disabled={disableForm}
-                                                supervisor={supervisor}
-                                            />
-                                            <FieldTokenAmount
-                                                form={form}
-                                                fields="amount"
-                                                precision={
-                                                    selectedToken?.precision ??
-                                                    0
-                                                }
-                                                balance={
-                                                    selectedToken?.balance
-                                                        ?.amount ?? 0
-                                                }
-                                                disabled={disableForm}
-                                                description={null}
-                                                onMaxAmountClick={
-                                                    handleSetMaxAmount
-                                                }
-                                            />
-                                        </div>
-                                        <form.AppField
-                                            name="memo"
-                                            children={(field) => (
-                                                <field.TextField
-                                                    disabled={disableForm}
-                                                    label="Memo (optional)"
-                                                    placeholder="Add a note about this transfer"
-                                                />
-                                            )}
-                                            validators={{
-                                                onChange: zTransferFormMemo,
-                                            }}
-                                        />
-                                        {!isTransferModalOpen && (
-                                            <div className="flex justify-end">
-                                                <form.SubmitButton
-                                                    labels={[
-                                                        "Send",
-                                                        "Sending...",
-                                                    ]}
-                                                    onClick={onSubmitPreflight}
-                                                />
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </GlowingCard>
-                            </form>
-                        </form.AppForm>
-                        <div className="my-4">
-                            <CreditTable
-                                isLoading={isLoading}
-                                user={currentUser}
-                                balances={sharedBalances}
-                            />
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-};
+    const clearAmountErrors = () => {
+        form.setFieldMeta("amount.amount", (prev) => ({
+            ...prev,
+            errors: [],
+            errorMap: {},
+        }));
+    };
 
-const TokenSelectOption = ({
-    option,
-}: {
-    option: SelectOption<{ id: string; balance?: Quantity }>;
-}) => {
     return (
-        <div className="flex min-w-56 items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-                <Avatar
-                    account={option.label}
-                    type="glass"
-                    className="size-5"
+        <>
+            <form.AppForm>
+                <form className="space-y-4">
+                    <GlowingCard>
+                        <TransferModal
+                            form={form}
+                            onClose={() => setTransferModal(false)}
+                            open={isTransferModalOpen}
+                            selectedToken={selectedToken}
+                            onSubmit={form.handleSubmit}
+                        />
+                        <CardContent className="@container space-y-2">
+                            {!isLoading && (
+                                <TokenSelector
+                                    tokens={tokens}
+                                    selectedToken={selectedToken}
+                                    onChange={(tokenId) => {
+                                        setSelectedTokenId(tokenId);
+                                        clearAmountErrors();
+                                    }}
+                                    onClickAvailableBalance={handleSetMaxAmount}
+                                />
+                            )}
+                        </CardContent>
+                    </GlowingCard>
+                    <GlowingCard>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <FieldAccountExisting
+                                    form={form}
+                                    fields="to"
+                                    label="Recipient"
+                                    description={undefined}
+                                    placeholder="Account"
+                                    disabled={disableForm}
+                                    supervisor={supervisor}
+                                />
+                                <FieldTokenAmount
+                                    form={form}
+                                    fields="amount"
+                                    precision={selectedToken?.precision ?? 0}
+                                    balance={
+                                        selectedToken?.balance?.amount ?? 0
+                                    }
+                                    disabled={disableForm}
+                                    description={null}
+                                    onMaxAmountClick={handleSetMaxAmount}
+                                />
+                            </div>
+                            <form.AppField
+                                name="memo"
+                                children={(field) => (
+                                    <field.TextField
+                                        disabled={disableForm}
+                                        label="Memo (optional)"
+                                        placeholder="Add a note about this transfer"
+                                    />
+                                )}
+                                validators={{
+                                    onChange: zTransferFormMemo,
+                                }}
+                            />
+                            {!isTransferModalOpen && (
+                                <div className="flex justify-end">
+                                    <form.SubmitButton
+                                        labels={["Send", "Sending..."]}
+                                        onClick={onSubmitPreflight}
+                                    />
+                                </div>
+                            )}
+                        </CardContent>
+                    </GlowingCard>
+                </form>
+            </form.AppForm>
+            <div className="my-4">
+                <CreditTable
+                    isLoading={isLoading}
+                    user={currentUser}
+                    balances={sharedBalances}
                 />
-                <span className="font-mono text-lg font-medium">
-                    {option.label}
-                </span>
             </div>
-            <div>
-                <span className="text-muted-foreground text-xs">
-                    {option.value.balance?.format({
-                        includeLabel: false,
-                    })}
-                </span>
-            </div>
-        </div>
+        </>
     );
 };
 
@@ -316,44 +273,6 @@ const GlowingCard = ({ children }: { children: React.ReactNode }) => {
             <Card className="relative z-10 border-gray-300 transition-colors duration-300 hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-700">
                 {children}
             </Card>
-        </div>
-    );
-};
-
-const TokenSelectTrigger = ({ selectedToken }: { selectedToken?: Token }) => {
-    const tokenLabel = selectedToken?.label ?? "UNKNOWN";
-
-    return (
-        <div className="flex select-none items-center gap-2 p-1">
-            <Avatar account={tokenLabel} type="glass" />
-            <span className="font-mono text-3xl font-medium">{tokenLabel}</span>
-            <SelectIcon asChild>
-                <ChevronDown className="size-4 opacity-50" />
-            </SelectIcon>
-        </div>
-    );
-};
-
-const AvailableBalance = ({
-    selectedToken,
-    onClick,
-}: {
-    selectedToken?: Token;
-    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}) => {
-    return (
-        <div className="@lg:items-end flex flex-col items-center">
-            <span className="text-foreground/75 select-none text-xs font-medium">
-                Available
-            </span>
-            <span className="text-foreground/90 font-mono text-xl font-medium">
-                <AnimateNumber
-                    n={selectedToken?.balance?.amount ?? 0}
-                    precision={selectedToken?.balance?.precision ?? 0}
-                    className="hover:cursor-pointer hover:underline"
-                    onClick={onClick}
-                />
-            </span>
         </div>
     );
 };

@@ -1,23 +1,13 @@
-import { Trigger } from "@radix-ui/react-select";
+import type { SelectOption } from "@shared/shadcn/custom/select";
 
 import { cn } from "@shared/lib/utils";
+import { CustomSelect } from "@shared/shadcn/custom/select";
 import { Label } from "@shared/shadcn/ui/label";
-import {
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-    Select as ShadcnSelect,
-} from "@shared/shadcn/ui/select";
 
 import { useFieldContext } from "../app-form";
 import { FieldErrors } from "./field-errors";
 
-export interface SelectOption<T = string> {
-    value: T;
-    label: string;
-    disabled?: boolean;
-}
+export type { SelectOption };
 
 interface Props<T = string> {
     options: SelectOption<T>[];
@@ -37,12 +27,12 @@ interface Props<T = string> {
 export const SelectField = <T = string,>({
     options,
     label,
-    placeholder = "Select an option",
-    disabled = false,
+    placeholder,
+    disabled,
     className,
     TriggerComponent,
     OptionComponent,
-    keyExtractor = (option: SelectOption<T>) => String(option.value),
+    keyExtractor,
 }: Props<T>) => {
     const field = useFieldContext<T>();
 
@@ -58,42 +48,19 @@ export const SelectField = <T = string,>({
                     {label}
                 </Label>
             )}
-            <ShadcnSelect
+            <CustomSelect<T>
+                options={options}
+                keyExtractor={keyExtractor}
+                TriggerComponent={TriggerComponent}
+                OptionComponent={OptionComponent}
                 value={field.state.value?.toString()}
-                onValueChange={(value) => {
-                    // Convert back to the original type
-                    const convertedValue =
-                        typeof keyExtractor(options[0]) === "number"
-                            ? (Number(value) as T)
-                            : (value as T);
-                    field.handleChange(convertedValue);
+                onChange={(value) => {
+                    field.handleChange(value as T);
                 }}
                 disabled={disabled}
-            >
-                {TriggerComponent ? (
-                    <Trigger
-                        data-slot="select-trigger"
-                        className="focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex w-fit rounded-md outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {TriggerComponent}
-                    </Trigger>
-                ) : (
-                    <SelectTrigger className={className} id={field.name}>
-                        <SelectValue placeholder={placeholder} />
-                    </SelectTrigger>
-                )}
-                <SelectContent>
-                    {options.map((option) => (
-                        <SelectItem
-                            key={keyExtractor(option)}
-                            value={keyExtractor(option)}
-                            disabled={option.disabled}
-                        >
-                            {OptionComponent?.({ option }) ?? option.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </ShadcnSelect>
+                className={className}
+                placeholder={placeholder}
+            />
             <FieldErrors meta={field.state.meta} />
         </div>
     );
