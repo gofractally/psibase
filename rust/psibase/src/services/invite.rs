@@ -45,12 +45,12 @@ mod service {
     /// Returns the ID of the newly created invite
     ///
     /// Parameters:
-    /// - `id` is the id of the invite (randomly generated)
-    /// - `inviteKey` is the public key of the invite.
-    /// - `numAccounts` is the number of accounts this invite can be used to create.
-    /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller the
-    ///   invite is updated.
-    /// - `secret` is an encrypted secret used to redeem the invite.
+    /// - `inviteId` is the id of the invite (could be randomly generated)
+    /// - `inviteKey` is the public key of the invite
+    /// - `numAccounts` is the number of accounts this invite can be used to create
+    /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
+    ///    the invite is updated
+    /// - `secret` is an encrypted secret used to redeem the invite
     ///
     /// If `useHooks` is true, the caller must be an account with a service deployed on it
     /// that implements the InviteHooks interface.
@@ -65,20 +65,22 @@ mod service {
         unimplemented!()
     }
 
-    /// Called directly by an invite credential (not an account) to create the specified
-    /// account which is authorized by the specified public key.
+    /// Called by an invite credential (not a user account) to create the specified
+    /// account. The new account is authorized by the specified public key.
     #[action]
     fn createAccount(account: AccountNumber, accountKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
-    
-    /// Called by existing accounts to accept an invite without creating a new account
+
+    /// The sender accepts an invite.
+    /// Calling this action also requires that the sender authorizes the transaction with the
+    /// proof for the credential associated with an invite.
     #[action]
     fn accept() {
         unimplemented!()
     }
 
-    /// Delete the invite.
+    /// Delete the invite and its secret (if applicable).
     /// Can only be called by the invite creator.
     #[action]
     fn delInvite(inviteId: u32) {
