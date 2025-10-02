@@ -42,7 +42,7 @@ interface with-key {
     use host:types/types.{error};
     use types.{key};
 
-    /// Encrypts data using the provided 32-byte key.
+    /// Encrypts data using a key.
     /// 
     /// Arguments:
     /// - key: The key to use for encryption
@@ -52,7 +52,7 @@ interface with-key {
     /// - The encrypted data
     encrypt: func(key: key, data: list<u8>) -> list<u8>;
 
-    /// Decrypts data using the provided 32-byte key.
+    /// Decrypts data using a key.
     /// 
     /// Arguments:
     /// - key: The key to use for decryption
