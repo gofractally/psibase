@@ -10,6 +10,16 @@ pub const PRODUCER_ACCOUNT_STRONG: AccountNumber = account!("prods-strong");
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim, ConsensusData, Producer};
+    use crate::{Pack, ToSchema, Unpack};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct CandidateInfo {
+        pub account: AccountNumber,
+        pub endpoint: String,
+        pub claim: Claim,
+    }
 
     #[action]
     fn setConsensus(prods: ConsensusData) {
@@ -18,6 +28,11 @@ mod service {
 
     #[action]
     fn setProducers(prods: Vec<Producer>) {
+        unimplemented!();
+    }
+
+    #[action]
+    fn regCandidate(endpoint: String, claim: Claim) {
         unimplemented!();
     }
 
