@@ -33,9 +33,16 @@ jobs:
         uses: actions/cache@v3
         with:
           path: .caches
-          key: $ubuntu-${{ matrix.ubuntu-version }}-caches-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
+          key: ubuntu-${{ matrix.ubuntu-version }}-caches-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            $ubuntu-${{ matrix.ubuntu-version }}-caches-
+            ubuntu-${{ matrix.ubuntu-version }}-caches-
+      - name: Preserve Rust artifacts
+        uses: actions/cache@v3
+        with:
+          path: build/rust
+          key: ubuntu-${{ matrix.ubuntu-version }}-rust-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ubuntu-${{ matrix.ubuntu-version }}-rust-
       - name: Build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
       - name: Publish packages
