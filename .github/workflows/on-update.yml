@@ -16,5 +16,7 @@ jobs:
   build:
     name: Run Builds
     uses: ./.github/workflows/ubuntu-builder.yml
+    with:
+      all-platforms: ${{ github.event_name == 'push' }} # Only on pushes to main/release
     secrets:
       publish-package-login: ${{ github.ref == 'refs/heads/main' && secrets.PUBLISH_PACKAGE_LOGIN || null }}
