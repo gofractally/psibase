@@ -7,7 +7,7 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import { Account } from "@/lib/zod/Account";
 
-const AppSchema = z
+export const AppSchema = z
     .object({
         title: z.string(),
         description: z.string(),
@@ -25,7 +25,7 @@ type App = z.infer<typeof AppSchema>;
 const apps: App[] = [
     {
         title: "Tokens",
-        description: "Create, burn and send tokens.",
+        description: "Send tokens and manage balances.",
         icon: <Coins className="h-6 w-6" />,
         service: Account.parse("tokens"),
     },
