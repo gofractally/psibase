@@ -52,11 +52,14 @@ export const useSetSchedule = () =>
             });
         },
         onSuccess: (_, params) => {
-            const { fractal } = zParams.parse(params);
+            const { fractal, guildSlug } = zParams.parse(params);
 
             setDefaultMembership(fractal, assertUser());
             queryClient.refetchQueries({
                 queryKey: QueryKey.fractal(fractal),
+            });
+            queryClient.refetchQueries({
+                queryKey: QueryKey.guildBySlug(fractal, guildSlug),
             });
 
             toast.success("Schedule updated");

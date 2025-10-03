@@ -14,6 +14,8 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 const formatScore = (num: number): string => {
     // Would it be neat to make the score a flat integer out of 100?
@@ -24,7 +26,9 @@ export const AllMembers = () => {
     const currentFractal = useFractalAccount();
 
     const { data: members } = useMembers(currentFractal);
-    const { data: scores } = useScores();
+    const guildSlug = useGuildSlug()
+    const { data: guild } = useGuildBySlug(currentFractal, guildSlug)
+    const { data: scores } = useScores(guild?.evalInstance?.evaluationId);
 
     const sortedMembers = (members || [])
         .map((member) => {
@@ -34,7 +38,7 @@ export const AllMembers = () => {
             );
             return {
                 ...member,
-                score: score ? score.value : 0,
+                score: score ? score.score : 0,
             };
         })
         .sort((a, b) => b.score - a.score);

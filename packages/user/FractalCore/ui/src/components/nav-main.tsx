@@ -1,8 +1,10 @@
 import {
-    CalendarClock,
+    Calendar,
+    CalendarArrowDownIcon,
     Contact,
     LucideIcon,
     Search,
+    SettingsIcon,
     Users,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -15,8 +17,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
-import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 interface MenuItem {
     groupLabel: string;
@@ -32,7 +33,8 @@ interface MenuItem {
     }
 }
 
-const browseMenu: MenuItem[] = [
+
+export const staticFractalMenus: MenuItem[] = [
     {
         groupLabel: "Global",
         path: "",
@@ -42,57 +44,67 @@ const browseMenu: MenuItem[] = [
                 icon: Search,
                 path: "",
             },
+
         ],
     },
 ];
 
-export const staticFractalMenus: MenuItem[] = [
-    {
-        groupLabel: "Membership",
-        path: "membership",
-        menus: [
-            {
-                title: "My membership",
-                icon: Contact,
-                path: "",
-            },
-            {
-                title: "All members",
-                icon: Users,
-                path: "members",
-            },
-        ],
-    },
-
-] as const;
 
 export function NavMain() {
     const location = useLocation();
 
-    const fractalName = useFractalAccount();
+    const guildSlug = useGuildSlug();
 
-    const { data } = useFractal();
-
-    const dynamic: MenuItem | undefined = data ?
+    const guildMenus: MenuItem[] = [
         {
-            groupLabel: "Guilds",
-            path: "guild",
-            menus: data!.guilds.nodes.map(guild => ({
-                title: guild.displayName,
-                icon: CalendarClock,
-                path: guild.id.toString(),
-            }))
-        }
-        : undefined;
+            groupLabel: "Membership",
+            path: `/guild/${guildSlug}`,
+            menus: [
+                {
+                    title: "My membership",
+                    icon: Contact,
+                    path: '',
+                },
+                {
+                    title: "All Members",
+                    icon: Users,
+                    path: 'members'
+                },
+            ],
+        },
+        {
+            groupLabel: "Evaluations",
+            path: `/guild/${guildSlug}`,
+            menus: [
+                {
+                    title: "Active & Upcoming",
+                    icon: Calendar,
+                    path: "evaluations"
+                },
+                {
+                    title: "Completed",
+                    icon: CalendarArrowDownIcon,
+                    path: "evaluations/completed"
+                }
+            ]
+        },
+        {
+            groupLabel: "Governance",
+            path: `/guild/${guildSlug}`,
+            menus: [
+                {
+                    title: "Settings",
+                    icon: SettingsIcon,
+                    path: 'settings',
+                },
 
-    const fractalMenus: MenuItem[] = [
-        ...staticFractalMenus,
-        ...(dynamic ? [dynamic] : []),
-    ]
+            ],
+        },
+    ];
 
-    const isBrowse = !location.pathname.startsWith("/fractal");
+    const isBrowse = !location.pathname.startsWith("/guild");
 
-    const menus = isBrowse ? browseMenu : fractalMenus;
+    const menus = isBrowse ? staticFractalMenus : guildMenus;
 
     return (
         <>
@@ -105,7 +117,7 @@ export function NavMain() {
                                 to={
                                     isBrowse
                                         ? item.path
-                                        : `/fractal/${fractalName}/${item.path}/${menu.path}`
+                                        : `${item.path}/${menu.path}`
                                 }
                                 end
                             >

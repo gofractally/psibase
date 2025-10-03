@@ -28,7 +28,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     disabled={isUnregistering}
                     onClick={() => {
                         unregister({
-                            evaluationId: guild!.evalInstance.evaluationId,
+                            evaluationId: guild!.evalInstance!.evaluationId,
                             guildSlug: guildSlug!,
 
                         });

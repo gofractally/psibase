@@ -9,9 +9,12 @@ export const zGuild = z.object({
     displayName: z.string(),
     council: zAccount.array(),
     rep: z.object({ member: zAccount }).nullable(),
-    evalInstance: z.object({
-        evaluationId: z.number().int(),
-    }),
+    evalInstance: z
+        .object({
+            evaluationId: z.number().int(),
+            interval: z.number().int(),
+        })
+        .nullable(),
     bio: z.string(),
 });
 
@@ -26,6 +29,7 @@ export const getGuildBySlug = async (fractal: Account, slug: Account) => {
                 }
                 evalInstance {
                     evaluationId
+                    interval
                 }
                 council
                 bio

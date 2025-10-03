@@ -13,12 +13,28 @@ import {
 } from "@shared/shadcn/ui/dialog";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 
 interface Props {
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
     trigger?: React.ReactNode;
     disabled?: boolean;
+}
+interface FormValues {
+    register: Date;
+    registerSeconds: number;
+    deliberationSeconds: number;
+    submissionSeconds: number;
+    intervalSeconds: number;
+};
+
+const defaultData: FormValues = {
+    register: new Date(),
+    registerSeconds: 60 * 15,
+    deliberationSeconds: 60 * 45,
+    submissionSeconds: 60 * 10,
+    intervalSeconds: 86400 * 7,
 }
 
 export const ScheduleDialog = ({
@@ -32,14 +48,18 @@ export const ScheduleDialog = ({
     const fractal = useFractalAccount();
     const guildSlug = useGuildSlug();
 
+    const { evaluation, guild, isPending } = useEvaluationInstance();
+
+    const defaultValues: FormValues = evaluation ? {
+        intervalSeconds: guild?.evalInstance?.interval || defaultData.intervalSeconds,
+        register: new Date(evaluation.registrationStarts * 1000),
+        deliberationSeconds: evaluation.submissionStarts - evaluation.deliberationStarts,
+        registerSeconds: evaluation.deliberationStarts - evaluation.registrationStarts,
+        submissionSeconds: evaluation.finishBy - evaluation.submissionStarts
+    } : defaultData
+
     const form = useAppForm({
-        defaultValues: {
-            register: new Date(),
-            registerSeconds: 60 * 15,
-            deliberationSeconds: 60 * 45,
-            submissionSeconds: 60 * 10,
-            intervalSeconds: 86400 * 7,
-        },
+        defaultValues,
         validators: {
             onSubmitAsync: async ({
                 value: {
@@ -86,7 +106,7 @@ export const ScheduleDialog = ({
                         }}
                         disabled={disabled}
                     >
-                        Schedule
+                        {isPending ? "Loading" : evaluation ? "Update schedule" : "Set new schedule"}
                     </Button>
                 )}
             </DialogTrigger>

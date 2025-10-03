@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 
 import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
-import { Guild } from "./pages/fractal/guild";
+import { Settings } from "./pages/settings";
 
 export const router = createBrowserRouter([
 
@@ -36,52 +36,64 @@ export const router = createBrowserRouter([
             },
             {
                 path: "/guild/:guildSlug",
-                element: (
-                    <ProtectedRoute>
-                        <Guild />
-                    </ProtectedRoute>
-                ),
+                children: [
+                    {
+                        path: "",
+                        element: <ProtectedRoute>
+                            <MyMembership />
+                        </ProtectedRoute>
+                    },
+                    {
+                        path: "members",
+                        element: (
+                            <ProtectedRoute>
+                                <AllMembers />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "evaluations",
+                        element: (
+                            <ProtectedRoute>
+                                <ActiveAndUpcoming />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "evaluations/completed",
+                        element: (
+                            <ProtectedRoute>
+                                <Completed />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "evaluations/completed/:evaluationId",
+                        element: (
+                            <ProtectedRoute>
+                                <EvaluationResult />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "evaluations/group/:groupNumber",
+                        element: (
+                            <ProtectedRoute>
+                                <EvaluationDeliberation />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "settings",
+                        element: (
+                            <ProtectedRoute>
+                                <Settings />
+                            </ProtectedRoute>
+                        ),
+                    },
+                ]
             },
-            {
-                path: "/membership/members",
-                element: (
-                    <ProtectedRoute>
-                        <AllMembers />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "/evaluations",
-                element: (
-                    <ProtectedRoute>
-                        <ActiveAndUpcoming />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "/evaluations/completed",
-                element: (
-                    <ProtectedRoute>
-                        <Completed />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "/evaluations/completed/:evaluationId",
-                element: (
-                    <ProtectedRoute>
-                        <EvaluationResult />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "/evaluations/:evaluationId/group/:groupNumber",
-                element: (
-                    <ProtectedRoute>
-                        <EvaluationDeliberation />
-                    </ProtectedRoute>
-                ),
-            },
+
         ],
     },
 ]);

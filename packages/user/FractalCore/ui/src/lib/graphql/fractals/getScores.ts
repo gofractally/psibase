@@ -8,8 +8,8 @@ export const zScore = z.object({
     fractal: zAccount,
     guild: z.number().int(),
     member: zAccount,
-    value: z.number(),
-    pending: z.number().nullable(),
+    score: z.number(),
+    pendingScore: z.number().nullable(),
 });
 
 export type Score = z.infer<typeof zScore>;
@@ -23,8 +23,8 @@ export const getScores = async (guildId: number) => {
                 fractal
                 guild
                 member
-                value
-                pending
+                score
+                pendingScore
             } 
         }
     }`,

@@ -6,14 +6,18 @@ import { useFractalAccount } from "./use-fractal-account";
 export const useEvaluationInstance = () => {
     const fractalAccount = useFractalAccount();
     const guildSlug = useGuildSlug();
-    const { data: guild } = useGuildBySlug(fractalAccount, guildSlug);
+    const { data: guild, isPending: isPendingGuild } = useGuildBySlug(
+        fractalAccount,
+        guildSlug,
+    );
 
-    const { data: evaluation } = useEvaluation(
+    const { data: evaluation, isPending: isPendingEval } = useEvaluation(
         guild?.evalInstance?.evaluationId,
     );
 
     return {
         evaluation,
         guild,
+        isPending: isPendingGuild || isPendingEval,
     };
 };
