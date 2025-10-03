@@ -88,7 +88,7 @@ class TestCrash(unittest.TestCase):
         c.connect(a)
 
         # stop and restart c
-        c.shutdown()
+        c.shutdown();
         c.start()
 
         a.connect(c)
@@ -142,11 +142,7 @@ class TestCrash(unittest.TestCase):
         keys = []
         for p in prods:
             device = p.unlock_softhsm()
-            with p.post(
-                '/native/admin/keys',
-                service='x-admin',
-                json={'service': 'verify-sig', 'device': device},
-            ) as reply:
+            with p.post('/native/admin/keys', service='x-admin', json={'service': 'verify-sig', 'device': device}) as reply:
                 reply.raise_for_status()
                 keys.append({'name': p.producer, 'auth': reply.json()[0]})
 
