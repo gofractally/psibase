@@ -258,8 +258,6 @@ add_manpage(psibase)
 add_manpage(psibase-create-snapshot)
 add_manpage(psibase-load-snapshot)
 
-# cargo-psibase is built individually with shared cache
-
 include(web-apps.cmake)
 
 # Static (not built) resource dependencies
@@ -1164,7 +1162,6 @@ psibase_package(
 
 write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket XSocketList)
 
-# psibase is built individually with shared cache
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 
 option(BUILD_EXAMPLES "Build examples" ON)
