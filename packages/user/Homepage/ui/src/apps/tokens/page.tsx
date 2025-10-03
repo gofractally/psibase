@@ -1,13 +1,16 @@
-import type { SharedBalance, Token } from "./hooks/tokensPlugin/useBalances";
+import type { Token } from "./hooks/tokensPlugin/useUserTokenBalances";
 
-import { CreditTable } from "@/apps/tokens/components/credit-table";
-import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
-import { TransferModal } from "@/apps/tokens/components/transfer-modal";
-import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { updateBalanceCache } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { supervisor } from "@/supervisor";
+
+// import { CreditTable } from "@/apps/tokens/components/credit-table";
+import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
+import { TransferModal } from "@/apps/tokens/components/transfer-modal";
+import {
+    updateUserTokenBalancesCache,
+    useUserTokenBalances,
+} from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Account } from "@/lib/zod/Account";
@@ -28,13 +31,12 @@ import {
 
 export const TokensPage = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
-    const { data, isLoading: isLoadingBalances } = useBalances(currentUserData);
+    const { data, isLoading: isLoadingBalances } =
+        useUserTokenBalances(currentUserData);
 
     const currentUser = isSuccess ? currentUserData : null;
 
-    const sharedBalances = data ? data.sharedBalances : [];
-    const tokens = useMemo(() => (data ? data.tokens : []), [data]);
-
+    const tokens = data ?? [];
     const isNoTokens = currentUser && tokens.length == 0;
 
     return (
@@ -47,7 +49,6 @@ export const TokensPage = () => {
                         tokens={tokens}
                         currentUser={currentUser}
                         isLoading={!isSuccess || isLoadingBalances}
-                        sharedBalances={sharedBalances}
                     />
                 )}
             </div>
@@ -59,12 +60,10 @@ const PageContents = ({
     tokens,
     currentUser,
     isLoading,
-    sharedBalances,
 }: {
     tokens: Token[];
     currentUser: string | null;
     isLoading: boolean;
-    sharedBalances: SharedBalance[];
 }) => {
     const { mutateAsync: credit } = useCredit();
 
@@ -83,7 +82,7 @@ const PageContents = ({
             : value.amount.amount;
 
         // Optimistically update the balance
-        updateBalanceCache(
+        updateUserTokenBalancesCache(
             Account.parse(currentUser),
             selectedTokenId,
             paddedAmount,
@@ -110,7 +109,7 @@ const PageContents = ({
             setTransferModal(false);
         } catch (e) {
             // Rollback optimistic update on error
-            updateBalanceCache(
+            updateUserTokenBalancesCache(
                 Account.parse(currentUser),
                 selectedTokenId,
                 paddedAmount,
@@ -253,11 +252,11 @@ const PageContents = ({
                     </form>
                 </form.AppForm>
             </GlowingCard>
-            <CreditTable
+            {/* <CreditTable
                 isLoading={isLoading}
                 user={currentUser}
                 balances={sharedBalances}
-            />
+            /> */}
         </div>
     );
 };

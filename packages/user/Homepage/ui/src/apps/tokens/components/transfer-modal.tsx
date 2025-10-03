@@ -1,9 +1,10 @@
-import type { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
+import type { Token } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
 
-import { Quantity } from "@/apps/tokens/lib/quantity";
 import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
 import { useMemo } from "react";
+
+import { Quantity } from "@/apps/tokens/lib/quantity";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 

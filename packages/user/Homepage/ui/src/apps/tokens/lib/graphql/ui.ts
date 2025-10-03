@@ -1,119 +1,81 @@
 import { graphql } from "@/lib/graphql";
 
-export interface Root {
-    data: Data;
+interface UserTokenBalanceRes {
+    userBalances: UserTokenBalance;
 }
 
-export interface Data {
-    userBalances: User;
-    userTokens: UserBalanceToken[];
-    userCredits: UserCreditDebit;
-    userDebits: UserCreditDebit;
+interface UserTokenBalance {
+    nodes: UserTokenBalanceNode[];
 }
 
-export interface User {
-    edges: UserBalancesEdge[];
-}
-
-export interface UserBalancesEdge {
-    node: SharedBalanceNode;
-}
-
-export interface SharedBalanceNode {
+export interface UserTokenBalanceNode {
     tokenId: number;
     balance: string;
     symbol: string;
     precision: number;
 }
 
-export interface UserBalanceToken {
-    id: number;
-    precision: number;
-    symbol: string;
+interface BalChangeRes {
+    balChanges: BalChange;
 }
 
-export interface UserCreditDebit {
-    edges: UserCreditDebitEdge[];
+export interface BalChange {
+    nodes: BalChangeNode[];
 }
 
-export interface UserCreditDebitEdge {
-    node: UserCreditDebitNode;
-}
-
-export interface UserCreditDebitNode {
-    symbol: string;
+export interface BalChangeNode {
     tokenId: number;
-    token: UserBalanceToken;
-    balance: string;
-    creditor: string;
-    debitor: string;
+    account: string;
+    counterParty: string;
+    action: "credited" | "debited" | "uncredited" | "rejected";
+    amount: string;
+    memo: string;
 }
 
-const queryString = (username: string) => `
-{
-	
-	userBalances(user: "${username}") {
-		edges {
-			node {
-				tokenId
-				balance
-				symbol
-				precision
-			}
-		}
-	}
+const qs = {
+    userTokenBalances: (username: string) => `
+        {	
+            userBalances(user: "${username}") {
+                nodes {
+                    tokenId
+                    balance
+                    symbol
+                    precision
+                }
+            }	
+        }
+    `,
+    userTokenBalanceChanges: (username: string, tokenId: number) => `
+        {
+            balChanges(tokenId: ${tokenId}, account: "${username}") {
+                nodes {
+                    tokenId
+                    account
+                    counterParty
+                    action
+                    amount
+                    memo
+                }
+            }
+        }
+    `,
+};
 
-	userTokens(user: "${username}") {
-		id
-		precision
-		symbol
-	}
-	
-	userCredits(user: "${username}") {
-		edges {
-			node {
-				symbol
-				tokenId
-				token {
-					id
-					precision
-					symbol
-				}
-				balance
-				creditor
-				debitor
-			}
-		}
-	}
-	
-	userDebits(user: "${username}") {
-		edges {
-			node {
-				symbol
-				tokenId
-				token {
-					id
-					precision
-					symbol
-				}
-				balance
-				creditor
-				debitor
-			}
-		}
-	}
-	
-}
+export const fetchUserTokenBalances = async (username: string) => {
+    const res = await graphql<UserTokenBalanceRes>(
+        qs.userTokenBalances(username),
+        "tokens",
+    );
+    return res.userBalances.nodes;
+};
 
-`;
-
-export const fetchUi = async (username: string) => {
-    const res = await graphql<Data>(queryString(username), "tokens");
-
-    return {
-        userDebits: res.userDebits.edges.map(({ node }) => node),
-        userCredits: res.userCredits.edges.map(({ node }) => node),
-        userBalances: res.userBalances.edges.map(({ node }) => node),
-        userTokens: res.userTokens,
-    };
+export const fetchUserTokenBalanceChanges = async (
+    username: string,
+    tokenId: number,
+) => {
+    const res = await graphql<BalChangeRes>(
+        qs.userTokenBalanceChanges(username, tokenId),
+        "tokens",
+    );
+    return res.balChanges.nodes;
 };
