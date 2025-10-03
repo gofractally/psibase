@@ -1,10 +1,10 @@
 import { z } from "zod";
 
+import { fractalsService } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "../../graphql";
-import { siblingUrl } from "@psibase/common-lib";
 
 export const zMember = z
     .object({
@@ -19,7 +19,8 @@ export const zMember = z
 export type Membership = z.infer<typeof zMember>;
 
 export const getMemberships = async (account: Account): Promise<Membership> => {
-    const res = await graphql(`
+    const res = await graphql(
+        `
         {
             memberships(member: "${account}") {
                 nodes {
@@ -31,7 +32,9 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
                 }
             }
         }
-    `, siblingUrl(null, 'fractals', '/graphql'));
+    `,
+        fractalsService,
+    );
 
     return z
         .object({

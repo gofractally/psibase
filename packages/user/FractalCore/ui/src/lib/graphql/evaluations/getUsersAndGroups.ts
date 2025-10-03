@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
+import { evaluationsService } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
 import { Account, zAccount } from "@/lib/zod/Account";
 
@@ -66,7 +65,7 @@ export const getUsersAndGroups = async (
                 }
             }
         }`,
-        siblingUrl(null, "evaluations", "/graphql"),
+        evaluationsService,
     );
 
     console.log(res, "was the res");

@@ -1,8 +1,8 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
+import { fractalsService } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
-import { siblingUrl } from "@psibase/common-lib";
 
 export const zCompletedEvaluation = z.object({
     evaluationId: z.number(),
@@ -23,7 +23,7 @@ const getCompletedEvaluationIds = async (guildId: number) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, siblingUrl(null, 'fractals', '/graphql'));
+    const evaluations = await graphql(gql, fractalsService);
 
     const response = z
         .object({
@@ -53,7 +53,7 @@ const getEvaluationsMetadata = async (guildId: number) => {
         }
     }`;
 
-    const evaluations = await graphql(gql);
+    const evaluations = await graphql(gql, fractalsService);
 
     const response = z
         .object({

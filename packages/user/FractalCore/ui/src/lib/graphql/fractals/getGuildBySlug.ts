@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { fractalsService } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
@@ -19,7 +20,8 @@ export const zGuild = z.object({
 });
 
 export const getGuildBySlug = async (fractal: Account, slug: Account) => {
-    const res = await graphql(`
+    const res = await graphql(
+        `
         {
             guildBySlug(fractal:"${fractal}", slug:"${slug}") {
                 id
@@ -35,7 +37,9 @@ export const getGuildBySlug = async (fractal: Account, slug: Account) => {
                 bio
             }
         }
-    `);
+    `,
+        fractalsService,
+    );
 
     return z
         .object({

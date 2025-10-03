@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { fractalsService } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
@@ -16,7 +17,8 @@ export const getGuildMemberships = async (
     fractal: Account,
     member: Account,
 ) => {
-    const res = await graphql(`
+    const res = await graphql(
+        `
         {
             guildMemberships(fractal: "${fractal}", member: "${member}") {
                 nodes {
@@ -28,7 +30,9 @@ export const getGuildMemberships = async (
                 }
             }
         }
-    `);
+    `,
+        fractalsService,
+    );
 
     return z
         .object({

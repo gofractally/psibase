@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
@@ -28,6 +29,7 @@ export const getScores = async (guildId: number) => {
             } 
         }
     }`,
+        fractalsService,
     );
 
     return z

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { PluginError, getSupervisor } from "@psibase/common-lib";
 
-import { fractalService } from "@/lib/constants";
+import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 import { zEvalType } from "@/lib/zod/EvaluationType";
 
@@ -18,7 +18,7 @@ export const useStart = () => {
             await getSupervisor().functionCall({
                 method: "start",
                 params: [params.fractal, params.evaluationType],
-                service: fractalService,
+                service: fractalsService,
                 intf: "admin",
             });
         },

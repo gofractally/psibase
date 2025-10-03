@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
+import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
@@ -27,7 +26,7 @@ export const getFractals = async () => {
                 }
             }
         `,
-        siblingUrl(null, "fractals", "/graphql"),
+        fractalsService,
     );
 
     return z
