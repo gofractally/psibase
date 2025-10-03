@@ -1,7 +1,8 @@
-import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
+
+import { Token } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
 
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";

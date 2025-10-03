@@ -52,6 +52,7 @@ export function CreditTable({ balances, user }: Props) {
     if (balances.length == 0) {
         return null;
     }
+
     return (
         <Table>
             <TableCaption>A list of your credit and debits.</TableCaption>
