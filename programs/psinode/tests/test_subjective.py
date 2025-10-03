@@ -10,6 +10,8 @@ import io
 from fracpack import Int, unpack
 
 def is_user_action(action):
+    if action['service'] == 'db' and action['method'] == 'open':
+        return False
     if action['service'] == 'cpu-limit':
         return False
     if action['service'] == 'accounts' and action['method'] == 'billCpu':

@@ -1,6 +1,7 @@
 #include <services/local/XAdmin.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
@@ -83,7 +84,10 @@ namespace LocalService
 
       bool chainIsBooted()
       {
-         auto row = Native::tables(KvMode::read).open<StatusTable>().get({});
+         auto mode   = KvMode::read;
+         auto prefix = std::span<const char>();
+         auto native = Native::Tables{to<XDb>().open(DbId::native, prefix, mode), mode};
+         auto row    = native.open<StatusTable>().get({});
          return row && row->head;
       }
 

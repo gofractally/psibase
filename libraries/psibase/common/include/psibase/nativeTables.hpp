@@ -428,15 +428,23 @@ namespace psibase
                                   EnvTable>;
       static Tables tables(KvMode mode = KvMode::readWrite)
       {
-         return Tables{kvOpen(DbId::native, {}, mode), mode};
+         return Tables{proxyKvOpen(DbId::native, {}, mode), mode};
+      }
+      static Tables tablesDirect(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{UniqueKvHandle{kvOpen(DbId::native, {}, mode)}, mode};
       }
       static Tables subjective(KvMode mode = KvMode::readWrite)
       {
-         return Tables{kvOpen(DbId::nativeSubjective, {}, mode), mode};
+         return Tables{proxyKvOpen(DbId::nativeSubjective, {}, mode), mode};
+      }
+      static Tables subjectiveDirect(KvMode mode = KvMode::readWrite)
+      {
+         return Tables{UniqueKvHandle{kvOpen(DbId::nativeSubjective, {}, mode)}, mode};
       }
       static Tables session(KvMode mode = KvMode::readWrite)
       {
-         return Tables{kvOpen(DbId::nativeSession, {}, mode), mode};
+         return Tables{proxyKvOpen(DbId::nativeSession, {}, mode), mode};
       }
    };
 

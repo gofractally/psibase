@@ -436,6 +436,8 @@ namespace psibase
           typename psio::get_struct_tuple_impl<typename psio::reflect<T>::data_members>::type>;
    };
 
+   UniqueKvHandle proxyKvOpen(DbId db, std::span<const char> prefix, KvMode mode);
+
    /// A primary or secondary index in a Table
    ///
    /// Use [Table::getIndex] to get this.
@@ -451,7 +453,9 @@ namespace psibase
       ///
       /// `prefix` identifies the range of database keys that the index occupies.
       TableIndex(DbId db, std::vector<char>&& prefix, bool is_secondary)
-          : db(kvOpen(db, {}, KvMode::read)), prefix(std::move(prefix)), is_secondary(is_secondary)
+          : db(proxyKvOpen(db, {}, KvMode::read)),
+            prefix(std::move(prefix)),
+            is_secondary(is_secondary)
       {
       }
 
@@ -813,7 +817,8 @@ namespace psibase
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
       ///
       /// This version of the constructor copies the data within `prefix`.
-      Table(DbId db, KeyView prefix, KvMode mode = KvMode::read) : db(kvOpen(db, prefix.data, mode))
+      Table(DbId db, KeyView prefix, KvMode mode = KvMode::read)
+          : db(proxyKvOpen(db, prefix.data, mode))
       {
       }
 
@@ -821,7 +826,7 @@ namespace psibase
       ///
       /// The prefix separates this table's data from other tables; see [Data format](#data-format).
       Table(DbId db, std::vector<char>&& prefix, KvMode mode = KvMode::read)
-          : db(kvOpen(db, prefix, mode))
+          : db(proxyKvOpen(db, prefix, mode))
       {
       }
 
@@ -1162,7 +1167,10 @@ namespace psibase
    template <typename... Tables>
    struct ExternTables
    {
-      ExternTables(KvHandle handle, KvMode mode = KvMode::read) : handle(handle), mode(mode) {}
+      ExternTables(UniqueKvHandle handle, KvMode mode = KvMode::read)
+          : handle(std::move(handle)), mode(mode)
+      {
+      }
 
       /// Open by table number
       ///
@@ -1210,8 +1218,8 @@ namespace psibase
          return open<I::value>();
       }
 
-      KvHandle handle;
-      KvMode   mode;
+      UniqueKvHandle handle;
+      KvMode         mode;
    };
 
 }  // namespace psibase

@@ -8,14 +8,14 @@ use crate::DbId;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
-pub struct KvHandle(u32);
+pub struct KvHandle(pub(crate) u32);
 
 impl KvHandle {
     pub const INVALID: KvHandle = KvHandle(u32::MAX);
 }
 
 #[derive(Debug, Clone, Copy)]
-#[repr(u32)]
+#[repr(u8)]
 pub enum KvMode {
     None = 0,
     Read = 1,
@@ -107,6 +107,9 @@ extern "C" {
     /// If the handle was exported, all copies are unaffected and
     /// will remain usable until they are also closed.
     pub fn kvClose(handle: KvHandle);
+
+    pub fn exportHandles(data: *const u8, len: u32);
+    pub fn importHandles() -> u32;
 
     /// Set a key-value pair
     ///

@@ -24,6 +24,7 @@ extern "C" void __wasm_call_ctors();
 extern "C" void start(AccountNumber this_service)
 {
    __wasm_call_ctors();
+   psibase::internal::receiver = this_service;
    check(this_service == TestServiceEntry::service,
          std::format("{} != {}", this_service.str(), TestServiceEntry::service.str()));
    ++start_called;
@@ -36,8 +37,9 @@ extern "C" void start(AccountNumber this_service)
 
 extern "C" void called(AccountNumber this_service, AccountNumber sender)
 {
-   auto act = getCurrentAction();
-   auto pl  = psio::from_frac_strict<payload>(act.rawData);
+   psibase::internal::receiver = this_service;
+   auto act                    = getCurrentAction();
+   auto pl                     = psio::from_frac_strict<payload>(act.rawData);
    check(ctors_called == 1, "ctors != 1");
    check(start_called == 1, "start != 1");
    check(this_service == TestServiceEntry::service, "called: this_service = " + this_service.str());

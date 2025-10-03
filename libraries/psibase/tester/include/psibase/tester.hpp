@@ -29,6 +29,8 @@ namespace psibase
 
    inline bool isUserAction(const Action& action)
    {
+      if (action.service == AccountNumber{"db"} && action.method == MethodNumber{"open"})
+         return false;
       if (action.service == AccountNumber{"cpu-limit"})
          return false;
       if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})

@@ -23,13 +23,9 @@ namespace UserService
    }
 
    EventIndexHandle::EventIndexHandle(psibase::KvMode mode)
-       : value(psibase::kvOpen(DbId::writeOnly,
-                               psio::composite_key(EventIndex::service, eventIndexesNum),
-                               mode))
+       : value(psibase::proxyKvOpen(DbId::writeOnly,
+                                    psio::composite_key(EventIndex::service, eventIndexesNum),
+                                    mode))
    {
-   }
-   EventIndexHandle::~EventIndexHandle()
-   {
-      psibase::kvClose(value);
    }
 }  // namespace UserService
