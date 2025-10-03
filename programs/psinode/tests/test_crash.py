@@ -6,7 +6,6 @@ import testutil
 import time
 import unittest
 
-
 class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_crash_cft(self, cluster):
@@ -77,9 +76,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_restart_after_disconnect(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        testutil.boot_with_producers(
-            prods, algorithm='cft', packages=['Minimal', 'Explorer']
-        )
+        testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer'])
 
         (a, b, c, d) = prods
         # Stop d, so we have no fault tolerance
@@ -140,9 +137,7 @@ class TestCrash(unittest.TestCase):
 
     @testutil.psinode_test
     def test_unlock_bft(self, cluster):
-        prods = cluster.complete(
-            *testutil.generate_names(4), softhsm=testutil.libsofthsm2()
-        )
+        prods = cluster.complete(*testutil.generate_names(4), softhsm=testutil.libsofthsm2())
         (a, b, c, d) = prods
         keys = []
         for p in prods:
@@ -156,9 +151,9 @@ class TestCrash(unittest.TestCase):
                 keys.append({'name': p.producer, 'auth': reply.json()[0]})
 
         print(keys)
-        print('booting chain')
+        print("booting chain")
         a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
-        print('setting producers')
+        print("setting producers")
         a.set_producers(keys, 'bft')
         p.wait(producers_are(prods))
 
@@ -178,7 +173,6 @@ class TestCrash(unittest.TestCase):
         d.unlock_softhsm()
 
         a.wait(new_block())
-
 
 if __name__ == '__main__':
     testutil.main()

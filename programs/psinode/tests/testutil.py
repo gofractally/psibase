@@ -12,15 +12,9 @@ import requests
 
 MIN_ACCOUNT_LENGTH = 10
 
-
 def psinode_test(f):
     def result(self):
-        with Cluster(
-            executable=args.psinode,
-            log_filter=args.log_filter,
-            log_format=args.log_format,
-            database_cache_size=256 * 1024 * 1024,
-        ) as cluster:
+        with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_size=256 * 1024 * 1024) as cluster:
             try:
                 try:
                     f(self, cluster)
@@ -33,12 +27,10 @@ def psinode_test(f):
                 raise
             else:
                 if args.print_logs is not None:
-                    for hostname, node in cluster.nodes.items():
+                    for (hostname, node) in cluster.nodes.items():
                         if hostname in args.print_logs or 'all' in args.print_logs:
                             node.print_log()
-
     return result
-
 
 def generate_names(n):
     letters = 'abcdefghijklmnopqrstuvwxyz'
@@ -46,18 +38,15 @@ def generate_names(n):
     num_numbers = MIN_ACCOUNT_LENGTH - num_letters
     numbers = ''.join(str(i) for i in range(1, num_numbers + 1))
     return [letter * num_letters + numbers for letter in letters[0:n]]
-    # return list(letters[0:n])
-
 
 def boot_with_producers(nodes, algorithm=None, timeout=10, packages=[]):
     p = nodes[0]
-    print('booting chain')
+    print("booting chain")
     p.boot(packages=packages)
-    print('setting producers')
+    print("setting producers")
     p.set_producers(nodes, algorithm)
     p.wait(predicates.producers_are(nodes), timeout=timeout)
     return p
-
 
 def sleep(secs, end_at):
     '''Like time.sleep, but waits additional time until the fractional seconds are equal to end_at'''
@@ -69,22 +58,17 @@ def sleep(secs, end_at):
 
     time.sleep(secs + extra)
 
-
 class SuppressErrors:
     '''A Context Manager used to handle repeated checks that we expect to pass most of the time'''
-
     def __init__(self, n):
         self.n = n
-
     def __enter__(self):
         return self
-
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
             self.n -= 1
             if self.n >= 0:
                 return True
-
 
 def test_packages():
     result = args.test_packages
@@ -93,13 +77,11 @@ def test_packages():
         result = os.path.join(os.path.dirname(psinode), 'test-packages')
     return result
 
-
 def libsofthsm2():
     result = args.libsofthsm2
     if result is None:
         result = 'libsofthsm2.so'
     return result
-
 
 def run_test_wasm(command):
     dirname = os.path.dirname(args.psinode)
@@ -113,39 +95,17 @@ def run_test_wasm(command):
     test_wasms = args.test_wasms
     if test_wasms is None:
         test_wasms = dirname
-    return subprocess.run(
-        [psitest, os.path.join(test_wasms, command[0])] + command[1:], check=True
-    )
-
+    return subprocess.run([psitest, os.path.join(test_wasms, command[0])] + command[1:], check=True)
 
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--psinode', default='psinode', help='The path to the psinode executable'
-    )
-    parser.add_argument(
-        '--log-filter', metavar='FILTER', help='Filter for log messages'
-    )
-    parser.add_argument(
-        '--log-format', metavar='FORMAT', help='Format for log messages'
-    )
-    parser.add_argument(
-        '--print-logs',
-        metavar='NODE',
-        action='append',
-        help='Nodes whose logs should be printed',
-    )
-    parser.add_argument(
-        '--test-packages',
-        metavar='DIRECTORY',
-        help='Directory containing test packages',
-    )
+    parser.add_argument('--psinode', default='psinode', help='The path to the psinode executable')
+    parser.add_argument('--log-filter', metavar='FILTER', help='Filter for log messages')
+    parser.add_argument('--log-format', metavar='FORMAT', help='Format for log messages')
+    parser.add_argument('--print-logs', metavar='NODE', action='append', help='Nodes whose logs should be printed')
+    parser.add_argument('--test-packages', metavar='DIRECTORY', help='Directory containing test packages')
     parser.add_argument('--libsofthsm2', metavar='PATH', help='Path to libsofthsm.so')
-    parser.add_argument(
-        '--test-wasms',
-        metavar='PATH',
-        help='Directory containing wasm programs used by the test suite',
-    )
+    parser.add_argument('--test-wasms', metavar='PATH', help='Directory containing wasm programs used by the test suite')
     global args
     (args, remaining) = parser.parse_known_args(argv)
     unittest.main(argv=remaining)
