@@ -107,7 +107,9 @@ SCENARIO("Creating an invite")
 
       auto a = alice.to<Invite>();
       auto b = bob.to<Invite>();
-      auto i = invited.to<Invite>();
+
+      auto invitedKeys = KeyList{{invPub, invPriv}};
+      auto i           = invited.with(invitedKeys).to<Invite>();
 
       THEN("Alice can create an invite")
       {
@@ -124,6 +126,7 @@ SCENARIO("Creating an invite")
       }
       THEN("Credential account cannot create an invite")
       {
+         CHECK(createInvite(a, invPub).succeeded());
          CHECK(createInvite(i, userPub).failed(canOnlyCallCreateAccount));
       }
    }
@@ -166,7 +169,7 @@ SCENARIO("Deleting an invite")
 }
 
 // - Expired invites
-//    - Expired invites can no longer be ccepted
+//    - Expired invites can no longer be accepted
 //    - Expired invites can be specifically deleted by the creator
 //       - In this case, only actually expired invites get deleted
 SCENARIO("Expired invites")
@@ -270,7 +273,7 @@ SCENARIO("Accepting an invite")
          }
          THEN("An invite can be used to create a new account")
          {
-            CHECK(i.createAccount("rebecca"_a, userPub).succeeded());
+            CHECK(i.createAccount("alexandria"_a, userPub).succeeded());
             AND_THEN(
                 "The invite can be accepted by the new account (tx also signed using credential)")
             {
@@ -279,7 +282,9 @@ SCENARIO("Accepting an invite")
          }
          THEN("A normal user may not create a new account")
          {
-            CHECK(b.createAccount("rebecca"_a, userPub).failed(mustUseInviteCredential));
+            std::string error =
+                "Only " + Credentials::CREDENTIAL_SENDER.str() + " can call createAccount";
+            CHECK(b.createAccount("alexandria"_a, userPub).failed(error));
          }
          THEN("Credential account may not accept an invite")
          {
@@ -295,7 +300,7 @@ SCENARIO("Accepting an invite")
             }
             THEN("An accepted invite can be accepted again with a created account")
             {
-               CHECK(i.createAccount("rebecca"_a, userPub).succeeded());
+               CHECK(i.createAccount("alexandria"_a, userPub).succeeded());
                CHECK(r.accept().succeeded());
             }
          }
@@ -353,12 +358,12 @@ SCENARIO("Accepting an invite")
          }
          THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
          {
-            CHECK(i.createAccount("rebecca"_a, invPub).failed(needUniquePubkey));
+            CHECK(i.createAccount("alexandria"_a, invPub).failed(needUniquePubkey));
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
-            i.createAccount("rebecca"_a, userPub);
-            CHECK(i.createAccount("jonathan"_a, userPub).failed(outOfNewAccounts));
+            i.createAccount("alexandria"_a, userPub);
+            CHECK(i.createAccount("christopher"_a, userPub).failed(outOfNewAccounts));
          }
       }
    }
