@@ -8,7 +8,7 @@ import { TokensPage } from "./page";
 export const tokensConfig: AppConfigType = {
     service: Account.parse("tokens"),
     name: "Tokens",
-    description: "Create, burn and send tokens.",
+    description: "Send tokens and manage balances.",
     icon: <Coins className="h-6 w-6" />,
     isMore: false,
     isLoginRequired: true,
