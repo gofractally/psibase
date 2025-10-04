@@ -25,6 +25,13 @@ jobs:
       - name: Timestamp
         id: ccache_cache_timestamp
         run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >>$GITHUB_OUTPUT
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          remove-android: "true"
+          remove-dotnet: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
       - name: Checkout
         uses: actions/checkout@v3
         with:
