@@ -28,6 +28,8 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
         with:
+          root-reserve-mb: 24576
+          temp-reserve-mb: 512
           remove-android: "true"
       - name: Checkout
         uses: actions/checkout@v3
