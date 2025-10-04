@@ -1,16 +1,19 @@
 #!/bin/bash
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+WORKSPACE_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
 # Copy sample VSCode configuration files
-for file in /root/psibase/.vscode/*.sample; do
+for file in "$WORKSPACE_ROOT/.vscode"/*.sample; do
     cp "$file" "${file%.sample}"
     echo "Copied $file to ${file%.sample}"
 done
 
 # Install dependencies and configure VSCode SDKs
-cd packages
+cd "$WORKSPACE_ROOT/packages"
 yarn
 yarn dlx @yarnpkg/sdks vscode
 
 # Symlink files to workspace root
-[ ! -L /root/psibase/.clangd ] && ln -s /root/psibase/.vscode/.clangd /root/psibase/.clangd
-[ ! -L /root/psibase/.envrc ] && ln -s /root/psibase/.vscode/.envrc /root/psibase/.envrc
+[ ! -L "$WORKSPACE_ROOT/.clangd" ] && ln -s "$SCRIPT_DIR/.clangd" "$WORKSPACE_ROOT/.clangd"
+[ ! -L "$WORKSPACE_ROOT/.envrc" ] && ln -s "$SCRIPT_DIR/.envrc" "$WORKSPACE_ROOT/.envrc"
