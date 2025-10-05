@@ -9,11 +9,11 @@ for file in "$WORKSPACE_ROOT/.vscode"/*.sample; do
     echo "Copied $file to ${file%.sample}"
 done
 
+# Symlink files to workspace root
+[ ! -L "$WORKSPACE_ROOT/.clangd" ] && ln -s "$SCRIPT_DIR/../.clangd" "$WORKSPACE_ROOT/.clangd"
+[ ! -L "$WORKSPACE_ROOT/.envrc" ] && ln -s "$SCRIPT_DIR/../.envrc" "$WORKSPACE_ROOT/.envrc"
+
 # Install dependencies and configure VSCode SDKs
 cd "$WORKSPACE_ROOT/packages"
 yarn
 yarn dlx @yarnpkg/sdks vscode
-
-# Symlink files to workspace root
-[ ! -L "$WORKSPACE_ROOT/.clangd" ] && ln -s "$SCRIPT_DIR/.clangd" "$WORKSPACE_ROOT/.clangd"
-[ ! -L "$WORKSPACE_ROOT/.envrc" ] && ln -s "$SCRIPT_DIR/.envrc" "$WORKSPACE_ROOT/.envrc"
