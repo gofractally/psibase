@@ -7,7 +7,6 @@ import { graphql } from "../../graphql";
 
 export const zScore = z.object({
     fractal: zAccount,
-    guild: z.number().int(),
     member: zAccount,
     score: z.number(),
     pendingScore: z.number().nullable(),
@@ -22,7 +21,6 @@ export const getScores = async (guildId: number) => {
         scores(guildId: ${guildId}) {
             nodes {
                 fractal
-                guild
                 member
                 score
                 pendingScore

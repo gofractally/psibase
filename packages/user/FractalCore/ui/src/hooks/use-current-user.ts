@@ -35,3 +35,8 @@ export const useCurrentUser = (refetchInterval?: number) =>
 
 export const assertUser = (): Account =>
     zAccount.parse(queryClient.getQueryData(QueryKey.currentUser()));
+
+export const getCurrentUser = (): string | null => {
+    const res = queryClient.getQueryData(QueryKey.currentUser());
+    return res ? z.string().parse(res) : null;
+};

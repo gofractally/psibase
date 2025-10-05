@@ -3,23 +3,24 @@ import { z } from "zod";
 
 import { PluginError, getSupervisor } from "@psibase/common-lib";
 
-import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
-import { zEvalType } from "@/lib/zod/EvaluationType";
+
+import { useFractalAccount } from "./use-fractal-account";
 
 export const zParams = z.object({
-    fractal: zAccount,
-    evaluationType: zEvalType,
+    guildSlug: zAccount,
 });
 
 export const useStart = () => {
+    const fractalAccount = useFractalAccount();
+
     return useMutation<undefined, PluginError, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             await getSupervisor().functionCall({
-                method: "start",
-                params: [params.fractal, params.evaluationType],
-                service: fractalsService,
-                intf: "admin",
+                method: "startEval",
+                params: [params.guildSlug],
+                service: fractalAccount,
+                intf: "user",
             });
         },
         onError: (error) => {
