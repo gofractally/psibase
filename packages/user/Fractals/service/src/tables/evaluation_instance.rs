@@ -204,7 +204,7 @@ impl EvaluationInstance {
 #[ComplexObject]
 impl EvaluationInstance {
     pub async fn guild_instance(&self) -> Guild {
-        GuildTable::new()
+        GuildTable::read()
             .get_index_pk()
             .get(&self.evaluation_id)
             .unwrap()

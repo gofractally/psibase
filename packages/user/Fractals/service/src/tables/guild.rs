@@ -31,7 +31,7 @@ impl Guild {
         slug: AccountNumber,
     ) -> Self {
         check_none(
-            GuildTable::new().get_index_by_slug().get(&(fractal, slug)),
+            GuildTable::read().get_index_by_slug().get(&(fractal, slug)),
             "slug already in use",
         );
         FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();
