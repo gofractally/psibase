@@ -17,7 +17,7 @@ import {
 import { useAppForm } from "./form/app-form";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { getGuildBySlug } from "@/lib/graphql/fractals/getGuildBySlug";
-import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 
 
 export const CreateGuildModal = ({
@@ -31,7 +31,7 @@ export const CreateGuildModal = ({
     const fractalAccount = useFractalAccount();
 
     const { data: currentUser } = useCurrentUser();
-    const { refetch } = useGuildMemberships(currentUser);
+    const { refetch } = useGuildMembershipsOfUser(currentUser);
 
 
     const navigate = useNavigate();

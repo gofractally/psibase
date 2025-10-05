@@ -124,6 +124,7 @@ pub mod tables {
         pub member: AccountNumber,
         pub score: u32,
         pub pending_score: Option<u32>,
+        pub created_at: psibase::TimePointSec,
     }
 
     impl GuildMember {

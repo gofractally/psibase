@@ -2,7 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
 use crate::tables::tables::{
-    Guild, GuildApplication, GuildApplicationTable, GuildAttestTable, GuildMember, GID,
+    Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember, GID,
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -20,6 +20,10 @@ impl GuildApplication {
 
     pub fn add(guild: GID, member: AccountNumber, app: String) {
         check_none(Self::get(guild, member), "application already exists");
+        check_none(
+            GuildMember::get(guild, member),
+            "user is already a guild member",
+        );
         Self::new(guild, member, app).save();
     }
 
@@ -62,5 +66,15 @@ impl GuildApplication {
 impl GuildApplication {
     pub async fn guild(&self) -> Guild {
         Guild::get_assert(self.guild)
+    }
+
+    pub async fn attestations(&self) -> Vec<GuildAttest> {
+        GuildAttestTable::read()
+            .get_index_pk()
+            .range(
+                (self.guild, self.member, AccountNumber::new(0))
+                    ..=(self.guild, self.member, AccountNumber::new(u64::MAX)),
+            )
+            .collect()
     }
 }

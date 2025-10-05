@@ -3,15 +3,20 @@ use psibase::{check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GID};
+use psibase::services::transact::Wrapper as TransactSvc;
+
 
 impl GuildMember {
     fn new(fractal: AccountNumber, guild: GID, member: AccountNumber) -> Self {
+        let now = TransactSvc::call().currentBlock().time.seconds();
+
         Self {
             fractal,
             guild,
             member,
             pending_score: None,
             score: 0,
+            created_at: now
         }
     }
 

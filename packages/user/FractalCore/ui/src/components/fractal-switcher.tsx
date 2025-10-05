@@ -22,9 +22,9 @@ import {
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
 
-import { CreateGuildModal } from "./create-fractal-modal";
+import { CreateGuildModal } from "./create-guild-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
 import { useGuildSlug } from "@/hooks/use-guild-id";
 
@@ -36,7 +36,7 @@ export function AppSwitcher() {
     const { data: currentUser } = useCurrentUser();
     const fractalAccount = useFractalAccount();
 
-    const { data: memberships, } = useGuildMemberships(currentUser);
+    const { data: memberships, } = useGuildMembershipsOfUser(currentUser);
 
     const guildSlug = useGuildSlug();
 

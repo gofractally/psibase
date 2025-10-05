@@ -116,7 +116,7 @@ pub mod service {
         );
         GuildAttest::add(guild.id, member, sender, comment, endorses);
 
-        if guild.rep.unwrap() == sender {
+        if fractal_account == sender || guild.rep.is_some_and(|rep| rep == sender) {
             application.respond(endorses)
         }
     }

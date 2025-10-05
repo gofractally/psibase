@@ -82,7 +82,7 @@ export const MyGuildMembership = () => {
                     </>
                 ) : (
                     <>
-                        <FractalOverviewCard
+                        <GuildOverviewCard
                             fractal={fractal}
                             fractalAccount={fractalAccount}
                             chainId={chainId}
@@ -98,7 +98,7 @@ export const MyGuildMembership = () => {
     );
 };
 
-const FractalOverviewCard = ({
+const GuildOverviewCard = ({
     fractal,
     fractalAccount,
     chainId,
@@ -107,6 +107,7 @@ const FractalOverviewCard = ({
     fractalAccount?: string;
     chainId: string;
 }) => {
+
     return (
         <Card>
             <CardHeader>

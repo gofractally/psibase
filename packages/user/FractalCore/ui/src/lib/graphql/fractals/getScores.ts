@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
+import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "../../graphql";
 
@@ -10,6 +11,7 @@ export const zScore = z.object({
     member: zAccount,
     score: z.number(),
     pendingScore: z.number().nullable(),
+    createdAt: zDateTime,
 });
 
 export type Score = z.infer<typeof zScore>;
@@ -24,6 +26,7 @@ export const getScores = async (guildId: number) => {
                 member
                 score
                 pendingScore
+                createdAt
             } 
         }
     }`,

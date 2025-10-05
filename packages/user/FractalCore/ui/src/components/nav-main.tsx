@@ -3,6 +3,7 @@ import {
     CalendarArrowDownIcon,
     Contact,
     LucideIcon,
+    PlusCircleIcon,
     SettingsIcon,
     Users,
 } from "lucide-react";
@@ -70,10 +71,15 @@ export function NavMain() {
                     path: '',
                 },
                 {
-                    title: "All Members",
+                    title: "Members",
                     icon: Users,
                     path: 'members'
                 },
+                {
+                    title: "Applications",
+                    icon: PlusCircleIcon,
+                    path: "applications"
+                }
             ],
         },
         {
