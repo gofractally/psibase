@@ -1,20 +1,20 @@
 import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
-import type { Membership } from "@/lib/graphql/fractals/getMembership";
-
-import dayjs from "dayjs";
-import { Loader2, Plus } from "lucide-react";
+// import type { Membership } from "@/lib/graphql/fractals/getMembership";
+// 
+// import dayjs from "dayjs";
+import { Plus } from "lucide-react";
 
 import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
-import { useMembership } from "@/hooks/fractals/use-membership";
+// import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
+// import { useMembership } from "@/hooks/fractals/use-membership";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
-import { getMemberLabel } from "@/lib/getMemberLabel";
+// import { getMemberLabel } from "@/lib/getMemberLabel";
 
-import { Badge } from "@shared/shadcn/ui/badge";
+// import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -22,9 +22,11 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { Separator } from "@shared/shadcn/ui/separator";
+// import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useState } from "react";
+import { ApplyGuildModal } from "@/components/apply-guild-modal";
 
 export const MyGuildMembership = () => {
     const fractalAccount = useFractalAccount();
@@ -41,11 +43,8 @@ export const MyGuildMembership = () => {
         error: errorFractal,
     } = useFractal();
 
-    const {
-        data: membership,
-        isLoading: isLoadingMembership,
-        error: errorMembership,
-    } = useMembership(fractalAccount, currentUser);
+
+    console.log({ currentUser })
 
     const {
         data: chainId,
@@ -53,16 +52,14 @@ export const MyGuildMembership = () => {
         error: errorChainId,
     } = useChainId();
 
-    console.log({ errorFractal, errorMembership, errorChainId }, 'x', { fractal, membership })
 
     const isLoading =
         isLoadingCurrentUser ||
         isLoadingFractal ||
-        isLoadingMembership ||
         isLoadingChainId;
 
     const error =
-        errorCurrentUser || errorFractal || errorMembership || errorChainId;
+        errorCurrentUser || errorFractal || errorChainId;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -87,10 +84,7 @@ export const MyGuildMembership = () => {
                             fractalAccount={fractalAccount}
                             chainId={chainId}
                         />
-                        <MembershipStatusCard membership={membership} />
-                        {membership == null && (
-                            <JoinFractalCard fractalAccount={fractalAccount} />
-                        )}
+                        <ApplyGuildCard />
                     </>
                 )}
             </div>
@@ -146,66 +140,68 @@ const GuildOverviewCard = ({
     );
 };
 
-const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
-    const status =
-        membership == null
-            ? "Not a member"
-            : membership
-                ? getMemberLabel(membership.memberStatus)
-                : "Loading...";
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">Membership status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Status</span>
-                    <Badge
-                        variant={
-                            status === "Not a member"
-                                ? "destructive"
-                                : "default"
-                        }
-                        className={
-                            status === "Not a member"
-                                ? "bg-destructive/10 text-destructive border-destructive/20"
-                                : ""
-                        }
-                    >
-                        {status}
-                    </Badge>
-                </div>
+// const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
+//     const status =
+//         membership == null
+//             ? "Not a member"
+//             : membership
+//                 ? getMemberLabel(membership.memberStatus)
+//                 : "Loading...";
+//     return (
+//         <Card>
+//             <CardHeader>
+//                 <CardTitle className="text-lg">Membership status</CardTitle>
+//             </CardHeader>
+//             <CardContent className="space-y-4">
+//                 <div className="flex items-center justify-between">
+//                     <span className="text-sm font-medium">Status</span>
+//                     <Badge
+//                         variant={
+//                             status === "Not a member"
+//                                 ? "destructive"
+//                                 : "default"
+//                         }
+//                         className={
+//                             status === "Not a member"
+//                                 ? "bg-destructive/10 text-destructive border-destructive/20"
+//                                 : ""
+//                         }
+//                     >
+//                         {status}
+//                     </Badge>
+//                 </div>
 
-                {membership && (
-                    <>
-                        <Separator />
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                                Member since
-                            </span>
-                            <span className="text-muted-foreground text-sm">
-                                {dayjs(membership.createdAt).format(
-                                    "MMMM D, YYYY",
-                                )}
-                            </span>
-                        </div>
-                    </>
-                )}
-            </CardContent>
-        </Card>
-    );
-};
+//                 {membership && (
+//                     <>
+//                         <Separator />
+//                         <div className="flex items-center justify-between">
+//                             <span className="text-sm font-medium">
+//                                 Member since
+//                             </span>
+//                             <span className="text-muted-foreground text-sm">
+//                                 {dayjs(membership.createdAt).format(
+//                                     "MMMM D, YYYY",
+//                                 )}
+//                             </span>
+//                         </div>
+//                     </>
+//                 )}
+//             </CardContent>
+//         </Card>
+//     );
+// };
 
-const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
-    const { mutateAsync: joinFractal, isPending, error } = useJoinFractal();
+const ApplyGuildCard = () => {
 
-    if (error) {
-        return <ErrorCard error={error} />;
-    }
+    const [showModal, setShowModal] = useState(false);
+
+    // if (error) {
+    //     return <ErrorCard error={error} />;
+    // }
 
     return (
         <Card className="border-dashed">
+            <ApplyGuildModal openChange={(show) => setShowModal(show)} show={showModal} />
             <CardContent className="pt-6">
                 <div className="flex flex-col items-center space-y-4 text-center">
                     <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-full">
@@ -216,20 +212,16 @@ const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
                             Apply to Join
                         </h3>
                         <p className="text-muted-foreground mt-1 text-sm">
-                            Create an application to join this fractal.
+                            Create an application to join this guild.
                         </p>
                     </div>
                     <Button
                         onClick={() => {
-                            joinFractal({
-                                fractal: fractalAccount!,
-                            });
+                            setShowModal(true)
                         }}
                         size="lg"
-                        disabled={!fractalAccount || isPending}
                         className="w-full sm:w-auto"
                     >
-                        {isPending && <Loader2 className="animate-spin" />}
                         Apply
                     </Button>
                 </div>

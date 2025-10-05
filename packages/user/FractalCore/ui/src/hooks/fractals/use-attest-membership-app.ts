@@ -15,7 +15,7 @@ export const zParams = z.object({
     endorses: z.boolean(),
 });
 
-export const useApplyGuild = () => {
+export const useAttestMembershipApp = () => {
     const fractal = useFractalAccount();
 
     return useMutation({

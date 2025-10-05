@@ -1,9 +1,7 @@
 import { ScheduleDialog } from "@/components/schedule-dialog"
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useGuildSlug } from "@/hooks/use-guild-id";
-import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useGuild } from "@/hooks/use-guild";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import dayjs from "dayjs";
 import { useState } from "react";
@@ -19,10 +17,8 @@ export const Settings = () => {
     const now = useNowUnix();
 
     const status = useEvaluationStatus(now);
-    const currentFractal = useFractalAccount();
-    const guildSlug = useGuildSlug();
 
-    const { data: guild, isPending: isGuildPending } = useGuildBySlug(currentFractal, guildSlug);
+    const { data: guild, isPending: isGuildPending } = useGuild();
 
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
