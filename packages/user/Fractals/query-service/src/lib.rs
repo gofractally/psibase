@@ -5,7 +5,8 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalMember, FractalMemberTable,
-        FractalTable, Guild, GuildMember, GuildMemberTable, GuildTable, GID,
+        FractalTable, Guild, GuildApplication, GuildApplicationTable, GuildMember,
+        GuildMemberTable, GuildTable, GID,
     };
     use psibase::*;
     use serde::{Deserialize, Deserializer};
@@ -158,6 +159,36 @@ mod service {
             FractalTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .get(&fractal)
+        }
+
+        async fn guild_application(
+            &self,
+            guild_id: GID,
+            member: AccountNumber,
+        ) -> Option<GuildApplication> {
+            GuildApplicationTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&(guild_id, member))
+        }
+
+        async fn guild_applications(
+            &self,
+            guild_id: GID,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, GuildApplication>> {
+            TableQuery::subindex::<AccountNumber>(
+                GuildApplicationTable::with_service(fractals::SERVICE).get_index_pk(),
+                &(guild_id),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn guilds(

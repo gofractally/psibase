@@ -1,31 +1,25 @@
 
+import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
+import { useGuild } from "@/hooks/use-guild";
 import {
     Table,
     TableBody,
-    // TableCell,
+    TableCell,
     TableHead,
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 
-
-// guild
-// member
-// app
-// createdAt
-//
-// guild
-// member
-// attestee
-// comment
-// endorses
 
 
 export const Applications = () => {
 
+    const { data: guild } = useGuild();
+    const { data: applications } = useGuildApplications(guild?.id);
 
-    // const applications = []
-
+    const navigate = useNavigate();
 
     return <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
         <div className="flex h-9 items-center">
@@ -36,31 +30,29 @@ export const Applications = () => {
                 <TableHeader>
                     <TableRow>
                         <TableHead>Account</TableHead>
-                        <TableHead>Reputation</TableHead>
-                        <TableHead>Member since</TableHead>
+                        <TableHead>Attestations</TableHead>
+                        <TableHead>Application created</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {/* {scores?.map((member, index) => (
+                    {applications?.map((member) => (
                         <TableRow
                             key={member.member}
-                            className={cn({
-                                "bg-background/80": index < 6,
-                            })}
+                            onClick={() => {
+                                navigate(member.member)
+                            }}
                         >
                             <TableCell className="font-medium">
                                 {member.member}
                             </TableCell>
                             <TableCell>
-                                {formatScore(member.score)}
+                                {member.attestations.length}
                             </TableCell>
                             <TableCell>
-                                {dayjs(member.createdAt).format(
-                                    "MMMM D, YYYY",
-                                )}
+                                {dayjs(member.createdAt).format('ddd MMM D, HH:mm')}
                             </TableCell>
                         </TableRow>
-                    ))} */}
+                    ))}
                 </TableBody>
             </Table>
         </div>
