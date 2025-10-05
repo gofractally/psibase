@@ -7,7 +7,10 @@ pub mod service {
 
     use crate::tables::{
         fractal_member::MemberStatus,
-        tables::{EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GID},
+        tables::{
+            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
+            GuildMember, GID,
+        },
     };
 
     use psibase::*;
@@ -15,13 +18,12 @@ pub mod service {
     /// TEMP ACTION
     #[action]
     fn init() {
-        ///
         let fractal_core: AccountNumber = "fractal-core".into();
         let a_account: AccountNumber = "a".into();
         Fractal::add(
             fractal_core,
             "Fractal Core".to_string(),
-            "mission".to_string(),
+            "Mission goes here".to_string(),
         );
         FractalMember::add(fractal_core, "a".into(), MemberStatus::Citizen);
         let discovery_guild = Guild::add(
@@ -57,8 +59,67 @@ pub mod service {
         Wrapper::emit().history().created_fractal(fractal_account);
     }
 
+    /// Apply to join a guild
+    ///
+    /// # Arguments
+    /// * `fractal_account` - The account number for the fractal of the guild.
+    /// * `slug` - The slug of the guild.
+    /// * `app` - Relevant information to the application.
     #[action]
-    fn apply_guild(fractal_account: AccountNumber, slug: AccountNumber) {}
+    fn apply_guild(fractal_account: AccountNumber, slug: AccountNumber, app: String) {
+        let guild = Guild::get_assert_by_slug(fractal_account, slug);
+        let member = check_some(
+            FractalMember::get(fractal_account, get_sender()),
+            "must be a member of a fractal to apply for its guild",
+        );
+        check(
+            MemberStatus::Exiled != member.member_status.into(),
+            "you are exiled",
+        );
+        GuildApplication::add(guild.id, get_sender(), app);
+    }
+
+    /// Attest Guild Membership application
+    ///
+    /// # Arguments
+    /// * `fractal_account` - The account number for the fractal of the guild.
+    /// * `slug` - The slug of the guild.
+    /// * `member` - Member to attest.
+    /// * `comment` - Any comment relevant to application.
+    /// * `endorses` - True if in favour of application.
+    #[action]
+    fn at_mem_app(
+        fractal_account: AccountNumber,
+        slug: AccountNumber,
+        member: AccountNumber,
+        comment: String,
+        endorses: bool,
+    ) {
+        let sender = get_sender();
+
+        let guild = Guild::get_assert_by_slug(fractal_account, slug);
+        let application = check_some(
+            GuildApplication::get(guild.id, member),
+            "application does not exist",
+        );
+        let fractal_membership = check_some(
+            FractalMember::get(fractal_account, sender),
+            "must be a member of a fractal to attest",
+        );
+        check(
+            MemberStatus::Exiled != fractal_membership.member_status.into(),
+            "you are exiled",
+        );
+        check_some(
+            GuildMember::get(guild.id, sender),
+            "must be member of the guild to attest",
+        );
+        GuildAttest::add(guild.id, member, sender, comment, endorses);
+
+        if guild.rep.unwrap() == sender {
+            application.respond(endorses)
+        }
+    }
 
     /// Starts an evaluation for the specified fractal and evaluation type.
     ///
@@ -96,7 +157,7 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        FractalMember::add(fractal, sender, MemberStatus::Citizen);
+        FractalMember::add(fractal, sender, MemberStatus::Visa);
 
         Wrapper::emit().history().joined_fractal(fractal, sender);
     }

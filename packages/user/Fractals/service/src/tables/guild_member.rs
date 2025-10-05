@@ -26,7 +26,7 @@ impl GuildMember {
     }
 
     pub fn get_assert(guild: GID, member: AccountNumber) -> Self {
-        check_some(Self::get(guild, member), "guild does not exist")
+        check_some(Self::get(guild, member), "guild member does not exist")
     }
 
     pub fn set_pending_score(&mut self, incoming_score: u32) {

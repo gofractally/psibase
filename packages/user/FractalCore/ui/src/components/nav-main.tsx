@@ -3,7 +3,6 @@ import {
     CalendarArrowDownIcon,
     Contact,
     LucideIcon,
-    Search,
     SettingsIcon,
     Users,
 } from "lucide-react";
@@ -36,13 +35,18 @@ interface MenuItem {
 
 export const staticFractalMenus: MenuItem[] = [
     {
-        groupLabel: "Global",
+        groupLabel: "Fractal",
         path: "",
         menus: [
             {
-                title: "Browse",
-                icon: Search,
-                path: "",
+                title: "Membership",
+                icon: Contact,
+                path: "membership",
+            },
+            {
+                title: "Members",
+                icon: Users,
+                path: "members",
             },
 
         ],
@@ -115,9 +119,7 @@ export function NavMain() {
                         {item.menus?.map((menu) => (
                             <NavLink
                                 to={
-                                    isBrowse
-                                        ? item.path
-                                        : `${item.path}/${menu.path}`
+                                    `${item.path}/${menu.path}`
                                 }
                                 end
                             >

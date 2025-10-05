@@ -20,6 +20,9 @@ interface user {
     join: func() -> result<_, error>;
     create-guild: func(display-name: string, slug: string) -> result<_, error>;
 
+    apply-guild: func(guild-slug: string, app: string) -> result<_, error>;
+    attest-membership-app: func(guild-slug: string, member: string, comment: string, endorses: bool) -> result<_, error>;
+
     attest: func(guild-slug: string, group-number: u32) -> result<_, error>;
     propose: func(guild-slug: string, group-number: u32, proposal: list<string>) -> result<_, error>;
     get-group-users: func(guild-slug: string, group-number: u32) -> result<list<string>, error>;

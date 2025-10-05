@@ -83,6 +83,19 @@ impl User for FractalCorePlugin {
         FractalsPlugin::user::join()
     }
 
+    fn apply_guild(guild_slug: String, app: String) -> Result<(), Error> {
+        FractalsPlugin::user::apply_guild(&guild_slug, &app)
+    }
+
+    fn attest_membership_app(
+        guild_slug: String,
+        member: String,
+        comment: String,
+        endorses: bool,
+    ) -> Result<(), Error> {
+        FractalsPlugin::user::attest_membership_app(&guild_slug, &member, &comment, endorses)
+    }
+
     fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
         FractalsPlugin::user::get_group_users(&guild_slug, group_number)
     }

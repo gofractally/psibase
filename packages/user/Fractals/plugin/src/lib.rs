@@ -107,6 +107,20 @@ impl User for FractallyPlugin {
         EvaluationsUser::unregister(&"fractals".to_string(), evaluation_id)
     }
 
+    fn apply_guild(guild_slug: String, app: String) -> Result<(), Error> {
+        let packed_args = fractals::action_structs::apply_guild {
+            fractal_account: get_sender_app()?,
+            slug: guild_slug.as_str().into(),
+            app,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::apply_guild::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
         let packed_args = fractals::action_structs::create_guild {
             fractal: get_sender_app()?,
@@ -117,6 +131,27 @@ impl User for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::create_guild::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn attest_membership_app(
+        guild_slug: String,
+        member: String,
+        comment: String,
+        endorses: bool,
+    ) -> Result<(), Error> {
+        let packed_args = fractals::action_structs::at_mem_app {
+            comment,
+            endorses,
+            fractal_account: get_sender_app()?,
+            member: member.as_str().into(),
+            slug: guild_slug.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::at_mem_app::ACTION_NAME,
             &packed_args,
         )
     }

@@ -3,6 +3,8 @@ mod evaluation_instance;
 mod fractal;
 pub mod fractal_member;
 mod guild;
+mod guild_application;
+mod guild_attest;
 mod guild_member;
 
 #[psibase::service_tables]
@@ -138,6 +140,43 @@ pub mod tables {
         #[secondary_key(2)]
         fn by_score(&self) -> (GID, u32, AccountNumber) {
             (self.guild, self.score, self.member)
+        }
+    }
+
+    #[table(name = "GuildApplicationTable", index = 6)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct GuildApplication {
+        #[graphql(skip)]
+        pub guild: GID,
+        pub member: AccountNumber,
+        pub app: String,
+        pub created_at: psibase::TimePointSec,
+    }
+
+    impl GuildApplication {
+        #[primary_key]
+        fn pk(&self) -> (GID, AccountNumber) {
+            (self.guild, self.member)
+        }
+    }
+
+    #[table(name = "GuildAttestTable", index = 7)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct GuildAttest {
+        #[graphql(skip)]
+        pub guild: GID,
+        pub member: AccountNumber,
+        pub attestee: AccountNumber,
+        pub comment: String,
+        pub endorses: bool,
+    }
+
+    impl GuildAttest {
+        #[primary_key]
+        fn pk(&self) -> (GID, AccountNumber, AccountNumber) {
+            (self.guild, self.member, self.attestee)
         }
     }
 }

@@ -16,6 +16,10 @@ interface user {
     get-group-users: func(guild-slug: string, group-number: u32) -> result<list<string>, error>;
     get-proposal: func(guild-slug: string, group-number: u32) -> result<option<list<string>>, error>;
 
+    apply-guild: func(guild-slug: string, app: string) -> result<_, error>;
+    attest-membership-app: func(guild-slug: string, member: string, comment: string, endorses: bool) -> result<_, error>;
+
+
 
 
 }
