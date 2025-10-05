@@ -11,9 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuild } from "@/hooks/use-guild";
 
 const formatScore = (num: number): string => {
     // Would it be neat to make the score a flat integer out of 100?
@@ -21,10 +19,7 @@ const formatScore = (num: number): string => {
 };
 
 export const AllGuildMembers = () => {
-    const currentFractal = useFractalAccount();
-
-    const guildSlug = useGuildSlug()
-    const { data: guild } = useGuildBySlug(currentFractal, guildSlug)
+    const { data: guild } = useGuild()
     const { data: scores } = useScores(guild?.id);
 
 

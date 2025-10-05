@@ -25,7 +25,7 @@ import {
 import { CreateGuildModal } from "./create-guild-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useGuild } from "@/hooks/use-guild";
 import { useGuildSlug } from "@/hooks/use-guild-id";
 
 export function AppSwitcher() {
@@ -40,7 +40,7 @@ export function AppSwitcher() {
 
     const guildSlug = useGuildSlug();
 
-    const { data: currentGuild } = useGuildBySlug(fractalAccount, guildSlug)
+    const { data: currentGuild } = useGuild()
 
     const { data: chainId } = useChainId();
 

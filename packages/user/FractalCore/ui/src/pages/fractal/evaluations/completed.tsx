@@ -13,14 +13,10 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
-import { useGuildSlug } from "@/hooks/use-guild-id";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuild } from "@/hooks/use-guild";
 
 export const Completed = () => {
-    const guildSlug = useGuildSlug();
-    const fractalAccount = useFractalAccount();
-    const { data: guild } = useGuildBySlug(fractalAccount, guildSlug);
+    const { data: guild } = useGuild();
     const { data: evaluations } = useCompletedEvaluation(guild?.id);
 
     const navigate = useNavigate();

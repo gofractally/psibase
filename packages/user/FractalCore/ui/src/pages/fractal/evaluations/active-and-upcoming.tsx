@@ -16,15 +16,11 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useGuildSlug } from "@/hooks/use-guild-id";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-import { useGuildBySlug } from "@/hooks/use-guild-slug-status";
+import { useGuild } from "@/hooks/use-guild";
 
 export const ActiveAndUpcoming = () => {
-    const currentFractal = useFractalAccount();
-    const guildSlug = useGuildSlug();
 
-    const { data: guild, isPending: isGuildPending } = useGuildBySlug(currentFractal, guildSlug);
+    const { data: guild, isPending: isGuildPending } = useGuild();
 
     const { data: currentUser } = useCurrentUser();
 
