@@ -29,7 +29,7 @@ export const useUnregister = () => {
                 method: "unregister",
                 service: fractalAccount,
                 intf: "user",
-                params: [params.evaluationId],
+                params: [params.guildSlug],
             }));
         },
         onError: (error, params) => {

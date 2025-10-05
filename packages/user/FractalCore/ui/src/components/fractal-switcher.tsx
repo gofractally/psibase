@@ -129,7 +129,7 @@ export function AppSwitcher() {
                                         className="flex flex-1 items-center gap-2"
                                         onClick={() =>
                                             navigate(
-                                                `/guild/${membership.guild.slug}`,
+                                                `/guild/${membership.guild.slug}/`,
                                             )
                                         }
                                     >

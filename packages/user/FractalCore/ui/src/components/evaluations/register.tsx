@@ -20,7 +20,11 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
     const now = useNowUnix();
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center gap-2">
+            <div>
+                Evaluation starts in{" "}
+                {evaluation && humanize(now - evaluation.deliberationStarts)}
+            </div>
             {status.isRegistered ? (
                 <Button
                     variant="secondary"
@@ -49,10 +53,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     {isRegistering ? "Registering" : "Register"}
                 </Button>
             )}
-            <div>
-                Evaluation starts in...{" "}
-                {evaluation && humanize(now - evaluation.deliberationStarts)}
-            </div>
+
         </div>
     );
 };

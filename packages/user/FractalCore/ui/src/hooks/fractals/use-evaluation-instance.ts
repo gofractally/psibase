@@ -18,6 +18,6 @@ export const useEvaluationInstance = () => {
     return {
         evaluation,
         guild,
-        isPending: isPendingGuild || isPendingEval,
+        isPending: isPendingGuild || (isPendingEval && !!guild?.evalInstance),
     };
 };
