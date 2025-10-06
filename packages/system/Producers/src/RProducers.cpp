@@ -30,11 +30,9 @@ struct ProducerQuery
 
    auto allCandidates() const
    {
-      auto idx = Producers::Tables{Producers::service, KvMode::read}
+      return Producers::Tables{Producers::service, KvMode::read}
                      .open<CandidateInfoTable>()
                      .getIndex<0>();
-
-      return TransformedConnection(std::move(idx), [](auto&& row) { return row; });
    }
 
    std::vector<Producer> producers() const
