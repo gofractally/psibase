@@ -274,7 +274,6 @@ add_rs_component_workspace(packages/:Plugins
     aes
     auth-any
     auth-delegate
-    auth-invite
     auth-sig
     base64
     kdf
