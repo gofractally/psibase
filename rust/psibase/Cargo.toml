@@ -31,11 +31,13 @@ lazy_static = "1.4"
 indoc = "2.0"
 sha2 = "0.10"
 mime_guess = "2.0"
+p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
 paste = "1.0"
 pem = "3.0.4"
 percent-encoding = "2.3"
 psibase_macros = { version = "0.21.0", path = "../psibase_macros" }
 psibase_names = { version = "0.21.0", path = "../psibase_names" }
+rand_core = { version = "0.6", features = ["getrandom"] }
 regex = "1"
 ripemd = "0.1"
 scopeguard = "1.2"
