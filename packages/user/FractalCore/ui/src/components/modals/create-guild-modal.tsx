@@ -14,7 +14,7 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-import { useAppForm } from "./form/app-form";
+import { useAppForm } from "../form/app-form";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { getGuildBySlug } from "@/lib/graphql/fractals/getGuildBySlug";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";

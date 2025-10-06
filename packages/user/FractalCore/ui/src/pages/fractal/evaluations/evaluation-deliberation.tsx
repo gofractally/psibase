@@ -35,7 +35,7 @@ const usePageParams = () => {
 };
 
 const useRanking = () => {
-    const { evaluationId, groupNumber } = usePageParams();
+    const { groupNumber } = usePageParams();
     const guildSlug = useGuildSlug();
 
     const { data: groupUsersData } = useGroupUsers(
@@ -62,11 +62,11 @@ const useRanking = () => {
     );
     const { mutateAsync: propose } = usePropose();
 
+
     const { maybeExecute: debounceAccounts } = useAsyncDebouncer(
         async (rankedNumbers: Account[]) => {
             cancel();
             await propose({
-                evaluationId: Number(evaluationId),
                 groupNumber: Number(groupNumber),
                 proposal: rankedNumbers,
             });

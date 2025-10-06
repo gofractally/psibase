@@ -1,20 +1,13 @@
 import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
-// import type { Membership } from "@/lib/graphql/fractals/getMembership";
-// 
-// import dayjs from "dayjs";
+
 import { Plus } from "lucide-react";
 
 import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-// import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
-// import { useMembership } from "@/hooks/fractals/use-membership";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
-// import { getMemberLabel } from "@/lib/getMemberLabel";
-
-// import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -22,11 +15,12 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-// import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useState } from "react";
-import { ApplyGuildModal } from "@/components/apply-guild-modal";
+import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildSlug } from "@/hooks/use-guild-id";
 
 export const MyGuildMembership = () => {
     const fractalAccount = useFractalAccount();
@@ -44,7 +38,10 @@ export const MyGuildMembership = () => {
     } = useFractal();
 
 
-    console.log({ currentUser })
+    const { data: memberships } = useGuildMembershipsOfUser(currentUser)
+
+    const guildSlug = useGuildSlug();
+    const isGuildMember = memberships?.some(membership => membership.guild.slug == guildSlug);
 
     const {
         data: chainId,
@@ -84,7 +81,7 @@ export const MyGuildMembership = () => {
                             fractalAccount={fractalAccount}
                             chainId={chainId}
                         />
-                        <ApplyGuildCard />
+                        {!isGuildMember && <ApplyGuildCard />}
                     </>
                 )}
             </div>

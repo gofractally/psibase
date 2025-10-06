@@ -3,26 +3,28 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
+import { useGuildSlug } from "../use-guild-id";
+import { useFractalAccount } from "./use-fractal-account";
+
 const zParams = z.object({
-    evaluationId: z.number(),
     groupNumber: z.number(),
     proposal: zAccount.array(),
 });
 
-export const usePropose = () =>
-    useMutation({
+export const usePropose = () => {
+    const fractalAccount = useFractalAccount();
+    const guildSlug = useGuildSlug();
+    return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            const { evaluationId, groupNumber, proposal } =
-                zParams.parse(params);
+            const { groupNumber, proposal } = zParams.parse(params);
 
             const pars = {
                 method: "propose",
-                service: fractalsService,
+                service: fractalAccount,
                 intf: "user",
-                params: [evaluationId, groupNumber, proposal],
+                params: [guildSlug, groupNumber, proposal],
             };
 
             void (await getSupervisor().functionCall(pars));
@@ -32,3 +34,4 @@ export const usePropose = () =>
             console.error(message, error);
         },
     });
+};

@@ -53,6 +53,12 @@ impl GuildApplication {
         if accepted {
             GuildMember::add(guild.fractal, self.guild, self.member);
         }
+
+        self.remove()
+    }
+
+    fn remove(&self) {
+        GuildApplicationTable::read_write().remove(&self);
     }
 
     fn save(&self) {

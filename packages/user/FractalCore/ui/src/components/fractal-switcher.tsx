@@ -22,7 +22,7 @@ import {
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
 
-import { CreateGuildModal } from "./create-guild-modal";
+import { CreateGuildModal } from "./modals/create-guild-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuild } from "@/hooks/use-guild";

@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { EvaluationStatus } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 
-import { useFractal } from "./use-fractal";
+import { useGuildSlug } from "../use-guild-id";
 
 export const useWatchStart = (status: EvaluationStatus | undefined) => {
-    const { data: fractal } = useFractal();
     const navigate = useNavigate();
+
+    const guildSlug = useGuildSlug();
 
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
@@ -20,13 +21,10 @@ export const useWatchStart = (status: EvaluationStatus | undefined) => {
 
         if (autoNavigate) {
             navigate(
-                paths.guild.evaluationGroup(
-                    fractal!.fractal!.account,
-                    status.groupNumber!,
-                ),
+                paths.guild.evaluationGroup(guildSlug!, status.groupNumber!),
             );
         }
-    }, [fractal, isAwaitingStart, navigate, status]);
+    }, [guildSlug, isAwaitingStart, navigate, status]);
 
     useEffect(() => {
         if (

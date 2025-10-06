@@ -8,7 +8,7 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 
-import { CreateGuildModal } from "./create-guild-modal";
+import { CreateGuildModal } from "./modals/create-guild-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const CreateAppAccountCard = () => {

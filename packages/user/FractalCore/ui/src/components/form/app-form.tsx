@@ -5,6 +5,7 @@ import { DurationSelect } from "./duration-select";
 import { NumberField } from "./number-field";
 import { SubmitButton } from "./submit-button";
 import { TextField } from "./text-field";
+import { CheckboxField } from "./checkbox-field";
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
     createFormHookContexts();
@@ -15,6 +16,7 @@ const { useAppForm, withForm } = createFormHook({
     fieldComponents: {
         TextField,
         NumberField,
+        CheckboxField,
         DateTime: DateTimePicker24h,
         Duration: DurationSelect,
     },

@@ -114,6 +114,7 @@ export const getStatus = (
     currentTime: number,
 ): EvaluationStatus => {
     const { groups, results, users } = usersAndGroups;
+    if (!evaluation) throw new Error("Evaluation is falsy");
 
     const timeStatus = getTimeStatus(evaluation, currentTime);
 

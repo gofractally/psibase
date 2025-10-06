@@ -18,7 +18,7 @@ export const CurrentEvaluationCard = () => {
 
     useWatchStart(status);
     useWatchAttest(status);
-    useWatchClose(status);
+    const isClosing = useWatchClose(status);
 
     return (
         <div className="w-full rounded-md border p-4">
@@ -31,7 +31,7 @@ export const CurrentEvaluationCard = () => {
             {status?.type == "deliberation" && <Deliberation status={status} />}
             {status?.type == "submission" && <Submission status={status} />}
             {status?.type == "finished" && (
-                <div>✅ Evaluation finished! Waiting to be closed.</div>
+                <div>✅ Evaluation finished! {isClosing ? "Now closing" : "Awaiting to close"}</div>
             )}
         </div>
     );

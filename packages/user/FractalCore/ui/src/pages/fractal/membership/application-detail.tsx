@@ -9,7 +9,9 @@ import {
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
 import { EmptyBlock } from "@/components/empty-block";
-import { useAttestMembershipApp } from "@/hooks/fractals/use-attest-membership-app";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useState } from "react";
+import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-modal";
 
 export const ApplicationDetail = () => {
 
@@ -17,16 +19,17 @@ export const ApplicationDetail = () => {
     const { applicant } = useParams();
     const { data: guild } = useGuild();
 
+    const { data: currentUser } = useCurrentUser();
     const { data: application, isPending } = useGuildApplication(guild?.id, applicant);
 
-    const { mutateAsync: attest } = useAttestMembershipApp()
 
-    console.log({ application, attest })
+    const isSelf = currentUser == applicant;
 
-    // create a modal to attest for the application
-    // 
+    const [showModal, setShowModal] = useState(false);
+
 
     return <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <AttestGuildMemberModal openChange={e => setShowModal(e)} show={showModal} />
         <div className="flex h-9 items-center">
             <h1 className="text-lg font-semibold">Application {applicant}</h1>
         </div>
@@ -74,8 +77,8 @@ export const ApplicationDetail = () => {
                             <div>
                                 {attest.endorses ? "For" : "Against"}
                             </div>
-                        </div>) : <EmptyBlock title="No attestations" onButtonClick={() => {
-
+                        </div>) : <EmptyBlock title="No attestations" onButtonClick={isSelf ? undefined : () => {
+                            setShowModal(true)
                         }} buttonLabel="Create attestation" description="No attestations have been made in favour or against this application." isLoading={isPending} />}
                     </div>
                 </CardContent>

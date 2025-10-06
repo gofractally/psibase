@@ -36,12 +36,12 @@ export const useEvaluationStatus = (
     const isLoading = isLoadingFractal || isLoadingUsersAndGroups;
 
     if (isLoading) return undefined;
-    if (usersAndGroupsError || fractalError) {
+    if (usersAndGroupsError || fractalError || !evaluation) {
         return undefined;
     }
 
     const currentStatus = getStatus(
-        evaluation!,
+        evaluation,
         currentUser!,
         usersAndGroups!,
         now,

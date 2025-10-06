@@ -96,6 +96,10 @@ impl User for FractalCorePlugin {
         FractalsPlugin::user::attest_membership_app(&guild_slug, &member, &comment, endorses)
     }
 
+    fn propose(guild_slug: String, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
+        FractalsPlugin::user::propose(&guild_slug, group_number, &proposal)
+    }
+
     fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
         FractalsPlugin::user::get_group_users(&guild_slug, group_number)
     }
