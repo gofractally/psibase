@@ -14,7 +14,7 @@ on:
 jobs:
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
-    runs-on: ubuntu-large
+    runs-on: ubuntu-latest
     env:
       can-publish: ${{ !! secrets.publish-package-login }}
     strategy:
@@ -25,6 +25,12 @@ jobs:
       - name: Timestamp
         id: ccache_cache_timestamp
         run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >>$GITHUB_OUTPUT
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 24576
+          temp-reserve-mb: 512
+          remove-android: "true"
       - name: Checkout
         uses: actions/checkout@v3
         with:
