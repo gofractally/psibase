@@ -16,6 +16,8 @@ mod service {
     struct EvaluationFinish {
         fractal_account: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
+        guild_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
     }
 
@@ -103,14 +105,14 @@ mod service {
 
         async fn evaluation_finishes(
             &self,
-            condition: String,
+            guild_id: u32,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
             EventQuery::new("history.fractals.evaluation_finished")
-                .condition(condition)
+                .condition(format!("guild_id = {}", guild_id))
                 .first(first)
                 .last(last)
                 .before(before)

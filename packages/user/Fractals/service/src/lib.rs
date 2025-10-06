@@ -207,12 +207,15 @@ pub mod service {
         check_is_eval();
 
         let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
+        let fractal = Guild::get_assert(evaluation.guild).fractal;
 
         evaluation.save_pending_scores();
 
-        Wrapper::emit()
-            .history()
-            .evaluation_finished(evaluation.guild, evaluation.evaluation_id);
+        Wrapper::emit().history().evaluation_finished(
+            fractal,
+            evaluation.guild,
+            evaluation.evaluation_id,
+        );
 
         evaluation.schedule_next_evaluation();
     }
@@ -294,7 +297,7 @@ pub mod service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(guild_id: GID, evaluation_id: u32) {}
+    pub fn evaluation_finished(fractal_account: AccountNumber, guild_id: GID, evaluation_id: u32) {}
 
     #[event(history)]
     pub fn scheduled_evaluation(
