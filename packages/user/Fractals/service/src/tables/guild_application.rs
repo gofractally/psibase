@@ -37,7 +37,7 @@ impl GuildApplication {
         check_some(Self::get(guild, member), "guild application does not exist")
     }
 
-    pub fn respond(&self, accepted: bool) {
+    pub fn conclude(&self, accepted: bool) {
         let guild = Guild::get_assert(self.guild);
 
         GuildAttestTable::read()
