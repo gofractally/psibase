@@ -16,7 +16,7 @@ export type CompletedEvaluation = z.infer<typeof zCompletedEvaluation>;
 
 const getCompletedEvaluationIds = async (guildId: number) => {
     const gql = `{
-        evaluationFinishes(guild: ${guildId}) {
+        evaluationFinishes(guildId: ${guildId}) {
             nodes {
                 evaluationId
             }
@@ -77,7 +77,9 @@ const getEvaluationsMetadata = async (guildId: number) => {
 export const getCompletedEvaluations = async (
     guildId: number,
 ): Promise<CompletedEvaluation[]> => {
-    const evaluationIds = await getCompletedEvaluationIds(guildId);
+    const evaluationIds = await getCompletedEvaluationIds(
+        z.number().int().parse(guildId),
+    );
     const evaluationsMetadata = await getEvaluationsMetadata(guildId);
 
     return evaluationIds
