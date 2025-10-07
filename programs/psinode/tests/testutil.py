@@ -99,13 +99,13 @@ def run_test_wasm(command):
 
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--psinode", default="psinode", help="The path to the psinode executable")
-    parser.add_argument("--log-filter", metavar="FILTER", help="Filter for log messages")
-    parser.add_argument("--log-format", metavar="FORMAT", help="Format for log messages")
-    parser.add_argument("--print-logs", metavar="NODE", action="append", help="Nodes whose logs should be printed")
-    parser.add_argument("--test-packages", metavar="DIRECTORY", help="Directory containing test packages")
-    parser.add_argument("--libsofthsm2", metavar="PATH", help="Path to libsofthsm.so")
-    parser.add_argument("--test-wasms", metavar="PATH", help="Directory containing wasm programs used by the test suite")
+    parser.add_argument('--psinode', default='psinode', help="The path to the psinode executable")
+    parser.add_argument('--log-filter', metavar='FILTER', help="Filter for log messages")
+    parser.add_argument('--log-format', metavar='FORMAT', help="Format for log messages")
+    parser.add_argument('--print-logs', metavar='NODE', action='append', help="Nodes whose logs should be printed")
+    parser.add_argument('--test-packages', metavar='DIRECTORY', help="Directory containing test packages")
+    parser.add_argument('--libsofthsm2', metavar='PATH', help="Path to libsofthsm.so")
+    parser.add_argument('--test-wasms', metavar='PATH', help="Directory containing wasm programs used by the test suite")
     global args
     (args, remaining) = parser.parse_known_args(argv)
     unittest.main(argv=remaining)
