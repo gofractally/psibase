@@ -21,6 +21,7 @@ import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
+import { CreditTable } from "./components/credit-table";
 import { TokenSelector } from "./components/token-selector";
 import { useCredit } from "./hooks/tokensPlugin/useCredit";
 import {
@@ -66,6 +67,8 @@ const PageContents = ({
     isLoading: boolean;
 }) => {
     const { mutateAsync: credit } = useCredit();
+
+    console.log("TOKENS:", tokens);
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>(
         tokens[0].id.toString(),
@@ -252,11 +255,9 @@ const PageContents = ({
                     </form>
                 </form.AppForm>
             </GlowingCard>
-            {/* <CreditTable
-                isLoading={isLoading}
-                user={currentUser}
-                balances={sharedBalances}
-            /> */}
+            {currentUser && selectedToken && (
+                <CreditTable user={currentUser} token={selectedToken} />
+            )}
         </div>
     );
 };
