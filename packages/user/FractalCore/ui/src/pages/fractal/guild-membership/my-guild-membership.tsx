@@ -20,7 +20,7 @@ import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useState } from "react";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export const MyGuildMembership = () => {
     const fractalAccount = useFractalAccount();
@@ -40,7 +40,7 @@ export const MyGuildMembership = () => {
 
     const { data: memberships } = useGuildMembershipsOfUser(currentUser)
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     const isGuildMember = memberships?.some(membership => membership.guild.slug == guildSlug);
 
     const {

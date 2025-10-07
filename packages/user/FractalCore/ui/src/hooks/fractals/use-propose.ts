@@ -5,7 +5,7 @@ import { getSupervisor } from "@psibase/common-lib";
 
 import { zAccount } from "@/lib/zod/Account";
 
-import { useGuildSlug } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-id";
 import { useFractalAccount } from "./use-fractal-account";
 
 const zParams = z.object({
@@ -15,7 +15,7 @@ const zParams = z.object({
 
 export const usePropose = () => {
     const fractalAccount = useFractalAccount();
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
             const { groupNumber, proposal } = zParams.parse(params);

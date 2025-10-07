@@ -1,10 +1,11 @@
 import { z } from "zod";
 
+import { siblingUrl } from "@psibase/common-lib";
+
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "../../graphql";
-import { siblingUrl } from "@psibase/common-lib";
 
 export const zFractal = z
     .object({
@@ -20,10 +21,12 @@ const zFractalRes = z.object({
     guilds: z.object({
         nodes: z
             .object({
-                id: z.number(),
-                rep: z.object({
-                    member: zAccount
-                }).optional(),
+                account: zAccount,
+                rep: z
+                    .object({
+                        member: zAccount,
+                    })
+                    .optional(),
                 displayName: z.string(),
                 council: z.array(zAccount),
                 bio: z.string(),
@@ -51,7 +54,7 @@ export const getFractal = async (owner: Account) => {
         }
         guilds(fractal: "${owner}") {
             nodes {
-                id
+                account
                 rep {
                     member
                 }
@@ -63,7 +66,8 @@ export const getFractal = async (owner: Account) => {
                 }
             }
         }
-    }`, siblingUrl(null, 'fractals', '/graphql')
+    }`,
+        siblingUrl(null, "fractals", "/graphql"),
     );
 
     return zFractalRes.parse(fractal);

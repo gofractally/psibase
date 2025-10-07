@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
             },
 
             {
-                path: "/guild/:guildSlug",
+                path: "/guild/:guildAccount",
                 children: [
                     {
                         path: "",

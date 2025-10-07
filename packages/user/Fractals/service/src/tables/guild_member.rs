@@ -6,11 +6,10 @@ use crate::tables::tables::{Guild, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
-    fn new(fractal: AccountNumber, guild: AccountNumber, member: AccountNumber) -> Self {
+    fn new(guild: AccountNumber, member: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
-            fractal,
             guild,
             member,
             pending_score: None,
@@ -19,8 +18,8 @@ impl GuildMember {
         }
     }
 
-    pub fn add(fractal: AccountNumber, guild: AccountNumber, member: AccountNumber) {
-        Self::new(fractal, guild, member).save();
+    pub fn add(guild: AccountNumber, member: AccountNumber) {
+        Self::new(guild, member).save();
     }
 
     pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {

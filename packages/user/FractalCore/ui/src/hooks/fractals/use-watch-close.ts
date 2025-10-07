@@ -1,11 +1,11 @@
 import { EvaluationStatus } from "@/lib/getStatus";
 
-import { useGuildSlug } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-id";
 import { useCloseEvaluation } from "./use-close-evaluation";
 import { useEvaluationInstance } from "./use-evaluation-instance";
 
 export const useWatchClose = (status: EvaluationStatus | undefined) => {
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const {
         mutateAsync: closeEvaluation,

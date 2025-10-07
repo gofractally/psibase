@@ -110,7 +110,6 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildMember {
-        pub fractal: AccountNumber,
         #[graphql(skip)]
         pub guild: AccountNumber,
         pub member: AccountNumber,
@@ -126,8 +125,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_fractal(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.fractal, self.member, self.guild)
+        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+            (self.member, self.guild)
         }
 
         #[secondary_key(2)]

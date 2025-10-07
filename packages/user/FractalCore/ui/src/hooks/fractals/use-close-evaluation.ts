@@ -43,7 +43,7 @@ export const useCloseEvaluation = () => {
                 queryKey: QueryKey.fractal(fractal),
             });
             queryClient.invalidateQueries({
-                queryKey: QueryKey.guildBySlug(fractal, guildSlug),
+                queryKey: QueryKey.guild(fractal, guildSlug),
             });
         },
     });

@@ -19,11 +19,11 @@ export const zGuild = z.object({
     bio: z.string(),
 });
 
-export const getGuildBySlug = async (fractal: Account, slug: Account) => {
+export const getGuildBySlug = async (guildAccount: Account) => {
     const res = await graphql(
         `
         {
-            guildBySlug(fractal:"${fractal}", slug:"${slug}") {
+            guild(guild:"${guildAccount}") {
                 id
                 displayName
                 rep {
@@ -43,7 +43,7 @@ export const getGuildBySlug = async (fractal: Account, slug: Account) => {
 
     return z
         .object({
-            guildBySlug: zGuild.nullable(),
+            guild: zGuild.nullable(),
         })
-        .parse(res).guildBySlug;
+        .parse(res).guild;
 };

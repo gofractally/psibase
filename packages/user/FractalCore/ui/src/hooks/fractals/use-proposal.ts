@@ -7,11 +7,11 @@ import { supervisor } from "@/supervisor";
 import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
 
-import { useGuildSlug } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-id";
 import { useFractalAccount } from "./use-fractal-account";
 
 export const useProposal = (groupNumber: OptionalNumber) => {
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     const fractal = useFractalAccount();
     return useQuery({
         queryKey: QueryKey.proposal(guildSlug, groupNumber),

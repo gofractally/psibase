@@ -4,12 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { EvaluationStatus } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 
-import { useGuildSlug } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-id";
 
 export const useWatchStart = (status: EvaluationStatus | undefined) => {
     const navigate = useNavigate();
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 

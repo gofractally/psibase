@@ -8,7 +8,7 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 import { useAppForm } from "../form/app-form";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { z } from "zod";
 import { useAttestMembershipApp } from "@/hooks/fractals/use-attest-membership-app";
 
@@ -23,7 +23,7 @@ export const AttestGuildMemberModal = ({
     const { mutateAsync: attest } = useAttestMembershipApp();
 
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const { applicant } = useParams()
 

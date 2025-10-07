@@ -1,14 +1,14 @@
 import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFormatRelative } from "@/hooks/use-format-relative";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 import { Button } from "@shared/shadcn/ui/button";
 
 export const Failed = () => {
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     const { evaluation, } = useEvaluationInstance();
 
     const { hasPassed, label } = useFormatRelative(evaluation?.finishBy);

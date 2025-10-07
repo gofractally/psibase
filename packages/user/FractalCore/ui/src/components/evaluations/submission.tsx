@@ -5,14 +5,14 @@ import { useFormatRelative } from "@/hooks/use-format-relative";
 import { SubmissionPhase } from "@/lib/getStatus";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export const Submission = ({ status }: { status: SubmissionPhase }) => {
     const { label } = useFormatRelative(status.submissionDeadline);
     const date = dayjs.unix(status.submissionDeadline).format("MMMM D HH:mm");
 
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();
 
     if (status.canCloseEarly) {

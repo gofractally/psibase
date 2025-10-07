@@ -6,13 +6,13 @@ import { DeliberationPhase } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
     const { data: fractal } = useFractal();
     const navigate = useNavigate();
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     const { evaluation } = useEvaluationInstance();
 
     if (!fractal || !evaluation) return null;

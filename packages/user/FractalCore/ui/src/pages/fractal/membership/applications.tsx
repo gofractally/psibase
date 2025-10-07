@@ -4,7 +4,7 @@ import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import {
     Table,
     TableBody,
@@ -27,10 +27,10 @@ export const Applications = () => {
     const navigate = useNavigate();
     const [showGuildModal, setShowGuildModal] = useState(false);
 
-    const guildSlug = useGuildSlug();
+    const guildAccount = useGuildAccount();
     const { data: currentUser } = useCurrentUser();
     const { data: memberships, isPending } = useGuildMembershipsOfUser(currentUser)
-    const isGuildMember = memberships?.some(membership => membership.guild.slug == guildSlug);
+    const isGuildMember = memberships?.some(membership => membership.guild.account == guildAccount);
 
     return <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
         <div className="flex h-9 items-center">

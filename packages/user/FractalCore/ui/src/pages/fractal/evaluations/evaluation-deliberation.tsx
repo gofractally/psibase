@@ -18,7 +18,7 @@ import { Account } from "@/lib/zod/Account";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -36,7 +36,7 @@ const usePageParams = () => {
 
 const useRanking = () => {
     const { groupNumber } = usePageParams();
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const { data: groupUsersData } = useGroupUsers(
         guildSlug,

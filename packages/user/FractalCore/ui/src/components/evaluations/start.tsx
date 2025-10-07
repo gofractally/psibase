@@ -6,7 +6,7 @@ import { useStart } from "@/hooks/fractals/use-start";
 import { Button } from "@shared/shadcn/ui/button";
 
 import { ErrorCard } from "../error-card";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 const checkUnableToGroupUsers = (error: PluginError | null): boolean =>
     error ? error.message.includes("unable to group users") : false;
@@ -20,7 +20,7 @@ export const Start = () => {
         error: startError,
     } = useStart();
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const isUnableToGroupUsers = checkUnableToGroupUsers(startError);
     console.log({ isUnableToGroupUsers });

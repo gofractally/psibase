@@ -13,7 +13,7 @@ import {
 
 import { useAppForm } from "../form/app-form";
 import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { z } from "zod";
 
 
@@ -28,7 +28,7 @@ export const ApplyGuildModal = ({
 
     const { data: currentUser } = useCurrentUser();
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
     const navigate = useNavigate();
 
     const form = useAppForm({

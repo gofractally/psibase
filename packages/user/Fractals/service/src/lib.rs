@@ -34,7 +34,7 @@ pub mod service {
             a_account,
             "Discovery".to_string().try_into().unwrap(),
         );
-        GuildMember::add(fractal_core, discovery_guild.account, a_account);
+        GuildMember::add(discovery_guild.account, a_account);
 
         GuildApplication::add(discovery_guild.account, "b".into(), "derp".to_string());
     }
@@ -64,7 +64,7 @@ pub mod service {
             sender,
             "Discovery".to_string().try_into().unwrap(),
         );
-        GuildMember::add(fractal_account, discovery_guild.account, sender);
+        GuildMember::add(discovery_guild.account, sender);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }

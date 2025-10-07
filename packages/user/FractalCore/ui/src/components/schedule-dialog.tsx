@@ -12,7 +12,7 @@ import {
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 
 interface Props {
@@ -46,7 +46,7 @@ export const ScheduleDialog = ({
     const { mutateAsync: setSchedule } = useSetSchedule();
 
     const fractal = useFractalAccount();
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const { evaluation, guild, isPending } = useEvaluationInstance();
 

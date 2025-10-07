@@ -8,11 +8,14 @@ import { useFractalAccount } from "./use-fractal-account";
 export const useGuildMembershipsOfUser = (user: OptionalAccount) => {
     const fractal = useFractalAccount();
     return useQuery({
-        queryKey: QueryKey.guildMemberships(fractal, user),
+        queryKey: QueryKey.guildMemberships(user),
         enabled: !!fractal && !!user,
         queryFn: async () => {
             try {
-                return await getGuildMemberships(fractal!, user!);
+                return (await getGuildMemberships(user!)).filter(
+                    (membership) =>
+                        membership.guild.fractal.account === fractal,
+                );
             } catch (error) {
                 const message = "Error getting memberships";
                 console.error(message, error);

@@ -34,7 +34,7 @@ impl Guild {
         let new_guild_instance = Self::new(fractal, guild, rep, display_name);
         new_guild_instance.save();
 
-        GuildMember::add(fractal, new_guild_instance.account, rep);
+        GuildMember::add(new_guild_instance.account, rep);
         new_guild_instance
     }
 

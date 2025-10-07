@@ -17,7 +17,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 interface MenuItem {
     groupLabel: string;
@@ -58,12 +58,14 @@ export const staticFractalMenus: MenuItem[] = [
 export function NavMain() {
     const location = useLocation();
 
-    const guildSlug = useGuildSlug();
+    const guildAccount = useGuildAccount();
+
+    console.log({ guildAccount }, 'is guild account ')
 
     const guildMenus: MenuItem[] = [
         {
             groupLabel: "Membership",
-            path: `/guild/${guildSlug}`,
+            path: `/guild/${guildAccount}`,
             menus: [
                 {
                     title: "My membership",
@@ -84,7 +86,7 @@ export function NavMain() {
         },
         {
             groupLabel: "Evaluations",
-            path: `/guild/${guildSlug}`,
+            path: `/guild/${guildAccount}`,
             menus: [
                 {
                     title: "Active & Upcoming",
@@ -100,7 +102,7 @@ export function NavMain() {
         },
         {
             groupLabel: "Governance",
-            path: `/guild/${guildSlug}`,
+            path: `/guild/${guildAccount}`,
             menus: [
                 {
                     title: "Settings",

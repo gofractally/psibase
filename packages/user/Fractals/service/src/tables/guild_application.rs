@@ -38,8 +38,6 @@ impl GuildApplication {
     }
 
     pub fn conclude(&self, accepted: bool) {
-        let guild = Guild::get_assert(self.guild);
-
         GuildAttestTable::read()
             .get_index_pk()
             .range(
@@ -51,7 +49,7 @@ impl GuildApplication {
             });
 
         if accepted {
-            GuildMember::add(guild.fractal, self.guild, self.member);
+            GuildMember::add(self.guild, self.member);
         }
 
         self.remove()

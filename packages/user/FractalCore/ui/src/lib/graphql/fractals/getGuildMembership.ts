@@ -1,31 +1,44 @@
 import { z } from "zod";
 
 import { fractalsService } from "@/lib/constants";
-import { Account, zAccount } from "@/lib/zod/Account";
+import { Account } from "@/lib/zod/Account";
 
 import { graphql } from "../../graphql";
 
-export const zGuildList = z.object({
-    slug: zAccount,
-    id: z.number().int(),
-    displayName: z.string(),
+const FractalSchema = z.object({
+    account: z.string(),
 });
 
-export type Membership = z.infer<typeof zGuildList>;
+const GuildSchema = z.object({
+    account: z.string(),
+    displayName: z.string(),
+    fractal: FractalSchema,
+});
 
-export const getGuildMemberships = async (
-    fractal: Account,
-    member: Account,
-) => {
+const NodeSchema = z.object({
+    guild: GuildSchema,
+});
+
+const GuildMembershipsSchema = z.object({
+    nodes: z.array(NodeSchema),
+});
+
+const DataSchema = z.object({
+    guildMemberships: GuildMembershipsSchema,
+});
+
+export const getGuildMemberships = async (member: Account) => {
     const res = await graphql(
         `
         {
-            guildMemberships(fractal: "${fractal}", member: "${member}") {
+            guildMemberships(member:"${member}") {
                 nodes {
                     guild {
-                        id
-                        slug
+                        account
                         displayName
+                        fractal {
+                            account
+                        }
                     }
                 }
             }
@@ -34,15 +47,5 @@ export const getGuildMemberships = async (
         fractalsService,
     );
 
-    return z
-        .object({
-            guildMemberships: z.object({
-                nodes: z
-                    .object({
-                        guild: zGuildList,
-                    })
-                    .array(),
-            }),
-        })
-        .parse(res).guildMemberships.nodes;
+    return DataSchema.parse(res).guildMemberships.nodes;
 };

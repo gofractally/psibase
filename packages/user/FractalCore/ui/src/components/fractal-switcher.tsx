@@ -26,7 +26,7 @@ import { CreateGuildModal } from "./modals/create-guild-modal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuild } from "@/hooks/use-guild";
-import { useGuildSlug } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -34,11 +34,10 @@ export function AppSwitcher() {
     const navigate = useNavigate();
 
     const { data: currentUser } = useCurrentUser();
-    const fractalAccount = useFractalAccount();
 
     const { data: memberships, } = useGuildMembershipsOfUser(currentUser);
 
-    const guildSlug = useGuildSlug();
+    const guildSlug = useGuildAccount();
 
     const { data: currentGuild } = useGuild()
 
@@ -117,19 +116,19 @@ export function AppSwitcher() {
                                 membership.guild.displayName;
 
                             const src = createIdenticon(
-                                chainId + fractalAccount + membership.guild.id,
+                                chainId + membership.guild.account,
                             );
 
                             return (
                                 <DropdownMenuItem
-                                    key={membership.guild.id}
+                                    key={membership.guild.account}
                                     className="flex items-center justify-between gap-2 p-2"
                                 >
                                     <div
                                         className="flex flex-1 items-center gap-2"
                                         onClick={() =>
                                             navigate(
-                                                `/guild/${membership.guild.slug}/`,
+                                                `/guild/${membership.guild.account}/`,
                                             )
                                         }
                                     >

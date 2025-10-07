@@ -59,7 +59,7 @@ export const useSetSchedule = () =>
                 queryKey: QueryKey.fractal(fractal),
             });
             queryClient.refetchQueries({
-                queryKey: QueryKey.guildBySlug(fractal, guildSlug),
+                queryKey: QueryKey.guild(fractal, guildSlug),
             });
 
             toast.success("Schedule updated");
