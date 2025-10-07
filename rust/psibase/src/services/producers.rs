@@ -37,7 +37,7 @@ mod service {
     }
 
     #[action]
-    fn unregCandidate() {
+    fn unregCand() {
         unimplemented!();
     }
 

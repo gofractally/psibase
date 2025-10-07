@@ -164,8 +164,8 @@ impl Api for ProducersPlugin {
 
     fn unregister_candidate() {
         add_action_to_transaction(
-            Actions::unregCandidate::ACTION_NAME,
-            &Actions::unregCandidate {}.packed(),
+            Actions::unregCand::ACTION_NAME,
+            &Actions::unregCand {}.packed(),
         )
         .unwrap();
     }

@@ -168,7 +168,7 @@ namespace SystemService
       Tables().open<CandidateInfoTable>().put(CandidateInfo{getSender(), endpoint, claim});
    }
 
-   void Producers::unregCandidate()
+   void Producers::unregCand()
    {
       auto sender = getSender();
 
@@ -176,7 +176,7 @@ namespace SystemService
       check(!std::ranges::contains(producers, sender, &Producer::name),
             "Cannot unregister: account is an active producer");
 
-auto nextProducers = ::getNextProducers();
+      auto nextProducers = ::getNextProducers();
       check(!std::ranges::contains(nextProducers, sender, &Producer::name),
             "Cannot unregister: account is scheduled to become a producer");
 
