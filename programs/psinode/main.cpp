@@ -1248,7 +1248,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // because it's probably a bad idea to reveal the
    // private keys.
    file.keep("", "key");
-   file.keep("", "leeway");
    file.keep("", "database-cache-size");
    //
    to_config(config.loggers, file);
@@ -1271,7 +1270,6 @@ void run(const std::string&              db_path,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
-         uint32_t                        leeway_us,
          RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
@@ -2156,7 +2154,6 @@ int main(int argc, char* argv[])
    std::vector<std::string>    pkcs11_modules;
    std::vector<std::string>    hosts = {};
    std::vector<listen_spec>    listen;
-   uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    bool                        enable_incoming_p2p = false;
@@ -2207,9 +2204,6 @@ int main(int argc, char* argv[])
    opt("pkcs11-module",
        po::value(&pkcs11_modules)->composing()->default_value({}, "")->value_name("path"),
        "Path to a PKCS #11 module to load");
-   // specify default token/service
-   opt("leeway", po::value<uint32_t>(&leeway_us)->default_value(200000),
-       "Transaction leeway, in µs.");
    opt("http-timeout", po::value(&http_timeout)->default_value({}, "")->value_name("seconds"),
        "The maximum time for HTTP clients to send or receive a message");
    opt("service-threads", po::value(&service_threads)->default_value(1, "")->value_name("num"),
@@ -2303,7 +2297,7 @@ int main(int argc, char* argv[])
          restart.soft              = true;
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
              pkcs11_modules, peers, autoconnect, enable_incoming_p2p, hosts, listen, services,
-             http_timeout, service_threads, root_ca, tls_cert, tls_key, leeway_us, restart);
+             http_timeout, service_threads, root_ca, tls_cert, tls_key, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
@@ -2318,7 +2312,7 @@ int main(int argc, char* argv[])
                 po::command_line_parser(argc, argv).options(desc).positional(p).run();
             auto keep_opt = [&restart](const auto& opt)
             {
-               if (opt.string_key == "database" || opt.string_key == "leeway")
+               if (opt.string_key == "database")
                   return true;
                else if (opt.string_key == "key")
                   return !restart.keysChanged;
