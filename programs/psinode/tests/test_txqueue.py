@@ -154,5 +154,16 @@ class TestTransactionQueue(unittest.TestCase):
                     self.assertNotEqual(action['sender'], 'alice')
         self.assertTrue(found_bob)
 
+    @testutil.psinode_test
+    def test_timeout(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+        a.boot(packages=['Minimal', 'Explorer'])
+        a.install(sources=[testutil.test_packages()], packages=['Loop'])
+
+        with self.assertRaises(TransactionError) as ctx:
+            a.push_action('loop', 'loop', 'loop', {})
+
+        self.assertIn("timed out", ctx.exception.trace['error'])
+
 if __name__ == '__main__':
     testutil.main()
