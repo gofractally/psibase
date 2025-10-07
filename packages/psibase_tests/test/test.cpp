@@ -29,7 +29,7 @@ TEST_CASE("kv")
 {
    DefaultTestChain t;
 
-   t.addService(TestKV::service, "TestKV.wasm");
+   t.addService(TestKV::service, "TestKV.wasm", TestKV::flags);
    CHECK(t.from(TestKV::service).to<TestKV>().test().succeeded());
 }  // kv
 
@@ -53,6 +53,21 @@ TEST_CASE("import/export handles")
 
    t.addService(TestExport::service, "TestExport.wasm", TestExport::flags);
    t.addService(TestImport::service, "TestImport.wasm", TestImport::flags);
+   t.http(HttpRequest{
+       .host        = "x-admin.psibase",
+       .rootHost    = "psibase",
+       .method      = "PUT",
+       .target      = "/services/" + TestExport::service.str(),
+       .contentType = "application/wasm",
+       .body        = readWholeFile("TestExport.wasm"),
+   });
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto table = Native::subjective().open<CodeTable>();
+      auto row   = table.get(TestExport::service).value();
+      row.flags |= CodeRow::isReplacement;
+      table.put(row);
+   }
 
    auto exp = t.to<TestExport>();
    auto imp = t.to<TestImport>();

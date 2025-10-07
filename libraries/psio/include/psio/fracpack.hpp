@@ -1570,6 +1570,9 @@ namespace psio
    template <typename T, typename U>
    concept PackableAs = std::is_same_v<T, U> || packable_as_impl<std::remove_cvref_t<T>, U>;
 
+   template <typename T, typename U>
+   constexpr bool packable_as_impl<std::span<T>, std::vector<U>> = PackableAs<T, U>;
+
    template <typename... T, typename... U>
       requires(sizeof...(T) == sizeof...(U))
    constexpr bool packable_as_impl<std::tuple<T...>, std::tuple<U...>> = (PackableAs<T, U> && ...);
