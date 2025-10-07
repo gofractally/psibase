@@ -291,6 +291,7 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
+    fractal-core
     config
     producers
 )
@@ -464,14 +465,6 @@ cargo_psibase_package(
     PATH packages/user/Fractals
     DEPENDS ${Fractals_js_DEP}
 )
-
-cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/FractalCore.psi
-    PATH packages/user/FractalCore
-    DEPENDS ${FractalCore_js_DEP}
-)
-
-
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
@@ -868,6 +861,30 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Config/postinstall.json
 )
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/FractalCore.psi
+    NAME FractalCore
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Vanilla fractal instance deployment"
+    PACKAGE_DEPENDS 
+        "HttpServer(^${PSIBASE_VERSION})" 
+        "Sites(^${PSIBASE_VERSION})" 
+        "Accounts(^${PSIBASE_VERSION})" 
+        "CommonApi(^${PSIBASE_VERSION})" 
+        "Registry(^${PSIBASE_VERSION})" 
+        "StagedTx(^${PSIBASE_VERSION})" 
+        "Transact(^${PSIBASE_VERSION})"
+        "SetCode(^${PSIBASE_VERSION})"
+        "ClientData(^${PSIBASE_VERSION})"
+    SERVICE fractal-core
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_fractal_core} /plugin.wasm
+    DEPENDS ${FractalCore_js_DEP}
+    DEPENDS ${Plugins_DEP}
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/postinstall.json
+)
+
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi

@@ -1,12 +1,11 @@
 [package]
-name = "fractal-core-plugin"
+name = "fractal-core"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-fractal-core = { path = "../service/", version = "0.21.0" }
 psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
