@@ -89,6 +89,42 @@ pub mod service {
         GuildApplication::add(guild.account, get_sender(), app);
     }
 
+    /// Set guild display name
+    ///
+    /// # Arguments
+    /// * `display_name` - New display name of the guild.
+    #[action]
+    fn set_g_disp(display_name: Memo) {
+        Guild::get_assert(get_sender()).set_display_name(display_name);
+    }
+
+    /// Set guild bio
+    ///
+    /// # Arguments
+    /// * `bio` - New bio of the guild.
+    #[action]
+    fn set_g_bio(bio: Memo) {
+        Guild::get_assert(get_sender()).set_bio(bio);
+    }
+
+    /// Set guild description
+    ///
+    /// # Arguments
+    /// * `description` - New description of the guild.
+    #[action]
+    fn set_g_desc(description: String) {
+        Guild::get_assert(get_sender()).set_description(description);
+    }
+
+    /// Kick member from guild
+    ///
+    /// # Arguments
+    /// * `member` - Guild member to be kicked.
+    #[action]
+    fn guild_kick(member: AccountNumber) {
+        GuildMember::get_assert(get_sender(), member).kick();
+    }
+
     /// Attest Guild Membership application
     ///
     /// # Arguments

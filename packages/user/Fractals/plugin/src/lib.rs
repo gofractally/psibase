@@ -66,6 +66,21 @@ impl Admin for FractallyPlugin {
         )
     }
 
+    fn set_guild_description(guild_account: String, description: String) -> Result<(), Error> {
+        // Lookup the guild, check the fractal for the guild
+        // Use permissions plugin to allow the u
+
+        // assert_authorized_with_whitelist(FunctionName::sign, vec!["fractal_account_here".into()])?;
+
+        // let packed_args = fractals::action_structs::set_g_desc { description }.packed();
+
+        // add_action_to_transaction(
+        //     fractals::action_structs::set_g_desc::ACTION_NAME,
+        //     &packed_args,
+        // )
+        Ok(())
+    }
+
     fn set_schedule(
         registration: u32,
         deliberation: u32,

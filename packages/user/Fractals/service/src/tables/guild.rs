@@ -69,7 +69,7 @@ impl Guild {
     }
 
     pub fn council_members(&self) -> Vec<GuildMember> {
-        let guild_members: Vec<GuildMember> = GuildMemberTable::read()
+        GuildMemberTable::read()
             .get_index_by_score()
             .range(
                 (self.account, 0, AccountNumber::new(0))
@@ -78,14 +78,27 @@ impl Guild {
             .rev()
             .take(6)
             .filter(|member| member.score != 0)
-            .collect();
-
-        guild_members
+            .collect()
     }
 
     pub fn representative(&self) -> Option<GuildMember> {
         self.rep
             .map(|rep| GuildMember::get_assert(self.account, rep))
+    }
+
+    pub fn set_display_name(&mut self, display_name: Memo) {
+        self.display_name = display_name;
+        self.save();
+    }
+
+    pub fn set_bio(&mut self, bio: Memo) {
+        self.bio = bio;
+        self.save();
+    }
+
+    pub fn set_description(&mut self, description: String) {
+        self.description = description;
+        self.save();
     }
 
     fn save(&self) {

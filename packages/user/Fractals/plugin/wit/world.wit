@@ -11,6 +11,10 @@ interface admin {
     start: func(guild-account: string) -> result<_, error>;
     close-eval: func(guild-account: string) -> result<_, error>;
 
+
+    set-guild-description: func(guild-account: string, description: string) -> result<_, error>;
+
+
 }
 
 

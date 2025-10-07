@@ -170,5 +170,10 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
             (self.guild, self.member, self.attestee)
         }
+
+        #[secondary_key(1)]
+        fn by_attestee(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.guild, self.attestee, self.member)
+        }
     }
 }

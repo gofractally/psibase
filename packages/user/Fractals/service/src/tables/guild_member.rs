@@ -2,7 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildMember, GuildMemberTable};
+use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -42,6 +42,16 @@ impl GuildMember {
             self.score = calculate_ema_u32(pending_score, self.score, Fraction::new(1, 6));
             self.save();
         });
+    }
+
+    pub fn kick(&self) {
+        GuildAttest::drop_user_attestations(self.guild, self.member);
+
+        self.remove();
+    }
+
+    fn remove(&self) {
+        GuildMemberTable::read_write().remove(&self);
     }
 
     fn save(&self) {
