@@ -70,17 +70,12 @@ pub mod service {
     use crate::tables::{Credential, CredentialId, CredentialTable, InitRow, InitTable};
     use crate::CREDENTIAL_SENDER;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
-    use psibase::services::{accounts, transact, transact::ServiceMethod};
+    use psibase::services::{transact, transact::ServiceMethod};
     use psibase::*;
 
     #[action]
     fn init() {
         InitTable::new().put(&InitRow {}).unwrap();
-        accounts::Wrapper::call().newAccount(
-            AccountNumber::from(CREDENTIAL_SENDER),
-            Wrapper::SERVICE,
-            false,
-        );
     }
 
     #[pre_action(exclude(init))]

@@ -116,15 +116,15 @@ class TestPsibase(unittest.TestCase):
                   "service":"accounts",
                   "method":"newAccount",
                   "data":{"name":account,"authService":"auth-any","requireNew":False}}])
-        a.run_psibase(['push'] + a.node_args(), input=make_input('a1'), text=True)
-        a.run_psibase(['push', '-'] + a.node_args(), input=make_input('a2'), text=True)
+        a.run_psibase(['push'] + a.node_args(), input=make_input('bbbbb12345'), text=True)
+        a.run_psibase(['push', '-'] + a.node_args(), input=make_input('ccccc12345'), text=True)
         with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8') as f:
-            f.write(make_input('a3'))
+            f.write(make_input('ddddd12345'))
             f.flush()
             a.run_psibase(['push', f.name] + a.node_args())
 
         a.wait(new_block())
-        for account in ['a1', 'a2', 'a3']:
+        for account in ['bbbbb12345', 'ccccc12345', 'ddddd12345']:
             res = a.graphql('accounts', 'query { getAccount(accountName: "%s") { authService } }' % account)
             self.assertEqual(res['getAccount']['authService'], 'auth-any')
 
@@ -246,13 +246,13 @@ class TestPsibase(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         # A non-existent account should be an error
-        for source in ['neminis', 'http://neminis.a/']:
+        for source in ['neminis', 'http://neminis.aaaaaaa123/']:
             status = a.run_psibase(['list', '--package-source', source] + a.node_args(), encoding='utf-8', stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, check=False)
             self.assertNotEqual(status.returncode, 0)
             self.assertIn("account 'neminis' does not exist", status.stderr)
 
         # An existing account is okay even if it wasn't intended as a package repo
-        for source in ['transact', 'http://transact.a']:
+        for source in ['transact', 'http://transact.aaaaaaa123']:
             l = a.run_psibase(['list', '--available', '--package-source', 'transact'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
             self.assertEqual(l, "")
 
@@ -366,19 +366,19 @@ class TestPsibase(unittest.TestCase):
         key = PrivateKey()
         key_file = os.path.join(a.dir, 'key')
 
-        accounts.new_account('b')
-        auth_sig.set_key('a', key)
+        accounts.new_account('bbbbbbb123')
+        auth_sig.set_key('aaaaaaa123', key)
         a.wait(new_block())
 
-        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', 'b'])
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', 'bbbbbbb123'])
         a.wait(new_block())
 
         # This should fail because the transaction was only proposed
         with self.assertRaises(requests.HTTPError):
             a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
 
-        for tx in staged_tx.get_staged(proposer='b'):
-            staged_tx.accept('a', tx, keys=[key])
+        for tx in staged_tx.get_staged(proposer='bbbbbbb123'):
+            staged_tx.accept('aaaaaaa123', tx, keys=[key])
 
         a.wait(new_block())
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
