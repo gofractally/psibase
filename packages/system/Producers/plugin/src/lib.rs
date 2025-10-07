@@ -33,6 +33,7 @@ struct CandidateLookupClaim {
 
 #[derive(Deserialize)]
 struct CandidateLookupCandidateInfo {
+    account: String,
     claim: CandidateLookupClaim,
 }
 
@@ -49,10 +50,11 @@ struct CandidateLookupData {
 }
 
 impl ProducersPlugin {
-    fn candidates_claims(accounts: &Vec<String>) -> Result<Vec<psibase::Claim>, Error> {
+    fn candidates_claims(accounts: &Vec<String>) -> Result<Vec<(String, psibase::Claim)>, Error> {
         let query = format!(
             r#"query {{
             candidatesInfo(names: [{names}]) {{
+                account
                 claim {{
                     service
                     rawData
@@ -75,30 +77,32 @@ impl ProducersPlugin {
             return Err(InvalidResponse(format!("Some candidate(s) not found")).into());
         }
 
-        let mut result: Vec<psibase::Claim> = vec![];
+        let mut result: Vec<(String, psibase::Claim)> = vec![];
         for candidate_info in claims {
             let der_bytes = hex::decode(&candidate_info.claim.raw_data)
                 .map_err(|e| InvalidResponse(format!("Invalid hex in candidate data: {}", e)))?;
             let spki = SubjectPublicKeyInfo(der_bytes);
 
-            result.push(psibase::Claim {
+            let claim = psibase::Claim {
                 service: AccountNumber::from(candidate_info.claim.service.as_str()),
                 rawData: spki.0.into(),
-            });
+            };
+
+            result.push((candidate_info.account, claim));
         }
 
         Ok(result)
     }
 
     fn lookup_candidates(accounts: &Vec<String>) -> Result<Vec<psibase::Producer>, Error> {
-        let claims = Self::candidates_claims(accounts)?;
+        let account_claims = Self::candidates_claims(accounts)?;
 
-        Ok(accounts
+        Ok(account_claims
             .into_iter()
-            .map(|account| AccountNumber::from(account.as_str()))
-            .into_iter()
-            .zip(claims.into_iter())
-            .map(|(name, auth)| Producer { name, auth })
+            .map(|(account, auth)| Producer {
+                name: AccountNumber::from(account.as_str()),
+                auth,
+            })
             .collect())
     }
 
