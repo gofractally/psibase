@@ -157,9 +157,9 @@ impl User for FractallyPlugin {
     }
 
     fn get_proposal(guild_slug: String, group_number: u32) -> Result<Option<Vec<String>>, Error> {
-        let slug: AccountNumber = guild_slug.as_str().into();
+        let guild_slug: AccountNumber = guild_slug.as_str().into();
 
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
             .ok_or(ErrorType::NoPendingEvaluation)?;
 
         match EvaluationsUser::get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
@@ -185,24 +185,24 @@ impl User for FractallyPlugin {
     }
 
     fn attest(guild_slug: String, group_number: u32) -> Result<(), Error> {
-        let slug: AccountNumber = guild_slug.as_str().into();
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+        let guild_slug: AccountNumber = guild_slug.as_str().into();
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
             .ok_or(ErrorType::NoPendingEvaluation)?;
 
         EvaluationsUser::attest(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
-        let slug: AccountNumber = guild_slug.as_str().into();
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+        let guild_slug: AccountNumber = guild_slug.as_str().into();
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
             .ok_or(ErrorType::NoPendingEvaluation)?;
 
         EvaluationsUser::get_group_users(&"fractals".to_string(), evaluation_id, group_number)
     }
 
     fn propose(guild_slug: String, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
-        let slug: AccountNumber = guild_slug.as_str().into();
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, slug)?
+        let guild_slug: AccountNumber = guild_slug.as_str().into();
+        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
             .ok_or(ErrorType::NoPendingEvaluation)?;
 
         let all_users: Vec<AccountNumber> =
