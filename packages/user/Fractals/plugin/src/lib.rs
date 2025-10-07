@@ -26,19 +26,24 @@ use crate::helpers::{check_app_origin, get_sender_app};
 struct FractallyPlugin;
 
 impl Admin for FractallyPlugin {
-    fn close_eval(guild_slug: String) -> Result<(), Error> {
-        let evaluation_id =
-            fetch_guild_eval_instance(get_sender_app()?, guild_slug.as_str().into())?
-                .ok_or(ErrorType::NoPendingEvaluation)?;
+    fn close_eval(guild_account: String) -> Result<(), Error> {
+        let evaluation_id = fetch_guild_eval_instance(guild_account.parse().unwrap())?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
 
         close(&"fractals".to_string(), evaluation_id)
     }
 
-    fn create_fractal(account: String, name: String, mission: String) -> Result<(), Error> {
+    fn create_fractal(
+        fractal_account: String,
+        guild_account: String,
+        name: String,
+        mission: String,
+    ) -> Result<(), Error> {
         check_app_origin()?;
 
         let packed_args = fractals::action_structs::create_fractal {
-            fractal_account: account.parse().unwrap(),
+            fractal_account: fractal_account.parse().unwrap(),
+            guild_account: guild_account.parse().unwrap(),
             name,
             mission,
         }
@@ -49,10 +54,9 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn start(guild_slug: String) -> Result<(), Error> {
+    fn start(guild_account: String) -> Result<(), Error> {
         let packed_args = fractals::action_structs::start_eval {
-            fractal_account: get_sender_app()?,
-            slug: guild_slug.as_str().into(),
+            guild_account: guild_account.as_str().into(),
         }
         .packed();
 
@@ -63,7 +67,6 @@ impl Admin for FractallyPlugin {
     }
 
     fn set_schedule(
-        guild_slug: String,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -74,7 +77,6 @@ impl Admin for FractallyPlugin {
         // the plugin needs to know that the guild in reference
 
         let packed_args = fractals::action_structs::set_schedule {
-            guild_slug: guild_slug.as_str().into(),
             deliberation,
             finish_by,
             interval_seconds,
@@ -91,26 +93,23 @@ impl Admin for FractallyPlugin {
 }
 
 impl User for FractallyPlugin {
-    fn register(guild_slug: String) -> Result<(), Error> {
-        let evaluation_id =
-            fetch_guild_eval_instance(get_sender_app()?, guild_slug.as_str().into())?
-                .ok_or(ErrorType::NoPendingEvaluation)?;
+    fn register(guild_account: String) -> Result<(), Error> {
+        let evaluation_id = fetch_guild_eval_instance(guild_account.parse().unwrap())?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
 
         EvaluationsUser::register(&"fractals".to_string(), evaluation_id)
     }
 
-    fn unregister(guild_slug: String) -> Result<(), Error> {
-        let evaluation_id =
-            fetch_guild_eval_instance(get_sender_app()?, guild_slug.as_str().into())?
-                .ok_or(ErrorType::NoPendingEvaluation)?;
+    fn unregister(guild_account: String) -> Result<(), Error> {
+        let evaluation_id: u32 = fetch_guild_eval_instance(guild_account.as_str().into())?
+            .ok_or(ErrorType::NoPendingEvaluation)?;
 
         EvaluationsUser::unregister(&"fractals".to_string(), evaluation_id)
     }
 
-    fn apply_guild(guild_slug: String, app: String) -> Result<(), Error> {
+    fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
         let packed_args = fractals::action_structs::apply_guild {
-            fractal_account: get_sender_app()?,
-            slug: guild_slug.as_str().into(),
+            guild_account: guild_account.as_str().into(),
             app,
         }
         .packed();
@@ -121,11 +120,11 @@ impl User for FractallyPlugin {
         )
     }
 
-    fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
+    fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let packed_args = fractals::action_structs::create_guild {
             fractal: get_sender_app()?,
             display_name: Memo::try_from(display_name).unwrap(),
-            slug: slug.as_str().into(),
+            guild_account: guild_account.as_str().into(),
         }
         .packed();
 
@@ -136,7 +135,7 @@ impl User for FractallyPlugin {
     }
 
     fn attest_membership_app(
-        guild_slug: String,
+        guild_account: String,
         member: String,
         comment: String,
         endorses: bool,
@@ -144,9 +143,8 @@ impl User for FractallyPlugin {
         let packed_args = fractals::action_structs::at_mem_app {
             comment,
             endorses,
-            fractal_account: get_sender_app()?,
+            guild_account: guild_account.as_str().into(),
             member: member.as_str().into(),
-            slug: guild_slug.as_str().into(),
         }
         .packed();
 
@@ -156,11 +154,14 @@ impl User for FractallyPlugin {
         )
     }
 
-    fn get_proposal(guild_slug: String, group_number: u32) -> Result<Option<Vec<String>>, Error> {
-        let guild_slug: AccountNumber = guild_slug.as_str().into();
+    fn get_proposal(
+        guild_account: String,
+        group_number: u32,
+    ) -> Result<Option<Vec<String>>, Error> {
+        let guild_account: AccountNumber = guild_account.as_str().into();
 
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
-            .ok_or(ErrorType::NoPendingEvaluation)?;
+        let evaluation_id =
+            fetch_guild_eval_instance(guild_account)?.ok_or(ErrorType::NoPendingEvaluation)?;
 
         match EvaluationsUser::get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
             None => Ok(None),
@@ -184,25 +185,28 @@ impl User for FractallyPlugin {
         }
     }
 
-    fn attest(guild_slug: String, group_number: u32) -> Result<(), Error> {
-        let guild_slug: AccountNumber = guild_slug.as_str().into();
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
-            .ok_or(ErrorType::NoPendingEvaluation)?;
+    fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
+        let guild_account: AccountNumber = guild_account.as_str().into();
+        let evaluation_id =
+            fetch_guild_eval_instance(guild_account)?.ok_or(ErrorType::NoPendingEvaluation)?;
 
         EvaluationsUser::attest(&"fractals".to_string(), evaluation_id, group_number)
     }
 
-    fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
-        let guild_slug: AccountNumber = guild_slug.as_str().into();
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
-            .ok_or(ErrorType::NoPendingEvaluation)?;
+    fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
+        let guild_account: AccountNumber = guild_account.as_str().into();
+        let evaluation_id =
+            fetch_guild_eval_instance(guild_account)?.ok_or(ErrorType::NoPendingEvaluation)?;
 
         EvaluationsUser::get_group_users(&"fractals".to_string(), evaluation_id, group_number)
     }
 
-    fn propose(guild_slug: String, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
-        let guild_slug: AccountNumber = guild_slug.as_str().into();
-        let evaluation_id = fetch_guild_eval_instance(get_sender_app()?, guild_slug)?
+    fn propose(
+        guild_account: String,
+        group_number: u32,
+        proposal: Vec<String>,
+    ) -> Result<(), Error> {
+        let evaluation_id = fetch_guild_eval_instance(guild_account.parse().unwrap())?
             .ok_or(ErrorType::NoPendingEvaluation)?;
 
         let all_users: Vec<AccountNumber> =

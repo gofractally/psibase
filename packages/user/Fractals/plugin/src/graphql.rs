@@ -4,23 +4,20 @@ use crate::{bindings::host::common::server as CommonServer, errors::ErrorType};
 use psibase::AccountNumber;
 use serde::{Deserialize, Serialize};
 
-pub fn fetch_guild_eval_instance(
-    fractal: AccountNumber,
-    slug: AccountNumber,
-) -> Result<Option<u32>, Error> {
+pub fn fetch_guild_eval_instance(guild: AccountNumber) -> Result<Option<u32>, Error> {
     let query = format!(
         r#"query {{
-            guildBySlug(fractal: "{}", slug: "{}") {{
+            guild(guild: "{}") {{
                 evalInstance {{
                     evaluationId
                 }}
             }}
         }}"#,
-        fractal, slug
+        guild
     );
     Response::try_from(CommonServer::post_graphql_get_json(&query)?).map(|res| {
         res.data
-            .guild_by_slug
+            .guild
             .eval_instance
             .map(|instance| instance.evaluation_id)
     })
@@ -34,12 +31,12 @@ pub struct Response {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Data {
-    guild_by_slug: GuildBySlug,
+    guild: Guild,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GuildBySlug {
+pub struct Guild {
     eval_instance: Option<EvalInstance>,
 }
 

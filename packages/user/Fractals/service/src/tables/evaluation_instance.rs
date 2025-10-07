@@ -1,7 +1,7 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
-use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable, GID};
+use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
     tables::tables::{EvaluationInstance, EvaluationInstanceTable},
@@ -9,15 +9,15 @@ use crate::{
 use async_graphql::ComplexObject;
 
 impl EvaluationInstance {
-    pub fn get(guild: GID) -> Option<Self> {
+    pub fn get(guild: AccountNumber) -> Option<Self> {
         EvaluationInstanceTable::read().get_index_pk().get(&guild)
     }
 
-    pub fn get_assert(guild: GID) -> Self {
+    pub fn get_assert(guild: AccountNumber) -> Self {
         check_some(Self::get(guild), "failed to find guild")
     }
 
-    fn new(guild: GID, interval: u32, evaluation_id: u32) -> Self {
+    fn new(guild: AccountNumber, interval: u32, evaluation_id: u32) -> Self {
         Self {
             guild,
             evaluation_id,
@@ -25,7 +25,7 @@ impl EvaluationInstance {
         }
     }
 
-    fn add(guild: GID, interval: u32, evaluation_id: u32) -> Self {
+    fn add(guild: AccountNumber, interval: u32, evaluation_id: u32) -> Self {
         let instance = Self::new(guild, interval, evaluation_id);
         instance.save();
         instance
@@ -85,7 +85,7 @@ impl EvaluationInstance {
     }
 
     fn create_evaluation(
-        guild: GID,
+        guild: AccountNumber,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -137,7 +137,7 @@ impl EvaluationInstance {
     }
 
     pub fn set_evaluation_schedule(
-        guild: GID,
+        guild: AccountNumber,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -204,9 +204,6 @@ impl EvaluationInstance {
 #[ComplexObject]
 impl EvaluationInstance {
     pub async fn guild_instance(&self) -> Guild {
-        GuildTable::read()
-            .get_index_pk()
-            .get(&self.evaluation_id)
-            .unwrap()
+        GuildTable::read().get_index_pk().get(&self.guild).unwrap()
     }
 }

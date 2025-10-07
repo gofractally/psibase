@@ -1,11 +1,11 @@
 use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GID};
+use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable};
 
 impl GuildAttest {
     fn new(
-        guild: GID,
+        guild: AccountNumber,
         member: AccountNumber,
         attestee: AccountNumber,
         comment: String,
@@ -21,7 +21,7 @@ impl GuildAttest {
     }
 
     pub fn add(
-        guild: GID,
+        guild: AccountNumber,
         member: AccountNumber,
         attestee: AccountNumber,
         comment: String,
@@ -30,13 +30,21 @@ impl GuildAttest {
         Self::new(guild, member, attestee, comment, endorses).save();
     }
 
-    pub fn get(guild: GID, member: AccountNumber, attestee: AccountNumber) -> Option<Self> {
+    pub fn get(
+        guild: AccountNumber,
+        member: AccountNumber,
+        attestee: AccountNumber,
+    ) -> Option<Self> {
         GuildAttestTable::read()
             .get_index_pk()
             .get(&(guild, member, attestee))
     }
 
-    pub fn get_assert(guild: GID, member: AccountNumber, attestee: AccountNumber) -> Self {
+    pub fn get_assert(
+        guild: AccountNumber,
+        member: AccountNumber,
+        attestee: AccountNumber,
+    ) -> Self {
         check_some(
             Self::get(guild, member, attestee),
             "guild attestation does not exist",

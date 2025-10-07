@@ -2,12 +2,11 @@ use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GID};
+use crate::tables::tables::{Guild, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
 
-
 impl GuildMember {
-    fn new(fractal: AccountNumber, guild: GID, member: AccountNumber) -> Self {
+    fn new(fractal: AccountNumber, guild: AccountNumber, member: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
@@ -16,21 +15,21 @@ impl GuildMember {
             member,
             pending_score: None,
             score: 0,
-            created_at: now
+            created_at: now,
         }
     }
 
-    pub fn add(fractal: AccountNumber, guild: GID, member: AccountNumber) {
+    pub fn add(fractal: AccountNumber, guild: AccountNumber, member: AccountNumber) {
         Self::new(fractal, guild, member).save();
     }
 
-    pub fn get(guild: GID, member: AccountNumber) -> Option<Self> {
+    pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {
         GuildMemberTable::read()
             .get_index_pk()
             .get(&(guild, member))
     }
 
-    pub fn get_assert(guild: GID, member: AccountNumber) -> Self {
+    pub fn get_assert(guild: AccountNumber, member: AccountNumber) -> Self {
         check_some(Self::get(guild, member), "guild member does not exist")
     }
 

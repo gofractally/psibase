@@ -2,70 +2,52 @@ use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
-    Config, EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable,
-    GuildTable, GID,
+    EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
 };
 
 impl Guild {
     fn new(
         fractal: AccountNumber,
+        guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
-        slug: AccountNumber,
     ) -> Self {
         Self {
-            id: Config::get_assert().gen_id(),
+            account: guild,
             fractal,
             bio: "".to_string().try_into().unwrap(),
             display_name,
             rep: Some(rep),
             description: "".to_string(),
-            slug,
         }
     }
 
     pub fn add(
         fractal: AccountNumber,
+        guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
-        slug: AccountNumber,
     ) -> Self {
-        check_none(
-            GuildTable::read().get_index_by_slug().get(&(fractal, slug)),
-            "slug already in use",
-        );
+        check_none(Self::get(guild), "guild already exists");
         FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();
 
-        let new_instance = Self::new(fractal, rep, display_name, slug);
-        new_instance.save();
+        let new_guild_instance = Self::new(fractal, guild, rep, display_name);
+        new_guild_instance.save();
 
-        GuildMember::add(fractal, new_instance.id, rep);
-        new_instance
+        GuildMember::add(fractal, new_guild_instance.account, rep);
+        new_guild_instance
     }
 
-    pub fn get(id: GID) -> Option<Self> {
-        GuildTable::read().get_index_pk().get(&id)
+    pub fn get(account: AccountNumber) -> Option<Self> {
+        GuildTable::read().get_index_pk().get(&account)
     }
 
-    pub fn get_assert(id: GID) -> Self {
-        check_some(Self::get(id), "guild does not exist")
-    }
-
-    pub fn get_by_slug(fractal: AccountNumber, guild_slug: AccountNumber) -> Option<Self> {
-        GuildTable::read()
-            .get_index_by_slug()
-            .get(&(fractal, guild_slug))
-    }
-
-    pub fn get_assert_by_slug(fractal: AccountNumber, guild_slug: AccountNumber) -> Self {
-        check_some(
-            Self::get_by_slug(fractal, guild_slug),
-            "guild does not exist",
-        )
+    pub fn get_assert(account: AccountNumber) -> Self {
+        check_some(Self::get(account), "guild does not exist")
     }
 
     pub fn evaluation(&self) -> Option<EvaluationInstance> {
-        EvaluationInstance::get(self.id)
+        EvaluationInstance::get(self.account)
     }
 
     pub fn set_schedule(
@@ -77,7 +59,7 @@ impl Guild {
         interval_seconds: u32,
     ) {
         EvaluationInstance::set_evaluation_schedule(
-            self.id,
+            self.account,
             registration,
             deliberation,
             submission,
@@ -90,8 +72,8 @@ impl Guild {
         let guild_members: Vec<GuildMember> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
-                (self.id, 0, AccountNumber::new(0))
-                    ..=(self.id, u32::MAX, AccountNumber::new(u64::MAX)),
+                (self.account, 0, AccountNumber::new(0))
+                    ..=(self.account, u32::MAX, AccountNumber::new(u64::MAX)),
             )
             .rev()
             .take(6)
@@ -102,7 +84,8 @@ impl Guild {
     }
 
     pub fn representative(&self) -> Option<GuildMember> {
-        self.rep.map(|rep| GuildMember::get_assert(self.id, rep))
+        self.rep
+            .map(|rep| GuildMember::get_assert(self.account, rep))
     }
 
     fn save(&self) {
@@ -113,7 +96,7 @@ impl Guild {
 #[ComplexObject]
 impl Guild {
     pub async fn eval_instance(&self) -> Option<EvaluationInstance> {
-        EvaluationInstance::get(self.id)
+        EvaluationInstance::get(self.account)
     }
 
     pub async fn fractal(&self) -> Fractal {

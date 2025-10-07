@@ -52,17 +52,16 @@ struct FractalCorePlugin;
 
 impl Admin for FractalCorePlugin {
     fn set_schedule(
-        guild_slug: String,
+        guild_account: String,
         registration: u32,
         deliberation: u32,
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
-        let _latch = ProposeLatch::new(&get_receiver());
+        let _latch = ProposeLatch::new(&guild_account);
 
         FractalsPlugin::admin::set_schedule(
-            &guild_slug,
             registration,
             deliberation,
             submission,
@@ -71,8 +70,8 @@ impl Admin for FractalCorePlugin {
         )
     }
 
-    fn close_eval(guild_slug: String) -> Result<(), Error> {
-        FractalsPlugin::admin::close_eval(&guild_slug)
+    fn close_eval(guild_account: String) -> Result<(), Error> {
+        FractalsPlugin::admin::close_eval(&guild_account)
     }
 }
 
@@ -83,35 +82,42 @@ impl User for FractalCorePlugin {
         FractalsPlugin::user::join()
     }
 
-    fn apply_guild(guild_slug: String, app: String) -> Result<(), Error> {
-        FractalsPlugin::user::apply_guild(&guild_slug, &app)
+    fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
+        FractalsPlugin::user::apply_guild(&guild_account, &app)
     }
 
     fn attest_membership_app(
-        guild_slug: String,
+        guild_account: String,
         member: String,
         comment: String,
         endorses: bool,
     ) -> Result<(), Error> {
-        FractalsPlugin::user::attest_membership_app(&guild_slug, &member, &comment, endorses)
+        FractalsPlugin::user::attest_membership_app(&guild_account, &member, &comment, endorses)
     }
 
-    fn propose(guild_slug: String, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
-        FractalsPlugin::user::propose(&guild_slug, group_number, &proposal)
+    fn propose(
+        guild_account: String,
+        group_number: u32,
+        proposal: Vec<String>,
+    ) -> Result<(), Error> {
+        FractalsPlugin::user::propose(&guild_account, group_number, &proposal)
     }
 
-    fn get_group_users(guild_slug: String, group_number: u32) -> Result<Vec<String>, Error> {
-        FractalsPlugin::user::get_group_users(&guild_slug, group_number)
+    fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
+        FractalsPlugin::user::get_group_users(&guild_account, group_number)
     }
 
-    fn get_proposal(guild_slug: String, group_number: u32) -> Result<Option<Vec<String>>, Error> {
-        FractalsPlugin::user::get_proposal(&guild_slug, group_number)
+    fn get_proposal(
+        guild_account: String,
+        group_number: u32,
+    ) -> Result<Option<Vec<String>>, Error> {
+        FractalsPlugin::user::get_proposal(&guild_account, group_number)
     }
 
-    fn start_eval(guild_slug: String) -> Result<(), Error> {
+    fn start_eval(guild_account: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::start_eval)?;
 
-        FractalsPlugin::admin::start(&guild_slug)
+        FractalsPlugin::admin::start(&guild_account)
     }
 
     fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
@@ -120,16 +126,16 @@ impl User for FractalCorePlugin {
         FractalsPlugin::user::create_guild(&display_name, &slug)
     }
 
-    fn attest(guild_slug: String, group_number: u32) -> Result<(), Error> {
-        FractalsPlugin::user::attest(&guild_slug, group_number)
+    fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
+        FractalsPlugin::user::attest(&guild_account, group_number)
     }
 
-    fn register(slug: String) -> Result<(), Error> {
-        FractalsPlugin::user::register(&slug)
+    fn register(guild_account: String) -> Result<(), Error> {
+        FractalsPlugin::user::register(&guild_account)
     }
 
-    fn unregister(slug: String) -> Result<(), Error> {
-        FractalsPlugin::user::unregister(&slug)
+    fn unregister(guild_account: String) -> Result<(), Error> {
+        FractalsPlugin::user::unregister(&guild_account)
     }
 }
 

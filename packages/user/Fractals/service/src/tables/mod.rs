@@ -61,7 +61,7 @@ pub mod tables {
     #[graphql(complex)]
     pub struct EvaluationInstance {
         #[primary_key]
-        pub guild: GID,
+        pub guild: AccountNumber,
         pub interval: u32,
         pub evaluation_id: u32,
     }
@@ -84,15 +84,12 @@ pub mod tables {
         fn pk(&self) {}
     }
 
-    pub type GID = u32;
-
     #[table(name = "GuildTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Guild {
         #[primary_key]
-        pub id: GID,
-        pub slug: AccountNumber,
+        pub account: AccountNumber,
         #[graphql(skip)]
         pub fractal: AccountNumber,
         pub display_name: Memo,
@@ -104,13 +101,8 @@ pub mod tables {
 
     impl Guild {
         #[secondary_key(1)]
-        pub fn by_fractal(&self) -> (AccountNumber, GID) {
-            (self.fractal, self.id)
-        }
-
-        #[secondary_key(2)]
-        pub fn by_slug(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.slug)
+        pub fn by_fractal(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
         }
     }
 
@@ -120,7 +112,7 @@ pub mod tables {
     pub struct GuildMember {
         pub fractal: AccountNumber,
         #[graphql(skip)]
-        pub guild: GID,
+        pub guild: AccountNumber,
         pub member: AccountNumber,
         pub score: u32,
         pub pending_score: Option<u32>,
@@ -129,17 +121,17 @@ pub mod tables {
 
     impl GuildMember {
         #[primary_key]
-        fn pk(&self) -> (GID, AccountNumber) {
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.guild, self.member)
         }
 
         #[secondary_key(1)]
-        fn by_fractal(&self) -> (AccountNumber, AccountNumber, GID) {
+        fn by_fractal(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
             (self.fractal, self.member, self.guild)
         }
 
         #[secondary_key(2)]
-        fn by_score(&self) -> (GID, u32, AccountNumber) {
+        fn by_score(&self) -> (AccountNumber, u32, AccountNumber) {
             (self.guild, self.score, self.member)
         }
     }
@@ -149,7 +141,7 @@ pub mod tables {
     #[graphql(complex)]
     pub struct GuildApplication {
         #[graphql(skip)]
-        pub guild: GID,
+        pub guild: AccountNumber,
         pub member: AccountNumber,
         pub app: String,
         pub created_at: psibase::TimePointSec,
@@ -157,7 +149,7 @@ pub mod tables {
 
     impl GuildApplication {
         #[primary_key]
-        fn pk(&self) -> (GID, AccountNumber) {
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.guild, self.member)
         }
     }
@@ -167,7 +159,7 @@ pub mod tables {
     #[graphql(complex)]
     pub struct GuildAttest {
         #[graphql(skip)]
-        pub guild: GID,
+        pub guild: AccountNumber,
         pub member: AccountNumber,
         pub attestee: AccountNumber,
         pub comment: String,
@@ -176,7 +168,7 @@ pub mod tables {
 
     impl GuildAttest {
         #[primary_key]
-        fn pk(&self) -> (GID, AccountNumber, AccountNumber) {
+        fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
             (self.guild, self.member, self.attestee)
         }
     }
