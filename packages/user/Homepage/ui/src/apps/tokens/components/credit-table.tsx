@@ -1,3 +1,5 @@
+import { MinusCircle, PlusCircle, ReceiptText } from "lucide-react";
+
 import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalanceChanges";
 
 import {
@@ -5,10 +7,13 @@ import {
     TableBody,
     TableCaption,
     TableCell,
-    TableHead,
-    TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@shared/shadcn/ui/tooltip";
 
 import { Token } from "../hooks/tokensPlugin/useUserTokenBalances";
 
@@ -50,31 +55,52 @@ export function CreditTable({ user, token }: Props) {
     return (
         <Table>
             <TableCaption>A list of your credit and debits.</TableCaption>
-            <TableHeader>
-                <TableRow>
-                    <TableHead className="w-[100px]">Counterparty</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                    <TableHead className="text-right">Memo</TableHead>
-                </TableRow>
-            </TableHeader>
             <TableBody>
                 {transactions?.map((transaction, index) => {
                     return (
                         <TableRow
                             key={`${transaction.counterParty}-${transaction.action}-${index}`}
                         >
-                            <TableCell className="font-medium">
-                                {transaction.counterParty}
+                            <TableCell
+                                className="w-6 text-center"
+                                title={transaction.action}
+                            >
+                                <Tooltip>
+                                    <TooltipContent>
+                                        {transaction.action
+                                            .charAt(0)
+                                            .toUpperCase() +
+                                            transaction.action.slice(1)}
+                                    </TooltipContent>
+                                    {transaction.direction === "incoming" ? (
+                                        <TooltipTrigger className="block">
+                                            <PlusCircle className="h-4 w-4" />
+                                        </TooltipTrigger>
+                                    ) : (
+                                        <TooltipTrigger className="block">
+                                            <MinusCircle className="h-4 w-4" />
+                                        </TooltipTrigger>
+                                    )}
+                                </Tooltip>
                             </TableCell>
-                            <TableCell>
-                                {transaction?.amount?.format()}
-                            </TableCell>
+                            <TableCell>{transaction.counterParty}</TableCell>
                             <TableCell className="text-right">
-                                {transaction.action}
+                                {transaction.direction === "incoming" && "+"}
+                                {transaction?.amount?.format({
+                                    fullPrecision: false,
+                                })}
                             </TableCell>
-                            <TableCell className="text-right">
-                                {transaction.memo}
+                            <TableCell className="h-full w-6 text-center">
+                                {transaction.memo && (
+                                    <Tooltip>
+                                        <TooltipContent>
+                                            {transaction.memo}
+                                        </TooltipContent>
+                                        <TooltipTrigger className="block">
+                                            <ReceiptText className="h-4 w-4" />
+                                        </TooltipTrigger>
+                                    </Tooltip>
+                                )}
                             </TableCell>
                             {/* <TableCell className="text-right">
                                 <Button

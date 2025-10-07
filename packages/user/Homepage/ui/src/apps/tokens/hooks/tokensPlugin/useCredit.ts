@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
+import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
 const Args = z.object({
@@ -12,8 +13,8 @@ const Args = z.object({
     receiver: Account,
 });
 
-export const useCredit = () =>
-    useMutation<void, Error, z.infer<typeof Args>>({
+export const useCredit = (user: string | null) => {
+    return useMutation<void, Error, z.infer<typeof Args>>({
         mutationKey: ["credit"],
         mutationFn: (vars) => {
             const { receiver, amount, memo, tokenId } = Args.parse(vars);
@@ -24,4 +25,13 @@ export const useCredit = () =>
                 intf: "transfer",
             });
         },
+        onSuccess: (_data, vars, _result, context) => {
+            context.client.invalidateQueries({
+                queryKey: QueryKey.userTokenBalanceChanges(
+                    user,
+                    Number(vars.tokenId),
+                ),
+            });
+        },
     });
+};

@@ -66,9 +66,7 @@ const PageContents = ({
     currentUser: string | null;
     isLoading: boolean;
 }) => {
-    const { mutateAsync: credit } = useCredit();
-
-    console.log("TOKENS:", tokens);
+    const { mutateAsync: credit } = useCredit(currentUser);
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>(
         tokens[0].id.toString(),
