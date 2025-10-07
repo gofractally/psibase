@@ -161,6 +161,14 @@ impl Api for ProducersPlugin {
             &Actions::regCandidate { endpoint, claim }.packed(),
         )
     }
+
+    fn unregister_candidate() {
+        add_action_to_transaction(
+            Actions::unregCandidate::ACTION_NAME,
+            &Actions::unregCandidate {}.packed(),
+        )
+        .unwrap();
+    }
 }
 
 bindings::export!(ProducersPlugin with_types_in bindings);

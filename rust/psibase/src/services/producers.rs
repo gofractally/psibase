@@ -37,6 +37,11 @@ mod service {
     }
 
     #[action]
+    fn unregCandidate() {
+        unimplemented!();
+    }
+
+    #[action]
     fn getProducers() -> Vec<AccountNumber> {
         unimplemented!();
     }

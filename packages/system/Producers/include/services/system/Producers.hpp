@@ -49,6 +49,7 @@ namespace SystemService
       void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);
       void regCandidate(const std::string& endpoint, psibase::Claim claim);
+      void unregCandidate();
 
       std::vector<psibase::AccountNumber> getProducers();
 
@@ -98,6 +99,7 @@ namespace SystemService
                 method(setConsensus, consensus),
                 method(setProducers, producers),
                 method(regCandidate, endpoint, claim),
+                method(unregCandidate),
                 method(getProducers),
                 method(getThreshold, account),
                 method(antiThreshold, account),

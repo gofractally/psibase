@@ -159,6 +159,17 @@ namespace SystemService
       Tables().open<CandidateInfoTable>().put(CandidateInfo{getSender(), endpoint, claim});
    }
 
+   void Producers::unregCandidate()
+   {
+      auto sender = getSender();
+
+      auto producers = ::getProducers();
+      check(!std::ranges::contains(producers, sender, &Producer::name),
+            "Cannot unregister: account is an active producer");
+
+      Tables().open<CandidateInfoTable>().erase(sender);
+   }
+
    std::vector<psibase::AccountNumber> Producers::getProducers()
    {
       return ::getProducers()                          //

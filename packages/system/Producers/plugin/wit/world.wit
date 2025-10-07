@@ -30,6 +30,10 @@ interface api {
 
     /// Register as a candidate for election to the active set of infrastructure providers
     register-candidate: func(endpoint: string, claim: claim-type) -> result<_, error>;
+
+    /// Unregister as a candidate for election to the active set of infrastructure providers
+    unregister-candidate: func();
+
 }
 
 world imports {
