@@ -17,14 +17,7 @@ interface CandidateInfo {
 interface CandidateInfoConnection {
     edges: Array<{
         node: CandidateInfo;
-        cursor: string;
     }>;
-    pageInfo: {
-        hasPreviousPage: boolean;
-        hasNextPage: boolean;
-        startCursor: string;
-        endCursor: string;
-    };
 }
 
 interface CandidatesResponse {
@@ -47,13 +40,6 @@ export const useCandidates = () => {
                                     rawData
                                 }
                             }
-                            cursor
-                        }
-                        pageInfo {
-                            hasPreviousPage
-                            hasNextPage
-                            startCursor
-                            endCursor
                         }
                     }
                 }
