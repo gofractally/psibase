@@ -353,7 +353,7 @@ SCENARIO("Accepting an invite")
          }
          THEN("An invite cannot be accepted with an account name less than 10 chars in length")
          {
-            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).failed(accountNameTooShort + "rebecca"));
+            CHECK(i.acceptCreate(id, "rebecca"_a, userPub).failed(std::string(accountNameTooShort) + "rebecca"));
          }
          THEN("A normal user may not create a new account")
          {
