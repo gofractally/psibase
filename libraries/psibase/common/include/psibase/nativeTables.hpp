@@ -26,6 +26,7 @@ namespace psibase
    static constexpr NativeTableNum socketTable                = 14;  // subjective
    static constexpr NativeTableNum runTable                   = 15;  // subjective
    static constexpr NativeTableNum envTable                   = 16;  // subjective
+   static constexpr NativeTableNum hostConfigTable            = 17;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -407,6 +408,23 @@ namespace psibase
    };
    using EnvTable = Table<EnvRow, &EnvRow::name>;
 
+   using HostConfigKeyType = KeyPrefixType;
+   auto hostConfigKey() -> HostConfigKeyType;
+   // The host config is a JSON object that represents the command line
+   // arguments, config file, etc. The contents are implementation
+   // defined. It is implementation defined whether the table is
+   // writable. If the host config is written, its persistence is
+   // implementation defined.
+   struct HostConfigRow
+   {
+      std::string       hostVersion;
+      std::string       config;
+      static const auto db = psibase::DbId::nativeSession;
+      auto              key() const -> HostConfigKeyType;
+      PSIO_REFLECT(HostConfigRow, hostVersion, config)
+   };
+   using HostConfigTable = Table<HostConfigRow, SingletonKey{}>;
+
    struct Native
    {
       using Tables = ExternTables<void,
@@ -425,7 +443,8 @@ namespace psibase
                                   LogTruncateTable,
                                   SocketTable,
                                   RunTable,
-                                  EnvTable>;
+                                  EnvTable,
+                                  HostConfigTable>;
       static Tables tables(KvMode mode = KvMode::readWrite)
       {
          return Tables{kvOpen(DbId::native, {}, mode), mode};

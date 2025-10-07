@@ -276,6 +276,11 @@ namespace psibase
          // Native doesn't do anything with the env table.
       }
 
+      void verifyHostConfigRow(psio::input_stream key, psio::input_stream value)
+      {
+         abortMessage("Writing the host config table is not implemented");
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -331,6 +336,8 @@ namespace psibase
             verifySocketRow(key, value);
          else if (table == envTable)
             verifyEnvRow(key, value);
+         else if (table == hostConfigTable)
+            verifyHostConfigRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }

@@ -183,6 +183,22 @@ namespace LocalService
          if (auto reply = checkAuth(req, socket))
             return reply;
 
+         if (target == "/native/admin/config" && req.method == "GET")
+         {
+            auto          native = Native::session(KvMode::read);
+            auto          table  = native.open<HostConfigTable>();
+            HostConfigRow row;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               row = table.get({}).value();
+            }
+            return HttpReply{
+                .status      = HttpStatus::ok,
+                .contentType = "application/json",
+                .body        = std::vector(row.config.begin(), row.config.end()),
+            };
+         }
+
          return {};
       }
       else if (target.starts_with("/services/"))

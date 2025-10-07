@@ -19,6 +19,7 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/log/core/core.hpp>
+#include <boost/preprocessor/stringize.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -37,6 +38,9 @@ using namespace psibase;
 using namespace psibase::net;
 
 using http::listen_spec;
+
+#define PSIBASE_VERSION_STRING \
+   BOOST_PP_STRINGIZE(PSIBASE_VERSION_MAJOR) "." BOOST_PP_STRINGIZE(PSIBASE_VERSION_MINOR) "." BOOST_PP_STRINGIZE(PSIBASE_VERSION_PATCH)
 
 struct native_service
 {
@@ -1319,6 +1323,36 @@ void run(const std::string&              db_path,
       auto               session = db.startWrite(system->sharedDatabase.createWriter());
       db.checkoutSubjective();
       load_environment(db);
+      HostConfigRow hostConfig{
+          .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
+      };
+      std::vector<char>   configText;
+      psio::vector_stream stream(configText);
+      psio::to_json(
+          PsinodeConfig{
+              .p2p            = enable_incoming_p2p,
+              .peers          = peers,
+              .autoconnect    = autoconnect,
+              .producer       = producer,
+              .pkcs11_modules = pkcs11_modules,
+              .hosts          = hosts,
+              .listen         = listen,
+#ifdef PSIBASE_ENABLE_SSL
+              .tls =
+                  {
+                      .certificate = tls_cert,
+                      .key         = tls_key,
+                      .trustfiles  = root_ca,
+                  },
+#endif
+              .services        = services,
+              .http_timeout    = http_timeout,
+              .service_threads = service_threads,
+              .loggers         = loggers::Config::get(),
+          },
+          stream);
+      hostConfig.config = std::string(configText.begin(), configText.end());
+      db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
       if (!db.commitSubjective(*system->sockets, autoClose))
       {
          throw std::runtime_error("Failed to initialize database");
@@ -1693,7 +1727,8 @@ void run(const std::string&              db_path,
       http_config->set_config =
           [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
            &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
-           &connect_one, setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
+           &connect_one, &system,
+           setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
@@ -1702,9 +1737,19 @@ void run(const std::string&              db_path,
              chainContext,
              [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
               &runResult, &http_config, &hosts, &services, &http_timeout, &service_threads, &tpool,
-              &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, setPKCS11Libs,
+              &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, &system, setPKCS11Libs,
               callback = std::move(callback)]() mutable
              {
+                HostConfigRow hostConfig{
+                    .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
+                };
+                {
+                   std::vector<char>   configText;
+                   psio::vector_stream stream(configText);
+                   psio::to_json(config, stream);
+                   hostConfig.config = std::string(configText.begin(), configText.end());
+                };
+
                 std::optional<http::services_t> new_services;
                 for (auto& entry : config.services)
                 {
@@ -1783,6 +1828,10 @@ void run(const std::string&              db_path,
                       file.write(out);
                    }
                    runResult.configChanged = true;
+                   auto writer             = system->sharedDatabase.createWriter();
+                   system->sharedDatabase.kvPutSubjective(*writer, hostConfig.db,
+                                                          psio::convert_to_key(hostConfig.key()),
+                                                          psio::to_frac(hostConfig));
                 }
                 callback(std::nullopt);
              });
