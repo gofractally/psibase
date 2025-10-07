@@ -438,14 +438,14 @@ SCENARIO("Accepting an invite")
             i.reject(id);
 
             // Try accept with create
-            CHECK(i.acceptCreate(id, "rebecca111"_a, userPub).failed(alreadyRejected));
+            CHECK(i.acceptCreate(id, "rebecca123"_a, userPub).failed(alreadyRejected));
 
             // Try accept with existing user
             CHECK(b.accept(id).failed(alreadyRejected));
          }
          THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
          {
-            CHECK(i.acceptCreate(id, "rebecca222"_a, invPub).failed(needUniquePubkey));
+            CHECK(i.acceptCreate(id, "rebecca123"_a, invPub).failed(needUniquePubkey));
          }
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
