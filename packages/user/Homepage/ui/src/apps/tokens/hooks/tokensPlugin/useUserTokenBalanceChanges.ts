@@ -45,21 +45,12 @@ export const useUserTokenBalanceChanges = (
                         throw new Error("Token ID mismatch");
                     }
 
-                    console.log(
-                        balance.amount,
-                        token.precision,
-                        balance.tokenId,
-                        token.symbol,
-                    );
-
                     const quantity = new Quantity(
                         balance.amount,
                         token.precision,
                         balance.tokenId,
                         token.symbol,
                     );
-
-                    console.log(quantity);
 
                     const direction =
                         balance.action === "credited" ? "outgoing" : "incoming";
@@ -74,7 +65,7 @@ export const useUserTokenBalanceChanges = (
                 },
             );
 
-            return userTokenBalances;
+            return userTokenBalances.reverse();
         },
     });
 };
