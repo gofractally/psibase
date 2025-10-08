@@ -156,14 +156,14 @@ pub mod service {
         unimplemented!()
     }
 
-    /// Sets a foreign account as a proxy target for this site.
-    /// When content is not found locally, the service will check the proxy target.
+    /// If content requested for the sender service is not found, proxy the request to the
+    /// specified proxy.
     #[action]
     fn setProxy(proxy: AccountNumber) {
         unimplemented!()
     }
 
-    /// Removes the proxy target for this site.
+    /// Removes the proxy set with `setProxy`.
     #[action]
     fn clearProxy() {
         unimplemented!()

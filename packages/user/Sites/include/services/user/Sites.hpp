@@ -130,11 +130,11 @@ namespace SystemService
       /// - If the hash does not match, the new content is returned with an updated `ETag` header
       void enableCache(bool enable);
 
-      /// Sets a foreign account as a proxy target for this site.
-      /// When content is not found locally, the service will check the proxy target.
+      /// If content requested for the sender service is not found, proxy the request to the
+      /// specified proxy.
       void setProxy(psibase::AccountNumber proxy);
 
-      /// Removes the proxy target for this site.
+      /// Removes the proxy set with `setProxy`.
       void clearProxy();
 
      private:
