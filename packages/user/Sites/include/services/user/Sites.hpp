@@ -44,12 +44,12 @@ namespace SystemService
    struct SiteConfigRow
    {
       psibase::AccountNumber                account;
-      bool                                  spa       = false;
-      bool                                  cache     = true;
-      std::optional<std::string>            globalCsp = std::nullopt;
-      std::optional<psibase::AccountNumber> proxy     = std::nullopt;
+      bool                                  spa          = false;
+      bool                                  cache        = true;
+      std::optional<std::string>            globalCsp    = std::nullopt;
+      std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO_REFLECT_TYPENAME(SiteConfigTable)
 

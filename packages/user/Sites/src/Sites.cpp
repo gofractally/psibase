@@ -10,6 +10,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <set>
+#include "psibase/api.hpp"
 
 using namespace psibase;
 
@@ -336,20 +337,20 @@ namespace SystemService
          auto table      = Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>();
          auto siteConfig = table.get(account);
 
-         if (!siteConfig || !siteConfig->proxy)
+         if (!siteConfig || !siteConfig->proxyAccount)
          {
             return std::nullopt;
          }
 
-         psibase::AccountNumber current = *siteConfig->proxy;
+         psibase::AccountNumber current = *siteConfig->proxyAccount;
          while (true)
          {
             auto nextConfig = table.get(current);
-            if (!nextConfig || !nextConfig->proxy)
+            if (!nextConfig || !nextConfig->proxyAccount)
             {
                return current;
             }
-            current = *nextConfig->proxy;
+            current = *nextConfig->proxyAccount;
          }
       }
 
@@ -417,10 +418,10 @@ namespace SystemService
 
          if (content)
          {
-            std::string cspHeader = getCspHeader(content, account);
+            std::string cspHeader = getCspHeader(content, content->account);
             auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
-            if (useCache(account) && shouldCache(request, etag))
+            if (useCache(content->account) && shouldCache(request, etag))
             {
                // https://issues.chromium.org/issues/40132719
                // Chrome bug - Devtools still shows 200 status code sometimes
@@ -663,16 +664,16 @@ namespace SystemService
          visited.insert(current);
 
          auto siteConfig = table.get(current);
-         if (!siteConfig || !siteConfig->proxy)
+         if (!siteConfig || !siteConfig->proxyAccount)
          {
             break;
          }
 
-         current = *siteConfig->proxy;
+         current = *siteConfig->proxyAccount;
       }
 
-      auto row  = table.get(self).value_or(SiteConfigRow{.account = self});
-      row.proxy = std::optional{std::move(proxy)};
+      auto row         = table.get(self).value_or(SiteConfigRow{.account = self});
+      row.proxyAccount = std::optional{std::move(proxy)};
       table.put(row);
    }
 
@@ -680,11 +681,11 @@ namespace SystemService
    {
       auto table = Tables{}.open<SiteConfigTable>();
       auto row   = table.get(getSender());
-      if (!row || !row->proxy)
+      if (!row || !row->proxyAccount)
       {
          return;
       }
-      row->proxy = std::nullopt;
+      row->proxyAccount = std::nullopt;
       table.put(*row);
    }
 
@@ -744,7 +745,7 @@ namespace SystemService
                               .spa       = record.spa,
                               .cache     = record.cache,
                               .globalCsp = record.globalCsp.value_or(""),
-                              .proxy     = record.proxy ? record.proxy->str() : ""};
+                              .proxy     = record.proxyAccount ? record.proxyAccount->str() : ""};
          }
 
          auto getContent(AccountNumber account) const

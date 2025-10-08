@@ -60,7 +60,7 @@ pub mod service {
         pub spa: bool,
         pub cache: bool,
         pub globalCsp: Option<String>,
-        pub proxy: Option<AccountNumber>,
+        pub proxyAccount: Option<AccountNumber>,
     }
 
     #[table(name = "SitesDataTable", index = 2)]
