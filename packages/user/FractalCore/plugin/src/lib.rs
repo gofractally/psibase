@@ -13,8 +13,6 @@ mod errors;
 use bindings::fractals::plugin as FractalsPlugin;
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 
-use crate::bindings::host::common::client::get_receiver;
-
 struct ProposeLatch;
 
 impl ProposeLatch {
