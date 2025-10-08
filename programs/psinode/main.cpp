@@ -1258,6 +1258,18 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    to_config(config.loggers, file);
 }
 
+HostConfigRow toHostConfig(const PsinodeConfig& config)
+{
+   HostConfigRow result{
+       .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
+   };
+   std::vector<char>   configText;
+   psio::vector_stream stream(configText);
+   psio::to_json(config, stream);
+   result.config = std::string(configText.begin(), configText.end());
+   return result;
+}
+
 void run(const std::string&              db_path,
          const std::string&              db_template,
          const DbConfig&                 db_conf,
@@ -1323,35 +1335,27 @@ void run(const std::string&              db_path,
       auto               session = db.startWrite(system->sharedDatabase.createWriter());
       db.checkoutSubjective();
       load_environment(db);
-      HostConfigRow hostConfig{
-          .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
-      };
-      std::vector<char>   configText;
-      psio::vector_stream stream(configText);
-      psio::to_json(
-          PsinodeConfig{
-              .p2p            = enable_incoming_p2p,
-              .peers          = peers,
-              .autoconnect    = autoconnect,
-              .producer       = producer,
-              .pkcs11_modules = pkcs11_modules,
-              .hosts          = hosts,
-              .listen         = listen,
+      HostConfigRow hostConfig = toHostConfig(PsinodeConfig{
+          .p2p            = enable_incoming_p2p,
+          .peers          = peers,
+          .autoconnect    = autoconnect,
+          .producer       = producer,
+          .pkcs11_modules = pkcs11_modules,
+          .hosts          = hosts,
+          .listen         = listen,
 #ifdef PSIBASE_ENABLE_SSL
-              .tls =
-                  {
-                      .certificate = tls_cert,
-                      .key         = tls_key,
-                      .trustfiles  = root_ca,
-                  },
+          .tls =
+              {
+                  .certificate = tls_cert,
+                  .key         = tls_key,
+                  .trustfiles  = root_ca,
+              },
 #endif
-              .services        = services,
-              .http_timeout    = http_timeout,
-              .service_threads = service_threads,
-              .loggers         = loggers::Config::get(),
-          },
-          stream);
-      hostConfig.config = std::string(configText.begin(), configText.end());
+          .services        = services,
+          .http_timeout    = http_timeout,
+          .service_threads = service_threads,
+          .loggers         = loggers::Config::get(),
+      });
       db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
       if (!db.commitSubjective(*system->sockets, autoClose))
       {
@@ -1740,15 +1744,7 @@ void run(const std::string&              db_path,
               &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, &system, setPKCS11Libs,
               callback = std::move(callback)]() mutable
              {
-                HostConfigRow hostConfig{
-                    .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
-                };
-                {
-                   std::vector<char>   configText;
-                   psio::vector_stream stream(configText);
-                   psio::to_json(config, stream);
-                   hostConfig.config = std::string(configText.begin(), configText.end());
-                };
+                HostConfigRow hostConfig = toHostConfig(config);
 
                 std::optional<http::services_t> new_services;
                 for (auto& entry : config.services)
