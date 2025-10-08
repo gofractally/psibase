@@ -1,9 +1,10 @@
-import { fetchUserTokenBalances } from "@/apps/tokens/lib/graphql/ui";
-import { Quantity } from "@/apps/tokens/lib/quantity";
 import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import { z } from "zod";
+
+import { fetchUserTokenBalances } from "@/apps/tokens/lib/graphql/ui";
+import { Quantity } from "@/apps/tokens/lib/quantity";
 
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
@@ -28,7 +29,6 @@ export const useUserTokenBalances = (
     return useQuery<Token[]>({
         queryKey: QueryKey.userTokenBalances(username),
         enabled: !!username,
-        refetchInterval: 10000,
         queryFn: async () => {
             if (!toasted.current) toast("Fetching token balances...");
             const res = await fetchUserTokenBalances(Account.parse(username));

@@ -9,6 +9,8 @@ const QueryKey = {
         ["userTokenBalances", user] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
         ["userTokenBalanceChanges", user, tokenId] as const,
+    userLinesOfCredit: (user?: string | null) =>
+        ["userLinesOfCredit", user] as const,
     contacts: (user: string | undefined | null) => ["contacts", user] as const,
     profile: (account: string | undefined | null) =>
         ["profile", account] as const,
