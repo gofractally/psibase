@@ -1,4 +1,6 @@
-import { PlusIcon, Settings, Trash, TrashIcon, } from "lucide-react";
+import { useStore } from "@tanstack/react-form";
+import { PlusIcon, Settings, Trash, TrashIcon } from "lucide-react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -7,9 +9,13 @@ import { useAppForm } from "@/components/forms/app-form";
 import { FieldErrors } from "@/components/forms/field-errors";
 
 import { useCandidates } from "@/hooks/use-candidates";
+import { useConfigPlugin } from "@/hooks/use-config-plugin";
+import { useProducersPlugin } from "@/hooks/use-producers-plugin";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Params, SetProducerParams } from "@/lib/producers";
 
 import { Button } from "@shared/shadcn/ui/button";
+import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -28,16 +34,6 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 import { Textarea } from "@shared/shadcn/ui/textarea";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useState } from "react";
-
-import {
-    Dialog,
-    DialogContent,
-} from "@shared/shadcn/ui/dialog";
-import { useProducersPlugin } from "@/hooks/use-producers-plugin";
-import { useConfigPlugin } from "@/hooks/use-config-plugin";
-import { useStore } from "@tanstack/react-form";
 
 const RegisterCandidateParams = z.object({
     endpoint: z.string().url().min(1, "Endpoint is required"),
@@ -46,22 +42,24 @@ const RegisterCandidateParams = z.object({
 
 type RegisterCandidateParams = z.infer<typeof RegisterCandidateParams>;
 
-
 export const BlockProduction = () => {
     const { data: candidates, refetch: refetchCandidates } = useCandidates();
 
     const { data: currentUser } = useCurrentUser();
 
-    const authenticatedCandidate = candidates?.find(candidate => candidate.account === currentUser);
+    const authenticatedCandidate = candidates?.find(
+        (candidate) => candidate.account === currentUser,
+    );
 
     const [showModal, setShowModal] = useState(false);
 
-    const { mutateAsync: unregisterCandidate, isPending: isUnregistering } = useProducersPlugin('unregisterCandidate', {
-        error: "Failed unregistering candidate",
-        loading: "Unregistering candidate",
-        success: "Unregistered candidate ",
-        isStagable: false
-    });
+    const { mutateAsync: unregisterCandidate, isPending: isUnregistering } =
+        useProducersPlugin("unregisterCandidate", {
+            error: "Failed unregistering candidate",
+            loading: "Unregistering candidate",
+            success: "Unregistered candidate ",
+            isStagable: false,
+        });
 
     const { mutateAsync: registerCandidate } = useProducersPlugin(
         "registerCandidate",
@@ -109,11 +107,14 @@ export const BlockProduction = () => {
         },
     });
 
-    const producers = useStore(producersForm.store, store => store.values.prods);
+    const producers = useStore(
+        producersForm.store,
+        (store) => store.values.prods,
+    );
 
     const registerForm = useAppForm({
         defaultValues: {
-            endpoint: authenticatedCandidate?.endpoint || '',
+            endpoint: authenticatedCandidate?.endpoint || "",
             pemKey: "",
         } as RegisterCandidateParams,
         validators: {
@@ -129,9 +130,9 @@ export const BlockProduction = () => {
     });
 
     const unregister = async () => {
-        await unregisterCandidate([])
-        setShowModal(false)
-    }
+        await unregisterCandidate([]);
+        setShowModal(false);
+    };
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6">
@@ -211,9 +212,20 @@ export const BlockProduction = () => {
                                     <Label htmlFor={`prods.${index}.name`}>
                                         Producer {field.state.value[index]}
                                     </Label>
-                                    <Button variant="destructive" size={"icon"} onClick={() => {
-                                        producersForm.setFieldValue('prods', prods => prods.filter(prod => prod !== value))
-                                    }}>
+                                    <Button
+                                        variant="destructive"
+                                        size={"icon"}
+                                        onClick={() => {
+                                            producersForm.setFieldValue(
+                                                "prods",
+                                                (prods) =>
+                                                    prods.filter(
+                                                        (prod) =>
+                                                            prod !== value,
+                                                    ),
+                                            );
+                                        }}
+                                    >
                                         <Trash />
                                     </Button>
                                 </div>
@@ -233,21 +245,25 @@ export const BlockProduction = () => {
 
                 <div className="flex justify-end">
                     <producersForm.AppForm>
-                        <producersForm.SubmitButton labels={["Save", "Saving"]} />
+                        <producersForm.SubmitButton
+                            labels={["Save", "Saving"]}
+                        />
                     </producersForm.AppForm>
                 </div>
             </form>
 
-            <Dialog onOpenChange={e => setShowModal(e)} open={showModal}>
+            <Dialog onOpenChange={(e) => setShowModal(e)} open={showModal}>
                 <DialogContent className="sm:max-w-2xl">
                     <div className="gap-2">
                         <h2 className="text-lg font-medium">
                             Producer Candidate Registration
                         </h2>
                         <p className="text-muted-foreground text-sm">
-                            {authenticatedCandidate ? 'Update registration' : 'Register yourself as a new producer candidate'}.
+                            {authenticatedCandidate
+                                ? "Update registration"
+                                : "Register yourself as a new producer candidate"}
+                            .
                         </p>
-
                     </div>
 
                     <form
@@ -283,7 +299,9 @@ export const BlockProduction = () => {
                         <registerForm.Field name="pemKey">
                             {(field) => (
                                 <div className="flex flex-col gap-2">
-                                    <Label htmlFor="pemKey">Public Key (PEM)</Label>
+                                    <Label htmlFor="pemKey">
+                                        Public Key (PEM)
+                                    </Label>
                                     <Textarea
                                         id="pemKey"
                                         placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
@@ -305,15 +323,26 @@ export const BlockProduction = () => {
 
                         <div className="flex justify-between">
                             <div>
-                                {authenticatedCandidate && <Button variant={"destructive"} disabled={isUnregistering} onClick={(e) => {
-                                    e.preventDefault()
-                                    unregister()
-                                }}>
-                                    <Trash /> Unregister</Button>}
+                                {authenticatedCandidate && (
+                                    <Button
+                                        variant={"destructive"}
+                                        disabled={isUnregistering}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            unregister();
+                                        }}
+                                    >
+                                        <Trash /> Unregister
+                                    </Button>
+                                )}
                             </div>
                             <registerForm.AppForm>
                                 <registerForm.SubmitButton
-                                    labels={authenticatedCandidate ? ['Update', 'Updating'] : ["Register", "Registering"]}
+                                    labels={
+                                        authenticatedCandidate
+                                            ? ["Update", "Updating"]
+                                            : ["Register", "Registering"]
+                                    }
                                 />
                             </registerForm.AppForm>
                         </div>
@@ -321,17 +350,33 @@ export const BlockProduction = () => {
                 </DialogContent>
             </Dialog>
 
-
             <div className="flex justify-between">
                 <div>
-                    <h2 className="text-lg font-medium">Registered Candidates</h2>
+                    <h2 className="text-lg font-medium">
+                        Registered Candidates
+                    </h2>
                     <p className="text-muted-foreground text-sm">
                         All registered producer candidates.
                     </p>
                 </div>
                 <div className="flex items-center">
-                    <Button size="sm" onClick={() => { setShowModal(true) }}>
-                        {authenticatedCandidate ? <div className="flex gap-1 items-center"><Settings />Update</div> : <div className="flex gap-1 items-center"><PlusIcon />Register</div>}
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            setShowModal(true);
+                        }}
+                    >
+                        {authenticatedCandidate ? (
+                            <div className="flex items-center gap-1">
+                                <Settings />
+                                Update
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1">
+                                <PlusIcon />
+                                Register
+                            </div>
+                        )}
                     </Button>
                 </div>
             </div>
@@ -354,15 +399,41 @@ export const BlockProduction = () => {
                                     {candidate.endpoint}
                                 </TableCell>
                                 <TableCell>
-                                    {producers.includes(candidate.account) ? <Button variant="outline" size={"icon"} onClick={() => {
-                                        producersForm.setFieldValue('prods', prods => prods.filter(prod => prod !== candidate.account))
-                                    }}>
-                                        <TrashIcon />
-                                    </Button> : <Button variant="outline" size={"icon"} onClick={() => {
-                                        producersForm.setFieldValue('prods', prods => [...prods, candidate.account])
-                                    }}>
-                                        <PlusIcon />
-                                    </Button>}
+                                    {producers.includes(candidate.account) ? (
+                                        <Button
+                                            variant="outline"
+                                            size={"icon"}
+                                            onClick={() => {
+                                                producersForm.setFieldValue(
+                                                    "prods",
+                                                    (prods) =>
+                                                        prods.filter(
+                                                            (prod) =>
+                                                                prod !==
+                                                                candidate.account,
+                                                        ),
+                                                );
+                                            }}
+                                        >
+                                            <TrashIcon />
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="outline"
+                                            size={"icon"}
+                                            onClick={() => {
+                                                producersForm.setFieldValue(
+                                                    "prods",
+                                                    (prods) => [
+                                                        ...prods,
+                                                        candidate.account,
+                                                    ],
+                                                );
+                                            }}
+                                        >
+                                            <PlusIcon />
+                                        </Button>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
