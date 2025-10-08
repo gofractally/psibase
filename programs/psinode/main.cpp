@@ -1434,7 +1434,14 @@ void run(const std::string&              db_path,
       for (const std::string& path : added)
       {
          PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Loading PKCS #11 module: " << path;
-         pkcs11Libs.insert({path, {std::make_shared<pkcs11::pkcs11_library>(path.c_str()), {}}});
+         try
+         {
+            pkcs11Libs.insert({path, {std::make_shared<pkcs11::pkcs11_library>(path.c_str()), {}}});
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(psibase::loggers::generic::get(), warning) << e.what();
+         }
       }
    };
    setPKCS11Libs(pkcs11_modules);
@@ -1510,9 +1517,10 @@ void run(const std::string&              db_path,
    // The callback is *not* posted to chainContext. It can run concurrently.
    node.chain().onChangeRunQueue([&] { runQueue.notify(); });
 
-   // This needs to be initialized after all chain state,
-   // because the thread pool can begin executing wasm immediately.
-   WasmThreadPool tpool{runQueue, service_threads};
+   // This needs to be declared so the host config change handler can reference it,
+   // but we can't safely start any threads until after all the node state
+   // is initialized.
+   WasmThreadPool tpool{runQueue, 0};
 
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
@@ -1530,6 +1538,99 @@ void run(const std::string&              db_path,
           node.add_connection(std::move(conn));
           return {};
        });
+
+   node.chain().onValidateHostConfig(
+       [](std::span<const char> value)
+       {
+          auto view   = psio::view<const HostConfigRow>(value);
+          auto config = psio::convert_from_json<PsinodeConfig>(view.config().unpack());
+       });
+   node.chain().onChangeHostConfig(
+       [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
+        &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
+        &connect_one, &system, setPKCS11Libs]
+       {
+          boost::asio::post(
+              chainContext,
+              [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &services,
+               &http_timeout, &service_threads, &tpool, &tls_cert, &tls_key, &root_ca,
+               &pkcs11_modules, &connect_one, &system, setPKCS11Libs]
+              {
+                 auto writer = system->sharedDatabase.createWriter();
+                 auto row    = system->sharedDatabase.kvGetSubjective(
+                     *writer, HostConfigRow::db, psio::convert_to_key(hostConfigKey()));
+                 auto hostConfig = psio::from_frac<HostConfigRow>(row.value());
+                 auto config     = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+
+                 std::optional<http::services_t> new_services;
+                 for (auto& entry : config.services)
+                 {
+                    entry.root =
+                        parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
+                 }
+                 if (services != config.services || hosts != config.hosts)
+                 {
+                    new_services.emplace();
+                    for (const auto& entry : config.services)
+                    {
+                       for (const auto& host : config.hosts)
+                       {
+                          load_service(entry, *new_services, host);
+                       }
+                    }
+                 }
+                 setPKCS11Libs(config.pkcs11_modules);
+                 node.set_producer_id(config.producer);
+                 node.set_hostnames(config.hosts);
+                 http_config->enable_p2p = config.p2p;
+                 if (!http_config->status.load().shutdown)
+                 {
+                    node.autoconnect(std::vector(config.peers), config.autoconnect.value,
+                                     connect_one);
+                 }
+                 pkcs11_modules  = config.pkcs11_modules;
+                 hosts           = config.hosts;
+                 services        = config.services;
+                 http_timeout    = config.http_timeout;
+                 service_threads = config.service_threads;
+#ifdef PSIBASE_ENABLE_SSL
+                 tls_cert = config.tls.certificate;
+                 tls_key  = config.tls.key;
+                 root_ca  = config.tls.trustfiles;
+#endif
+                 loggers::configure(config.loggers);
+                 {
+                    std::lock_guard l{http_config->mutex};
+                    http_config->hosts               = hosts;
+                    http_config->listen              = config.listen;
+                    http_config->enable_transactions = !hosts.empty();
+                    http_config->idle_timeout_us     = http_timeout.duration.count();
+                    if (new_services)
+                    {
+                       // Use swap instead of move to delay freeing the old
+                       // services until after releasing the mutex
+                       http_config->services.swap(*new_services);
+                    }
+                 }
+                 tpool.setNumThreads(service_threads);
+                 {
+                    auto       path = std::filesystem::path(db_path) / "config";
+                    ConfigFile file{config_options};
+                    {
+                       std::ifstream in(path);
+                       file.parse(in);
+                    }
+                    to_config(config, file);
+                    {
+                       std::ofstream out(path);
+                       file.write(out);
+                    }
+                    runResult.configChanged = true;
+                 }
+              });
+       });
+
+   tpool.setNumThreads(service_threads);
 
    timer_type timer(chainContext);
 

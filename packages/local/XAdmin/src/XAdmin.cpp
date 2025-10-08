@@ -183,20 +183,40 @@ namespace LocalService
          if (auto reply = checkAuth(req, socket))
             return reply;
 
-         if (target == "/native/admin/config" && req.method == "GET")
+         if (target == "/native/admin/config")
          {
-            auto          native = Native::session(KvMode::read);
-            auto          table  = native.open<HostConfigTable>();
-            HostConfigRow row;
-            PSIBASE_SUBJECTIVE_TX
+            if (req.method == "GET")
             {
-               row = table.get({}).value();
+               auto          native = Native::session(KvMode::read);
+               auto          table  = native.open<HostConfigTable>();
+               HostConfigRow row;
+               PSIBASE_SUBJECTIVE_TX
+               {
+                  row = table.get({}).value();
+               }
+               return HttpReply{
+                   .status      = HttpStatus::ok,
+                   .contentType = "application/json",
+                   .body        = std::vector(row.config.begin(), row.config.end()),
+               };
             }
-            return HttpReply{
-                .status      = HttpStatus::ok,
-                .contentType = "application/json",
-                .body        = std::vector(row.config.begin(), row.config.end()),
-            };
+            else if (req.method == "PUT")
+            {
+               auto table = Native::session(KvMode::readWrite).open<HostConfigTable>();
+               PSIBASE_SUBJECTIVE_TX
+               {
+                  auto row   = table.get({}).value();
+                  row.config = std::string(req.body.begin(), req.body.end());
+                  table.put(row);
+               }
+               return HttpReply{
+                   .status = HttpStatus::ok,
+               };
+            }
+            else
+            {
+               return HttpReply::methodNotAllowed(req);
+            }
          }
 
          return {};
