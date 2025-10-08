@@ -2,7 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
+use crate::tables::tables::{Guild, GuildAttest, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {

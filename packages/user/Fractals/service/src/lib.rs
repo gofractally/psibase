@@ -35,8 +35,6 @@ pub mod service {
             "Discovery".to_string().try_into().unwrap(),
         );
         GuildMember::add(discovery_guild.account, a_account);
-
-        GuildApplication::add(discovery_guild.account, "b".into(), "derp".to_string());
     }
 
     /// Creates a new account and fractal.
