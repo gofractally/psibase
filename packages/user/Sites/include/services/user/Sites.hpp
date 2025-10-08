@@ -47,7 +47,7 @@ namespace SystemService
       bool                                  spa       = false;
       bool                                  cache     = true;
       std::optional<std::string>            globalCsp = std::nullopt;
-std::optional<psibase::AccountNumber> proxy     = std::nullopt;
+      std::optional<psibase::AccountNumber> proxy     = std::nullopt;
    };
    PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
@@ -130,7 +130,7 @@ std::optional<psibase::AccountNumber> proxy     = std::nullopt;
       /// - If the hash does not match, the new content is returned with an updated `ETag` header
       void enableCache(bool enable);
 
-/// Sets a foreign account as a proxy target for this site.
+      /// Sets a foreign account as a proxy target for this site.
       /// When content is not found locally, the service will check the proxy target.
       void setProxy(psibase::AccountNumber proxy);
 
@@ -138,12 +138,13 @@ std::optional<psibase::AccountNumber> proxy     = std::nullopt;
       void clearProxy();
 
      private:
-      std::optional<SitesContentRow>    useDefaultProfile(const std::string& target);
       bool                              useSpa(const psibase::AccountNumber& account);
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
       std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
                                                      const psibase::AccountNumber&         account);
+      std::optional<SitesContentRow>    getContent(const psibase::AccountNumber& account,
+                                                const std::string&            target);
    };
 
    PSIO_REFLECT(Sites,
