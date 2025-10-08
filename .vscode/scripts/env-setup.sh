@@ -10,8 +10,8 @@ for file in "$WORKSPACE_ROOT/.vscode"/*.sample; do
 done
 
 # Symlink files to workspace root
-[ ! -L "$WORKSPACE_ROOT/.clangd" ] && ln -s "$SCRIPT_DIR/../.clangd" "$WORKSPACE_ROOT/.clangd"
-[ ! -L "$WORKSPACE_ROOT/.envrc" ] && ln -s "$SCRIPT_DIR/../.envrc" "$WORKSPACE_ROOT/.envrc"
+[ ! -L "$WORKSPACE_ROOT/.clangd" ] && ln -sr "$WORKSPACE_ROOT/.vscode/.clangd" "$WORKSPACE_ROOT/.clangd"
+[ ! -L "$WORKSPACE_ROOT/.envrc" ] && ln -sr "$WORKSPACE_ROOT/.vscode/.envrc" "$WORKSPACE_ROOT/.envrc"
 
 # Install dependencies and configure VSCode SDKs
 cd "$WORKSPACE_ROOT/packages"
