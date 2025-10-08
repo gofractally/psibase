@@ -3,7 +3,8 @@ import { Coins } from "lucide-react";
 
 import { Account } from "@/lib/zod/Account";
 
-import { TokensPage } from "./page";
+import { TokensLayout } from "./layout";
+import { TransferPage } from "./transfer";
 
 export const tokensConfig: AppConfigType = {
     service: Account.parse("tokens"),
@@ -13,21 +14,17 @@ export const tokensConfig: AppConfigType = {
     isMore: false,
     isLoginRequired: true,
     showLoginLoadingSpinner: true,
+    element: <TokensLayout />,
     children: [
         {
             path: "",
-            element: <TokensPage />,
-            name: "Home",
-        },
-        {
-            path: "transfer",
-            element: <div>Transfer page!!!!!!!!!!!!!</div>,
+            element: <TransferPage />,
             name: "Transfer",
         },
         {
-            path: "history",
-            element: <div>History page</div>,
-            name: "History",
+            path: "lines-of-credit",
+            element: <div>Lines of credit page</div>,
+            name: "Lines of credit",
         },
     ],
 };
