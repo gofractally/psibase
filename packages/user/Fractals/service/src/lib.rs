@@ -41,6 +41,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
+    /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
@@ -51,8 +52,6 @@ pub mod service {
         mission: String,
     ) {
         let sender = get_sender();
-        psibase::services::auth_delegate::Wrapper::call().newAccount(fractal_account, sender);
-        psibase::services::auth_delegate::Wrapper::call().newAccount(guild_account, sender);
 
         Fractal::add(fractal_account, name, mission);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
@@ -70,8 +69,7 @@ pub mod service {
     /// Apply to join a guild
     ///
     /// # Arguments
-    /// * `fractal_account` - The account number for the fractal of the guild.
-    /// * `slug` - The slug of the guild.
+    /// * `guild_account` - The account number for the guild.
     /// * `app` - Relevant information to the application.
     #[action]
     fn apply_guild(guild_account: AccountNumber, app: String) {
@@ -126,8 +124,7 @@ pub mod service {
     /// Attest Guild Membership application
     ///
     /// # Arguments
-    /// * `fractal_account` - The account number for the fractal of the guild.
-    /// * `slug` - The slug of the guild.
+    /// * `guild_account` - The account number for the guild.
     /// * `member` - Member to attest.
     /// * `comment` - Any comment relevant to application.
     /// * `endorses` - True if in favour of application.
@@ -164,11 +161,10 @@ pub mod service {
         }
     }
 
-    /// Starts an evaluation for the specified fractal and evaluation type.
+    /// Starts an evaluation for the specified guild.
     ///
     /// # Arguments
-    /// * `fractal_account` - The account number for the new fractal.
-    /// * `slug` - The slug of the guild.
+    /// * `guild_account` - The account number for the guild.
     #[action]
     fn start_eval(guild_account: AccountNumber) {
         let evaluation = check_some(
@@ -301,10 +297,10 @@ pub mod service {
             .users(Some(group_number))
             .unwrap()
             .len();
-        let is_valid_attestion = attestation
+        let is_valid_attestation = attestation
             .iter()
             .all(|num| *num as usize <= acceptable_numbers);
-        check(is_valid_attestion, "invalid attestation");
+        check(is_valid_attestation, "invalid attestation");
     }
 
     /// Called when a group finalizes its result in a fractal evaluation.
@@ -320,6 +316,12 @@ pub mod service {
             .award_group_scores(group_number, group_result);
     }
 
+    /// Creates a guild within a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guild_account` - The account number for the new guild.
+    /// * `display_name` - The display name of the guild.
     #[action]
     fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
         check(

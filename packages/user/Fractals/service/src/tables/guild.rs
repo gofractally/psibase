@@ -1,5 +1,6 @@
 use async_graphql::ComplexObject;
-use psibase::{check_none, check_some, AccountNumber, Memo, Table};
+use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
@@ -29,6 +30,8 @@ impl Guild {
         display_name: Memo,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
+        AuthDelegate::call().newAccount(guild, get_sender());
+
         FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();
 
         let new_guild_instance = Self::new(fractal, guild, rep, display_name);
