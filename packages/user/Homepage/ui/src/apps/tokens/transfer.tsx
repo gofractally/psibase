@@ -1,76 +1,46 @@
-import type { Token } from "./hooks/tokensPlugin/useUserTokenBalances";
+import type { TokensOutletContext } from "./layout";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 
 import { supervisor } from "@/supervisor";
 
-// import { CreditTable } from "@/apps/tokens/components/credit-table";
-import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
-import {
-    updateUserTokenBalancesCache,
-    useUserTokenBalances,
-} from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
+import { updateUserTokenBalancesCache } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { GlowingCard } from "@/components/glowing-card";
+
 import { Account } from "@/lib/zod/Account";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
-import { Card, CardContent } from "@shared/shadcn/ui/card";
+import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { CreditTable } from "./components/credit-table";
-import { TokenSelector } from "./components/token-selector";
 import { useCredit } from "./hooks/tokensPlugin/useCredit";
+import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
     defaultTransferValues,
     zTransferForm,
     zTransferFormMemo,
 } from "./lib/transfer-form-schema";
 
-export const TokensPage = () => {
-    const { data: currentUserData, isSuccess } = useCurrentUser();
-    const { data, isLoading: isLoadingBalances } =
-        useUserTokenBalances(currentUserData);
-
-    const currentUser = isSuccess ? currentUserData : null;
-
-    const tokens = data ?? [];
-    const isNoTokens = currentUser && tokens.length == 0;
-
-    return (
-        <div className="p-4">
-            <div className="mx-auto max-w-screen-md">
-                {isNoTokens ? (
-                    <NoTokensWarning />
-                ) : (
-                    <PageContents
-                        tokens={tokens}
-                        currentUser={currentUser}
-                        isLoading={!isSuccess || isLoadingBalances}
-                    />
-                )}
-            </div>
-        </div>
-    );
+export const TransferPage = () => {
+    const context = useOutletContext<TokensOutletContext>();
+    if (!context) return <div>No context</div>;
+    return <TransferPageContents />;
 };
 
-const PageContents = ({
-    tokens,
-    currentUser,
-    isLoading,
-}: {
-    tokens: Token[];
-    currentUser: string | null;
-    isLoading: boolean;
-}) => {
+const TransferPageContents = () => {
+    const context = useOutletContext<TokensOutletContext>();
+    console.log("context:", context);
+    const { selectedToken, currentUser, isLoading } = context;
     const { mutateAsync: credit } = useCredit(currentUser);
 
-    const [selectedTokenId, setSelectedTokenId] = useState<string>(
-        tokens[0].id.toString(),
-    );
+    const { setHandleSetMaxAmount, setClearAmountErrors } =
+        useTransferActions();
 
     const handleConfirm = async ({
         value,
@@ -81,6 +51,8 @@ const PageContents = ({
         const paddedAmount = value.amount.amount.startsWith(".")
             ? "0" + value.amount.amount
             : value.amount.amount;
+
+        const selectedTokenId = selectedToken.id.toString();
 
         // Optimistically update the balance
         updateUserTokenBalancesCache(
@@ -140,10 +112,6 @@ const PageContents = ({
 
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
-    const selectedToken = tokens.find(
-        (balance) => balance.id == Number(selectedTokenId),
-    );
-
     const disableForm = !currentUser || isLoading;
 
     const onSubmitPreflight = async (
@@ -162,21 +130,40 @@ const PageContents = ({
         setTransferModal(true);
     };
 
-    const handleSetMaxAmount = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-        form.setFieldValue("amount", {
-            amount: selectedToken?.balance?.amount.toString() ?? "",
-        });
-        form.validateField("amount.amount", "change");
-    };
+    const handleSetMaxAmount = useCallback(
+        (e: React.MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+            form.setFieldValue("amount", {
+                amount: selectedToken?.balance?.amount.toString() ?? "",
+            });
+            form.validateField("amount.amount", "change");
+        },
+        [form, selectedToken],
+    );
 
-    const clearAmountErrors = () => {
+    const clearAmountErrors = useCallback(() => {
         form.setFieldMeta("amount.amount", (prev) => ({
             ...prev,
             errors: [],
             errorMap: {},
         }));
-    };
+    }, [form]);
+
+    // Expose functions to layout via Jotai atoms
+    useEffect(() => {
+        setHandleSetMaxAmount(() => handleSetMaxAmount);
+        setClearAmountErrors(() => clearAmountErrors);
+
+        return () => {
+            setHandleSetMaxAmount(null);
+            setClearAmountErrors(null);
+        };
+    }, [
+        setHandleSetMaxAmount,
+        setClearAmountErrors,
+        handleSetMaxAmount,
+        clearAmountErrors,
+    ]);
 
     return (
         <div className="space-y-4">
@@ -187,21 +174,6 @@ const PageContents = ({
                 selectedToken={selectedToken}
                 onSubmit={form.handleSubmit}
             />
-            <GlowingCard>
-                <CardContent className="@container space-y-2">
-                    {!isLoading && (
-                        <TokenSelector
-                            tokens={tokens}
-                            selectedToken={selectedToken}
-                            onChange={(tokenId) => {
-                                setSelectedTokenId(tokenId);
-                                clearAmountErrors();
-                            }}
-                            onClickAvailableBalance={handleSetMaxAmount}
-                        />
-                    )}
-                </CardContent>
-            </GlowingCard>
             <GlowingCard>
                 <form.AppForm>
                     <form>
@@ -256,17 +228,6 @@ const PageContents = ({
             {currentUser && selectedToken && (
                 <CreditTable user={currentUser} token={selectedToken} />
             )}
-        </div>
-    );
-};
-
-const GlowingCard = ({ children }: { children: React.ReactNode }) => {
-    return (
-        <div className="group relative">
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 blur-xl transition-all duration-500 group-hover:blur-2xl dark:from-purple-500/20 dark:to-blue-500/20" />
-            <Card className="relative z-10 border-gray-300 transition-colors duration-300 hover:border-gray-400 dark:border-gray-800 dark:hover:border-gray-700">
-                {children}
-            </Card>
         </div>
     );
 };
