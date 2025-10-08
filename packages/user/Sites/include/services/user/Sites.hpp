@@ -43,10 +43,11 @@ namespace SystemService
 
    struct SiteConfigRow
    {
-      psibase::AccountNumber     account;
-      bool                       spa       = false;
-      bool                       cache     = true;
-      std::optional<std::string> globalCsp = std::nullopt;
+      psibase::AccountNumber                account;
+      bool                                  spa       = false;
+      bool                                  cache     = true;
+      std::optional<std::string>            globalCsp = std::nullopt;
+std::optional<psibase::AccountNumber> proxy     = std::nullopt;
    };
    PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
@@ -129,6 +130,13 @@ namespace SystemService
       /// - If the hash does not match, the new content is returned with an updated `ETag` header
       void enableCache(bool enable);
 
+/// Sets a foreign account as a proxy target for this site.
+      /// When content is not found locally, the service will check the proxy target.
+      void setProxy(psibase::AccountNumber proxy);
+
+      /// Removes the proxy target for this site.
+      void clearProxy();
+
      private:
       std::optional<SitesContentRow>    useDefaultProfile(const std::string& target);
       bool                              useSpa(const psibase::AccountNumber& account);
@@ -147,7 +155,9 @@ namespace SystemService
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
                 method(deleteCsp, path),
-                method(enableCache, enable))
+                method(enableCache, enable),
+                method(setProxy, proxy),
+                method(clearProxy))
 
    PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService

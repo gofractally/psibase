@@ -635,6 +635,46 @@ namespace SystemService
       table.put(row);
    }
 
+   void Sites::setProxy(psibase::AccountNumber proxy)
+   {
+      auto self = getSender();
+
+      std::set<psibase::AccountNumber> visited{self};
+      psibase::AccountNumber           current = proxy;
+
+      auto table = open<SiteConfigTable>();
+      while (true)
+      {
+         check(!visited.contains(current), "Proxy chain would create a cycle");
+
+         visited.insert(current);
+
+         auto siteConfig = table.get(current);
+         if (!siteConfig || !siteConfig->proxy)
+         {
+            break;
+         }
+
+         current = *siteConfig->proxy;
+      }
+
+      auto row  = table.get(self).value_or(SiteConfigRow{.account = self});
+      row.proxy = std::optional{std::move(proxy)};
+      table.put(row);
+   }
+
+   void Sites::clearProxy()
+   {
+      auto table = Tables{}.open<SiteConfigTable>();
+      auto row   = table.get(getSender());
+      if (!row || !row->proxy)
+      {
+         return;
+      }
+      row->proxy = std::nullopt;
+      table.put(row);
+   }
+
    std::optional<SitesContentRow> Sites::useDefaultProfile(const std::string& target)
    {
       auto index = open<SitesContentTable>(KvMode::read).getIndex<0>();
@@ -689,6 +729,7 @@ namespace SystemService
          bool                   spa       = false;
          bool                   cache     = true;
          std::string            globalCsp = "";
+std::string            proxy     = "";
       };
       PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
 
@@ -708,7 +749,8 @@ namespace SystemService
             return SiteConfig{.account   = record.account,
                               .spa       = record.spa,
                               .cache     = record.cache,
-                              .globalCsp = record.globalCsp.value_or("")};
+                              .globalCsp = record.globalCsp.value_or(""),
+                              .proxy     = record.proxy ? record.proxy->str() : ""};
          }
 
          auto getContent(AccountNumber account) const
