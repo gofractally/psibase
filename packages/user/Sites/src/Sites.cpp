@@ -331,6 +331,72 @@ namespace SystemService
          return exists;
       }
 
+      std::optional<psibase::AccountNumber> getProxy(const psibase::AccountNumber& account)
+      {
+         auto table      = Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>();
+         auto siteConfig = table.get(account);
+
+         if (!siteConfig || !siteConfig->proxy)
+         {
+            return std::nullopt;
+         }
+
+         psibase::AccountNumber current = *siteConfig->proxy;
+         while (true)
+         {
+            auto nextConfig = table.get(current);
+            if (!nextConfig || !nextConfig->proxy)
+            {
+               return current;
+            }
+            current = *nextConfig->proxy;
+         }
+      }
+
+      bool useSpa(const psibase::AccountNumber& account)
+      {
+         auto siteConfig =
+             Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>().get(account);
+         return siteConfig && siteConfig->spa;
+      }
+
+      std::optional<SitesContentRow> getContent(const psibase::AccountNumber& account,
+                                                const std::string&            target)
+      {
+         auto tables = Sites::Tables{getReceiver(), KvMode::read};
+         auto isSpa  = useSpa(account);
+
+         std::optional<SitesContentRow> content;
+
+         auto index = tables.open<SitesContentTable>().getIndex<0>();
+
+         if (isSpa)
+         {
+            auto t  = isStaticAsset(target) ? target : "/index.html";
+            content = index.get(SitesContentKey{account, t});
+         }
+         else
+         {
+            content = index.get(SitesContentKey{account, target});
+            if (!content)
+            {
+               auto t  = target.ends_with('/') ? target : target + '/';
+               content = index.get(SitesContentKey{account, t + "index.html"});
+            }
+         }
+
+         if (!content)
+         {
+            auto proxyTarget = getProxy(account);
+            if (proxyTarget)
+            {
+               content = getContent(*proxyTarget, target);
+            }
+         }
+
+         return content;
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -619,13 +685,7 @@ namespace SystemService
          return;
       }
       row->proxy = std::nullopt;
-      table.put(row);
-   }
-
-   bool Sites::useSpa(const psibase::AccountNumber& account)
-   {
-      auto siteConfig = open<SiteConfigTable>(KvMode::read).get(account);
-      return siteConfig && siteConfig->spa;
+      table.put(*row);
    }
 
    std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
@@ -653,43 +713,6 @@ namespace SystemService
                             .get(account)
                             .value_or(SiteConfigRow{.account = getSender()});
       return siteConfig.cache;
-   }
-
-   std::optional<SitesContentRow> Sites::getContent(const psibase::AccountNumber& account,
-                                                    const std::string&            target)
-   {
-      Tables tables{getReceiver(), KvMode::read};
-      auto   isSpa = useSpa(account);
-
-      std::optional<SitesContentRow> content;
-
-      if (isSpa)
-      {
-         if (!isStaticAsset(target))
-         {
-            auto index = tables.open<SitesContentTable>().getIndex<0>();
-            content    = index.get(SitesContentKey{account, "/index.html"});
-         }
-         else
-         {
-            auto index = tables.open<SitesContentTable>().getIndex<0>();
-            content    = index.get(SitesContentKey{account, target});
-         }
-      }
-      else
-      {
-         auto index = tables.open<SitesContentTable>().getIndex<0>();
-         content    = index.get(SitesContentKey{account, target});
-         if (!content)
-         {
-            if (target.ends_with('/'))
-               content = index.get(SitesContentKey{account, target + "index.html"});
-            else
-               content = index.get(SitesContentKey{account, target + "/index.html"});
-         }
-      }
-
-      return content;
    }
 
    namespace

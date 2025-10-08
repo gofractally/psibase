@@ -138,13 +138,10 @@ namespace SystemService
       void clearProxy();
 
      private:
-      bool                              useSpa(const psibase::AccountNumber& account);
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
       std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
                                                      const psibase::AccountNumber&         account);
-      std::optional<SitesContentRow>    getContent(const psibase::AccountNumber& account,
-                                                const std::string&            target);
    };
 
    PSIO_REFLECT(Sites,
