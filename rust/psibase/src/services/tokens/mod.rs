@@ -119,7 +119,7 @@ mod service {
     /// * `amount`   - Amount to uncredit
     /// * `memo`     - Memo
     #[action]
-    fn uncredit(tokenId: TID, debitor: AccountNumber, maxAmount: Quantity, memo: Memo) {
+    fn uncredit(tokenId: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -141,7 +141,7 @@ mod service {
     /// * `amount`   - Amount to debit
     /// * `memo`     - Memo
     #[action]
-    fn debit(tokenId: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {
+    fn debit(tokenId: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -406,65 +406,28 @@ mod service {
     }
 
     #[event(history)]
-    pub fn recalled(
+    pub fn configured(token_id: TID, action: String, memo: Memo) {}
+
+    #[event(history)]
+    pub fn supplyChanged(
         token_id: TID,
-        amount: Quantity,
-        burner: AccountNumber,
-        from: AccountNumber,
+        counter_party: AccountNumber,
+        action: String,
+        amount: String,
         memo: Memo,
     ) {
     }
 
     #[event(history)]
-    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
-
-    #[event(history)]
-    pub fn created(
+    pub fn balChanged(
         token_id: TID,
-        sender: AccountNumber,
-        precision: Precision,
-        max_issued_supply: Quantity,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
-
-    #[event(history)]
-    pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
-
-    #[event(history)]
-    pub fn credited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
+        account: AccountNumber,
+        counter_party: AccountNumber,
+        action: String,
+        amount: String,
         memo: Memo,
     ) {
     }
-
-    #[event(history)]
-    pub fn uncredited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-        memo: Memo,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn debited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-        memo: Memo,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: Memo) {}
 }
 
 #[test]

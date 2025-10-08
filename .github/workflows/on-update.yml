@@ -8,9 +8,15 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('on-update-pr-{0}', github.event.pull_request.number) || format('on-update-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Run Builds
     uses: ./.github/workflows/ubuntu-builder.yml
+    with:
+      all-platforms: ${{ github.event_name == 'push' }} # Only on pushes to main/release
     secrets:
       publish-package-login: ${{ github.ref == 'refs/heads/main' && secrets.PUBLISH_PACKAGE_LOGIN || null }}

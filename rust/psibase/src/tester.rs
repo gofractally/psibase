@@ -547,6 +547,17 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         self.get_with_debug(false)
     }
 
+    fn is_user_action(act: &Action) -> bool {
+        use crate::{
+            self as psibase, method,
+            services::{accounts, cpu_limit, db, events},
+        };
+        !(act.service == db::SERVICE && act.method == method!("open")
+            || act.service == cpu_limit::SERVICE
+            || act.service == accounts::SERVICE && act.method == method!("billCpu")
+            || act.service == events::SERVICE && act.method == method!("sync"))
+    }
+
     pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
@@ -558,6 +569,9 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
+                        if !Self::is_user_action(&at.action) {
+                            return None;
+                        }
                         if debug {
                             println!(
                                 ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",

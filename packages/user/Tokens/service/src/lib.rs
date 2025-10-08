@@ -5,14 +5,19 @@ pub mod tables;
 pub mod service {
     use crate::tables::tables::*;
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
+    use psibase::services::events;
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::symbol::Service::Wrapper as Symbol;
-    use psibase::services::tokens::{Precision, Quantity};
-    use psibase::{AccountNumber, Memo};
+    use psibase::services::tokens::{Decimal, Precision, Quantity};
+    use psibase::{get_sender, AccountNumber, Memo};
 
     use psibase::*;
 
     pub type TID = u32;
+
+    pub fn fmt_amount(token_id: TID, amount: Quantity) -> String {
+        Decimal::new(amount, Token::get_assert(token_id).precision).to_string()
+    }
 
     #[action]
     fn init() {
@@ -22,8 +27,22 @@ pub mod service {
             let init_instance = InitRow { last_used_id: 0 };
             table.put(&init_instance).unwrap();
 
-            Nfts::call_from(Wrapper::SERVICE)
-                .setUserConf(psibase::NamedBit::from("manualDebit"), true);
+            Nfts::call().setUserConf(psibase::NamedBit::from("manualDebit"), true);
+
+            let add_index = |method: &str, column: u8| {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            };
+
+            add_index("configured", 0);
+            add_index("supplyChanged", 0);
+            add_index("balChanged", 1);
+            add_index("balChanged", 2);
+
             UserConfig::get_or_new(Wrapper::SERVICE).set_flag(BalanceFlags::MANUAL_DEBIT, true);
         }
     }
@@ -49,11 +68,19 @@ pub mod service {
         );
         let new_token = Token::add(precision, max_issued_supply);
 
-        Wrapper::emit()
-            .history()
-            .created(new_token.id, get_sender(), precision, max_issued_supply);
+        let tid = new_token.id;
+        Wrapper::emit().history().configured(
+            tid,
+            "created".to_string(),
+            Memo::new(format!(
+                "New token {} with max supply: {}",
+                tid,
+                fmt_amount(tid, max_issued_supply)
+            ))
+            .unwrap(),
+        );
 
-        new_token.id
+        tid
     }
 
     /// Lookup token details
@@ -99,12 +126,10 @@ pub mod service {
 
         token.map_symbol(symbol);
 
-        let symbol_owner_nft = Symbol::call_from(Wrapper::SERVICE)
-            .getSymbol(symbol)
-            .ownerNft;
+        let symbol_owner_nft = Symbol::call().getSymbol(symbol).ownerNft;
         check(symbol_owner_nft != 0, "Symbol does not exist");
 
-        Nfts::call_from(Wrapper::SERVICE).debit(
+        Nfts::call().debit(
             symbol_owner_nft,
             format!(
                 "Mapping symbol {} to token {}",
@@ -112,11 +137,13 @@ pub mod service {
                 token_id
             ),
         );
-        Nfts::call_from(Wrapper::SERVICE).burn(symbol_owner_nft);
+        Nfts::call().burn(symbol_owner_nft);
 
-        Wrapper::emit()
-            .history()
-            .symbol_mapped(token_id, get_sender(), symbol);
+        Wrapper::emit().history().configured(
+            token.id,
+            "named".to_string(),
+            Memo::new(format!("{}", symbol.to_string())).unwrap(),
+        );
     }
 
     /// Get user's token-specific balance configuration
@@ -247,7 +274,16 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
-        Token::get_assert(token_id).set_flag(index.into(), enabled);
+        let flag = index.into();
+        Token::get_assert(token_id).set_flag(flag, enabled);
+
+        Wrapper::emit().history().configured(
+            token_id,
+            "configured".to_string(),
+            format!("Flag: {}: {}", flag.to_string(), enabled)
+                .try_into()
+                .unwrap(),
+        );
     }
 
     /// Get user token balance
@@ -288,11 +324,31 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
-        Token::get_assert(token_id).recall(amount, from);
+        let mut token = Token::get_assert(token_id);
 
-        Wrapper::emit()
-            .history()
-            .recalled(token_id, amount, get_sender(), from, memo);
+        token.recall(amount, from);
+
+        let actor = get_sender();
+        let recalled = "recalled".to_string();
+        let amount = fmt_amount(token_id, amount);
+        let event = Wrapper::emit().history();
+
+        event.balChanged(
+            token_id,
+            from,  // We want this balance change event to show in `from`'s balChanged index
+            actor, // In this exceptional case, the actor is the counterparty
+            recalled.clone(),
+            amount.clone(),
+            memo.clone(),
+        );
+
+        event.supplyChanged(
+            token_id,
+            actor,
+            recalled,
+            amount,
+            Memo::new(format!("Recalled from {}", from)).unwrap(),
+        );
     }
 
     /// Burn's the specified amount of the sender's specified tokens
@@ -303,11 +359,25 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn burn(token_id: TID, amount: Quantity, memo: Memo) {
-        Token::get_assert(token_id).burn(amount);
+        let mut token = Token::get_assert(token_id);
 
-        Wrapper::emit()
-            .history()
-            .burned(token_id, get_sender(), amount, memo);
+        token.burn(amount);
+
+        let actor = get_sender();
+        let burned = "burned".to_string();
+        let amount = fmt_amount(token_id, amount);
+        let event = Wrapper::emit().history();
+
+        event.balChanged(
+            token_id,
+            actor,
+            actor,
+            burned.clone(),
+            amount.clone(),
+            memo.clone(),
+        );
+
+        event.supplyChanged(token_id, actor, burned, amount, memo);
     }
 
     /// Mint / Issue new tokens into existence
@@ -321,9 +391,17 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn mint(token_id: TID, amount: Quantity, memo: Memo) {
-        Token::get_assert(token_id).mint(amount);
+        let mut token = Token::get_assert(token_id);
 
-        Wrapper::emit().history().minted(token_id, amount, memo);
+        token.mint(amount);
+
+        Wrapper::emit().history().supplyChanged(
+            token_id,
+            get_sender(),
+            "minted".to_string(),
+            fmt_amount(token_id, amount),
+            memo,
+        );
     }
 
     /// Credit tokens to a debitor (recipient).
@@ -348,9 +426,14 @@ pub mod service {
         let creditor = get_sender();
         SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
 
-        Wrapper::emit()
-            .history()
-            .credited(token_id, creditor, debitor, amount, memo);
+        Wrapper::emit().history().balChanged(
+            token_id,
+            creditor,
+            debitor,
+            "credited".to_string(),
+            fmt_amount(token_id, amount),
+            memo,
+        );
     }
 
     /// Uncredit tokens that were credited into a shared balance
@@ -376,9 +459,14 @@ pub mod service {
 
         SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
 
-        Wrapper::emit()
-            .history()
-            .uncredited(token_id, creditor, debitor, amount, memo);
+        Wrapper::emit().history().balChanged(
+            token_id,
+            creditor,
+            debitor,
+            "uncredited".to_string(),
+            fmt_amount(token_id, amount),
+            memo,
+        );
     }
 
     /// Debit tokens that were credited into a shared balance
@@ -425,65 +513,28 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn recalled(
+    pub fn configured(token_id: TID, action: String, memo: Memo) {}
+
+    #[event(history)]
+    pub fn supplyChanged(
         token_id: TID,
-        amount: Quantity,
-        burner: AccountNumber,
-        from: AccountNumber,
+        actor: AccountNumber,
+        action: String,
+        amount: String,
         memo: Memo,
     ) {
     }
 
     #[event(history)]
-    pub fn burned(token_id: TID, sender: AccountNumber, amount: Quantity, memo: Memo) {}
-
-    #[event(history)]
-    pub fn created(
+    pub fn balChanged(
         token_id: TID,
-        sender: AccountNumber,
-        precision: Precision,
-        max_issued_supply: Quantity,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn minted(token_id: TID, amount: Quantity, memo: Memo) {}
-
-    #[event(history)]
-    pub fn symbol_mapped(token_id: TID, sender: AccountNumber, symbol: AccountNumber) {}
-
-    #[event(history)]
-    pub fn credited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
+        account: AccountNumber,
+        counter_party: AccountNumber,
+        action: String,
+        amount: String,
         memo: Memo,
     ) {
     }
-
-    #[event(history)]
-    pub fn uncredited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-        memo: Memo,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn debited(
-        token_id: TID,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-        memo: Memo,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn rejected(token_id: TID, creditor: AccountNumber, debitor: AccountNumber, memo: Memo) {}
 }
 
 #[cfg(test)]
