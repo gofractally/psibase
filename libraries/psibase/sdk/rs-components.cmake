@@ -54,7 +54,7 @@ function(add_rs_component_workspace TARGET_TUPLE)
     endforeach()
 
     # Use shared target directory for all Rust builds to enable dependency sharing
-    set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/rust-target)
+    set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/packages)
     set(TARGET_ARCH wasm32-wasip1)
 
     set(COPY_COMMANDS "")

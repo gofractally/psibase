@@ -333,7 +333,7 @@ function(cargo_psibase_package)
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust-target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/packages/wasm32-wasip1/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext
@@ -342,7 +342,7 @@ function(cargo_psibase_package)
         CONFIGURE_COMMAND ""
         BUILD_COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
-            --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust-target
+            --target-dir ${CMAKE_CURRENT_BINARY_DIR}/packages
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
         DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
