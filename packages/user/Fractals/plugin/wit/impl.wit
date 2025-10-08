@@ -5,6 +5,8 @@ world impl {
     include transact:plugin/imports;
     include sites:plugin/imports;
     include evaluations:plugin/imports;
+    include permissions:plugin/imports;
+
 
     export admin;
     export user;

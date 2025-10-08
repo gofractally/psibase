@@ -12,6 +12,7 @@ mod errors;
 
 use bindings::fractals::plugin as FractalsPlugin;
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
+use trust::{assert_authorized, FunctionName};
 
 struct ProposeLatch;
 
@@ -41,8 +42,8 @@ define_trust! {
         ",
     }
     functions {
-        Low => [],
-        High => [start_eval],
+        Low => [join, apply_guild, attest_membership_app, propose, get_group_users, get_proposal, start_eval, create_guild, attest, register, unregister, set_schedule, close_eval],
+        High => [],
     }
 }
 
@@ -57,9 +58,11 @@ impl Admin for FractalCorePlugin {
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_schedule)?;
         let _latch = ProposeLatch::new(&guild_account);
 
         FractalsPlugin::admin::set_schedule(
+            &guild_account,
             registration,
             deliberation,
             submission,
@@ -69,18 +72,22 @@ impl Admin for FractalCorePlugin {
     }
 
     fn close_eval(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::close_eval)?;
+
         FractalsPlugin::admin::close_eval(&guild_account)
     }
 }
 
 impl User for FractalCorePlugin {
     fn join() -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::start_eval)?;
+        assert_authorized(FunctionName::join)?;
 
         FractalsPlugin::user::join()
     }
 
     fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::apply_guild)?;
+
         FractalsPlugin::user::apply_guild(&guild_account, &app)
     }
 
@@ -90,6 +97,8 @@ impl User for FractalCorePlugin {
         comment: String,
         endorses: bool,
     ) -> Result<(), Error> {
+        assert_authorized(FunctionName::attest_membership_app)?;
+
         FractalsPlugin::user::attest_membership_app(&guild_account, &member, &comment, endorses)
     }
 
@@ -98,10 +107,14 @@ impl User for FractalCorePlugin {
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<(), Error> {
+        assert_authorized(FunctionName::propose)?;
+
         FractalsPlugin::user::propose(&guild_account, group_number, &proposal)
     }
 
     fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
+        assert_authorized(FunctionName::get_group_users)?;
+
         FractalsPlugin::user::get_group_users(&guild_account, group_number)
     }
 
@@ -109,30 +122,38 @@ impl User for FractalCorePlugin {
         guild_account: String,
         group_number: u32,
     ) -> Result<Option<Vec<String>>, Error> {
+        assert_authorized(FunctionName::get_proposal)?;
+
         FractalsPlugin::user::get_proposal(&guild_account, group_number)
     }
 
     fn start_eval(guild_account: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::start_eval)?;
+        assert_authorized(FunctionName::start_eval)?;
 
         FractalsPlugin::admin::start(&guild_account)
     }
 
     fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::start_eval)?;
+        assert_authorized(FunctionName::create_guild)?;
 
         FractalsPlugin::user::create_guild(&display_name, &slug)
     }
 
     fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::attest)?;
+
         FractalsPlugin::user::attest(&guild_account, group_number)
     }
 
     fn register(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::register)?;
+
         FractalsPlugin::user::register(&guild_account)
     }
 
     fn unregister(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::unregister)?;
+
         FractalsPlugin::user::unregister(&guild_account)
     }
 }

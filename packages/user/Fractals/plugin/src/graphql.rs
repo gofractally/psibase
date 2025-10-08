@@ -4,23 +4,21 @@ use crate::{bindings::host::common::server as CommonServer, errors::ErrorType};
 use psibase::AccountNumber;
 use serde::{Deserialize, Serialize};
 
-pub fn fetch_guild_eval_instance(guild: AccountNumber) -> Result<Option<u32>, Error> {
+fn fetch_guild(guild: AccountNumber) -> Result<Guild, Error> {
     let query = format!(
         r#"query {{
             guild(guild: "{}") {{
                 evalInstance {{
                     evaluationId
                 }}
+                fractal {{
+                    account
+                }}
             }}
         }}"#,
         guild
     );
-    Response::try_from(CommonServer::post_graphql_get_json(&query)?).map(|res| {
-        res.data
-            .guild
-            .eval_instance
-            .map(|instance| instance.evaluation_id)
-    })
+    Response::try_from(CommonServer::post_graphql_get_json(&query)?).map(|res| res.data.guild)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -31,19 +29,25 @@ pub struct Response {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Data {
-    guild: Guild,
+    pub guild: Guild,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Guild {
-    eval_instance: Option<EvalInstance>,
+    pub eval_instance: Option<EvalInstance>,
+    pub fractal: Fractal,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalInstance {
-    evaluation_id: u32,
+    pub evaluation_id: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Fractal {
+    pub account: AccountNumber,
 }
 
 impl TryFrom<String> for Response {
@@ -55,4 +59,22 @@ impl TryFrom<String> for Response {
 
         Ok(response_root)
     }
+}
+
+pub struct GuildHelper {
+    pub fractal: AccountNumber,
+    pub evaluation_id: Option<u32>,
+}
+
+impl From<Guild> for GuildHelper {
+    fn from(value: Guild) -> Self {
+        Self {
+            fractal: value.fractal.account,
+            evaluation_id: value.eval_instance.map(|instance| instance.evaluation_id),
+        }
+    }
+}
+
+pub fn get_guild(guild: String) -> Result<GuildHelper, Error> {
+    fetch_guild(guild.as_str().into()).map(|guild| GuildHelper::from(guild))
 }

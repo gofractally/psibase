@@ -27,6 +27,7 @@ world = "impl"
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "evaluations:plugin" = { path = "../../Evaluations/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 
 [dev-dependencies]
