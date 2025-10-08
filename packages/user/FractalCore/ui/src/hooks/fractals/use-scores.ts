@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
 import { getScores } from "@/lib/graphql/fractals/getScores";
-import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { zAccount } from "@/lib/zod/Account";
 
-export const useScores = (guildId: OptionalNumber) => {
+export const useScores = (guildAccount: OptionalAccount) => {
     return useQuery({
-        queryKey: QueryKey.scores(guildId),
-        enabled: !!guildId,
+        queryKey: QueryKey.scores(guildAccount),
+        enabled: !!guildAccount,
         queryFn: async () => {
             try {
-                return await getScores(z.number().int().parse(guildId));
+                return await getScores(zAccount.parse(guildAccount));
             } catch (error) {
                 const message = "Error getting scores";
                 console.error(message, error);

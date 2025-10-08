@@ -19,8 +19,11 @@ impl Fractal {
     }
 
     pub fn add(account: AccountNumber, name: String, mission: String) {
-        AuthDelegate::call().newAccount(account, get_sender());
-
+        // TEMP DEV
+        if account != "fractal-core".into() {
+            AuthDelegate::call().newAccount(account, get_sender());
+        }
+        // TEMP DEV END
         Self::new(account, name, mission).save();
     }
 

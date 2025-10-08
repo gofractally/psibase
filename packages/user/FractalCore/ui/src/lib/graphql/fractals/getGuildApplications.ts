@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { fractalsService } from "@/lib/constants";
-import { zAccount } from "@/lib/zod/Account";
+import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "../../graphql";
@@ -21,11 +21,11 @@ export type GuildApplicationListInstance = z.infer<
     typeof zGuildApplicationListInstance
 >;
 
-export const getGuildApplications = async (guildId: number) => {
+export const getGuildApplications = async (guildAccount: Account) => {
     const res = await graphql(
         `
             {
-                guildApplications(guildId: ${guildId}) {
+                guildApplications(guild: ${guildAccount}) {
                     nodes {
                         member
                         app

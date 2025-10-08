@@ -7,20 +7,20 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
-import { useGuild } from "@/hooks/use-guild";
 import { EmptyBlock } from "@/components/empty-block";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useState } from "react";
 import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-modal";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export const ApplicationDetail = () => {
 
 
     const { applicant } = useParams();
-    const { data: guild } = useGuild();
+    const guildAccount = useGuildAccount();
 
     const { data: currentUser } = useCurrentUser();
-    const { data: application, isPending } = useGuildApplication(guild?.id, applicant);
+    const { data: application, isPending } = useGuildApplication(guildAccount, applicant);
 
 
     const isSelf = currentUser == applicant;

@@ -6,7 +6,7 @@ interface user {
 
     join: func() -> result<_, error>;
 
-    create-guild: func(display-name: string, slug: string) -> result<_, error>;
+    create-guild: func(display-name: string, account: string) -> result<_, error>;
 
     attest: func(guild-account: string, group-number: u32) -> result<_, error>;
     propose: func(guild-account: string, group-number: u32, proposal: list<string>) -> result<_, error>;

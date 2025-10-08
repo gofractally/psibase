@@ -40,8 +40,8 @@ export const MyGuildMembership = () => {
 
     const { data: memberships } = useGuildMembershipsOfUser(currentUser)
 
-    const guildSlug = useGuildAccount();
-    const isGuildMember = memberships?.some(membership => membership.guild.slug == guildSlug);
+    const guildAccount = useGuildAccount();
+    const isGuildMember = memberships?.some(membership => membership.guild.account == guildAccount);
 
     const {
         data: chainId,

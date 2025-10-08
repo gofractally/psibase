@@ -24,7 +24,8 @@ const QueryKey = {
     branding: () => ["branding"] as const,
     logout: () => ["logout"] as const,
     members: (account: OptionalAccount) => ["members", account] as const,
-    scores: (guildId: OptionalNumber) => ["scores", guildId] as const,
+    scores: (guildAccount: OptionalAccount) =>
+        ["scores", guildAccount] as const,
     membership: (fractal: OptionalAccount, user: OptionalAccount) =>
         ["membership", fractal, user] as const,
     evaluation: (evaluationId: OptionalNumber) =>
@@ -36,10 +37,12 @@ const QueryKey = {
         ["usersAndGroups", evaluationId] as const,
     groupUsers: (slug: OptionalAccount, groupNumber: OptionalNumber) =>
         ["groupUsers", slug, groupNumber] as const,
-    guildApplications: (guildId: OptionalNumber) =>
-        ["guildApplications", guildId] as const,
-    guildApplication: (guildId: OptionalNumber, account: OptionalAccount) =>
-        ["guildApplication", guildId, account] as const,
+    guildApplications: (guildAccount: OptionalAccount) =>
+        ["guildApplications", guildAccount] as const,
+    guildApplication: (
+        guildAccount: OptionalAccount,
+        applicant: OptionalAccount,
+    ) => ["guildApplication", guildAccount, applicant] as const,
     proposal: (guildSlug: OptionalAccount, groupNumber: OptionalNumber) =>
         ["proposal", guildSlug, groupNumber] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;

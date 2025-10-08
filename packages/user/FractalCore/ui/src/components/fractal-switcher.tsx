@@ -66,7 +66,7 @@ export function AppSwitcher() {
                                 <img
                                     className="size-4"
                                     src={createIdenticon(
-                                        chainId + currentFractal + currentGuild?.id,
+                                        chainId + currentFractal + currentGuild?.account,
                                     )}
                                 />
                             </div>

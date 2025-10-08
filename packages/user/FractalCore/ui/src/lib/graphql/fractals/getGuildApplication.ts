@@ -23,11 +23,14 @@ export type GuildApplicationListInstance = z.infer<
     typeof zGuildApplicationListInstance
 >;
 
-export const getGuildApplication = async (guildId: number, member: Account) => {
+export const getGuildApplication = async (
+    guildAccount: Account,
+    member: Account,
+) => {
     const res = await graphql(
         `
             {
-                guildApplication(guildId: ${guildId}, member: "${member}") {
+                guildApplication(guild: ${guildAccount}, member: "${member}") {
                         member
                         app
                         createdAt

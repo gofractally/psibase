@@ -15,9 +15,8 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 import { useAppForm } from "../form/app-form";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-import { getGuildBySlug } from "@/lib/graphql/fractals/getGuildBySlug";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { isAccountAvailable } from "@/lib/isAccountAvailable";
 
 
 export const CreateGuildModal = ({
@@ -28,7 +27,6 @@ export const CreateGuildModal = ({
     openChange: (show: boolean) => void;
 }) => {
     const { mutateAsync: createGuild } = useCreateGuild();
-    const fractalAccount = useFractalAccount();
 
     const { data: currentUser } = useCurrentUser();
     const { refetch } = useGuildMembershipsOfUser(currentUser);
@@ -38,16 +36,16 @@ export const CreateGuildModal = ({
 
     const form = useAppForm({
         defaultValues: {
-            slug: "",
+            account: "",
             name: "",
         },
-        onSubmit: async ({ value: { name, slug, } }) => {
+        onSubmit: async ({ value: { name, account, } }) => {
             await createGuild({
                 name,
-                slug,
+                account,
             });
             openChange(false);
-            navigate(`/guild/${slug}`);
+            navigate(`/guild/${account}`);
             refetch();
         },
         validators: {
@@ -80,21 +78,23 @@ export const CreateGuildModal = ({
                             )}
                         />
                         <form.AppField
-                            name="slug"
+                            name="account"
                             validators={{
                                 onChangeAsyncDebounceMs: 1000,
                                 onChangeAsync: async ({ value }) => {
-                                    const guild =
-                                        await getGuildBySlug(fractalAccount, value);
-                                    if (guild) {
-                                        return "Slug is already in use";
+                                    const accountStatus =
+                                        await isAccountAvailable(value);
+                                    if (accountStatus == 'Taken') {
+                                        return "Account is taken";
+                                    } else if (accountStatus == 'Invalid') {
+                                        return "Invalid account"
                                     }
                                 },
                             }}
                             children={(field) => (
                                 <field.TextField
-                                    label="Slug"
-                                    description="Unique identifier inside the fractal"
+                                    label="Account"
+                                    description="Unique identifier of the guild"
                                 />
                             )}
                         />

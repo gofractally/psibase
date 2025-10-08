@@ -6,7 +6,7 @@ import { Account, zAccount } from "@/lib/zod/Account";
 import { graphql } from "../../graphql";
 
 export const zGuild = z.object({
-    id: z.number().int(),
+    account: zAccount,
     displayName: z.string(),
     council: zAccount.array(),
     rep: z.object({ member: zAccount }).nullable(),
@@ -19,12 +19,12 @@ export const zGuild = z.object({
     bio: z.string(),
 });
 
-export const getGuildBySlug = async (guildAccount: Account) => {
+export const getGuild = async (guildAccount: Account) => {
     const res = await graphql(
         `
         {
             guild(guild:"${guildAccount}") {
-                id
+                account
                 displayName
                 rep {
                     member

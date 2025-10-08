@@ -133,10 +133,10 @@ impl User for FractalCorePlugin {
         FractalsPlugin::admin::start(&guild_account)
     }
 
-    fn create_guild(display_name: String, slug: String) -> Result<(), Error> {
+    fn create_guild(display_name: String, account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::create_guild)?;
 
-        FractalsPlugin::user::create_guild(&display_name, &slug)
+        FractalsPlugin::user::create_guild(&display_name, &account)
     }
 
     fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {

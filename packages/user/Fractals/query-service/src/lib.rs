@@ -231,7 +231,7 @@ mod service {
 
         async fn scores(
             &self,
-            guild_id: u32,
+            guild_account: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
@@ -239,7 +239,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
             TableQuery::subindex::<AccountNumber>(
                 GuildMemberTable::with_service(fractals::SERVICE).get_index_pk(),
-                &(guild_id),
+                &(guild_account),
             )
             .first(first)
             .last(last)

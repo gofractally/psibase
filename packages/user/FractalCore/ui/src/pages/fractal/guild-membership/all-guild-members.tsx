@@ -20,8 +20,7 @@ const formatScore = (num: number): string => {
 
 export const AllGuildMembers = () => {
     const { data: guild } = useGuild()
-    const { data: scores } = useScores(guild?.id);
-
+    const { data: scores } = useScores(guild?.account);
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
