@@ -187,6 +187,9 @@ namespace LocalService
       }
       else if (target == "/config")
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          if (req.method == "GET")
          {
             auto          native = Native::session(KvMode::read);
@@ -204,6 +207,14 @@ namespace LocalService
          }
          else if (req.method == "PUT")
          {
+            if (req.contentType != "application/json")
+            {
+               return HttpReply{
+                   .status      = HttpStatus::unsupportedMediaType,
+                   .contentType = "text/html",
+                   .body        = toVec("Content-Type must be application/json\n"),
+               };
+            }
             auto table = Native::session(KvMode::readWrite).open<HostConfigTable>();
             PSIBASE_SUBJECTIVE_TX
             {
