@@ -5,6 +5,7 @@ import { GlowingCard } from "@/components/glowing-card";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
+import { toast } from "@shared/shadcn/ui/sonner";
 import {
     Table,
     TableBody,
@@ -20,7 +21,12 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { useUserLinesOfCredit } from "./hooks/tokensPlugin/useUserLinesOfCredit";
+import { useDebit } from "./hooks/tokensPlugin/useDebit";
+import { useUncredit } from "./hooks/tokensPlugin/useUncredit";
+import {
+    type LineOfCredit,
+    useUserLinesOfCredit,
+} from "./hooks/tokensPlugin/useUserLinesOfCredit";
 import { TokensOutletContext } from "./layout";
 
 export const PendingPage = () => {
@@ -34,6 +40,8 @@ export const PendingPageContents = () => {
     const { currentUser, isLoading } = context;
 
     const { data: pendingTransactions } = useUserLinesOfCredit(currentUser);
+    const { mutateAsync: uncredit } = useUncredit(currentUser);
+    const { mutateAsync: debit } = useDebit(currentUser);
 
     if (isLoading) {
         return (
@@ -54,6 +62,50 @@ export const PendingPageContents = () => {
             </GlowingCard>
         );
     }
+
+    const handleRecall = async (pt: LineOfCredit) => {
+        try {
+            await uncredit({
+                tokenId: pt.balance.tokenNumber.toString(),
+                debitor: pt.debitor,
+                amount: pt.balance.amount.toString(),
+                memo: "",
+            });
+            toast.success("Pending balance successfully recalled");
+        } catch (e) {
+            toast.error("Failed to recall pending balance", {
+                closeButton: true,
+                richColors: true,
+                duration: Infinity,
+                description:
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
+            });
+        }
+    };
+
+    const handleClaim = async (pt: LineOfCredit) => {
+        try {
+            await debit({
+                tokenId: pt.balance.tokenNumber.toString(),
+                sender: pt.creditor,
+                amount: pt.balance.amount.toString(),
+                memo: "",
+            });
+            toast.success("Pending balance successfully claimed");
+        } catch (e) {
+            toast.error("Failed to claim pending balance", {
+                closeButton: true,
+                richColors: true,
+                duration: Infinity,
+                description:
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
+            });
+        }
+    };
 
     return (
         <GlowingCard>
@@ -98,13 +150,11 @@ export const PendingPageContents = () => {
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-6 w-6"
-                                                            onClick={() => {
-                                                                // TODO: Implement claim logic
-                                                                console.log(
-                                                                    "Claim:",
-                                                                    pt,
-                                                                );
-                                                            }}
+                                                            onClick={() =>
+                                                                handleClaim(
+                                                                    pt.debit!,
+                                                                )
+                                                            }
                                                         >
                                                             <HandCoins className="h-4 w-4" />
                                                         </Button>
@@ -134,13 +184,11 @@ export const PendingPageContents = () => {
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-6 w-6"
-                                                            onClick={() => {
-                                                                // TODO: Implement recall logic
-                                                                console.log(
-                                                                    "Recall:",
-                                                                    pt,
-                                                                );
-                                                            }}
+                                                            onClick={() =>
+                                                                handleRecall(
+                                                                    pt.credit!,
+                                                                )
+                                                            }
                                                         >
                                                             <Undo2 className="h-4 w-4" />
                                                         </Button>

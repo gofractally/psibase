@@ -6,11 +6,8 @@ import { useOutletContext } from "react-router-dom";
 import { supervisor } from "@/supervisor";
 
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
-import { updateUserTokenBalancesCache } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
 
 import { GlowingCard } from "@/components/glowing-card";
-
-import { Account } from "@/lib/zod/Account";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
@@ -46,20 +43,12 @@ const TransferPageContents = () => {
     }: {
         value: typeof defaultTransferValues;
     }) => {
+        const selectedTokenId = selectedToken.id.toString();
+
         // Pad with 0 if the amount string starts with a dot (e.g., ".01" -> "0.01")
         const paddedAmount = value.amount.amount.startsWith(".")
             ? "0" + value.amount.amount
             : value.amount.amount;
-
-        const selectedTokenId = selectedToken.id.toString();
-
-        // Optimistically update the balance
-        updateUserTokenBalancesCache(
-            Account.parse(currentUser),
-            selectedTokenId,
-            paddedAmount,
-            "Subtract",
-        );
 
         try {
             await credit({
@@ -68,28 +57,21 @@ const TransferPageContents = () => {
                 amount: paddedAmount,
                 memo: value.memo,
             });
+
             toast("Sent", {
                 description: `Sent ${paddedAmount} ${
                     selectedToken?.label || selectedToken?.symbol
                 } to ${value.to.account}`,
             });
-            // do not reset the token field
+
             form.resetField("amount");
             form.resetField("to");
             form.resetField("memo");
 
             setTransferModal(false);
         } catch (e) {
-            // Rollback optimistic update on error
-            updateUserTokenBalancesCache(
-                Account.parse(currentUser),
-                selectedTokenId,
-                paddedAmount,
-                "Add",
-            );
             setTransferModal(false);
             toast.error("Token transfer failed", {
-                // dismissible: true,
                 closeButton: true,
                 richColors: true,
                 duration: Infinity,
