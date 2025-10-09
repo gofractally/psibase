@@ -1,0 +1,29 @@
+import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+
+import { zGuildAccount } from "@/lib/zod/Wrappers";
+
+import { useFractalAccount } from "./use-fractal-account";
+
+export const zParams = z.object({
+    guildAccount: zGuildAccount,
+    displayName: z.string(),
+});
+
+export const useSetGuildDisplayName = () => {
+    const fractal = useFractalAccount();
+
+    return useMutation({
+        mutationFn: async (params: z.infer<typeof zParams>) => {
+            const { guildAccount, displayName } = zParams.parse(params);
+            await supervisor.functionCall({
+                method: "setGuildDisplayName",
+                service: fractal,
+                intf: "admin",
+                params: [guildAccount, displayName],
+            });
+        },
+    });
+};

@@ -39,7 +39,7 @@ define_trust! {
         ",
     }
     functions {
-        Low => [close_eval, create_fractal, start, set_guild_description, set_schedule, register, unregister, apply_guild, create_guild, attest_membership_app, get_proposal, attest, get_group_users, propose, join],
+        Low => [close_eval, create_fractal, start, set_guild_display_name, set_guild_bio, set_guild_description, set_schedule, register, unregister, apply_guild, create_guild, attest_membership_app, get_proposal, attest, get_group_users, propose, join],
         High => [],
     }
 }
@@ -95,6 +95,34 @@ impl Admin for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::start_eval::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_guild_display_name(guild: String, display_name: String) -> Result<(), Error> {
+        get_guild(guild)?.assert_authorized(FunctionName::set_guild_display_name)?;
+
+        let packed_args = fractals::action_structs::set_g_disp {
+            display_name: display_name.try_into().unwrap(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_g_disp::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_guild_bio(guild: String, bio: String) -> Result<(), Error> {
+        get_guild(guild)?.assert_authorized(FunctionName::set_guild_bio)?;
+
+        let packed_args = fractals::action_structs::set_g_bio {
+            bio: bio.try_into().unwrap(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_g_bio::ACTION_NAME,
             &packed_args,
         )
     }
@@ -280,6 +308,7 @@ impl User for FractallyPlugin {
     }
 
     fn join() -> Result<(), Error> {
+        assert_authorized(FunctionName::join)?;
         let packed_args = fractals::action_structs::join {
             fractal: get_sender_app()?,
         }

@@ -1,39 +1,42 @@
 import { useAppForm } from "@/components/form/app-form";
 import { ScheduleDialog } from "@/components/schedule-dialog"
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useSetGuildBio } from "@/hooks/fractals/use-set-guild-bio";
+import { useSetGuildDescription } from "@/hooks/fractals/use-set-guild-description";
+import { useSetGuildDisplayName } from "@/hooks/fractals/use-set-guild-display-name";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuild } from "@/hooks/use-guild";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import dayjs from "dayjs";
 import { useState } from "react";
 import { z } from "zod";
 
 
-
-
 export const Settings = () => {
-
-
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
     const now = useNowUnix();
 
     const status = useEvaluationStatus(now);
+    const guildAccount = useGuildAccount()
 
     const { data: guild, isPending: isGuildPending } = useGuild();
 
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
     const { evaluation } = useEvaluationInstance();
+    const { mutateAsync: setGuildBio } = useSetGuildBio()
+    const { mutateAsync: setGuildDescription } = useSetGuildDescription()
+    const { mutateAsync: setGuildDisplayName } = useSetGuildDisplayName()
 
 
     const displayNameForm = useAppForm({
         defaultValues: {
-            displayName: ''
+            displayName: guild?.displayName ?? ''
         },
         onSubmit: async ({ value: { displayName } }) => {
-            console.log(displayName, 'was received');
-
+            await setGuildDisplayName({ displayName, guildAccount: guildAccount! })
         },
         validators: {
             onChange: z.object({
@@ -44,11 +47,10 @@ export const Settings = () => {
 
     const bioForm = useAppForm({
         defaultValues: {
-            bio: ''
+            bio: guild?.bio ?? ''
         },
-        onSubmit: async ({ value: { bio }, formApi }) => {
-            console.log(bio, 'was received');
-            formApi.reset()
+        onSubmit: async ({ value: { bio } }) => {
+            await setGuildBio({ bio, guildAccount: guildAccount! })
         },
         validators: {
             onChange: z.object({
@@ -59,11 +61,10 @@ export const Settings = () => {
 
     const descriptonForm = useAppForm({
         defaultValues: {
-            description: ''
+            description: guild?.description ?? ''
         },
         onSubmit: async ({ value: { description } }) => {
-            console.log(description, 'was received');
-            descriptonForm.reset()
+            await setGuildDescription({ description, guildAccount: guildAccount! })
         },
         validators: {
             onChange: z.object({
@@ -106,7 +107,7 @@ export const Settings = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-                    <form className="text-muted-foreground" onSubmit={(e) => {
+                    <form onSubmit={(e) => {
                         e.preventDefault()
                         void displayNameForm.handleSubmit();
                     }}>
@@ -118,9 +119,7 @@ export const Settings = () => {
                             }
                         />
                         <displayNameForm.AppForm>
-                            <displayNameForm.SubmitButton
-
-                            />
+                            <displayNameForm.SubmitButton />
                         </displayNameForm.AppForm>
                     </form>
 
@@ -135,9 +134,7 @@ export const Settings = () => {
                             }
                         />
                         <bioForm.AppForm>
-                            <bioForm.SubmitButton
-
-                            />
+                            <bioForm.SubmitButton />
                         </bioForm.AppForm>
                     </form>
 
@@ -152,9 +149,7 @@ export const Settings = () => {
                             }
                         />
                         <descriptonForm.AppForm>
-                            <descriptonForm.SubmitButton
-
-                            />
+                            <descriptonForm.SubmitButton />
                         </descriptonForm.AppForm>
                     </form>
 

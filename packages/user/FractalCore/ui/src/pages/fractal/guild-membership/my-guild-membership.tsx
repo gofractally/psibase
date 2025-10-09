@@ -105,18 +105,8 @@ const GuildOverviewCard = () => {
                             Mission
                         </h3>
                         <p className="text-sm leading-relaxed">
-                            {guild?.bio ||
-                                "No mission available."}
-                        </p>
-
-                    </div>
-                    <div>
-                        <h3 className="text-muted-foreground mb-1 text-sm font-medium">
-                            Description
-                        </h3>
-                        <p className="text-sm leading-relaxed">
                             {guild?.description ||
-                                "No description available."}
+                                "No mission available."}
                         </p>
 
                     </div>

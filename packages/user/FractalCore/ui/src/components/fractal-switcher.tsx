@@ -23,7 +23,6 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 import { CreateGuildModal } from "./modals/create-guild-modal";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-id";
@@ -45,7 +44,6 @@ export function AppSwitcher() {
 
     const [showCreateFractalModal, setShowCreateGuildModal] = useState(false);
 
-    const currentFractal = useFractalAccount();
 
 
     return (
@@ -66,7 +64,7 @@ export function AppSwitcher() {
                                 <img
                                     className="size-4"
                                     src={createIdenticon(
-                                        chainId + currentFractal + currentGuild?.account,
+                                        chainId + guildAccount,
                                     )}
                                 />
                             </div>

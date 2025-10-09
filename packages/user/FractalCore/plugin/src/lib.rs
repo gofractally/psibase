@@ -42,7 +42,7 @@ define_trust! {
         ",
     }
     functions {
-        Low => [join, apply_guild, attest_membership_app, propose, get_group_users, get_proposal, start_eval, create_guild, attest, register, unregister, set_schedule, close_eval],
+        Low => [join, apply_guild, attest_membership_app, propose, get_group_users, get_proposal, start_eval, create_guild, attest, register, unregister, set_schedule, close_eval, set_guild_display_name, set_guild_bio, set_guild_description],
         High => [],
     }
 }
@@ -75,6 +75,30 @@ impl Admin for FractalCorePlugin {
         assert_authorized(FunctionName::close_eval)?;
 
         FractalsPlugin::admin::close_eval(&guild_account)
+    }
+
+    fn set_guild_display_name(guild_account: String, display_name: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_guild_display_name)?;
+
+        let _latch = ProposeLatch::new(&guild_account);
+
+        FractalsPlugin::admin::set_guild_display_name(&guild_account, &display_name)
+    }
+
+    fn set_guild_bio(guild_account: String, bio: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_guild_bio)?;
+
+        let _latch = ProposeLatch::new(&guild_account);
+
+        FractalsPlugin::admin::set_guild_bio(&guild_account, &bio)
+    }
+
+    fn set_guild_description(guild_account: String, description: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_guild_description)?;
+
+        let _latch = ProposeLatch::new(&guild_account);
+
+        FractalsPlugin::admin::set_guild_description(&guild_account, &description)
     }
 }
 
