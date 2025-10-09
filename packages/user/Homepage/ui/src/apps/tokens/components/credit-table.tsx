@@ -1,4 +1,4 @@
-import { MinusCircle, PlusCircle, ReceiptText } from "lucide-react";
+import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
 
 import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalanceChanges";
 
@@ -72,15 +72,23 @@ export function CreditTable({ user, token }: Props) {
                                             .toUpperCase() +
                                             transaction.action.slice(1)}
                                     </TooltipContent>
-                                    {transaction.direction === "incoming" ? (
+                                    {transaction.action === "credited" ? (
                                         <TooltipTrigger className="block">
-                                            <PlusCircle className="h-4 w-4" />
+                                            <ArrowUp className="h-4 w-4" />
                                         </TooltipTrigger>
-                                    ) : (
+                                    ) : transaction.action === "debited" ? (
                                         <TooltipTrigger className="block">
-                                            <MinusCircle className="h-4 w-4" />
+                                            <ArrowDown className="h-4 w-4" />
                                         </TooltipTrigger>
-                                    )}
+                                    ) : transaction.action === "uncredited" ? (
+                                        <TooltipTrigger className="block">
+                                            <Undo2 className="h-4 w-4" />
+                                        </TooltipTrigger>
+                                    ) : transaction.action === "rejected" ? (
+                                        <TooltipTrigger className="block">
+                                            <X className="h-4 w-4" />
+                                        </TooltipTrigger>
+                                    ) : null}
                                 </Tooltip>
                             </TableCell>
                             <TableCell>{transaction.counterParty}</TableCell>

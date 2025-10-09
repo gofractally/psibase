@@ -24,7 +24,7 @@ type App = z.infer<typeof AppSchema>;
 
 const apps: App[] = [
     {
-        title: "Tokens",
+        title: "Wallet",
         description: "Send tokens and manage balances.",
         icon: <Coins className="h-6 w-6" />,
         service: Account.parse("tokens"),
