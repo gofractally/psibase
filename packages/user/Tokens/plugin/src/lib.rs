@@ -3,16 +3,18 @@ mod bindings;
 
 use std::str::FromStr;
 
-use bindings::exports::tokens::plugin::helpers::Guest as Helpers;
-use bindings::exports::tokens::plugin::intf::Guest as Intf;
-use bindings::exports::tokens::plugin::queries::Guest as Queries;
-use bindings::exports::tokens::plugin::transfer::Guest as Transfer;
-use bindings::exports::tokens::plugin::types as Wit;
+use bindings::exports::tokens::plugin as Exports;
+use Exports::helpers::Guest as Helpers;
+use Exports::intf::Guest as Intf;
+use Exports::queries::Guest as Queries;
+use Exports::transfer::Guest as Transfer;
+use Exports::types as Wit;
 
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::{fracpack::Pack, services::tokens::Decimal};
+use psibase::{fracpack::Pack, services::tokens::Decimal, FlagsType};
+use tokens::{BalanceFlags, TokenFlags, action_structs as Actions};
 
 mod errors;
 use errors::ErrorType;
@@ -24,6 +26,57 @@ pub mod query {
 }
 
 struct TokensPlugin;
+
+impl TokensPlugin {
+    fn set_balance_flag(
+        token_id: Wit::TokenId,
+        flag: BalanceFlags,
+        enable: bool,
+    ) -> Result<(), Error> {
+        use Actions::setBalConf;
+
+        add_action_to_transaction(
+            setBalConf::ACTION_NAME,
+            &setBalConf {
+                token_id,
+                index: flag.index(),
+                enabled: enable,
+            }
+            .packed(),
+        )
+    }
+
+    fn set_token_flag(
+        token_id: Wit::TokenId,
+        flag: TokenFlags,
+        enable: bool,
+    ) -> Result<(), Error> {
+        use Actions::setTokenConf;
+
+        add_action_to_transaction(
+            setTokenConf::ACTION_NAME,
+            &setTokenConf {
+                token_id,
+                index: flag.index(),
+                enabled: enable,
+            }
+            .packed(),
+        )
+    }
+
+    fn set_user_flag(flag: BalanceFlags, enable: bool) -> Result<(), Error> {
+        use Actions::setUserConf;
+        
+        add_action_to_transaction(
+            setUserConf::ACTION_NAME,
+            &setUserConf {
+                index: flag.index(),
+                enabled: enable,
+            }
+            .packed(),
+        )
+    }
+}
 
 impl Intf for TokensPlugin {
     fn create(precision: u8, max_issued_supply: Wit::Quantity) -> Result<(), Error> {
@@ -84,17 +137,18 @@ impl Intf for TokensPlugin {
         add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
     }
 
-    fn set_balance_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::setBalConf {
-            enabled,
-            index,
-            token_id,
-        }
-        .packed();
-        add_action_to_transaction(
-            tokens::action_structs::setBalConf::ACTION_NAME,
-            &packed_args,
-        )
+    fn enable_balance_manual_debit(
+        token_id: Wit::TokenId,
+        enable: bool,
+    ) -> Result<(), Error> {
+        Self::set_balance_flag(token_id, BalanceFlags::MANUAL_DEBIT, enable)
+    }
+
+    fn enable_balance_keep_zero_balances(
+        token_id: Wit::TokenId,
+        enable: bool,
+    ) -> Result<(), Error> {
+        Self::set_balance_flag(token_id, BalanceFlags::KEEP_ZERO_BALANCES, enable)
     }
 
     fn del_balance_config(token_id: Wit::TokenId) -> Result<(), Error> {
@@ -106,25 +160,26 @@ impl Intf for TokensPlugin {
         )
     }
 
-    fn set_token_config(token_id: Wit::TokenId, index: u8, enabled: bool) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::setTokenConf {
-            enabled,
-            index,
-            token_id,
-        }
-        .packed();
-        add_action_to_transaction(
-            tokens::action_structs::setTokenConf::ACTION_NAME,
-            &packed_args,
-        )
+    fn enable_token_untransferable(
+        token_id: Wit::TokenId,
+        enable: bool,
+    ) -> Result<(), Error> {
+        Self::set_token_flag(token_id, TokenFlags::UNTRANSFERABLE, enable)
     }
 
-    fn set_user_config(index: u8, enabled: bool) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::setUserConf { enabled, index }.packed();
-        add_action_to_transaction(
-            tokens::action_structs::setUserConf::ACTION_NAME,
-            &packed_args,
-        )
+    fn enable_token_unrecallable(
+        token_id: Wit::TokenId,
+        enable: bool,
+    ) -> Result<(), Error> {
+        Self::set_token_flag(token_id, TokenFlags::UNRECALLABLE, enable)
+    }
+
+    fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
+        Self::set_user_flag(BalanceFlags::MANUAL_DEBIT, enable)
+    }
+
+    fn enable_user_keep_zero_balances(enable: bool) -> Result<(), Error> {
+        Self::set_user_flag(BalanceFlags::KEEP_ZERO_BALANCES, enable)
     }
 }
 

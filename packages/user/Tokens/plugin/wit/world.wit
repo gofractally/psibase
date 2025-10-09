@@ -35,11 +35,14 @@ interface intf {
 
     map-symbol: func(token-id: token-id, symbol: account-number) -> result<_, error>;
 
-    set-balance-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
+    enable-balance-manual-debit: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-balance-keep-zero-balances: func(token-id: token-id, enable: bool) -> result<_, error>;
     del-balance-config: func(token-id: token-id) -> result<_, error>;
 
-    set-token-config: func(token-id: token-id, index: u8, enabled: bool) -> result<_, error>;
-    set-user-config: func(index: u8, enabled: bool) -> result<_, error>;
+    enable-token-untransferable: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-token-unrecallable: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-user-manual-debit: func(enable: bool) -> result<_, error>;
+    enable-user-keep-zero-balances: func(enable: bool) -> result<_, error>;
 
 }
 
