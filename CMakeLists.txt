@@ -876,7 +876,7 @@ psibase_package(
         "StagedTx(^${PSIBASE_VERSION})" 
         "Transact(^${PSIBASE_VERSION})"
         "SetCode(^${PSIBASE_VERSION})"
-        "ClientData(^${PSIBASE_VERSION})"
+        "Fractals(^${PSIBASE_VERSION})"
     SERVICE fractal-core
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_fractal_core} /plugin.wasm
