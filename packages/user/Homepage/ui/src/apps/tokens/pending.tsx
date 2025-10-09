@@ -8,6 +8,7 @@ import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -55,108 +56,109 @@ export const PendingPageContents = () => {
     }
 
     return (
-        <div className="space-y-4">
-            <GlowingCard>
-                <CardHeader>
-                    <CardTitle>Pending Transactions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Counterparty</TableHead>
-                                <TableHead className="text-right">
-                                    Claimable
-                                </TableHead>
-                                <TableHead className="text-right">
-                                    Recallable
-                                </TableHead>
+        <GlowingCard>
+            <CardHeader>
+                <CardTitle>Pending Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableCaption>
+                        A list of your pending transactions.
+                    </TableCaption>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Counterparty</TableHead>
+                            <TableHead className="text-right">
+                                Claimable
+                            </TableHead>
+                            <TableHead className="text-right">
+                                Recallable
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {pendingTransactions.map((pt, index) => (
+                            <TableRow key={`${pt.counterParty}-${index}`}>
+                                <TableCell className="font-medium">
+                                    {pt.counterParty}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        {pt.debit ? (
+                                            <>
+                                                {pt.debit.balance.format({
+                                                    fullPrecision: false,
+                                                })}
+                                                <Tooltip>
+                                                    <TooltipContent>
+                                                        Claim Pending
+                                                    </TooltipContent>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                            onClick={() => {
+                                                                // TODO: Implement claim logic
+                                                                console.log(
+                                                                    "Claim:",
+                                                                    pt,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <HandCoins className="h-4 w-4" />
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                </Tooltip>
+                                            </>
+                                        ) : (
+                                            <span className="text-muted-foreground">
+                                                -
+                                            </span>
+                                        )}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        {pt.credit ? (
+                                            <>
+                                                {pt.credit.balance.format({
+                                                    fullPrecision: false,
+                                                })}
+                                                <Tooltip>
+                                                    <TooltipContent>
+                                                        Recall Available
+                                                    </TooltipContent>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                            onClick={() => {
+                                                                // TODO: Implement recall logic
+                                                                console.log(
+                                                                    "Recall:",
+                                                                    pt,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Undo2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                </Tooltip>
+                                            </>
+                                        ) : (
+                                            <span className="text-muted-foreground">
+                                                -
+                                            </span>
+                                        )}
+                                    </div>
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {pendingTransactions.map((pt, index) => (
-                                <TableRow key={`${pt.counterParty}-${index}`}>
-                                    <TableCell className="font-medium">
-                                        {pt.counterParty}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            {pt.debit ? (
-                                                <>
-                                                    {pt.debit.balance.format({
-                                                        fullPrecision: false,
-                                                    })}
-                                                    <Tooltip>
-                                                        <TooltipContent>
-                                                            Claim Pending
-                                                        </TooltipContent>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
-                                                                onClick={() => {
-                                                                    // TODO: Implement claim logic
-                                                                    console.log(
-                                                                        "Claim:",
-                                                                        pt,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <HandCoins className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                    </Tooltip>
-                                                </>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    -
-                                                </span>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            {pt.credit ? (
-                                                <>
-                                                    {pt.credit.balance.format({
-                                                        fullPrecision: false,
-                                                    })}
-                                                    <Tooltip>
-                                                        <TooltipContent>
-                                                            Recall Available
-                                                        </TooltipContent>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
-                                                                onClick={() => {
-                                                                    // TODO: Implement recall logic
-                                                                    console.log(
-                                                                        "Recall:",
-                                                                        pt,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Undo2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                    </Tooltip>
-                                                </>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    -
-                                                </span>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </GlowingCard>
-        </div>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </GlowingCard>
     );
 };
