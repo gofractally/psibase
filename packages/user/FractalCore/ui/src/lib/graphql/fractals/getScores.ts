@@ -18,7 +18,7 @@ export const getScores = async (guild: Account) => {
     const member = await graphql(
         `
     {
-        scores(guildAccount: "${guild}") {
+        scores(guild: "${guild}") {
             nodes {
                 member
                 score

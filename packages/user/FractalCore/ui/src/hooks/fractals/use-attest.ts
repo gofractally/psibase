@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSupervisor } from "@psibase/common-lib";
 
 import { paths } from "@/lib/paths";
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -13,7 +13,7 @@ import { useFractalAccount } from "./use-fractal-account";
 import { updateAttestation } from "./use-users-and-groups";
 
 export const zParams = z.object({
-    guildSlug: zGuildSlug,
+    guildAccount: zGuildAccount,
     groupNumber: z.number(),
 });
 
@@ -28,7 +28,7 @@ export const useAttest = () => {
                     method: "attest",
                     service: fractal,
                     intf: "user",
-                    params: [params.guildSlug, params.groupNumber],
+                    params: [params.guildAccount, params.groupNumber],
                 }),
                 {
                     error: (error) => {

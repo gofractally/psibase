@@ -15,7 +15,7 @@ const zParams = z.object({
 
 export const usePropose = () => {
     const fractalAccount = useFractalAccount();
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
             const { groupNumber, proposal } = zParams.parse(params);
@@ -24,7 +24,7 @@ export const usePropose = () => {
                 method: "propose",
                 service: fractalAccount,
                 intf: "user",
-                params: [guildSlug, groupNumber, proposal],
+                params: [guildAccount, groupNumber, proposal],
             };
 
             void (await getSupervisor().functionCall(pars));

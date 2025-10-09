@@ -8,18 +8,18 @@ import { zAccount } from "@/lib/zod/Account";
 import { useFractalAccount } from "./use-fractal-account";
 
 export const useGroupUsers = (
-    guildSlug: OptionalAccount,
+    guildAccount: OptionalAccount,
     groupNumber: OptionalNumber,
 ) => {
     const fractal = useFractalAccount();
     return useQuery({
-        queryKey: QueryKey.groupUsers(guildSlug, groupNumber),
-        enabled: !!(guildSlug && groupNumber),
+        queryKey: QueryKey.groupUsers(guildAccount, groupNumber),
+        enabled: !!(guildAccount && groupNumber),
         queryFn: async () => {
             try {
                 const res = await supervisor.functionCall({
                     method: "getGroupUsers",
-                    params: [guildSlug, groupNumber],
+                    params: [guildAccount, groupNumber],
                     service: fractal,
                     intf: "user",
                 });

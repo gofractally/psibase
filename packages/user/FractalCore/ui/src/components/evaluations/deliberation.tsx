@@ -12,7 +12,7 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
     const { data: fractal } = useFractal();
     const navigate = useNavigate();
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
     const { evaluation } = useEvaluationInstance();
 
     if (!fractal || !evaluation) return null;
@@ -24,7 +24,7 @@ export const Deliberation = ({ status }: { status: DeliberationPhase }) => {
                 onClick={() => {
                     navigate(
                         paths.guild.evaluationGroup(
-                            guildSlug!,
+                            guildAccount!,
                             status.groupNumber!,
                         ),
                     );

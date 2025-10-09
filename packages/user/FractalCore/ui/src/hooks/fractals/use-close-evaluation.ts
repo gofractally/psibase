@@ -5,12 +5,12 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { useFractalAccount } from "./use-fractal-account";
 
 const zParams = z.object({
-    guildSlug: zGuildSlug,
+    guildAccount: zGuildAccount,
 });
 
 export const useCloseEvaluation = () => {
@@ -19,11 +19,11 @@ export const useCloseEvaluation = () => {
     return useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             try {
-                const { guildSlug } = zParams.parse(params);
+                const { guildAccount } = zParams.parse(params);
 
                 void (await supervisor.functionCall({
                     method: "closeEval",
-                    params: [guildSlug],
+                    params: [guildAccount],
                     service: fractal,
                     intf: "admin",
                 }));
@@ -38,12 +38,12 @@ export const useCloseEvaluation = () => {
                 }
             }
         },
-        onSuccess: (_, { guildSlug }) => {
+        onSuccess: (_, { guildAccount }) => {
             queryClient.invalidateQueries({
                 queryKey: QueryKey.fractal(fractal),
             });
             queryClient.invalidateQueries({
-                queryKey: QueryKey.guild(fractal, guildSlug),
+                queryKey: QueryKey.guild(guildAccount),
             });
         },
     });

@@ -43,8 +43,8 @@ const QueryKey = {
         guildAccount: OptionalAccount,
         applicant: OptionalAccount,
     ) => ["guildApplication", guildAccount, applicant] as const,
-    proposal: (guildSlug: OptionalAccount, groupNumber: OptionalNumber) =>
-        ["proposal", guildSlug, groupNumber] as const,
+    proposal: (guildAccount: OptionalAccount, groupNumber: OptionalNumber) =>
+        ["proposal", guildAccount, groupNumber] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

@@ -28,7 +28,7 @@ export const ApplyGuildModal = ({
 
     const { data: currentUser } = useCurrentUser();
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
     const navigate = useNavigate();
 
     const form = useAppForm({
@@ -38,10 +38,10 @@ export const ApplyGuildModal = ({
         onSubmit: async ({ value: { app } }) => {
             await applyGuild({
                 app,
-                guildSlug: guildSlug!
+                guildAccount: guildAccount!
             });
             openChange(false);
-            navigate(`/guild/${guildSlug}/applications/${currentUser}`);
+            navigate(`/guild/${guildAccount}/applications/${currentUser}`);
         },
         validators: {
             onChange: z.object({

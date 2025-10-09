@@ -1,3 +1,3 @@
 import { zAccount } from "./Account";
 
-export const zGuildSlug = zAccount;
+export const zGuildAccount = zAccount;

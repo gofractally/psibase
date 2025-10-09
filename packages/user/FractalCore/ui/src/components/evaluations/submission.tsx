@@ -12,7 +12,7 @@ export const Submission = ({ status }: { status: SubmissionPhase }) => {
     const date = dayjs.unix(status.submissionDeadline).format("MMMM D HH:mm");
 
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();
 
     if (status.canCloseEarly) {
@@ -23,7 +23,7 @@ export const Submission = ({ status }: { status: SubmissionPhase }) => {
                     size="sm"
                     onClick={() => {
                         closeEvaluation({
-                            guildSlug: guildSlug!,
+                            guildAccount: guildAccount!,
                         });
                     }}
                 >

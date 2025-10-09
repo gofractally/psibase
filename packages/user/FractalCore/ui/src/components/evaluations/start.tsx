@@ -20,7 +20,7 @@ export const Start = () => {
         error: startError,
     } = useStart();
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const isUnableToGroupUsers = checkUnableToGroupUsers(startError);
     console.log({ isUnableToGroupUsers });
@@ -39,7 +39,7 @@ export const Start = () => {
                 disabled={isStarting}
                 onClick={() => {
                     startEvaluation({
-                        guildSlug: guildSlug!,
+                        guildAccount: guildAccount!,
                     });
                 }}
             >

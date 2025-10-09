@@ -8,7 +8,7 @@ import { Button } from "@shared/shadcn/ui/button";
 export const Failed = () => {
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
     const { evaluation, } = useEvaluationInstance();
 
     const { hasPassed, label } = useFormatRelative(evaluation?.finishBy);
@@ -31,7 +31,7 @@ export const Failed = () => {
                 <Button
                     onClick={() => {
                         closeEvaluation({
-                            guildSlug: guildSlug!,
+                            guildAccount: guildAccount!,
                         });
                     }}
                 >

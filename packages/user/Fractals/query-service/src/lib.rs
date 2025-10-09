@@ -14,16 +14,16 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     struct EvaluationFinish {
-        fractal_account: AccountNumber,
-        guild_account: AccountNumber,
+        fractal: AccountNumber,
+        guild: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
     }
 
     #[derive(Deserialize, SimpleObject)]
     struct ScheduledEvaluation {
-        fractal_account: AccountNumber,
-        guild_account: AccountNumber,
+        fractal: AccountNumber,
+        guild: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -105,14 +105,14 @@ mod service {
 
         async fn evaluation_finishes(
             &self,
-            guild_account: AccountNumber,
+            guild: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
             EventQuery::new("history.fractals.evaluation_finished")
-                .condition(format!("guild_account = '{}'", guild_account))
+                .condition(format!("guild = '{}'", guild))
                 .first(first)
                 .last(last)
                 .before(before)
@@ -122,14 +122,14 @@ mod service {
 
         async fn scheduled_evaluations(
             &self,
-            guild_account: AccountNumber,
+            guild: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, ScheduledEvaluation>> {
             EventQuery::new("history.fractals.scheduled_evaluation")
-                .condition(format!("guild_account = '{}'", guild_account))
+                .condition(format!("guild = '{}'", guild))
                 .first(first)
                 .last(last)
                 .before(before)
@@ -231,7 +231,7 @@ mod service {
 
         async fn scores(
             &self,
-            guild_account: AccountNumber,
+            guild: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
@@ -239,7 +239,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
             TableQuery::subindex::<AccountNumber>(
                 GuildMemberTable::with_service(fractals::SERVICE).get_index_pk(),
-                &(guild_account),
+                &(guild),
             )
             .first(first)
             .last(last)

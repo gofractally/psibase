@@ -8,7 +8,7 @@ import { zAccount } from "@/lib/zod/Account";
 import { useFractalAccount } from "./use-fractal-account";
 
 export const zParams = z.object({
-    guildSlug: zAccount,
+    guildAccount: zAccount,
 });
 
 export const useStart = () => {
@@ -18,7 +18,7 @@ export const useStart = () => {
         mutationFn: async (params) => {
             await getSupervisor().functionCall({
                 method: "startEval",
-                params: [params.guildSlug],
+                params: [params.guildAccount],
                 service: fractalAccount,
                 intf: "user",
             });

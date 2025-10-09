@@ -9,7 +9,7 @@ import { humanize } from "@/lib/humanize";
 import { Button } from "@shared/shadcn/ui/button";
 
 export const Register = ({ status }: { status: RegistrationPhase }) => {
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const { evaluation, guild } = useEvaluationInstance();
 
@@ -33,7 +33,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     onClick={() => {
                         unregister({
                             evaluationId: guild!.evalInstance!.evaluationId,
-                            guildSlug: guildSlug!,
+                            guildAccount: guildAccount!,
 
                         });
                     }}
@@ -46,7 +46,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     disabled={isRegistering}
                     onClick={() => {
                         register({
-                            slug: guildSlug!,
+                            slug: guildAccount!,
                         });
                     }}
                 >

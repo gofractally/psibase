@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSupervisor } from "@psibase/common-lib";
 
 import QueryKey from "@/lib/queryKeys";
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -15,7 +15,7 @@ import { useFractalAccount } from "./use-fractal-account";
 import { updateParticipants } from "./use-users-and-groups";
 
 export const zParams = z.object({
-    slug: zGuildSlug,
+    slug: zGuildAccount,
 });
 
 export const useRegister = () => {

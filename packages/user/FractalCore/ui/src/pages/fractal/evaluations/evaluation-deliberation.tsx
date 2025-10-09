@@ -36,10 +36,10 @@ const usePageParams = () => {
 
 const useRanking = () => {
     const { groupNumber } = usePageParams();
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const { data: groupUsersData } = useGroupUsers(
-        guildSlug,
+        guildAccount,
         groupNumber,
     );
 
@@ -79,7 +79,7 @@ const useRanking = () => {
 
     const updateRankedNumbers = (accounts: Account[]) => {
         cancel();
-        setCachedProposal(guildSlug!, Number(groupNumber), accounts);
+        setCachedProposal(guildAccount!, Number(groupNumber), accounts);
         debounceAccounts(accounts);
     };
 

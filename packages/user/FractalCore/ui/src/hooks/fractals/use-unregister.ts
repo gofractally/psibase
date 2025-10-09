@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSupervisor } from "@psibase/common-lib";
 
 import QueryKey from "@/lib/queryKeys";
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -15,7 +15,7 @@ import { updateParticipants } from "./use-users-and-groups";
 
 export const zParams = z.object({
     evaluationId: z.number(),
-    guildSlug: zGuildSlug,
+    guildAccount: zGuildAccount,
 });
 
 export const useUnregister = () => {
@@ -29,7 +29,7 @@ export const useUnregister = () => {
                 method: "unregister",
                 service: fractalAccount,
                 intf: "user",
-                params: [params.guildSlug],
+                params: [params.guildAccount],
             }));
         },
         onError: (error, params) => {

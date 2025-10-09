@@ -37,7 +37,7 @@ export function AppSwitcher() {
 
     const { data: memberships, } = useGuildMembershipsOfUser(currentUser);
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const { data: currentGuild } = useGuild()
 
@@ -74,10 +74,10 @@ export function AppSwitcher() {
                                 <span className="truncate font-semibold">
                                     {currentGuild
                                         ? currentGuild.displayName
-                                        : guildSlug || "Explore"}
+                                        : guildAccount || "Explore"}
                                 </span>
                                 <span className="truncate text-xs">
-                                    {guildSlug}
+                                    {guildAccount}
                                 </span>
                             </div>
                             <ChevronsUpDown className="ml-auto" />

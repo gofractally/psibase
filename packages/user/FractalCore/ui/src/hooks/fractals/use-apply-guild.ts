@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { useFractalAccount } from "./use-fractal-account";
 
 export const zParams = z.object({
-    guildSlug: zGuildSlug,
+    guildAccount: zGuildAccount,
     app: z.string(),
 });
 
@@ -17,12 +17,12 @@ export const useApplyGuild = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            const { guildSlug, app } = zParams.parse(params);
+            const { guildAccount, app } = zParams.parse(params);
             await supervisor.functionCall({
                 method: "applyGuild",
                 service: fractal,
                 intf: "user",
-                params: [guildSlug, app],
+                params: [guildAccount, app],
             });
         },
     });

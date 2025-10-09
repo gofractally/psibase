@@ -22,8 +22,7 @@ export const AttestGuildMemberModal = ({
 }) => {
     const { mutateAsync: attest } = useAttestMembershipApp();
 
-
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const { applicant } = useParams()
 
@@ -34,7 +33,7 @@ export const AttestGuildMemberModal = ({
         },
         onSubmit: async ({ value: { comment, endorses, } }) => {
             await attest({
-                guildSlug: guildSlug!,
+                guildAccount: guildAccount!,
                 comment,
                 endorses,
                 member: applicant!

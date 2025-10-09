@@ -17,7 +17,7 @@ import { useGuild } from "@/hooks/use-guild";
 
 export const Completed = () => {
     const { data: guild } = useGuild();
-    const { data: evaluations } = useCompletedEvaluation(guild?.id);
+    const { data: evaluations } = useCompletedEvaluation(guild?.account);
 
     const navigate = useNavigate();
     return (

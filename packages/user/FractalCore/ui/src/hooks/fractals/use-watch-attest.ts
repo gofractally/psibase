@@ -5,7 +5,7 @@ import { useAttest } from "./use-attest";
 
 export const useWatchAttest = (status: EvaluationStatus | undefined) => {
     const { mutateAsync: attest, isPending, isError, isSuccess } = useAttest();
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     if (
         status?.type == "submission" &&
@@ -15,7 +15,7 @@ export const useWatchAttest = (status: EvaluationStatus | undefined) => {
         !isSuccess
     ) {
         attest({
-            guildSlug: guildSlug!,
+            guildAccount: guildAccount!,
             groupNumber: status.groupNumber!,
         });
     }

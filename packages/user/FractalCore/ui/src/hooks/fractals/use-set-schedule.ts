@@ -7,7 +7,7 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 import { zUnix } from "@/lib/zod/Unix";
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -15,7 +15,7 @@ import { assertUser } from "../use-current-user";
 import { setDefaultMembership } from "./use-membership";
 
 const zParams = z.object({
-    guildSlug: zGuildSlug,
+    guildAccount: zGuildAccount,
     fractal: zAccount,
     registration: zUnix,
     deliberation: zUnix,
@@ -28,7 +28,7 @@ export const useSetSchedule = () =>
     useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) => {
             const {
-                guildSlug,
+                guildAccount,
                 fractal,
                 registration,
                 deliberation,
@@ -40,7 +40,7 @@ export const useSetSchedule = () =>
             await supervisor.functionCall({
                 method: "setSchedule",
                 params: [
-                    guildSlug,
+                    guildAccount,
                     registration,
                     deliberation,
                     submission,
@@ -52,14 +52,14 @@ export const useSetSchedule = () =>
             });
         },
         onSuccess: (_, params) => {
-            const { fractal, guildSlug } = zParams.parse(params);
+            const { fractal, guildAccount } = zParams.parse(params);
 
             setDefaultMembership(fractal, assertUser());
             queryClient.refetchQueries({
                 queryKey: QueryKey.fractal(fractal),
             });
             queryClient.refetchQueries({
-                queryKey: QueryKey.guild(fractal, guildSlug),
+                queryKey: QueryKey.guild(guildAccount),
             });
 
             toast.success("Schedule updated");

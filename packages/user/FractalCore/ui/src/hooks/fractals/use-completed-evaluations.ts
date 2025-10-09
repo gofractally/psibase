@@ -4,20 +4,20 @@ import {
     CompletedEvaluation,
     getCompletedEvaluations,
 } from "@/lib/graphql/fractals/getCompletedEvaluations";
-import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
 
-export const useCompletedEvaluation = (guildId: OptionalNumber) => {
+export const useCompletedEvaluation = (guildAccount: OptionalAccount) => {
     return useQuery<CompletedEvaluation[]>({
         queryKey: QueryKey.completedEvaluations(),
         queryFn: async () => {
             try {
-                return await getCompletedEvaluations(guildId!);
+                return await getCompletedEvaluations(guildAccount!);
             } catch (error) {
                 const message = "Error getting completed evaluations";
                 console.error(message, error);
                 throw new Error(message);
             }
         },
-        enabled: !!guildId,
+        enabled: !!guildAccount,
     });
 };

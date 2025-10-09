@@ -4,12 +4,12 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import { zAccount } from "@/lib/zod/Account";
-import { zGuildSlug } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { useFractalAccount } from "./use-fractal-account";
 
 export const zParams = z.object({
-    guildSlug: zGuildSlug,
+    guildAccount: zGuildAccount,
     member: zAccount,
     comment: z.string(),
     endorses: z.boolean(),
@@ -20,13 +20,13 @@ export const useAttestMembershipApp = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            const { comment, endorses, guildSlug, member } =
+            const { comment, endorses, guildAccount, member } =
                 zParams.parse(params);
             await supervisor.functionCall({
                 method: "attestMembershipApp",
                 service: fractal,
                 intf: "user",
-                params: [guildSlug, member, comment, endorses],
+                params: [guildAccount, member, comment, endorses],
             });
         },
     });

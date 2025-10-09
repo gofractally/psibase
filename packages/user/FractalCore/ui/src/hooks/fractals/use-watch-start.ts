@@ -9,7 +9,7 @@ import { useGuildAccount } from "../use-guild-id";
 export const useWatchStart = (status: EvaluationStatus | undefined) => {
     const navigate = useNavigate();
 
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const [isAwaitingStart, setIsAwaitingStart] = useState(false);
 
@@ -21,10 +21,10 @@ export const useWatchStart = (status: EvaluationStatus | undefined) => {
 
         if (autoNavigate) {
             navigate(
-                paths.guild.evaluationGroup(guildSlug!, status.groupNumber!),
+                paths.guild.evaluationGroup(guildAccount!, status.groupNumber!),
             );
         }
-    }, [guildSlug, isAwaitingStart, navigate, status]);
+    }, [guildAccount, isAwaitingStart, navigate, status]);
 
     useEffect(() => {
         if (

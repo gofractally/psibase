@@ -22,7 +22,7 @@ import { useNavigate } from "react-router-dom";
 export const Applications = () => {
 
     const { data: guild } = useGuild();
-    const { data: applications } = useGuildApplications(guild?.id);
+    const { data: applications } = useGuildApplications(guild?.account);
 
     const navigate = useNavigate();
     const [showGuildModal, setShowGuildModal] = useState(false);

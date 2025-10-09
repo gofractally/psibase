@@ -11,15 +11,15 @@ import { useGuildAccount } from "../use-guild-id";
 import { useFractalAccount } from "./use-fractal-account";
 
 export const useProposal = (groupNumber: OptionalNumber) => {
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
     const fractal = useFractalAccount();
     return useQuery({
-        queryKey: QueryKey.proposal(guildSlug, groupNumber),
+        queryKey: QueryKey.proposal(guildAccount, groupNumber),
         queryFn: async () => {
             try {
                 const res = await supervisor.functionCall({
                     method: "getProposal",
-                    params: [guildSlug, groupNumber],
+                    params: [guildAccount, groupNumber],
                     service: fractal,
                     intf: "user",
                 });
@@ -35,12 +35,12 @@ export const useProposal = (groupNumber: OptionalNumber) => {
 };
 
 export const setCachedProposal = (
-    guildSlug: string,
+    guildAccount: Account,
     groupNumber: number,
     accounts: Account[],
 ) => {
     queryClient.setQueryData(
-        QueryKey.proposal(guildSlug, groupNumber),
+        QueryKey.proposal(guildAccount, groupNumber),
         accounts,
     );
 };

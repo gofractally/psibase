@@ -46,7 +46,7 @@ export const ScheduleDialog = ({
     const { mutateAsync: setSchedule } = useSetSchedule();
 
     const fractal = useFractalAccount();
-    const guildSlug = useGuildAccount();
+    const guildAccount = useGuildAccount();
 
     const { evaluation, guild, isPending } = useEvaluationInstance();
 
@@ -76,7 +76,7 @@ export const ScheduleDialog = ({
                 const finishBy = submission + submissionSeconds;
 
                 await setSchedule({
-                    guildSlug: guildSlug!,
+                    guildAccount: guildAccount!,
                     registration,
                     deliberation,
                     submission,
