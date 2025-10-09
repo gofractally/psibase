@@ -17,25 +17,143 @@ interface types {
     }
 }
 
-interface intf {
+interface issuer {
     use host:types/types.{error};
     use types.{precision, quantity, token-id, account-number};
 
+    /// Create a new token
+    ///
+    /// Arguments
+    /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
+    /// * `max_supply` - The permanent max issued supply of the token
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
-    burn: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+
+    /// Recall an amount of tokens from a user's balance and burn them.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `amount`   - Amount of tokens to recall
+    /// * `memo`     - Memo describing the recall
+    /// * `account`  - Account from which tokens are recalled
     recall: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+
+    /// Mint new tokens into existence.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `amount`   - Amount of tokens to mint
+    /// * `memo`     - Memo describing the mint
     mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
 
+    /// Map a symbol to a token.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `symbol`   - Symbol to map, e.g. "BTC"
+    ///
+    /// This will burn the symbol NFT ensuring the symbol cannot be mapped to any other tokens.
     map-symbol: func(token-id: token-id, symbol: account-number) -> result<_, error>;
 
-    enable-balance-manual-debit: func(token-id: token-id, enable: bool) -> result<_, error>;
-    enable-balance-keep-zero-balances: func(token-id: token-id, enable: bool) -> result<_, error>;
-    del-balance-config: func(token-id: token-id) -> result<_, error>;
-
+    /// Configures whether a token should be transferable.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `enable`   - `true` to prevent transfers, `false` to allow them
     enable-token-untransferable: func(token-id: token-id, enable: bool) -> result<_, error>;
+
+    /// Configures whether a token should be able to be recalled by the token issuer.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `enable`   - `true` to prevent recalls, `false` to allow them
     enable-token-unrecallable: func(token-id: token-id, enable: bool) -> result<_, error>;
+}
+
+interface user {
+    use host:types/types.{error};
+    use types.{precision, quantity, token-id, account-number};
+
+    /// Credit tokens to a recipient.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `receiver` - Debitor / recipient account
+    /// * `amount`   - Amount to credit
+    /// * `memo`     - Memo describing the credit
+    ///
+    /// Places funds in shared balance when the receiver has manual debit enabled
+    credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+
+    /// Cancel a pending shared-balance credit.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `debitor`  - Debitor / recipient account
+    /// * `amount`   - Amount to uncredit
+    /// * `memo`     - Memo describing the uncredit
+    uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    
+    /// Move tokens from shared balance into the debitor's account balance.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `creditor` - Account that initiated the credit
+    /// * `amount`   - Amount to debit
+    /// * `memo`     - Memo describing the debit
+    debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
+
+    /// Reject all shared-balance tokens from a creditor.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `creditor` - Account that initiated the credit
+    /// * `memo`     - Memo describing the rejection
+    reject: func(token-id: token-id, creditor: account-number, memo: string) -> result<_, error>;
+    
+    /// Burn tokens from the caller's balance.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `amount`   - Amount to burn
+    /// * `memo`     - Memo describing the burn
+    burn: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+}
+
+interface user-config {
+    use host:types/types.{error};
+    use types.{token-id};
+
+    /// Enable or disable manual debit globally for the caller.
+    ///
+    /// Arguments
+    /// * `enable` - `true` to require manual debit, `false` for automatic debit
     enable-user-manual-debit: func(enable: bool) -> result<_, error>;
+    
+    /// Keep zero balances globally for the caller.
+    ///
+    /// Arguments
+    /// * `enable` - `true` to retain zero-balance rows, `false` to prune them
     enable-user-keep-zero-balances: func(enable: bool) -> result<_, error>;
+    
+    /// Enable manual debit for a specific token balance.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `enable`   - `true` to require manual debit, `false` for automatic debit
+    enable-balance-manual-debit: func(token-id: token-id, enable: bool) -> result<_, error>;
+    
+    /// Keep zero balances for a specific token balance.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `enable`   - `true` to retain zero-balance rows, `false` to prune them
+    enable-balance-keep-zero-balances: func(token-id: token-id, enable: bool) -> result<_, error>;
+    
+    /// Delete the caller's balance configuration for a token.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    del-balance-config: func(token-id: token-id) -> result<_, error>;
 }
 
 interface helpers {
@@ -49,22 +167,15 @@ interface helpers {
 interface queries {
     use host:types/types.{error};
     use types.{token-id, token-detail};
+
     token-owner: func(token-id: token-id) -> result<token-detail, error>;
 }
 
-interface transfer {
-    use host:types/types.{error};
-    use types.{token-id, account-number, quantity, token-detail};
-
-    uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
-    credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
-    debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
-    reject: func(token-id: token-id, creditor: account-number, memo: string) -> result<_, error>;
-}
-
 world imports {
-    import intf;
-    import queries;
-    import transfer;
+    import types;
+    import issuer;
+    import user;
+    import user-config;
     import helpers;
+    import queries;
 }
