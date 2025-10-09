@@ -1,4 +1,6 @@
-import { Trash2 } from "lucide-react";
+import { useStore } from "@tanstack/react-form";
+import { PlusIcon, Settings, Trash, TrashIcon } from "lucide-react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -7,12 +9,13 @@ import { useAppForm } from "@/components/forms/app-form";
 import { FieldErrors } from "@/components/forms/field-errors";
 
 import { useCandidates } from "@/hooks/use-candidates";
-import { usePluginMutation } from "@/hooks/use-plugin-mutation";
-import { isAccountAvailable } from "@/lib/isAccountAvailable";
+import { useConfigPlugin } from "@/hooks/use-config-plugin";
+import { useProducersPlugin } from "@/hooks/use-producers-plugin";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Params, SetProducerParams } from "@/lib/producers";
-import { CONFIG, PRODUCERS } from "@/lib/services";
 
 import { Button } from "@shared/shadcn/ui/button";
+import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -33,55 +36,30 @@ import {
 import { Textarea } from "@shared/shadcn/ui/textarea";
 
 const RegisterCandidateParams = z.object({
-    endpoint: z.string().min(1, "Endpoint is required"),
+    endpoint: z.string().url().min(1, "Endpoint is required"),
     pemKey: z.string().min(1, "PEM key is required"),
 });
 
 type RegisterCandidateParams = z.infer<typeof RegisterCandidateParams>;
 
-const useConfigPlugin = (
-    method: string,
-    meta: { loading: string; success: string; error: string },
-) =>
-    usePluginMutation(
-        {
-            intf: "producers",
-            service: CONFIG,
-            method,
-        },
-        {
-            error: meta.error,
-            loading: meta.loading,
-            success: meta.success,
-            isStagable: true,
-        },
-    );
-
-const useProducersPlugin = (
-    method: string,
-    meta: {
-        loading: string;
-        success: string;
-        error: string;
-        isStagable?: boolean;
-    },
-) =>
-    usePluginMutation(
-        {
-            intf: "api",
-            service: PRODUCERS,
-            method,
-        },
-        {
-            error: meta.error,
-            loading: meta.loading,
-            success: meta.success,
-            isStagable: meta.isStagable ?? true,
-        },
-    );
-
 export const BlockProduction = () => {
     const { data: candidates, refetch: refetchCandidates } = useCandidates();
+
+    const { data: currentUser } = useCurrentUser();
+
+    const authenticatedCandidate = candidates?.find(
+        (candidate) => candidate.account === currentUser,
+    );
+
+    const [showModal, setShowModal] = useState(false);
+
+    const { mutateAsync: unregisterCandidate, isPending: isUnregistering } =
+        useProducersPlugin("unregisterCandidate", {
+            error: "Failed unregistering candidate",
+            loading: "Unregistering candidate",
+            success: "Unregistered candidate ",
+            isStagable: false,
+        });
 
     const { mutateAsync: registerCandidate } = useProducersPlugin(
         "registerCandidate",
@@ -108,9 +86,9 @@ export const BlockProduction = () => {
         error: "Failed to set producers",
     });
 
-    const form = useAppForm({
+    const producersForm = useAppForm({
         defaultValues: {
-            prods: [""],
+            prods: [],
             mode: "existing",
         } as SetProducerParams,
         validators: {
@@ -118,20 +96,25 @@ export const BlockProduction = () => {
         },
         onSubmit: async ({ value: { mode, prods } }) => {
             if (mode == "existing") {
-                setCurrent([prods]);
+                await setCurrent([prods]);
             } else if (mode == "bft") {
-                setBft([prods]);
+                await setBft([prods]);
             } else if (mode == "cft") {
-                setCft([prods]);
+                await setCft([prods]);
             } else {
                 throw new Error("Unrecognised mode");
             }
         },
     });
 
+    const producers = useStore(
+        producersForm.store,
+        (store) => store.values.prods,
+    );
+
     const registerForm = useAppForm({
         defaultValues: {
-            endpoint: "",
+            endpoint: authenticatedCandidate?.endpoint || "",
             pemKey: "",
         } as RegisterCandidateParams,
         validators: {
@@ -142,8 +125,14 @@ export const BlockProduction = () => {
             const claim = { tag: "pubkey-pem", val: pemKey };
             await registerCandidate([endpoint, claim]);
             refetchCandidates();
+            setShowModal(false);
         },
     });
+
+    const unregister = async () => {
+        await unregisterCandidate([]);
+        setShowModal(false);
+    };
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6">
@@ -159,11 +148,11 @@ export const BlockProduction = () => {
                 onSubmit={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    form.handleSubmit();
+                    producersForm.handleSubmit();
                 }}
                 className="space-y-4"
             >
-                <form.Field name="mode">
+                <producersForm.Field name="mode">
                     {(field) => (
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="mode">Consensus Mode</Label>
@@ -206,12 +195,12 @@ export const BlockProduction = () => {
                             </p>
                         </div>
                     )}
-                </form.Field>
+                </producersForm.Field>
 
                 {/* Producers List */}
-                <form.Field name="prods" mode="array">
+                <producersForm.Field name="prods" mode="array">
                     {(field) =>
-                        field.state.value.map((_, index) => (
+                        field.state.value.map((value, index) => (
                             <div
                                 key={index}
                                 className="flex flex-col gap-2 rounded-md border p-3"
@@ -221,49 +210,27 @@ export const BlockProduction = () => {
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor={`prods.${index}.name`}>
-                                        Producer Name
+                                        Producer {field.state.value[index]}
                                     </Label>
                                     <Button
                                         variant="destructive"
-                                        size="icon"
-                                        className="flex items-center justify-center p-2"
-                                        type="button"
-                                        disabled={field.state.value.length == 1}
-                                        onClick={() => field.removeValue(index)}
+                                        size={"icon"}
+                                        onClick={() => {
+                                            producersForm.setFieldValue(
+                                                "prods",
+                                                (prods) =>
+                                                    prods.filter(
+                                                        (prod) =>
+                                                            prod !== value,
+                                                    ),
+                                            );
+                                        }}
                                     >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Trash />
                                     </Button>
                                 </div>
-                                <form.Field
-                                    key={index}
-                                    name={`prods[${index}]`}
-                                    validators={{
-                                        onChangeAsync: async ({ value }) => {
-                                            const status =
-                                                await isAccountAvailable(value);
-                                            if (status == "Available") {
-                                                return "Account does not exist";
-                                            } else if (status == "Invalid") {
-                                                return "Account is invalid";
-                                            }
-                                        },
-                                    }}
-                                    asyncDebounceMs={600}
-                                >
-                                    {(subfield) => (
-                                        <Input
-                                            id={`prods.${index}`}
-                                            placeholder="Producer name"
-                                            value={subfield.state.value}
-                                            onChange={(e) =>
-                                                subfield.handleChange(
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    )}
-                                </form.Field>
-                                <form.Subscribe
+
+                                <producersForm.Subscribe
                                     selector={(f) =>
                                         f.fieldMeta[`prods[${index}]`]
                                     }
@@ -274,103 +241,144 @@ export const BlockProduction = () => {
                             </div>
                         ))
                     }
-                </form.Field>
-
-                <div className="flex justify-between">
-                    <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => {
-                            form.setFieldValue("prods", (prods) => [
-                                ...prods,
-                                "",
-                            ]);
-                        }}
-                    >
-                        Add Producer
-                    </Button>
-                    <form.AppForm>
-                        <form.SubmitButton labels={["Save", "Saving"]} />
-                    </form.AppForm>
-                </div>
-            </form>
-
-            <div>
-                <h2 className="text-lg font-medium">
-                    Register Producer Candidate
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                    Register yourself as a new producer candidate.
-                </p>
-            </div>
-
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    registerForm.handleSubmit();
-                }}
-                className="space-y-4"
-            >
-                <registerForm.Field name="endpoint">
-                    {(field) => (
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="endpoint">Endpoint</Label>
-                            <Input
-                                id="endpoint"
-                                placeholder="https://example.com"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                    field.handleChange(e.target.value)
-                                }
-                            />
-                            <registerForm.Subscribe
-                                selector={(f) => f.fieldMeta.endpoint}
-                                children={(fieldMeta) => (
-                                    <FieldErrors meta={fieldMeta} />
-                                )}
-                            />
-                        </div>
-                    )}
-                </registerForm.Field>
-
-                <registerForm.Field name="pemKey">
-                    {(field) => (
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="pemKey">Public Key (PEM)</Label>
-                            <Textarea
-                                id="pemKey"
-                                placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                    field.handleChange(e.target.value)
-                                }
-                                rows={6}
-                            />
-                            <registerForm.Subscribe
-                                selector={(f) => f.fieldMeta.pemKey}
-                                children={(fieldMeta) => (
-                                    <FieldErrors meta={fieldMeta} />
-                                )}
-                            />
-                        </div>
-                    )}
-                </registerForm.Field>
+                </producersForm.Field>
 
                 <div className="flex justify-end">
-                    <registerForm.AppForm>
-                        <registerForm.SubmitButton
-                            labels={["Register", "Registering"]}
+                    <producersForm.AppForm>
+                        <producersForm.SubmitButton
+                            labels={["Save", "Saving"]}
                         />
-                    </registerForm.AppForm>
+                    </producersForm.AppForm>
                 </div>
             </form>
 
-            <div>
-                <h2 className="text-lg font-medium">Registered Candidates</h2>
-                <p className="text-muted-foreground text-sm">
-                    All registered producer candidates.
-                </p>
+            <Dialog onOpenChange={(e) => setShowModal(e)} open={showModal}>
+                <DialogContent className="sm:max-w-2xl">
+                    <div className="gap-2">
+                        <h2 className="text-lg font-medium">
+                            Producer Candidate Registration
+                        </h2>
+                        <p className="text-muted-foreground text-sm">
+                            {authenticatedCandidate
+                                ? "Update registration"
+                                : "Register yourself as a new producer candidate"}
+                            .
+                        </p>
+                    </div>
+
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            registerForm.handleSubmit();
+                        }}
+                        className="space-y-4"
+                    >
+                        <registerForm.Field name="endpoint">
+                            {(field) => (
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="endpoint">Endpoint</Label>
+                                    <Input
+                                        id="endpoint"
+                                        placeholder="https://example.com"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                            field.handleChange(e.target.value)
+                                        }
+                                    />
+                                    <registerForm.Subscribe
+                                        selector={(f) => f.fieldMeta.endpoint}
+                                        children={(fieldMeta) => (
+                                            <FieldErrors meta={fieldMeta} />
+                                        )}
+                                    />
+                                </div>
+                            )}
+                        </registerForm.Field>
+
+                        <registerForm.Field name="pemKey">
+                            {(field) => (
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="pemKey">
+                                        Public Key (PEM)
+                                    </Label>
+                                    <Textarea
+                                        id="pemKey"
+                                        placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                            field.handleChange(e.target.value)
+                                        }
+                                        rows={6}
+                                    />
+                                    <registerForm.Subscribe
+                                        selector={(f) => f.fieldMeta.pemKey}
+                                        children={(fieldMeta) => (
+                                            <FieldErrors meta={fieldMeta} />
+                                        )}
+                                    />
+                                </div>
+                            )}
+                        </registerForm.Field>
+
+                        <div className="flex justify-between">
+                            <div>
+                                {authenticatedCandidate && (
+                                    <Button
+                                        variant={"destructive"}
+                                        disabled={isUnregistering}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            unregister();
+                                        }}
+                                    >
+                                        <Trash /> Unregister
+                                    </Button>
+                                )}
+                            </div>
+                            <registerForm.AppForm>
+                                <registerForm.SubmitButton
+                                    labels={
+                                        authenticatedCandidate
+                                            ? ["Update", "Updating"]
+                                            : ["Register", "Registering"]
+                                    }
+                                />
+                            </registerForm.AppForm>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <div className="flex justify-between">
+                <div>
+                    <h2 className="text-lg font-medium">
+                        Registered Candidates
+                    </h2>
+                    <p className="text-muted-foreground text-sm">
+                        All registered producer candidates.
+                    </p>
+                </div>
+                <div className="flex items-center">
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            setShowModal(true);
+                        }}
+                    >
+                        {authenticatedCandidate ? (
+                            <div className="flex items-center gap-1">
+                                <Settings />
+                                Update
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1">
+                                <PlusIcon />
+                                Register
+                            </div>
+                        )}
+                    </Button>
+                </div>
             </div>
 
             <div className="rounded-md border">
@@ -382,13 +390,50 @@ export const BlockProduction = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {candidates?.map((candidate, index) => (
-                            <TableRow key={index}>
+                        {candidates?.map((candidate) => (
+                            <TableRow key={candidate.account}>
                                 <TableCell className="font-mono">
                                     {candidate.account}
                                 </TableCell>
                                 <TableCell className="font-mono">
                                     {candidate.endpoint}
+                                </TableCell>
+                                <TableCell>
+                                    {producers.includes(candidate.account) ? (
+                                        <Button
+                                            variant="outline"
+                                            size={"icon"}
+                                            onClick={() => {
+                                                producersForm.setFieldValue(
+                                                    "prods",
+                                                    (prods) =>
+                                                        prods.filter(
+                                                            (prod) =>
+                                                                prod !==
+                                                                candidate.account,
+                                                        ),
+                                                );
+                                            }}
+                                        >
+                                            <TrashIcon />
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="outline"
+                                            size={"icon"}
+                                            onClick={() => {
+                                                producersForm.setFieldValue(
+                                                    "prods",
+                                                    (prods) => [
+                                                        ...prods,
+                                                        candidate.account,
+                                                    ],
+                                                );
+                                            }}
+                                        >
+                                            <PlusIcon />
+                                        </Button>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}
