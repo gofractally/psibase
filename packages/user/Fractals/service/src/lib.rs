@@ -19,7 +19,7 @@ pub mod service {
     #[action]
     fn init() {
         let fractal_core: AccountNumber = "fractal-core".into();
-        let discovery: AccountNumber = "discovery".into();
+        let genesis: AccountNumber = "genesis".into();
         let a_account: AccountNumber = "a".into();
 
         Fractal::add(
@@ -28,13 +28,13 @@ pub mod service {
             "Mission goes here".to_string(),
         );
         FractalMember::add(fractal_core, "a".into(), MemberStatus::Citizen);
-        let discovery_guild = Guild::add(
+        let genesis_guild = Guild::add(
             fractal_core,
-            discovery,
+            genesis,
             a_account,
-            "Discovery".to_string().try_into().unwrap(),
+            "Genesis".to_string().try_into().unwrap(),
         );
-        GuildMember::add(discovery_guild.account, a_account);
+        GuildMember::add(genesis_guild.account, a_account);
     }
 
     /// Creates a new account and fractal.
@@ -55,13 +55,13 @@ pub mod service {
 
         Fractal::add(fractal_account, name, mission);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
-        let discovery_guild = Guild::add(
+        let genesis_guild = Guild::add(
             fractal_account,
             guild_account,
             sender,
-            "Discovery".to_string().try_into().unwrap(),
+            "Genesis".to_string().try_into().unwrap(),
         );
-        GuildMember::add(discovery_guild.account, sender);
+        GuildMember::add(genesis_guild.account, sender);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
