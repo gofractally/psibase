@@ -17,15 +17,14 @@ export const Settings = () => {
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
     const now = useNowUnix();
-
     const status = useEvaluationStatus(now);
     const guildAccount = useGuildAccount()
 
     const { data: guild, isPending: isGuildPending } = useGuild();
-
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
     const { evaluation } = useEvaluationInstance();
+
     const { mutateAsync: setGuildBio } = useSetGuildBio()
     const { mutateAsync: setGuildDescription } = useSetGuildDescription()
     const { mutateAsync: setGuildDisplayName } = useSetGuildDisplayName()
@@ -36,7 +35,7 @@ export const Settings = () => {
             displayName: guild?.displayName ?? ''
         },
         onSubmit: async ({ value: { displayName } }) => {
-            await setGuildDisplayName({ displayName, guildAccount: guildAccount! })
+            await setGuildDisplayName([guildAccount!, displayName])
         },
         validators: {
             onChange: z.object({
@@ -47,10 +46,10 @@ export const Settings = () => {
 
     const bioForm = useAppForm({
         defaultValues: {
-            bio: guild?.bio ?? ''
+            bio: guild?.bio ?? 'f'
         },
         onSubmit: async ({ value: { bio } }) => {
-            await setGuildBio({ bio, guildAccount: guildAccount! })
+            await setGuildBio([guildAccount!, bio,])
         },
         validators: {
             onChange: z.object({
@@ -64,7 +63,7 @@ export const Settings = () => {
             description: guild?.description ?? ''
         },
         onSubmit: async ({ value: { description } }) => {
-            await setGuildDescription({ description, guildAccount: guildAccount! })
+            await setGuildDescription([guildAccount!, description,])
         },
         validators: {
             onChange: z.object({

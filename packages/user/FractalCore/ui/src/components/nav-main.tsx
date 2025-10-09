@@ -72,8 +72,6 @@ export function NavMain() {
 
     const guildAccount = useGuildAccount();
 
-    console.log({ guildAccount }, 'is guild account ')
-
     const guildMenus: MenuItem[] = [
         {
             groupLabel: "Membership",
