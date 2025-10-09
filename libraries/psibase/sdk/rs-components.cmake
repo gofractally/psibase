@@ -70,7 +70,7 @@ function(add_rs_component_workspace TARGET_TUPLE)
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATHS}
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home cargo component build -r
+        BUILD_COMMAND cargo component build -r
             --target ${TARGET_ARCH}
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${TARGET_DIR}

@@ -340,7 +340,7 @@ function(cargo_psibase_package)
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}
         BUILD_BYPRODUCTS ${PACKAGE_OUTPUT}
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND CARGO_HOME=${CMAKE_CURRENT_BINARY_DIR}/cargo-home ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
+        BUILD_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
             --target-dir ${CMAKE_CURRENT_BINARY_DIR}/packages
         INSTALL_COMMAND ""
