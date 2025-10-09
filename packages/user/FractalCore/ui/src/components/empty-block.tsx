@@ -18,9 +18,8 @@ export const EmptyBlock = ({
     isLoading = false,
     onButtonClick,
 }: Props) => {
-
     if (isLoading) {
-        return <Skeleton className="h-[450px] w-full rounded-md" />
+        return <Skeleton className="h-[450px] w-full rounded-md" />;
     }
     return (
         <div className="flex h-[450px] shrink-0 items-center justify-center rounded-md border border-dashed">

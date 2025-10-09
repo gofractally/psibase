@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { z } from "zod";
 
-
+import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 import {
     Dialog,
@@ -12,10 +14,6 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 import { useAppForm } from "../form/app-form";
-import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
-import { useGuildAccount } from "@/hooks/use-guild-id";
-import { z } from "zod";
-
 
 export const ApplyGuildModal = ({
     show,
@@ -38,14 +36,14 @@ export const ApplyGuildModal = ({
         onSubmit: async ({ value: { app } }) => {
             await applyGuild({
                 app,
-                guildAccount: guildAccount!
+                guildAccount: guildAccount!,
             });
             openChange(false);
             navigate(`/guild/${guildAccount}/applications/${currentUser}`);
         },
         validators: {
             onChange: z.object({
-                app: z.string()
+                app: z.string(),
             }),
         },
     });
@@ -75,14 +73,9 @@ export const ApplyGuildModal = ({
                             )}
                         />
 
-
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={[
-                                    "Apply",
-                                    "Applying",
-                                    "Applied!",
-                                ]}
+                                labels={["Apply", "Applying", "Applied!"]}
                             />
                         </form.AppForm>
                     </form>

@@ -1,4 +1,4 @@
-import { createBrowserRouter, } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 
 import { MyMembership } from "@/pages/fractal/membership/my-membership";
 import { Loader } from "@/pages/loader";

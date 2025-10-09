@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
@@ -12,17 +13,16 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-
-
 
 export const AllMembers = () => {
     const currentFractal = useFractalAccount();
 
     const { data: members } = useMembers(currentFractal);
 
-    const sortedMembers = (members || [])
-        .sort((a, b) => new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf());
+    const sortedMembers = (members || []).sort(
+        (a, b) =>
+            new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf(),
+    );
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">

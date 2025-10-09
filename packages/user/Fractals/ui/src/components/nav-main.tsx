@@ -1,8 +1,4 @@
-import {
-    Contact,
-    LucideIcon,
-    Search,
-} from "lucide-react";
+import { Contact, LucideIcon, Search } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
@@ -21,13 +17,13 @@ interface MenuItem {
     path: string;
     menus: {
         title: string;
-        icon: LucideIcon,
+        icon: LucideIcon;
         path: string;
-    }[],
+    }[];
     button?: {
         label: string;
         onClick: () => void;
-    }
+    };
 }
 
 const browseMenu: MenuItem[] = [
@@ -44,8 +40,6 @@ const browseMenu: MenuItem[] = [
     },
 ];
 
-
-
 export const staticFractalMenus: MenuItem[] = [
     {
         groupLabel: "Membership",
@@ -58,7 +52,6 @@ export const staticFractalMenus: MenuItem[] = [
             },
         ],
     },
-
 ] as const;
 
 export function NavMain() {
@@ -66,11 +59,7 @@ export function NavMain() {
 
     const fractalName = useCurrentFractal();
 
-
-    const fractalMenus = [
-        ...staticFractalMenus,
-    ]
-
+    const fractalMenus = [...staticFractalMenus];
 
     const isBrowse = !location.pathname.startsWith("/fractal");
 
@@ -106,10 +95,14 @@ export function NavMain() {
                                 )}
                             </NavLink>
                         ))}
-                        {item.button && <button onClick={() => {
-
-                        }} className="border text-sm rounded-sm border-dashed border-muted-foreground/50 py-3 hover:border-primary">Create Guild</button>}
-
+                        {item.button && (
+                            <button
+                                onClick={() => {}}
+                                className="border-muted-foreground/50 hover:border-primary rounded-sm border border-dashed py-3 text-sm"
+                            >
+                                Create Guild
+                            </button>
+                        )}
                     </SidebarMenu>
                 </SidebarGroup>
             ))}

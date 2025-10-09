@@ -1,11 +1,11 @@
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
 
+import { CheckboxField } from "./checkbox-field";
 import { DateTimePicker24h } from "./date-time-picker";
 import { DurationSelect } from "./duration-select";
 import { NumberField } from "./number-field";
 import { SubmitButton } from "./submit-button";
 import { TextField } from "./text-field";
-import { CheckboxField } from "./checkbox-field";
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
     createFormHookContexts();

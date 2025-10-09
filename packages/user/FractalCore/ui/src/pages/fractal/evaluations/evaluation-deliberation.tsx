@@ -10,6 +10,7 @@ import { usePropose } from "@/hooks/fractals/use-propose";
 import { useWatchAttest } from "@/hooks/fractals/use-watch-attest";
 import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
@@ -18,7 +19,6 @@ import { Account } from "@/lib/zod/Account";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { useGuildAccount } from "@/hooks/use-guild-id";
 
 const usePageParams = () => {
     const { evaluationId, fractalName, groupNumber } = useParams<{
@@ -38,10 +38,7 @@ const useRanking = () => {
     const { groupNumber } = usePageParams();
     const guildAccount = useGuildAccount();
 
-    const { data: groupUsersData } = useGroupUsers(
-        guildAccount,
-        groupNumber,
-    );
+    const { data: groupUsersData } = useGroupUsers(guildAccount, groupNumber);
 
     const groupUsers = groupUsersData || [];
 
@@ -61,7 +58,6 @@ const useRanking = () => {
         },
     );
     const { mutateAsync: propose } = usePropose();
-
 
     const { maybeExecute: debounceAccounts } = useAsyncDebouncer(
         async (rankedNumbers: Account[]) => {

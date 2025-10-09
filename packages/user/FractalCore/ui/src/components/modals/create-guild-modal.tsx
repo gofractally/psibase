@@ -5,7 +5,9 @@ import {
     useCreateGuild,
     zParams as zCreateGuild,
 } from "@/hooks/fractals/use-create-guild";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { isAccountAvailable } from "@/lib/isAccountAvailable";
 
 import {
     Dialog,
@@ -15,9 +17,6 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 import { useAppForm } from "../form/app-form";
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { isAccountAvailable } from "@/lib/isAccountAvailable";
-
 
 export const CreateGuildModal = ({
     show,
@@ -31,7 +30,6 @@ export const CreateGuildModal = ({
     const { data: currentUser } = useCurrentUser();
     const { refetch } = useGuildMembershipsOfUser(currentUser);
 
-
     const navigate = useNavigate();
 
     const form = useAppForm({
@@ -39,7 +37,7 @@ export const CreateGuildModal = ({
             account: "",
             name: "",
         },
-        onSubmit: async ({ value: { name, account, } }) => {
+        onSubmit: async ({ value: { name, account } }) => {
             await createGuild({
                 name,
                 account,
@@ -84,10 +82,10 @@ export const CreateGuildModal = ({
                                 onChangeAsync: async ({ value }) => {
                                     const accountStatus =
                                         await isAccountAvailable(value);
-                                    if (accountStatus == 'Taken') {
+                                    if (accountStatus == "Taken") {
                                         return "Account is taken";
-                                    } else if (accountStatus == 'Invalid') {
-                                        return "Invalid account"
+                                    } else if (accountStatus == "Invalid") {
+                                        return "Invalid account";
                                     }
                                 },
                             }}

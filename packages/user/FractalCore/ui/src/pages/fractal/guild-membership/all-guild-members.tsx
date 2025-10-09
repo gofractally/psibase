@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 
 import { useScores } from "@/hooks/fractals/use-scores";
+import { useGuild } from "@/hooks/use-guild";
 
 import { cn } from "@shared/lib/utils";
 import {
@@ -11,7 +12,6 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useGuild } from "@/hooks/use-guild";
 
 const formatScore = (num: number): string => {
     // Would it be neat to make the score a flat integer out of 100?
@@ -19,7 +19,7 @@ const formatScore = (num: number): string => {
 };
 
 export const AllGuildMembers = () => {
-    const { data: guild } = useGuild()
+    const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
 
     return (

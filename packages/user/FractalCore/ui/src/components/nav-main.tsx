@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
+import { useGuildAccount } from "@/hooks/use-guild-id";
+
 import { cn } from "@shared/lib/utils";
 import {
     SidebarGroup,
@@ -18,22 +20,20 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
-import { useGuildAccount } from "@/hooks/use-guild-id";
 
 interface MenuItem {
     groupLabel: string;
     path: string;
     menus: {
         title: string;
-        icon: LucideIcon,
+        icon: LucideIcon;
         path: string;
-    }[],
+    }[];
     button?: {
         label: string;
         onClick: () => void;
-    }
+    };
 }
-
 
 export const staticFractalMenus: MenuItem[] = [
     {
@@ -50,7 +50,6 @@ export const staticFractalMenus: MenuItem[] = [
                 icon: Users,
                 path: "members",
             },
-
         ],
     },
     {
@@ -66,7 +65,6 @@ export const staticFractalMenus: MenuItem[] = [
     },
 ];
 
-
 export function NavMain() {
     const location = useLocation();
 
@@ -80,18 +78,18 @@ export function NavMain() {
                 {
                     title: "My membership",
                     icon: Contact,
-                    path: '',
+                    path: "",
                 },
                 {
                     title: "Members",
                     icon: Users,
-                    path: 'members'
+                    path: "members",
                 },
                 {
                     title: "Applications",
                     icon: PlusCircleIcon,
-                    path: "applications"
-                }
+                    path: "applications",
+                },
             ],
         },
         {
@@ -101,14 +99,14 @@ export function NavMain() {
                 {
                     title: "Active & Upcoming",
                     icon: Calendar,
-                    path: "evaluations"
+                    path: "evaluations",
                 },
                 {
                     title: "Completed",
                     icon: CalendarArrowDownIcon,
-                    path: "evaluations/completed"
-                }
-            ]
+                    path: "evaluations/completed",
+                },
+            ],
         },
         {
             groupLabel: "Governance",
@@ -117,9 +115,8 @@ export function NavMain() {
                 {
                     title: "Settings",
                     icon: SettingsIcon,
-                    path: 'settings',
+                    path: "settings",
                 },
-
             ],
         },
     ];
@@ -135,12 +132,7 @@ export function NavMain() {
                     <SidebarGroupLabel>{item.groupLabel}</SidebarGroupLabel>
                     <SidebarMenu>
                         {item.menus?.map((menu) => (
-                            <NavLink
-                                to={
-                                    `${item.path}/${menu.path}`
-                                }
-                                end
-                            >
+                            <NavLink to={`${item.path}/${menu.path}`} end>
                                 {({ isActive }) => (
                                     <SidebarMenuItem
                                         className={cn({
@@ -156,10 +148,14 @@ export function NavMain() {
                                 )}
                             </NavLink>
                         ))}
-                        {item.button && <button onClick={() => {
-
-                        }} className="border text-sm rounded-sm border-dashed border-muted-foreground/50 py-3 hover:border-primary">Create Guild</button>}
-
+                        {item.button && (
+                            <button
+                                onClick={() => {}}
+                                className="border-muted-foreground/50 hover:border-primary rounded-sm border border-dashed py-3 text-sm"
+                            >
+                                Create Guild
+                            </button>
+                        )}
                     </SidebarMenu>
                 </SidebarGroup>
             ))}

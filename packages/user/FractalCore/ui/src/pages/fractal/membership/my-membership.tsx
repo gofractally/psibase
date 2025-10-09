@@ -7,6 +7,7 @@ import { Loader2, Plus } from "lucide-react";
 import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useChainId } from "@/hooks/use-chain-id";
@@ -24,7 +25,6 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const MyMembership = () => {
     const fractalAccount = useFractalAccount();
@@ -53,7 +53,10 @@ export const MyMembership = () => {
         error: errorChainId,
     } = useChainId();
 
-    console.log({ errorFractal, errorMembership, errorChainId }, 'x', { fractal, membership })
+    console.log({ errorFractal, errorMembership, errorChainId }, "x", {
+        fractal,
+        membership,
+    });
 
     const isLoading =
         isLoadingCurrentUser ||
@@ -150,8 +153,8 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         membership == null
             ? "Not a member"
             : membership
-                ? getMemberLabel(membership.memberStatus)
-                : "Loading...";
+              ? getMemberLabel(membership.memberStatus)
+              : "Loading...";
     return (
         <Card>
             <CardHeader>
@@ -211,9 +214,7 @@ const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
                         <Plus className="text-muted-foreground h-6 w-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold">
-                            Apply to Join
-                        </h3>
+                        <h3 className="text-lg font-semibold">Apply to Join</h3>
                         <p className="text-muted-foreground mt-1 text-sm">
                             Create an application to join this fractal.
                         </p>

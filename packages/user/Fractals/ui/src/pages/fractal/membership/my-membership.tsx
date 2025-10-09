@@ -3,6 +3,8 @@ import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
 
+import { siblingUrl } from "@psibase/common-lib";
+
 import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
@@ -12,9 +14,9 @@ import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { getMemberLabel } from "@/lib/getMemberLabel";
-import { Button } from "@shared/shadcn/ui/button"
 
 import { Badge } from "@shared/shadcn/ui/badge";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardContent,
@@ -23,8 +25,6 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { siblingUrl } from "@psibase/common-lib";
-
 
 export const MyMembership = () => {
     const fractalAccount = useCurrentFractal();
@@ -106,11 +106,13 @@ const FractalOverviewCard = ({
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <div className="flex justify-between w-full ">
+                    <div className="flex w-full justify-between ">
                         <div>
                             <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
                                 <img
-                                    src={createIdenticon(chainId + fractalAccount)}
+                                    src={createIdenticon(
+                                        chainId + fractalAccount,
+                                    )}
                                     alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
                                     className="size-5"
                                 />
@@ -125,9 +127,15 @@ const FractalOverviewCard = ({
                             </div>
                         </div>
                         <div className="flex flex-col items-center justify-center">
-                            <Button onClick={() => {
-                                window.open(siblingUrl(null, fractalAccount))
-                            }}>Open</Button>
+                            <Button
+                                onClick={() => {
+                                    window.open(
+                                        siblingUrl(null, fractalAccount),
+                                    );
+                                }}
+                            >
+                                Open
+                            </Button>
                         </div>
                     </div>
                 </CardTitle>
@@ -154,8 +162,8 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         membership == null
             ? "Not a member"
             : membership
-                ? getMemberLabel(membership.memberStatus)
-                : "Loading...";
+              ? getMemberLabel(membership.memberStatus)
+              : "Loading...";
     return (
         <Card>
             <CardHeader>
@@ -199,5 +207,3 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         </Card>
     );
 };
-
-

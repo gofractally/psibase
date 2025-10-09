@@ -2,11 +2,11 @@ import { PluginError } from "@psibase/common-lib";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useStart } from "@/hooks/fractals/use-start";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 import { Button } from "@shared/shadcn/ui/button";
 
 import { ErrorCard } from "../error-card";
-import { useGuildAccount } from "@/hooks/use-guild-id";
 
 const checkUnableToGroupUsers = (error: PluginError | null): boolean =>
     error ? error.message.includes("unable to group users") : false;
@@ -32,7 +32,7 @@ export const Start = () => {
     }
 
     return (
-        <div className="flex justify-between items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
             <div>Ready to start!</div>
             <Button
                 size="sm"

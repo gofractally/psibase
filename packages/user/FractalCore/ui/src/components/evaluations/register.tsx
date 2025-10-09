@@ -20,7 +20,7 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
     const now = useNowUnix();
 
     return (
-        <div className="flex justify-between items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
             <div>
                 Evaluation starts in{" "}
                 {evaluation && humanize(now - evaluation.deliberationStarts)}
@@ -34,7 +34,6 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                         unregister({
                             evaluationId: guild!.evalInstance!.evaluationId,
                             guildAccount: guildAccount!,
-
                         });
                     }}
                 >
@@ -53,7 +52,6 @@ export const Register = ({ status }: { status: RegistrationPhase }) => {
                     {isRegistering ? "Registering" : "Register"}
                 </Button>
             )}
-
         </div>
     );
 };

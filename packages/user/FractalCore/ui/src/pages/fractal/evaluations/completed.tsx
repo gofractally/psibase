@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { EmptyBlock } from "@/components/empty-block";
 
 import { useCompletedEvaluation } from "@/hooks/fractals/use-completed-evaluations";
+import { useGuild } from "@/hooks/use-guild";
 
 import {
     Table,
@@ -13,7 +14,6 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useGuild } from "@/hooks/use-guild";
 
 export const Completed = () => {
     const { data: guild } = useGuild();

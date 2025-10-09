@@ -1,11 +1,16 @@
-
 import { Plus } from "lucide-react";
+import { useState } from "react";
 
 import { ErrorCard } from "@/components/error-card";
+import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGuild } from "@/hooks/use-guild";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { createIdenticon } from "@/lib/createIdenticon";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -14,31 +19,22 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { useState } from "react";
-import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useGuildAccount } from "@/hooks/use-guild-id";
-import { useGuild } from "@/hooks/use-guild";
 
 export const MyGuildMembership = () => {
-
     const {
         data: currentUser,
         isLoading: isLoadingCurrentUser,
         error: errorCurrentUser,
     } = useCurrentUser();
 
-
-
-    const { data: memberships } = useGuildMembershipsOfUser(currentUser)
+    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
 
     const guildAccount = useGuildAccount();
-    const isGuildMember = memberships?.some(membership => membership.guild.account == guildAccount);
+    const isGuildMember = memberships?.some(
+        (membership) => membership.guild.account == guildAccount,
+    );
 
-
-
-    const isLoading =
-        isLoadingCurrentUser
+    const isLoading = isLoadingCurrentUser;
 
     const error = errorCurrentUser;
 
@@ -70,12 +66,10 @@ export const MyGuildMembership = () => {
 };
 
 const GuildOverviewCard = () => {
-
     const { data: guild } = useGuild();
-    const { data: chainId } = useChainId()
+    const { data: chainId } = useChainId();
 
-    console.log({ guild })
-
+    console.log({ guild });
 
     return (
         <Card>
@@ -105,10 +99,8 @@ const GuildOverviewCard = () => {
                             Mission
                         </h3>
                         <p className="text-sm leading-relaxed">
-                            {guild?.description ||
-                                "No mission available."}
+                            {guild?.description || "No mission available."}
                         </p>
-
                     </div>
                 </div>
             </CardContent>
@@ -168,7 +160,6 @@ const GuildOverviewCard = () => {
 // };
 
 const ApplyGuildCard = () => {
-
     const [showModal, setShowModal] = useState(false);
 
     // if (error) {
@@ -177,23 +168,24 @@ const ApplyGuildCard = () => {
 
     return (
         <Card className="border-dashed">
-            <ApplyGuildModal openChange={(show) => setShowModal(show)} show={showModal} />
+            <ApplyGuildModal
+                openChange={(show) => setShowModal(show)}
+                show={showModal}
+            />
             <CardContent className="pt-6">
                 <div className="flex flex-col items-center space-y-4 text-center">
                     <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-full">
                         <Plus className="text-muted-foreground h-6 w-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold">
-                            Apply to Join
-                        </h3>
+                        <h3 className="text-lg font-semibold">Apply to Join</h3>
                         <p className="text-muted-foreground mt-1 text-sm">
                             Create an application to join this guild.
                         </p>
                     </div>
                     <Button
                         onClick={() => {
-                            setShowModal(true)
+                            setShowModal(true);
                         }}
                         size="lg"
                         className="w-full sm:w-auto"

@@ -2,7 +2,10 @@ import dayjs from "dayjs";
 
 import { useAppForm } from "@/components/form/app-form";
 
+import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -11,9 +14,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
-import { useGuildAccount } from "@/hooks/use-guild-id";
-import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 
 interface Props {
     isOpen: boolean;
@@ -27,7 +27,7 @@ interface FormValues {
     deliberationSeconds: number;
     submissionSeconds: number;
     intervalSeconds: number;
-};
+}
 
 const defaultData: FormValues = {
     register: new Date(),
@@ -35,7 +35,7 @@ const defaultData: FormValues = {
     deliberationSeconds: 60 * 45,
     submissionSeconds: 60 * 10,
     intervalSeconds: 86400 * 7,
-}
+};
 
 export const ScheduleDialog = ({
     isOpen,
@@ -50,13 +50,19 @@ export const ScheduleDialog = ({
 
     const { evaluation, guild, isPending } = useEvaluationInstance();
 
-    const defaultValues: FormValues = evaluation ? {
-        intervalSeconds: guild?.evalInstance?.interval || defaultData.intervalSeconds,
-        register: new Date(evaluation.registrationStarts * 1000),
-        deliberationSeconds: evaluation.submissionStarts - evaluation.deliberationStarts,
-        registerSeconds: evaluation.deliberationStarts - evaluation.registrationStarts,
-        submissionSeconds: evaluation.finishBy - evaluation.submissionStarts
-    } : defaultData
+    const defaultValues: FormValues = evaluation
+        ? {
+              intervalSeconds:
+                  guild?.evalInstance?.interval || defaultData.intervalSeconds,
+              register: new Date(evaluation.registrationStarts * 1000),
+              deliberationSeconds:
+                  evaluation.submissionStarts - evaluation.deliberationStarts,
+              registerSeconds:
+                  evaluation.deliberationStarts - evaluation.registrationStarts,
+              submissionSeconds:
+                  evaluation.finishBy - evaluation.submissionStarts,
+          }
+        : defaultData;
 
     const form = useAppForm({
         defaultValues,
@@ -106,7 +112,11 @@ export const ScheduleDialog = ({
                         }}
                         disabled={disabled}
                     >
-                        {isPending ? "Loading" : evaluation ? "Update schedule" : "Set new schedule"}
+                        {isPending
+                            ? "Loading"
+                            : evaluation
+                              ? "Update schedule"
+                              : "Set new schedule"}
                     </Button>
                 )}
             </DialogTrigger>

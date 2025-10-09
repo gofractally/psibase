@@ -2,15 +2,14 @@ import dayjs from "dayjs";
 
 import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
 import { useFormatRelative } from "@/hooks/use-format-relative";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { SubmissionPhase } from "@/lib/getStatus";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export const Submission = ({ status }: { status: SubmissionPhase }) => {
     const { label } = useFormatRelative(status.submissionDeadline);
     const date = dayjs.unix(status.submissionDeadline).format("MMMM D HH:mm");
-
 
     const guildAccount = useGuildAccount();
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();

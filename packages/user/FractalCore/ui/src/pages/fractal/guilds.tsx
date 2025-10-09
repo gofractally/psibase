@@ -1,3 +1,6 @@
+import { useNavigate } from "react-router-dom";
+
+import { useFractal } from "@/hooks/fractals/use-fractal";
 
 import { cn } from "@shared/lib/utils";
 import {
@@ -8,21 +11,16 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useNavigate } from "react-router-dom";
-
-
 
 export const Guilds = () => {
-
     const { data: fractal } = useFractal();
 
-    console.log({ fractal, }, 'is the fractal guilds')
+    console.log({ fractal }, "is the fractal guilds");
 
     const navigate = useNavigate();
     const guildsData = fractal?.guilds.nodes;
 
-    const guilds = (guildsData || [])
+    const guilds = guildsData || [];
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -46,17 +44,17 @@ export const Guilds = () => {
                                     "bg-background/80": index < 6,
                                 })}
                                 onClick={() => {
-                                    navigate(`/guild/${guild.account}/`)
+                                    navigate(`/guild/${guild.account}/`);
                                 }}
                             >
                                 <TableCell className="font-medium">
                                     {guild.displayName}
                                 </TableCell>
+                                <TableCell>{guild.bio}</TableCell>
                                 <TableCell>
-                                    {guild.bio}
-                                </TableCell>
-                                <TableCell>
-                                    {guild.rep?.member ? guild.rep.member : "Council"}
+                                    {guild.rep?.member
+                                        ? guild.rep.member
+                                        : "Council"}
                                 </TableCell>
                             </TableRow>
                         ))}

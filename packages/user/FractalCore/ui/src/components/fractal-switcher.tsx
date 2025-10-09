@@ -1,9 +1,12 @@
 import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGuild } from "@/hooks/use-guild";
+import { useGuildAccount } from "@/hooks/use-guild-id";
 import { createIdenticon } from "@/lib/createIdenticon";
 
 import {
@@ -23,9 +26,6 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 import { CreateGuildModal } from "./modals/create-guild-modal";
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useGuild } from "@/hooks/use-guild";
-import { useGuildAccount } from "@/hooks/use-guild-id";
 
 export function AppSwitcher() {
     const { isMobile } = useSidebar();
@@ -34,17 +34,15 @@ export function AppSwitcher() {
 
     const { data: currentUser } = useCurrentUser();
 
-    const { data: memberships, } = useGuildMembershipsOfUser(currentUser);
+    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
 
     const guildAccount = useGuildAccount();
 
-    const { data: currentGuild } = useGuild()
+    const { data: currentGuild } = useGuild();
 
     const { data: chainId } = useChainId();
 
     const [showCreateFractalModal, setShowCreateGuildModal] = useState(false);
-
-
 
     return (
         <SidebarMenu>
@@ -109,9 +107,7 @@ export function AppSwitcher() {
                             </DropdownMenuLabel>
                         )}
                         {memberships?.map((membership) => {
-
-                            const displayName =
-                                membership.guild.displayName;
+                            const displayName = membership.guild.displayName;
 
                             const src = createIdenticon(
                                 chainId + membership.guild.account,

@@ -6,7 +6,7 @@ import { EmptyBlock } from "@/components/empty-block";
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 import { useCurrentUser } from "@/hooks/use-current-user";
-
+import { useGuild } from "@/hooks/use-guild";
 
 import {
     Table,
@@ -16,18 +16,21 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { useGuild } from "@/hooks/use-guild";
 
 export const ActiveAndUpcoming = () => {
-
     const { data: guild, isPending: isGuildPending } = useGuild();
 
     const { data: currentUser } = useCurrentUser();
 
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
-    const isAuthority = !!(guild && currentUser && (guild.rep?.member == currentUser || guild.council.includes(currentUser)))
-    console.log({ isAuthority })
+    const isAuthority = !!(
+        guild &&
+        currentUser &&
+        (guild.rep?.member == currentUser ||
+            guild.council.includes(currentUser))
+    );
+    console.log({ isAuthority });
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -49,8 +52,6 @@ export const ActiveAndUpcoming = () => {
         </div>
     );
 };
-
-
 
 const EvaluationsTable = () => {
     const { evaluation, guild } = useEvaluationInstance();

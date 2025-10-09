@@ -31,7 +31,10 @@ export const CurrentEvaluationCard = () => {
             {status?.type == "deliberation" && <Deliberation status={status} />}
             {status?.type == "submission" && <Submission status={status} />}
             {status?.type == "finished" && (
-                <div>✅ Evaluation finished! {isClosing ? "Now closing" : "Awaiting to close"}</div>
+                <div>
+                    ✅ Evaluation finished!{" "}
+                    {isClosing ? "Now closing" : "Awaiting to close"}
+                </div>
             )}
         </div>
     );

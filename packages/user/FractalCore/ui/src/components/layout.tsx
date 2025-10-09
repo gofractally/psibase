@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 import {
     Breadcrumb,
@@ -19,7 +20,6 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 import { staticFractalMenus } from "./nav-main";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const Layout = () => {
     const fractal = useFractalAccount();

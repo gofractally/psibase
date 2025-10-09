@@ -9,7 +9,7 @@ export const Failed = () => {
     const { mutateAsync: closeEvaluation } = useCloseEvaluation();
 
     const guildAccount = useGuildAccount();
-    const { evaluation, } = useEvaluationInstance();
+    const { evaluation } = useEvaluationInstance();
 
     const { hasPassed, label } = useFormatRelative(evaluation?.finishBy);
 

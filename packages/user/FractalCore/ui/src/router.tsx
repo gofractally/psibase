@@ -10,15 +10,14 @@ import { ProtectedRoute } from "@/components/protected-route";
 
 import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
-import { Settings } from "./pages/settings";
-import { MyGuildMembership } from "./pages/fractal/guild-membership/my-guild-membership";
 import { AllGuildMembers } from "./pages/fractal/guild-membership/all-guild-members";
-import { Applications } from "./pages/fractal/membership/applications";
-import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
+import { MyGuildMembership } from "./pages/fractal/guild-membership/my-guild-membership";
 import { Guilds } from "./pages/fractal/guilds";
+import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
+import { Applications } from "./pages/fractal/membership/applications";
+import { Settings } from "./pages/settings";
 
 export const router = createBrowserRouter([
-
     {
         path: "/",
         element: <Layout />,
@@ -61,9 +60,11 @@ export const router = createBrowserRouter([
                 children: [
                     {
                         path: "",
-                        element: <ProtectedRoute>
-                            <MyGuildMembership />
-                        </ProtectedRoute>
+                        element: (
+                            <ProtectedRoute>
+                                <MyGuildMembership />
+                            </ProtectedRoute>
+                        ),
                     },
                     {
                         path: "members",
@@ -129,9 +130,8 @@ export const router = createBrowserRouter([
                             </ProtectedRoute>
                         ),
                     },
-                ]
+                ],
             },
-
         ],
     },
 ]);
