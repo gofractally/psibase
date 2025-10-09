@@ -1,4 +1,4 @@
-import { HandCoins, Undo2 } from "lucide-react";
+import { ArrowDown, Loader2, Undo2 } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 
 import { GlowingCard } from "@/components/glowing-card";
@@ -40,8 +40,10 @@ export const PendingPageContents = () => {
     const { currentUser, isLoading } = context;
 
     const { data: pendingTransactions } = useUserLinesOfCredit(currentUser);
-    const { mutateAsync: uncredit } = useUncredit(currentUser);
-    const { mutateAsync: debit } = useDebit(currentUser);
+    const { mutateAsync: uncredit, isPending: isUncreditPending } =
+        useUncredit(currentUser);
+    const { mutateAsync: debit, isPending: isDebitPending } =
+        useDebit(currentUser);
 
     if (isLoading) {
         return (
@@ -119,12 +121,12 @@ export const PendingPageContents = () => {
                     </TableCaption>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Counterparty</TableHead>
+                            <TableHead></TableHead>
                             <TableHead className="text-right">
-                                Claimable
+                                Incoming
                             </TableHead>
                             <TableHead className="text-right">
-                                Recallable
+                                Outgoing
                             </TableHead>
                         </TableRow>
                     </TableHeader>
@@ -143,20 +145,27 @@ export const PendingPageContents = () => {
                                                 })}
                                                 <Tooltip>
                                                     <TooltipContent>
-                                                        Claim Pending
+                                                        Accept
                                                     </TooltipContent>
                                                     <TooltipTrigger asChild>
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="outline"
                                                             size="icon"
                                                             className="h-6 w-6"
+                                                            disabled={
+                                                                isDebitPending
+                                                            }
                                                             onClick={() =>
                                                                 handleClaim(
                                                                     pt.debit!,
                                                                 )
                                                             }
                                                         >
-                                                            <HandCoins className="h-4 w-4" />
+                                                            {isDebitPending ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <ArrowDown className="h-4 w-4" />
+                                                            )}
                                                         </Button>
                                                     </TooltipTrigger>
                                                 </Tooltip>
@@ -177,20 +186,27 @@ export const PendingPageContents = () => {
                                                 })}
                                                 <Tooltip>
                                                     <TooltipContent>
-                                                        Recall Available
+                                                        Cancel
                                                     </TooltipContent>
                                                     <TooltipTrigger asChild>
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="outline"
                                                             size="icon"
                                                             className="h-6 w-6"
+                                                            disabled={
+                                                                isUncreditPending
+                                                            }
                                                             onClick={() =>
                                                                 handleRecall(
                                                                     pt.credit!,
                                                                 )
                                                             }
                                                         >
-                                                            <Undo2 className="h-4 w-4" />
+                                                            {isUncreditPending ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Undo2 className="h-4 w-4" />
+                                                            )}
                                                         </Button>
                                                     </TooltipTrigger>
                                                 </Tooltip>

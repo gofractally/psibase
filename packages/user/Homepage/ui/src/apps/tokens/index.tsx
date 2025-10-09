@@ -9,7 +9,7 @@ import { TransferPage } from "./transfer";
 
 export const tokensConfig: AppConfigType = {
     service: Account.parse("tokens"),
-    name: "Tokens",
+    name: "Wallet",
     description: "Send tokens and manage balances.",
     icon: <Coins className="h-6 w-6" />,
     isMore: false,
@@ -25,7 +25,7 @@ export const tokensConfig: AppConfigType = {
         {
             path: "Pending",
             element: <PendingPage />,
-            name: "Pending transactions",
+            name: "Pending",
         },
     ],
 };
