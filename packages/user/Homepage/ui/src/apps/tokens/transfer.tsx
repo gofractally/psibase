@@ -15,7 +15,7 @@ import { Account } from "@/lib/zod/Account";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
-import { CardContent } from "@shared/shadcn/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { CreditTable } from "./components/credit-table";
@@ -225,7 +225,14 @@ const TransferPageContents = () => {
                 </form.AppForm>
             </GlowingCard>
             {currentUser && selectedToken && (
-                <CreditTable user={currentUser} token={selectedToken} />
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>Recent Transactions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CreditTable user={currentUser} token={selectedToken} />
+                    </CardContent>
+                </GlowingCard>
             )}
         </div>
     );
