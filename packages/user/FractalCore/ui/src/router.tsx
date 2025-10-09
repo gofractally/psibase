@@ -15,6 +15,7 @@ import { MyGuildMembership } from "./pages/fractal/guild-membership/my-guild-mem
 import { AllGuildMembers } from "./pages/fractal/guild-membership/all-guild-members";
 import { Applications } from "./pages/fractal/membership/applications";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
+import { Guilds } from "./pages/fractal/guilds";
 
 export const router = createBrowserRouter([
 
@@ -43,6 +44,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <AllMembers />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/guilds",
+                element: (
+                    <ProtectedRoute>
+                        <Guilds />
                     </ProtectedRoute>
                 ),
             },

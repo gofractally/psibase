@@ -1,10 +1,8 @@
-import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 
 import { Plus } from "lucide-react";
 
 import { ErrorCard } from "@/components/error-card";
 
-import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
@@ -16,14 +14,13 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useState } from "react";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuild } from "@/hooks/use-guild";
 
 export const MyGuildMembership = () => {
-    const fractalAccount = useFractalAccount();
 
     const {
         data: currentUser,
@@ -31,11 +28,6 @@ export const MyGuildMembership = () => {
         error: errorCurrentUser,
     } = useCurrentUser();
 
-    const {
-        data: fractal,
-        isLoading: isLoadingFractal,
-        error: errorFractal,
-    } = useFractal();
 
 
     const { data: memberships } = useGuildMembershipsOfUser(currentUser)
@@ -43,20 +35,12 @@ export const MyGuildMembership = () => {
     const guildAccount = useGuildAccount();
     const isGuildMember = memberships?.some(membership => membership.guild.account == guildAccount);
 
-    const {
-        data: chainId,
-        isLoading: isLoadingChainId,
-        error: errorChainId,
-    } = useChainId();
 
 
     const isLoading =
-        isLoadingCurrentUser ||
-        isLoadingFractal ||
-        isLoadingChainId;
+        isLoadingCurrentUser
 
-    const error =
-        errorCurrentUser || errorFractal || errorChainId;
+    const error = errorCurrentUser;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -76,11 +60,7 @@ export const MyGuildMembership = () => {
                     </>
                 ) : (
                     <>
-                        <GuildOverviewCard
-                            fractal={fractal}
-                            fractalAccount={fractalAccount}
-                            chainId={chainId}
-                        />
+                        <GuildOverviewCard />
                         {!isGuildMember && <ApplyGuildCard />}
                     </>
                 )}
@@ -89,15 +69,13 @@ export const MyGuildMembership = () => {
     );
 };
 
-const GuildOverviewCard = ({
-    fractal,
-    fractalAccount,
-    chainId,
-}: {
-    fractal?: FractalRes;
-    fractalAccount?: string;
-    chainId: string;
-}) => {
+const GuildOverviewCard = () => {
+
+    const { data: guild } = useGuild();
+    const { data: chainId } = useChainId()
+
+    console.log({ guild })
+
 
     return (
         <Card>
@@ -105,17 +83,17 @@ const GuildOverviewCard = ({
                 <CardTitle className="flex items-center gap-2">
                     <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
                         <img
-                            src={createIdenticon(chainId + fractalAccount)}
-                            alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
+                            src={createIdenticon(chainId + guild?.account)}
+                            alt={guild?.displayName || "Guild"}
                             className="size-5"
                         />
                     </div>
                     <div>
                         <div className="text-xl font-semibold">
-                            {fractal?.fractal?.name || "Loading..."}
+                            {guild?.displayName || "Loading..."}
                         </div>
                         <div className="text-muted-foreground text-sm font-normal">
-                            {fractalAccount}
+                            {guild?.bio}
                         </div>
                     </div>
                 </CardTitle>
@@ -127,9 +105,20 @@ const GuildOverviewCard = ({
                             Mission
                         </h3>
                         <p className="text-sm leading-relaxed">
-                            {fractal?.fractal?.mission ||
-                                "No mission available"}
+                            {guild?.bio ||
+                                "No mission available."}
                         </p>
+
+                    </div>
+                    <div>
+                        <h3 className="text-muted-foreground mb-1 text-sm font-medium">
+                            Description
+                        </h3>
+                        <p className="text-sm leading-relaxed">
+                            {guild?.description ||
+                                "No description available."}
+                        </p>
+
                     </div>
                 </div>
             </CardContent>

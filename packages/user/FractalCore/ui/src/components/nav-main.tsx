@@ -2,6 +2,7 @@ import {
     Calendar,
     CalendarArrowDownIcon,
     Contact,
+    Landmark,
     LucideIcon,
     PlusCircleIcon,
     SettingsIcon,
@@ -50,6 +51,17 @@ export const staticFractalMenus: MenuItem[] = [
                 path: "members",
             },
 
+        ],
+    },
+    {
+        groupLabel: "Guilds",
+        path: "guilds",
+        menus: [
+            {
+                title: "Guilds",
+                icon: Landmark,
+                path: "",
+            },
         ],
     },
 ];

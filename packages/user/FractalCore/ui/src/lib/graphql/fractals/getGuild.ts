@@ -17,6 +17,7 @@ export const zGuild = z.object({
         })
         .nullable(),
     bio: z.string(),
+    description: z.string(),
 });
 
 export const getGuild = async (guildAccount: Account) => {
@@ -35,6 +36,7 @@ export const getGuild = async (guildAccount: Account) => {
                 }
                 council
                 bio
+                description
             }
         }
     `,
