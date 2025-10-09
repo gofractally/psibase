@@ -33,7 +33,7 @@ impl GuildMember {
     }
 
     pub fn set_pending_score(&mut self, incoming_score: u32) {
-        self.pending_score = Some(incoming_score);
+        self.pending_score = Some(incoming_score * 10000);
         self.save();
     }
 
