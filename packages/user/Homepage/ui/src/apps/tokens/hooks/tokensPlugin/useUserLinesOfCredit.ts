@@ -17,14 +17,15 @@ export interface LineOfCredit {
 }
 
 interface Output {
-    credits: LineOfCredit[];
-    debits: LineOfCredit[];
+    counterParty: z.infer<typeof Account>;
+    credit: LineOfCredit | undefined;
+    debit: LineOfCredit | undefined;
 }
 
 export const useUserLinesOfCredit = (
     username: z.infer<typeof Account> | undefined | null,
 ) => {
-    return useQuery<Output>({
+    return useQuery<Output[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,
         queryFn: async () => {
@@ -49,7 +50,32 @@ export const useUserLinesOfCredit = (
             const credits: LineOfCredit[] = res.credits.map(transformLOC);
             const debits: LineOfCredit[] = res.debits.map(transformLOC);
 
-            return { credits, debits };
+            const creditCounterParties = credits.map(
+                (credit) => credit.debitor,
+            );
+            const debitCounterParties = debits.map((debit) => debit.creditor);
+            const counterParties = new Set([
+                ...creditCounterParties,
+                ...debitCounterParties,
+            ]);
+
+            const pendingTransactions = Array.from(counterParties).map(
+                (counterParty) => {
+                    const credit = credits.find(
+                        (credit) => credit.debitor === counterParty,
+                    );
+                    const debit = debits.find(
+                        (debit) => debit.creditor === counterParty,
+                    );
+                    return {
+                        counterParty,
+                        credit,
+                        debit,
+                    };
+                },
+            );
+
+            return pendingTransactions;
         },
     });
 };

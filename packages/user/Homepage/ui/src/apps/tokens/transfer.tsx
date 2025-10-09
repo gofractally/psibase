@@ -35,7 +35,6 @@ export const TransferPage = () => {
 
 const TransferPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
-    console.log("context:", context);
     const { selectedToken, currentUser, isLoading } = context;
     const { mutateAsync: credit } = useCredit(currentUser);
 
