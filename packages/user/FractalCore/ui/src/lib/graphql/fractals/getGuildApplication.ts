@@ -6,18 +6,20 @@ import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "../../graphql";
 
-export const zGuildApplicationListInstance = z.object({
-    member: zAccount,
-    app: z.string(),
-    createdAt: zDateTime,
-    attestations: z
-        .object({
-            endorses: z.boolean(),
-            comment: z.string(),
-            attestee: zAccount,
-        })
-        .array(),
-});
+export const zGuildApplicationListInstance = z
+    .object({
+        member: zAccount,
+        app: z.string(),
+        createdAt: zDateTime,
+        attestations: z
+            .object({
+                endorses: z.boolean(),
+                comment: z.string(),
+                attestee: zAccount,
+            })
+            .array(),
+    })
+    .nullable();
 
 export type GuildApplicationListInstance = z.infer<
     typeof zGuildApplicationListInstance

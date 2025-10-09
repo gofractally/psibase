@@ -121,7 +121,7 @@ export function NavMain() {
         },
     ];
 
-    const isBrowse = !location.pathname.startsWith("/guild");
+    const isBrowse = !location.pathname.startsWith("/guild") || location.pathname == '/guilds/'
 
     const menus = isBrowse ? staticFractalMenus : guildMenus;
 
@@ -150,7 +150,7 @@ export function NavMain() {
                         ))}
                         {item.button && (
                             <button
-                                onClick={() => {}}
+                                onClick={() => { }}
                                 className="border-muted-foreground/50 hover:border-primary rounded-sm border border-dashed py-3 text-sm"
                             >
                                 Create Guild

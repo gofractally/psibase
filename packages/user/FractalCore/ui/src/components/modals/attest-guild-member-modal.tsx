@@ -33,12 +33,12 @@ export const AttestGuildMemberModal = ({
             endorses: true,
         },
         onSubmit: async ({ value: { comment, endorses } }) => {
-            await attest({
-                guildAccount: guildAccount!,
+            await attest([
+                guildAccount!,
+                applicant!,
                 comment,
                 endorses,
-                member: applicant!,
-            });
+            ]);
             openChange(false);
         },
         validators: {

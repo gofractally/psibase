@@ -14,10 +14,12 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
+import { useGuild } from "@/hooks/use-guild";
 
 export const ApplicationDetail = () => {
     const { applicant } = useParams();
     const guildAccount = useGuildAccount();
+    const guild = useGuild();
 
     const { data: currentUser } = useCurrentUser();
     const { data: application, isPending } = useGuildApplication(
@@ -28,6 +30,12 @@ export const ApplicationDetail = () => {
     const isSelf = currentUser == applicant;
 
     const [showModal, setShowModal] = useState(false);
+
+    if (application === null) {
+        return <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+            Application for {currentUser} to join the guild {guild.data?.displayName} does not exist.
+        </div>
+    }
 
     return (
         <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
@@ -68,7 +76,7 @@ export const ApplicationDetail = () => {
                     <CardContent>
                         <div className="flex flex-col gap-2">
                             {application?.attestations &&
-                            application?.attestations.length > 0 ? (
+                                application?.attestations.length > 0 ? (
                                 application?.attestations.map((attest) => (
                                     <div
                                         key={attest.attestee}
@@ -92,8 +100,8 @@ export const ApplicationDetail = () => {
                                         isSelf
                                             ? undefined
                                             : () => {
-                                                  setShowModal(true);
-                                              }
+                                                setShowModal(true);
+                                            }
                                     }
                                     buttonLabel="Create attestation"
                                     description="No attestations have been made in favour or against this application."

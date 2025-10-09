@@ -38,14 +38,16 @@ impl GuildApplication {
     }
 
     pub fn conclude(&self, accepted: bool) {
-        GuildAttestTable::read()
+        let table = GuildAttestTable::read_write();
+
+        table
             .get_index_pk()
             .range(
                 (self.guild, self.member, AccountNumber::new(0))
                     ..=(self.guild, self.member, AccountNumber::new(u64::MAX)),
             )
             .for_each(|attest| {
-                attest.remove();
+                table.remove(&attest);
             });
 
         if accepted {
