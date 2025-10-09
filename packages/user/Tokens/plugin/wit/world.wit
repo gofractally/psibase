@@ -15,13 +15,6 @@ interface types {
         current-supply: quantity,
         max-issued-supply: quantity,
     }
-
-    record balance {
-        balance: string,
-        creditor: string,
-        debitor: string,
-        token-number: token-id,
-    }
 }
 
 interface intf {
@@ -43,17 +36,14 @@ interface intf {
     enable-token-unrecallable: func(token-id: token-id, enable: bool) -> result<_, error>;
     enable-user-manual-debit: func(enable: bool) -> result<_, error>;
     enable-user-keep-zero-balances: func(enable: bool) -> result<_, error>;
-
 }
 
 interface helpers {
     use host:types/types.{error};
     use types.{quantity, token-id};
 
-
     decimal-to-u64: func(token-id: token-id, amount: quantity) -> result<u64, error>;
     u64-to-decimal: func(token-id: token-id, amount: u64) -> result<quantity, error>;
-
 }
 
 interface queries {
@@ -64,14 +54,12 @@ interface queries {
 
 interface transfer {
     use host:types/types.{error};
-    use types.{token-id, account-number, quantity, balance, token-detail};
+    use types.{token-id, account-number, quantity, token-detail};
 
     uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
     credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
     debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
     reject: func(token-id: token-id, creditor: account-number, memo: string) -> result<_, error>;
-
-
 }
 
 world imports {
