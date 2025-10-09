@@ -30,8 +30,8 @@ export const SubmitButton = ({
                         {isSubmitting
                             ? submittingLabel
                             : isSubmitSuccessful
-                              ? submittedLabel
-                              : label}
+                                ? submittedLabel
+                                : label}
                     </Button>
                 );
             }}
