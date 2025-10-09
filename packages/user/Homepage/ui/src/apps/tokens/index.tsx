@@ -4,6 +4,7 @@ import { Coins } from "lucide-react";
 import { Account } from "@/lib/zod/Account";
 
 import { TokensLayout } from "./layout";
+import { PendingPage } from "./pending";
 import { TransferPage } from "./transfer";
 
 export const tokensConfig: AppConfigType = {
@@ -22,9 +23,9 @@ export const tokensConfig: AppConfigType = {
             name: "Transfer",
         },
         {
-            path: "lines-of-credit",
-            element: <div>Lines of credit page</div>,
-            name: "Lines of credit",
+            path: "Pending",
+            element: <PendingPage />,
+            name: "Pending transactions",
         },
     ],
 };
