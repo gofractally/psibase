@@ -562,22 +562,6 @@ namespace psibase
 #define CATCH_IGNORE \
    catch (...) {}
 
-template <typename Timer, typename F>
-void loop(Timer& timer, F&& f)
-{
-   using namespace std::literals::chrono_literals;
-   timer.expires_after(100ms);
-   timer.async_wait(
-       [&timer, f](const std::error_code& e)
-       {
-          f(e);
-          if (!e)
-          {
-             loop(timer, f);
-          }
-       });
-}
-
 std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
@@ -1630,8 +1614,6 @@ void run(const std::string&              db_path,
 
    tpool.setNumThreads(service_threads);
 
-   timer_type timer(chainContext);
-
    if (!listen.empty())
    {
       // TODO: command-line options
@@ -1690,7 +1672,7 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &timer, &runResult,
+      http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &runResult,
                                &server_work](std::vector<char> data)
       {
          data.push_back('\0');
@@ -1710,7 +1692,7 @@ void run(const std::string&              db_path,
          else
          {
             boost::asio::post(chainContext,
-                              [&chainContext, &node, &connect_one, &http_config, &timer, &runResult,
+                              [&chainContext, &node, &connect_one, &http_config, &runResult,
                                &server_work, restart, soft]()
                               {
                                  atomic_set_field(http_config->status,
@@ -1724,7 +1706,6 @@ void run(const std::string&              db_path,
                                                                        [&server_work]()
                                                                        { server_work.reset(); });
                                                   });
-                                 timer.cancel();
                                  node.consensus().async_shutdown();
                                  node.peers().autoconnect({}, 0, connect_one);
                                  node.peers().disconnect_all(restart);
@@ -2059,12 +2040,7 @@ void run(const std::string&              db_path,
       PSIBASE_LOG(loggers::generic::get(), notice)
           << "The server is not configured to accept connections on any interface. Use --listen "
              "<port> to add a listener.";
-      boost::asio::post(chainContext,
-                        [&server_work, &timer]
-                        {
-                           server_work.reset();
-                           timer.cancel();
-                        });
+      boost::asio::post(chainContext, [&server_work] { server_work.reset(); });
    }
 
    auto remove_http_handlers = psio::finally{[&http_config, &system]
