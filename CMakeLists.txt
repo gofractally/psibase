@@ -475,6 +475,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
+    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
