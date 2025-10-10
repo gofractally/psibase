@@ -286,14 +286,12 @@ impl User for FractallyPlugin {
     fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::attest)?;
-
         EvaluationsUser::attest(&"fractals".to_string(), guild.eval_id()?, group_number)
     }
 
     fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::get_group_users)?;
-
         EvaluationsUser::get_group_users(&"fractals".to_string(), guild.eval_id()?, group_number)
     }
 
