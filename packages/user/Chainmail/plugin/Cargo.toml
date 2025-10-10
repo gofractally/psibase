@@ -13,7 +13,7 @@ psibase.workspace = true
 chainmail = { path = "../service", version = "0.21.1" }
 serde_json.workspace = true
 serde.workspace = true
-serde-aux = "4.5.0"
+serde-aux.workspace = true
 chrono = "0.4"
 
 [dev-dependencies]

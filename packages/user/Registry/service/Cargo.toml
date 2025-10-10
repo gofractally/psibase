@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-registry"
-plugin = "plugin"
+plugin = "registry-plugin"
 postinstall = [{ sender = "registry", service = "registry", method = "init" }]
 
 [package.metadata.psibase.dependencies]
@@ -15,10 +15,10 @@ HttpServer = "0.21.0"
 Sites = "0.21.0"
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase", version = "0.21.0" }
-serde = { version = "1", features = ["derive"] }
-async-graphql = "=7.0.17"
-serde_json = "1.0.120"
+psibase.workspace = true
+serde.workspace = true
+async-graphql.workspace = true
+serde_json.workspace = true
 url = "2.5.2"
 
 [dev-dependencies]

@@ -1,16 +1,16 @@
 [package]
-name = "plugin"
+name = "registry-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase", version = "0.21.0" }
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
 registry = { path = "../service", version = "0.21.0" }
-serde = "1.0"
-serde_json = "1.0"
+serde.workspace = true
+serde_json.workspace = true
 chrono = "0.4"
 
 [lib]

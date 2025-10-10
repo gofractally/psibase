@@ -1,15 +1,15 @@
 [package]
-name = "plugin"
+name = "identity-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.30.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = { version = "1.0.125" }
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 identity = { path = "../service/", version = "0.21.0" }
 
 [lib]
