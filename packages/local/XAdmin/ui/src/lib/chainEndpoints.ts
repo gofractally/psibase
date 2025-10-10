@@ -61,13 +61,6 @@ const schem = z.object({
             written: z.string(),
         })
         .array(),
-    transactions: z.object({
-        unprocessed: z.coerce.number(),
-        total: z.coerce.number(),
-        failed: z.coerce.number(),
-        succeeded: z.coerce.number(),
-        skipped: z.coerce.number(),
-    }),
 });
 
 const TransactStats = z.object({
