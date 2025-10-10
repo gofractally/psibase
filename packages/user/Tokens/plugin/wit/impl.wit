@@ -5,8 +5,8 @@ world impl {
     include transact:plugin/imports;
 
     export types;
-    export intf;
+    export issuer;
+    export user;
+    export user-config;
     export helpers;
-    export transfer;
-    export queries;
 }
