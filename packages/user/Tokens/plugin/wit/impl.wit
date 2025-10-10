@@ -9,5 +9,4 @@ world impl {
     export user;
     export user-config;
     export helpers;
-    export queries;
 }

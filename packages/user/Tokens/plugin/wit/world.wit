@@ -77,12 +77,12 @@ interface user {
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
-    /// * `receiver` - Debitor / recipient account
+    /// * `debitor` - Debitor / recipient account
     /// * `amount`   - Amount to credit
     /// * `memo`     - Memo describing the credit
     ///
-    /// Places funds in shared balance when the receiver has manual debit enabled
-    credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+    /// Places funds in shared balance when the debitor has manual debit enabled
+    credit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
 
     /// Cancel a pending shared-balance credit.
     ///
@@ -160,15 +160,15 @@ interface helpers {
     use host:types/types.{error};
     use types.{quantity, token-id};
 
-    decimal-to-u64: func(token-id: token-id, amount: quantity) -> result<u64, error>;
-    u64-to-decimal: func(token-id: token-id, amount: u64) -> result<quantity, error>;
-}
+    /// Uses the precision of the specified token to convert from a token 
+    ///   quantity (string) to its u64 representation 
+    ///   (e.g. "100.0000" -> 1000000)
+    quantity-to-u64: func(token-id: token-id, amount: quantity) -> result<u64, error>;
 
-interface queries {
-    use host:types/types.{error};
-    use types.{token-id, token-detail};
-
-    token-owner: func(token-id: token-id) -> result<token-detail, error>;
+    /// Uses the precision of the specified token to convert from an u64 representation
+    ///   of token quantity to a string representation
+    ///   (e.g. 1000000 -> "100.0000")
+    u64-to-quantity: func(token-id: token-id, amount: u64) -> result<quantity, error>;
 }
 
 world imports {
@@ -177,5 +177,4 @@ world imports {
     import user;
     import user-config;
     import helpers;
-    import queries;
 }
