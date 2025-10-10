@@ -1,4 +1,3 @@
-mod config;
 mod evaluation_instance;
 mod fractal;
 pub mod fractal_member;
@@ -73,18 +72,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "ConfigTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Config {
-        pub last_id: u32,
-    }
-
-    impl Config {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "GuildTable", index = 4)]
+    #[table(name = "GuildTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Guild {
@@ -106,7 +94,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildMemberTable", index = 5)]
+    #[table(name = "GuildMemberTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildMember {
@@ -135,7 +123,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildApplicationTable", index = 6)]
+    #[table(name = "GuildApplicationTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildApplication {
@@ -153,7 +141,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildAttestTable", index = 7)]
+    #[table(name = "GuildAttestTable", index = 6)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildAttest {
