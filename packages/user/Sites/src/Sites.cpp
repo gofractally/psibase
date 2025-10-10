@@ -342,16 +342,7 @@ namespace SystemService
             return std::nullopt;
          }
 
-         psibase::AccountNumber current = *siteConfig->proxyAccount;
-         while (true)
-         {
-            auto nextConfig = table.get(current);
-            if (!nextConfig || !nextConfig->proxyAccount)
-            {
-               return current;
-            }
-            current = *nextConfig->proxyAccount;
-         }
+         return *siteConfig->proxyAccount;
       }
 
       bool useSpa(const psibase::AccountNumber& account)
