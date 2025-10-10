@@ -1,9 +1,8 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, get_sender, AccountNumber, Table};
+use psibase::{check_some, AccountNumber, Table};
 
 use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
-use psibase::services::auth_delegate::Wrapper as AuthDelegate;
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl Fractal {
@@ -19,11 +18,6 @@ impl Fractal {
     }
 
     pub fn add(account: AccountNumber, name: String, mission: String) {
-        // TEMP DEV
-        if account != "fractal-core".into() {
-            AuthDelegate::call().newAccount(account, get_sender());
-        }
-        // TEMP DEV END
         Self::new(account, name, mission).save();
     }
 

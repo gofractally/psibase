@@ -13,28 +13,53 @@ pub mod service {
         },
     };
 
+    use psibase::fracpack::Pack;
+    use psibase::services::{accounts, auth_delegate, sites, transact};
     use psibase::*;
 
-    /// TEMP ACTION
-    #[action]
-    fn init() {
-        let fractal_core: AccountNumber = "fractal-core".into();
-        let genesis: AccountNumber = "genesis".into();
-        let a_account: AccountNumber = "a".into();
+    fn configure_new_fractal_account(fractal_account: AccountNumber) {
+        accounts::Wrapper::call().newAccount(
+            fractal_account,
+            AccountNumber::from("auth-any"),
+            true,
+        );
+        let set_proxy = Action {
+            sender: fractal_account,
+            service: sites::SERVICE,
+            method: sites::action_structs::setProxy::ACTION_NAME.into(),
+            rawData: sites::action_structs::setProxy {
+                proxy: "fractal-core".into(),
+            }
+            .packed()
+            .into(),
+        };
 
-        Fractal::add(
-            fractal_core,
-            "Fractal Core".to_string(),
-            "Mission goes here".to_string(),
-        );
-        FractalMember::add(fractal_core, "a".into(), MemberStatus::Citizen);
-        let genesis_guild = Guild::add(
-            fractal_core,
-            genesis,
-            a_account,
-            "Genesis".to_string().try_into().unwrap(),
-        );
-        GuildMember::add(genesis_guild.account, a_account);
+        let set_owner = Action {
+            sender: fractal_account,
+            service: auth_delegate::SERVICE,
+            method: auth_delegate::action_structs::setOwner::ACTION_NAME.into(),
+            rawData: auth_delegate::action_structs::setOwner {
+                owner: get_sender(),
+            }
+            .packed()
+            .into(),
+        };
+
+        let set_auth_serv = Action {
+            sender: fractal_account,
+            service: accounts::SERVICE,
+            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+            rawData: accounts::action_structs::setAuthServ {
+                authService: auth_delegate::SERVICE,
+            }
+            .packed()
+            .into(),
+        };
+
+        // Create the fractal account, proxy it to fractal-core for a default UI
+        transact::Wrapper::call().runAs(set_proxy, vec![]);
+        transact::Wrapper::call().runAs(set_owner, vec![]);
+        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
     }
 
     /// Creates a new account and fractal.
@@ -52,6 +77,8 @@ pub mod service {
         mission: String,
     ) {
         let sender = get_sender();
+
+        configure_new_fractal_account(fractal_account);
 
         Fractal::add(fractal_account, name, mission);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
