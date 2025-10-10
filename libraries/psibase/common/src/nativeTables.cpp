@@ -176,4 +176,12 @@ namespace psibase
       return envKey(name);
    }
 
+   auto hostConfigKey() -> HostConfigKeyType
+   {
+      return std::tuple{hostConfigTable, nativeTablePrimaryIndex};
+   }
+   auto HostConfigRow::key() const -> HostConfigKeyType
+   {
+      return hostConfigKey();
+   }
 }  // namespace psibase

@@ -638,27 +638,6 @@ namespace psibase::http
                     websocket_log_session<stream_type>::run(std::move(session));
                  });
          }
-         else if (req_target == "/native/admin/config")
-         {
-            if (req.method() == bhttp::verb::get)
-            {
-               runNativeHandlerGenericNoFail(server.http_config->get_config, "application/json");
-            }
-            else if (req.method() == bhttp::verb::put)
-            {
-               if (req[bhttp::field::content_type] != "application/json")
-               {
-                  return send(builder.error(bhttp::status::unsupported_media_type,
-                                            "Content-Type must be application/json\n"));
-               }
-               runNativeHandlerNoContent(server.http_config->set_config);
-            }
-            else
-            {
-               send(builder.methodNotAllowed(req.target(), req.method_string(), "GET, PUT"));
-            }
-            return;
-         }
          else if (req_target == "/native/admin/keys")
          {
             if (req.method() == bhttp::verb::get)

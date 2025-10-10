@@ -2017,6 +2017,8 @@ namespace psibase
 
       void onChangeNextTransaction(auto&& fn) { dbCallbacks.nextTransaction = fn; }
       void onChangeRunQueue(auto&& fn) { dbCallbacks.runQueue = fn; }
+      void onChangeHostConfig(auto&& fn) { dbCallbacks.hostConfig = fn; };
+      void onValidateHostConfig(auto&& fn) { dbCallbacks.validateHostConfig = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {

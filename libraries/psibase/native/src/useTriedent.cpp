@@ -469,6 +469,11 @@ namespace psibase
       impl->callbacks = callbacks;
    }
 
+   DatabaseCallbacks* SharedDatabase::getCallbacks() const
+   {
+      return impl->callbacks;
+   }
+
    struct SubjectiveRevision
    {
       std::array<std::size_t, numIndependentDatabases> changeSetPos;
