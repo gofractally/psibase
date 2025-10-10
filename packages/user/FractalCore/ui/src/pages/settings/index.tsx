@@ -46,7 +46,7 @@ export const Settings = () => {
 
     const bioForm = useAppForm({
         defaultValues: {
-            bio: guild?.bio ?? "f",
+            bio: guild?.bio ?? "",
         },
         onSubmit: async ({ value: { bio } }) => {
             await setGuildBio([guildAccount!, bio]);
