@@ -11,6 +11,7 @@ plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
+    { sender = "fractals", service = "fractals", method = "init", data = {} },
 ]
 
 

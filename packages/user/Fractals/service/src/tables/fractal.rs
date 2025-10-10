@@ -1,9 +1,9 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{check_some, get_sender, AccountNumber, Table};
 
-use crate::tables::evaluation_instance::EvalType;
-use crate::tables::tables::{EvaluationInstance, Fractal, FractalTable, Member, MemberTable};
+use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
+use psibase::services::auth_delegate::Wrapper as AuthDelegate;
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl Fractal {
@@ -19,12 +19,16 @@ impl Fractal {
     }
 
     pub fn add(account: AccountNumber, name: String, mission: String) {
+        // TEMP DEV
+        if account != "fractal-core".into() {
+            AuthDelegate::call().newAccount(account, get_sender());
+        }
+        // TEMP DEV END
         Self::new(account, name, mission).save();
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
-        let table = FractalTable::new();
-        table.get_index_pk().get(&(fractal))
+        FractalTable::read().get_index_pk().get(&(fractal))
     }
 
     pub fn get_assert(fractal: AccountNumber) -> Self {
@@ -32,13 +36,13 @@ impl Fractal {
     }
 
     fn save(&self) {
-        let table = FractalTable::new();
-        table.put(&self).expect("failed to save");
+        FractalTable::read_write()
+            .put(&self)
+            .expect("failed to save");
     }
 
-    pub fn members(&self) -> Vec<Member> {
-        let table = MemberTable::new();
-        table
+    pub fn members(&self) -> Vec<FractalMember> {
+        FractalMemberTable::read()
             .get_index_pk()
             .range(
                 (self.account, AccountNumber::new(0))
@@ -46,31 +50,11 @@ impl Fractal {
             )
             .collect()
     }
-
-    pub fn set_schedule(
-        &self,
-        eval_type: EvalType,
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-        interval_seconds: u32,
-    ) {
-        EvaluationInstance::set_evaluation_schedule(
-            self.account,
-            eval_type,
-            registration,
-            deliberation,
-            submission,
-            finish_by,
-            interval_seconds,
-        )
-    }
 }
 
 #[ComplexObject]
 impl Fractal {
-    pub async fn council(&self) -> Vec<AccountNumber> {
-        vec![psibase::services::auth_delegate::Wrapper::call().getOwner(self.account)]
+    async fn memberships(&self) -> Vec<FractalMember> {
+        self.members()
     }
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { siblingUrl } from "@psibase/common-lib";
+
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
@@ -25,6 +27,7 @@ export const getMembers = async (fractalAccount: Account) => {
                 createdAt
         }} 
     }`,
+        siblingUrl(null, "fractals", "/graphql"),
     );
 
     return z
