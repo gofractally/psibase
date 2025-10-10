@@ -60,6 +60,7 @@ pub mod service {
         pub spa: bool,
         pub cache: bool,
         pub globalCsp: Option<String>,
+        pub proxyAccount: Option<AccountNumber>,
     }
 
     #[table(name = "SitesDataTable", index = 2)]
@@ -152,6 +153,19 @@ pub mod service {
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
     #[action]
     fn enableCache(enable: bool) {
+        unimplemented!()
+    }
+
+    /// If content requested for the sender service is not found, proxy the request to the
+    /// specified proxy.
+    #[action]
+    fn setProxy(proxy: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Removes the proxy set with `setProxy`.
+    #[action]
+    fn clearProxy() {
         unimplemented!()
     }
 }
