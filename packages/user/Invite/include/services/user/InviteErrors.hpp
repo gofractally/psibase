@@ -11,6 +11,7 @@ namespace UserService
       constexpr std::string_view inviteDNE           = "Invite does not exist";
       constexpr std::string_view needUniquePubkey    = "Cannot use invite key as account key";
       constexpr std::string_view inviteExpired       = "Invite expired";
+      constexpr std::string_view accountNameTooShort = "account name must be at least 10 characters: ";
       constexpr std::string_view noNewAccToken = "No new accounts may be created with this invite";
       constexpr std::string_view unauthDelete  = "Only the inviter can delete an invite";
       constexpr std::string_view acceptOwnInvite = "You can only accept your own invite!";

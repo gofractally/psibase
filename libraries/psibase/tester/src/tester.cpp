@@ -300,13 +300,35 @@ void psibase::TestChain::startBlock(BlockTime tp)
 {
    if (producing)
       finishBlock();
+
+   auto producer = AccountNumber{"firstproducer"};
+   if (status)
+   {
+      auto getFirstProducer = [&](const auto& c)
+      {
+         if (!c.producers.empty())
+         {
+            producer = c.producers.front().name;
+         }
+      };
+      if (status->consensus.next)
+         std::visit(getFirstProducer, status->consensus.next->consensus.data);
+      if (!status->consensus.next || status->current.commitNum < status->consensus.next->blockNum)
+         std::visit(getFirstProducer, status->consensus.current.data);
+   }
+
+   auto term      = status ? status->current.term : 0;
+   auto commitNum = status ? status->head.value().header.blockNum : 0;
+
    // Guarantee that there is a recent block for fillTapos to use.
    if (status && status->head->header.time + Seconds(1) < tp)
    {
-      tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count());
+      tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count(), producer.value,
+                              term, commitNum);
       finishBlock();
+      commitNum = status->head.value().header.blockNum;
    }
-   tester::raw::startBlock(id, tp.time_since_epoch().count());
+   tester::raw::startBlock(id, tp.time_since_epoch().count(), producer.value, term, commitNum);
    status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
 }
@@ -526,6 +548,28 @@ namespace
    return pushTransaction(signTransaction(std::move(trx), keys));
 }
 
+void psibase::TestChain::pushBlock(const SignedBlock& block)
+{
+   auto& header = block.block.header;
+   tester::raw::getFork(id, block.block.header.previous);
+   tester::raw::startBlock(id, header.time.time_since_epoch().count(), header.producer.value,
+                           header.term, header.commitNum);
+   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   producing = true;
+   for (auto& trx : block.block.transactions)
+   {
+      expect(pushTransaction(trx));
+   }
+   finishBlock();
+   BlockInfo info{header};
+   if (info.blockId != status->head->blockId)
+   {
+      abortMessage(std::format("block header does not match: {} != {}",
+                               psio::convert_to_json(info.header),
+                               psio::convert_to_json(status->head->header)));
+   }
+}
+
 std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction()
 {
    if (auto row = kvGet<NotifyRow>(DbId::nativeSubjective, notifyKey(NotifyType::nextTransaction)))
@@ -537,7 +581,7 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
          act.rawData = psio::to_frac(std::tuple());
          auto trace  = tester::runAction(id, RunMode::callback, false, act);
          if (trace.error)
-            abortMessage("nextTransaction failed");
+            abortMessage("nextTransaction failed:\n" + prettyTrace(trace));
          check(trace.actionTraces.size() == 1, "Wrong number of action traces");
          if (auto tx = psio::from_frac<std::optional<SignedTransaction>>(
                  trace.actionTraces.front().rawRetval))

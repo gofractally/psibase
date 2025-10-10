@@ -119,7 +119,7 @@ namespace SystemService
          }
          if (request.target == "/common/remove-auth-cookie")
          {
-            std::vector<HttpHeader> headers;
+            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
             bool                    isLocalhost = psibase::isLocalhost(request);
             std::string             cookieName  = "__Host-SESSION";
 

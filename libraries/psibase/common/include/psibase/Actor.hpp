@@ -3,6 +3,7 @@
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
+#include <psibase/export.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/nested.hpp>
@@ -49,16 +50,37 @@ namespace psibase
       }
    };
 
+   template <typename T>
+   struct ImportView
+   {
+      psio::shared_view_ptr<exportType<T>>         raw;
+      psio::shared_view_ptr<std::vector<KvHandle>> handles;
+      T unpack() const { return psibaseImport((T*)nullptr, *raw, *handles); }
+   };
+
    template <typename R>
    auto fraccall(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
    {
       auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
       if constexpr (not std::is_same_v<void, R>)
       {
-         psio::shared_view_ptr<R> result(psio::size_tag{result_size});
-         raw::getResult(result.data(), result_size, 0);
-         check(result.validate(), "value returned was not serialized as expected");
-         return result;
+         if constexpr (hasExport<R>)
+         {
+            psio::shared_view_ptr<exportType<R>> result(psio::size_tag{result_size});
+            raw::getResult(result.data(), result_size, 0);
+            check(result.validate(), "value returned was not serialized as expected");
+            auto                                         handles_size = raw::importHandles();
+            psio::shared_view_ptr<std::vector<KvHandle>> handles(psio::size_tag{handles_size});
+            raw::getResult(handles.data(), handles_size, 0);
+            return ImportView<R>{std::move(result), std::move(handles)};
+         }
+         else
+         {
+            psio::shared_view_ptr<R> result(psio::size_tag{result_size});
+            raw::getResult(result.data(), result_size, 0);
+            check(result.validate(), "value returned was not serialized as expected");
+            return result;
+         }
       }
    }
 

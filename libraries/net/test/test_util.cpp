@@ -6,6 +6,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
+#include <services/system/Db.hpp>
 #include <services/system/Producers.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
@@ -107,6 +108,11 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
                                                   .service = AuthAny::service,
                                                   .flags   = 0,
                                                   .code    = readWholeFile("AuthAny.wasm"),
+                                           },
+                                              {
+                                                  .service = Db::service,
+                                                  .flags   = Db::flags,
+                                                  .code    = readWholeFile("Db.wasm"),
                                            }};
    if (ec)
    {

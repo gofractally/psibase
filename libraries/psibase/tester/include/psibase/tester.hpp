@@ -29,6 +29,8 @@ namespace psibase
 
    inline bool isUserAction(const Action& action)
    {
+      if (action.service == AccountNumber{"db"} && action.method == MethodNumber{"open"})
+         return false;
       if (action.service == AccountNumber{"cpu-limit"})
          return false;
       if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})
@@ -348,6 +350,11 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
+
+      /**
+       * Switches to the block before the new block, and then applies it.
+       */
+      void pushBlock(const SignedBlock& block);
 
       /**
        * Runs the nextTransaction callback to find the

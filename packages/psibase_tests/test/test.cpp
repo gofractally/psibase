@@ -1,5 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <services/test/TestExport.hpp>
+#include <services/test/TestImport.hpp>
 #include <services/test/TestKV.hpp>
 #include <services/test/TestServiceEntry.hpp>
 #include <services/test/TestTable.hpp>
@@ -27,7 +29,7 @@ TEST_CASE("kv")
 {
    DefaultTestChain t;
 
-   t.addService(TestKV::service, "TestKV.wasm");
+   t.addService(TestKV::service, "TestKV.wasm", TestKV::flags);
    CHECK(t.from(TestKV::service).to<TestKV>().test().succeeded());
 }  // kv
 
@@ -44,3 +46,36 @@ TEST_CASE("table")
    CHECK(testTable.removeMulti().succeeded());
    CHECK(testTable.subindex().succeeded());
 }  // table
+
+TEST_CASE("import/export handles")
+{
+   DefaultTestChain t;
+
+   t.addService(TestExport::service, "TestExport.wasm", TestExport::flags);
+   t.addService(TestImport::service, "TestImport.wasm", TestImport::flags);
+   t.http(HttpRequest{
+       .host        = "x-admin.psibase",
+       .rootHost    = "psibase",
+       .method      = "PUT",
+       .target      = "/services/" + TestExport::service.str(),
+       .contentType = "application/wasm",
+       .body        = readWholeFile("TestExport.wasm"),
+   });
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto table = Native::subjective().open<CodeTable>();
+      auto row   = table.get(TestExport::service).value();
+      row.flags |= CodeRow::isReplacement;
+      table.put(row);
+   }
+
+   auto exp = t.to<TestExport>();
+   auto imp = t.to<TestImport>();
+
+   CHECK(exp.testPlain().succeeded());
+   CHECK(exp.testRpc().succeeded());
+   CHECK(exp.testCallback().succeeded());
+   CHECK(imp.testPlain().succeeded());
+   CHECK(imp.testRpc().succeeded());
+   CHECK(imp.testCallback().succeeded());
+}

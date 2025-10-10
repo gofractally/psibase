@@ -1250,7 +1250,6 @@ dependencies = [
  "p256",
  "pem",
  "psibase",
- "rand_core 0.6.4",
  "wit-bindgen-rt 0.28.0",
 ]
 
@@ -2088,7 +2087,10 @@ dependencies = [
 name = "producers"
 version = "0.21.0"
 dependencies = [
+ "hex 0.4.3",
  "psibase",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt 0.39.0",
 ]
 
@@ -2121,12 +2123,14 @@ dependencies = [
  "jwt",
  "lazy_static",
  "mime_guess",
+ "p256",
  "paste",
  "pem",
  "percent-encoding",
  "pkcs8",
  "psibase_macros",
  "psibase_names",
+ "rand_core 0.6.4",
  "regex",
  "reqwest",
  "ring",

@@ -50,6 +50,8 @@ function(add suffix)
         AuthAny/include
         AuthSig/include
         CpuLimit/include
+        Credentials/service/cpp/include
+        Db/include
         Producers/include
         HttpServer/include
         SetCode/include
@@ -68,6 +70,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(AuthAny)
     add_subdirectory(AuthSig)
     add_subdirectory(CpuLimit)
+    add_subdirectory(Db)
     add_subdirectory(Producers)
     add_subdirectory(HttpServer)
     add_subdirectory(SetCode)

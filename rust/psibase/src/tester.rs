@@ -245,15 +245,53 @@ impl Chain {
     pub fn start_block_at(&self, time: BlockTime) {
         let status = &mut *self.status.borrow_mut();
 
+        let (producer, term, mut commit_num) = if let Some(status) = status {
+            let producers = if let Some(next) = &status.consensus.next {
+                if status.current.commitNum < next.blockNum {
+                    status.consensus.current.data.producers()
+                } else {
+                    next.consensus.data.producers()
+                }
+            } else {
+                status.consensus.current.data.producers()
+            };
+            (
+                if producers.is_empty() {
+                    AccountNumber::from("firstproducer")
+                } else {
+                    producers[0].name
+                },
+                status.current.term,
+                status.head.as_ref().map_or(0, |head| head.header.blockNum),
+            )
+        } else {
+            (AccountNumber::from("firstproducer"), 0, 0)
+        };
+
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
             if status.current.time + Seconds::new(1) < time {
                 unsafe {
-                    tester_raw::startBlock(self.chain_handle, (time - Seconds::new(1)).microseconds)
+                    tester_raw::startBlock(
+                        self.chain_handle,
+                        (time - Seconds::new(1)).microseconds,
+                        producer.value,
+                        term,
+                        commit_num,
+                    )
                 }
+                commit_num += 1;
             }
         }
-        unsafe { tester_raw::startBlock(self.chain_handle, time.microseconds) }
+        unsafe {
+            tester_raw::startBlock(
+                self.chain_handle,
+                time.microseconds,
+                producer.value,
+                term,
+                commit_num,
+            )
+        }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())
             .unwrap();
@@ -264,7 +302,7 @@ impl Chain {
     ///
     /// Starts a new block 1 second after the most recent.
     pub fn start_block(&self) {
-        self.start_block_at(TimePointUSec { microseconds: 0 })
+        self.start_block_after(Seconds::new(1).into())
     }
 
     /// Finish a block
@@ -509,6 +547,17 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         self.get_with_debug(false)
     }
 
+    fn is_user_action(act: &Action) -> bool {
+        use crate::{
+            self as psibase, method,
+            services::{accounts, cpu_limit, db, events},
+        };
+        !(act.service == db::SERVICE && act.method == method!("open")
+            || act.service == cpu_limit::SERVICE
+            || act.service == accounts::SERVICE && act.method == method!("billCpu")
+            || act.service == events::SERVICE && act.method == method!("sync"))
+    }
+
     pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
@@ -520,6 +569,9 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
+                        if !Self::is_user_action(&at.action) {
+                            return None;
+                        }
                         if debug {
                             println!(
                                 ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",

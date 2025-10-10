@@ -573,23 +573,15 @@ namespace psibase
             abortMessage("invalid mode");
       }
 
-      // TODO: Once all services are updated, restrict reads of the service db, too.
-      if (keyHasServicePrefix(db) && ((db != DbId::service && db != DbId::writeOnly) || isWrite))
+      if (!(code.flags & CodeRow::isPrivileged))
       {
-         uint64_t service = code.codeNum.value;
-         std::reverse(reinterpret_cast<char*>(&service), reinterpret_cast<char*>(&service + 1));
-         if (prefix.size() < sizeof(service) || memcmp(prefix.data(), &service, sizeof(service)))
-            abortMessage("key prefix must match service db=" + std::to_string(dbRaw) +
-                         " prefix=" + psio::to_hex(prefix));
-      };
+         abortMessage("service may not open databases");
+      }
 
       switch (db)
       {
          // Objective databases
          case DbId::native:
-            check(!isWrite || (code.flags & CodeRow::isPrivileged),
-                  "service may not write this database");
-            [[fallthrough]];
          case DbId::service:
             check(dbMode.isSubjective || dbMode.isSync,
                   "database access disabled during proof verification");
@@ -602,31 +594,20 @@ namespace psibase
          case DbId::uiEvent:
          case DbId::merkleEvent:
          case DbId::blockLog:
-            check(!isWrite || (code.flags & CodeRow::isPrivileged),
-                  "service may not write this db");
-            [[fallthrough]];
          case DbId::writeOnly:
             check(!isRead || isSubjectiveContext(*this),
                   "subjective databases cannot be read in a deterministic context");
             check(!isWrite || dbMode.isSync, "database cannot be written in async context");
-            //check(
-            //    !isWrite || !isSubjectiveContext(*this) || (code.flags & CodeRow::isPrivileged),
-            //    "service may not write this db in a subjective context");
             break;
          // Chain independent databases
          case DbId::nativeSubjective:
          case DbId::nativeSession:
-            check(code.flags & CodeRow::isPrivileged, "service may not access this db");
-            check(code.flags & ExecutionContext::isLocal, "service may not access this db");
-            [[fallthrough]];
          case DbId::subjective:
          case DbId::session:
          case DbId::temporary:
             check(isSubjectiveContext(*this),
                   "subjective databases cannot be accessed in a deterministic context");
-            check(!isWrite || (code.flags & CodeRow::isPrivileged) ||
-                      (code.flags & ExecutionContext::isLocal),
-                  "service may not write this db");
+            check(code.flags & ExecutionContext::isLocal, "service may not open this db");
             break;
          default:
             throw std::runtime_error("service may not read this db, or must use another intrinsic");
@@ -655,6 +636,28 @@ namespace psibase
    void NativeFunctions::kvClose(uint32_t handle)
    {
       buckets.close(static_cast<KvHandle>(handle));
+   }
+
+   void NativeFunctions::exportHandles(eosio::vm::span<const char> data)
+   {
+      using Handles = std::vector<KvHandle>;
+      check(psio::fracpack_validate_strict<Handles>(data), "Expected list of handles");
+      auto handles = psio::view<const Handles>{psio::prevalidated{data}};
+      check(handles.size() <= transactionContext.getWasmConfig().maxHandles,
+            "Too many handles exported");
+      transactionContext.exportedHandles.clear();
+      transactionContext.exportedHandles.reserve(handles.size());
+      for (auto handle : handles)
+      {
+         transactionContext.exportedHandles.push_back(buckets[handle]);
+      }
+   }
+
+   uint32_t NativeFunctions::importHandles()
+   {
+      return setResult(*this,
+                       psio::to_frac(buckets.add(std::move(transactionContext.importedHandles),
+                                                 transactionContext.getWasmConfig().maxHandles)));
    }
 
    void NativeFunctions::kvPut(uint32_t                    handle,

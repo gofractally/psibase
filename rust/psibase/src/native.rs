@@ -166,12 +166,28 @@ pub use native_raw::KvMode;
 
 impl KvHandle {
     pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
-        KvHandle(unsafe { native_raw::kvOpen(db, prefix.as_ptr(), prefix.len() as u32, mode) })
+        match db {
+            DbId::Service | DbId::WriteOnly | DbId::BlockLog | DbId::Native => Self::import(
+                crate::services::db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
+            ),
+            DbId::Subjective | DbId::Session | DbId::Temporary => Self::import(
+                crate::services::x_db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
+            ),
+            _ => KvHandle(unsafe {
+                native_raw::kvOpen(db, prefix.as_ptr(), prefix.len() as u32, mode)
+            }),
+        }
     }
     pub fn subtree(&self, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe {
             native_raw::kvOpenAt(self.0, prefix.as_ptr(), prefix.len() as u32, mode)
         })
+    }
+    pub fn import(index: u32) -> KvHandle {
+        let handles =
+            Vec::<u32>::unpacked(&get_result_bytes(unsafe { native_raw::importHandles() }))
+                .unwrap();
+        KvHandle(native_raw::KvHandle(handles[index as usize]))
     }
 }
 

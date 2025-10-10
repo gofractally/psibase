@@ -1,44 +1,31 @@
-#include <optional>
-#include <psibase/Rpc.hpp>
-#include <psibase/Service.hpp>
-#include <psibase/Table.hpp>
+#include <services/test/SubjectiveCounterService.hpp>
+
 #include <psibase/dispatch.hpp>
-#include <psibase/nativeTables.hpp>
 #include <psibase/servePackAction.hpp>
-#include <string>
 
 using namespace psibase;
-
-struct SubjectiveCounterRow
-{
-   std::string   key;
-   std::uint32_t value;
-};
-
-PSIO_REFLECT(SubjectiveCounterRow, key, value)
-
-using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
-PSIO_REFLECT_TYPENAME(SubjectiveCounterTable)
-
-struct SubjectiveCounterService : psibase::Service
-{
-   using Tables                              = psibase::SubjectiveTables<SubjectiveCounterTable>;
-   static constexpr auto             service = psibase::AccountNumber{"counter"};
-   static constexpr auto             serviceFlags = psibase::CodeRow::isPrivileged;
-   std::uint32_t                     inc(std::string key, std::uint32_t id);
-   std::uint32_t                     incImpl(std::string key, std::uint32_t id);
-   std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
-};
-PSIO_REFLECT(SubjectiveCounterService,
-             method(inc, key, id),
-             method(incImpl, key, id),
-             ,
-             method(serveSys, req))
-PSIBASE_REFLECT_TABLES(SubjectiveCounterService, SubjectiveCounterService::Tables)
+using namespace TestService;
 
 std::uint32_t SubjectiveCounterService::inc(std::string key, std::uint32_t id)
 {
    return to<SubjectiveCounterService>().withFlags(CallFlags::runModeRpc).incImpl(key, id);
+}
+
+void SubjectiveCounterService::checkIncRpc(std::string   key,
+                                           std::uint32_t id,
+                                           std::uint32_t expected)
+{
+   auto result = to<SubjectiveCounterService>().withFlags(CallFlags::runModeRpc).incImpl(key, id);
+   check(result == expected, std::format("{} != {}", result, expected));
+}
+
+void SubjectiveCounterService::checkIncCallback(std::string   key,
+                                                std::uint32_t id,
+                                                std::uint32_t expected)
+{
+   auto result =
+       to<SubjectiveCounterService>().withFlags(CallFlags::runModeCallback).incImpl(key, id);
+   check(result == expected, std::format("{} != {}", result, expected));
 }
 
 std::uint32_t SubjectiveCounterService::incImpl(std::string key, std::uint32_t id)

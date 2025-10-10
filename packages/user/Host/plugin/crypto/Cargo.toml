@@ -7,7 +7,6 @@ edition.workspace = true
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { version = "0.21.0", path = "../../../../../rust/psibase" }
 p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
-rand_core = { version = "0.6", features = ["getrandom"] }
 pem = "3"
 
 [lib]

@@ -142,7 +142,13 @@ pub enum DbId {
     /// blocks.
     NativeSubjective,
 
-    EndIndependent,
+    /// Data that is not part of consensus and is not preserved when the
+    /// server exits
+    Session,
+
+    /// Native subjective tables that are not preserved when the server
+    /// exits
+    NativeSession,
 
     /// Subjective tables that are local to the transaction/query/callback
     /// context.
@@ -150,6 +156,7 @@ pub enum DbId {
 }
 
 const BEGIN_INDEPENDENT: u32 = 64;
+const END_INDEPENDENT: u32 = DbId::Temporary as u32 + 1;
 
 impl Pack for DbId {
     const FIXED_SIZE: u32 = 4;
@@ -168,7 +175,7 @@ impl<'a> Unpack<'a> for DbId {
     fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
         let u32_form = u32::unpack(src)?;
         if u32_form >= DbId::NumChainDatabases as u32
-            && !(BEGIN_INDEPENDENT..(DbId::EndIndependent as u32)).contains(&u32_form)
+            && !(BEGIN_INDEPENDENT..(END_INDEPENDENT as u32)).contains(&u32_form)
         {
             return Err(fracpack::Error::BadEnumIndex);
         }

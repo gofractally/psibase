@@ -9,7 +9,6 @@ use exports::config::plugin::settings::Guest as Settings;
 
 use host::types::types::Error;
 
-use crate::bindings::exports::config::plugin::producers::Producer;
 use staged_tx::plugin::proposer::set_propose_latch;
 
 struct ConfigPlugin;
@@ -23,19 +22,19 @@ impl Settings for ConfigPlugin {
 }
 
 impl Producers for ConfigPlugin {
-    fn set_cft_consensus(prods: Vec<Producer>) -> Result<(), Error> {
+    fn set_cft_consensus(prods: Vec<String>) -> Result<(), Error> {
         set_propose_latch(Some("producers"))?;
 
         producers::plugin::api::set_cft_consensus(&prods[..])
     }
 
-    fn set_bft_consensus(prods: Vec<Producer>) -> Result<(), Error> {
+    fn set_bft_consensus(prods: Vec<String>) -> Result<(), Error> {
         set_propose_latch(Some("producers"))?;
 
         producers::plugin::api::set_bft_consensus(&prods[..])
     }
 
-    fn set_producers(prods: Vec<Producer>) -> Result<(), Error> {
+    fn set_producers(prods: Vec<String>) -> Result<(), Error> {
         set_propose_latch(Some("producers"))?;
 
         producers::plugin::api::set_producers(&prods[..])

@@ -31,10 +31,8 @@ namespace UserService
    struct EventIndexHandle
    {
       explicit EventIndexHandle(psibase::KvMode mode);
-      EventIndexHandle(const EventIndexHandle&) = delete;
-      ~EventIndexHandle();
       operator psibase::KvHandle() const { return value; }
-      psibase::KvHandle value;
+      psibase::UniqueKvHandle value;
    };
 
 }  // namespace UserService

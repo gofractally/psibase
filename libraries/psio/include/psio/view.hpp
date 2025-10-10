@@ -557,9 +557,9 @@ namespace psio
          else
          {
 #ifndef COMPILING_WASM
-            throw std::out_of_range("view<vector> our of range");
+            throw std::out_of_range("view<vector> out of range");
 #else
-            abort_error("view<vector> our of range");
+            abort_error("view<vector> out of range");
 #endif
          }
       }
