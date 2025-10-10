@@ -650,9 +650,8 @@ namespace SystemService
       auto table = open<SiteConfigTable>();
       while (true)
       {
-         check(!visited.contains(current), "Proxy chain would create a cycle");
-
-         visited.insert(current);
+         auto [_, inserted] = visited.insert(current);
+         check(inserted, "Proxy chain would create a cycle");
 
          auto siteConfig = table.get(current);
          if (!siteConfig || !siteConfig->proxyAccount)
