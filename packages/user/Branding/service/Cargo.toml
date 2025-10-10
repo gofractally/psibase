@@ -9,7 +9,7 @@ publish = false
 
 [package.metadata.psibase]
 server = "branding"
-plugin = "plugin"
+plugin = "branding-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 
 [dependencies]

@@ -21,4 +21,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 branding = { path = "service", version = "0.21.1" }
-plugin = { path = "plugin", version = "0.21.1" }
+branding-plugin = { path = "plugin", version = "0.21.1" }

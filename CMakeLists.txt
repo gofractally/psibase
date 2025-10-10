@@ -436,6 +436,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
     PATH packages/user/Chainmail
+    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
@@ -481,6 +482,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
     PATH packages/user/BrotliCodec
+    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(

@@ -1,6 +1,6 @@
 [package]
 name = "chainmail"
-version.workspace = true
+version = "0.21.1"
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -9,14 +9,14 @@ publish = false
 
 [package.metadata.psibase]
 server = "chainmail"
-plugin = "plugin"
+plugin = "chainmail-plugin"
 data = [{ src = "../ui/dist/", dst = "/" }]
 postinstall = [{ sender = "chainmail", service = "chainmail", method = "init" }]
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.209", features = ["derive"] }
+psibase.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 chainmail_package = { path = "..", version = "0.21.1" }

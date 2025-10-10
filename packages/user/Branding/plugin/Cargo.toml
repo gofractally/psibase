@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "branding-plugin"
 version = "0.21.1"
 rust-version.workspace = true
 repository.workspace = true
