@@ -30,6 +30,8 @@ impl Guild {
         display_name: Memo,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
+        
+        // TODO: replace with auth-guild when available
         AuthDelegate::call().newAccount(guild, get_sender());
 
         FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();

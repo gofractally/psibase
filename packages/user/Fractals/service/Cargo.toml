@@ -11,9 +11,7 @@ plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
-    { sender = "fractals", service = "fractals", method = "init", data = {} },
 ]
-
 
 [dependencies]
 psibase = { version = "0.21.0", path = "../../../../rust/psibase" }

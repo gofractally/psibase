@@ -1,0 +1,13 @@
+[
+  {
+    "sender": "fractal-core",
+    "service": "fractals",
+    "method": "create_fractal",
+    "data": {
+      "fractal_account": "core-fractal",
+      "guild_account": "genesis-guild",
+      "name": "Core Fractal",
+      "mission": "Mission goes here"
+    }
+  }
+]
