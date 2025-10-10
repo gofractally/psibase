@@ -248,8 +248,6 @@ namespace psibase::http
       get_peers_t            get_peers            = {};
       connect_t              connect              = {};
       connect_t              disconnect           = {};
-      get_config_t           get_config           = {};
-      connect_t              set_config           = {};
       get_config_t           get_keys             = {};
       generic_json_t         new_key              = {};
       unlock_keyring_t       unlock_keyring       = {};

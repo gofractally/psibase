@@ -80,7 +80,7 @@ class Chain {
     }
 
     public async getConfig(): Promise<PsinodeConfigSelect> {
-        const config = await getJson("/native/admin/config");
+        const config = await getJson("/config");
         return psinodeConfigSchema.parse(config);
     }
 
@@ -140,7 +140,7 @@ class Chain {
     private async updateConfigOnNode(
         newConfig: PsinodeConfigSelect,
     ): Promise<void> {
-        const result = await putJson("/native/admin/config", newConfig);
+        const result = await putJson("/config", newConfig);
         if (!result.ok) {
             throw "Update failed";
         }

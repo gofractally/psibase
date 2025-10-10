@@ -31,8 +31,8 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `GET`  | `/native/admin/keys/devices` | Lists available cryptographic devices                                         |
 | `POST` | `/native/admin/keys/unlock`  | Unlocks a cryptographic device                                                |
 | `POST` | `/native/admin/keys/lock`    | Locks a cryptographic device                                                  |
-| `GET`  | `/native/admin/config`       | Returns the current [server configuration](#server-configuration)             |
-| `PUT`  | `/native/admin/config`       | Sets the [server configuration](#server-configuration)                        |
+| `GET`  | `/config`                    | Returns the current [server configuration](#server-configuration)             |
+| `PUT`  | `/config`                    | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/perf`         | Returns [performance monitoring](#performance-monitoring) data                |
 | `GET`  | `/native/admin/log`          | Websocket that provides access to [live server logs](#websocket-logger)       |
 
@@ -118,7 +118,7 @@ Each peer has the following fields:
 
 ### Server configuration
 
-`/native/admin/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
+`/config` provides `GET` and `PUT` access to the server's configuration. Changes made using this API are persistent across server restarts. New versions of psibase may add fields at any time. Clients that wish to set the configuration should `GET` the configuration first and return unknown fields to the server unchanged.
 
 | Field                    | Type              | Description                                                                                                                                                                                               |
 |--------------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -297,7 +297,7 @@ The precision of time measurements may be less than representation in microsecon
 - [Pipe Logger](#pipe-logger)
 - [Websocket Logger](#websocket-logger)
 
-The `loggers` field of `/native/admin/config` controls the server's logging configuration.
+The `loggers` field of `/config` controls the server's logging configuration.
 
 The log configuration is a JSON object which has a field for each logger. The name of the logger is only significant to identify the logger. When the log configuration is changed, if the new configuration has a logger with the same name and type as one in the old configuration, the old logger will be updated to the new configuration without dropping or duplicating any log records.
 

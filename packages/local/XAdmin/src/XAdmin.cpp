@@ -189,6 +189,52 @@ namespace LocalService
 
          return {};
       }
+      else if (target == "/config")
+      {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
+         if (req.method == "GET")
+         {
+            auto          native = Native::session(KvMode::read);
+            auto          table  = native.open<HostConfigTable>();
+            HostConfigRow row;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               row = table.get({}).value();
+            }
+            return HttpReply{
+                .status      = HttpStatus::ok,
+                .contentType = "application/json",
+                .body        = std::vector(row.config.begin(), row.config.end()),
+            };
+         }
+         else if (req.method == "PUT")
+         {
+            if (req.contentType != "application/json")
+            {
+               return HttpReply{
+                   .status      = HttpStatus::unsupportedMediaType,
+                   .contentType = "text/html",
+                   .body        = toVec("Content-Type must be application/json\n"),
+               };
+            }
+            auto table = Native::session(KvMode::readWrite).open<HostConfigTable>();
+            PSIBASE_SUBJECTIVE_TX
+            {
+               auto row   = table.get({}).value();
+               row.config = std::string(req.body.begin(), req.body.end());
+               table.put(row);
+            }
+            return HttpReply{
+                .status = HttpStatus::ok,
+            };
+         }
+         else
+         {
+            return HttpReply::methodNotAllowed(req);
+         }
+      }
       else if (target.starts_with("/services/"))
       {
          if (auto reply = checkAuth(req, socket))

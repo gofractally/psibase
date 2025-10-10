@@ -276,6 +276,26 @@ namespace psibase
          // Native doesn't do anything with the env table.
       }
 
+      void verifyHostConfigRow(TransactionContext& context,
+                               psio::input_stream  key,
+                               psio::input_stream  value)
+      {
+         check(psio::fracpack_validate<HostConfigRow>({value.pos, value.end}),
+               "HostConfigRow has invalid format");
+         auto expected_key = psio::convert_to_key(hostConfigKey());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "HostConfigRow has incorrect key");
+         if (auto* callbacks = context.blockContext.systemContext.sharedDatabase.getCallbacks())
+         {
+            if (callbacks->validateHostConfig)
+            {
+               callbacks->validateHostConfig({value.pos, value.end});
+            }
+         }
+         context.blockContext.db.setCallbackFlags(DatabaseCallbacks::hostConfigFlag);
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -321,7 +341,9 @@ namespace psibase
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
 
-      void verifyWriteSession(Database& db, psio::input_stream key, psio::input_stream value)
+      void verifyWriteSession(TransactionContext& context,
+                              psio::input_stream  key,
+                              psio::input_stream  value)
       {
          NativeTableNum table;
          check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
@@ -331,6 +353,8 @@ namespace psibase
             verifySocketRow(key, value);
          else if (table == envTable)
             verifyEnvRow(key, value);
+         else if (table == hostConfigTable)
+            verifyHostConfigRow(context, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
@@ -707,7 +731,7 @@ namespace psibase
              }
              else if (bucket.db == DbId::nativeSession)
              {
-                verifyWriteSession(database, fullKey, {value.data(), value.size()});
+                verifyWriteSession(transactionContext, fullKey, {value.data(), value.size()});
              }
              database.kvPutRaw(bucket.db, {fullKey.data(), fullKey.size()},
                                {value.data(), value.size()});
