@@ -10,7 +10,7 @@ import { usePropose } from "@/hooks/fractals/use-propose";
 import { useWatchAttest } from "@/hooks/fractals/use-watch-attest";
 import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { EvaluationStatus } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 
-import { useGuildAccount } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-account";
 
 export const useWatchStart = (status: EvaluationStatus | undefined) => {
     const navigate = useNavigate();

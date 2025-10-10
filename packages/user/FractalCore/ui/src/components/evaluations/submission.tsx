@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 
 import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
 import { useFormatRelative } from "@/hooks/use-format-relative";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 import { SubmissionPhase } from "@/lib/getStatus";
 
 import { Button } from "@shared/shadcn/ui/button";

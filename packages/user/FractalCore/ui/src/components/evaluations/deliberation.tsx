@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 import { DeliberationPhase } from "@/lib/getStatus";
 import { paths } from "@/lib/paths";
 

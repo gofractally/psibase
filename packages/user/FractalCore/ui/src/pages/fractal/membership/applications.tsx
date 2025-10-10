@@ -9,7 +9,7 @@ import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import {
     Table,
@@ -86,8 +86,8 @@ export const Applications = () => {
                             isGuildMember || isPending
                                 ? undefined
                                 : () => {
-                                      setShowGuildModal(true);
-                                  }
+                                    setShowGuildModal(true);
+                                }
                         }
                     />
                 )}

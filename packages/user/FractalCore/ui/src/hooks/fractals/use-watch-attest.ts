@@ -1,6 +1,6 @@
 import { EvaluationStatus } from "@/lib/getStatus";
 
-import { useGuildAccount } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-account";
 import { useAttest } from "./use-attest";
 
 export const useWatchAttest = (status: EvaluationStatus | undefined) => {

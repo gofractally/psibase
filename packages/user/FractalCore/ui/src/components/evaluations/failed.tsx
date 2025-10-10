@@ -1,7 +1,7 @@
 import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFormatRelative } from "@/hooks/use-format-relative";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { Button } from "@shared/shadcn/ui/button";
 

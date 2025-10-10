@@ -1,6 +1,6 @@
 import { EvaluationStatus } from "@/lib/getStatus";
 
-import { useGuildAccount } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-account";
 import { useCloseEvaluation } from "./use-close-evaluation";
 import { useEvaluationInstance } from "./use-evaluation-instance";
 

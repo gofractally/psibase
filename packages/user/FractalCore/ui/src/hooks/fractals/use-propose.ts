@@ -5,7 +5,7 @@ import { getSupervisor } from "@psibase/common-lib";
 
 import { zAccount } from "@/lib/zod/Account";
 
-import { useGuildAccount } from "../use-guild-id";
+import { useGuildAccount } from "../use-guild-account";
 import { useFractalAccount } from "./use-fractal-account";
 
 const zParams = z.object({

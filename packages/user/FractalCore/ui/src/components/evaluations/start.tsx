@@ -2,7 +2,7 @@ import { PluginError } from "@psibase/common-lib";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useStart } from "@/hooks/fractals/use-start";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { Button } from "@shared/shadcn/ui/button";
 

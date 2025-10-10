@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { cn } from "@shared/lib/utils";
 import {

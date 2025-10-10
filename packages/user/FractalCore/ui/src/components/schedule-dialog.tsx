@@ -5,7 +5,7 @@ import { useAppForm } from "@/components/form/app-form";
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useSetSchedule } from "@/hooks/fractals/use-set-schedule";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -52,16 +52,16 @@ export const ScheduleDialog = ({
 
     const defaultValues: FormValues = evaluation
         ? {
-              intervalSeconds:
-                  guild?.evalInstance?.interval || defaultData.intervalSeconds,
-              register: new Date(evaluation.registrationStarts * 1000),
-              deliberationSeconds:
-                  evaluation.submissionStarts - evaluation.deliberationStarts,
-              registerSeconds:
-                  evaluation.deliberationStarts - evaluation.registrationStarts,
-              submissionSeconds:
-                  evaluation.finishBy - evaluation.submissionStarts,
-          }
+            intervalSeconds:
+                guild?.evalInstance?.interval || defaultData.intervalSeconds,
+            register: new Date(evaluation.registrationStarts * 1000),
+            deliberationSeconds:
+                evaluation.submissionStarts - evaluation.deliberationStarts,
+            registerSeconds:
+                evaluation.deliberationStarts - evaluation.registrationStarts,
+            submissionSeconds:
+                evaluation.finishBy - evaluation.submissionStarts,
+        }
         : defaultData;
 
     const form = useAppForm({
@@ -115,8 +115,8 @@ export const ScheduleDialog = ({
                         {isPending
                             ? "Loading"
                             : evaluation
-                              ? "Update schedule"
-                              : "Set new schedule"}
+                                ? "Update schedule"
+                                : "Set new schedule"}
                     </Button>
                 )}
             </DialogTrigger>

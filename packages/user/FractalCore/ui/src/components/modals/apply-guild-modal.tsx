@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import {
     Dialog,

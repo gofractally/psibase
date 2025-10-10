@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { useAttestMembershipApp } from "@/hooks/fractals/use-attest-membership-app";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import {
     Dialog,

@@ -6,7 +6,7 @@ import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-
 
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useGuildAccount } from "@/hooks/use-guild-id";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import {
     Card,
