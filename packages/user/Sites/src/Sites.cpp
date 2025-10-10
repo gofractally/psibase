@@ -1,6 +1,7 @@
 #include "services/user/Sites.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -10,7 +11,6 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <set>
-#include "psibase/api.hpp"
 
 using namespace psibase;
 
