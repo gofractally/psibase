@@ -70,6 +70,15 @@ const schem = z.object({
     }),
 });
 
+const TransactStats = z.object({
+    unprocessed: z.coerce.number(),
+    total: z.coerce.number(),
+    failed: z.coerce.number(),
+    succeeded: z.coerce.number(),
+    expired: z.coerce.number(),
+});
+export type TransactStatsType = z.infer<typeof TransactStats>;
+
 class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
         return Peers.parse(await getJson("/native/admin/peers"));
@@ -236,6 +245,11 @@ class Chain {
 
     public getServerKeys(): Promise<ServerKey[]> {
         return getJson("/native/admin/keys");
+    }
+
+    public async getTransactStats(): Promise<TransactStatsType> {
+        const url = siblingUrl(null, "transact", "/stats");
+        return TransactStats.parse(await getJson(url));
     }
 }
 
