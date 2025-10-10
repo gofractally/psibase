@@ -11,7 +11,7 @@ class TestCrash(unittest.TestCase):
     def test_crash_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
-        b = cluster.nodes['b']
+        b = cluster.nodes['bbbbbbb123']
 
         a.wait(new_block())
         a.wait(irreversible(a.get_block_header()['blockNum']))
@@ -142,7 +142,7 @@ class TestCrash(unittest.TestCase):
         keys = []
         for p in prods:
             device = p.unlock_softhsm()
-            with p.post('/native/admin/keys', service='x-admin', json={'service':'verify-sig', 'device': device}) as reply:
+            with p.post('/native/admin/keys', service='x-admin', json={'service': 'verify-sig', 'device': device}) as reply:
                 reply.raise_for_status()
                 keys.append({'name': p.producer, 'auth': reply.json()[0]})
 

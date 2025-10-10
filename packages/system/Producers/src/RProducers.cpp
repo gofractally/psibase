@@ -14,6 +14,27 @@ using namespace psibase;
 
 struct ProducerQuery
 {
+   std::vector<CandidateInfo> candidatesInfo(std::vector<AccountNumber> names) const
+   {
+      auto table = Producers::Tables{Producers::service, KvMode::read}.open<CandidateInfoTable>();
+
+      std::vector<CandidateInfo> infos;
+      for (const auto& name : names)
+      {
+         auto info = table.get(name);
+         if (info)
+            infos.push_back(*info);
+      }
+      return infos;
+   }
+
+   auto allCandidates() const
+   {
+      return Producers::Tables{Producers::service, KvMode::read}
+                     .open<CandidateInfoTable>()
+                     .getIndex<0>();
+   }
+
    std::vector<Producer> producers() const
    {
       return std::visit([](const auto& c) { return c.producers; }, consensus());
@@ -47,6 +68,8 @@ struct ProducerQuery
    }
 };
 PSIO_REFLECT(ProducerQuery,
+             method(candidatesInfo, names),
+             method(allCandidates),
              method(producers),
              method(nextProducers),
              method(consensus),

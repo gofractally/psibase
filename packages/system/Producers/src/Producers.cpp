@@ -46,6 +46,15 @@ namespace
                         { return std::move(c.producers); }, getStatus().consensus.current.data);
    }
 
+   std::vector<Producer> getNextProducers()
+   {
+      auto status = getStatus();
+      if (!status.consensus.next)
+         return {};
+      return std::visit([](const auto& c) -> std::vector<Producer>
+                        { return std::move(c.producers); }, status.consensus.next->consensus.data);
+   }
+
    using IndirectCheckFunc =
        bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
                                                      std::vector<AccountNumber>,
@@ -152,6 +161,26 @@ namespace SystemService
            status->consensus.current.services, status->consensus.current.wasmConfig},
           status->current.blockNum};
       table.put(*status);
+   }
+
+   void Producers::regCandidate(const std::string& endpoint, psibase::Claim claim)
+   {
+      Tables().open<CandidateInfoTable>().put(CandidateInfo{getSender(), endpoint, claim});
+   }
+
+   void Producers::unregCand()
+   {
+      auto sender = getSender();
+
+      auto producers = ::getProducers();
+      check(!std::ranges::contains(producers, sender, &Producer::name),
+            "Cannot unregister: account is an active producer");
+
+      auto nextProducers = ::getNextProducers();
+      check(!std::ranges::contains(nextProducers, sender, &Producer::name),
+            "Cannot unregister: account is scheduled to become a producer");
+
+      Tables().open<CandidateInfoTable>().erase(sender);
    }
 
    std::vector<psibase::AccountNumber> Producers::getProducers()
