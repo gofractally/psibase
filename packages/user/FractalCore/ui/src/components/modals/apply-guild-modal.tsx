@@ -69,7 +69,7 @@ export const ApplyGuildModal = ({
                         <form.AppField
                             name="app"
                             children={(field) => (
-                                <field.TextField label="App" />
+                                <field.TextField label="Notes" />
                             )}
                         />
 
