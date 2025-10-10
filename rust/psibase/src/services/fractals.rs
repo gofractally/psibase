@@ -4,12 +4,6 @@ pub mod Service {
     use crate::AccountNumber;
     use crate::Memo;
 
-    /// TEMP ACTION
-    #[action]
-    fn init() {
-        unimplemented!()
-    }
-
     /// Creates a new account and fractal.
     ///
     /// # Arguments
