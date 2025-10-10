@@ -404,10 +404,21 @@ namespace
       return result;
    }
 
-   void stopTracking(const std::vector<psibase::Checksum256>& txids)
+   void incFailedCount()
+   {
+      auto statsTable = RTransact::Subjective{}.open<TxStatsTable>();
+      auto stats      = statsTable.get({}).value_or(TxStatsRecord{});
+      ++stats.failed;
+
+      --stats.unprocessed;
+      statsTable.put(stats);
+   }
+
+   void stopTracking(const std::vector<psibase::Checksum256>& txids, TxStatsRecord statsDelta)
    {
       auto pendingTxTable = RTransact::Subjective{}.open<PendingTransactionTable>();
       auto dataTable      = RTransact::Subjective{}.open<TransactionDataTable>();
+      auto statsTable     = RTransact::Subjective{}.open<TxStatsTable>();
 
       PSIBASE_SUBJECTIVE_TX
       {
@@ -420,6 +431,12 @@ namespace
             }
             dataTable.erase(id);
          }
+         auto stats = statsTable.get({}).value_or(TxStatsRecord{});
+         stats.unprocessed -= txids.size();
+         stats.succeeded += statsDelta.succeeded;
+         stats.failed += statsDelta.failed;
+         stats.expired += statsDelta.expired;
+         statsTable.put(stats);
       }
    }
 
@@ -473,6 +490,8 @@ namespace
       auto successfulTxs = RTransact::WriteOnly{}.open<TxSuccessTable>();
       auto failedTxs     = RTransact::Subjective{}.open<TxFailedTable>();
 
+      TxStatsRecord stats{};
+
       for (auto id : txids)
       {
          std::shared_ptr<void>                             traceStorage;
@@ -490,6 +509,7 @@ namespace
                //   (if it exists).
                failedTxs.erase(id);
             }
+            ++stats.succeeded;
          }
          else
          {
@@ -500,6 +520,7 @@ namespace
                   traceView.emplace(tx->trace());
                   failedTxs.remove(*tx);
                   traceStorage = std::move(tx).shared_data();
+                  ++stats.failed;
                }
             }
          }
@@ -510,12 +531,13 @@ namespace
                 TransactionTrace{.error = "Transaction expired"});
             traceView.emplace(*p);
             traceStorage = std::move(p).shared_data();
+            ++stats.expired;
          }
 
          sendReply(id, *traceView);
       }
 
-      stopTracking(txids);
+      stopTracking(txids, stats);
 
 #ifdef __wasm32__
       printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
@@ -610,6 +632,29 @@ namespace
       }
    }
 
+   void reportSpeculativeFailure(psio::view<const TransactionTrace> trace,
+                                 const Checksum256&                 id,
+                                 TimePointSec                       expiration,
+                                 std::optional<Checksum256>&        errorTxId)
+   {
+      auto clients = RTransact{}.open<TraceClientTable>();
+      RTransact{}.open<TransactionDataTable>().erase(id);
+      incFailedCount();
+      if (auto client = clients.get(id))
+      {
+         if (std::ranges::any_of(client->clients, WaitFor::isApplied))
+            errorTxId = id;
+         if (std::ranges::any_of(client->clients, WaitFor::isFinal))
+         {
+            RTransact{}.open<TxFailedTable>().put(TxFailedView{
+                .id         = id,
+                .expiration = expiration,
+                .trace      = trace,
+            });
+         }
+      }
+   }
+
 }  // namespace
 
 void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
@@ -633,7 +678,7 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
       waitForFinal   = std::ranges::any_of(row->clients, WaitFor::isFinal);
    }
 
-   if (waitForFinal)
+   if (row)
    {
       if (!trace.error().has_value())
       {
@@ -697,6 +742,7 @@ void RTransact::onBlock()
    auto pendingTxTable    = Subjective{}.open<PendingTransactionTable>();
    auto dataTable         = Subjective{}.open<TransactionDataTable>();
    auto clientTable       = open<TraceClientTable>();
+   auto statsTable        = open<TxStatsTable>();
 
    // Get all successful and irreversible transactions
    auto successTxIdx = successfulTxTable.getIndex<1>();
@@ -707,6 +753,8 @@ void RTransact::onBlock()
          txids.push_back(tx.id);
       }
    }
+
+   const auto nSuccessful = txids.size();
 
    PSIBASE_SUBJECTIVE_TX
    {
@@ -722,6 +770,7 @@ void RTransact::onBlock()
 
    // Ensure all txids have a client waiting for a reply
    std::vector<psibase::Checksum256> needsReply;
+   std::size_t                       i = 0;
    for (auto id : txids)
    {
       PSIBASE_SUBJECTIVE_TX
@@ -741,8 +790,16 @@ void RTransact::onBlock()
 
             successfulTxTable.erase(id);
             failedTxTable.erase(id);
+            auto stats = statsTable.get({}).value_or(TxStatsRecord{});
+            --stats.unprocessed;
+            if (i < nSuccessful)
+               ++stats.succeeded;
+            else
+               ++stats.expired;
+            statsTable.put(stats);
          }
       }
+      ++i;
    }
 
    sendReplies(needsReply);
@@ -757,7 +814,6 @@ void RTransact::onVerify(std::uint64_t                      id,
    auto pendingVerifies        = open<PendingVerifyTable>();
    auto unverifiedTransactions = open<UnverifiedTransactionTable>();
    auto reverify               = open<ReverifySignaturesTable>();
-   auto clients                = open<TraceClientTable>();
    auto runVerifyId = open<VerifyIdTable>(KvMode::read).get({}).value_or(VerifyIdRecord{}).verifyId;
    auto errorTxId   = std::optional<Checksum256>{};
    auto broadcastTxId = std::optional<Checksum256>{};
@@ -806,20 +862,7 @@ void RTransact::onVerify(std::uint64_t                      id,
             {
                unverifiedTransactions.remove(*tx);
                cancelSpeculative(tx->speculative);
-               open<TransactionDataTable>().erase(tx->id);
-               if (auto client = clients.get(tx->id))
-               {
-                  if (std::ranges::any_of(client->clients, WaitFor::isFinal))
-                  {
-                     Subjective{}.open<TxFailedTable>().put(TxFailedView{
-                         .id         = tx->id,
-                         .expiration = tx->expiration,
-                         .trace      = trace,
-                     });
-                  }
-                  if (std::ranges::any_of(client->clients, WaitFor::isApplied))
-                     errorTxId = tx->id;
-               }
+               reportSpeculativeFailure(trace, tx->id, tx->expiration, errorTxId);
             }
             else
             {
@@ -907,7 +950,6 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::view<const TransactionTrace> t
                unverified.remove(*trx);
                auto pending = open<PendingVerifyTable>();
                cancelVerify(pending, *trx);
-               open<TransactionDataTable>().erase(trx->id);
                expiration = trx->expiration;
             }
             else if (auto trx = pending.get(row->txid))
@@ -920,20 +962,7 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::view<const TransactionTrace> t
                check(false,
                      "Speculative execution should be cancelled when a transaction is dropped");
             }
-            open<TransactionDataTable>().erase(row->txid);
-            if (auto client = clients.get(row->txid))
-            {
-               if (std::ranges::any_of(client->clients, WaitFor::isApplied))
-                  errorTxId = row->txid;
-               if (std::ranges::any_of(client->clients, WaitFor::isFinal))
-               {
-                  open<TxFailedTable>().put({
-                      .id         = row->txid,
-                      .expiration = expiration,
-                      .trace      = trace.unpack(),
-                  });
-               }
-            }
+            reportSpeculativeFailure(trace, row->txid, expiration, errorTxId);
          }
       }
    }
@@ -1024,6 +1053,11 @@ namespace
          auto speculative = speculate ? std::optional{scheduleSpeculative(id, trx)} : std::nullopt;
          scheduleVerify(id, trx, false, speculative);
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
+         auto statsTable = Subjective{}.open<TxStatsTable>();
+         auto stats      = statsTable.get({}).value_or(TxStatsRecord{});
+         ++stats.unprocessed;
+         ++stats.total;
+         statsTable.put(stats);
       }
       if (!speculate && trx.transaction->claims().empty())
       {
@@ -1481,11 +1515,40 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    }
    else if (target == "/jwt_key" && request.method == "GET")
    {
-      check(user.has_value(), "Unauthorized");
-      check(to<XAdmin>().isAdmin(*user), "Forbidden");
+      if (!to<XAdmin>().isAdmin(user, socket))
+      {
+         std::string_view msg = "Not authorized";
+         return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,
+                          .contentType = "text/html",
+                          .body        = std::vector(msg.begin(), msg.end()),
+                          .headers     = allowCors(request, AccountNumber{"x-admin"})};
+      }
       return HttpReply{.contentType = "application/octet-stream",
                        .body        = getJWTKey(),
                        .headers     = allowCors(request, AccountNumber{"supervisor"})};
+   }
+   else if (target == "/stats" && request.method == "GET")
+   {
+      if (!to<XAdmin>().isAdmin(user, socket))
+      {
+         std::string_view msg = "Not authorized";
+         return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,
+                          .contentType = "text/html",
+                          .body        = std::vector(msg.begin(), msg.end()),
+                          .headers     = allowCors(request, AccountNumber{"x-admin"})};
+      }
+      HttpReply reply{
+          .contentType = "application/json",
+          .headers     = allowCors(request, AccountNumber{"x-admin"}),
+      };
+      psio::vector_stream stream{reply.body};
+      TxStatsRecord       stats;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         stats = open<TxStatsTable>().get({}).value_or(TxStatsRecord{});
+      }
+      to_json(stats, stream);
+      return reply;
    }
    else if (auto result = serveGraphQL(request, TransactQuery{}))
       return result;
