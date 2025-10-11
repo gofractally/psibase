@@ -181,23 +181,35 @@ else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
 
-# Documentation
-ExternalProject_Add(
-    gen-cpp-doc
-    DEPENDS             wasm
-    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
-    CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-    INSTALL_COMMAND     ""
+# Rust components with shared cache
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/gen-cpp-doc
+    COMMAND cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    DEPENDS wasm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
 )
-ExternalProject_Add(
-    md2man
-    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
-    CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-    BUILD_ALWAYS        1
-    INSTALL_COMMAND     ""
+add_custom_target(gen-cpp-doc ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/gen-cpp-doc)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man
+    COMMAND cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
 )
+add_custom_target(md2man ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
+    COMMAND cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
+)
+add_custom_target(cargo-psibase ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
+    COMMAND cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
+)
+add_custom_target(rust ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase)
 
 function(ADD_BOOK_FILES path extension)
     file(COPY ${CMAKE_CURRENT_SOURCE_DIR}${path} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}${path})
@@ -246,17 +258,6 @@ add_manpage(psinode)
 add_manpage(psibase)
 add_manpage(psibase-create-snapshot)
 add_manpage(psibase-load-snapshot)
-
-# Cargo psibase
-ExternalProject_Add(
-    cargo-psibase
-    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
-    CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-    BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
-    BUILD_ALWAYS        1
-    INSTALL_COMMAND     ""
-)
 
 include(web-apps.cmake)
 
@@ -1205,15 +1206,6 @@ psibase_package(
 
 write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList)
 
-ExternalProject_Add(
-    rust
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
-    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-    BUILD_ALWAYS 1
-    INSTALL_COMMAND ""
-)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 
 option(BUILD_EXAMPLES "Build examples" ON)

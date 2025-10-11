@@ -39,3 +39,4 @@ homepage = "https://psibase.io"
 
 [workspace.dependencies]
 async-graphql = "=7.0.17"
+wasmparser = "=0.201.0"
