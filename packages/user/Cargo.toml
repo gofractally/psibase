@@ -1,0 +1,70 @@
+[workspace]
+resolver = "2"
+members = [
+    "Branding",
+    "Branding/service",
+    "Branding/plugin",
+    "BrotliCodec",
+    "BrotliCodec/service",
+    "BrotliCodec/plugin",
+    "Chainmail",
+    "Chainmail/service",
+    "Chainmail/plugin",
+    "Evaluations",
+    "Evaluations/service",
+    "Evaluations/plugin",
+    "Evaluations/query-service",
+    "Fractals",
+    "Fractals/service",
+    "Fractals/plugin",
+    "Fractals/query-service",
+    "Identity",
+    "Identity/service",
+    "Identity/plugin",
+    "Profiles",
+    "Profiles/service",
+    "Profiles/plugin",
+    "Profiles/query-service",
+    "Registry",
+    "Registry/service",
+    "Registry/query",
+    "Registry/plugin",
+    "Subgroups",
+    "Subgroups/service",
+    "TokenStream",
+    "TokenStream/service",
+    "TokenStream/plugin",
+    "TokenStream/query-service",
+    "Tokens",
+    "Tokens/service",
+    "Tokens/plugin",
+    "Tokens/query-service",
+]
+
+exclude = ["CommonApi/common/packages/component-parser"]
+
+[workspace.package]
+version = "0.21.0"
+rust-version = "1.64"
+edition = "2021"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
+publish = false
+
+[workspace.dependencies]
+# Common dependencies for user packages with Rust services
+psibase = { path = "../../rust/psibase", version = "0.21.0" }
+psibase_macros = { path = "../../rust/psibase_macros", version = "0.21.0" }
+async-graphql = "=7.0.17"
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = "1.0.120"
+serde-aux = "4.7.0"
+# Standard version for cargo-component 0.15.0
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true

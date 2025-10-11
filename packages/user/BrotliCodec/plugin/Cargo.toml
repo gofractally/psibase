@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "brotli-codec-plugin"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -9,8 +9,8 @@ publish.workspace = true
 
 [dependencies]
 brotli-codec = { path = "../service", version = "0.21.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
-wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
+psibase.workspace = true
+wit-bindgen-rt.workspace = true
 brotli = { version = "7.0.0" }
 
 [lib]

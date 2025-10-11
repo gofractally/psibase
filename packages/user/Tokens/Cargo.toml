@@ -1,27 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin", "query-service"]
-
-[workspace.package]
-version = "0.21.1"
-rust-version = "1.64"
-edition = "2021"
-publish = false
-
 [package]
-name = "tokens-pkg"                   # Crate name
+name = "tokens-pkg"
 description = "Native tokens service"
-version.workspace = true
+version = "0.21.1"
 rust-version.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "Tokens"
@@ -35,6 +20,6 @@ Sites = "0.21.0"
 crate-type = ["rlib"]
 
 [dependencies]
-tokens = { path = "service", version = "0.21.0" }
-r-tokens = { path = "query-service", version = "0.21.0" }
-plugin = { path = "plugin", version = "0.21.0" }
+tokens = { path = "service", version = "0.21.1" }
+r-tokens = { path = "query-service", version = "0.21.1" }
+tokens-plugin = { path = "plugin", version = "0.21.1" }
