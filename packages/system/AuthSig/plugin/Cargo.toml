@@ -4,12 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase" }
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
 pem = "3"
 seahash = "4.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde.workspace = true
+serde_json.workspace = true
 indoc = "2.0.6"
 lazy_static = "1.4"
 
