@@ -96,6 +96,11 @@ impl Admin for FractalCorePlugin {
         set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin::set_guild_description(&guild_account, &description)
     }
+
+    fn start_eval(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::start_eval)?;
+        FractalsPlugin::admin::start(&guild_account)
+    }
 }
 
 impl User for FractalCorePlugin {
@@ -139,11 +144,6 @@ impl User for FractalCorePlugin {
     ) -> Result<Option<Vec<String>>, Error> {
         assert_authorized(FunctionName::get_proposal)?;
         FractalsPlugin::user::get_proposal(&guild_account, group_number)
-    }
-
-    fn start_eval(guild_account: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::start_eval)?;
-        FractalsPlugin::admin::start(&guild_account)
     }
 
     fn create_guild(display_name: String, account: String) -> Result<(), Error> {
