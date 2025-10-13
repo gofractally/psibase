@@ -19,7 +19,7 @@ define_trust! {
         Low => "
         Low trust grants these abilities:
             - Starting an evaluation cycle
-            - Register for a guild evaluation
+            - Registering for a guild evaluation
             - Unregistering from guild evaluation
             - Closing an evaluation cycle
         ",
