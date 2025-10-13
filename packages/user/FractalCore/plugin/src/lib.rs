@@ -14,21 +14,6 @@ use bindings::fractals::plugin as FractalsPlugin;
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 use trust::{assert_authorized, FunctionName};
 
-struct ProposeLatch;
-
-impl ProposeLatch {
-    fn new(app: &str) -> Self {
-        set_propose_latch(Some(app)).unwrap();
-        Self
-    }
-}
-
-impl Drop for ProposeLatch {
-    fn drop(&mut self) {
-        set_propose_latch(None).unwrap();
-    }
-}
-
 define_trust! {
     descriptions {
         Low => "
@@ -76,7 +61,8 @@ impl Admin for FractalCorePlugin {
         interval_seconds: u32,
     ) -> Result<(), Error> {
         assert_authorized(FunctionName::set_schedule)?;
-        let _latch = ProposeLatch::new(&guild_account);
+
+        set_propose_latch(Some(&guild_account))?;
 
         FractalsPlugin::admin::set_schedule(
             &guild_account,
@@ -95,19 +81,19 @@ impl Admin for FractalCorePlugin {
 
     fn set_guild_display_name(guild_account: String, display_name: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_guild_display_name)?;
-        let _latch = ProposeLatch::new(&guild_account);
+        set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin::set_guild_display_name(&guild_account, &display_name)
     }
 
     fn set_guild_bio(guild_account: String, bio: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_guild_bio)?;
-        let _latch = ProposeLatch::new(&guild_account);
+        set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin::set_guild_bio(&guild_account, &bio)
     }
 
     fn set_guild_description(guild_account: String, description: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_guild_description)?;
-        let _latch = ProposeLatch::new(&guild_account);
+        set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin::set_guild_description(&guild_account, &description)
     }
 }

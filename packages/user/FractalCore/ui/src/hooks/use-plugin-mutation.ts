@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import z from "zod";
 
 import { supervisor } from "@/supervisor";
@@ -37,8 +36,6 @@ export const usePluginMutation = <T>(
     { intf, method, service }: Params,
     { error, loading, success, isStagable = true, onSuccess }: Meta<T>,
 ) => {
-    const navigate = useNavigate();
-
     return useMutation<void, Error, T, string | number>({
         mutationKey: [service, intf, method],
         onMutate: () => {
