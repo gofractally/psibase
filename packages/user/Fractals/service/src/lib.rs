@@ -99,7 +99,7 @@ pub mod service {
     /// * `guild_account` - The account number for the guild.
     /// * `app` - Relevant information to the application.
     #[action]
-    fn apply_guild(guild_account: AccountNumber, app: String) {
+    fn apply_guild(guild_account: AccountNumber, extra_info: String) {
         let guild = Guild::get_assert(guild_account);
         let member = check_some(
             FractalMember::get(guild.fractal, get_sender()),
@@ -109,7 +109,7 @@ pub mod service {
             MemberStatus::Exiled != member.member_status.into(),
             "you are exiled",
         );
-        GuildApplication::add(guild.account, get_sender(), app);
+        GuildApplication::add(guild.account, get_sender(), extra_info);
     }
 
     /// Set guild display name

@@ -9,7 +9,7 @@ import { useFractalAccount } from "./use-fractal-account";
 
 export const zParams = z.object({
     guildAccount: zGuildAccount,
-    app: z.string(),
+    extraInfo: z.string(),
 });
 
 export const useApplyGuild = () => {
@@ -17,12 +17,12 @@ export const useApplyGuild = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            const { guildAccount, app } = zParams.parse(params);
+            const { guildAccount, extraInfo } = zParams.parse(params);
             await supervisor.functionCall({
                 method: "applyGuild",
                 service: fractal,
                 intf: "user",
-                params: [guildAccount, app],
+                params: [guildAccount, extraInfo],
             });
         },
     });

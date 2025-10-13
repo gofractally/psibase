@@ -130,7 +130,7 @@ pub mod tables {
         #[graphql(skip)]
         pub guild: AccountNumber,
         pub member: AccountNumber,
-        pub app: String,
+        pub extra_info: String,
         pub created_at: psibase::TimePointSec,
     }
 

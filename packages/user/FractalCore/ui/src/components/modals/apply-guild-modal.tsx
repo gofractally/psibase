@@ -31,11 +31,11 @@ export const ApplyGuildModal = ({
 
     const form = useAppForm({
         defaultValues: {
-            app: "",
+            extraInfo: "",
         },
-        onSubmit: async ({ value: { app } }) => {
+        onSubmit: async ({ value: { extraInfo } }) => {
             await applyGuild({
-                app,
+                extraInfo,
                 guildAccount: guildAccount!,
             });
             openChange(false);
@@ -43,7 +43,7 @@ export const ApplyGuildModal = ({
         },
         validators: {
             onChange: z.object({
-                app: z.string(),
+                extraInfo: z.string(),
             }),
         },
     });
@@ -67,9 +67,9 @@ export const ApplyGuildModal = ({
                         className="mt-3 w-full space-y-6"
                     >
                         <form.AppField
-                            name="app"
+                            name="extraInfo"
                             children={(field) => (
-                                <field.TextField label="Notes" />
+                                <field.TextField label="Extra info" />
                             )}
                         />
 

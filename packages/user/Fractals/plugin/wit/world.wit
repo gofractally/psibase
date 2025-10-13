@@ -28,7 +28,7 @@ interface user {
     join: func() -> result<_, error>;
     create-guild: func(display-name: string, slug: string) -> result<_, error>;
 
-    apply-guild: func(guild-account: string, app: string) -> result<_, error>;
+    apply-guild: func(guild-account: string, extra-info: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, member: string, comment: string, endorses: bool) -> result<_, error>;
 
     attest: func(guild-account: string, group-number: u32) -> result<_, error>;

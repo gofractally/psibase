@@ -7,24 +7,24 @@ use crate::tables::tables::{
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildApplication {
-    fn new(guild: AccountNumber, member: AccountNumber, app: String) -> Self {
+    fn new(guild: AccountNumber, member: AccountNumber, extra_info: String) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
             guild,
             member,
-            app,
+            extra_info,
             created_at: now,
         }
     }
 
-    pub fn add(guild: AccountNumber, member: AccountNumber, app: String) {
+    pub fn add(guild: AccountNumber, member: AccountNumber, extra_info: String) {
         check_none(Self::get(guild, member), "application already exists");
         check_none(
             GuildMember::get(guild, member),
             "user is already a guild member",
         );
-        Self::new(guild, member, app).save();
+        Self::new(guild, member, extra_info).save();
     }
 
     pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {

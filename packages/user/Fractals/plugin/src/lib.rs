@@ -197,12 +197,12 @@ impl User for FractallyPlugin {
         EvaluationsUser::unregister(&"fractals".to_string(), guild.eval_id()?)
     }
 
-    fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
+    fn apply_guild(guild_account: String, extra_info: String) -> Result<(), Error> {
         get_guild(guild_account.clone())?.assert_authorized(FunctionName::apply_guild)?;
 
         let packed_args = fractals::action_structs::apply_guild {
             guild_account: guild_account.as_str().into(),
-            app,
+            extra_info,
         }
         .packed();
 
