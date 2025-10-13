@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import z from "zod";
 
 import { supervisor } from "@/supervisor";
+import { siblingUrl } from "@psibase/common-lib";
 
 import { TxStatus, checkLastTx } from "@/lib/checkStaging";
 import { zAccount } from "@/lib/zod/Account";
@@ -77,8 +78,12 @@ export const usePluginMutation = <T>(
                         action: {
                             label: "View",
                             onClick: () => {
-                                navigate(
-                                    `/pending-transactions/${lastTx.stagedId}`,
+                                window.open(
+                                    siblingUrl(
+                                        null,
+                                        "config",
+                                        `/pending-transactions/${lastTx.stagedId}`,
+                                    ),
                                 );
                             },
                         },
