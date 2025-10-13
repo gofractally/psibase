@@ -3,12 +3,13 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 
-// Hard coding chain ID for now as there's no easy way to access nor is it high priority
-// TODO: Fetch chain ID
 export const useChainId = () =>
     useQuery({
         queryKey: QueryKey.chainId(),
         initialData: "",
-        queryFn: async () =>
-            z.string().parse(`2282d80c-1c8c-43b9-808d-13e3e8d580c7`),
+        queryFn: async () => {
+            const res = await fetch("/common/chainid");
+            const text = await res.json();
+            return z.string().parse(text);
+        },
     });
