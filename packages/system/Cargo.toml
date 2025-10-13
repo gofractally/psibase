@@ -19,7 +19,6 @@ homepage = "https://psibase.io"
 publish = false
 
 [workspace.dependencies]
-# Common dependencies for system packages with Rust services
 psibase = { path = "../../rust/psibase", version = "0.21.0" }
 psibase_macros = { path = "../../rust/psibase_macros", version = "0.21.0" }
 async-graphql = "=7.0.17"
