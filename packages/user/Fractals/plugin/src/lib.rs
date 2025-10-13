@@ -40,25 +40,24 @@ define_trust! {
             - Unregistering from guild evaluation
             - Applying to join a guild
             - Attesting guild membership for a fractal member
-            - Proposing vote in evaluation cycle
-            - Retrieving group users in evaluation
             - Retrieving a proposal in evaluation
             - Creating a new guild
             - Creating a new fractal
-            - Attesting in an evaluation
-        ",
+            ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
+            High trust grants the abilities of all lower trust levels, plus these abilities:
+            - Proposing a vote in evaluation cycle
             - Setting the guild evaluation schedule
             - Setting the guild display name
             - Setting the guild bio
             - Setting the guild description
+            - Attesting in an evaluation
         ",
     }
     functions {
         Low => [start, close_eval],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, propose, get_group_users, get_proposal, create_guild, create_fractal, attest],
-        High => [set_schedule, set_guild_display_name, set_guild_bio, set_guild_description],
+        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_guild, create_fractal],
+        High => [propose, set_schedule, set_guild_display_name, set_guild_bio, set_guild_description, attest],
     }
 }
 
@@ -291,7 +290,6 @@ impl User for FractallyPlugin {
 
     fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
         let guild = get_guild(guild_account)?;
-        guild.assert_authorized(FunctionName::get_group_users)?;
         EvaluationsUser::get_group_users(&"fractals".to_string(), guild.eval_id()?, group_number)
     }
 
