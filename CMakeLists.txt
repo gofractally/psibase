@@ -447,33 +447,28 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenStream.psi
     PATH packages/user/TokenStream
-    WORKSPACE_PATH packages/user
     DEPENDS ${TokenStream_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
     PATH packages/user/Profiles
-    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH packages/user/Evaluations
-    WORKSPACE_PATH packages/user
     DEPENDS ${Evaluations_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
-    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH packages/user/Fractals
-    WORKSPACE_PATH packages/user
     DEPENDS ${Fractals_js_DEP}
 )
 
@@ -481,19 +476,16 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
-    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
     PATH packages/user/BrotliCodec
-    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH packages/user/Registry
-    WORKSPACE_PATH packages/user
 )
 
 cargo_psibase_package(
@@ -505,7 +497,6 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
-    WORKSPACE_PATH packages/user
 )
 
 psibase_package(
@@ -651,7 +642,6 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
     PATH packages/user/Identity
-    WORKSPACE_PATH packages/user
     DEPENDS ${Identity_js_DEP}
 )
 
