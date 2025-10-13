@@ -19,13 +19,13 @@ define_trust! {
         Low => "
         Low trust grants these abilities:
             - Starting an evaluation cycle
-            - Registering for a guild evaluation
-            - Unregistering from guild evaluation
             - Closing an evaluation cycle
         ",
         Medium => "
         Medium trust grants the abilities of the Low trust level, plus these abilities:
             - Joining the fractal
+            - Registering for a guild evaluation
+            - Unregistering from guild evaluation
             - Applying to join a guild
             - Attesting guild membership for a fractal member
             - Proposing vote in evaluation cycle
@@ -43,8 +43,8 @@ define_trust! {
         ",
     }
     functions {
-        Low => [start_eval, register, unregister, close_eval],
-        Medium => [join, apply_guild, attest_membership_app, propose, get_group_users, get_proposal, create_guild, attest],
+        Low => [start_eval, close_eval],
+        Medium => [join, register, unregister, apply_guild, attest_membership_app, propose, get_group_users, get_proposal, create_guild, attest],
         High => [set_schedule, set_guild_display_name, set_guild_bio, set_guild_description],
     }
 }
