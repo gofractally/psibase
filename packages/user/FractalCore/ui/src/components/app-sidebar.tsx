@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { AppSwitcher } from "@/components/fractal-switcher";
+import { GuildSwitcher } from "@/components/guild-switcher";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 
@@ -16,7 +16,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <AppSwitcher />
+                <GuildSwitcher />
             </SidebarHeader>
             <SidebarContent>
                 <NavMain />

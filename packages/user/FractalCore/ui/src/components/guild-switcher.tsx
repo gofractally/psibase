@@ -27,7 +27,7 @@ import {
 
 import { CreateGuildModal } from "./modals/create-guild-modal";
 
-export function AppSwitcher() {
+export function GuildSwitcher() {
     const { isMobile } = useSidebar();
 
     const navigate = useNavigate();
