@@ -1,5 +1,5 @@
 [package]
-name = "identity-pkg"
+name = "identity-pkg"                                         # Crate name
 description = "Tools for exploring and confirming identities"
 version.workspace = true
 rust-version.workspace = true

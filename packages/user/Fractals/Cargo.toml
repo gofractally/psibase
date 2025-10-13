@@ -1,5 +1,5 @@
 [package]
-name = "fractals-pkg"
+name = "fractals-pkg"              # Crate name
 description = "Fractal governance"
 version.workspace = true
 rust-version.workspace = true

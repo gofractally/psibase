@@ -1,5 +1,5 @@
 [package]
-name = "profiles"
+name = "profiles"             # Crate name
 version = "0.21.1"
 rust-version.workspace = true
 edition.workspace = true

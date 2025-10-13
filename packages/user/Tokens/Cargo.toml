@@ -1,5 +1,5 @@
 [package]
-name = "tokens-pkg"
+name = "tokens-pkg"                   # Crate name
 description = "Native tokens service"
 version = "0.21.1"
 rust-version.workspace = true

@@ -1,5 +1,5 @@
 [package]
-name = "registry-pkg"
+name = "registry-pkg"                     # Crate name
 description = "Registry for psibase apps"
 version.workspace = true
 rust-version.workspace = true

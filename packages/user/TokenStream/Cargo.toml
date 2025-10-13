@@ -1,5 +1,5 @@
 [package]
-name = "token-stream-pkg"
+name = "token-stream-pkg"                          # Crate name
 description = "Stream tokens by exponential decay"
 version.workspace = true
 rust-version.workspace = true
