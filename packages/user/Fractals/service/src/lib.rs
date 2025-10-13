@@ -203,7 +203,7 @@ pub mod service {
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
     }
 
-    /// Allows a user to join a fractal and immediately become a citizen.
+    /// Allows a user to join a fractal and immediately become a visa holder.
     ///
     /// Cannot be called by a fractal.
     ///
