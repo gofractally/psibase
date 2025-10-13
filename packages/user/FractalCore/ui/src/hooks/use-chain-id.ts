@@ -9,7 +9,7 @@ export const useChainId = () =>
         initialData: "",
         queryFn: async () => {
             const res = await fetch("/common/chainid");
-            const text = await res.json();
-            return z.string().parse(text);
+            const json = await res.json();
+            return z.string().parse(json);
         },
     });
