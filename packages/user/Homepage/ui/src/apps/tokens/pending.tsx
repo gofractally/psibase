@@ -37,9 +37,15 @@ export const PendingPage = () => {
 
 export const PendingPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
-    const { currentUser, isLoading } = context;
+    const { currentUser, isLoading, selectedToken } = context;
 
-    const { data: pendingTransactions } = useUserLinesOfCredit(currentUser);
+    const { data } = useUserLinesOfCredit(currentUser);
+    const pendingTransactions = data?.filter(
+        (pt) =>
+            pt.credit?.balance.tokenNumber === selectedToken.id ||
+            pt.debit?.balance.tokenNumber === selectedToken.id,
+    );
+
     const { mutateAsync: uncredit, isPending: isUncreditPending } =
         useUncredit(currentUser);
     const { mutateAsync: debit, isPending: isDebitPending } =
@@ -59,7 +65,7 @@ export const PendingPageContents = () => {
         return (
             <GlowingCard>
                 <CardContent className="text-muted-foreground py-8 text-center">
-                    No pending transactions
+                    No pending transactions to display
                 </CardContent>
             </GlowingCard>
         );
