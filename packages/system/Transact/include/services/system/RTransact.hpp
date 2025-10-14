@@ -226,6 +226,19 @@ namespace SystemService
    };
    PSIO_REFLECT(TxFailedView, id, expiration, trace)
 
+   struct TxStatsRecord
+   {
+      uint64_t unprocessed;
+      uint64_t total;
+      uint64_t failed;
+      uint64_t succeeded;
+      uint64_t expired;
+   };
+   PSIO_REFLECT(TxStatsRecord, unprocessed, total, failed, succeeded, expired)
+
+   using TxStatsTable = psibase::Table<TxStatsRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(TxStatsTable)
+
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification
    // are dispatched asynchronously. When they complete, the transaction
@@ -242,7 +255,8 @@ namespace SystemService
                                                                 UnverifiedTransactionTable,
                                                                 PendingVerifyTable,
                                                                 ReverifySignaturesTable,
-                                                                SpeculativeTransactionTable>;
+                                                                SpeculativeTransactionTable,
+                                                                TxStatsTable>;
       using Session                 = psibase::SessionTables<TraceClientTable>;
       using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
                                                                ReversibleBlocksTable,

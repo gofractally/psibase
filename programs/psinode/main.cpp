@@ -562,22 +562,6 @@ namespace psibase
 #define CATCH_IGNORE \
    catch (...) {}
 
-template <typename Timer, typename F>
-void loop(Timer& timer, F&& f)
-{
-   using namespace std::literals::chrono_literals;
-   timer.expires_after(100ms);
-   timer.async_wait(
-       [&timer, f](const std::error_code& e)
-       {
-          f(e);
-          if (!e)
-          {
-             loop(timer, f);
-          }
-       });
-}
-
 std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
@@ -676,25 +660,13 @@ struct MemStats
 };
 PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
 
-// TODO: this will need to be reworked when we have more complete transaction tracking
-struct TransactionStats
-{
-   uint64_t unprocessed;
-   uint64_t total;
-   uint64_t failed;
-   uint64_t succeeded;
-   uint64_t skipped;
-};
-PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
-
 struct Perf
 {
    std::int64_t            timestamp;
    MemStats                memory;
    std::vector<ThreadInfo> tasks;
-   TransactionStats        transactions;
 };
-PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
+PSIO_REFLECT(Perf, timestamp, memory, tasks)
 
 void write_om_descriptor(std::string_view name,
                          std::string_view type,
@@ -807,30 +779,11 @@ void write_om_tasks(const Perf& perf, auto& stream)
    }
 }
 
-void write_om_transaction_stats(const TransactionStats& stats, auto& stream)
-{
-   write_om_descriptor("psinode_transactions_submitted", "counter", "", "Total Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_submitted_total", std::to_string(stats.total), stream);
-   write_om_descriptor("psinode_transactions_succeeded", "counter", "", "Succeeded Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_succeeded_total", std::to_string(stats.succeeded), stream);
-   write_om_descriptor("psinode_transactions_failed", "counter", "", "Failed Transactions", stream);
-   write_om_sample("psinode_transactions_failed_total", std::to_string(stats.failed), stream);
-   write_om_descriptor("psinode_transactions_skipped", "counter", "", "Skipped Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_skipped_total", std::to_string(stats.skipped), stream);
-   write_om_descriptor("psinode_transactions_unprocessed", "gauge", "", "Pending Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_unprocessed", std::to_string(stats.unprocessed), stream);
-}
-
 template <typename S>
 void to_openmetrics_text(const Perf& perf, S& stream)
 {
    write_om_mem(perf, stream);
    write_om_tasks(perf, stream);
-   write_om_transaction_stats(perf.transactions, stream);
    stream.write("# EOF\n", 6);
 }
 
@@ -1093,15 +1046,14 @@ MemStats getMemStats(const SharedState& state)
    return result;
 }
 
-Perf get_perf(const SharedState& state, const TransactionStats& transactions)
+Perf get_perf(const SharedState& state)
 {
    long clk_tck = ::sysconf(_SC_CLK_TCK);
    Perf result;
    result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
-   result.memory       = getMemStats(state);
-   result.transactions = transactions;
+   result.memory = getMemStats(state);
    for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
    {
       result.tasks.push_back(getThreadInfo(entry, clk_tck));
@@ -1299,9 +1251,6 @@ void run(const std::string&              db_path,
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
-   //
-   TransactionStats transactionStats = {};
-   std::mutex       transactionStatsMutex;
 
    if (system->sharedDatabase.isSlow())
    {
@@ -1630,8 +1579,6 @@ void run(const std::string&              db_path,
 
    tpool.setNumThreads(service_threads);
 
-   timer_type timer(chainContext);
-
    if (!listen.empty())
    {
       // TODO: command-line options
@@ -1690,7 +1637,7 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &timer, &runResult,
+      http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &runResult,
                                &server_work](std::vector<char> data)
       {
          data.push_back('\0');
@@ -1710,7 +1657,7 @@ void run(const std::string&              db_path,
          else
          {
             boost::asio::post(chainContext,
-                              [&chainContext, &node, &connect_one, &http_config, &timer, &runResult,
+                              [&chainContext, &node, &connect_one, &http_config, &runResult,
                                &server_work, restart, soft]()
                               {
                                  atomic_set_field(http_config->status,
@@ -1724,7 +1671,6 @@ void run(const std::string&              db_path,
                                                                        [&server_work]()
                                                                        { server_work.reset(); });
                                                   });
-                                 timer.cancel();
                                  node.consensus().async_shutdown();
                                  node.peers().autoconnect({}, 0, connect_one);
                                  node.peers().disconnect_all(restart);
@@ -1732,16 +1678,10 @@ void run(const std::string&              db_path,
          }
       };
 
-      http_config->get_perf =
-          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      http_config->get_perf = [sharedState](auto callback)
       {
-         TransactionStats trx;
-         {
-            std::lock_guard lock{transactionStatsMutex};
-            trx = transactionStats;
-         }
          callback(
-             [result = get_perf(*sharedState, trx)]() mutable
+             [result = get_perf(*sharedState)]() mutable
              {
                 std::vector<char>   json;
                 psio::vector_stream stream(json);
@@ -1750,16 +1690,10 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->get_metrics =
-          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      http_config->get_metrics = [sharedState](auto callback)
       {
-         TransactionStats trx;
-         {
-            std::lock_guard lock{transactionStatsMutex};
-            trx = transactionStats;
-         }
          callback(
-             [result = get_perf(*sharedState, trx)]() mutable
+             [result = get_perf(*sharedState)]() mutable
              {
                 std::vector<char>   data;
                 psio::vector_stream stream(data);
@@ -2059,12 +1993,7 @@ void run(const std::string&              db_path,
       PSIBASE_LOG(loggers::generic::get(), notice)
           << "The server is not configured to accept connections on any interface. Use --listen "
              "<port> to add a listener.";
-      boost::asio::post(chainContext,
-                        [&server_work, &timer]
-                        {
-                           server_work.reset();
-                           timer.cancel();
-                        });
+      boost::asio::post(chainContext, [&server_work] { server_work.reset(); });
    }
 
    auto remove_http_handlers = psio::finally{[&http_config, &system]
