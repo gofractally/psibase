@@ -3,8 +3,12 @@ mod bindings;
 
 use std::str::FromStr;
 
-use bindings::exports::fractals::plugin::admin::Guest as Admin;
-use bindings::exports::fractals::plugin::user::Guest as User;
+use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
+use bindings::exports::fractals::plugin::admin_guild::Guest as AdminGuild;
+use bindings::exports::fractals::plugin::user_guild::Guest as UserGuild;
+
+use bindings::exports::fractals::plugin::user_eval::Guest as UserEval;
+use bindings::exports::fractals::plugin::user_fractal::Guest as UserFractal;
 
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -73,14 +77,7 @@ impl GuildHelper {
 
 struct FractallyPlugin;
 
-impl Admin for FractallyPlugin {
-    fn close_eval(guild: String) -> Result<(), Error> {
-        let guild = get_guild(guild)?;
-        guild.assert_authorized(FunctionName::close_eval)?;
-
-        close(&"fractals".to_string(), guild.eval_id()?)
-    }
-
+impl AdminFractal for FractallyPlugin {
     fn create_fractal(
         fractal_account: String,
         guild_account: String,
@@ -100,23 +97,28 @@ impl Admin for FractallyPlugin {
             &packed_args,
         )
     }
+}
 
-    fn start(guild_account: String) -> Result<(), Error> {
+impl AdminGuild for FractallyPlugin {
+    fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account.clone())?;
-        guild.assert_authorized(FunctionName::start)?;
 
-        let packed_args = fractals::action_structs::start_eval {
+        guild.assert_authorized(FunctionName::create_guild)?;
+
+        let packed_args = fractals::action_structs::create_guild {
+            fractal: guild.fractal,
+            display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
         }
         .packed();
 
         add_action_to_transaction(
-            fractals::action_structs::start_eval::ACTION_NAME,
+            fractals::action_structs::create_guild::ACTION_NAME,
             &packed_args,
         )
     }
 
-    fn set_guild_display_name(guild: String, display_name: String) -> Result<(), Error> {
+    fn set_display_name(guild: String, display_name: String) -> Result<(), Error> {
         get_guild(guild)?.assert_authorized(FunctionName::set_guild_display_name)?;
 
         let packed_args = fractals::action_structs::set_g_disp {
@@ -130,7 +132,7 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn set_guild_bio(guild: String, bio: String) -> Result<(), Error> {
+    fn set_bio(guild: String, bio: String) -> Result<(), Error> {
         get_guild(guild)?.assert_authorized(FunctionName::set_guild_bio)?;
 
         let packed_args = fractals::action_structs::set_g_bio {
@@ -144,7 +146,7 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn set_guild_description(guild_account: String, description: String) -> Result<(), Error> {
+    fn set_description(guild_account: String, description: String) -> Result<(), Error> {
         get_guild(guild_account)?.assert_authorized(FunctionName::set_guild_description)?;
 
         let packed_args = fractals::action_structs::set_g_desc { description }.packed();
@@ -155,7 +157,7 @@ impl Admin for FractallyPlugin {
         )
     }
 
-    fn set_schedule(
+    fn set_eval_schedule(
         guild_account: String,
         registration: u32,
         deliberation: u32,
@@ -179,23 +181,42 @@ impl Admin for FractallyPlugin {
             &packed_args,
         )
     }
+
+    fn start_eval(guild_account: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account.clone())?;
+        guild.assert_authorized(FunctionName::start)?;
+
+        let packed_args = fractals::action_structs::start_eval {
+            guild_account: guild_account.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::start_eval::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn close_eval(guild_account: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account)?;
+        guild.assert_authorized(FunctionName::close_eval)?;
+
+        close(&"fractals".to_string(), guild.eval_id()?)
+    }
 }
 
-impl User for FractallyPlugin {
-    fn register(guild_account: String) -> Result<(), Error> {
-        let guild = get_guild(guild_account)?;
-        guild.assert_authorized(FunctionName::register)?;
-
-        EvaluationsUser::register(&"fractals".to_string(), guild.eval_id()?)
+impl UserFractal for FractallyPlugin {
+    fn join() -> Result<(), Error> {
+        assert_authorized(FunctionName::join)?;
+        let packed_args = fractals::action_structs::join {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
+}
 
-    fn unregister(guild_account: String) -> Result<(), Error> {
-        let guild = get_guild(guild_account)?;
-        guild.assert_authorized(FunctionName::unregister)?;
-
-        EvaluationsUser::unregister(&"fractals".to_string(), guild.eval_id()?)
-    }
-
+impl UserGuild for FractallyPlugin {
     fn apply_guild(guild_account: String, extra_info: String) -> Result<(), Error> {
         get_guild(guild_account.clone())?.assert_authorized(FunctionName::apply_guild)?;
 
@@ -207,24 +228,6 @@ impl User for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::apply_guild::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
-    fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
-        let guild = get_guild(guild_account.clone())?;
-
-        guild.assert_authorized(FunctionName::create_guild)?;
-
-        let packed_args = fractals::action_structs::create_guild {
-            fractal: guild.fractal,
-            display_name: Memo::try_from(display_name).unwrap(),
-            guild_account: guild_account.as_str().into(),
-        }
-        .packed();
-
-        add_action_to_transaction(
-            fractals::action_structs::create_guild::ACTION_NAME,
             &packed_args,
         )
     }
@@ -250,6 +253,27 @@ impl User for FractallyPlugin {
             fractals::action_structs::at_mem_app::ACTION_NAME,
             &packed_args,
         )
+    }
+}
+
+impl UserEval for FractallyPlugin {
+    fn register(guild_account: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account)?;
+        guild.assert_authorized(FunctionName::register)?;
+
+        EvaluationsUser::register(&"fractals".to_string(), guild.eval_id()?)
+    }
+
+    fn unregister(guild_account: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account)?;
+        guild.assert_authorized(FunctionName::unregister)?;
+
+        EvaluationsUser::unregister(&"fractals".to_string(), guild.eval_id()?)
+    }
+
+    fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
+        let guild = get_guild(guild_account)?;
+        EvaluationsUser::get_group_users(&"fractals".to_string(), guild.eval_id()?, group_number)
     }
 
     fn get_proposal(
@@ -282,17 +306,6 @@ impl User for FractallyPlugin {
         }
     }
 
-    fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
-        let guild = get_guild(guild_account)?;
-        guild.assert_authorized(FunctionName::attest)?;
-        EvaluationsUser::attest(&"fractals".to_string(), guild.eval_id()?, group_number)
-    }
-
-    fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
-        let guild = get_guild(guild_account)?;
-        EvaluationsUser::get_group_users(&"fractals".to_string(), guild.eval_id()?, group_number)
-    }
-
     fn propose(
         guild_account: String,
         group_number: u32,
@@ -321,13 +334,10 @@ impl User for FractallyPlugin {
         EvaluationsUser::propose(&"fractals".to_string(), evaluation_id, group_number, &res)
     }
 
-    fn join() -> Result<(), Error> {
-        assert_authorized(FunctionName::join)?;
-        let packed_args = fractals::action_structs::join {
-            fractal: get_sender_app()?,
-        }
-        .packed();
-        add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
+    fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
+        let guild = get_guild(guild_account)?;
+        guild.assert_authorized(FunctionName::attest)?;
+        EvaluationsUser::attest(&"fractals".to_string(), guild.eval_id()?, group_number)
     }
 }
 

@@ -1,51 +1,62 @@
 package fractals:plugin;
 
-interface admin {
-
+interface admin-fractal {
     use host:types/types.{error};
 
-
     create-fractal: func(fractal-account: string, guild-account: string, name: string, mission: string) -> result<_, error>;
-    set-schedule: func(guild-account: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32) -> result<_, error>;
-
-    start: func(guild-account: string) -> result<_, error>;
-    close-eval: func(guild-account: string) -> result<_, error>;
-
-
-    set-guild-display-name: func(guild-account: string, display-name: string) -> result<_, error>;
-    set-guild-bio: func(guild-account: string, bio: string) -> result<_, error>;
-    set-guild-description: func(guild-account: string, description: string) -> result<_, error>;
-
-
-
-
 }
 
+interface admin-guild {
+    use host:types/types.{error};
 
-interface user {
+    create-guild: func(display-name: string, slug: string) -> result<_, error>;
+    set-display-name: func(guild-account: string, display-name: string) -> result<_, error>;
+    set-bio: func(guild-account: string, bio: string) -> result<_, error>;
+    set-description: func(guild-account: string, description: string) -> result<_, error>;
+
+    set-eval-schedule: func(guild-account: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32) -> result<_, error>;
+    start-eval: func(guild-account: string) -> result<_, error>;
+    close-eval: func(guild-account: string) -> result<_, error>;
+}
+
+interface user-fractal {
     use host:types/types.{error};
 
     join: func() -> result<_, error>;
-    create-guild: func(display-name: string, slug: string) -> result<_, error>;
+}
+
+
+interface user-guild {
+    use host:types/types.{error};
 
     apply-guild: func(guild-account: string, extra-info: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, member: string, comment: string, endorses: bool) -> result<_, error>;
+}
 
-    attest: func(guild-account: string, group-number: u32) -> result<_, error>;
-    propose: func(guild-account: string, group-number: u32, proposal: list<string>) -> result<_, error>;
-    get-group-users: func(guild-account: string, group-number: u32) -> result<list<string>, error>;
+interface user-eval {
+    use host:types/types.{error};
 
     register: func(guild-account: string) -> result<_, error>;
     unregister: func(guild-account: string) -> result<_, error>;
-
+    get-group-users: func(guild-account: string, group-number: u32) -> result<list<string>, error>;
     get-proposal: func(guild-account: string, group-number: u32) -> result<option<list<string>>, error>;
+    propose: func(guild-account: string, group-number: u32, proposal: list<string>) -> result<_, error>;
+    attest: func(guild-account: string, group-number: u32) -> result<_, error>;
 }
+
+
+
+
 
 
 
 
 
 world imports {
-    import admin;
-    import user;
+    import admin-fractal;
+    import user-fractal;
+    import admin-guild;
+    import user-guild;
+    import user-eval;
+
 }

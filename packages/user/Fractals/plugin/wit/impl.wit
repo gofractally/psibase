@@ -8,6 +8,9 @@ world impl {
     include permissions:plugin/imports;
 
 
-    export admin;
-    export user;
+    export admin-guild;
+    export user-guild;
+    export admin-fractal;
+    export user-fractal;
+    export user-eval;
 }
