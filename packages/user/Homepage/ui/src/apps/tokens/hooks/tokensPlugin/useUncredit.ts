@@ -16,9 +16,9 @@ const Args = z.object({
     memo: z.string().default(""),
 });
 
-export const useUncredit = (user: string | null) =>
+export const useUncredit = (user: string | null, counterParty: string) =>
     useMutation<void, Error, z.infer<typeof Args>>({
-        mutationKey: ["uncredit"],
+        mutationKey: ["uncredit", counterParty],
         mutationFn: (vars) => {
             console.log("uncredit", vars);
             const { amount, memo, tokenId, debitor } = Args.parse(vars);

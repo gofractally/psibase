@@ -46,11 +46,6 @@ export const PendingPageContents = () => {
             pt.debit?.balance.tokenNumber === selectedToken.id,
     );
 
-    const { mutateAsync: uncredit, isPending: isUncreditPending } =
-        useUncredit(currentUser);
-    const { mutateAsync: debit, isPending: isDebitPending } =
-        useDebit(currentUser);
-
     if (isLoading) {
         return (
             <GlowingCard>
@@ -70,50 +65,6 @@ export const PendingPageContents = () => {
             </GlowingCard>
         );
     }
-
-    const handleRecall = async (pt: LineOfCredit) => {
-        try {
-            await uncredit({
-                tokenId: pt.balance.tokenNumber.toString(),
-                debitor: pt.debitor,
-                amount: pt.balance.amount.toString(),
-                memo: "",
-            });
-            toast.success("Pending balance successfully recalled");
-        } catch (e) {
-            toast.error("Failed to recall pending balance", {
-                closeButton: true,
-                richColors: true,
-                duration: Infinity,
-                description:
-                    e instanceof Error
-                        ? e.message
-                        : `Unrecognised error, see logs.`,
-            });
-        }
-    };
-
-    const handleClaim = async (pt: LineOfCredit) => {
-        try {
-            await debit({
-                tokenId: pt.balance.tokenNumber.toString(),
-                sender: pt.creditor,
-                amount: pt.balance.amount.toString(),
-                memo: "",
-            });
-            toast.success("Pending balance successfully claimed");
-        } catch (e) {
-            toast.error("Failed to claim pending balance", {
-                closeButton: true,
-                richColors: true,
-                duration: Infinity,
-                description:
-                    e instanceof Error
-                        ? e.message
-                        : `Unrecognised error, see logs.`,
-            });
-        }
-    };
 
     return (
         <GlowingCard>
@@ -149,32 +100,13 @@ export const PendingPageContents = () => {
                                                 {pt.debit.balance.format({
                                                     fullPrecision: false,
                                                 })}
-                                                <Tooltip>
-                                                    <TooltipContent>
-                                                        Accept
-                                                    </TooltipContent>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            className="h-6 w-6"
-                                                            disabled={
-                                                                isDebitPending
-                                                            }
-                                                            onClick={() =>
-                                                                handleClaim(
-                                                                    pt.debit!,
-                                                                )
-                                                            }
-                                                        >
-                                                            {isDebitPending ? (
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <ArrowDown className="h-4 w-4" />
-                                                            )}
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                </Tooltip>
+                                                <AcceptButton
+                                                    currentUser={currentUser}
+                                                    pt={pt.debit}
+                                                    counterParty={
+                                                        pt.counterParty
+                                                    }
+                                                />
                                             </>
                                         ) : (
                                             <span className="text-muted-foreground">
@@ -190,32 +122,13 @@ export const PendingPageContents = () => {
                                                 {pt.credit.balance.format({
                                                     fullPrecision: false,
                                                 })}
-                                                <Tooltip>
-                                                    <TooltipContent>
-                                                        Cancel
-                                                    </TooltipContent>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            className="h-6 w-6"
-                                                            disabled={
-                                                                isUncreditPending
-                                                            }
-                                                            onClick={() =>
-                                                                handleRecall(
-                                                                    pt.credit!,
-                                                                )
-                                                            }
-                                                        >
-                                                            {isUncreditPending ? (
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <Undo2 className="h-4 w-4" />
-                                                            )}
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                </Tooltip>
+                                                <CancelButton
+                                                    currentUser={currentUser}
+                                                    pt={pt.credit}
+                                                    counterParty={
+                                                        pt.counterParty
+                                                    }
+                                                />
                                             </>
                                         ) : (
                                             <span className="text-muted-foreground">
@@ -230,5 +143,121 @@ export const PendingPageContents = () => {
                 </Table>
             </CardContent>
         </GlowingCard>
+    );
+};
+
+const AcceptButton = ({
+    currentUser,
+    pt,
+    counterParty,
+}: {
+    currentUser: string | null;
+    pt: LineOfCredit;
+    counterParty: string;
+}) => {
+    const { mutateAsync: debit, isPending: isDebitPending } = useDebit(
+        currentUser,
+        counterParty,
+    );
+
+    const handleClaim = async (pt: LineOfCredit) => {
+        try {
+            await debit({
+                tokenId: pt.balance.tokenNumber.toString(),
+                sender: pt.creditor,
+                amount: pt.balance.amount.toString(),
+                memo: "",
+            });
+            toast.success("Pending balance successfully claimed");
+        } catch (e) {
+            toast.error("Failed to claim pending balance", {
+                closeButton: true,
+                richColors: true,
+                duration: Infinity,
+                description:
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
+            });
+        }
+    };
+
+    return (
+        <Tooltip>
+            <TooltipContent>Accept</TooltipContent>
+            <TooltipTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={isDebitPending}
+                    onClick={() => handleClaim(pt)}
+                >
+                    {isDebitPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <ArrowDown className="h-4 w-4" />
+                    )}
+                </Button>
+            </TooltipTrigger>
+        </Tooltip>
+    );
+};
+
+const CancelButton = ({
+    currentUser,
+    pt,
+    counterParty,
+}: {
+    currentUser: string | null;
+    pt: LineOfCredit;
+    counterParty: string;
+}) => {
+    const { mutateAsync: uncredit, isPending: isUncreditPending } = useUncredit(
+        currentUser,
+        counterParty,
+    );
+
+    const handleRecall = async (pt: LineOfCredit) => {
+        try {
+            await uncredit({
+                tokenId: pt.balance.tokenNumber.toString(),
+                debitor: pt.debitor,
+                amount: pt.balance.amount.toString(),
+                memo: "",
+            });
+            toast.success("Pending balance successfully recalled");
+        } catch (e) {
+            toast.error("Failed to recall pending balance", {
+                closeButton: true,
+                richColors: true,
+                duration: Infinity,
+                description:
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
+            });
+        }
+    };
+
+    return (
+        <Tooltip>
+            <TooltipContent>Cancel</TooltipContent>
+            <TooltipTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={isUncreditPending}
+                    onClick={() => handleRecall(pt)}
+                >
+                    {isUncreditPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Undo2 className="h-4 w-4" />
+                    )}
+                </Button>
+            </TooltipTrigger>
+        </Tooltip>
     );
 };

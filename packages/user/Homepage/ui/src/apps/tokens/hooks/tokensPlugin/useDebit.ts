@@ -16,9 +16,9 @@ const Args = z.object({
     memo: z.string().default(""),
 });
 
-export const useDebit = (user: string | null) =>
+export const useDebit = (user: string | null, counterParty: string) =>
     useMutation<void, Error, z.infer<typeof Args>>({
-        mutationKey: ["debit"],
+        mutationKey: ["debit", counterParty],
         mutationFn: (vars) => {
             console.log("debit", vars);
             const { sender, amount, memo, tokenId } = Args.parse(vars);
