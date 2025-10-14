@@ -1,32 +1,20 @@
 package tokens:plugin;
 
 interface types {
-
-    type quantity = string;
-    type precision = u8;
-    type token-id = u32;
-    type account-number = string;
-
-    record token-detail {
-        id: token-id,
-        owner: string,
-        precision: u8,
-        symbol-id: string,
-        current-supply: quantity,
-        max-issued-supply: quantity,
-    }
+    /// A string that contains a decimal representation of a quantity of tokens, e.g. "10.1234"
+    type decimal = string;
 }
 
 interface issuer {
     use host:types/types.{error};
-    use types.{precision, quantity, token-id, account-number};
+    use types.{decimal};
 
     /// Create a new token
     ///
     /// Arguments
     /// * `precision` - Amount of decimal places in the token, 4 = 1.0000. 8 = 1.00000000
     /// * `max_supply` - The permanent max issued supply of the token
-    create: func(precision: precision, max-supply: quantity) -> result<_, error>;
+    create: func(precision: u8, max-supply: decimal) -> result<_, error>;
 
     /// Recall an amount of tokens from a user's balance and burn them.
     ///
@@ -35,7 +23,7 @@ interface issuer {
     /// * `amount`   - Amount of tokens to recall
     /// * `memo`     - Memo describing the recall
     /// * `account`  - Account from which tokens are recalled
-    recall: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+    recall: func(token-id: u32, amount: decimal, memo: string, account: string) -> result<_, error>;
 
     /// Mint new tokens into existence.
     ///
@@ -43,7 +31,7 @@ interface issuer {
     /// * `token_id` - Unique token identifier
     /// * `amount`   - Amount of tokens to mint
     /// * `memo`     - Memo describing the mint
-    mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+    mint: func(token-id: u32, amount: decimal, memo: string) -> result<_, error>;
 
     /// Map a symbol to a token.
     ///
@@ -52,26 +40,26 @@ interface issuer {
     /// * `symbol`   - Symbol to map, e.g. "BTC"
     ///
     /// This will burn the symbol NFT ensuring the symbol cannot be mapped to any other tokens.
-    map-symbol: func(token-id: token-id, symbol: account-number) -> result<_, error>;
+    map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
 
     /// Configures whether a token should be transferable.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to prevent transfers, `false` to allow them
-    enable-token-untransferable: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-token-untransferable: func(token-id: u32, enable: bool) -> result<_, error>;
 
     /// Configures whether a token should be able to be recalled by the token issuer.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to prevent recalls, `false` to allow them
-    enable-token-unrecallable: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-token-unrecallable: func(token-id: u32, enable: bool) -> result<_, error>;
 }
 
 interface user {
     use host:types/types.{error};
-    use types.{precision, quantity, token-id, account-number};
+    use types.{decimal};
 
     /// Credit tokens to a recipient.
     ///
@@ -82,7 +70,7 @@ interface user {
     /// * `memo`     - Memo describing the credit
     ///
     /// Places funds in shared balance when the debitor has manual debit enabled
-    credit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
 
     /// Cancel a pending shared-balance credit.
     ///
@@ -91,7 +79,7 @@ interface user {
     /// * `debitor`  - Debitor / recipient account
     /// * `amount`   - Amount to uncredit
     /// * `memo`     - Memo describing the uncredit
-    uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     
     /// Move tokens from shared balance into the debitor's account balance.
     ///
@@ -100,7 +88,7 @@ interface user {
     /// * `creditor` - Account that initiated the credit
     /// * `amount`   - Amount to debit
     /// * `memo`     - Memo describing the debit
-    debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    debit: func(token-id: u32, creditor: string, amount: decimal, memo: string) -> result<_, error>;
 
     /// Reject all shared-balance tokens from a creditor.
     ///
@@ -108,7 +96,7 @@ interface user {
     /// * `token_id` - Unique token identifier
     /// * `creditor` - Account that initiated the credit
     /// * `memo`     - Memo describing the rejection
-    reject: func(token-id: token-id, creditor: account-number, memo: string) -> result<_, error>;
+    reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
     
     /// Burn tokens from the caller's balance.
     ///
@@ -116,12 +104,11 @@ interface user {
     /// * `token_id` - Unique token identifier
     /// * `amount`   - Amount to burn
     /// * `memo`     - Memo describing the burn
-    burn: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+    burn: func(token-id: u32, amount: decimal, memo: string) -> result<_, error>;
 }
 
 interface user-config {
     use host:types/types.{error};
-    use types.{token-id};
 
     /// Enable or disable manual debit globally for the caller.
     ///
@@ -140,35 +127,35 @@ interface user-config {
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to require manual debit, `false` for automatic debit
-    enable-balance-manual-debit: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-balance-manual-debit: func(token-id: u32, enable: bool) -> result<_, error>;
     
     /// Keep zero balances for a specific token balance.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to retain zero-balance rows, `false` to prune them
-    enable-balance-keep-zero-balances: func(token-id: token-id, enable: bool) -> result<_, error>;
+    enable-balance-keep-zero-balances: func(token-id: u32, enable: bool) -> result<_, error>;
     
     /// Delete the caller's balance configuration for a token.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
-    del-balance-config: func(token-id: token-id) -> result<_, error>;
+    del-balance-config: func(token-id: u32) -> result<_, error>;
 }
 
 interface helpers {
     use host:types/types.{error};
-    use types.{quantity, token-id};
+    use types.{decimal};
 
     /// Uses the precision of the specified token to convert from a token 
-    ///   quantity (string) to its u64 representation 
+    ///   decimal (string) to its u64 representation 
     ///   (e.g. "100.0000" -> 1000000)
-    quantity-to-u64: func(token-id: token-id, amount: quantity) -> result<u64, error>;
+    decimal-to-u64: func(token-id: u32, amount: decimal) -> result<u64, error>;
 
     /// Uses the precision of the specified token to convert from an u64 representation
-    ///   of token quantity to a string representation
+    ///   of token decimal to a string representation
     ///   (e.g. 1000000 -> "100.0000")
-    u64-to-quantity: func(token-id: token-id, amount: u64) -> result<quantity, error>;
+    u64-to-decimal: func(token-id: u32, amount: u64) -> result<decimal, error>;
 }
 
 world imports {

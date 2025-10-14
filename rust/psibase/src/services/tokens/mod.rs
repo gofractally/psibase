@@ -97,7 +97,7 @@ mod service {
     /// * `amount`   - Amount to credit
     /// * `memo`     - Memo
     #[action]
-    fn credit(tokenId: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
+    fn credit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -119,7 +119,7 @@ mod service {
     /// * `amount`   - Amount to uncredit
     /// * `memo`     - Memo
     #[action]
-    fn uncredit(tokenId: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
+    fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -141,7 +141,7 @@ mod service {
     /// * `amount`   - Amount to debit
     /// * `memo`     - Memo
     #[action]
-    fn debit(tokenId: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
+    fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -164,7 +164,7 @@ mod service {
     /// * `amount`   - Amount of tokens to burn
     /// * `memo`     - Memo
     #[action]
-    fn burn(tokenId: TID, amount: Quantity, memo: Memo) {
+    fn burn(token_id: TID, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -178,7 +178,7 @@ mod service {
     /// * `amount`   - Amount of tokens to mint
     /// * `memo`     - Memo
     #[action]
-    fn mint(tokenId: TID, amount: Quantity, memo: Memo) {
+    fn mint(token_id: TID, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 
@@ -192,7 +192,7 @@ mod service {
     /// * `amount`   - Amount of tokens to recall
     /// * `memo`     - Memo
     #[action]
-    fn recall(tokenId: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
+    fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
         unimplemented!()
     }
 

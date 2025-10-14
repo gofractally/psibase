@@ -6,19 +6,19 @@ mod errors;
 use errors::ErrorType;
 
 use bindings::exports::tokens::plugin as Exports;
+use Exports::types::Decimal;
 use Exports::{
-    helpers::Guest as Helpers, issuer::Guest as Issuer, types as Wit, user::Guest as User,
+    helpers::Guest as Helpers, issuer::Guest as Issuer, user::Guest as User,
     user_config::Guest as UserConfig,
 };
 
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::services::tokens::quantity::Quantity;
+use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
+use psibase::services::tokens::Quantity;
 use psibase::AccountNumber;
-use psibase::{fracpack::Pack, services::tokens::Decimal, FlagsType};
-use tokens::{action_structs as Actions, BalanceFlags, TokenFlags};
-
+use psibase::{fracpack::Pack, services::tokens, FlagsType};
 pub mod query {
     pub mod fetch_token;
 }
@@ -26,11 +26,7 @@ pub mod query {
 struct TokensPlugin;
 
 impl TokensPlugin {
-    fn set_balance_flag(
-        token_id: Wit::TokenId,
-        flag: BalanceFlags,
-        enable: bool,
-    ) -> Result<(), Error> {
+    fn set_balance_flag(token_id: u32, flag: BalanceFlags, enable: bool) -> Result<(), Error> {
         use Actions::setBalConf;
 
         add_action_to_transaction(
@@ -44,7 +40,7 @@ impl TokensPlugin {
         )
     }
 
-    fn set_token_flag(token_id: Wit::TokenId, flag: TokenFlags, enable: bool) -> Result<(), Error> {
+    fn set_token_flag(token_id: u32, flag: TokenFlags, enable: bool) -> Result<(), Error> {
         use Actions::setTokenConf;
 
         add_action_to_transaction(
@@ -73,65 +69,60 @@ impl TokensPlugin {
 }
 
 impl Issuer for TokensPlugin {
-    fn create(precision: Wit::Precision, max_supply: Wit::Quantity) -> Result<(), Error> {
+    fn create(precision: u8, max_supply: Decimal) -> Result<(), Error> {
         let max_issued_supply =
             Quantity::from_str(&max_supply, precision.try_into().unwrap()).unwrap();
 
-        let packed_args = tokens::action_structs::create {
+        let packed_args = Actions::create {
             max_issued_supply,
             precision: precision.try_into().unwrap(),
         }
         .packed();
 
-        add_action_to_transaction(tokens::action_structs::create::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::create::ACTION_NAME, &packed_args)
     }
 
-    fn recall(
-        token_id: Wit::TokenId,
-        amount: Wit::Quantity,
-        memo: String,
-        account: Wit::AccountNumber,
-    ) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::recall {
-            amount: Self::quantity_to_u64(token_id, amount)?.into(),
+    fn recall(token_id: u32, amount: Decimal, memo: String, account: String) -> Result<(), Error> {
+        let packed_args = Actions::recall {
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             from: account.as_str().into(),
             memo: memo.try_into().unwrap(),
             token_id,
         }
         .packed();
-        add_action_to_transaction(tokens::action_structs::recall::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::recall::ACTION_NAME, &packed_args)
     }
 
-    fn mint(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::mint {
-            amount: Self::quantity_to_u64(token_id, amount)?.into(),
+    fn mint(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
+        let packed_args = Actions::mint {
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
             token_id,
         }
         .packed();
-        add_action_to_transaction(tokens::action_structs::mint::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::mint::ACTION_NAME, &packed_args)
     }
 
-    fn map_symbol(token_id: Wit::TokenId, symbol: Wit::AccountNumber) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::mapSymbol {
+    fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
+        let packed_args = Actions::mapSymbol {
             token_id,
             symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
         }
         .packed();
-        add_action_to_transaction(tokens::action_structs::mapSymbol::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::mapSymbol::ACTION_NAME, &packed_args)
     }
 
-    fn enable_token_untransferable(token_id: Wit::TokenId, enable: bool) -> Result<(), Error> {
+    fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {
         Self::set_token_flag(token_id, TokenFlags::UNTRANSFERABLE, enable)
     }
 
-    fn enable_token_unrecallable(token_id: Wit::TokenId, enable: bool) -> Result<(), Error> {
+    fn enable_token_unrecallable(token_id: u32, enable: bool) -> Result<(), Error> {
         Self::set_token_flag(token_id, TokenFlags::UNRECALLABLE, enable)
     }
 }
 
 impl Helpers for TokensPlugin {
-    fn quantity_to_u64(token_id: Wit::TokenId, amount: Wit::Quantity) -> Result<u64, Error> {
+    fn decimal_to_u64(token_id: u32, amount: String) -> Result<u64, Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Quantity::from_str(&amount, token.precision)
@@ -139,88 +130,74 @@ impl Helpers for TokensPlugin {
             .map_err(|error| Error::from(ErrorType::ConversionError(error.to_string())))
     }
 
-    fn u64_to_quantity(token_id: Wit::TokenId, amount: u64) -> Result<Wit::Quantity, Error> {
+    fn u64_to_decimal(token_id: u32, amount: u64) -> Result<String, Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        Ok(Decimal::new(amount.into(), token.precision).to_string())
+        Ok(tokens::Decimal::new(amount.into(), token.precision).to_string())
     }
 }
 
 impl User for TokensPlugin {
-    fn credit(
-        token_id: Wit::TokenId,
-        debitor: Wit::AccountNumber,
-        amount: Wit::Quantity,
-        memo: String,
-    ) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::credit {
-            amount: Self::quantity_to_u64(token_id, amount)?.into(),
+    fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
+        let packed_args = Actions::credit {
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
             debitor: debitor.as_str().into(),
             token_id,
         }
         .packed();
 
-        add_action_to_transaction(tokens::action_structs::credit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::credit::ACTION_NAME, &packed_args)
     }
 
     fn uncredit(
-        token_id: Wit::TokenId,
-        debitor: Wit::AccountNumber,
-        amount: Wit::Quantity,
+        token_id: u32,
+        debitor: String,
+        amount: Decimal,
         memo: String,
     ) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::uncredit {
-            amount: Self::quantity_to_u64(token_id, amount)?.into(),
+        let packed_args = Actions::uncredit {
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
             debitor: debitor.as_str().into(),
             token_id,
         }
         .packed();
 
-        add_action_to_transaction(tokens::action_structs::uncredit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::uncredit::ACTION_NAME, &packed_args)
     }
 
-    fn debit(
-        token_id: Wit::TokenId,
-        creditor: Wit::AccountNumber,
-        amount: Wit::Quantity,
-        memo: String,
-    ) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::debit {
-            amount: Self::quantity_to_u64(token_id, amount)?.into(),
+    fn debit(token_id: u32, creditor: String, amount: Decimal, memo: String) -> Result<(), Error> {
+        let packed_args = Actions::debit {
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             creditor: creditor.as_str().into(),
             memo: memo.try_into().unwrap(),
             token_id,
         }
         .packed();
 
-        add_action_to_transaction(tokens::action_structs::debit::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::debit::ACTION_NAME, &packed_args)
     }
 
-    fn reject(
-        token_id: Wit::TokenId,
-        creditor: Wit::AccountNumber,
-        memo: String,
-    ) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::reject {
+    fn reject(token_id: u32, creditor: String, memo: String) -> Result<(), Error> {
+        let packed_args = Actions::reject {
             creditor: creditor.as_str().into(),
             token_id,
             memo: memo.try_into().unwrap(),
         }
         .packed();
 
-        add_action_to_transaction(tokens::action_structs::reject::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::reject::ACTION_NAME, &packed_args)
     }
 
-    fn burn(token_id: Wit::TokenId, amount: Wit::Quantity, memo: String) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::burn {
-            amount: Self::quantity_to_u64(token_id, amount)?.into(),
+    fn burn(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
+        let packed_args = Actions::burn {
+            amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
             token_id,
         }
         .packed();
-        add_action_to_transaction(tokens::action_structs::burn::ACTION_NAME, &packed_args)
+        add_action_to_transaction(Actions::burn::ACTION_NAME, &packed_args)
     }
 }
 
@@ -233,24 +210,18 @@ impl UserConfig for TokensPlugin {
         Self::set_user_flag(BalanceFlags::KEEP_ZERO_BALANCES, enable)
     }
 
-    fn enable_balance_manual_debit(token_id: Wit::TokenId, enable: bool) -> Result<(), Error> {
+    fn enable_balance_manual_debit(token_id: u32, enable: bool) -> Result<(), Error> {
         Self::set_balance_flag(token_id, BalanceFlags::MANUAL_DEBIT, enable)
     }
 
-    fn enable_balance_keep_zero_balances(
-        token_id: Wit::TokenId,
-        enable: bool,
-    ) -> Result<(), Error> {
+    fn enable_balance_keep_zero_balances(token_id: u32, enable: bool) -> Result<(), Error> {
         Self::set_balance_flag(token_id, BalanceFlags::KEEP_ZERO_BALANCES, enable)
     }
 
-    fn del_balance_config(token_id: Wit::TokenId) -> Result<(), Error> {
-        let packed_args = tokens::action_structs::delBalConf { token_id }.packed();
+    fn del_balance_config(token_id: u32) -> Result<(), Error> {
+        let packed_args = Actions::delBalConf { token_id }.packed();
 
-        add_action_to_transaction(
-            tokens::action_structs::delBalConf::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::delBalConf::ACTION_NAME, &packed_args)
     }
 }
 

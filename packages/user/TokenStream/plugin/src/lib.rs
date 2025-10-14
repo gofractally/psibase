@@ -3,7 +3,7 @@ mod bindings;
 
 use bindings::exports::token_stream::plugin::api::Guest as Api;
 use bindings::host::types::types::Error;
-use bindings::tokens::plugin::helpers::quantity_to_u64;
+use bindings::tokens::plugin::helpers::decimal_to_u64;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::define_trust;
@@ -53,7 +53,7 @@ impl Api for TokenStreamPlugin {
 
         let packed_args = token_stream::action_structs::deposit {
             nft_id,
-            amount: quantity_to_u64(token_id, &amount)?.into(),
+            amount: decimal_to_u64(token_id, &amount)?.into(),
         }
         .packed();
 
