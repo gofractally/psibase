@@ -1,8 +1,19 @@
 import { ArrowDown, Loader2, Undo2, X } from "lucide-react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { GlowingCard } from "@/components/glowing-card";
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -168,6 +179,7 @@ export const PendingPageContents = () => {
 
 const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     const { mutateAsync, isPending } = useDebit(currentUser, counterParty);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleClaim = async (pt: LineOfCredit) => {
         try {
@@ -178,6 +190,7 @@ const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                 memo: "",
             });
             toast.success("Pending balance successfully claimed");
+            setIsDialogOpen(false);
         } catch (e) {
             toast.error("Failed to claim pending balance", {
                 closeButton: true,
@@ -192,29 +205,60 @@ const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     };
 
     return (
-        <Tooltip>
-            <TooltipContent>Accept</TooltipContent>
-            <TooltipTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={isPending}
-                    onClick={() => handleClaim(pt)}
-                >
-                    {isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <ArrowDown className="h-4 w-4" />
-                    )}
-                </Button>
-            </TooltipTrigger>
-        </Tooltip>
+        <>
+            <Tooltip>
+                <TooltipContent>Accept</TooltipContent>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={isPending}
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        {isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <ArrowDown className="h-4 w-4" />
+                        )}
+                    </Button>
+                </TooltipTrigger>
+            </Tooltip>
+            <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Accept Pending Payment
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to accept{" "}
+                            {pt.balance.format({ fullPrecision: false })} from{" "}
+                            {counterParty}?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={isPending}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleClaim(pt);
+                            }}
+                        >
+                            {isPending ? "Accepting..." : "Accept"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 };
 
 const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     const { mutateAsync, isPending } = useUncredit(currentUser, counterParty);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleRecall = async (pt: LineOfCredit) => {
         try {
@@ -225,6 +269,7 @@ const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                 memo: "",
             });
             toast.success("Pending balance successfully recalled");
+            setIsDialogOpen(false);
         } catch (e) {
             toast.error("Failed to recall pending balance", {
                 closeButton: true,
@@ -239,29 +284,61 @@ const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     };
 
     return (
-        <Tooltip>
-            <TooltipContent>Cancel</TooltipContent>
-            <TooltipTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={isPending}
-                    onClick={() => handleRecall(pt)}
-                >
-                    {isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <Undo2 className="h-4 w-4" />
-                    )}
-                </Button>
-            </TooltipTrigger>
-        </Tooltip>
+        <>
+            <Tooltip>
+                <TooltipContent>Cancel</TooltipContent>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={isPending}
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        {isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Undo2 className="h-4 w-4" />
+                        )}
+                    </Button>
+                </TooltipTrigger>
+            </Tooltip>
+            <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Cancel Outgoing Payment
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to cancel your outgoing
+                            payment of{" "}
+                            {pt.balance.format({ fullPrecision: false })} to{" "}
+                            {counterParty}?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>
+                            Back
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={isPending}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleRecall(pt);
+                            }}
+                        >
+                            {isPending ? "Canceling..." : "Cancel Payment"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 };
 
 const RejectButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     const { mutateAsync, isPending } = useReject(currentUser, counterParty);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleReject = async (pt: LineOfCredit) => {
         try {
@@ -271,6 +348,7 @@ const RejectButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                 memo: "",
             });
             toast.success("Pending balance successfully rejected");
+            setIsDialogOpen(false);
         } catch (e) {
             toast.error("Failed to reject pending balance", {
                 closeButton: true,
@@ -285,23 +363,53 @@ const RejectButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     };
 
     return (
-        <Tooltip>
-            <TooltipContent>Reject</TooltipContent>
-            <TooltipTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={isPending}
-                    onClick={() => handleReject(pt)}
-                >
-                    {isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <X className="h-4 w-4" />
-                    )}
-                </Button>
-            </TooltipTrigger>
-        </Tooltip>
+        <>
+            <Tooltip>
+                <TooltipContent>Reject</TooltipContent>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={isPending}
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        {isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <X className="h-4 w-4" />
+                        )}
+                    </Button>
+                </TooltipTrigger>
+            </Tooltip>
+            <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Reject Incoming Payment
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to reject{" "}
+                            {pt.balance.format({ fullPrecision: false })} from{" "}
+                            {counterParty}?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>
+                            Back
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={isPending}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleReject(pt);
+                            }}
+                        >
+                            {isPending ? "Rejecting..." : "Reject"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 };
