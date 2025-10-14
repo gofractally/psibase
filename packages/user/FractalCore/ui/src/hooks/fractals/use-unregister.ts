@@ -28,7 +28,7 @@ export const useUnregister = () => {
             void (await getSupervisor().functionCall({
                 method: "unregister",
                 service: fractalAccount,
-                intf: "user",
+                intf: "userEval",
                 params: [params.guildAccount],
             }));
         },

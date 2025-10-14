@@ -21,7 +21,7 @@ export const useGroupUsers = (
                     method: "getGroupUsers",
                     params: [guildAccount, groupNumber],
                     service: fractal,
-                    intf: "user",
+                    intf: "userEval",
                 });
                 return zAccount.array().parse(res);
             } catch (error) {

@@ -25,7 +25,7 @@ export const useCloseEvaluation = () => {
                     method: "closeEval",
                     params: [guildAccount],
                     service: fractal,
-                    intf: "admin",
+                    intf: "adminGuild",
                 }));
             } catch (e) {
                 const error = e as Error;

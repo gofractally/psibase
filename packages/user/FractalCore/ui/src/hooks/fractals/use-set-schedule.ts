@@ -48,7 +48,7 @@ export const useSetSchedule = () =>
                     intervalSeconds,
                 ],
                 service: fractal,
-                intf: "admin",
+                intf: "adminGuild",
             });
         },
         onSuccess: (_, params) => {

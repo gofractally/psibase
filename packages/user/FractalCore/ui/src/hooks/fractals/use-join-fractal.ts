@@ -20,7 +20,7 @@ const mutationFn = async (fractal: string) => {
             method: "join",
             params: [fractal],
             service: fractal,
-            intf: "user",
+            intf: "userFractal",
         });
     } catch (error) {
         const message = "Error joining fractal";

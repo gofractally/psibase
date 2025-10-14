@@ -26,7 +26,7 @@ export const useCreateGuild = () => {
                 method: "createGuild",
                 params: [name, account],
                 service: fractalAccount,
-                intf: "user",
+                intf: "adminGuild",
             });
         },
         onSuccess: (_, { account }) => {

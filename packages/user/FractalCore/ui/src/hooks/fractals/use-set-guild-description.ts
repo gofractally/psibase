@@ -8,8 +8,8 @@ export const useSetGuildDescription = () => {
 
     return usePluginMutation<[Account, string]>(
         {
-            intf: "admin",
-            method: "setGuildDescription",
+            intf: "adminGuild",
+            method: "setDescription",
             service: fractal,
         },
         {

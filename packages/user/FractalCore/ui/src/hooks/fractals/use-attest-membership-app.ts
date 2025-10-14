@@ -34,7 +34,7 @@ export const useAttestMembershipApp = () => {
         {
             method: "attestMembershipApp",
             service: fractal,
-            intf: "user",
+            intf: "userGuild",
         },
         {
             error: "Failed attesting membership",

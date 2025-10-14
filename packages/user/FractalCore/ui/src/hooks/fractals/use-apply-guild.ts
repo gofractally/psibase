@@ -21,7 +21,7 @@ export const useApplyGuild = () => {
             await supervisor.functionCall({
                 method: "applyGuild",
                 service: fractal,
-                intf: "user",
+                intf: "userGuild",
                 params: [guildAccount, extraInfo],
             });
         },

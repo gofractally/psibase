@@ -27,7 +27,7 @@ export const useAttest = () => {
                 getSupervisor().functionCall({
                     method: "attest",
                     service: fractal,
-                    intf: "user",
+                    intf: "userEval",
                     params: [params.guildAccount, params.groupNumber],
                 }),
                 {

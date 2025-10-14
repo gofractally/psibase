@@ -29,7 +29,7 @@ export const useCreateFractal = () =>
                 method: "createFractal",
                 params: [fractalAccount, guildAccount, name, mission],
                 service: fractalsService,
-                intf: "admin",
+                intf: "adminFractal",
             });
         },
         onSuccess: (_, { fractalAccount: account }) => {

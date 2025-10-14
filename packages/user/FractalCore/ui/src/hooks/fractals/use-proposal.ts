@@ -21,7 +21,7 @@ export const useProposal = (groupNumber: OptionalNumber) => {
                     method: "getProposal",
                     params: [guildAccount, groupNumber],
                     service: fractal,
-                    intf: "user",
+                    intf: "userEval",
                 });
 
                 return z.optional(zAccount.array()).parse(res);

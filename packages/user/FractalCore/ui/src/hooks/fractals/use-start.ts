@@ -20,7 +20,7 @@ export const useStart = () => {
                 method: "startEval",
                 params: [params.guildAccount],
                 service: fractalAccount,
-                intf: "user",
+                intf: "adminGuild",
             });
         },
         onError: (error) => {

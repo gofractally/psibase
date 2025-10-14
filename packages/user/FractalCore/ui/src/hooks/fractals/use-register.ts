@@ -30,7 +30,7 @@ export const useRegister = () => {
             void (await getSupervisor().functionCall({
                 method: "register",
                 service: fractalAccount,
-                intf: "user",
+                intf: "userEval",
                 params: [params.slug],
             }));
         },

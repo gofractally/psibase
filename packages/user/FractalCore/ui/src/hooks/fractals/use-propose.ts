@@ -23,7 +23,7 @@ export const usePropose = () => {
             const pars = {
                 method: "propose",
                 service: fractalAccount,
-                intf: "user",
+                intf: "userEval",
                 params: [guildAccount, groupNumber, proposal],
             };
 
