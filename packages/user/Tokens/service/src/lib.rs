@@ -1,5 +1,6 @@
 pub mod helpers;
 pub mod tables;
+pub use tables::tables::{BalanceFlags, TokenFlags};
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
