@@ -61,7 +61,7 @@ define_trust! {
     functions {
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_guild, create_fractal],
-        High => [propose, set_schedule, set_guild_display_name, set_guild_bio, set_guild_description, attest],
+        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest],
     }
 }
 
@@ -119,7 +119,7 @@ impl AdminGuild for FractallyPlugin {
     }
 
     fn set_display_name(guild: String, display_name: String) -> Result<(), Error> {
-        get_guild(guild)?.assert_authorized(FunctionName::set_guild_display_name)?;
+        get_guild(guild)?.assert_authorized(FunctionName::set_display_name)?;
 
         let packed_args = fractals::action_structs::set_g_disp {
             display_name: display_name.try_into().unwrap(),
@@ -133,7 +133,7 @@ impl AdminGuild for FractallyPlugin {
     }
 
     fn set_bio(guild: String, bio: String) -> Result<(), Error> {
-        get_guild(guild)?.assert_authorized(FunctionName::set_guild_bio)?;
+        get_guild(guild)?.assert_authorized(FunctionName::set_bio)?;
 
         let packed_args = fractals::action_structs::set_g_bio {
             bio: bio.try_into().unwrap(),
@@ -147,7 +147,7 @@ impl AdminGuild for FractallyPlugin {
     }
 
     fn set_description(guild_account: String, description: String) -> Result<(), Error> {
-        get_guild(guild_account)?.assert_authorized(FunctionName::set_guild_description)?;
+        get_guild(guild_account)?.assert_authorized(FunctionName::set_description)?;
 
         let packed_args = fractals::action_structs::set_g_desc { description }.packed();
 
