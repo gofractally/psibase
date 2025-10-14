@@ -909,7 +909,6 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A test fractal"
     PACKAGE_DEPENDS "FractalCore(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION})" "Fractals(^${PSIBASE_VERSION})"
-    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/test-fractal.json
 )
 
 psibase_package(
