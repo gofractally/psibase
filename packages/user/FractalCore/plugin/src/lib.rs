@@ -1,8 +1,10 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::fractal_core::plugin::admin::Guest as Admin;
-use bindings::exports::fractal_core::plugin::user::Guest as User;
+use bindings::exports::fractal_core::plugin::admin_guild::Guest as AdminGuild;
+use bindings::exports::fractal_core::plugin::user_eval::Guest as UserEval;
+use bindings::exports::fractal_core::plugin::user_fractal::Guest as UserFractal;
+use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
 
@@ -44,13 +46,13 @@ define_trust! {
     functions {
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_guild],
-        High => [propose, set_schedule, set_guild_display_name, set_guild_bio, set_guild_description, attest],
+        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest],
     }
 }
 
 struct FractalCorePlugin;
 
-impl Admin for FractalCorePlugin {
+impl AdminGuild for FractalCorePlugin {
     fn set_schedule(
         guild_account: String,
         registration: u32,
@@ -78,20 +80,20 @@ impl Admin for FractalCorePlugin {
         FractalsPlugin::admin_guild::close_eval(&guild_account)
     }
 
-    fn set_guild_display_name(guild_account: String, display_name: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_guild_display_name)?;
+    fn set_display_name(guild_account: String, display_name: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_display_name)?;
         set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin_guild::set_display_name(&guild_account, &display_name)
     }
 
-    fn set_guild_bio(guild_account: String, bio: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_guild_bio)?;
+    fn set_bio(guild_account: String, bio: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_bio)?;
         set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin_guild::set_bio(&guild_account, &bio)
     }
 
-    fn set_guild_description(guild_account: String, description: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_guild_description)?;
+    fn set_description(guild_account: String, description: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_description)?;
         set_propose_latch(Some(&guild_account))?;
         FractalsPlugin::admin_guild::set_description(&guild_account, &description)
     }
@@ -100,34 +102,14 @@ impl Admin for FractalCorePlugin {
         assert_authorized(FunctionName::start_eval)?;
         FractalsPlugin::admin_guild::start_eval(&guild_account)
     }
+
+    fn create_guild(display_name: String, account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::create_guild)?;
+        FractalsPlugin::admin_guild::create_guild(&display_name, &account)
+    }
 }
 
-impl User for FractalCorePlugin {
-    fn join() -> Result<(), Error> {
-        assert_authorized(FunctionName::join)?;
-        FractalsPlugin::user_fractal::join()
-    }
-
-    fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::apply_guild)?;
-        FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
-    }
-
-    fn attest_membership_app(
-        guild_account: String,
-        member: String,
-        comment: String,
-        endorses: bool,
-    ) -> Result<(), Error> {
-        assert_authorized(FunctionName::attest_membership_app)?;
-        FractalsPlugin::user_guild::attest_membership_app(
-            &guild_account,
-            &member,
-            &comment,
-            endorses,
-        )
-    }
-
+impl UserEval for FractalCorePlugin {
     fn propose(
         guild_account: String,
         group_number: u32,
@@ -149,11 +131,6 @@ impl User for FractalCorePlugin {
         FractalsPlugin::user_eval::get_proposal(&guild_account, group_number)
     }
 
-    fn create_guild(display_name: String, account: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::create_guild)?;
-        FractalsPlugin::admin_guild::create_guild(&display_name, &account)
-    }
-
     fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::attest)?;
         FractalsPlugin::user_eval::attest(&guild_account, group_number)
@@ -167,6 +144,35 @@ impl User for FractalCorePlugin {
     fn unregister(guild_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::unregister)?;
         FractalsPlugin::user_eval::unregister(&guild_account)
+    }
+}
+
+impl UserFractal for FractalCorePlugin {
+    fn join() -> Result<(), Error> {
+        assert_authorized(FunctionName::join)?;
+        FractalsPlugin::user_fractal::join()
+    }
+}
+
+impl UserGuild for FractalCorePlugin {
+    fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::apply_guild)?;
+        FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
+    }
+
+    fn attest_membership_app(
+        guild_account: String,
+        member: String,
+        comment: String,
+        endorses: bool,
+    ) -> Result<(), Error> {
+        assert_authorized(FunctionName::attest_membership_app)?;
+        FractalsPlugin::user_guild::attest_membership_app(
+            &guild_account,
+            &member,
+            &comment,
+            endorses,
+        )
     }
 }
 
