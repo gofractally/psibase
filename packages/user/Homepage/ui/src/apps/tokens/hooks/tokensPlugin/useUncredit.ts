@@ -20,7 +20,6 @@ export const useUncredit = (user: string | null, counterParty: string) =>
     useMutation<void, Error, z.infer<typeof Args>>({
         mutationKey: ["uncredit", counterParty],
         mutationFn: (vars) => {
-            console.log("uncredit", vars);
             const { amount, memo, tokenId, debitor } = Args.parse(vars);
 
             // Optimistically update the balance

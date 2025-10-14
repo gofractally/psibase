@@ -1,4 +1,4 @@
-import { ArrowDown, Loader2, Undo2 } from "lucide-react";
+import { ArrowDown, Loader2, Undo2, X } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 
 import { GlowingCard } from "@/components/glowing-card";
@@ -22,12 +22,19 @@ import {
 } from "@shared/shadcn/ui/tooltip";
 
 import { useDebit } from "./hooks/tokensPlugin/useDebit";
+import { useReject } from "./hooks/tokensPlugin/useReject";
 import { useUncredit } from "./hooks/tokensPlugin/useUncredit";
 import {
     type LineOfCredit,
     useUserLinesOfCredit,
 } from "./hooks/tokensPlugin/useUserLinesOfCredit";
 import { TokensOutletContext } from "./layout";
+
+interface PendingAction {
+    currentUser: string | null;
+    pt: LineOfCredit;
+    counterParty: string;
+}
 
 export const PendingPage = () => {
     const context = useOutletContext<TokensOutletContext>();
@@ -100,13 +107,26 @@ export const PendingPageContents = () => {
                                                 {pt.debit.balance.format({
                                                     fullPrecision: false,
                                                 })}
-                                                <AcceptButton
-                                                    currentUser={currentUser}
-                                                    pt={pt.debit}
-                                                    counterParty={
-                                                        pt.counterParty
-                                                    }
-                                                />
+                                                <div className="flex gap-1">
+                                                    <AcceptButton
+                                                        currentUser={
+                                                            currentUser
+                                                        }
+                                                        pt={pt.debit}
+                                                        counterParty={
+                                                            pt.counterParty
+                                                        }
+                                                    />
+                                                    <RejectButton
+                                                        currentUser={
+                                                            currentUser
+                                                        }
+                                                        pt={pt.debit}
+                                                        counterParty={
+                                                            pt.counterParty
+                                                        }
+                                                    />
+                                                </div>
                                             </>
                                         ) : (
                                             <span className="text-muted-foreground">
@@ -146,23 +166,12 @@ export const PendingPageContents = () => {
     );
 };
 
-const AcceptButton = ({
-    currentUser,
-    pt,
-    counterParty,
-}: {
-    currentUser: string | null;
-    pt: LineOfCredit;
-    counterParty: string;
-}) => {
-    const { mutateAsync: debit, isPending: isDebitPending } = useDebit(
-        currentUser,
-        counterParty,
-    );
+const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
+    const { mutateAsync, isPending } = useDebit(currentUser, counterParty);
 
     const handleClaim = async (pt: LineOfCredit) => {
         try {
-            await debit({
+            await mutateAsync({
                 tokenId: pt.balance.tokenNumber.toString(),
                 sender: pt.creditor,
                 amount: pt.balance.amount.toString(),
@@ -190,10 +199,10 @@ const AcceptButton = ({
                     variant="outline"
                     size="icon"
                     className="h-6 w-6"
-                    disabled={isDebitPending}
+                    disabled={isPending}
                     onClick={() => handleClaim(pt)}
                 >
-                    {isDebitPending ? (
+                    {isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                         <ArrowDown className="h-4 w-4" />
@@ -204,23 +213,12 @@ const AcceptButton = ({
     );
 };
 
-const CancelButton = ({
-    currentUser,
-    pt,
-    counterParty,
-}: {
-    currentUser: string | null;
-    pt: LineOfCredit;
-    counterParty: string;
-}) => {
-    const { mutateAsync: uncredit, isPending: isUncreditPending } = useUncredit(
-        currentUser,
-        counterParty,
-    );
+const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
+    const { mutateAsync, isPending } = useUncredit(currentUser, counterParty);
 
     const handleRecall = async (pt: LineOfCredit) => {
         try {
-            await uncredit({
+            await mutateAsync({
                 tokenId: pt.balance.tokenNumber.toString(),
                 debitor: pt.debitor,
                 amount: pt.balance.amount.toString(),
@@ -248,13 +246,59 @@ const CancelButton = ({
                     variant="outline"
                     size="icon"
                     className="h-6 w-6"
-                    disabled={isUncreditPending}
+                    disabled={isPending}
                     onClick={() => handleRecall(pt)}
                 >
-                    {isUncreditPending ? (
+                    {isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                         <Undo2 className="h-4 w-4" />
+                    )}
+                </Button>
+            </TooltipTrigger>
+        </Tooltip>
+    );
+};
+
+const RejectButton = ({ currentUser, pt, counterParty }: PendingAction) => {
+    const { mutateAsync, isPending } = useReject(currentUser, counterParty);
+
+    const handleReject = async (pt: LineOfCredit) => {
+        try {
+            await mutateAsync({
+                tokenId: pt.balance.tokenNumber.toString(),
+                creditor: pt.creditor,
+                memo: "",
+            });
+            toast.success("Pending balance successfully rejected");
+        } catch (e) {
+            toast.error("Failed to reject pending balance", {
+                closeButton: true,
+                richColors: true,
+                duration: Infinity,
+                description:
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
+            });
+        }
+    };
+
+    return (
+        <Tooltip>
+            <TooltipContent>Reject</TooltipContent>
+            <TooltipTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={isPending}
+                    onClick={() => handleReject(pt)}
+                >
+                    {isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <X className="h-4 w-4" />
                     )}
                 </Button>
             </TooltipTrigger>

@@ -20,7 +20,6 @@ export const useDebit = (user: string | null, counterParty: string) =>
     useMutation<void, Error, z.infer<typeof Args>>({
         mutationKey: ["debit", counterParty],
         mutationFn: (vars) => {
-            console.log("debit", vars);
             const { sender, amount, memo, tokenId } = Args.parse(vars);
 
             // Optimistically update the balance
