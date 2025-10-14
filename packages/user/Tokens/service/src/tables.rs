@@ -458,7 +458,7 @@ pub mod tables {
                     memo,
                 );
                 self.sub_balance(balance);
-                Balance::get_or_new(self.debitor, self.token_id).add_balance(balance);
+                Balance::get_or_new(self.creditor, self.token_id).add_balance(balance);
             }
         }
 
