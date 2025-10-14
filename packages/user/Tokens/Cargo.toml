@@ -23,3 +23,4 @@ crate-type = ["rlib"]
 tokens = { path = "service", version = "0.21.1" }
 r-tokens = { path = "query-service", version = "0.21.1" }
 tokens-plugin = { path = "plugin", version = "0.21.1" }
+user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }
