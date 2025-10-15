@@ -31,9 +31,8 @@ define_trust! {
             - Applying to join a guild
             - Attesting guild membership for a fractal member
             - Retrieving a proposal in evaluation
-            - Creating a new guild
             ",
-        High => "
+            High => "
             High trust grants the abilities of all lower trust levels, plus these abilities:
             - Proposing a vote in evaluation cycle
             - Setting the guild evaluation schedule
@@ -41,12 +40,14 @@ define_trust! {
             - Setting the guild bio
             - Setting the guild description
             - Attesting in an evaluation
+            - Creating a new guild
         ",
     }
     functions {
+        None => [get_group_users],
         Low => [start_eval, close_eval],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_guild],
-        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest],
+        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
+        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
     }
 }
 
