@@ -134,10 +134,13 @@ pub mod tables {
             self.active_difficulty
         }
 
-        fn check_difficulty_increase(&mut self) -> u64 {
+        fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
             if self.counter > self.target_max {
                 let percent = 1.0 + self.percent();
-                let times_over_target = self.counter / self.target_max;
+                let mut times_over_target = self.counter / self.target_max;
+                if clamp_increase {
+                    times_over_target = times_over_target.min(1);
+                }
                 let mut difficulty = self.active_difficulty as f64;
                 for _ in 0..times_over_target {
                     difficulty = difficulty * percent;
@@ -165,7 +168,7 @@ pub mod tables {
             self.check_sender_is_consumer();
             let difficulty = self.check_difficulty_decrease();
             self.counter += increment_amount;
-            self.check_difficulty_increase();
+            self.check_difficulty_increase(false);
             self.save();
             difficulty
         }
@@ -185,6 +188,7 @@ pub mod tables {
             self.check_difficulty_decrease();
             self.target_min = target_min;
             self.target_max = target_max;
+            self.check_difficulty_increase(true);
             self.save();
         }
 
