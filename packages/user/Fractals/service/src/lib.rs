@@ -97,7 +97,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
-    /// * `app` - Relevant information to the application.
+    /// * `extra_info` - Relevant information to the application.
     #[action]
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
         let guild = Guild::get_assert(guild_account);
