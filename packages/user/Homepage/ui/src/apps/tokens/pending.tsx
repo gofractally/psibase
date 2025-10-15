@@ -16,6 +16,8 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import { toast } from "@shared/shadcn/ui/sonner";
 import {
     Table,
@@ -40,6 +42,7 @@ import {
     useUserLinesOfCredit,
 } from "./hooks/tokensPlugin/useUserLinesOfCredit";
 import { TokensOutletContext } from "./layout";
+import { zTransferFormMemo } from "./lib/transfer-form-schema";
 
 interface PendingAction {
     currentUser: string | null;
@@ -180,6 +183,18 @@ export const PendingPageContents = () => {
 const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     const { mutateAsync, isPending } = useDebit(currentUser, counterParty);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [memo, setMemo] = useState("");
+    const [memoError, setMemoError] = useState<string | null>(null);
+
+    const handleMemoChange = (value: string) => {
+        setMemo(value);
+        const result = zTransferFormMemo.safeParse(value);
+        if (!result.success) {
+            setMemoError(result.error.errors[0]?.message || "Invalid memo");
+        } else {
+            setMemoError(null);
+        }
+    };
 
     const handleClaim = async (pt: LineOfCredit) => {
         try {
@@ -187,10 +202,12 @@ const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                 tokenId: pt.balance.tokenNumber.toString(),
                 sender: pt.creditor,
                 amount: pt.balance.amount.toString(),
-                memo: "",
+                memo: memo,
             });
             toast.success("Pending balance successfully claimed");
             setIsDialogOpen(false);
+            setMemo("");
+            setMemoError(null);
         } catch (e) {
             toast.error("Failed to claim pending balance", {
                 closeButton: true,
@@ -236,12 +253,27 @@ const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                             {counterParty}?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="accept-memo">Memo (optional)</Label>
+                        <Input
+                            id="accept-memo"
+                            value={memo}
+                            onChange={(e) => handleMemoChange(e.target.value)}
+                            placeholder="Add a note about this transaction"
+                            disabled={isPending}
+                        />
+                        {memoError && (
+                            <p className="text-destructive text-sm">
+                                {memoError}
+                            </p>
+                        )}
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isPending}>
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
-                            disabled={isPending}
+                            disabled={isPending || !!memoError}
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleClaim(pt);
@@ -259,6 +291,18 @@ const AcceptButton = ({ currentUser, pt, counterParty }: PendingAction) => {
 const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     const { mutateAsync, isPending } = useUncredit(currentUser, counterParty);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [memo, setMemo] = useState("");
+    const [memoError, setMemoError] = useState<string | null>(null);
+
+    const handleMemoChange = (value: string) => {
+        setMemo(value);
+        const result = zTransferFormMemo.safeParse(value);
+        if (!result.success) {
+            setMemoError(result.error.errors[0]?.message || "Invalid memo");
+        } else {
+            setMemoError(null);
+        }
+    };
 
     const handleRecall = async (pt: LineOfCredit) => {
         try {
@@ -266,10 +310,12 @@ const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                 tokenId: pt.balance.tokenNumber.toString(),
                 debitor: pt.debitor,
                 amount: pt.balance.amount.toString(),
-                memo: "",
+                memo: memo,
             });
             toast.success("Pending balance successfully recalled");
             setIsDialogOpen(false);
+            setMemo("");
+            setMemoError(null);
         } catch (e) {
             toast.error("Failed to recall pending balance", {
                 closeButton: true,
@@ -316,12 +362,27 @@ const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                             {counterParty}?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="cancel-memo">Memo (optional)</Label>
+                        <Input
+                            id="cancel-memo"
+                            value={memo}
+                            onChange={(e) => handleMemoChange(e.target.value)}
+                            placeholder="Add a note about this cancellation"
+                            disabled={isPending}
+                        />
+                        {memoError && (
+                            <p className="text-destructive text-sm">
+                                {memoError}
+                            </p>
+                        )}
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isPending}>
                             Back
                         </AlertDialogCancel>
                         <AlertDialogAction
-                            disabled={isPending}
+                            disabled={isPending || !!memoError}
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleRecall(pt);
@@ -339,16 +400,30 @@ const CancelButton = ({ currentUser, pt, counterParty }: PendingAction) => {
 const RejectButton = ({ currentUser, pt, counterParty }: PendingAction) => {
     const { mutateAsync, isPending } = useReject(currentUser, counterParty);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [memo, setMemo] = useState("");
+    const [memoError, setMemoError] = useState<string | null>(null);
+
+    const handleMemoChange = (value: string) => {
+        setMemo(value);
+        const result = zTransferFormMemo.safeParse(value);
+        if (!result.success) {
+            setMemoError(result.error.errors[0]?.message || "Invalid memo");
+        } else {
+            setMemoError(null);
+        }
+    };
 
     const handleReject = async (pt: LineOfCredit) => {
         try {
             await mutateAsync({
                 tokenId: pt.balance.tokenNumber.toString(),
                 creditor: pt.creditor,
-                memo: "",
+                memo: memo,
             });
             toast.success("Pending balance successfully rejected");
             setIsDialogOpen(false);
+            setMemo("");
+            setMemoError(null);
         } catch (e) {
             toast.error("Failed to reject pending balance", {
                 closeButton: true,
@@ -394,12 +469,27 @@ const RejectButton = ({ currentUser, pt, counterParty }: PendingAction) => {
                             {counterParty}?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="reject-memo">Memo (optional)</Label>
+                        <Input
+                            id="reject-memo"
+                            value={memo}
+                            onChange={(e) => handleMemoChange(e.target.value)}
+                            placeholder="Add a note about this rejection"
+                            disabled={isPending}
+                        />
+                        {memoError && (
+                            <p className="text-destructive text-sm">
+                                {memoError}
+                            </p>
+                        )}
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isPending}>
                             Back
                         </AlertDialogCancel>
                         <AlertDialogAction
-                            disabled={isPending}
+                            disabled={isPending || !!memoError}
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleReject(pt);
