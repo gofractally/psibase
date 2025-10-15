@@ -93,6 +93,17 @@ pub mod service {
         Wrapper::emit().history().created_fractal(fractal_account);
     }
 
+    #[action]
+    fn get_g_counc(guild_account: AccountNumber) -> Option<Vec<AccountNumber>> {
+        Guild::get(guild_account).map(|guild| {
+            guild
+                .council_members()
+                .into_iter()
+                .map(|m| m.account)
+                .collect()
+        })
+    }
+
     /// Apply to join a guild
     ///
     /// # Arguments

@@ -3,6 +3,19 @@
 pub mod Service {
     use crate::AccountNumber;
     use crate::Memo;
+    use fracpack::{Pack, ToSchema, Unpack};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct Guild {
+        pub account: AccountNumber,
+        pub fractal: AccountNumber,
+        pub display_name: Memo,
+        pub rep: Option<AccountNumber>,
+        pub bio: Memo,
+        pub description: String,
+    }
 
     /// Creates a new account and fractal.
     ///
@@ -18,6 +31,16 @@ pub mod Service {
         name: String,
         mission: String,
     ) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn get_g_counc(guild_account: AccountNumber) -> Option<Vec<AccountNumber>> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn get_guild(guild_account: AccountNumber) -> Option<Guild> {
         unimplemented!()
     }
 

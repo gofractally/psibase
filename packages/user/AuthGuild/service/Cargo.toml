@@ -7,9 +7,6 @@ publish.workspace = true
 
 [package.metadata.psibase]
 plugin = "auth-guild-plugin"
-postinstall = [
-    { sender = "auth-guild", service = "auth-guild", method = "init", data = {} },
-]
 
 [dependencies]
 psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
