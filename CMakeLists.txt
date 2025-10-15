@@ -890,7 +890,6 @@ psibase_package(
         "Sites(^${PSIBASE_VERSION})" 
         "Accounts(^${PSIBASE_VERSION})" 
         "CommonApi(^${PSIBASE_VERSION})" 
-        "Registry(^${PSIBASE_VERSION})" 
         "StagedTx(^${PSIBASE_VERSION})" 
         "Transact(^${PSIBASE_VERSION})"
         "Fractals(^${PSIBASE_VERSION})"
