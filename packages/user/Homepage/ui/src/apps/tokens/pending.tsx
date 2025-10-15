@@ -2,6 +2,7 @@ import { useOutletContext } from "react-router-dom";
 
 import { GlowingCard } from "@/components/glowing-card";
 
+import { Avatar } from "@shared/components/avatar";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
@@ -90,7 +91,14 @@ export const PendingPageContents = () => {
                         {pendingTransactions.map((pt, index) => (
                             <TableRow key={`${pt.counterParty}-${index}`}>
                                 <TableCell className="font-medium">
-                                    {pt.counterParty}
+                                    <div className="flex items-center gap-2">
+                                        <Avatar
+                                            account={pt.counterParty}
+                                            className="h-5 w-5"
+                                            alt="Counterparty avatar"
+                                        />
+                                        {pt.counterParty}
+                                    </div>
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-2">

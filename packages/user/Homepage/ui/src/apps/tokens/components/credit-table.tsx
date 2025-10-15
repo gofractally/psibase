@@ -4,6 +4,7 @@ import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use
 
 import { GlowingCard } from "@/components/glowing-card";
 
+import { Avatar } from "@shared/components/avatar";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
@@ -102,7 +103,16 @@ export function CreditTable({ user, token }: Props) {
                                         </Tooltip>
                                     </TableCell>
                                     <TableCell>
-                                        {transaction.counterParty}
+                                        <div className="flex items-center gap-2">
+                                            <Avatar
+                                                account={
+                                                    transaction.counterParty
+                                                }
+                                                className="h-5 w-5"
+                                                alt="Counterparty avatar"
+                                            />
+                                            {transaction.counterParty}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {transaction.direction === "incoming" &&
