@@ -1,1 +1,3 @@
-export const useFractalAccount = () => window.location.hostname.split(".")[0];
+import { useSubDomain } from "@shared/hooks/use-sub-domain";
+
+export const useFractalAccount = useSubDomain;
