@@ -14,6 +14,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { CardContent } from "@shared/shadcn/ui/card";
 
 import { TokenSelector } from "./components/token-selector";
+import { AutoDebitSwitch } from "./components/transfer/auto-debit-switch";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 
 export interface TokensOutletContext {
@@ -60,6 +61,7 @@ export const TokensLayout = () => {
                     <NoTokensWarning />
                 ) : (
                     <div className="space-y-4">
+                        <AutoDebitSwitch currentUser={currentUser} />
                         <GlowingCard>
                             <CardContent className="@container space-y-2">
                                 {!isLoading && (

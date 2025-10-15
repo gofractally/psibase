@@ -5,6 +5,7 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
 const QueryKey = {
+    userSettings: (user?: string | null) => ["userSettings", user] as const,
     userTokenBalances: (user?: string | null) =>
         ["userTokenBalances", user] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>

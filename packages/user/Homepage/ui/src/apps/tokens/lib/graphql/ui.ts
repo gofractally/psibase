@@ -51,6 +51,27 @@ const qs = {
             }
         }
     `,
+    userSettings: (username: string) => `
+        userSettings(user: "${username}") {
+            settings {
+                manualDebit
+            }
+        }
+    `,
+};
+
+interface UserSettingsRes {
+    userSettings: {
+        settings: {
+            manualDebit: boolean;
+        };
+    };
+}
+
+export const fetchUserSettings = async (username: string) => {
+    const query = `{${qs.userSettings(username)}}`;
+    const res = await graphql<UserSettingsRes>(query, "tokens");
+    return res.userSettings.settings;
 };
 
 // User Token Balances
