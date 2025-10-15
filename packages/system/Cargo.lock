@@ -565,6 +565,7 @@ dependencies = [
  "psibase_macros",
  "serde",
  "serde_json",
+ "system-workspace-hack",
 ]
 
 [[package]]
@@ -573,6 +574,7 @@ version = "0.21.0"
 dependencies = [
  "credentials",
  "credentials-plugin",
+ "system-workspace-hack",
 ]
 
 [[package]]
@@ -584,6 +586,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "system-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -1941,6 +1944,7 @@ dependencies = [
  "serde",
  "serde_json",
  "staged-tx",
+ "system-workspace-hack",
 ]
 
 [[package]]
@@ -2413,6 +2417,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "staged-tx-pkg",
+ "system-workspace-hack",
 ]
 
 [[package]]
@@ -2422,6 +2427,7 @@ dependencies = [
  "r-staged-tx",
  "staged-tx",
  "staged-tx-plugin",
+ "system-workspace-hack",
 ]
 
 [[package]]
@@ -2433,6 +2439,7 @@ dependencies = [
  "serde_json",
  "staged-tx",
  "staged-tx-pkg",
+ "system-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -2562,6 +2569,20 @@ checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "system-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "memchr",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_core",
+ "serde_json",
+ "syn 2.0.106",
 ]
 
 [[package]]
