@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -25,7 +26,7 @@ export const AutoDebitSwitch = ({
     currentUser: string | null;
 }) => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const { mutateAsync } = useToggleUserManualDebit(currentUser);
+    const { mutateAsync, isPending } = useToggleUserManualDebit(currentUser);
     const { data: manualDebit } = useUserManualDebit(currentUser);
     const autoDebit = !manualDebit;
 
@@ -101,9 +102,21 @@ export const AutoDebitSwitch = ({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleConfirm}>
-                            Proceed
+                        <AlertDialogCancel disabled={isPending}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={isPending}
+                            onClick={handleConfirm}
+                        >
+                            {isPending ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Processing...
+                                </>
+                            ) : (
+                                "Proceed"
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

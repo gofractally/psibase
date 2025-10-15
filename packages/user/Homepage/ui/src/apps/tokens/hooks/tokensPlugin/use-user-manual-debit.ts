@@ -44,14 +44,5 @@ export const useToggleUserManualDebit = (user: string | null) => {
                 queryKey: QueryKey.userSettings(parsedUser),
             });
         },
-        // onError: (_error, vars) => {
-        //     // Rollback optimistic update on error
-        //     updateUserTokenBalancesCache(
-        //         Account.parse(user),
-        //         vars.tokenId,
-        //         vars.amount,
-        //         "Add",
-        //     );
-        // },
     });
 };
