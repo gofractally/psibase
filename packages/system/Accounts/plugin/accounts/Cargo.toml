@@ -9,6 +9,7 @@ wit-bindgen-rt.workspace = true
 psibase = { path = "../../../../../rust/psibase/" }
 serde = "1.0.204"
 serde_json = "1.0.120"
+plugin-workspace-hack = { version = "0.1", path = "../../../../plugin-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]

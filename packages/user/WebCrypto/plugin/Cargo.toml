@@ -9,6 +9,7 @@ psibase.workspace = true
 p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
 pem = "3"
 seahash = "4.1"
+plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]
