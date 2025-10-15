@@ -444,6 +444,11 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthGuild.psi
+    PATH packages/user/AuthGuild
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenStream.psi
     PATH packages/user/TokenStream
     DEPENDS ${TokenStream_js_DEP}
