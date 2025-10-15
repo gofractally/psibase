@@ -16,3 +16,4 @@ data = [{src = "../ui", dst = "/"}]
 psibase = { path = "../../psibase", version = "0.21.0" }
 serde = "1.0"
 tpack = { path = "../service", version = "0.21.0" }
+rust-workspace-hack = { version = "0.1", path = "../../rust-workspace-hack" }

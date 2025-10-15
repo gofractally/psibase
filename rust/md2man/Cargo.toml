@@ -11,3 +11,4 @@ description = "Generate man page from markdown"
 [dependencies]
 pulldown-cmark = "0.9"
 clap = {version = "4.5", features = ["derive"]}
+rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }

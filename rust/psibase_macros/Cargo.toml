@@ -10,3 +10,4 @@ license = "MIT"
 
 [dependencies]
 psibase-macros-derive = { path = "psibase-macros-derive", version = "0.21.0" }
+rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }

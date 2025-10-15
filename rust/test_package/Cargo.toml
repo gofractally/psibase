@@ -18,3 +18,4 @@ crate-type = ["rlib"]
 [dependencies]
 tpack = { path = "service", version = "0.21.0" }
 r-tpack = { path = "query", version = "0.21.0" }
+rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }

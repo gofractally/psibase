@@ -19,3 +19,4 @@ crate-type = ["cdylib"]
 psibase_macros = { version = "0.21.0", path = "../psibase_macros" }
 psibase = { version = "0.21.0", path = "../psibase" }
 serde = { version = "1", features = ["derive"] }
+rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }

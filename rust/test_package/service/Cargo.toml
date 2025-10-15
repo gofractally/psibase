@@ -19,6 +19,7 @@ Sites = "0.21.0"
 [dependencies]
 psibase = { path = "../../psibase", version = "0.21.0" }
 serde = "1.0"
+rust-workspace-hack = { version = "0.1", path = "../../rust-workspace-hack" }
 
 [dev-dependencies]
 test_package = { path = "..", version = "0.21.0" }

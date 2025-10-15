@@ -19,3 +19,4 @@ quote = "1.0.15"
 syn = { version = "1.0.86", features = ["full", "visit-mut"] }
 toml = "0.8.19"
 psibase-macros-lib = { path = "../psibase-macros-lib", version = "0.21.0" }
+rust-workspace-hack = { version = "0.1", path = "../../rust-workspace-hack" }
