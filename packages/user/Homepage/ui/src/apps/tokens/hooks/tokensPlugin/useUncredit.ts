@@ -32,9 +32,10 @@ export const useUncredit = (user: string | null, counterParty: string) =>
 
             return supervisor.functionCall({
                 service: "tokens",
+                plugin: "plugin",
+                intf: "user",
                 method: "uncredit",
                 params: [tokenId, debitor, amount, memo],
-                intf: "transfer",
             });
         },
         onSuccess: (_data, vars, _result, context) => {

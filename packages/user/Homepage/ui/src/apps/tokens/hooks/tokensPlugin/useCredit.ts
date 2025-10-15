@@ -31,9 +31,10 @@ export const useCredit = (user: string | null) => {
 
             return supervisor.functionCall({
                 service: "tokens",
+                plugin: "plugin",
+                intf: "user",
                 method: "credit",
                 params: [tokenId, receiver, amount, memo],
-                intf: "transfer",
             });
         },
         onSuccess: (_data, vars, _result, context) => {

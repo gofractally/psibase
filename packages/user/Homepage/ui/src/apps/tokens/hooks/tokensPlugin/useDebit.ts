@@ -32,9 +32,10 @@ export const useDebit = (user: string | null, counterParty: string) =>
 
             return supervisor.functionCall({
                 service: "tokens",
+                plugin: "plugin",
+                intf: "user",
                 method: "debit",
                 params: [tokenId, sender, amount, memo],
-                intf: "transfer",
             });
         },
         onSuccess: (_data, vars, _result, context) => {

@@ -21,9 +21,10 @@ export const useReject = (user: string | null, counterParty: string) =>
 
             return supervisor.functionCall({
                 service: "tokens",
+                plugin: "plugin",
+                intf: "user",
                 method: "reject",
                 params: [tokenId, creditor, memo],
-                intf: "transfer",
             });
         },
         onSuccess: (_data, _vars, _result, context) => {
