@@ -4,8 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+hex = "0.4"
 
 [lib]
 crate-type = ["cdylib"]
@@ -21,6 +24,4 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
-"host:crypto" = { path = "../../../user/Host/plugin/crypto/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
-"staged-tx:plugin" = { path = "../../StagedTx/plugin/wit/world.wit" }

@@ -1,8 +1,9 @@
+import { siblingUrl } from "@psibase/common-lib";
+
 import { useAppForm } from "@/components/forms/app-form";
 
 import { useSetSnapshot } from "@/hooks/use-set-snapshot";
 import { useSnapshotSeconds } from "@/hooks/use-snapshot-seconds";
-import { siblingUrl } from "@psibase/common-lib";
 
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -18,14 +19,14 @@ const oneDay = 86400;
 export const Settings = () => {
     const { mutateAsync: setSnapshot } = useSetSnapshot();
 
-    const { data: seconds, } = useSnapshotSeconds();
+    const { data: seconds } = useSnapshotSeconds();
 
     const form = useAppForm({
         defaultValues: {
             seconds: seconds ?? oneDay,
         },
         onSubmit: async (data) => {
-            const { seconds } = data.value
+            const { seconds } = data.value;
             await setSnapshot([seconds]);
             form.reset({
                 seconds,

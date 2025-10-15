@@ -581,7 +581,7 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
          act.rawData = psio::to_frac(std::tuple());
          auto trace  = tester::runAction(id, RunMode::callback, false, act);
          if (trace.error)
-            abortMessage("nextTransaction failed");
+            abortMessage("nextTransaction failed:\n" + prettyTrace(trace));
          check(trace.actionTraces.size() == 1, "Wrong number of action traces");
          if (auto tx = psio::from_frac<std::optional<SignedTransaction>>(
                  trace.actionTraces.front().rawRetval))

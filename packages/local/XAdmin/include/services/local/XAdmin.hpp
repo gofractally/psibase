@@ -22,8 +22,9 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-admin"};
       using Subjective = psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable>;
-      /// Returns true if the account is a node admin
-      bool isAdmin(psibase::AccountNumber account);
+      /// Returns true if the account or the remote end of socket is a node admin
+      bool isAdmin(std::optional<psibase::AccountNumber> account,
+                   std::optional<std::int32_t>           socket);
 
       std::optional<psibase::HttpReply> checkAuth(const psibase::HttpRequest& req,
                                                   std::optional<std::int32_t> socket);
@@ -31,7 +32,7 @@ namespace LocalService
                                                  std::optional<std::int32_t> socket);
    };
    PSIO_REFLECT(XAdmin,
-                method(isAdmin, account),
+                method(isAdmin, account, socket),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective)

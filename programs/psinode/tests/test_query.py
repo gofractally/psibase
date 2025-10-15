@@ -93,6 +93,7 @@ class TestQuery(unittest.TestCase):
         self.assertEqual(r1, {"i":9})
 
         XAdmin(a).install(os.path.join(testutil.test_packages(), "XSocketList.psi"))
+        time.sleep(0.5)
 
         # Check that all sockets were cleaned up
         sockets = a.graphql(service='x-sock-list', query='''

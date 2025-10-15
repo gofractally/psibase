@@ -118,6 +118,15 @@ macro_rules! define_flags {
                 $(
                     pub const [<$field:snake:upper>]: $name = $name($field_index);
                 )*
+
+                pub fn to_string(&self) -> &'static str {
+                    $(
+                        if self.0 == $field_index {
+                            return stringify!($field);
+                        }
+                    )*
+                    "unknown"
+                }
             }
 
             impl From<u8> for $name {

@@ -276,6 +276,26 @@ namespace psibase
          // Native doesn't do anything with the env table.
       }
 
+      void verifyHostConfigRow(TransactionContext& context,
+                               psio::input_stream  key,
+                               psio::input_stream  value)
+      {
+         check(psio::fracpack_validate<HostConfigRow>({value.pos, value.end}),
+               "HostConfigRow has invalid format");
+         auto expected_key = psio::convert_to_key(hostConfigKey());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "HostConfigRow has incorrect key");
+         if (auto* callbacks = context.blockContext.systemContext.sharedDatabase.getCallbacks())
+         {
+            if (callbacks->validateHostConfig)
+            {
+               callbacks->validateHostConfig({value.pos, value.end});
+            }
+         }
+         context.blockContext.db.setCallbackFlags(DatabaseCallbacks::hostConfigFlag);
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -321,7 +341,9 @@ namespace psibase
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
 
-      void verifyWriteSession(Database& db, psio::input_stream key, psio::input_stream value)
+      void verifyWriteSession(TransactionContext& context,
+                              psio::input_stream  key,
+                              psio::input_stream  value)
       {
          NativeTableNum table;
          check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
@@ -331,6 +353,8 @@ namespace psibase
             verifySocketRow(key, value);
          else if (table == envTable)
             verifyEnvRow(key, value);
+         else if (table == hostConfigTable)
+            verifyHostConfigRow(context, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
@@ -573,23 +597,15 @@ namespace psibase
             abortMessage("invalid mode");
       }
 
-      // TODO: Once all services are updated, restrict reads of the service db, too.
-      if (keyHasServicePrefix(db) && ((db != DbId::service && db != DbId::writeOnly) || isWrite))
+      if (!(code.flags & CodeRow::isPrivileged))
       {
-         uint64_t service = code.codeNum.value;
-         std::reverse(reinterpret_cast<char*>(&service), reinterpret_cast<char*>(&service + 1));
-         if (prefix.size() < sizeof(service) || memcmp(prefix.data(), &service, sizeof(service)))
-            abortMessage("key prefix must match service db=" + std::to_string(dbRaw) +
-                         " prefix=" + psio::to_hex(prefix));
-      };
+         abortMessage("service may not open databases");
+      }
 
       switch (db)
       {
          // Objective databases
          case DbId::native:
-            check(!isWrite || (code.flags & CodeRow::isPrivileged),
-                  "service may not write this database");
-            [[fallthrough]];
          case DbId::service:
             check(dbMode.isSubjective || dbMode.isSync,
                   "database access disabled during proof verification");
@@ -602,31 +618,20 @@ namespace psibase
          case DbId::uiEvent:
          case DbId::merkleEvent:
          case DbId::blockLog:
-            check(!isWrite || (code.flags & CodeRow::isPrivileged),
-                  "service may not write this db");
-            [[fallthrough]];
          case DbId::writeOnly:
             check(!isRead || isSubjectiveContext(*this),
                   "subjective databases cannot be read in a deterministic context");
             check(!isWrite || dbMode.isSync, "database cannot be written in async context");
-            //check(
-            //    !isWrite || !isSubjectiveContext(*this) || (code.flags & CodeRow::isPrivileged),
-            //    "service may not write this db in a subjective context");
             break;
          // Chain independent databases
          case DbId::nativeSubjective:
          case DbId::nativeSession:
-            check(code.flags & CodeRow::isPrivileged, "service may not access this db");
-            check(code.flags & ExecutionContext::isLocal, "service may not access this db");
-            [[fallthrough]];
          case DbId::subjective:
          case DbId::session:
          case DbId::temporary:
             check(isSubjectiveContext(*this),
                   "subjective databases cannot be accessed in a deterministic context");
-            check(!isWrite || (code.flags & CodeRow::isPrivileged) ||
-                      (code.flags & ExecutionContext::isLocal),
-                  "service may not write this db");
+            check(code.flags & ExecutionContext::isLocal, "service may not open this db");
             break;
          default:
             throw std::runtime_error("service may not read this db, or must use another intrinsic");
@@ -726,7 +731,7 @@ namespace psibase
              }
              else if (bucket.db == DbId::nativeSession)
              {
-                verifyWriteSession(database, fullKey, {value.data(), value.size()});
+                verifyWriteSession(transactionContext, fullKey, {value.data(), value.size()});
              }
              database.kvPutRaw(bucket.db, {fullKey.data(), fullKey.size()},
                                {value.data(), value.size()});

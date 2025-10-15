@@ -27,6 +27,7 @@ dist
 vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
+.envrc
 psinode_db
 psinode_db_secure
 /db
@@ -36,3 +37,5 @@ ccache.conf
 bindings.rs
 target/
 **/install-state.gz
+.clangd
+AGENTS.md

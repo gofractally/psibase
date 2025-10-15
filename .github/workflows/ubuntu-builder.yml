@@ -2,6 +2,11 @@ name: Ubuntu builds
 
 on:
   workflow_call:
+    inputs:
+      all-platforms:
+        type: boolean
+        required: false
+        default: true
     secrets:
       publish-package-login:
         required: false
@@ -15,15 +20,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:073ffc7576039990f47c4389c1258b5033190d60"
-            ubuntu-version: "2204"
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:073ffc7576039990f47c4389c1258b5033190d60"
-            ubuntu-version: "2404"
+        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404"]' || '["2204"]') }}
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
         run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >>$GITHUB_OUTPUT
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 24576
+          temp-reserve-mb: 512
+          remove-android: "true"
       - name: Checkout
         uses: actions/checkout@v3
         with:
@@ -37,7 +44,9 @@ jobs:
           restore-keys: |
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
-        run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
+        run: |
+          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:073ffc7576039990f47c4389c1258b5033190d60"
+          bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} "$BUILDER_IMAGE" ${{ matrix.ubuntu-version }}
       - name: Publish packages
         if: fromJSON(env.can-publish) && matrix.ubuntu-version == '2404'
         env:

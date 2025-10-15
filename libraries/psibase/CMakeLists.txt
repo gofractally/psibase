@@ -7,7 +7,7 @@ find_package(ZLIB REQUIRED)
 
 function(add suffix)
     add_library(psibase${suffix})
-    target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix})
+    target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix} services_local)
     target_sources(psibase${suffix} PRIVATE
         common/src/block.cpp
         common/src/crypto.cpp
@@ -79,6 +79,7 @@ function(add suffix)
         target_sources(psibase-service-base${suffix} PRIVATE
             service/src/intrinsic.cpp
             service/src/Service.cpp
+            service/src/Table.cpp
         )
         target_link_libraries(psibase-service-base${suffix} PUBLIC psibase${suffix})
         target_compile_options(psibase-service-base${suffix} PUBLIC -DCOMPILING_SERVICE)
@@ -135,6 +136,7 @@ function(add suffix)
             tester/src/chain_polyfill.cpp
             tester/src/wasi_polyfill/system.cpp
             tester/src/wasi_polyfill/init_cwd.cpp
+            tester/src/Table.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
@@ -162,6 +164,7 @@ function(add suffix)
             ../../packages/system/HttpServer/include
             ../../packages/system/SetCode/include
             ../../packages/system/StagedTx/service/cpp/include
+            ../../packages/system/Credentials/service/cpp/include
             ../../packages/system/Transact/include
             ../../packages/user/CommonApi/include
             ../../packages/user/Explorer/include

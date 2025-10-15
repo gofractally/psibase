@@ -62,11 +62,14 @@ namespace psibase
    //
    struct DatabaseCallbacks
    {
-      std::function<void()> nextTransaction;
-      std::function<void()> runQueue;
-      static const unsigned nextTransactionFlag = 1;
-      static const unsigned runQueueFlag        = 2;
-      using Flags                               = unsigned;
+      std::function<void()>                      nextTransaction;
+      std::function<void()>                      runQueue;
+      std::function<void(std::span<const char>)> validateHostConfig;
+      std::function<void()>                      hostConfig;
+      static const unsigned                      nextTransactionFlag = 1;
+      static const unsigned                      runQueueFlag        = 2;
+      static const unsigned                      hostConfigFlag      = 4;
+      using Flags                                                    = unsigned;
       void run(Flags& flags)
       {
          if ((flags & nextTransactionFlag) != 0 && nextTransaction)
@@ -76,6 +79,10 @@ namespace psibase
          if ((flags & runQueueFlag) && runQueue)
          {
             runQueue();
+         }
+         if ((flags & hostConfigFlag) && hostConfig)
+         {
+            hostConfig();
          }
          flags = 0;
       }
@@ -129,7 +136,8 @@ namespace psibase
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
 
-      void setCallbacks(DatabaseCallbacks*);
+      void               setCallbacks(DatabaseCallbacks*);
+      DatabaseCallbacks* getCallbacks() const;
    };
 
    struct DatabaseImpl;
