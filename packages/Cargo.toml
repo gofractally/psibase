@@ -23,6 +23,7 @@ members = [
     "user/Packages/plugin",
     "user/Permissions/plugin",
     "user/WebCrypto/plugin",
+    "user/FractalCore/plugin",
     "user/Workshop/plugin",
     "user/Config/plugin",
 ]
