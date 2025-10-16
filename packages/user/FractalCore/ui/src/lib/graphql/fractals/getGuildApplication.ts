@@ -9,7 +9,7 @@ import { graphql } from "../../graphql";
 export const zGuildApplicationListInstance = z
     .object({
         member: zAccount,
-        app: z.string(),
+        extraInfo: z.string(),
         createdAt: zDateTime,
         attestations: z
             .object({
@@ -34,7 +34,7 @@ export const getGuildApplication = async (
             {
                 guildApplication(guild: ${guildAccount}, member: "${member}") {
                         member
-                        app
+                        extraInfo
                         createdAt
                         attestations {
                             endorses
