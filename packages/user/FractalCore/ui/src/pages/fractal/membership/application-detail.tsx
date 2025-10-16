@@ -60,7 +60,7 @@ export const ApplicationDetail = () => {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-3">{application?.app}</div>
+                        <div className="space-y-3">{application?.extraInfo}</div>
                     </CardContent>
                 </Card>
                 <Card>
