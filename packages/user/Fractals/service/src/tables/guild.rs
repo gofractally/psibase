@@ -1,10 +1,13 @@
 use async_graphql::ComplexObject;
-use psibase::services::auth_delegate::Wrapper as AuthDelegate;
-use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table};
+use psibase::services::accounts;
+use psibase::{check_none, check_some, AccountNumber, Action, Memo, Table};
 
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
 };
+
+use psibase::fracpack::Pack;
+use psibase::services::transact;
 
 impl Guild {
     fn new(
@@ -23,6 +26,23 @@ impl Guild {
         }
     }
 
+    fn configure_new_guild_account(account: AccountNumber) {
+        accounts::Wrapper::call().newAccount(account, AccountNumber::from("auth-any"), true);
+
+        let set_auth_serv = Action {
+            sender: account,
+            service: accounts::SERVICE,
+            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+            rawData: accounts::action_structs::setAuthServ {
+                authService: "auth-guild".into(),
+            }
+            .packed()
+            .into(),
+        };
+
+        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
+    }
+
     pub fn add(
         fractal: AccountNumber,
         guild: AccountNumber,
@@ -30,9 +50,6 @@ impl Guild {
         display_name: Memo,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
-        
-        // TODO: replace with auth-guild when available
-        AuthDelegate::call().newAccount(guild, get_sender());
 
         FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();
 
@@ -40,6 +57,9 @@ impl Guild {
         new_guild_instance.save();
 
         GuildMember::add(new_guild_instance.account, rep);
+
+        Self::configure_new_guild_account(guild);
+
         new_guild_instance
     }
 

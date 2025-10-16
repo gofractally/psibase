@@ -2,7 +2,7 @@ pub mod helpers;
 mod scoring;
 pub mod tables;
 
-#[psibase::service(tables = "tables::tables")]
+#[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
     use crate::tables::{
@@ -99,9 +99,14 @@ pub mod service {
             guild
                 .council_members()
                 .into_iter()
-                .map(|m| m.account)
+                .map(|m| m.member)
                 .collect()
         })
+    }
+
+    #[action]
+    fn get_guild(guild_account: AccountNumber) -> Option<Guild> {
+        Guild::get(guild_account)
     }
 
     /// Apply to join a guild

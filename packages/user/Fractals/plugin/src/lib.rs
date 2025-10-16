@@ -102,12 +102,10 @@ impl AdminFractal for FractallyPlugin {
 
 impl AdminGuild for FractallyPlugin {
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
-        let guild = get_guild(guild_account.clone())?;
-
-        guild.assert_authorized(FunctionName::create_guild)?;
+        assert_authorized(FunctionName::create_guild)?;
 
         let packed_args = fractals::action_structs::create_guild {
-            fractal: guild.fractal,
+            fractal: get_sender_app()?,
             display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
         }
