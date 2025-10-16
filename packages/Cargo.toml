@@ -51,10 +51,11 @@ homepage = "https://psibase.io"
 publish = false
 
 [workspace.dependencies]
-# Common dependencies for plugins
 async-graphql = "=7.0.17"
 psibase = { path = "../rust/psibase", version = "0.21.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
-# Standard version for cargo-component 0.15.0
-wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+wit-bindgen-rt = { version = "0.30.0", features = [
+    "bitflags",
+] } # Standard version for cargo-component 0.15.0
+cxx-build = ">=1, <1.0.187" # Pin to avoid 1.0.187 which requires Rust 1.87
