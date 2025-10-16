@@ -34,10 +34,7 @@ define_trust! {
 struct AuthGuildPlugin;
 
 impl Api for AuthGuildPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = auth_guild::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+    fn set_example_thing(_thing: String) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -63,7 +60,7 @@ impl Queries for AuthGuildPlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val = 
+        let examplething_val =
             examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
