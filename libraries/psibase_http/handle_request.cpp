@@ -549,20 +549,6 @@ namespace psibase::http
                send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
             }
          }
-         else if (req_target == "/native/admin/shutdown")
-         {
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
-            }
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               return send(builder.error(bhttp::status::unsupported_media_type,
-                                         "Content-Type must be application/json\n"));
-            }
-            server.http_config->shutdown(std::move(req.body()));
-            return send(builder.accepted());
-         }
          else if (req_target == "/native/admin/perf" && server.http_config->get_perf)
          {
             if (req.method() != bhttp::verb::get)

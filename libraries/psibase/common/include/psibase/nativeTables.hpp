@@ -27,6 +27,7 @@ namespace psibase
    static constexpr NativeTableNum runTable                   = 15;  // subjective
    static constexpr NativeTableNum envTable                   = 16;  // subjective
    static constexpr NativeTableNum hostConfigTable            = 17;  // subjective
+   static constexpr NativeTableNum pendingShutdownTable       = 18;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -425,6 +426,31 @@ namespace psibase
    };
    using HostConfigTable = Table<HostConfigRow, SingletonKey{}>;
 
+   auto pendingShutdownKey() -> KeyPrefixType;
+   /// If this row is present, it indicates that the server
+   /// should halt. args should be JSON. The interpretation
+   /// is implementation defined. The effect of overwriting
+   /// or removing an existing row is implementation defined.
+   ///
+   /// psinode recognizes the following fields:
+   /// - restart: array of strings: If this is present the args will
+   ///   will passed to a new instance after shutdown.
+   /// - soft: bool: Only meaningful with restart. Config files will be
+   ///   reloaded and any pending config updates will be applied. A new
+   ///   session may be started.
+   /// - deadline: number: microsecond steady_clock timepoint after which
+   ///   any running tasks will be terminated.
+   ///
+   struct PendingShutdownRow
+   {
+      std::string args;
+
+      static const auto db = psibase::DbId::nativeSession;
+      auto              key() const -> KeyPrefixType;
+      PSIO_REFLECT(PendingShutdownRow, args);
+   };
+   using PendingShutdownTable = Table<PendingShutdownRow, SingletonKey{}>;
+
    struct Native
    {
       using Tables = ExternTables<void,
@@ -444,7 +470,8 @@ namespace psibase
                                   SocketTable,
                                   RunTable,
                                   EnvTable,
-                                  HostConfigTable>;
+                                  HostConfigTable,
+                                  PendingShutdownTable>;
       static Tables tables(KvMode mode = KvMode::readWrite)
       {
          return Tables{proxyKvOpen(DbId::native, {}, mode), mode};

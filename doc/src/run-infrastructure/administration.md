@@ -22,7 +22,7 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | Method | URL                          | Description                                                                   |
 |--------|------------------------------|-------------------------------------------------------------------------------|
 | `GET`  | `/native/admin/status`       | Returns status conditions currently affecting the server                      |
-| `POST` | `/native/admin/shutdown`     | Stops or restarts the server                                                  |
+| `POST` | `/shutdown`                  | Stops or restarts the server                                                  |
 | `GET`  | `/native/admin/peers`        | Returns a JSON array of all the peers that the node is currently connected to |
 | `POST` | `/native/admin/connect`      | Connects to another node                                                      |
 | `POST` | `/native/admin/disconnect`   | Disconnects an existing peer connection                                       |
@@ -46,7 +46,7 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `"startup"`  | `psinode` is still initializing. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                      |
 | `"shutdown"` | `psinode` is shutting down. Some functionality may be unavailable.                                                                                                                                                                                                                                                                                                           |
 
-`POST` to `/native/admin/shutdown` stops or restarts the server. The `POST` data should be JSON with any of the following options:
+`POST` to `/shutdown` stops or restarts the server. The `POST` data should be JSON with any of the following options:
 
 | Field     | Type    | Description                                                                                                                                                                                                                     |
 |-----------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
