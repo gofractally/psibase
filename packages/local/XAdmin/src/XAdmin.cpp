@@ -66,6 +66,22 @@ namespace LocalService
       };
       PSIO_REFLECT(LoginReply, access_token, token_type)
 
+      struct ShutdownRequest
+      {
+         bool restart = false;
+         bool force   = false;
+         bool soft    = false;
+      };
+      PSIO_REFLECT(ShutdownRequest, restart, force, soft);
+
+      struct PsinodeShutdownArgs
+      {
+         std::optional<std::vector<std::string>> restart;
+         bool                                    soft = false;
+         std::optional<MicroSeconds>             deadline;
+      };
+      PSIO_REFLECT(PsinodeShutdownArgs, restart, soft, deadline)
+
       void initRefCounts()
       {
          auto refs      = XAdmin{}.open<CodeRefCountTable>();
@@ -244,6 +260,40 @@ namespace LocalService
          {
             return HttpReply::methodNotAllowed(req);
          }
+      }
+      else if (target == "/shutdown")
+      {
+         if (req.method != "POST")
+         {
+            return HttpReply::methodNotAllowed(req);
+         }
+         if (req.contentType != "application/json")
+         {
+            return HttpReply{
+                .status      = HttpStatus::unsupportedMediaType,
+                .contentType = "text/html",
+                .body        = toVec("Content-Type must be application/json\n"),
+            };
+         }
+         auto body = psio::convert_from_json<ShutdownRequest>(
+             std::string{req.body.begin(), req.body.end()});
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now())
+                           .time_since_epoch();
+            PsinodeShutdownArgs args{
+                .restart  = body.restart ? std::optional{std::vector<std::string>{}} : std::nullopt,
+                .soft     = body.soft,
+                .deadline = body.force ? now : now + std::chrono::seconds{10}};
+            PendingShutdownRow row{.args = psio::convert_to_json(args)};
+
+            auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
+            PSIBASE_SUBJECTIVE_TX
+            {
+               table.put(row);
+            }
+         }
+         return HttpReply{};
       }
       else if (target.starts_with("/services/"))
       {
