@@ -2473,6 +2473,8 @@ int main(int argc, char* argv[])
             else
             {
                std::vector<const char*> cArgs;
+               cArgs.push_back(argv[0]);
+               cArgs.push_back(db_path.c_str());
                for (const std::string& s : newArgs)
                   cArgs.push_back(s.c_str());
                cArgs.push_back(nullptr);

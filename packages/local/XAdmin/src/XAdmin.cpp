@@ -442,10 +442,16 @@ namespace LocalService
          {
             auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now())
                            .time_since_epoch();
-            PsinodeShutdownArgs args{
-                .restart  = body.restart ? std::optional{std::vector<std::string>{}} : std::nullopt,
-                .soft     = body.soft,
-                .deadline = body.force ? now : now + std::chrono::seconds{10}};
+
+            PsinodeShutdownArgs args{.restart  = std::nullopt,
+                                     .soft     = body.soft,
+                                     .deadline = body.force ? now : now + std::chrono::seconds{10}};
+            if (body.restart)
+            {
+               HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
+               auto          opts       = psio::convert_from_json<CliArgs>(hostConfig.config);
+               args.restart             = std::move(opts.argv);
+            }
             PendingShutdownRow row{.args = psio::convert_to_json(args)};
 
             auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
