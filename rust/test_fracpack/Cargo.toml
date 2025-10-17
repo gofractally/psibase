@@ -18,6 +18,7 @@ serde-aux = "4.4"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 test_fracpack_macros = { version = "0.21.0", path = "../test_fracpack_macros" }
+rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }
 
 [build-dependencies]
 cxx-build = "1.0"

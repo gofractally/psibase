@@ -8,6 +8,7 @@ members = [
     "md2man",
     "psibase_macros",
     "psibase",
+    "rust-workspace-hack",
     "test_contract",
     "test_contract_2",
     "test_package/plugin",

@@ -24,3 +24,4 @@ serde_json = "1.0.132"
 basicwquery = { path = "services/basic-w-query" }
 mincallrecvr = { path = "services/min-call-recvr" }
 addcheckinit = { path = "services/add-check-init" }
+rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }

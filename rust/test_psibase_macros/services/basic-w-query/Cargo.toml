@@ -20,6 +20,7 @@ psibase_macros = { path = "../../../psibase_macros" }
 async-graphql.workspace = true
 serde = { version = "1.0.209", features = ["derive"] }
 mincallrecvr = { path = "../min-call-recvr" }
+rust-workspace-hack = { version = "0.1", path = "../../../rust-workspace-hack" }
 
 [dev-dependencies]
 psimacrotest = { path = "../.." }
