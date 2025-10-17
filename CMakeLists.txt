@@ -436,7 +436,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
     PATH packages/user/Chainmail
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 cargo_psibase_package(
@@ -447,33 +447,33 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenStream.psi
     PATH packages/user/TokenStream
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
     DEPENDS ${TokenStream_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
     PATH packages/user/Profiles
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH packages/user/Evaluations
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
     DEPENDS ${Evaluations_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH packages/user/Fractals
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
     DEPENDS ${Fractals_js_DEP}
 )
 
@@ -481,19 +481,19 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
     PATH packages/user/BrotliCodec
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH packages/user/Registry
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 cargo_psibase_package(
@@ -504,7 +504,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
 )
 
 psibase_package(
@@ -650,7 +650,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
     PATH packages/user/Identity
-    WORKSPACE_PATH packages/user
+    TARGET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target
     DEPENDS ${Identity_js_DEP}
 )
 
