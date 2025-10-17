@@ -331,12 +331,14 @@ void from_json(Timeout& obj, auto& stream)
 }
 
 std::filesystem::path option_path;
-ConfigFileOptions     config_options{.expandValue = [](std::string_view key)
+ConfigFileOptions     config_options{.expandValue =
+                                     [](std::string_view key)
                                  {
                                     // shell commands are processed by the shell. They should not go
                                     // through another round of expansion.
                                     return !key.ends_with(".command");
-                                 }};
+                                 },
+                                     .allowUnregistered = true};
 std::filesystem::path parse_path(std::string_view             s,
                                  const std::filesystem::path& context = option_path)
 {
@@ -1091,9 +1093,28 @@ struct TLSConfig
 };
 PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
 
+using ExtraConfigFields =
+    std::map<std::string, std::variant<std::string, std::vector<std::string>>>;
+
+ExtraConfigFields extraConfig(const std::vector<boost::program_options::option>& opts)
+{
+   ExtraConfigFields result;
+   for (const auto& option : opts)
+   {
+      if (!option.unregistered || option.value.empty())
+         continue;
+      auto [pos, inserted] = result.try_emplace(option.string_key, option.value);
+      if (!inserted)
+      {
+         auto& value = std::get<std::vector<std::string>>(pos->second);
+         value.insert(value.end(), option.value.begin(), option.value.end());
+      }
+   }
+   return result;
+}
+
 struct PsinodeConfig
 {
-   bool                        p2p = false;
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    AccountNumber               producer;
@@ -1106,9 +1127,18 @@ struct PsinodeConfig
    std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
    std::vector<std::string>    argv;
+   ExtraConfigFields           extra;
+
+   static bool isNative(std::string_view name)
+   {
+      constexpr std::string_view opts[] = {
+          "peers",        "autoconnect",     "producer", "pkcs11-modules",     "host",
+          "listen",       "tls-key",         "tls-cert", "tls-trustfile",      "service",
+          "http-timeout", "service-threads", "key",      "database-cache-size"};
+      return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.");
+   }
 };
 PSIO_REFLECT(PsinodeConfig,
-             p2p,
              peers,
              autoconnect,
              producer,
@@ -1124,9 +1154,94 @@ PSIO_REFLECT(PsinodeConfig,
              loggers,
              argv);
 
+void from_json(PsinodeConfig& obj, auto& stream)
+{
+   from_json_object(stream,
+                    [&](std::string_view key) -> void
+                    {
+                       bool found = psio::get_data_member<PsinodeConfig>(
+                           key, [&](auto member) { from_json(obj.*member, stream); });
+                       if (!found)
+                       {
+                          if (PsinodeConfig::isNative(key))
+                             from_json_skip_value(stream);
+                          else
+                          {
+                             auto t = stream.peek_token();
+                             switch (t.get().type)
+                             {
+                                case psio::json_token_type::type_bool:
+                                   obj.extra[std::string(key)] =
+                                       stream.get_bool() ? "true" : "false";
+                                   break;
+                                case psio::json_token_type::type_string:
+                                   obj.extra[std::string(key)] = std::string(stream.get_string());
+                                   break;
+                                case psio::json_token_type::type_start_array:
+                                {
+                                   std::vector<std::string> values;
+                                   while (!stream.get_end_array_pred())
+                                   {
+                                      // bool or string
+                                      auto t = stream.peek_token();
+                                      if (t.get().type == psio::json_token_type::type_bool)
+                                      {
+                                         values.push_back(stream.get_bool() ? "true" : "false");
+                                      }
+                                      else
+                                      {
+                                         values.push_back(std::string(stream.get_string()));
+                                      }
+                                   }
+                                   obj.extra[std::string(key)] = std::move(values);
+                                   break;
+                                }
+                                default:
+                                   from_json_skip_value(stream);
+                                   break;
+                             }
+                          }
+                       }
+                    });
+}
+
+void to_json(const PsinodeConfig& obj, auto& stream)
+{
+   stream.write('{');
+   std::size_t i = 0;
+   psio::for_each_member(&obj, (typename psio::reflect<PsinodeConfig>::data_members*)nullptr,
+                         [&](const auto& member)
+                         {
+                            if (i == 0)
+                               increase_indent(stream);
+                            else
+                               stream.write(',');
+                            to_json(psio::reflect<PsinodeConfig>::data_member_names[i], stream);
+                            write_colon(stream);
+                            to_json(member, stream);
+                            ++i;
+                         });
+   for (const auto& [key, value] : obj.extra)
+   {
+      if (i == 0)
+         increase_indent(stream);
+      else
+         stream.write(',');
+      to_json(key, stream);
+      write_colon(stream);
+      std::visit([&](auto& v) { to_json(v, stream); }, value);
+      ++i;
+   }
+   if (i != 0)
+   {
+      decrease_indent(stream);
+      write_newline(stream);
+   }
+   stream.write('}');
+}
+
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
-   file.set("", "p2p", config.p2p ? "on" : "off", "Whether to accept incoming P2P connections");
    if (!config.peers.empty())
    {
       file.set(
@@ -1201,6 +1316,17 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    }
    file.set("", "service-threads", std::to_string(config.service_threads),
             "The number of threads that run async actions posted by services");
+
+   for (const auto& [key, value] : config.extra)
+   {
+      if (auto* s = std::get_if<std::string>(&value))
+         file.set("", key, *s, "Service defined option");
+      else if (auto* v = std::get_if<std::vector<std::string>>(&value))
+         file.set(
+             "", key, *v, [](std::string_view text) { return std::string(text); },
+             "Service defined option");
+   }
+
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1279,7 +1405,6 @@ void run(const std::string&              db_path,
          std::vector<std::string>&       pkcs11_modules,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
-         bool                            enable_incoming_p2p,
          std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
@@ -1289,6 +1414,7 @@ void run(const std::string&              db_path,
          std::string                     tls_cert,
          std::string                     tls_key,
          const std::vector<std::string>& extra_options,
+         const ExtraConfigFields&        extra_config_file_options,
          RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
@@ -1332,7 +1458,6 @@ void run(const std::string&              db_path,
       db.checkoutSubjective();
       load_environment(db);
       HostConfigRow hostConfig = toHostConfig(PsinodeConfig{
-          .p2p            = enable_incoming_p2p,
           .peers          = peers,
           .autoconnect    = autoconnect,
           .producer       = producer,
@@ -1352,6 +1477,7 @@ void run(const std::string&              db_path,
           .service_threads = service_threads,
           .loggers         = loggers::Config::get(),
           .argv            = extra_options,
+          .extra           = extra_config_file_options,
       });
       db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
       if (!db.commitSubjective(*system->sockets, autoClose))
@@ -2145,7 +2271,6 @@ int main(int argc, char* argv[])
    std::vector<listen_spec>    listen;
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
-   bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
@@ -2155,6 +2280,7 @@ int main(int argc, char* argv[])
    Timeout                     http_timeout;
    std::size_t                 service_threads;
    std::vector<std::string>    extra_options;
+   ExtraConfigFields           extra_config_file_options;
 
    namespace po = boost::program_options;
 
@@ -2169,8 +2295,6 @@ int main(int argc, char* argv[])
        "Root host name for the http server");
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
-   opt("p2p", po::bool_switch(&enable_incoming_p2p)->default_value(false, "off"),
-       "Enable incoming p2p connections");
    opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
    opt("autoconnect", po::value(&autoconnect)->default_value({}, "")->value_name("num"),
        "Limits the number of peers to be connected automatically");
@@ -2222,7 +2346,7 @@ int main(int argc, char* argv[])
       args = {argv + 1, argv + argc};
    }
 
-   auto parse_args = [&desc, &cfg_opts, &extra_options, &database](
+   auto parse_args = [&desc, &cfg_opts, &extra_options, &extra_config_file_options, &database](
                          const std::vector<std::string>& args, po::variables_map& vm)
    {
       option_path   = std::filesystem::current_path();
@@ -2237,7 +2361,9 @@ int main(int argc, char* argv[])
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
-            po::store(psibase::parse_config_file(in, cfg_opts, config_options, config_path), vm);
+            auto parsed = psibase::parse_config_file(in, cfg_opts, config_options, config_path);
+            extra_config_file_options = extraConfig(parsed.options);
+            po::store(parsed, vm);
          }
          else if (!exists(config_path))
          {
@@ -2245,8 +2371,9 @@ int main(int argc, char* argv[])
             if (std::filesystem::is_regular_file(template_path))
             {
                std::ifstream in(template_path);
-               po::store(psibase::parse_config_file(in, cfg_opts, config_options, template_path),
-                         vm);
+               auto parsed = psibase::parse_config_file(in, cfg_opts, config_options, config_path);
+               extra_config_file_options = extraConfig(parsed.options);
+               po::store(parsed, vm);
             }
          }
       }
@@ -2297,8 +2424,9 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, peers, autoconnect, enable_incoming_p2p, hosts, listen, services,
-             http_timeout, service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
+             pkcs11_modules, peers, autoconnect, hosts, listen, services, http_timeout,
+             service_threads, root_ca, tls_cert, tls_key, extra_options, extra_config_file_options,
+             restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
