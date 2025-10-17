@@ -15,3 +15,4 @@ async-graphql.workspace = true
 serde-aux.workspace = true
 ecies = { version = "0.2", default-features = false, features = ["pure"] }
 average = "0.16.0"
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }

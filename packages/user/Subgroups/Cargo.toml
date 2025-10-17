@@ -17,3 +17,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 subgroups = { path = "service", version = "0.21.0" }
+user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }

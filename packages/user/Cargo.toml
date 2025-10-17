@@ -39,6 +39,7 @@ members = [
     "Tokens/service",
     "Tokens/plugin",
     "Tokens/query-service",
+    "user-workspace-hack",
 ]
 
 exclude = ["CommonApi/common/packages/component-parser"]
