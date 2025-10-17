@@ -321,10 +321,13 @@ endfunction()
 # Description:              - Use this function when you want to add additional details to a package that is 
 #                             built/managed by cargo-psibase, as opposed to packages built entirely using CMake.
 # OUTPUT <filename>         - [Required] The package file. Must be identical to 'package.metadata.psibase.package-name' in project's Cargo.toml
-# PATH <filepath>           - [Required] The path to the cargo workspace (e.g. `packages/user/Branding`).
+# PATH <filepath>           - [Required] The path to the package (e.g. `packages/user/Branding`).
+# TARGET_DIR <filepath>     - [Optional] Cargo target directory for build artifacts (e.g. `${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target`).
+#                             If provided, passed to cargo-psibase via --target-dir for workspace sharing.
+#                             If not provided, the package will use its own target directory (backward compatible).
 # DEPENDS <targets>...      - Targets that this target depends on
 function(cargo_psibase_package)
-    cmake_parse_arguments(ARG "" "PATH;OUTPUT;DEPENDS" "" ${ARGN})
+    cmake_parse_arguments(ARG "" "PATH;OUTPUT;TARGET_DIR;DEPENDS" "" ${ARGN})
 
     if(NOT ARG_PATH OR NOT ARG_OUTPUT)
         message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
@@ -333,15 +336,25 @@ function(cargo_psibase_package)
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    
+    # Determine package output location and build command based on whether TARGET_DIR is provided
+    if(ARG_TARGET_DIR)
+        set(PACKAGE_OUTPUT ${ARG_TARGET_DIR}/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+        set(BUILD_CMD ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
+            --target-dir ${ARG_TARGET_DIR})
+    else()
+        set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+        set(BUILD_CMD ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml)
+    endif()
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}
         BUILD_BYPRODUCTS ${PACKAGE_OUTPUT}
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
-            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
+        BUILD_COMMAND ${BUILD_CMD}
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
         DEPENDS ${ARG_DEPENDS} cargo-psibase psitest

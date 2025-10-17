@@ -318,6 +318,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/package
 include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
+set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 
 set(PSIBASE_VERSION 0.21)
 
@@ -437,6 +438,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
     PATH packages/user/Chainmail
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -447,44 +449,52 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenStream.psi
     PATH packages/user/TokenStream
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${TokenStream_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
     PATH packages/user/Profiles
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH packages/user/Evaluations
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Evaluations_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH packages/user/Fractals
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Fractals_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
     PATH packages/user/BrotliCodec
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH packages/user/Registry
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -495,6 +505,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 psibase_package(
@@ -640,6 +651,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
     PATH packages/user/Identity
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Identity_js_DEP}
 )
 
