@@ -10,14 +10,14 @@ publish = false
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 server = "r-staged-tx"
-plugin = "plugin"
+plugin = "staged-tx-plugin"
 postinstall = [{ sender = "staged-tx", service = "staged-tx", method = "init" }]
 
 [dependencies]
-async-graphql = "=7.0.17"
-psibase = { path = "../../../../rust/psibase/" }
-serde = { version = "1.0.213", features = ["derive"] }
-serde_json = { version = "1.0.100" }
+async-graphql.workspace = true
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sha2 = { version = "0.10" }
 pem = { version = "3.0.4" }
 
