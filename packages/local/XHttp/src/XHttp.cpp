@@ -97,6 +97,13 @@ namespace
       auto row    = native.open<StatusTable>().get({});
       return row && row->head;
    }
+
+   struct HttpOptions
+   {
+      std::vector<std::string> argv;
+      bool                     p2p = false;
+   };
+   PSIO_REFLECT(HttpOptions, argv, p2p)
 }  // namespace
 
 extern "C" [[clang::export_name("recv")]] void recv()
@@ -162,6 +169,8 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 
 #ifndef PSIBASE_GENERATE_SCHEMA
 
+extern "C" [[clang::export_name("startSession")]] void startSession() {}
+
 extern "C" [[clang::export_name("serve")]] void serve()
 {
    auto act                    = getCurrentActionView();
@@ -219,12 +228,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (std::string_view{req.target()} == "/native/p2p")
-   {
-      // p2p is accepted regardless of the host name
-      return;
-   }
-   else if (req.rootHost() != req.host())
+   else if (req.rootHost() != req.host() && std::string_view{req.target()} != "/native/p2p")
    {
       if (!req.rootHost().empty())
       {
@@ -243,6 +247,31 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    if (std::string_view{req.target()} == "/native/p2p")
    {
+      HostConfigRow hostConfig;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         hostConfig = Native::session().open<HostConfigTable>().get({}).value();
+      }
+      auto opts = psio::convert_from_json<HttpOptions>(hostConfig.config);
+      for (const auto& opt : opts.argv)
+      {
+         if (opt == "--p2p")
+         {
+            opts.p2p = true;
+         }
+         else if (opt.starts_with("--p2p="))
+         {
+            auto value = std::string_view(opt).substr(6);
+            if (value == "yes" || value == "true" || value == "on" || value == "1")
+               opts.p2p = true;
+            else if (value == "no" || value == "false" || value == "off" || value == "0")
+               opts.p2p = false;
+            else
+               opts.p2p = false;
+         }
+      }
+      if (!opts.p2p)
+         sendNotFound(sock, req);
       return;
    }
    else if (std::string_view{req.target()}.starts_with("/native/"))

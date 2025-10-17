@@ -1105,6 +1105,7 @@ struct PsinodeConfig
    Timeout                     http_timeout;
    std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
+   std::vector<std::string>    argv;
 };
 PSIO_REFLECT(PsinodeConfig,
              p2p,
@@ -1120,7 +1121,8 @@ PSIO_REFLECT(PsinodeConfig,
              services,
              http_timeout,
              service_threads,
-             loggers);
+             loggers,
+             argv);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
@@ -1286,6 +1288,7 @@ void run(const std::string&              db_path,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
+         const std::vector<std::string>& extra_options,
          RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
@@ -1322,8 +1325,6 @@ void run(const std::string&              db_path,
       }
    }
 
-   // If this is a new database, initialize subjective services
-   initialize_database(*system, db_template);
    {
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;
@@ -1350,12 +1351,24 @@ void run(const std::string&              db_path,
           .http_timeout    = http_timeout,
           .service_threads = service_threads,
           .loggers         = loggers::Config::get(),
+          .argv            = extra_options,
       });
       db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
       if (!db.commitSubjective(*system->sockets, autoClose))
       {
          throw std::runtime_error("Failed to initialize database");
       }
+   }
+   // If this is a new database, initialize subjective services
+   initialize_database(*system, db_template);
+   {
+      Action act{.service = proxyServiceNum, .rawData = psio::to_frac(std::tuple())};
+
+      BlockContext bc{*system, system->sharedDatabase.getHead(),
+                      system->sharedDatabase.createWriter(), true};
+
+      TransactionTrace trace;
+      bc.execAsyncExport("startSession", std::move(act), trace);
    }
 
    // Manages the session and and unlinks all keys from prover on destruction
@@ -1580,7 +1593,6 @@ void run(const std::string&              db_path,
                  setPKCS11Libs(config.pkcs11_modules);
                  node.set_producer_id(config.producer);
                  node.set_hostnames(config.hosts);
-                 http_config->enable_p2p = config.p2p;
                  if (!http_config->status.load().shutdown)
                  {
                     node.autoconnect(std::vector(config.peers), config.autoconnect.value,
@@ -2053,7 +2065,6 @@ void run(const std::string&              db_path,
                                              }};
 
    node.set_producer_id(producer);
-   http_config->enable_p2p = enable_incoming_p2p;
    {
       atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
@@ -2115,7 +2126,7 @@ void run(const std::string&              db_path,
    chainContext.run();
 }
 
-const char usage[] = "USAGE: psinode [OPTIONS] database";
+const char usage[] = "USAGE: psinode database [OPTIONS]";
 
 int main(int argc, char* argv[])
 {
@@ -2126,7 +2137,6 @@ int main(int argc, char* argv[])
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
    }
 
-   std::string                 db_path;
    std::string                 db_template;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
@@ -2144,6 +2154,7 @@ int main(int argc, char* argv[])
    byte_size                   db_size;
    Timeout                     http_timeout;
    std::size_t                 service_threads;
+   std::vector<std::string>    extra_options;
 
    namespace po = boost::program_options;
 
@@ -2189,31 +2200,38 @@ int main(int argc, char* argv[])
        "The number of threads that run async actions posted by services");
    desc.add(common_opts);
    opt = desc.add_options();
-   // Options that can only be specified on the command line
-   // database should be available on the command line, but should not be listed in help
-   opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
-       "Path to database");
    // These should be usable on the command line and shown in help
    auto add_cmdonly = [](auto& opts)
    { opts.add_options()("help,h", "Show this message")("version,V", "Print version information"); };
    add_cmdonly(desc);
-
-   po::positional_options_description p;
-   p.add("database", 1);
 
    // Options that are only allowed in the config file
    po::options_description cfg_opts("psinode");
    cfg_opts.add(common_opts);
    cfg_opts.add_options()("logger.*", po::value<std::string>(), "Log configuration");
 
-   auto parse_args =
-       [&desc, &p, &cfg_opts](int argc, const char* const* argv, po::variables_map& vm)
+   std::optional<std::string_view> database;
+   std::vector<std::string>        args;
+   if (argc >= 2 && argv[1][0] != '-')
    {
-      option_path = std::filesystem::current_path();
-      po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-      if (vm.count("database"))
+      database = argv[1];
+      args     = {argv + 2, argv + argc};
+   }
+   else
+   {
+      args = {argv + 1, argv + argc};
+   }
+
+   auto parse_args = [&desc, &cfg_opts, &extra_options, &database](
+                         const std::vector<std::string>& args, po::variables_map& vm)
+   {
+      option_path   = std::filesystem::current_path();
+      auto parsed   = po::command_line_parser(args).options(desc).allow_unregistered().run();
+      extra_options = po::collect_unrecognized(parsed.options, po::include_positional);
+      po::store(parsed, vm);
+      if (database)
       {
-         auto db_root     = std::filesystem::path(vm["database"].as<std::string>());
+         auto db_root     = std::filesystem::path(*database);
          option_path      = option_path / db_root;
          auto config_path = db_root / "config";
          if (std::filesystem::is_regular_file(config_path))
@@ -2232,13 +2250,17 @@ int main(int argc, char* argv[])
             }
          }
       }
+      else
+      {
+         throw std::runtime_error("database is required");
+      }
       po::notify(vm);
    };
 
    po::variables_map vm;
    try
    {
-      parse_args(argc, argv, vm);
+      parse_args(args, vm);
    }
    catch (std::exception& e)
    {
@@ -2264,6 +2286,8 @@ int main(int argc, char* argv[])
       return 1;
    }
 
+   std::string db_path{*database};
+
    try
    {
       psibase::loggers::set_path(db_path);
@@ -2274,7 +2298,7 @@ int main(int argc, char* argv[])
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
              pkcs11_modules, peers, autoconnect, enable_incoming_p2p, hosts, listen, services,
-             http_timeout, service_threads, root_ca, tls_cert, tls_key, restart);
+             http_timeout, service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
@@ -2284,31 +2308,31 @@ int main(int argc, char* argv[])
          {
             // Forward the command line, but remove any arguments that were
             // written to the config file.
-            std::vector<const char*> args;
+            std::vector<std::string> newArgs;
             auto                     original_args =
-                po::command_line_parser(argc, argv).options(desc).positional(p).run();
+                po::command_line_parser(args).options(desc).allow_unregistered().run();
             auto keep_opt = [&restart](const auto& opt)
             {
-               if (opt.string_key == "database")
-                  return true;
-               else if (opt.string_key == "key")
+               if (opt.string_key == "key")
                   return !restart.keysChanged;
                else
-                  return !restart.configChanged;
+                  return !restart.configChanged && !opt.unregistered;
             };
-            if (argc > 0)
+            for (const auto& opt : original_args.options)
             {
-               args.push_back(argv[0]);
-               for (const auto& opt : original_args.options)
+               if (keep_opt(opt))
                {
-                  if (keep_opt(opt))
+                  for (const auto& s : opt.original_tokens)
                   {
-                     for (const auto& s : opt.original_tokens)
-                     {
-                        args.push_back(s.c_str());
-                     }
+                     newArgs.push_back(s);
                   }
                }
+            }
+
+            if (restart.args && restart.args->restart)
+            {
+               newArgs.insert(newArgs.end(), restart.args->restart->begin(),
+                              restart.args->restart->end());
             }
 
             if (restart.args && restart.args->soft)
@@ -2316,17 +2340,20 @@ int main(int argc, char* argv[])
                PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Soft restart";
                po::variables_map tmp;
                // Reload the config file
-               parse_args(args.size(), args.data(), tmp);
+               parse_args(newArgs, tmp);
             }
             else
             {
+               std::vector<const char*> cArgs;
+               for (const std::string& s : newArgs)
+                  cArgs.push_back(s.c_str());
+               cArgs.push_back(nullptr);
                PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Restart";
-               args.push_back(nullptr);
                // Cleanup that would normally happen in exit()
                boost::log::core::get()->remove_all_sinks();
                std::fflush(stdout);
                std::fflush(stderr);
-               ::execvp(argv[0], const_cast<char**>(args.data()));
+               ::execvp(argv[0], const_cast<char**>(cArgs.data()));
                break;
             }
          }
