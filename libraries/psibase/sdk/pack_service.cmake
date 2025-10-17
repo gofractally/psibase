@@ -337,11 +337,16 @@ function(cargo_psibase_package)
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
     
-    # Determine package output location based on whether TARGET_DIR is provided
+    # Determine package output location and build command based on whether TARGET_DIR is provided
     if(ARG_TARGET_DIR)
         set(PACKAGE_OUTPUT ${ARG_TARGET_DIR}/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+        set(BUILD_CMD ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
+            --target-dir ${ARG_TARGET_DIR})
     else()
         set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+        set(BUILD_CMD ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml)
     endif()
 
     # Build the package if needed
@@ -349,9 +354,7 @@ function(cargo_psibase_package)
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}
         BUILD_BYPRODUCTS ${PACKAGE_OUTPUT}
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
-            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
-            $<$<BOOL:${ARG_TARGET_DIR}>:--target-dir ${ARG_TARGET_DIR}>
+        BUILD_COMMAND ${BUILD_CMD}
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
         DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
