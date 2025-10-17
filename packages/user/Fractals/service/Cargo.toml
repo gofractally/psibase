@@ -13,7 +13,6 @@ postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
 ]
 
-
 [dependencies]
 psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
 psibase_macros = { version = "0.21.0", path = "../../../../rust/psibase_macros" }
