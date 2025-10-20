@@ -396,7 +396,7 @@ pub mod tables {
             Self::get(creditor, debitor, token_id).unwrap_or(Self::new(creditor, debitor, token_id))
         }
 
-        pub fn credit(&mut self, quantity: Quantity) {
+        pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
             check(quantity.value > 0, "credit quantity must be greater than 0");
 
             Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
@@ -416,7 +416,7 @@ pub mod tables {
                 );
 
             if !is_manual_debit {
-                self.debit(quantity, Memo::new("Autodebit".to_string()).unwrap());
+                self.debit(quantity, memo);
             }
         }
 
@@ -458,7 +458,7 @@ pub mod tables {
                     memo,
                 );
                 self.sub_balance(balance);
-                Balance::get_or_new(self.debitor, self.token_id).add_balance(balance);
+                Balance::get_or_new(self.creditor, self.token_id).add_balance(balance);
             }
         }
 

@@ -1,66 +1,38 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
-use psibase::abort_message;
 use psibase::{check_some, get_service, AccountNumber, Table};
 
+use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
-    tables::tables::{EvaluationInstance, EvaluationInstanceTable, Score, ScoreTable},
+    tables::tables::{EvaluationInstance, EvaluationInstanceTable},
 };
-
-#[derive(PartialEq, Clone)]
-pub enum EvalType {
-    Repuation = 1,
-    Favor = 2,
-}
-
-pub type EvalTypeU8 = u8;
-
-impl From<EvalTypeU8> for EvalType {
-    fn from(eval_type: EvalTypeU8) -> Self {
-        match eval_type {
-            1 => EvalType::Repuation,
-            2 => EvalType::Favor,
-            _ => abort_message("invalid evaluation type"),
-        }
-    }
-}
-
-impl From<EvalType> for u8 {
-    fn from(eval_type: EvalType) -> u8 {
-        eval_type as u8
-    }
-}
+use async_graphql::ComplexObject;
 
 impl EvaluationInstance {
-    fn get(fractal: AccountNumber, eval_type: EvalType) -> Option<Self> {
-        let table = EvaluationInstanceTable::new();
-        table.get_index_pk().get(&(fractal, eval_type.into()))
+    pub fn get(guild: AccountNumber) -> Option<Self> {
+        EvaluationInstanceTable::read().get_index_pk().get(&guild)
     }
 
-    pub fn get_assert(fractal: AccountNumber, eval_type: EvalType) -> Self {
-        check_some(
-            Self::get(fractal, eval_type),
-            "failed to find evaluation instance",
-        )
+    pub fn get_assert(guild: AccountNumber) -> Self {
+        check_some(Self::get(guild), "failed to find guild")
     }
 
-    fn new(fractal: AccountNumber, eval_type: EvalType, interval: u32, evaluation_id: u32) -> Self {
+    fn new(guild: AccountNumber, interval: u32, evaluation_id: u32) -> Self {
         Self {
-            eval_type: eval_type.into(),
+            guild,
             evaluation_id,
-            fractal,
             interval,
         }
     }
 
-    fn add(fractal: AccountNumber, eval_type: EvalType, interval: u32, evaluation_id: u32) -> Self {
-        let instance = Self::new(fractal, eval_type, interval, evaluation_id);
+    fn add(guild: AccountNumber, interval: u32, evaluation_id: u32) -> Self {
+        let instance = Self::new(guild, interval, evaluation_id);
         instance.save();
         instance
     }
 
     pub fn get_by_evaluation_id(eval_id: u32) -> Self {
-        let table = EvaluationInstanceTable::new();
+        let table = EvaluationInstanceTable::read();
 
         check_some(
             table.get_index_by_evaluation().get(&eval_id),
@@ -113,8 +85,7 @@ impl EvaluationInstance {
     }
 
     fn create_evaluation(
-        fractal: AccountNumber,
-        eval_type: EvalType,
+        guild: AccountNumber,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -132,10 +103,13 @@ impl EvaluationInstance {
             true,
         );
 
-        Self::add(fractal, eval_type, interval_seconds, evaluation_id);
+        Self::add(guild, interval_seconds, evaluation_id);
+
+        let guild_instance = Guild::get_assert(guild);
 
         crate::Wrapper::emit().history().scheduled_evaluation(
-            fractal,
+            guild_instance.fractal,
+            guild,
             evaluation_id,
             registration,
             deliberation,
@@ -153,8 +127,7 @@ impl EvaluationInstance {
         );
 
         Self::create_evaluation(
-            self.fractal,
-            self.eval_type.into(),
+            self.guild,
             evaluation.registration_starts + interval,
             evaluation.deliberation_starts + interval,
             evaluation.submission_starts + interval,
@@ -164,21 +137,19 @@ impl EvaluationInstance {
     }
 
     pub fn set_evaluation_schedule(
-        fractal: AccountNumber,
-        eval_type: EvalType,
+        guild: AccountNumber,
         registration: u32,
         deliberation: u32,
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
     ) {
-        Self::get(fractal, eval_type.clone()).map(|existing| {
+        Self::get(guild).map(|existing| {
             psibase::services::evaluations::Wrapper::call().delete(existing.evaluation_id, false);
         });
 
         Self::create_evaluation(
-            fractal,
-            eval_type,
+            guild,
             registration,
             deliberation,
             submission,
@@ -188,24 +159,23 @@ impl EvaluationInstance {
     }
 
     fn save(&self) {
-        let table = EvaluationInstanceTable::new();
+        let table = EvaluationInstanceTable::read_write();
         table.put(&self).expect("failed to save");
     }
 
-    fn scores(&self) -> Vec<Score> {
-        let table = ScoreTable::new();
+    fn guild_members(&self) -> Vec<GuildMember> {
+        let table = GuildMemberTable::read();
 
         table
             .get_index_pk()
             .range(
-                (self.fractal, AccountNumber::from(0), self.eval_type)
-                    ..=(self.fractal, AccountNumber::from(u64::MAX), self.eval_type),
+                (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
             )
             .collect()
     }
 
     pub fn set_pending_scores(&self, pending_score: u32) {
-        self.scores().into_iter().for_each(|mut account| {
+        self.guild_members().into_iter().for_each(|mut account| {
             account.set_pending_score(pending_score);
         });
     }
@@ -220,14 +190,20 @@ impl EvaluationInstance {
 
         for (index, account) in fractal_group_result.into_iter().enumerate() {
             let level = (6 as usize) - index;
-            Score::get_assert(self.fractal, self.eval_type.into(), account)
-                .set_pending_score(level as u32);
+            GuildMember::get_assert(self.guild, account).set_pending_score(level as u32);
         }
     }
 
     pub fn save_pending_scores(&self) {
-        self.scores().into_iter().for_each(|mut account| {
+        self.guild_members().into_iter().for_each(|mut account| {
             account.save_pending_score();
         });
+    }
+}
+
+#[ComplexObject]
+impl EvaluationInstance {
+    pub async fn guild_instance(&self) -> Guild {
+        GuildTable::read().get_index_pk().get(&self.guild).unwrap()
     }
 }

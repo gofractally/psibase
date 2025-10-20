@@ -4,11 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 hex = "0.4"
+plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]

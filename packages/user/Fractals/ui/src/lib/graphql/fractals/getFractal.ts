@@ -1,8 +1,9 @@
 import { z } from "zod";
 
+import { siblingUrl } from "@psibase/common-lib";
+
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
-import { zEvalType } from "@/lib/zod/EvaluationType";
 
 import { graphql } from "../../graphql";
 
@@ -12,22 +13,31 @@ export const zFractal = z
         createdAt: zDateTime,
         name: z.string(),
         mission: z.string(),
-        council: z.array(zAccount),
     })
     .or(z.null());
 
-export const zEvaluation = z
-    .object({
-        fractal: zAccount,
-        evalType: zEvalType,
-        interval: z.number(),
-        evaluationId: z.number(),
-    })
-    .array();
-
 const zFractalRes = z.object({
     fractal: zFractal,
-    evaluations: zEvaluation,
+    guilds: z.object({
+        nodes: z
+            .object({
+                account: zAccount,
+                rep: z
+                    .object({
+                        member: zAccount,
+                    })
+                    .optional(),
+                displayName: z.string(),
+                council: z.array(zAccount),
+                bio: z.string(),
+                evalInstance: z
+                    .object({
+                        evaluationId: z.number().int(),
+                    })
+                    .nullable(),
+            })
+            .array(),
+    }),
 });
 
 export type FractalRes = z.infer<typeof zFractalRes>;
@@ -39,17 +49,25 @@ export const getFractal = async (owner: Account) => {
         fractal(fractal: "${owner}") {     
             account
             createdAt
-            name
             mission
-            council
+            name
         }
-        evaluations(fractal: "${owner}") {
-            fractal
-            evalType
-            interval
-            evaluationId
+        guilds(fractal: "${owner}") {
+            nodes {
+                account
+                rep {
+                    member
+                }
+                displayName
+                council
+                bio
+                evalInstance {
+                  evaluationId
+                }
+            }
         }
     }`,
+        siblingUrl(null, "fractals", "/graphql"),
     );
 
     return zFractalRes.parse(fractal);

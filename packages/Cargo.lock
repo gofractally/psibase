@@ -16,20 +16,22 @@ dependencies = [
 name = "account-tokens"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.34.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
 name = "accounts"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
  "serde",
  "serde_json",
  "url",
- "wit-bindgen-rt 0.34.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -73,7 +75,8 @@ name = "aes"
 version = "0.21.0"
 dependencies = [
  "aes-gcm",
- "wit-bindgen-rt 0.39.0",
+ "plugin-workspace-hack",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -324,23 +327,26 @@ dependencies = [
 name = "auth-any"
 version = "0.21.0"
 dependencies = [
- "wit-bindgen-rt 0.34.0",
+ "plugin-workspace-hack",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
 name = "auth-delegate"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.34.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
 name = "auth-invite"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.33.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -350,11 +356,12 @@ dependencies = [
  "indoc",
  "lazy_static",
  "pem",
+ "plugin-workspace-hack",
  "psibase",
  "seahash",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.26.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -395,7 +402,8 @@ name = "base64"
 version = "0.21.0"
 dependencies = [
  "base64 0.22.1",
- "wit-bindgen-rt 0.39.0",
+ "plugin-workspace-hack",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -577,8 +585,9 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 name = "clientdata"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.33.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -602,7 +611,8 @@ dependencies = [
 name = "config"
 version = "0.21.0"
 dependencies = [
- "wit-bindgen-rt 0.38.0",
+ "plugin-workspace-hack",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -990,6 +1000,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fractal-core"
+version = "0.21.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.30.0",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1217,20 +1237,22 @@ dependencies = [
 name = "host-auth"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
 name = "host-common"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
  "regex",
  "serde",
  "serde_json",
  "url",
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -1239,8 +1261,9 @@ version = "0.21.0"
 dependencies = [
  "p256",
  "pem",
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -1248,15 +1271,17 @@ name = "host-prompt"
 version = "0.21.0"
 dependencies = [
  "chrono",
+ "plugin-workspace-hack",
  "psibase",
  "urlencoding",
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
 name = "host-types"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "wit-bindgen-rt 0.30.0",
 ]
 
@@ -1545,13 +1570,14 @@ dependencies = [
  "chrono",
  "hex 0.4.3",
  "pem",
+ "plugin-workspace-hack",
  "psibase",
  "rand",
  "serde",
  "serde_json",
  "spki",
  "urlencoding",
- "wit-bindgen-rt 0.26.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -1628,8 +1654,9 @@ name = "kdf"
 version = "0.21.0"
 dependencies = [
  "pbkdf2",
+ "plugin-workspace-hack",
  "sha2",
- "wit-bindgen-rt 0.39.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -1817,12 +1844,13 @@ dependencies = [
  "anyhow",
  "chrono",
  "getrandom 0.3.3",
+ "plugin-workspace-hack",
  "psibase",
  "regex",
  "serde",
  "serde_json",
  "sha2",
- "wit-bindgen-rt 0.29.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -1914,6 +1942,7 @@ name = "permissions"
 version = "0.21.0"
 dependencies = [
  "chrono",
+ "plugin-workspace-hack",
  "psibase",
  "serde",
  "serde_json",
@@ -1984,6 +2013,30 @@ checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
  "der",
  "spki",
+]
+
+[[package]]
+name = "plugin-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.9.1",
+ "crypto-common",
+ "digest",
+ "generic-array",
+ "getrandom 0.2.16",
+ "getrandom 0.3.3",
+ "hmac",
+ "indexmap",
+ "libc",
+ "memchr",
+ "proc-macro2",
+ "quote",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "subtle",
+ "syn 2.0.104",
+ "zeroize",
 ]
 
 [[package]]
@@ -2078,10 +2131,11 @@ name = "producers"
 version = "0.21.0"
 dependencies = [
  "hex 0.4.3",
+ "plugin-workspace-hack",
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.39.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -2583,8 +2637,9 @@ dependencies = [
 name = "setcode"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.38.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -2628,8 +2683,9 @@ name = "sites"
 version = "0.21.0"
 dependencies = [
  "brotli",
+ "plugin-workspace-hack",
  "psibase",
- "wit-bindgen-rt 0.32.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -2992,12 +3048,13 @@ name = "transact"
 version = "0.21.0"
 dependencies = [
  "chrono",
+ "plugin-workspace-hack",
  "psibase",
  "regex",
  "serde",
  "serde_json",
  "sha2",
- "wit-bindgen-rt 0.29.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -3281,9 +3338,10 @@ version = "0.21.0"
 dependencies = [
  "p256",
  "pem",
+ "plugin-workspace-hack",
  "psibase",
  "seahash",
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -3635,72 +3693,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29c7526379ace8709ee9ab9f2bb50f112d95581063a59ef3097d9c10153886c9"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7a37bd9274cb2d4754b915d624447ec0dce9105d174361841c0826efc79ceb9"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b18e27825442721d23ed98591a80f55220cfe0bf883d92b1ead6c9be237bb34"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ca6f307148acf7199e492fd3781cc7b79f8f3eda003c0ac3aa8079449601ccb"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.33.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3268f3d866458b787f390cf61f4bbb563b922d091359f9608842999eaee3943c"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.34.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744845cde309b8fa32408d6fb67456449278c66ea4dcd96de29797b302721f02"
-dependencies = [
- "bitflags 2.9.1",
-]
-
-[[package]]
-name = "wit-bindgen-rt"
-version = "0.38.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed6f8d372a2d4a1227f2556e051cc24b2a5f15768d53451c84ff91e2527139e3"
 dependencies = [
  "bitflags 2.9.1",
 ]
@@ -3718,10 +3713,11 @@ dependencies = [
 name = "workshop"
 version = "0.21.0"
 dependencies = [
+ "plugin-workspace-hack",
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.38.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
