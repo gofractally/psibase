@@ -15,6 +15,7 @@ psibase_macros.workspace = true
 async-graphql.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
 profiles-pkg = { path = "..", version = "0.21.1" }

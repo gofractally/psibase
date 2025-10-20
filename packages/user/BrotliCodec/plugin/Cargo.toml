@@ -12,6 +12,7 @@ brotli-codec = { path = "../service", version = "0.21.0" }
 psibase.workspace = true
 wit-bindgen-rt.workspace = true
 brotli = { version = "7.0.0" }
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]
