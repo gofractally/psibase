@@ -49,6 +49,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Exile a fractal member.
+    ///
+    /// # Arguments
+    /// * `member` - The fractal member to be exiled.
+    #[action]
+    fn exile_member(member: AccountNumber) {
+        unimplemented!()
+    }
+
     /// Set guild description
     ///
     /// # Arguments
