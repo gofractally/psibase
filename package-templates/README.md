@@ -14,18 +14,46 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 # Usage
 
-## Instantiating the template
+## Generate and add to workspace (single command)
 
-From the root of the workspace, run:
-`cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v`
+```bash
+./package-templates/generate-package.sh <project-name> <description>
+```
 
-This will run a CLI wizard to set up the new app in the `./packages/user/` directory.
+Example:
+
+```bash
+./package-templates/generate-package.sh my-new-app "My new application"
+```
+
+This automatically:
+
+1. Generates the package from the template
+2. Adds it to `packages/user/Cargo.toml` workspace
+3. Reports completion
 
 ## Building the app
 
-1. From the app's `ui/` subdirectory, run `yarn` and `yarn build` to generate the UI.
-2. From the app's root directory, run `cargo-psibase package` to create a package file for the new app (`./target/wasm32-wasip1/release/packages/AppName.psi`).
+1. From the app's `ui/` subdirectory, run `yarn` and `yarn build` to generate the UI:
+   ```bash
+   cd packages/user/YourPackageName/ui && yarn && yarn build
+   ```
+2. From the package directory, run `cargo-psibase package` to create a `.psi` file:
+   ```bash
+   cd packages/user/YourPackageName
+   cargo-psibase package
+   ```
 3. Use `cargo-psibase install` to install the new app package to a network.
+
+## Advanced: Add existing package to workspace only
+
+If you've already generated a package and just need to add it to the workspace:
+
+```bash
+./package-templates/generate-package.sh YourPackageName
+```
+
+(Note: Use PascalCase name, no description argument)
 
 # Additional resources
 
