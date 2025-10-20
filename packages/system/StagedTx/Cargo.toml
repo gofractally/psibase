@@ -24,3 +24,4 @@ crate-type = ["rlib"]
 staged-tx = { path = "service", version = "0.21.0" }
 r-staged-tx = { path = "query-service", version = "0.21.0" }
 staged-tx-plugin = { path = "plugin", version = "0.21.0" }
+system-workspace-hack = { version = "0.1", path = "../system-workspace-hack" }

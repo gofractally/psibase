@@ -13,6 +13,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
+system-workspace-hack = { version = "0.1", path = "../../system-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]
