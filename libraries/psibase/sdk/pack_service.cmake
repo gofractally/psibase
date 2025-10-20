@@ -321,13 +321,10 @@ endfunction()
 # Description:              - Use this function when you want to add additional details to a package that is 
 #                             built/managed by cargo-psibase, as opposed to packages built entirely using CMake.
 # OUTPUT <filename>         - [Required] The package file. Must be identical to 'package.metadata.psibase.package-name' in project's Cargo.toml
-# PATH <filepath>           - [Required] The path to the package (e.g. `packages/user/Branding`).
-# WORKSPACE_PATH <filepath> - [Optional] Path to workspace root if package is a workspace member (e.g. `packages/user`).
-#                             If provided, the package output will be in the workspace's shared target directory.
-#                             If not provided, the package will use its own target directory (backward compatible).
+# PATH <filepath>           - [Required] The path to the cargo workspace (e.g. `packages/user/Branding`).
 # DEPENDS <targets>...      - Targets that this target depends on
 function(cargo_psibase_package)
-    cmake_parse_arguments(ARG "" "PATH;OUTPUT;WORKSPACE_PATH;DEPENDS" "" ${ARGN})
+    cmake_parse_arguments(ARG "" "PATH;OUTPUT;DEPENDS" "" ${ARGN})
 
     if(NOT ARG_PATH OR NOT ARG_OUTPUT)
         message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
@@ -336,15 +333,7 @@ function(cargo_psibase_package)
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
-    
-    # Determine target directory: use workspace if provided, otherwise package's own directory
-    if(ARG_WORKSPACE_PATH)
-        set(TARGET_DIR ${ARG_WORKSPACE_PATH})
-    else()
-        set(TARGET_DIR ${ARG_PATH})
-    endif()
-    
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_DIR}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext

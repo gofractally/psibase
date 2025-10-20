@@ -441,7 +441,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
-    WORKSPACE_PATH packages/system
+    TARGET_DIR packages/system
 )
 
 cargo_psibase_package(
@@ -491,7 +491,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/StagedTx.psi
     PATH packages/system/StagedTx
-    WORKSPACE_PATH packages/system
+    TARGET_DIR packages/system
 )
 
 cargo_psibase_package(
