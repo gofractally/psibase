@@ -291,10 +291,7 @@ namespace LocalService
             PendingShutdownRow row{.args = psio::convert_to_json(args)};
 
             auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
-            PSIBASE_SUBJECTIVE_TX
-            {
-               table.put(row);
-            }
+            table.put(row);
          }
          return HttpReply{};
       }
