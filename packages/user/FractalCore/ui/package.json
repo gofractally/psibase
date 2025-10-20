@@ -6,9 +6,12 @@
         "dev": "vite",
         "build": "node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && yarn lint && vite build'",
         "lint": "eslint .",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "codegen": "graphql-code-generator",
+        "codegen:watch": "graphql-code-generator --watch"
     },
     "dependencies": {
+        "@apollo/client": "^4.0.7",
         "@dicebear/collection": "^9.2.2",
         "@dicebear/core": "^9.2.2",
         "@tanstack/react-form": "^1.11.1",
@@ -16,6 +19,7 @@
         "@tanstack/react-query": "^5.75.7",
         "@uidotdev/usehooks": "^2.4.1",
         "dayjs": "^1.11.13",
+        "graphql": "^16.11.0",
         "humanize-duration": "^3.32.2",
         "lucide-react": "^0.475.0",
         "nuqs": "^2.4.3",
@@ -23,16 +27,21 @@
         "react-dom": "^19.1.0",
         "react-easy-sort": "^1.6.0",
         "react-router-dom": "^6.26.1",
+        "rxjs": "^7.8.2",
         "usehooks-ts": "^3.1.1",
         "zod": "^3.24.2"
     },
     "devDependencies": {
+        "@graphql-codegen/cli": "^6.0.0",
+        "@graphql-codegen/typescript": "^5.0.2",
+        "@graphql-codegen/typescript-operations": "^5.0.2",
+        "@graphql-codegen/typescript-react-apollo": "^4.3.3",
         "@types/humanize-duration": "^3.27.4",
-        "@types/node": "^22.15.0",
+        "@types/node": "^24.8.1",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",
         "eslint": "^9.15.0",
-        "typescript": "^5.7.3",
+        "typescript": "^5.9.3",
         "vite": "^5.4.1"
     }
 }

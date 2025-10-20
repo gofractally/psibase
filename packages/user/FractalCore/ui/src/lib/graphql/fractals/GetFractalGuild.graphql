@@ -1,0 +1,22 @@
+query GetFractalGuild($fractal: AccountNumber!) {
+    fractal(fractal: $fractal) {
+        account
+        createdAt
+        mission
+        name
+    }
+    guilds(fractal: $fractal) {
+        nodes {
+            account
+            rep {
+                member
+            }
+            displayName
+            council
+            bio
+            evalInstance {
+                evaluationId
+            }
+        }
+    }
+}

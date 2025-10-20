@@ -1,4 +1,3 @@
-import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
@@ -26,8 +25,21 @@ import {
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
+import { useGetFractalQuery } from "@/lib/graphql/generated";
+
+
 export const MyMembership = () => {
     const fractalAccount = useFractalAccount();
+
+    const { data, loading, error: errorDerp } = useGetFractalQuery({
+        variables: {
+            fractalAccount
+        },
+        skip: !fractalAccount,
+    });
+
+
+    console.log({ data, loading, errorDerp }, "membership data");
 
     const {
         data: currentUser,
@@ -86,7 +98,6 @@ export const MyMembership = () => {
                 ) : (
                     <>
                         <FractalOverviewCard
-                            fractal={fractal}
                             fractalAccount={fractalAccount}
                             chainId={chainId}
                         />
@@ -102,14 +113,14 @@ export const MyMembership = () => {
 };
 
 const FractalOverviewCard = ({
-    fractal,
     fractalAccount,
     chainId,
 }: {
-    fractal?: FractalRes;
     fractalAccount?: string;
     chainId: string;
 }) => {
+
+    const fractal = useFractal();
     return (
         <Card>
             <CardHeader>
@@ -153,8 +164,8 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         membership == null
             ? "Not a member"
             : membership
-              ? getMemberLabel(membership.memberStatus)
-              : "Loading...";
+                ? getMemberLabel(membership.memberStatus)
+                : "Loading...";
     return (
         <Card>
             <CardHeader>
