@@ -477,7 +477,7 @@ class Node(API):
     def node_args(self):
         return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
     def start(self, database_cache_size=None):
-        args = [self.executable, "-l", self.socketpath]
+        args = [self.executable, self.dir, "-l", self.socketpath]
         for interface in self.listen:
             args.extend(['-l', interface])
         if self.producer is not None:
@@ -488,7 +488,6 @@ class Node(API):
             args.append('--p2p')
         if database_cache_size is not None:
             args.extend(['--database-cache-size', str(database_cache_size)])
-        args.append(self.dir)
         kw = {}
         if len(self.env) != 0:
             env = dict(os.environ)
