@@ -223,25 +223,73 @@ namespace LocalService
          }
       }
 
-      // differences between /config and HostConfigRow
-      // - HostConfigRow has list of strings for options defined by services.
-      //   /config translates this to appropriate types.
-      // - /config does not include argv
+      struct PsinodeConfig
+      {
+         psio::json::any         host;
+         psio::json::any         service;
+         psio::json::any_object* serviceConfig()
+         {
+            if (auto* s = service.get_if<psio::json::any_object>())
+            {
+               auto pos =
+                   std::ranges::find_if(*s, [](auto& entry) { return entry.key == "config"; });
+               if (pos != s->end())
+               {
+                  return pos->value.get_if<psio::json::any_object>();
+               }
+            }
+            return nullptr;
+         }
+         std::vector<std::string> serviceArgv()
+         {
+            if (auto* s = service.get_if<psio::json::any_object>())
+            {
+               auto pos = std::ranges::find_if(*s, [](auto& entry) { return entry.key == "argv"; });
+               if (pos != s->end())
+               {
+                  if (auto* arr = pos->value.get_if<psio::json::any_array>())
+                  {
+                     std::vector<std::string> result;
+                     for (const auto& arg : *arr)
+                     {
+                        if (auto* s = arg.get_if<std::string>())
+                           result.push_back(*s);
+                        else
+                           return {};
+                     }
+                     return result;
+                  }
+               }
+            }
+            return {};
+         }
+         PSIO_REFLECT(PsinodeConfig, host, service)
+      };
+
+      // The result of /config merges the host psinode config with the AdminOptions row
       std::string readConfig()
       {
-         psio::json::any_object json;
-         AdminOptionsRow        adminOpts;
+         AdminOptionsRow adminOpts;
+         PsinodeConfig   json;
          PSIBASE_SUBJECTIVE_TX
          {
             HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
-            json      = psio::convert_from_json<psio::json::any_object>(hostConfig.config);
+            json                     = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
             adminOpts = XAdmin{}.open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
          }
          psio::json::any_object result;
-         for (auto& entry : json)
+         if (auto* host = json.host.get_if<psio::json::any_object>())
          {
-            if (entry.key != "argv" && entry.key != "p2p")
+            for (auto& entry : *host)
             {
+               // Rename host options that conflict with the ours.
+               // Note that we preserve the service defined options here,
+               // because they are used by the UI, which is part of this
+               // service. Unknown host options will not be displayed and
+               // will be round-tripped unmodified.
+               if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+                   entry.key.starts_with("host."))
+                  entry.key = "host." + entry.key;
                result.push_back(std::move(entry));
             }
          }
@@ -255,41 +303,32 @@ namespace LocalService
             auto            table      = Native::session().open<HostConfigTable>();
             HostConfigRow   hostConfig = table.get({}).value();
             AdminOptionsRow adminConfig{};
-            auto existing = psio::convert_from_json<psio::json::any_object>(hostConfig.config);
-            auto json     = psio::convert_from_json<psio::json::any_object>(std::move(config));
-            psio::json::any_object result;
+            auto json = psio::convert_from_json<psio::json::any_object>(std::move(config));
+            psio::json::any_object host;
+            psio::json::any_object service;
             for (auto& entry : json)
             {
-               if (entry.key == "argv")
-               {
-               }
                if (entry.key == "p2p")
                {
                   if (const bool* b = entry.value.get_if<bool>())
                   {
                      adminConfig.p2p = *b;
                      entry.value     = std::string(*b ? "on" : "off");
-                     result.push_back(std::move(entry));
+                     service.push_back(std::move(entry));
                   }
                }
                else
                {
-                  bool found = false;
-                  for (auto& old : existing)
-                  {
-                     if (old.key == entry.key)
-                     {
-                        found = true;
-                        break;
-                     }
-                  }
-                  if (found)
-                  {
-                     result.push_back(std::move(entry));
-                  }
+                  if (entry.key.starts_with("host."))
+                     entry.key = entry.key.substr(5);
+
+                  host.push_back(std::move(entry));
                }
             }
-            hostConfig.config = psio::convert_to_json(psio::json::any{std::move(result)});
+            hostConfig.config = psio::convert_to_json(PsinodeConfig{
+                .host = std::move(host),
+                .service =
+                    psio::json::any_object{psio::json::entry{"config", std::move(service)}}});
             table.put(hostConfig);
             XAdmin{}.open<AdminOptionsTable>().put(adminConfig);
          }
@@ -302,18 +341,24 @@ namespace LocalService
       PSIBASE_SUBJECTIVE_TX
       {
          HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
-         auto          opts       = psio::convert_from_json<CliArgs>(hostConfig.config);
-         auto          json = psio::convert_from_json<psio::json::any_object>(hostConfig.config);
+         auto          json       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
 
          AdminOptionsRow adminOpts{};
-         for (const auto& entry : json)
+         if (auto* config = json.serviceConfig())
          {
-            if (entry.key == "p2p")
+            for (const auto& entry : *config)
             {
-               adminOpts.p2p = parseOptionList(entry.value, false);
+               if (entry.key == "p2p")
+               {
+                  adminOpts.p2p = parseOptionList(entry.value, false);
+               }
+               else
+               {
+                  abortMessage(std::format("Unknown option: {}", entry.key));
+               }
             }
          }
-         for (const auto& opt : opts.argv)
+         for (const auto& opt : json.serviceArgv())
          {
             if (!parseOption("--p2p", opt, adminOpts.p2p))
             {
@@ -449,8 +494,8 @@ namespace LocalService
             if (body.restart)
             {
                HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
-               auto          opts       = psio::convert_from_json<CliArgs>(hostConfig.config);
-               args.restart             = std::move(opts.argv);
+               auto          opts       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+               args.restart             = opts.serviceArgv();
             }
             PendingShutdownRow row{.args = psio::convert_to_json(args)};
 

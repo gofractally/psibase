@@ -11,7 +11,9 @@
 #include <psibase/version.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
+#include <psio/from_json/map.hpp>
 #include <psio/to_json.hpp>
+#include <psio/to_json/map.hpp>
 
 #include "connect.hpp"
 #include "connection.hpp"
@@ -1093,8 +1095,53 @@ struct TLSConfig
 };
 PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
 
-using ExtraConfigFields =
-    std::map<std::string, std::variant<std::string, std::vector<std::string>>>;
+struct ExtraConfigField
+{
+   std::variant<std::string, std::vector<std::string>> value;
+};
+
+void to_json(const ExtraConfigField& field, auto& stream)
+{
+   std::visit([&](auto& v) { to_json(v, stream); }, field.value);
+}
+
+void from_json(ExtraConfigField& field, auto& stream)
+{
+   auto t = stream.peek_token();
+   switch (t.get().type)
+   {
+      case psio::json_token_type::type_bool:
+         field.value = stream.get_bool() ? "true" : "false";
+         break;
+      case psio::json_token_type::type_string:
+         field.value = std::string(stream.get_string());
+         break;
+      case psio::json_token_type::type_start_array:
+      {
+         std::vector<std::string> values;
+         while (!stream.get_end_array_pred())
+         {
+            // bool or string
+            auto t = stream.peek_token();
+            if (t.get().type == psio::json_token_type::type_bool)
+            {
+               values.push_back(stream.get_bool() ? "true" : "false");
+            }
+            else
+            {
+               values.push_back(std::string(stream.get_string()));
+            }
+         }
+         field.value = std::move(values);
+         break;
+      }
+      default:
+         throw std::runtime_error("Expected string or array");
+         break;
+   }
+}
+
+using ExtraConfigFields = std::map<std::string, ExtraConfigField>;
 
 ExtraConfigFields extraConfig(const std::vector<boost::program_options::option>& opts)
 {
@@ -1103,15 +1150,26 @@ ExtraConfigFields extraConfig(const std::vector<boost::program_options::option>&
    {
       if (!option.unregistered || option.value.empty())
          continue;
-      auto [pos, inserted] = result.try_emplace(option.string_key, option.value);
+      std::string_view prefix{"service."};
+      std::string_view key{option.string_key};
+      if (key.starts_with(prefix))
+         key.remove_prefix(prefix.size());
+      auto [pos, inserted] = result.try_emplace(std::string(key), option.value);
       if (!inserted)
       {
-         auto& value = std::get<std::vector<std::string>>(pos->second);
+         auto& value = std::get<std::vector<std::string>>(pos->second.value);
          value.insert(value.end(), option.value.begin(), option.value.end());
       }
    }
    return result;
 }
+
+struct PsinodeServiceConfig
+{
+   std::vector<std::string> argv;
+   ExtraConfigFields        config;
+   PSIO_REFLECT(PsinodeServiceConfig, argv, config)
+};
 
 struct PsinodeConfig
 {
@@ -1126,8 +1184,6 @@ struct PsinodeConfig
    Timeout                     http_timeout;
    std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
-   std::vector<std::string>    argv;
-   ExtraConfigFields           extra;
 
    static bool isNative(std::string_view name)
    {
@@ -1135,7 +1191,8 @@ struct PsinodeConfig
           "peers",        "autoconnect",     "producer", "pkcs11-modules",     "host",
           "listen",       "tls-key",         "tls-cert", "tls-trustfile",      "service",
           "http-timeout", "service-threads", "key",      "database-cache-size"};
-      return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.");
+      return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
+             name.starts_with("service.");
    }
 };
 PSIO_REFLECT(PsinodeConfig,
@@ -1151,94 +1208,7 @@ PSIO_REFLECT(PsinodeConfig,
              services,
              http_timeout,
              service_threads,
-             loggers,
-             argv);
-
-void from_json(PsinodeConfig& obj, auto& stream)
-{
-   from_json_object(stream,
-                    [&](std::string_view key) -> void
-                    {
-                       bool found = psio::get_data_member<PsinodeConfig>(
-                           key, [&](auto member) { from_json(obj.*member, stream); });
-                       if (!found)
-                       {
-                          if (PsinodeConfig::isNative(key))
-                             from_json_skip_value(stream);
-                          else
-                          {
-                             auto t = stream.peek_token();
-                             switch (t.get().type)
-                             {
-                                case psio::json_token_type::type_bool:
-                                   obj.extra[std::string(key)] =
-                                       stream.get_bool() ? "true" : "false";
-                                   break;
-                                case psio::json_token_type::type_string:
-                                   obj.extra[std::string(key)] = std::string(stream.get_string());
-                                   break;
-                                case psio::json_token_type::type_start_array:
-                                {
-                                   std::vector<std::string> values;
-                                   while (!stream.get_end_array_pred())
-                                   {
-                                      // bool or string
-                                      auto t = stream.peek_token();
-                                      if (t.get().type == psio::json_token_type::type_bool)
-                                      {
-                                         values.push_back(stream.get_bool() ? "true" : "false");
-                                      }
-                                      else
-                                      {
-                                         values.push_back(std::string(stream.get_string()));
-                                      }
-                                   }
-                                   obj.extra[std::string(key)] = std::move(values);
-                                   break;
-                                }
-                                default:
-                                   from_json_skip_value(stream);
-                                   break;
-                             }
-                          }
-                       }
-                    });
-}
-
-void to_json(const PsinodeConfig& obj, auto& stream)
-{
-   stream.write('{');
-   std::size_t i = 0;
-   psio::for_each_member(&obj, (typename psio::reflect<PsinodeConfig>::data_members*)nullptr,
-                         [&](const auto& member)
-                         {
-                            if (i == 0)
-                               increase_indent(stream);
-                            else
-                               stream.write(',');
-                            to_json(psio::reflect<PsinodeConfig>::data_member_names[i], stream);
-                            write_colon(stream);
-                            to_json(member, stream);
-                            ++i;
-                         });
-   for (const auto& [key, value] : obj.extra)
-   {
-      if (i == 0)
-         increase_indent(stream);
-      else
-         stream.write(',');
-      to_json(key, stream);
-      write_colon(stream);
-      std::visit([&](auto& v) { to_json(v, stream); }, value);
-      ++i;
-   }
-   if (i != 0)
-   {
-      decrease_indent(stream);
-      write_newline(stream);
-   }
-   stream.write('}');
-}
+             loggers);
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
@@ -1317,16 +1287,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    file.set("", "service-threads", std::to_string(config.service_threads),
             "The number of threads that run async actions posted by services");
 
-   for (const auto& [key, value] : config.extra)
-   {
-      if (auto* s = std::get_if<std::string>(&value))
-         file.set("", key, *s, "Service defined option");
-      else if (auto* v = std::get_if<std::vector<std::string>>(&value))
-         file.set(
-             "", key, *v, [](std::string_view text) { return std::string(text); },
-             "Service defined option");
-   }
-
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1336,14 +1296,36 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    to_config(config.loggers, file);
 }
 
-HostConfigRow toHostConfig(const PsinodeConfig& config)
+struct PsinodeCombinedConfig
+{
+   PsinodeConfig        host;
+   PsinodeServiceConfig service;
+   PSIO_REFLECT(PsinodeCombinedConfig, host, service)
+};
+
+void to_config(const PsinodeCombinedConfig& config, ConfigFile& file)
+{
+   to_config(config.host, file);
+   for (const auto& [key, value] : config.service.config)
+   {
+      std::string_view section = PsinodeConfig::isNative(key) ? "service" : "";
+      if (auto* s = std::get_if<std::string>(&value.value))
+         file.set(section, key, *s, "Service defined option");
+      else if (auto* v = std::get_if<std::vector<std::string>>(&value.value))
+         file.set(
+             section, key, *v, [](std::string_view text) { return std::string(text); },
+             "Service defined option");
+   }
+}
+
+HostConfigRow toHostConfig(const PsinodeConfig& config, const PsinodeServiceConfig& extra)
 {
    HostConfigRow result{
        .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
    };
    std::vector<char>   configText;
    psio::vector_stream stream(configText);
-   psio::to_json(config, stream);
+   psio::to_json(PsinodeCombinedConfig{config, extra}, stream);
    result.config = std::string(configText.begin(), configText.end());
    return result;
 }
@@ -1413,8 +1395,7 @@ void run(const std::string&              db_path,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
-         const std::vector<std::string>& extra_options,
-         const ExtraConfigFields&        extra_config_file_options,
+         const PsinodeServiceConfig&     extra_options,
          RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
@@ -1457,28 +1438,28 @@ void run(const std::string&              db_path,
       auto               session = db.startWrite(system->sharedDatabase.createWriter());
       db.checkoutSubjective();
       load_environment(db);
-      HostConfigRow hostConfig = toHostConfig(PsinodeConfig{
-          .peers          = peers,
-          .autoconnect    = autoconnect,
-          .producer       = producer,
-          .pkcs11_modules = pkcs11_modules,
-          .hosts          = hosts,
-          .listen         = listen,
+      HostConfigRow hostConfig = toHostConfig(
+          PsinodeConfig{
+              .peers          = peers,
+              .autoconnect    = autoconnect,
+              .producer       = producer,
+              .pkcs11_modules = pkcs11_modules,
+              .hosts          = hosts,
+              .listen         = listen,
 #ifdef PSIBASE_ENABLE_SSL
-          .tls =
-              {
-                  .certificate = tls_cert,
-                  .key         = tls_key,
-                  .trustfiles  = root_ca,
-              },
+              .tls =
+                  {
+                      .certificate = tls_cert,
+                      .key         = tls_key,
+                      .trustfiles  = root_ca,
+                  },
 #endif
-          .services        = services,
-          .http_timeout    = http_timeout,
-          .service_threads = service_threads,
-          .loggers         = loggers::Config::get(),
-          .argv            = extra_options,
-          .extra           = extra_config_file_options,
-      });
+              .services        = services,
+              .http_timeout    = http_timeout,
+              .service_threads = service_threads,
+              .loggers         = loggers::Config::get(),
+          },
+          extra_options);
       db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
       if (!db.commitSubjective(*system->sockets, autoClose))
       {
@@ -1697,7 +1678,9 @@ void run(const std::string&              db_path,
                  auto row    = system->sharedDatabase.kvGetSubjective(
                      *writer, HostConfigRow::db, psio::convert_to_key(hostConfigKey()));
                  auto hostConfig = psio::from_frac<HostConfigRow>(row.value());
-                 auto config     = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+                 auto combinedConfig =
+                     psio::convert_from_json<PsinodeCombinedConfig>(hostConfig.config);
+                 auto& config = combinedConfig.host;
 
                  std::optional<http::services_t> new_services;
                  for (auto& entry : config.services)
@@ -1756,7 +1739,7 @@ void run(const std::string&              db_path,
                        std::ifstream in(path);
                        file.parse(in);
                     }
-                    to_config(config, file);
+                    to_config(combinedConfig, file);
                     {
                        std::ofstream out(path);
                        file.write(out);
@@ -2279,8 +2262,7 @@ int main(int argc, char* argv[])
    byte_size                   db_size;
    Timeout                     http_timeout;
    std::size_t                 service_threads;
-   std::vector<std::string>    extra_options;
-   ExtraConfigFields           extra_config_file_options;
+   PsinodeServiceConfig        extra_options;
 
    namespace po = boost::program_options;
 
@@ -2346,12 +2328,12 @@ int main(int argc, char* argv[])
       args = {argv + 1, argv + argc};
    }
 
-   auto parse_args = [&desc, &cfg_opts, &extra_options, &extra_config_file_options, &database](
+   auto parse_args = [&desc, &cfg_opts, &extra_options, &database](
                          const std::vector<std::string>& args, po::variables_map& vm)
    {
-      option_path   = std::filesystem::current_path();
-      auto parsed   = po::command_line_parser(args).options(desc).allow_unregistered().run();
-      extra_options = po::collect_unrecognized(parsed.options, po::include_positional);
+      option_path        = std::filesystem::current_path();
+      auto parsed        = po::command_line_parser(args).options(desc).allow_unregistered().run();
+      extra_options.argv = po::collect_unrecognized(parsed.options, po::include_positional);
       po::store(parsed, vm);
       if (database)
       {
@@ -2362,7 +2344,7 @@ int main(int argc, char* argv[])
          {
             std::ifstream in(config_path);
             auto parsed = psibase::parse_config_file(in, cfg_opts, config_options, config_path);
-            extra_config_file_options = extraConfig(parsed.options);
+            extra_options.config = extraConfig(parsed.options);
             po::store(parsed, vm);
          }
          else if (!exists(config_path))
@@ -2372,7 +2354,7 @@ int main(int argc, char* argv[])
             {
                std::ifstream in(template_path);
                auto parsed = psibase::parse_config_file(in, cfg_opts, config_options, config_path);
-               extra_config_file_options = extraConfig(parsed.options);
+               extra_options.config = extraConfig(parsed.options);
                po::store(parsed, vm);
             }
          }
@@ -2425,8 +2407,7 @@ int main(int argc, char* argv[])
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
              pkcs11_modules, peers, autoconnect, hosts, listen, services, http_timeout,
-             service_threads, root_ca, tls_cert, tls_key, extra_options, extra_config_file_options,
-             restart);
+             service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
