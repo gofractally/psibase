@@ -101,13 +101,9 @@ pub mod service {
     #[action]
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
         let guild = Guild::get_assert(guild_account);
-        let member = check_some(
+        check_some(
             FractalMember::get(guild.fractal, get_sender()),
             "must be a member of a fractal to apply for its guild",
-        );
-        check(
-            MemberStatus::Exiled != member.member_status.into(),
-            "you are exiled",
         );
         GuildApplication::add(guild.account, get_sender(), extra_info);
     }
@@ -169,13 +165,9 @@ pub mod service {
             GuildApplication::get(guild.account, member),
             "application does not exist",
         );
-        let fractal_membership = check_some(
+        check_some(
             FractalMember::get(guild.fractal, sender),
             "must be a member of a fractal to attest",
-        );
-        check(
-            MemberStatus::Exiled != fractal_membership.member_status.into(),
-            "you are exiled",
         );
         check_some(
             GuildMember::get(guild.account, sender),
@@ -356,6 +348,15 @@ pub mod service {
             "must be a citizen to create a guild",
         );
         Guild::add(fractal, guild_account, get_sender(), display_name);
+    }
+
+    /// Exile a fractal member.
+    ///
+    /// # Arguments
+    /// * `member` - The fractal member to be exiled.
+    #[action]
+    fn exile_member(member: AccountNumber) {
+        FractalMember::get_assert(get_sender(), member).exhile();
     }
 
     #[event(history)]
