@@ -263,6 +263,9 @@ namespace LocalService
       }
       else if (target == "/shutdown")
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          if (req.method != "POST")
          {
             return HttpReply::methodNotAllowed(req);
