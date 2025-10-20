@@ -77,7 +77,7 @@ impl FractalMember {
         MemberStatus::Visa == self.member_status.into()
     }
 
-    pub fn exhile(&self) {
+    pub fn exile(&self) {
         FractalExile::add(self.fractal, self.account);
         self.remove();
     }

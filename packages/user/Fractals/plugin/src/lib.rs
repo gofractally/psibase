@@ -63,7 +63,7 @@ define_trust! {
         None => [get_group_users],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [exhile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
+        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
     }
 }
 
@@ -101,7 +101,7 @@ impl AdminFractal for FractallyPlugin {
     }
 
     fn exile_member(member: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::exhile_member)?;
+        assert_authorized(FunctionName::exile_member)?;
         let packed_args = fractals::action_structs::exile_member {
             member: member.parse().unwrap(),
         }

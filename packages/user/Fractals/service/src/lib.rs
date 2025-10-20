@@ -356,7 +356,7 @@ pub mod service {
     /// * `member` - The fractal member to be exiled.
     #[action]
     fn exile_member(member: AccountNumber) {
-        FractalMember::get_assert(get_sender(), member).exhile();
+        FractalMember::get_assert(get_sender(), member).exile();
     }
 
     #[event(history)]
