@@ -50,6 +50,7 @@ define_trust! {
             High => "
             High trust grants the abilities of all lower trust levels, plus these abilities:
             - Proposing a vote in evaluation cycle
+            - Exiling a fractal member
             - Setting the guild evaluation schedule
             - Setting the guild display name
             - Setting the guild bio
@@ -62,7 +63,7 @@ define_trust! {
         None => [get_group_users],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
+        High => [exhile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
     }
 }
 
@@ -95,6 +96,18 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::create_fractal::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn exile_member(member: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::exhile_member)?;
+        let packed_args = fractals::action_structs::exile_member {
+            member: member.parse().unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::exile_member::ACTION_NAME,
             &packed_args,
         )
     }

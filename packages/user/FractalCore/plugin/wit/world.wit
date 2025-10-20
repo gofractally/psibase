@@ -1,6 +1,11 @@
 package fractal-core:plugin;
 
 
+interface admin-fractal {
+    use host:types/types.{error};
+
+    exile-member: func(fractal: string, member: string) -> result<_, error>;
+}
 
 interface user-fractal {
     use host:types/types.{error};
