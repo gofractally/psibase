@@ -14,11 +14,11 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 # Usage
 
-## Generate and add to workspace
+## Instantiating template and adding to workspace
 
-```bash
-./package-templates/generate-package.sh <project-name>
-```
+From the root of the workspace, run: `./package-templates/generate-package.sh <project-name>`
+
+This will run a CLI wizard to set up the new app in the `./packages/user/` directory.
 
 Example:
 
@@ -26,20 +26,12 @@ Example:
 ./package-templates/generate-package.sh my-new-app
 ```
 
-This automatically:
-
-1. Runs the cargo-generate wizard to collect project information
-2. Generates the package from the template
-3. Adds it to `packages/user/Cargo.toml` workspace
-4. Reports next steps
+This will run a CLI wizard to set up the new app in the `./packages/user/` directory and add it to the `packages/user/Cargo.toml` workspace
 
 ## Building the app
 
-1. From the app's `ui/` subdirectory, run `yarn` and `yarn build` to generate the UI:
-   ```bash
-   cd packages/user/YourPackageName/ui && yarn && yarn build
-   ```
-2. From the package directory, run `cargo-psibase package` to create a `.psi` file:
+1. From the app's `ui/` subdirectory, run `yarn` and `yarn build` to generate the UI.
+2. From the app's root directory, run `cargo-psibase package` to create a `.psi` package file for the new app (`./target/wasm32-wasip1/release/packages/AppName.psi`).
    ```bash
    cd packages/user/YourPackageName
    cargo-psibase package
