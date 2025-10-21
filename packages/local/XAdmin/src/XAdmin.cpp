@@ -469,6 +469,9 @@ namespace LocalService
       }
       else if (target == "/shutdown")
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          if (req.method != "POST")
          {
             return HttpReply::methodNotAllowed(req);
@@ -500,10 +503,7 @@ namespace LocalService
             PendingShutdownRow row{.args = psio::convert_to_json(args)};
 
             auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
-            PSIBASE_SUBJECTIVE_TX
-            {
-               table.put(row);
-            }
+            table.put(row);
          }
          return HttpReply{};
       }
