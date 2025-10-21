@@ -207,6 +207,33 @@ namespace LocalService
          return default_;
       }
 
+      std::string parseOption(const psio::json::any& opt, std::string default_)
+      {
+         if (auto* s = opt.get_if<std::string>())
+         {
+            return *s;
+         }
+         return default_;
+      }
+
+      template <typename T>
+      std::vector<T> parseOptionList(const psio::json::any& opt, const std::vector<T>& default_)
+      {
+         T result;
+         if (auto* l = opt.get_if<psio::json::any_array>())
+         {
+            for (const auto& item : *l)
+            {
+               result.push_back(parseOption(item, T{}));
+            }
+         }
+         else
+         {
+            return default_;
+         }
+         return result;
+      }
+
       template <typename T>
       T parseOptionList(const psio::json::any& opt, const T& default_)
       {
@@ -225,8 +252,20 @@ namespace LocalService
 
       struct PsinodeConfig
       {
-         psio::json::any         host;
-         psio::json::any         service;
+         psio::json::any  host;
+         psio::json::any  service;
+         psio::json::any* hostOption(std::string_view key)
+         {
+            if (auto* s = host.get_if<psio::json::any_object>())
+            {
+               auto pos = std::ranges::find_if(*s, [key](auto& entry) { return entry.key == key; });
+               if (pos != s->end())
+               {
+                  return &pos->value;
+               }
+            }
+            return nullptr;
+         }
          psio::json::any_object* serviceConfig()
          {
             if (auto* s = service.get_if<psio::json::any_object>())
@@ -287,13 +326,17 @@ namespace LocalService
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
                // will be round-tripped unmodified.
-               if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
-                   entry.key.starts_with("host."))
+               if (entry.key == "hosts")
+                  continue;
+               else if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+                        entry.key.starts_with("host."))
                   entry.key = "host." + entry.key;
                result.push_back(std::move(entry));
             }
          }
          result.push_back({"p2p", adminOpts.p2p});
+         result.push_back({"hosts", psio::convert_from_json<psio::json::any>(
+                                        psio::convert_to_json(adminOpts.hosts))});
          return psio::convert_to_json(psio::json::any{std::move(result)});
       }
       void writeConfig(std::string config)
@@ -316,6 +359,12 @@ namespace LocalService
                      entry.value     = std::string(*b ? "on" : "off");
                      service.push_back(std::move(entry));
                   }
+               }
+               else if (entry.key == "hosts")
+               {
+                  adminConfig.hosts = psio::convert_from_json<std::vector<std::string>>(
+                      psio::convert_to_json(entry.value));
+                  host.push_back(std::move(entry));
                }
                else
                {
@@ -344,6 +393,11 @@ namespace LocalService
          auto          json       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
 
          AdminOptionsRow adminOpts{};
+         if (auto* hosts = json.hostOption("hosts"))
+         {
+            adminOpts.hosts =
+                psio::convert_from_json<std::vector<std::string>>(psio::convert_to_json(*hosts));
+         }
          if (auto* config = json.serviceConfig())
          {
             for (const auto& entry : *config)

@@ -19,8 +19,35 @@ namespace
       return std::ranges::equal(std::string_view{header.name()}, h, {}, ::tolower, ::tolower);
    }
 
+   std::string_view getRootHost(std::string_view host)
+   {
+      static std::vector<std::string> hosts = to<XAdmin>().options().hosts;
+      std::string_view                result;
+
+      // Find the most specific host name that matches the request
+      std::string_view root_host;
+      for (const auto& name : hosts)
+      {
+         if (host.ends_with(name) &&
+             (host.size() == name.size() || host[host.size() - name.size() - 1] == '.'))
+         {
+            if (name.size() > root_host.size())
+            {
+               result = name;
+            }
+         }
+      }
+      // If there isn't a matching host, default to the first host
+      if (result.empty() && !hosts.empty())
+      {
+         result = hosts.front();
+      }
+      return result;
+   }
+
    std::string getUrl(psio::view<const HttpRequest> req,
                       std::int32_t                  socket,
+                      std::string_view              rootHost,
                       std::optional<AccountNumber>  subdomain = {})
    {
       std::string              location;
@@ -38,7 +65,7 @@ namespace
          location += subdomain->str();
          location += '.';
       }
-      location += req.rootHost();
+      location += rootHost;
       for (auto header : req.headers())
       {
          if (matches(header, "host"))
@@ -160,6 +187,11 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    socketSend(socket, psio::to_frac(result));
 }
 
+std::string XHttp::rootHost(psio::view<const std::string> host)
+{
+   return std::string(getRootHost(host));
+}
+
 #ifndef PSIBASE_GENERATE_SCHEMA
 
 extern "C" [[clang::export_name("startSession")]] void startSession()
@@ -176,9 +208,10 @@ extern "C" [[clang::export_name("serve")]] void serve()
    auto [sockview, req] = psio::view<const std::tuple<std::int32_t, HttpRequest>>(act->rawData());
    auto sock            = sockview.unpack();
 
-   auto owned = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
+   auto owned    = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
+   auto rootHost = getRootHost(req.host());
 
-   if (auto service = XHttp::getService(req); service != AccountNumber{})
+   if (auto service = XHttp::getService(req.host(), rootHost); service != AccountNumber{})
    {
       // Handle local service subdomains
       auto                   codeTable = Native::subjective(KvMode::read).open<CodeTable>();
@@ -225,11 +258,11 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (req.rootHost() != req.host() && std::string_view{req.target()} != "/native/p2p")
+   else if (rootHost != req.host() && std::string_view{req.target()} != "/native/p2p")
    {
-      if (!req.rootHost().empty())
+      if (!rootHost.empty())
       {
-         std::string location = getUrl(req, sock);
+         std::string location = getUrl(req, sock, rootHost);
          auto        reply    = redirect(HttpStatus::found,
                                          R"(<html><body>This psibase server is hosted at {}.</body></html>)",
                                          location);
@@ -259,7 +292,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    {
       if (req.method() == "GET" || req.method() == "HEAD")
       {
-         std::string location = getUrl(req, sock, XAdmin::service);
+         std::string location = getUrl(req, sock, rootHost, XAdmin::service);
          auto        reply    = redirect(
              HttpStatus::found,
              R"(<html><body>Node is not connected to any psibase network.  Visit {} for node setup.</body></html>)",
