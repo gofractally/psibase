@@ -1,19 +1,20 @@
 mod evaluation_instance;
 mod fractal;
-pub mod member;
-mod score;
+pub mod fractal_member;
+mod guild;
+mod guild_application;
+mod guild_attest;
+mod guild_member;
 
 #[psibase::service_tables]
 pub mod tables {
-    use std::u64;
 
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, TimePointSec, ToSchema};
+    use psibase::{AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
 
     use serde::{Deserialize, Serialize};
 
-    use crate::tables::evaluation_instance::EvalTypeU8;
-    use crate::tables::member::StatusU8;
+    use crate::tables::fractal_member::StatusU8;
 
     #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -32,17 +33,17 @@ pub mod tables {
         }
     }
 
-    #[table(name = "MemberTable", index = 1)]
+    #[table(name = "FractalMemberTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
-    pub struct Member {
+    pub struct FractalMember {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
     }
 
-    impl Member {
+    impl FractalMember {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.fractal, self.account)
@@ -56,39 +57,111 @@ pub mod tables {
 
     #[table(name = "EvaluationInstanceTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct EvaluationInstance {
-        pub fractal: AccountNumber,
-        pub eval_type: EvalTypeU8,
+        #[primary_key]
+        pub guild: AccountNumber,
         pub interval: u32,
         pub evaluation_id: u32,
     }
 
     impl EvaluationInstance {
-        #[primary_key]
-        fn pk(&self) -> (AccountNumber, EvalTypeU8) {
-            (self.fractal, self.eval_type)
-        }
-
         #[secondary_key(1)]
         pub fn by_evaluation(&self) -> u32 {
             self.evaluation_id
         }
     }
 
-    #[table(name = "ScoreTable", index = 3)]
+    #[table(name = "GuildTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Score {
-        pub fractal: AccountNumber,
+    #[graphql(complex)]
+    pub struct Guild {
+        #[primary_key]
         pub account: AccountNumber,
-        pub eval_type: EvalTypeU8,
-        pub value: u32,
-        pub pending: Option<u32>,
+        #[graphql(skip)]
+        pub fractal: AccountNumber,
+        pub display_name: Memo,
+        #[graphql(skip)]
+        pub rep: Option<AccountNumber>,
+        pub bio: Memo,
+        pub description: String,
     }
 
-    impl Score {
+    impl Guild {
+        #[secondary_key(1)]
+        pub fn by_fractal(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
+        }
+    }
+
+    #[table(name = "GuildMemberTable", index = 4)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct GuildMember {
+        #[graphql(skip)]
+        pub guild: AccountNumber,
+        pub member: AccountNumber,
+        pub score: u32,
+        pub pending_score: Option<u32>,
+        pub created_at: psibase::TimePointSec,
+    }
+
+    impl GuildMember {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, EvalTypeU8) {
-            (self.fractal, self.account, self.eval_type)
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.guild, self.member)
+        }
+
+        #[secondary_key(1)]
+        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+            (self.member, self.guild)
+        }
+
+        #[secondary_key(2)]
+        fn by_score(&self) -> (AccountNumber, u32, AccountNumber) {
+            (self.guild, self.score, self.member)
+        }
+    }
+
+    #[table(name = "GuildApplicationTable", index = 5)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct GuildApplication {
+        #[graphql(skip)]
+        pub guild: AccountNumber,
+        pub member: AccountNumber,
+        pub extra_info: String,
+        pub created_at: psibase::TimePointSec,
+    }
+
+    impl GuildApplication {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.guild, self.member)
+        }
+    }
+
+    #[table(name = "GuildAttestTable", index = 6)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct GuildAttest {
+        #[graphql(skip)]
+        pub guild: AccountNumber,
+        pub member: AccountNumber,
+        pub attestee: AccountNumber,
+        pub comment: String,
+        pub endorses: bool,
+    }
+
+    impl GuildAttest {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.guild, self.member, self.attestee)
+        }
+
+        #[secondary_key(1)]
+        fn by_attestee(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.guild, self.attestee, self.member)
         }
     }
 }

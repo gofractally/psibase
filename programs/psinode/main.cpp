@@ -562,22 +562,6 @@ namespace psibase
 #define CATCH_IGNORE \
    catch (...) {}
 
-template <typename Timer, typename F>
-void loop(Timer& timer, F&& f)
-{
-   using namespace std::literals::chrono_literals;
-   timer.expires_after(100ms);
-   timer.async_wait(
-       [&timer, f](const std::error_code& e)
-       {
-          f(e);
-          if (!e)
-          {
-             loop(timer, f);
-          }
-       });
-}
-
 std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
@@ -590,13 +574,13 @@ std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
    return urls;
 }
 
-struct ShutdownRequest
+struct ShutdownArgs
 {
-   bool restart = false;
-   bool force   = false;
-   bool soft    = false;
+   std::optional<std::vector<std::string>> restart;
+   bool                                    soft = false;
+   std::optional<std::int64_t>             deadline;
 };
-PSIO_REFLECT(ShutdownRequest, restart, force, soft);
+PSIO_REFLECT(ShutdownArgs, restart, soft, deadline)
 
 // connect,disconnect
 
@@ -645,11 +629,10 @@ struct RestartInfo
 {
    // If the server stops for any reason other than an explicit
    // shutdown request, then all the other parameters should be ignored.
-   std::atomic<bool> shutdownRequested = false;
-   std::atomic<bool> shouldRestart     = true;
-   std::atomic<bool> soft              = true;
-   bool              keysChanged       = false;
-   bool              configChanged     = false;
+   std::optional<ShutdownArgs> args;
+   // We need to track these to filter command line arguments on restart
+   bool keysChanged   = false;
+   bool configChanged = false;
 };
 PSIO_REFLECT(RestartInfo, shouldRestart);
 
@@ -676,25 +659,13 @@ struct MemStats
 };
 PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
 
-// TODO: this will need to be reworked when we have more complete transaction tracking
-struct TransactionStats
-{
-   uint64_t unprocessed;
-   uint64_t total;
-   uint64_t failed;
-   uint64_t succeeded;
-   uint64_t skipped;
-};
-PSIO_REFLECT(TransactionStats, unprocessed, total, failed, succeeded, skipped)
-
 struct Perf
 {
    std::int64_t            timestamp;
    MemStats                memory;
    std::vector<ThreadInfo> tasks;
-   TransactionStats        transactions;
 };
-PSIO_REFLECT(Perf, timestamp, memory, tasks, transactions)
+PSIO_REFLECT(Perf, timestamp, memory, tasks)
 
 void write_om_descriptor(std::string_view name,
                          std::string_view type,
@@ -807,30 +778,11 @@ void write_om_tasks(const Perf& perf, auto& stream)
    }
 }
 
-void write_om_transaction_stats(const TransactionStats& stats, auto& stream)
-{
-   write_om_descriptor("psinode_transactions_submitted", "counter", "", "Total Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_submitted_total", std::to_string(stats.total), stream);
-   write_om_descriptor("psinode_transactions_succeeded", "counter", "", "Succeeded Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_succeeded_total", std::to_string(stats.succeeded), stream);
-   write_om_descriptor("psinode_transactions_failed", "counter", "", "Failed Transactions", stream);
-   write_om_sample("psinode_transactions_failed_total", std::to_string(stats.failed), stream);
-   write_om_descriptor("psinode_transactions_skipped", "counter", "", "Skipped Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_skipped_total", std::to_string(stats.skipped), stream);
-   write_om_descriptor("psinode_transactions_unprocessed", "gauge", "", "Pending Transactions",
-                       stream);
-   write_om_sample("psinode_transactions_unprocessed", std::to_string(stats.unprocessed), stream);
-}
-
 template <typename S>
 void to_openmetrics_text(const Perf& perf, S& stream)
 {
    write_om_mem(perf, stream);
    write_om_tasks(perf, stream);
-   write_om_transaction_stats(perf.transactions, stream);
    stream.write("# EOF\n", 6);
 }
 
@@ -1093,15 +1045,14 @@ MemStats getMemStats(const SharedState& state)
    return result;
 }
 
-Perf get_perf(const SharedState& state, const TransactionStats& transactions)
+Perf get_perf(const SharedState& state)
 {
    long clk_tck = ::sysconf(_SC_CLK_TCK);
    Perf result;
    result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
-   result.memory       = getMemStats(state);
-   result.transactions = transactions;
+   result.memory = getMemStats(state);
    for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
    {
       result.tasks.push_back(getThreadInfo(entry, clk_tck));
@@ -1269,6 +1220,55 @@ HostConfigRow toHostConfig(const PsinodeConfig& config)
    return result;
 }
 
+// Asio's timers are not usable for shutdown because they keep the io_context alive
+struct ShutdownTimer
+{
+   void setDeadline(boost::asio::io_context& ctx, const std::optional<std::int64_t>& newDeadline)
+   {
+      {
+         std::lock_guard l{mutex};
+         if (newDeadline)
+         {
+            auto tp = std::chrono::steady_clock::time_point(MicroSeconds{*newDeadline});
+            if (!deadline || tp < *deadline)
+               cond.notify_one();
+            deadline = tp;
+         }
+         else
+         {
+            deadline.reset();
+         }
+      }
+      if (!worker.joinable())
+      {
+         worker = std::jthread{
+             [this, &ctx]
+             {
+                while (!done && (!deadline || std::chrono::steady_clock::now() < *deadline))
+                {
+                   std::unique_lock l{mutex};
+                   if (deadline)
+                      cond.wait_until(l, *deadline);
+                   else
+                      cond.wait(l);
+                }
+                ctx.stop();
+             }};
+      }
+   }
+   ~ShutdownTimer()
+   {
+      std::lock_guard l{mutex};
+      done = true;
+      cond.notify_one();
+   }
+   std::condition_variable                              cond;
+   std::mutex                                           mutex;
+   bool                                                 done = false;
+   std::optional<std::chrono::steady_clock::time_point> deadline;
+   std::jthread                                         worker;
+};
+
 void run(const std::string&              db_path,
          const std::string&              db_template,
          const DbConfig&                 db_conf,
@@ -1299,9 +1299,6 @@ void run(const std::string&              db_path,
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
-   //
-   TransactionStats transactionStats = {};
-   std::mutex       transactionStatsMutex;
 
    if (system->sharedDatabase.isSlow())
    {
@@ -1520,22 +1517,25 @@ void run(const std::string&              db_path,
    // is initialized.
    WasmThreadPool tpool{runQueue, 0};
 
+   ShutdownTimer shutdownTimer;
+
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
-   auto connect_one = make_connect_one(
-       resolver, chainContext, http_config,
-       [&http_config, &node, &runResult](auto&& conn) -> std::error_code
-       {
-          if (http_config->status.load().shutdown)
-          {
-             conn->close(runResult.shouldRestart ? connection_base::close_code::restart
-                                                 : connection_base::close_code::shutdown);
-             return make_error_code(boost::asio::error::operation_aborted);
-          }
-          node.add_connection(std::move(conn));
-          return {};
-       });
+   auto connect_one =
+       make_connect_one(resolver, chainContext, http_config,
+                        [&http_config, &node, &runResult](auto&& conn) -> std::error_code
+                        {
+                           if (http_config->status.load().shutdown)
+                           {
+                              conn->close(runResult.args && runResult.args->restart
+                                              ? connection_base::close_code::restart
+                                              : connection_base::close_code::shutdown);
+                              return make_error_code(boost::asio::error::operation_aborted);
+                           }
+                           node.add_connection(std::move(conn));
+                           return {};
+                        });
 
    node.chain().onValidateHostConfig(
        [](std::span<const char> value)
@@ -1628,9 +1628,42 @@ void run(const std::string&              db_path,
               });
        });
 
-   tpool.setNumThreads(service_threads);
+   node.chain().onChangeShutdown(
+       [&chainContext, &node, &system, &connect_one, &http_config, &shutdownTimer, &runResult,
+        &server_work]
+       {
+          boost::asio::post(
+              chainContext,
+              [&chainContext, &node, &system, &connect_one, &http_config, &shutdownTimer,
+               &runResult, &server_work]
+              {
+                 auto writer = system->sharedDatabase.createWriter();
+                 auto row    = system->sharedDatabase.kvGetSubjective(
+                     *writer, PendingShutdownRow::db, psio::convert_to_key(pendingShutdownKey()));
+                 if (!row)
+                    return;
+                 auto shutdown  = psio::from_frac<PendingShutdownRow>(row.value());
+                 runResult.args = psio::convert_from_json<ShutdownArgs>(shutdown.args);
 
-   timer_type timer(chainContext);
+                 shutdownTimer.setDeadline(chainContext, runResult.args->deadline);
+
+                 atomic_set_field(http_config->status,
+                                  [](auto& status) { status.shutdown = true; });
+                 boost::asio::use_service<http::server_service>(
+                     static_cast<boost::asio::execution_context&>(chainContext))
+                     .async_close(runResult.args->restart.has_value(),
+                                  [&chainContext, &server_work]()
+                                  {
+                                     boost::asio::post(chainContext,
+                                                       [&server_work]() { server_work.reset(); });
+                                  });
+                 node.consensus().async_shutdown();
+                 node.peers().autoconnect({}, 0, connect_one);
+                 node.peers().disconnect_all(runResult.args->restart.has_value());
+              });
+       });
+
+   tpool.setNumThreads(service_threads);
 
    if (!listen.empty())
    {
@@ -1690,58 +1723,10 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->shutdown = [&chainContext, &node, &http_config, &connect_one, &timer, &runResult,
-                               &server_work](std::vector<char> data)
+      http_config->get_perf = [sharedState](auto callback)
       {
-         data.push_back('\0');
-         psio::json_token_stream stream(data.data());
-         auto [restart, force, soft] = psio::from_json<ShutdownRequest>(stream);
-         // In the case of concurrent shutdown requests, prefer shutdown over
-         // restart and hard restart over soft restart.
-         runResult.shutdownRequested = true;
-         if (!restart)
-            runResult.shouldRestart = false;
-         if (!soft)
-            runResult.soft = false;
-         if (force)
-         {
-            chainContext.stop();
-         }
-         else
-         {
-            boost::asio::post(chainContext,
-                              [&chainContext, &node, &connect_one, &http_config, &timer, &runResult,
-                               &server_work, restart, soft]()
-                              {
-                                 atomic_set_field(http_config->status,
-                                                  [](auto& status) { status.shutdown = true; });
-                                 boost::asio::use_service<http::server_service>(
-                                     static_cast<boost::asio::execution_context&>(chainContext))
-                                     .async_close(restart,
-                                                  [&chainContext, &server_work]()
-                                                  {
-                                                     boost::asio::post(chainContext,
-                                                                       [&server_work]()
-                                                                       { server_work.reset(); });
-                                                  });
-                                 timer.cancel();
-                                 node.consensus().async_shutdown();
-                                 node.peers().autoconnect({}, 0, connect_one);
-                                 node.peers().disconnect_all(restart);
-                              });
-         }
-      };
-
-      http_config->get_perf =
-          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
-      {
-         TransactionStats trx;
-         {
-            std::lock_guard lock{transactionStatsMutex};
-            trx = transactionStats;
-         }
          callback(
-             [result = get_perf(*sharedState, trx)]() mutable
+             [result = get_perf(*sharedState)]() mutable
              {
                 std::vector<char>   json;
                 psio::vector_stream stream(json);
@@ -1750,16 +1735,10 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->get_metrics =
-          [sharedState, &transactionStats, &transactionStatsMutex](auto callback)
+      http_config->get_metrics = [sharedState](auto callback)
       {
-         TransactionStats trx;
-         {
-            std::lock_guard lock{transactionStatsMutex};
-            trx = transactionStats;
-         }
          callback(
-             [result = get_perf(*sharedState, trx)]() mutable
+             [result = get_perf(*sharedState)]() mutable
              {
                 std::vector<char>   data;
                 psio::vector_stream stream(data);
@@ -2059,12 +2038,7 @@ void run(const std::string&              db_path,
       PSIBASE_LOG(loggers::generic::get(), notice)
           << "The server is not configured to accept connections on any interface. Use --listen "
              "<port> to add a listener.";
-      boost::asio::post(chainContext,
-                        [&server_work, &timer]
-                        {
-                           server_work.reset();
-                           timer.cancel();
-                        });
+      boost::asio::post(chainContext, [&server_work] { server_work.reset(); });
    }
 
    auto remove_http_handlers = psio::finally{[&http_config, &system]
@@ -2297,13 +2271,11 @@ int main(int argc, char* argv[])
       RestartInfo restart;
       while (true)
       {
-         restart.shutdownRequested = false;
-         restart.shouldRestart     = true;
-         restart.soft              = true;
+         restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
              pkcs11_modules, peers, autoconnect, enable_incoming_p2p, hosts, listen, services,
              http_timeout, service_threads, root_ca, tls_cert, tls_key, restart);
-         if (!restart.shouldRestart || !restart.shutdownRequested)
+         if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
             break;
@@ -2339,7 +2311,7 @@ int main(int argc, char* argv[])
                }
             }
 
-            if (restart.soft)
+            if (restart.args && restart.args->soft)
             {
                PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Soft restart";
                po::variables_map tmp;

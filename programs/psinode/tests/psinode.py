@@ -534,7 +534,7 @@ class Node(API):
             self.tempdir.cleanup()
     def shutdown(self, force=False):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/native/admin/shutdown', service='x-admin', json={"force":force}):
+        with self.post('/shutdown', service='x-admin', json={"force":force}):
             pass
         self.session.close()
         try:
