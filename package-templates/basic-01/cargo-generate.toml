@@ -4,3 +4,4 @@ version = { prompt = "Enter the current psibase version", default = "0.21.0", ty
 
 [hooks]
 pre = ["validate-project-name.rhai"]
+post = ["add-to-workspace.rhai"]
