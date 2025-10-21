@@ -5,9 +5,9 @@
 set -e
 
 if [ -z "$1" ]; then
-    echo "Instsantiate new package and add to workspace:"
-    echo "Usage: $0 <project-name>"
-    echo "  Example: $0 my-new-app"
+    echo "Instantiate new package and add to workspace:"
+    echo "Usage: $0 <ProjectName>"
+    echo "  Example: $0 MyNewApp"
     exit 1
 fi
 
@@ -28,20 +28,16 @@ echo "Generating package: $PROJECT_NAME"
 cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --name "$PROJECT_NAME" --silent basic-01
 
 echo ""
-
-# Convert kebab-case to PascalCase
-PASCAL_NAME=$(echo "$PROJECT_NAME" | sed -r 's/(^|-)(\w)/\U\2/g')
+echo "Adding $PROJECT_NAME to workspace..."
 
 # Check if already added
-if grep -q "\"$PASCAL_NAME\"" "$WORKSPACE_TOML"; then
-    echo "✓ $PASCAL_NAME is already in the workspace"
+if grep -q "\"$PROJECT_NAME\"" "$WORKSPACE_TOML"; then
+    echo "✓ $PROJECT_NAME is already in the workspace"
     exit 0
 fi
 
-echo "Adding $PASCAL_NAME to workspace..."
-
 # Use awk to insert the new members at the bottom of the members list
-awk -v project="$PASCAL_NAME" '
+awk -v project="$PROJECT_NAME" '
 /^]$/ && in_members {
     print "    \"" project "\","
     print "    \"" project "/service\","
@@ -55,8 +51,8 @@ awk -v project="$PASCAL_NAME" '
 
 mv "$WORKSPACE_TOML.tmp" "$WORKSPACE_TOML"
 
-echo "✓ Added $PASCAL_NAME to $WORKSPACE_TOML"
+echo "✓ Added $PROJECT_NAME to $WORKSPACE_TOML"
 echo ""
 echo "Next steps:"
-echo "  1. cd packages/user/$PASCAL_NAME/ui && yarn && yarn build"
-echo "  2. cd packages/user/$PASCAL_NAME && cargo-psibase package"
+echo "  1. cd packages/user/$PROJECT_NAME/ui && yarn && yarn build"
+echo "  2. cd packages/user/$PROJECT_NAME && cargo-psibase package"

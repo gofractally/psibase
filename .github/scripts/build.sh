@@ -67,4 +67,4 @@ ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubu
 echo =====
 ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
 echo =====
-${DOCKER} bash -c "./package-templates/generate-package.sh buildtest && cd packages/user/Buildtest && ${WORKSPACE_ROOT}/build/rust/release/cargo-psibase package"
+${DOCKER} bash -c "./package-templates/generate-package.sh Buildtest && cd packages/user/Buildtest && ${WORKSPACE_ROOT}/build/rust/release/cargo-psibase package"

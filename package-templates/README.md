@@ -16,14 +16,15 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 ## Instantiating template and adding to workspace
 
-From the root of the workspace, run: `./package-templates/generate-package.sh <project-name>`
+From the root of the workspace, run:
+`./package-templates/generate-package.sh <project-name>`
 
 This will run a CLI wizard to set up the new app in the `./packages/user/` directory.
 
 Example:
 
 ```bash
-./package-templates/generate-package.sh my-new-app
+./package-templates/generate-package.sh MyNewApp
 ```
 
 This will run a CLI wizard to set up the new app in the `./packages/user/` directory and add it to the `packages/user/Cargo.toml` workspace
