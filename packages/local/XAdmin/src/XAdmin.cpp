@@ -161,12 +161,6 @@ namespace LocalService
          return false;
       }
 
-      struct CliArgs
-      {
-         std::vector<std::string> argv;
-         PSIO_REFLECT(CliArgs, argv)
-      };
-
       bool parseOptionValue(std::string_view value, const bool& default_)
       {
          if (value == "yes" || value == "true" || value == "on" || value == "1")
