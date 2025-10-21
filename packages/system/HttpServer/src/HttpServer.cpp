@@ -254,6 +254,10 @@ namespace SystemService
       }
    }  // serve()
 
+   std::string HttpServer::rootHost(psio::view<const std::string> host)
+   {
+      return to<XHttp>().rootHost(host);
+   }
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::HttpServer)

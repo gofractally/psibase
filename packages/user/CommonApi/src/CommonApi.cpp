@@ -39,18 +39,17 @@ namespace SystemService
       {
          if (request.target == "/common/thisservice")
          {
+            auto        rootHost = to<HttpServer>().rootHost(request.host);
             std::string serviceName;
-            if (request.host.size() > request.rootHost.size() + 1 &&
-                request.host.ends_with(request.rootHost) &&
-                request.host[request.host.size() - request.rootHost.size() - 1] == '.')
-               serviceName.assign(request.host.begin(),
-                                  request.host.end() - request.rootHost.size() - 1);
+            if (request.host.size() > rootHost.size() + 1 && request.host.ends_with(rootHost) &&
+                request.host[request.host.size() - rootHost.size() - 1] == '.')
+               serviceName.assign(request.host.begin(), request.host.end() - rootHost.size() - 1);
             else
                serviceName = HttpServer::homepageService.str();
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
-            return to_json(request.rootHost);
+            return to_json(to<HttpServer>().rootHost(request.host));
          if (request.target == "/common/tapos/head")
          {
             auto [index, suffix] = headTapos();
