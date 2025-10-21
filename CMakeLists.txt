@@ -319,6 +319,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
+set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
 set(PSIBASE_VERSION 0.21)
 
@@ -444,7 +445,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
-    TARGET_DIR packages/system
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -501,7 +502,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/StagedTx.psi
     PATH packages/system/StagedTx
-    TARGET_DIR packages/system
+    TARGET_DIR  ${SYSTEM_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
