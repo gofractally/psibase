@@ -14,23 +14,24 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 # Usage
 
-## Generate and add to workspace (single command)
+## Generate and add to workspace
 
 ```bash
-./package-templates/generate-package.sh <project-name> <description>
+./package-templates/generate-package.sh <project-name>
 ```
 
 Example:
 
 ```bash
-./package-templates/generate-package.sh my-new-app "My new application"
+./package-templates/generate-package.sh my-new-app
 ```
 
 This automatically:
 
-1. Generates the package from the template
-2. Adds it to `packages/user/Cargo.toml` workspace
-3. Reports completion
+1. Runs the cargo-generate wizard to collect project information
+2. Generates the package from the template
+3. Adds it to `packages/user/Cargo.toml` workspace
+4. Reports next steps
 
 ## Building the app
 
@@ -44,16 +45,6 @@ This automatically:
    cargo-psibase package
    ```
 3. Use `cargo-psibase install` to install the new app package to a network.
-
-## Advanced: Add existing package to workspace only
-
-If you've already generated a package and just need to add it to the workspace:
-
-```bash
-./package-templates/generate-package.sh YourPackageName
-```
-
-(Note: Use PascalCase name, no description argument)
 
 # Additional resources
 

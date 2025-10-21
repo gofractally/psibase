@@ -1,26 +1,17 @@
 #!/bin/bash
 # Generate psibase package from template and add to workspace
-# Usage: 
-#   ./generate-package.sh <project-name> [description]
-#   If description is provided, generates from template first, then adds to workspace
-#   If description is omitted, only adds existing package to workspace
+# Usage: ./generate-package.sh <project-name>
 
 set -e
 
 if [ -z "$1" ]; then
-    echo "Usage: $0 <project-name> [description]"
-    echo ""
-    echo "Examples:"
-    echo "  # Generate new package and add to workspace:"
-    echo "  $0 my-new-app 'My new application'"
-    echo ""
-    echo "  # Add existing package to workspace only:"
-    echo "  $0 MyExistingApp"
+    echo "Instsantiate new package and add to workspace:"
+    echo "Usage: $0 <project-name>"
+    echo "  Example: $0 my-new-app"
     exit 1
 fi
 
 PROJECT_NAME="$1"
-DESCRIPTION="$2"
 
 # Find workspace root
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -33,18 +24,10 @@ if [ ! -f "$WORKSPACE_TOML" ]; then
     exit 1
 fi
 
-# If description provided, generate from template first
-if [ -n "$DESCRIPTION" ]; then
-    echo "Generating package: $PROJECT_NAME"
-    cargo generate -p ./package-templates/basic-01 \
-        --destination ./packages/user/ \
-        --init \
-        --name "$PROJECT_NAME" \
-        -d description="$DESCRIPTION" \
-        -d version="0.21.0"
-    
-    echo ""
-fi
+echo "Generating package: $PROJECT_NAME"
+cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --name "$PROJECT_NAME" --silent basic-01
+
+echo ""
 
 # Convert kebab-case to PascalCase
 PASCAL_NAME=$(echo "$PROJECT_NAME" | sed -r 's/(^|-)(\w)/\U\2/g')
@@ -77,4 +60,3 @@ echo ""
 echo "Next steps:"
 echo "  1. cd packages/user/$PASCAL_NAME/ui && yarn && yarn build"
 echo "  2. cd packages/user/$PASCAL_NAME && cargo-psibase package"
-
