@@ -15,7 +15,7 @@ serde_json.workspace = true
 serde.workspace = true
 serde-aux.workspace = true
 chrono = "0.4"
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 chainmail_package = { path = "..", version = "0.21.0" }

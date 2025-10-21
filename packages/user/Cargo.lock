@@ -397,10 +397,10 @@ dependencies = [
  "async-graphql",
  "branding-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -409,7 +409,7 @@ version = "0.21.1"
 dependencies = [
  "branding",
  "branding-plugin",
- "user-workspace-hack",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
@@ -419,9 +419,9 @@ dependencies = [
  "branding",
  "branding-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -445,8 +445,8 @@ dependencies = [
  "brotli",
  "brotli-codec-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -455,8 +455,8 @@ version = "0.21.0"
 dependencies = [
  "brotli-codec",
  "brotli-codec-plugin",
+ "psibase-user-workspace-hack",
  "serde",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -467,7 +467,7 @@ dependencies = [
  "brotli-codec",
  "brotli-codec-pkg",
  "psibase",
- "user-workspace-hack",
+ "psibase-user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -525,8 +525,8 @@ dependencies = [
  "async-graphql",
  "chainmail_package",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -537,10 +537,10 @@ dependencies = [
  "chainmail_package",
  "chrono",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -550,7 +550,7 @@ version = "0.21.1"
 dependencies = [
  "chainmail",
  "chainmail-plugin",
- "user-workspace-hack",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
@@ -1026,11 +1026,11 @@ dependencies = [
  "average",
  "ecies",
  "psibase",
+ "psibase-user-workspace-hack",
  "rand 0.9.2",
  "serde",
  "serde-aux",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -1039,8 +1039,8 @@ version = "0.21.0"
 dependencies = [
  "evaluations",
  "evaluations-plugin",
+ "psibase-user-workspace-hack",
  "r-evaluations",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -1051,11 +1051,11 @@ dependencies = [
  "ecies",
  "evaluations",
  "psibase",
+ "psibase-user-workspace-hack",
  "rand 0.9.2",
  "serde",
  "serde_json",
  "sha2",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -1142,10 +1142,10 @@ dependencies = [
  "evaluations",
  "fractals-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -1154,8 +1154,8 @@ version = "0.21.0"
 dependencies = [
  "fractals",
  "fractals-plugin",
+ "psibase-user-workspace-hack",
  "r-fractals",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -1165,9 +1165,9 @@ dependencies = [
  "fractals",
  "fractals-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -1604,10 +1604,10 @@ dependencies = [
  "async-graphql",
  "identity-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -1616,7 +1616,7 @@ version = "0.21.0"
 dependencies = [
  "identity",
  "identity-plugin",
- "user-workspace-hack",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
@@ -1626,9 +1626,9 @@ dependencies = [
  "identity",
  "identity-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -2248,10 +2248,10 @@ dependencies = [
  "async-graphql",
  "profiles-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2260,8 +2260,8 @@ version = "0.21.1"
 dependencies = [
  "profiles",
  "profiles-plugin",
+ "psibase-user-workspace-hack",
  "r-profiles",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2271,9 +2271,9 @@ dependencies = [
  "profiles",
  "profiles-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -2363,6 +2363,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase-user-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "generic-array",
+ "getrandom 0.3.3",
+ "indexmap",
+ "libc",
+ "libsecp256k1-core",
+ "memchr",
+ "num-traits",
+ "once_cell",
+ "portable-atomic",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_core",
+ "serde_json",
+ "subtle",
+ "syn 2.0.106",
+ "zeroize",
+]
+
+[[package]]
 name = "psibase_macros"
 version = "0.21.0"
 dependencies = [
@@ -2400,10 +2423,10 @@ dependencies = [
  "ecies",
  "evaluations",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2413,10 +2436,10 @@ dependencies = [
  "async-graphql",
  "fractals",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2426,9 +2449,9 @@ dependencies = [
  "async-graphql",
  "profiles",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2437,11 +2460,11 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "registry",
  "registry-pkg",
  "serde",
  "serde-aux",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2450,11 +2473,11 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
  "token-stream",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2463,11 +2486,11 @@ version = "0.21.1"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
  "tokens",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2561,21 +2584,21 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "registry-pkg",
  "serde",
  "serde_json",
  "url",
- "user-workspace-hack",
 ]
 
 [[package]]
 name = "registry-pkg"
 version = "0.21.0"
 dependencies = [
+ "psibase-user-workspace-hack",
  "r-registry",
  "registry",
  "registry-plugin",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -2584,11 +2607,11 @@ version = "0.21.0"
 dependencies = [
  "chrono",
  "psibase",
+ "psibase-user-workspace-hack",
  "registry",
  "registry-pkg",
  "serde",
  "serde_json",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -3049,18 +3072,18 @@ name = "subgroups"
 version = "0.21.0"
 dependencies = [
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "subgroups-pkg",
- "user-workspace-hack",
 ]
 
 [[package]]
 name = "subgroups-pkg"
 version = "0.21.0"
 dependencies = [
+ "psibase-user-workspace-hack",
  "subgroups",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -3200,21 +3223,21 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
  "token-stream-pkg",
- "user-workspace-hack",
 ]
 
 [[package]]
 name = "token-stream-pkg"
 version = "0.21.0"
 dependencies = [
+ "psibase-user-workspace-hack",
  "r-token-stream",
  "token-stream",
  "token-stream-plugin",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -3222,10 +3245,10 @@ name = "token-stream-plugin"
 version = "0.21.0"
 dependencies = [
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
  "token-stream",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -3235,21 +3258,21 @@ version = "0.21.1"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
  "tokens-pkg",
- "user-workspace-hack",
 ]
 
 [[package]]
 name = "tokens-pkg"
 version = "0.21.1"
 dependencies = [
+ "psibase-user-workspace-hack",
  "r-tokens",
  "tokens",
  "tokens-plugin",
- "user-workspace-hack",
 ]
 
 [[package]]
@@ -3257,10 +3280,10 @@ name = "tokens-plugin"
 version = "0.21.1"
 dependencies = [
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
  "tokens",
- "user-workspace-hack",
  "wit-bindgen-rt",
 ]
 
@@ -3482,29 +3505,6 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
-]
-
-[[package]]
-name = "user-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "generic-array",
- "getrandom 0.3.3",
- "indexmap",
- "libc",
- "libsecp256k1-core",
- "memchr",
- "num-traits",
- "once_cell",
- "portable-atomic",
- "proc-macro2",
- "quote",
- "serde",
- "serde_core",
- "serde_json",
- "subtle",
- "syn 2.0.106",
- "zeroize",
 ]
 
 [[package]]
