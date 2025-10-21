@@ -1,9 +1,2 @@
 [template]
 sub_templates = ["basic-01"]
-
-[placeholders]
-description = { prompt = "Enter a description of the package", default = "An example application", type = "string" }
-version = { prompt = "Enter the current psibase version", default = "0.21.0", type = "string", regex = "^[0-9]+.[0-9]+.[0-9]+$" }
-
-[hooks]
-pre = ["validate-project-name.rhai"]
