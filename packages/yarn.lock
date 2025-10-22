@@ -2968,7 +2968,6 @@ __metadata:
     react-dom: "npm:^19.1.0"
     react-easy-sort: "npm:^1.6.0"
     react-router-dom: "npm:^6.26.1"
-    rxjs: "npm:^7.8.2"
     typescript: "npm:^5.9.3"
     usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
@@ -13361,7 +13360,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rxjs@npm:^7.8.1, rxjs@npm:^7.8.2":
+"rxjs@npm:^7.8.1":
   version: 7.8.2
   resolution: "rxjs@npm:7.8.2"
   dependencies:

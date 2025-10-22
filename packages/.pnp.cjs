@@ -4399,7 +4399,6 @@ const RAW_RUNTIME_STATE =
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.0"],\
           ["react-easy-sort", "virtual:5264730febc38ea13beab048700e07e89dd640fc95f2142de4f9ebfe260da3e26c04b01eb44fe61468f43fb10b46bb2778c5ee5176df2376ca0cc3606d7339a2#npm:1.6.0"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.1"],\
-          ["rxjs", "npm:7.8.2"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["usehooks-ts", "virtual:1a2acd14adc9bcc2d91e1a5d9e8e7de810df51090691e5cba4a847bd5f7762c522c5fafe708507c28d5b18b4b905893b6dd66ae885ae51e7c499d13c572ca329#npm:3.1.1"],\
           ["vite", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:5.4.19"],\
