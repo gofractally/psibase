@@ -3,7 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import { z } from "zod";
 
-import { fetchUserTokenBalances } from "@/apps/tokens/lib/graphql/ui";
+import {
+    fetchTokenMeta,
+    fetchUserTokenBalances,
+} from "@/apps/tokens/lib/graphql/ui";
 import { Quantity } from "@/apps/tokens/lib/quantity";
 
 import QueryKey from "@/lib/queryKeys";
@@ -20,6 +23,7 @@ export interface Token {
     symbol: string;
     label: string;
     precision: number;
+    isTransferable: boolean;
 }
 
 export const useUserTokenBalances = (
@@ -32,6 +36,13 @@ export const useUserTokenBalances = (
         queryFn: async () => {
             if (!toasted.current) toast("Fetching token balances...");
             const res = await fetchUserTokenBalances(Account.parse(username));
+
+            // TODO: Remove this once token settings comes back from `fetchUserTokenBalances`
+            const tokenMetaPromises = res.map(async (balance) => {
+                return await fetchTokenMeta(balance.tokenId.toString());
+            });
+            const tokensMeta = await Promise.all(tokenMetaPromises);
+            // END TODO
 
             const userTokenBalances: Token[] = res.map((balance): Token => {
                 const quan = new Quantity(
@@ -49,6 +60,9 @@ export const useUserTokenBalances = (
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
                     balance: quan,
+                    isTransferable:
+                        tokensMeta.find((meta) => meta.id === balance.tokenId)
+                            ?.settings.untransferable === false,
                 };
             });
 

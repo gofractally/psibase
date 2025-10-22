@@ -8,8 +8,18 @@ const qs = {
                 balance
                 symbol
                 precision
+                account
             }
         }	
+    `,
+    tokenMeta: (tokenId: string) => `
+        token(tokenId: "${tokenId}") {
+            id
+            settings {
+                untransferable
+                unrecallable
+            }
+        }
     `,
     userTokenBalanceChanges: (username: string, tokenId: number) => `
         balChanges(tokenId: ${tokenId}, account: "${username}") {
@@ -88,12 +98,31 @@ export interface UserTokenBalanceNode {
     balance: string;
     symbol: string;
     precision: number;
+    account: string;
 }
 
 export const fetchUserTokenBalances = async (username: string) => {
     const query = `{${qs.userTokenBalances(username)}}`;
     const res = await graphql<UserTokenBalanceRes>(query, "tokens");
     return res.userBalances.nodes;
+};
+
+interface TokenMetaRes {
+    token: TokenMetaNode;
+}
+
+interface TokenMetaNode {
+    id: number;
+    settings: {
+        untransferable: boolean;
+        unrecallable: boolean;
+    };
+}
+
+export const fetchTokenMeta = async (tokenId: string) => {
+    const query = `{${qs.tokenMeta(tokenId)}}`;
+    const res = await graphql<TokenMetaRes>(query, "tokens");
+    return res.token;
 };
 
 // User Token Balance Changes

@@ -15,6 +15,7 @@ import { CardContent } from "@shared/shadcn/ui/card";
 
 import { TokenSelector } from "./components/token-selector";
 import { AutoDebitSwitch } from "./components/transfer/auto-debit-switch";
+import { UntransferableTokenWarning } from "./components/transfer/untransferable-warning";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 
 export interface TokensOutletContext {
@@ -65,14 +66,20 @@ export const TokensLayout = () => {
                         <GlowingCard>
                             <CardContent className="@container space-y-2">
                                 {!isLoading && (
-                                    <TokenSelector
-                                        tokens={tokens}
-                                        selectedToken={selectedToken}
-                                        onChange={handleTokenSelect}
-                                        onClickAvailableBalance={
-                                            handleSetMaxAmount ?? undefined
-                                        }
-                                    />
+                                    <>
+                                        <TokenSelector
+                                            tokens={tokens}
+                                            selectedToken={selectedToken}
+                                            onChange={handleTokenSelect}
+                                            onClickAvailableBalance={
+                                                handleSetMaxAmount ?? undefined
+                                            }
+                                        />
+                                        {selectedToken?.isTransferable ===
+                                            false && (
+                                            <UntransferableTokenWarning />
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </GlowingCard>

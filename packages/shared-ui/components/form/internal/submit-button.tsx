@@ -7,9 +7,11 @@ type SubmitButtonLabels = [label: string, submittingLabel: string];
 export const SubmitButton = ({
     labels = ["Save", "Saving..."],
     onClick,
+    disabled,
 }: {
     labels?: SubmitButtonLabels;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+    disabled?: boolean;
 }) => {
     const form = useFormContext();
     const [label, submittingLabel] = labels;
@@ -22,7 +24,7 @@ export const SubmitButton = ({
                 return (
                     <Button
                         type="submit"
-                        disabled={!canSubmit || isSubmitting}
+                        disabled={!canSubmit || isSubmitting || disabled}
                         onClick={onClick}
                     >
                         {isSubmitting ? submittingLabel : label}

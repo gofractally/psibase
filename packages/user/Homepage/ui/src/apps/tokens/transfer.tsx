@@ -93,7 +93,8 @@ const TransferPageContents = () => {
 
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
-    const disableForm = !currentUser || isLoading;
+    const disableForm =
+        !currentUser || isLoading || selectedToken?.isTransferable === false;
 
     const onSubmitPreflight = async (
         e: React.MouseEvent<HTMLButtonElement>,
@@ -199,6 +200,7 @@ const TransferPageContents = () => {
                                     <form.SubmitButton
                                         labels={["Send", "Sending..."]}
                                         onClick={onSubmitPreflight}
+                                        disabled={disableForm}
                                     />
                                 </div>
                             )}
