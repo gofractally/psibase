@@ -1004,6 +1004,7 @@ name = "fractal-core"
 version = "0.21.0"
 dependencies = [
  "psibase",
+ "psibase-plugin-workspace-hack",
  "serde",
  "serde_json",
  "wit-bindgen-rt 0.30.0",
