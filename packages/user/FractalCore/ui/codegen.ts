@@ -10,8 +10,13 @@ const config: CodegenConfig = {
                 "typescript-operations",
                 "typescript-react-apollo",
             ],
+            config: {
+                apolloReactHooksImportFrom: "@apollo/client/react",
+                withHooks: true,
+            },
         },
     },
+    // emitLegacyCommonJSImports: true,
     overwrite: true,
 };
 

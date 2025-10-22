@@ -17,6 +17,8 @@ export const Guilds = () => {
 
     console.log({ fractal }, "is the fractal guilds");
 
+
+
     const navigate = useNavigate();
     const guildsData = fractal?.guilds.nodes;
 
