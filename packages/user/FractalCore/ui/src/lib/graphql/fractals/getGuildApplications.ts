@@ -4,7 +4,7 @@ import { fractalsService } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
-import { graphql } from "../../graphql";
+import { derp } from "../../graphql";
 
 export const zGuildApplicationListInstance = z.object({
     member: zAccount,
@@ -22,7 +22,7 @@ export type GuildApplicationListInstance = z.infer<
 >;
 
 export const getGuildApplications = async (guildAccount: Account) => {
-    const res = await graphql(
+    const res = await derp(
         `
             {
                 guildApplications(guild: ${guildAccount}) {

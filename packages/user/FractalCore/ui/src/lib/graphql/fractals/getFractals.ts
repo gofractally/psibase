@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fractalsService } from "@/lib/constants";
 import { zAccount } from "@/lib/zod/Account";
 
-import { graphql } from "../../graphql";
+import { derp } from "../../graphql";
 
 export const zFractalListInstance = z.object({
     account: zAccount,
@@ -14,7 +14,7 @@ export const zFractalListInstance = z.object({
 export type FractalListInstance = z.infer<typeof zFractalListInstance>;
 
 export const getFractals = async () => {
-    const res = await graphql(
+    const res = await derp(
         `
             {
                 fractals(first: 99) {

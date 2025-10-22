@@ -4,7 +4,7 @@ import { fractalsService } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
-import { graphql } from "../../graphql";
+import { derp } from "../../graphql";
 
 export const zScore = z.object({
     member: zAccount,
@@ -15,7 +15,7 @@ export const zScore = z.object({
 export type Score = z.infer<typeof zScore>;
 
 export const getScores = async (guild: Account) => {
-    const member = await graphql(
+    const member = await derp(
         `
     {
         scores(guild: "${guild}") {

@@ -20,6 +20,7 @@
         "@uidotdev/usehooks": "^2.4.1",
         "dayjs": "^1.11.13",
         "graphql": "^16.11.0",
+        "graphql-request": "^7.3.1",
         "humanize-duration": "^3.32.2",
         "lucide-react": "^0.475.0",
         "nuqs": "^2.4.3",
@@ -32,10 +33,12 @@
         "zod": "^3.24.2"
     },
     "devDependencies": {
-        "@graphql-codegen/cli": "^6.0.0",
+        "@graphql-codegen/cli": "^6.0.1",
+        "@graphql-codegen/client-preset": "^5.1.0",
         "@graphql-codegen/typescript": "^5.0.2",
         "@graphql-codegen/typescript-operations": "^5.0.2",
         "@graphql-codegen/typescript-react-apollo": "^4.3.3",
+        "@parcel/watcher": "^2.5.1",
         "@types/humanize-duration": "^3.27.4",
         "@types/node": "^24.8.1",
         "@types/react": "^19.1.0",

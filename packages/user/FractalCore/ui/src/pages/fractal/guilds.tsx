@@ -20,7 +20,7 @@ export const Guilds = () => {
 
 
     const navigate = useNavigate();
-    const guildsData = fractal?.guilds.nodes;
+    const guildsData = fractal?.guilds?.nodes;
 
     const guilds = guildsData || [];
 

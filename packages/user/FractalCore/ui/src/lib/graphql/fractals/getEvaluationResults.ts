@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { fractalsService } from "@/lib/constants";
-import { graphql } from "@/lib/graphql";
+import { derp } from "@/lib/graphql";
 import { zAccount } from "@/lib/zod/Account";
 
 export const zGroupFinishes = z.object({
@@ -34,7 +34,7 @@ export const getEvaluationResults = async (evaluationId: number) => {
         }
     }`;
 
-    const results = await graphql(gql, fractalsService);
+    const results = await derp(gql, fractalsService);
 
     const response = z
         .object({
