@@ -1,14 +1,16 @@
 import { graphql } from "@/gql";
 import {
-    GetFractalGuilQuery,
-    GetFractalGuilQueryVariables,
+    GetFractalGuildQuery,
+    GetFractalGuildQueryVariables,
 } from "@/gql/graphql";
-import { useQuery } from "@apollo/client/react";
+import { useQuery } from "@tanstack/react-query";
+
+import { client } from "@/lib/graphql/client";
 
 import { useFractalAccount } from "./use-fractal-account";
 
-const theFractal = graphql(`
-    query GetFractalGuil($fractal: AccountNumber!) {
+const query = graphql(`
+    query GetFractalGuild($fractal: AccountNumber!) {
         fractal(fractal: $fractal) {
             account
             createdAt
@@ -33,13 +35,20 @@ const theFractal = graphql(`
 
 export const useFractal = () => {
     const currentFractal = useFractalAccount();
-    const res = useQuery<GetFractalGuilQuery, GetFractalGuilQueryVariables>(
-        theFractal,
-        {
-            variables: { fractal: currentFractal! },
-            skip: !currentFractal,
+    const res = useQuery({
+        queryKey: ["fractal", currentFractal],
+        enabled: Boolean(currentFractal),
+        queryFn: async () => {
+            const res = await client.request<
+                GetFractalGuildQuery,
+                GetFractalGuildQueryVariables
+            >(query, {
+                fractal: currentFractal,
+            });
+
+            return res;
         },
-    );
+    });
 
     return res;
 };

@@ -1,9 +1,0 @@
-query GetFractals {
-    fractals {
-        nodes {
-            account
-            name
-            mission
-        }
-    }
-}

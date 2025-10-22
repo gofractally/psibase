@@ -1,6 +1,0 @@
-query GetFractal($fractalAccount: AccountNumber!) {
-    fractal(fractal: $fractalAccount) {
-        account
-        createdAt
-    }
-}

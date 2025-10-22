@@ -25,33 +25,14 @@ import {
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-import { useGetFractalQuery } from "@/lib/graphql/generated";
-
-
 export const MyMembership = () => {
     const fractalAccount = useFractalAccount();
-
-    const { data, loading, error: errorDerp } = useGetFractalQuery({
-        variables: {
-            fractalAccount
-        },
-        skip: !fractalAccount,
-    });
-
-
-    console.log({ data, loading, errorDerp }, "membership data");
 
     const {
         data: currentUser,
         isLoading: isLoadingCurrentUser,
         error: errorCurrentUser,
     } = useCurrentUser();
-
-    const {
-        data: fractal,
-        isLoading: isLoadingFractal,
-        error: errorFractal,
-    } = useFractal();
 
     const {
         data: membership,
@@ -65,19 +46,14 @@ export const MyMembership = () => {
         error: errorChainId,
     } = useChainId();
 
-    console.log({ errorFractal, errorMembership, errorChainId }, "x", {
-        fractal,
-        membership,
-    });
 
     const isLoading =
         isLoadingCurrentUser ||
-        isLoadingFractal ||
         isLoadingMembership ||
         isLoadingChainId;
 
     const error =
-        errorCurrentUser || errorFractal || errorMembership || errorChainId;
+        errorCurrentUser || errorMembership || errorChainId;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -120,7 +96,7 @@ const FractalOverviewCard = ({
     chainId: string;
 }) => {
 
-    const fractal = useFractal();
+    const { data: fractal } = useFractal();
     return (
         <Card>
             <CardHeader>

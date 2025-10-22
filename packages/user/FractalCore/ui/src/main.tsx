@@ -14,18 +14,10 @@ import { Toaster } from "@shared/shadcn/ui/sonner";
 
 import { queryClient } from "./queryClient";
 import { router } from "./router";
-import { siblingUrl } from "@psibase/common-lib";
-import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
-import { ApolloProvider } from "@apollo/client/react";
 
 dayjs.extend(advancedFormat);
 dayjs.extend(timezone);
 dayjs.extend(duration);
-
-export const client = new ApolloClient({
-    link: new HttpLink({ uri: siblingUrl(null, 'fractals', '/graphql') }),
-    cache: new InMemoryCache(),
-});
 
 
 createRoot(document.getElementById("root")!).render(
@@ -33,10 +25,7 @@ createRoot(document.getElementById("root")!).render(
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
             <QueryClientProvider client={queryClient}>
                 <NuqsAdapter>
-                    <ApolloProvider client={client}>
-
-                        <RouterProvider router={router} />
-                    </ApolloProvider>
+                    <RouterProvider router={router} />
                 </NuqsAdapter>
                 <Toaster />
             </QueryClientProvider>
