@@ -1,6 +1,6 @@
 #[psibase::service]
 #[allow(non_snake_case)]
-mod service {
+pub mod service {
 
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
@@ -79,7 +79,7 @@ mod service {
         }
     }
 
-    struct Query;
+    pub struct Query;
 
     #[Object]
     impl Query {

@@ -43,8 +43,6 @@ export const getGuild = async (guildAccount: Account) => {
         fractalsService,
     );
 
-    console.log("derp");
-
     return z
         .object({
             guild: zGuild.nullable(),
