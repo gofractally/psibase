@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { GlowingCard } from "@/components/glowing-card";
 
 import { Avatar } from "@shared/components/avatar";
+import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
@@ -104,9 +105,21 @@ export const PendingPageContents = () => {
                                     <div className="flex items-center justify-end gap-2">
                                         {pt.debit ? (
                                             <>
-                                                {pt.debit.balance.format({
-                                                    fullPrecision: false,
-                                                })}
+                                                <span className="font-mono">
+                                                    {pt.debit.balance.format({
+                                                        fullPrecision: true,
+                                                        includeLabel: false,
+                                                    })}
+                                                </span>{" "}
+                                                <span
+                                                    className={cn(
+                                                        "text-muted-foreground",
+                                                        !pt.debit.balance.hasTokenSymbol() &&
+                                                            "italic",
+                                                    )}
+                                                >
+                                                    {pt.debit.balance.getDisplayLabel()}
+                                                </span>
                                                 <div className="flex gap-1">
                                                     <AcceptButton
                                                         currentUser={
@@ -139,9 +152,21 @@ export const PendingPageContents = () => {
                                     <div className="flex items-center justify-end gap-2">
                                         {pt.credit ? (
                                             <>
-                                                {pt.credit.balance.format({
-                                                    fullPrecision: false,
-                                                })}
+                                                <span className="font-mono">
+                                                    {pt.credit.balance.format({
+                                                        fullPrecision: true,
+                                                        includeLabel: false,
+                                                    })}
+                                                </span>{" "}
+                                                <span
+                                                    className={cn(
+                                                        "text-muted-foreground",
+                                                        !pt.credit.balance.hasTokenSymbol() &&
+                                                            "italic",
+                                                    )}
+                                                >
+                                                    {pt.credit.balance.getDisplayLabel()}
+                                                </span>
                                                 <CancelButton
                                                     currentUser={currentUser}
                                                     pt={pt.credit}

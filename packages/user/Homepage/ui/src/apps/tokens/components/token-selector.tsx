@@ -105,6 +105,7 @@ const AvailableBalance = ({
                     precision={selectedToken?.balance?.precision ?? 0}
                     className="hover:cursor-pointer hover:underline"
                     onClick={onClick}
+                    useFullPrecision={true}
                 />
             </span>
         </div>

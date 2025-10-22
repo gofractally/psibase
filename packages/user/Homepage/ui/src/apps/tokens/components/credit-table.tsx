@@ -5,6 +5,7 @@ import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use
 import { GlowingCard } from "@/components/glowing-card";
 
 import { Avatar } from "@shared/components/avatar";
+import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
@@ -115,11 +116,23 @@ export function CreditTable({ user, token }: Props) {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {transaction.direction === "incoming" &&
-                                            "+"}
-                                        {transaction?.amount?.format({
-                                            fullPrecision: false,
-                                        })}
+                                        <span className="font-mono">
+                                            {transaction.direction ===
+                                                "outgoing" && "-"}
+                                            {transaction?.amount?.format({
+                                                fullPrecision: true,
+                                                includeLabel: false,
+                                            })}
+                                        </span>{" "}
+                                        <span
+                                            className={cn(
+                                                "text-muted-foreground",
+                                                !transaction?.amount?.hasTokenSymbol() &&
+                                                    "italic",
+                                            )}
+                                        >
+                                            {transaction?.amount.getDisplayLabel()}
+                                        </span>
                                     </TableCell>
                                     <TableCell className="h-full w-6 text-center">
                                         {transaction.memo && (

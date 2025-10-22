@@ -131,7 +131,7 @@ export class Quantity {
      * Get the display label for the token
      */
     public getDisplayLabel(): string {
-        return this.tokenSymbol?.toUpperCase() || `TOKEN ${this.tokenNumber}`;
+        return this.tokenSymbol?.toUpperCase() || `ID:${this.tokenNumber}`;
     }
 
     /**

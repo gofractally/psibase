@@ -1,38 +1,77 @@
-import { animated, useSpring } from "@react-spring/web";
+import { useSpring } from "@react-spring/web";
+import React, { useMemo } from "react";
 
 import { formatThousands } from "@/apps/tokens/lib/format-number";
-
-const getDecimals = (formatted: string): number =>
-    formatted.includes(".") ? formatted.split(".")[1].length : 0;
 
 export const AnimateNumber = ({
     n,
     precision,
+    useFullPrecision = false,
     className,
     onClick,
 }: {
     n: number;
     precision: number;
+    useFullPrecision?: boolean;
     className?: string;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) => {
-    const { number } = useSpring({
-        from: { number: 0 },
+    // Calculate significant decimal places (trimming trailing zeros)
+    const getSignificantDecimalPlaces = (num: number): number => {
+        const str = num.toString();
+        if (str.includes(".")) {
+            const decimalPart = str.split(".")[1];
+            // Find the last non-zero digit
+            let lastSignificant = decimalPart.length;
+            for (let i = decimalPart.length - 1; i >= 0; i--) {
+                if (decimalPart[i] !== "0") {
+                    lastSignificant = i + 1;
+                    break;
+                }
+            }
+            return lastSignificant;
+        }
+        return 0;
+    };
+
+    // Calculate spring precision based on the precision parameter and number's actual precision
+    const desiredDecimalPlaces = useMemo(() => {
+        if (useFullPrecision) {
+            return precision;
+        }
+        return getSignificantDecimalPlaces(n);
+    }, [n, precision, useFullPrecision]);
+
+    // Returns "0.0001" for 4 decimal places and "0.01" for 2 decimal places
+    const springPrecision = useMemo(() => {
+        return Math.pow(10, -desiredDecimalPlaces);
+    }, [desiredDecimalPlaces]);
+
+    // Store the formatted value in state to prevent react-spring from converting it back to a number
+    // (using <animated.span> will convert it back to a number and we'll lose trailing zeros on rerenders that don't retrigger the animation)
+    const [displayValue, setDisplayValue] = React.useState(() =>
+        formatThousands(n, desiredDecimalPlaces, true),
+    );
+
+    useSpring({
+        from: { number: 0 }, // TODO: this should be from the previous number, not 0
         number: n,
         delay: 10,
-        config: { mass: 1, tension: 300, friction: 50 },
+        config: {
+            mass: 1,
+            tension: 300,
+            friction: 50,
+            precision: springPrecision,
+        },
+        onChange: (result) => {
+            const val = result.value.number;
+            const formatted = formatThousands(val, desiredDecimalPlaces, true);
+            setDisplayValue(formatted);
+        },
     });
 
-    const finalPrecision = getDecimals(formatThousands(n, precision));
-
     const numbers = () => {
-        return (
-            <animated.span className={className}>
-                {number.to((animatedNumber) =>
-                    formatThousands(animatedNumber, finalPrecision),
-                )}
-            </animated.span>
-        );
+        return <span className={className}>{displayValue}</span>; // don't use <animated.span> here!
     };
 
     if (!onClick) return numbers();
