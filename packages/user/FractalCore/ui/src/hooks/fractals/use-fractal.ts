@@ -1,8 +1,9 @@
 import { graphql } from "@/gql";
-import { GetFractalGuilQuery } from "@/gql/graphql";
+import {
+    GetFractalGuilQuery,
+    GetFractalGuilQueryVariables,
+} from "@/gql/graphql";
 import { useQuery } from "@apollo/client/react";
-
-// import { useQuery } from "@tanstack/react-query";
 
 import { useFractalAccount } from "./use-fractal-account";
 
@@ -32,10 +33,13 @@ const theFractal = graphql(`
 
 export const useFractal = () => {
     const currentFractal = useFractalAccount();
-    const res = useQuery<GetFractalGuilQuery>(theFractal, {
-        variables: { fractal: currentFractal! },
-        skip: !currentFractal,
-    });
+    const res = useQuery<GetFractalGuilQuery, GetFractalGuilQueryVariables>(
+        theFractal,
+        {
+            variables: { fractal: currentFractal! },
+            skip: !currentFractal,
+        },
+    );
 
     return res;
 };
