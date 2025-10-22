@@ -4,11 +4,11 @@
     "version": "0.0.0",
     "scripts": {
         "dev": "vite",
-        "build": "yarn run graphql-codegen && node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && yarn lint && vite build'",
+        "build": "yarn run codegen && node ../../../if-build-needed.mjs 'tsc --noEmit --skipLibCheck && yarn lint && vite build'",
         "lint": "eslint .",
         "preview": "vite preview",
-        "codegen": "graphql-code-generator",
-        "codegen:watch": "graphql-code-generator --watch"
+        "codegen": "graphql-codegen",
+        "codegen:watch": "graphql-codegen --watch"
     },
     "dependencies": {
         "@apollo/client": "^4.0.7",
