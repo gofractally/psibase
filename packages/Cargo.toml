@@ -61,6 +61,3 @@ serde_json = "1.0.125"
 psibase-plugin-workspace-hack = { version = "0.1" }
 # Standard version for cargo-component 0.15.0
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
-
-[patch.crates-io.psibase-plugin-workspace-hack]
-path = "plugin-workspace-hack"

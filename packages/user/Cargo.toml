@@ -70,6 +70,3 @@ opt-level = "s"
 debug = false
 strip = true
 lto = true
-
-[patch.crates-io.psibase-user-workspace-hack]
-path = "user-workspace-hack"
