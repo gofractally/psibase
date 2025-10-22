@@ -1,5 +1,5 @@
 import { useSpring } from "@react-spring/web";
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 
 import { formatThousands } from "@/apps/tokens/lib/format-number";
 
@@ -47,6 +47,9 @@ export const AnimateNumber = ({
         return Math.pow(10, -desiredDecimalPlaces);
     }, [desiredDecimalPlaces]);
 
+    // Track the previous number to animate from
+    const prevNumberRef = useRef(n);
+
     // Store the formatted value in state to prevent react-spring from converting it back to a number
     // (using <animated.span> will convert it back to a number and we'll lose trailing zeros on rerenders that don't retrigger the animation)
     const [displayValue, setDisplayValue] = React.useState(() =>
@@ -54,8 +57,8 @@ export const AnimateNumber = ({
     );
 
     useSpring({
-        from: { number: 0 }, // TODO: this should be from the previous number, not 0
-        number: n,
+        from: { number: prevNumberRef.current },
+        to: { number: n },
         delay: 10,
         config: {
             mass: 1,
@@ -67,6 +70,10 @@ export const AnimateNumber = ({
             const val = result.value.number;
             const formatted = formatThousands(val, desiredDecimalPlaces, true);
             setDisplayValue(formatted);
+        },
+        onRest: () => {
+            // Update the previous value ref after animation completes
+            prevNumberRef.current = n;
         },
     });
 
