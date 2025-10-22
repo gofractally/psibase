@@ -5,7 +5,7 @@ import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import {
     type Token,
     useUserTokenBalances,
-} from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
+} from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 
 import { GlowingCard } from "@/components/glowing-card";
 

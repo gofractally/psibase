@@ -1,4 +1,4 @@
-import type { Token } from "./useUserTokenBalances";
+import type { Token } from "./use-user-token-balances";
 
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";

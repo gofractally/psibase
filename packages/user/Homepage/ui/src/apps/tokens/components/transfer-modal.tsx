@@ -1,4 +1,4 @@
-import type { Token } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalances";
+import type { Token } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 
 import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";

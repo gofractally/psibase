@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
 
-import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/useUserTokenBalanceChanges";
+import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 
 import { GlowingCard } from "@/components/glowing-card";
 
@@ -19,7 +19,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { Token } from "../hooks/tokensPlugin/useUserTokenBalances";
+import { Token } from "../hooks/tokensPlugin/use-user-token-balances";
 
 interface Props {
     user: string;

@@ -1,4 +1,4 @@
-import type { LineOfCredit } from "../../hooks/tokensPlugin/useUserLinesOfCredit";
+import type { LineOfCredit } from "../../hooks/tokensPlugin/use-user-lines-of-credit";
 import type { PendingActionProps } from "../../pending";
 
 import { Loader2, Undo2 } from "lucide-react";
@@ -24,7 +24,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { useUncredit } from "../../hooks/tokensPlugin/useUncredit";
+import { useUncredit } from "../../hooks/tokensPlugin/use-uncredit";
 import { zTransferFormMemo } from "../../lib/transfer-form-schema";
 
 export const CancelButton = ({

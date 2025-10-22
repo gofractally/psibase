@@ -16,7 +16,7 @@ import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { CreditTable } from "./components/credit-table";
-import { useCredit } from "./hooks/tokensPlugin/useCredit";
+import { useCredit } from "./hooks/tokensPlugin/use-credit";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
     defaultTransferValues,

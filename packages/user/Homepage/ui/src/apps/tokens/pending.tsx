@@ -20,7 +20,7 @@ import { RejectButton } from "./components/pending/button-reject";
 import {
     type LineOfCredit,
     useUserLinesOfCredit,
-} from "./hooks/tokensPlugin/useUserLinesOfCredit";
+} from "./hooks/tokensPlugin/use-user-lines-of-credit";
 import { TokensOutletContext } from "./layout";
 
 export interface PendingActionProps {

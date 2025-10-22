@@ -7,20 +7,20 @@ import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 import { TokenId } from "@/lib/zod/TokenId";
 
-import { updateUserTokenBalancesCache } from "./useUserTokenBalances";
+import { updateUserTokenBalancesCache } from "./use-user-token-balances";
 
 const Args = z.object({
     tokenId: TokenId,
-    debitor: Account,
+    sender: Account,
     amount: z.string(),
     memo: z.string().default(""),
 });
 
-export const useUncredit = (user: string | null, counterParty: string) =>
+export const useDebit = (user: string | null, counterParty: string) =>
     useMutation<void, Error, z.infer<typeof Args>>({
-        mutationKey: ["uncredit", counterParty],
+        mutationKey: ["debit", counterParty],
         mutationFn: (vars) => {
-            const { amount, memo, tokenId, debitor } = Args.parse(vars);
+            const { sender, amount, memo, tokenId } = Args.parse(vars);
 
             // Optimistically update the balance
             updateUserTokenBalancesCache(
@@ -34,8 +34,8 @@ export const useUncredit = (user: string | null, counterParty: string) =>
                 service: "tokens",
                 plugin: "plugin",
                 intf: "user",
-                method: "uncredit",
-                params: [tokenId, debitor, amount, memo],
+                method: "debit",
+                params: [tokenId, sender, amount, memo],
             });
         },
         onSuccess: (_data, vars, _result, context) => {

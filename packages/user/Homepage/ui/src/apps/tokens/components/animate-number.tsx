@@ -1,6 +1,6 @@
 import { animated, useSpring } from "@react-spring/web";
 
-import { formatThousands } from "@/lib/formatNumber";
+import { formatThousands } from "@/apps/tokens/lib/format-number";
 
 const getDecimals = (formatted: string): number =>
     formatted.includes(".") ? formatted.split(".")[1].length : 0;

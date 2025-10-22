@@ -1,4 +1,4 @@
-import type { LineOfCredit } from "../../hooks/tokensPlugin/useUserLinesOfCredit";
+import type { LineOfCredit } from "../../hooks/tokensPlugin/use-user-lines-of-credit";
 import type { PendingActionProps } from "../../pending";
 
 import { Loader2, X } from "lucide-react";
@@ -24,7 +24,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { useReject } from "../../hooks/tokensPlugin/useReject";
+import { useReject } from "../../hooks/tokensPlugin/use-reject";
 import { zTransferFormMemo } from "../../lib/transfer-form-schema";
 
 export const RejectButton = ({

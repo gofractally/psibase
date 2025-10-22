@@ -6,7 +6,7 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
-import { updateUserTokenBalancesCache } from "./useUserTokenBalances";
+import { updateUserTokenBalancesCache } from "./use-user-token-balances";
 
 const Args = z.object({
     tokenId: z.string(),
