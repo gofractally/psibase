@@ -50,10 +50,10 @@ define_trust! {
         Low => "
         Low trust grants these abilities:
             - Delete previously created invites
+            - Reject active invites
         ",
         Medium => "Medium trust grants all the abilities of low trust, plus these abilities:
             - Generate new invites
-            - Reject active invites
         ",
         High => "",
     }
@@ -99,16 +99,6 @@ impl Invitee for InvitePlugin {
         }
         Ok(imported.unwrap())
     }
-
-    // This is shorthand for calling `import-invite-token` and then immediately
-    // attempting to connect a new account to the caller app.
-    // fn consume_invite_token(token: String) -> Result<(), HostTypes::Error> {
-    //     assert!(Client::get_sender() == Client::get_active_app());
-    //     validate_invite_token(&token)?;
-    //     InviteTokensTable::import(token);
-    //     // TODO - call connect() on accounts app.
-    //     Ok(())
-    // }
 
     /// Returns whether or not an invite from someone is active for the caller
     /// application

@@ -34,7 +34,7 @@ endfunction()
 
 # Parameters:
 # TARGET_TUPLE: The target tuple includes the path and the target name. Example: "packages/:ServiceComponents"
-# ARGN: All of the package names to build. If cargo.toml has `package.name = "auth-invite"`, then pass `auth-invite`
+# ARGN: All of the package names to build. If cargo.toml has `package.name = "my-package"`, then pass `my-package`
 function(add_rs_component_workspace TARGET_TUPLE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
@@ -45,7 +45,7 @@ function(add_rs_component_workspace TARGET_TUPLE)
         string(REGEX REPLACE "-" "_" FILENAME ${FILENAME})
         
         # Sets a veriable called {TARGET_NAME}_OUTPUT_FILE_{FILENAME} and expose it to the caller of this function
-        # For example, for the package 'auth-invite', a variable called `Plugins_auth_invite_OUTPUT_FILE`
+        # For example, for the package 'my-package', a variable called `Plugins_my_package_OUTPUT_FILE`
         set(${TARGET_NAME}_OUTPUT_FILE_${FILENAME} ${COMPONENT_BIN_DIR}/${FILENAME}.wasm PARENT_SCOPE)
 
         set(FILENAME ${FILENAME}.wasm)

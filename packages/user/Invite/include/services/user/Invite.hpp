@@ -49,12 +49,12 @@ namespace UserService
          /// Returns the ID of the newly created invite
          ///
          /// Parameters:
-         /// - `id` is the id of the invite (randomly generated)
-         /// - `inviteKey` is the public key of the invite.
-         /// - `numAccounts` is the number of accounts this invite can be used to create.
-         /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller the
-         ///   invite is updated.
-         /// - `secret` is an encrypted secret used to redeem the invite.
+         /// - `inviteId` is the id of the invite (could be randomly generated)
+         /// - `inviteKey` is the public key of the invite
+         /// - `numAccounts` is the number of accounts this invite can be used to create
+         /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
+         ///    the invite is updated
+         /// - `secret` is an encrypted secret used to redeem the invite
          ///
          /// If `useHooks` is true, the caller must be an account with a service deployed on it
          /// that implements the InviteHooks interface.
@@ -64,12 +64,12 @@ namespace UserService
                                bool        useHooks,
                                std::string secret);
 
-         /// Called directly by an invite credential (not an account) to create the specified
-         /// account which is authorized by the specified public key.
+         /// Called by an invite credential (not a user account) to create the specified
+         /// account. The new account is authorized by the specified public key.
          void createAccount(psibase::AccountNumber account, Spki accountKey);
 
          /// The sender accepts an invite.
-         /// Calling this action also requires that the sender authorizes the transaction with the 
+         /// Calling this action also requires that the sender authorizes the transaction with the
          /// proof for the credential associated with an invite.
          void accept();
 

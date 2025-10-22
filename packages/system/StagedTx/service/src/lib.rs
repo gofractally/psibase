@@ -177,7 +177,7 @@ pub mod service {
                     abort_message(&format!("Authorization for {} failed", action.sender));
                 }
                 let act = action.packed();
-                unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
+                unsafe { native_raw::call(act.as_ptr(), act.len() as u32, 0) };
             });
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::EXECUTED);

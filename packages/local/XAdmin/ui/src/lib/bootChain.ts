@@ -11,7 +11,7 @@ type BootChainParams = {
     packages: PackageInfo[];
     producerName: string;
     blockSigningPubKey: CryptoKey | undefined;
-    txSigningPubKey: CryptoKey | undefined;
+    txSigningPubKeyPem: string | undefined;
     compression: number;
     onProgressUpdate: (state: BootState) => void;
 };
@@ -20,7 +20,7 @@ export const bootChain = async ({
     packages,
     producerName,
     blockSigningPubKey,
-    txSigningPubKey,
+    txSigningPubKeyPem,
     compression,
     onProgressUpdate,
 }: BootChainParams): Promise<void> => {
@@ -43,17 +43,10 @@ export const bootChain = async ({
         );
 
         let blockSigningPubKeyPem: string | undefined;
-        let txSigningPubKeyPem: string | undefined;
         try {
             if (blockSigningPubKey) {
                 blockSigningPubKeyPem = await exportKeyToPEM(
                     blockSigningPubKey,
-                    "PUBLIC KEY",
-                );
-            }
-            if (txSigningPubKey) {
-                txSigningPubKeyPem = await exportKeyToPEM(
-                    txSigningPubKey,
                     "PUBLIC KEY",
                 );
             }

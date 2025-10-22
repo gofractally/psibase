@@ -2,6 +2,8 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
+#include <services/test/AsRpc.hpp>
+#include <services/test/SubjectiveCounterService.hpp>
 #include <services/test/SubjectiveDb.hpp>
 #include <services/test/XSudo.hpp>
 
@@ -83,15 +85,17 @@ TEST_CASE("local service sudo")
 {
    DefaultTestChain t;
    auto             callee = AccountNumber{"callee"};
-   t.addService(callee, "Nop.wasm", CodeRow::runModeRpc);
+   t.addService(callee, "Nop.wasm");
+   t.addService(AsRpc::service, "AsRpc.wasm", AsRpc::flags);
    t.startBlock();
    // sanity check
-   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})));
+   REQUIRE(t.to<AsRpc>().asRpc(Action{.sender = AsRpc::service, .service = callee}).succeeded());
 
    addLocalService(t, AccountNumber{"callee"}, "Nop.wasm", 0);
    t.startBlock();
-   expect(t.pushTransaction(t.makeTransaction({Action{.sender = callee, .service = callee}})),
-          "Cannot substitute");
+   CHECK(t.to<AsRpc>()
+             .asRpc(Action{.sender = AsRpc::service, .service = callee})
+             .failed("cannot sudo"));
 
    auto sudo = AccountNumber{"sudo"};
    t.addService(sudo, "XSudo.wasm", XSudo::flags);
@@ -112,4 +116,40 @@ TEST_CASE("local service sudo")
           t.post(XSudo::service, "/", FracPackBody{Action{.sender = callee, .service = callee}});
       CHECK((int)reply.status == 200);
    }
+}
+
+TEST_CASE("replay subjective")
+{
+   DefaultTestChain t;
+   TestChain        u(t, true);
+
+   auto sync = [&]
+   {
+      auto tHeadNum =
+          t.kvGet<StatusRow>(StatusRow::db, statusKey()).value().head.value().header.blockNum;
+      auto uHeadNum =
+          u.kvGet<StatusRow>(StatusRow::db, statusKey()).value().head.value().header.blockNum;
+      for (auto i = uHeadNum + 1; i <= tHeadNum; ++i)
+      {
+         auto block = t.kvGet<Block>(DbId::blockLog, i);
+         u.pushBlock(SignedBlock{std::move(block.value())});
+      }
+   };
+
+   t.addService<SubjectiveCounterService>("SubjectiveCounterService.wasm");
+   t.from(SubjectiveCounterService::service)
+       .to<HttpServer>()
+       .registerServer(SubjectiveCounterService::service);
+
+   // RPC mode is skipped on replay
+   CHECK(t.to<SubjectiveCounterService>().checkIncRpc("", 0, 1).succeeded());
+   CHECK(t.get<int>(SubjectiveCounterService::service, "/value") == 1);
+   sync();
+   CHECK(u.get<int>(SubjectiveCounterService::service, "/value") == 0);
+
+   // Callback mode does run on replay, but the return value is from the producer
+   CHECK(t.to<SubjectiveCounterService>().checkIncCallback("", 0, 2).succeeded());
+   CHECK(t.get<int>(SubjectiveCounterService::service, "/value") == 2);
+   sync();
+   CHECK(u.get<int>(SubjectiveCounterService::service, "/value") == 1);
 }

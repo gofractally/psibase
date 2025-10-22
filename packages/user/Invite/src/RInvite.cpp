@@ -9,9 +9,6 @@
 
 namespace UserService
 {
-
-   // TODO - tell whether an invite is expired from a query
-
    namespace InviteNs
    {
       using namespace psibase;

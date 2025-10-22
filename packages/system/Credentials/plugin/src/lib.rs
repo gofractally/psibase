@@ -23,21 +23,21 @@ const DB: Store::Database = Store::Database {
     duration: Store::StorageDuration::Ephemeral,
 };
 
-fn claims() -> Store::Bucket {
-    Store::Bucket::new(DB, "claims")
+fn public_keys() -> Store::Bucket {
+    Store::Bucket::new(DB, "pubkeys")
 }
 
-fn proofs() -> Store::Bucket {
-    Store::Bucket::new(DB, "proofs")
+fn private_keys() -> Store::Bucket {
+    Store::Bucket::new(DB, "privkeys")
 }
 
 impl Api for Credentials {
     fn sign_latch(credential: Credential) {
         // Implies an app can only sign for one credential at at a time in a particular call context
-        claims().set(&Client::get_sender(), &credential.p256_pub);
+        public_keys().set(&Client::get_sender(), &credential.p256_pub);
 
         let hash = Sha256::digest(credential.p256_pub.as_slice());
-        proofs().set(&base64::encode(hash.as_slice()), &credential.p256_priv);
+        private_keys().set(&base64::encode(hash.as_slice()), &credential.p256_priv);
 
         hook_action_auth();
     }
@@ -45,12 +45,12 @@ impl Api for Credentials {
 
 impl HookActionAuth for Credentials {
     fn on_action_auth_claims(action: Action) -> Result<Vec<Claim>, Error> {
-        let pubkey = claims().get(&action.service);
+        let pubkey = public_keys().get(&action.service);
 
-        if pubkey.is_some() {
+        if let Some(pubkey) = pubkey {
             return Ok(vec![Claim {
                 verify_service: psibase::services::verify_sig::SERVICE.to_string(),
-                raw_data: pubkey.unwrap(),
+                raw_data: pubkey,
             }]);
         }
         return Ok(vec![]);
@@ -67,7 +67,7 @@ impl HookActionAuth for Credentials {
         let mut result = Vec::new();
         for claim in claims {
             let hash = Sha256::digest(claim.raw_data.as_slice());
-            if let Some(private_key) = proofs().get(&base64::encode(hash.as_slice())) {
+            if let Some(private_key) = private_keys().get(&base64::encode(hash.as_slice())) {
                 result.push(Proof {
                     signature: sign_explicit(&transaction_hash, &private_key)?,
                 });

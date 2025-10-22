@@ -75,15 +75,11 @@ namespace psibase
    struct CodeRow
    {
       // Constants for flags
-      static constexpr uint64_t isPrivileged    = uint64_t(1) << 0;
-      static constexpr uint64_t isVerify        = uint64_t(1) << 1;
-      static constexpr uint64_t runModeRpc      = uint64_t(1) << 2;
-      static constexpr uint64_t runModeCallback = uint64_t(2) << 2;
-      static constexpr uint64_t isReplacement   = uint64_t(1) << 32;
+      static constexpr uint64_t isPrivileged  = uint64_t(1) << 0;
+      static constexpr uint64_t isVerify      = uint64_t(1) << 1;
+      static constexpr uint64_t isReplacement = uint64_t(1) << 32;
 
-      static constexpr auto runMode = runModeRpc | runModeCallback;
-      static constexpr auto chainServiceFlags =
-          isPrivileged | isVerify | runModeRpc | runModeCallback;
+      static constexpr auto chainServiceFlags = isPrivileged | isVerify;
       static constexpr auto localServiceFlags = isPrivileged | isReplacement;
       static constexpr auto allFlags          = chainServiceFlags | localServiceFlags;
 

@@ -1,6 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
-    use crate::service::TID;
+    use crate::service::{fmt_amount, TID};
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
@@ -433,26 +433,30 @@ pub mod tables {
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
             check(quantity.value > 0, "debit quantity must be greater than 0");
 
-            crate::Wrapper::emit().history().debited(
+            crate::Wrapper::emit().history().balChanged(
                 self.token_id,
-                self.creditor,
                 self.debitor,
-                quantity,
+                self.creditor,
+                "debited".to_string(),
+                fmt_amount(self.token_id, quantity),
                 memo,
             );
+
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
         }
 
         pub fn reject(&mut self, memo: Memo) {
             if self.balance.value > 0 {
-                crate::Wrapper::emit().history().rejected(
+                let balance = self.balance;
+                crate::Wrapper::emit().history().balChanged(
                     self.token_id,
                     self.creditor,
                     self.debitor,
+                    "rejected".to_string(),
+                    fmt_amount(self.token_id, balance),
                     memo,
                 );
-                let balance = self.balance;
                 self.sub_balance(balance);
                 Balance::get_or_new(self.debitor, self.token_id).add_balance(balance);
             }

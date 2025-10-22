@@ -42,6 +42,25 @@ namespace psibase
       }
       operator KvHandle() const { return value; }
 
+      friend std::uint32_t psibaseExport(const UniqueKvHandle& self, std::vector<KvHandle>& handles)
+      {
+         auto result = handles.size();
+         handles.push_back(self.value);
+         return result;
+      }
+
+      friend UniqueKvHandle psibaseImport(const UniqueKvHandle*,
+                                          psio::view<const std::uint32_t>         value,
+                                          psio::view<const std::vector<KvHandle>> handles)
+      {
+         return UniqueKvHandle{handles.at(value.unpack())};
+      }
+
+      friend auto to_schema(auto& builder, const UniqueKvHandle*)
+      {
+         return builder.template insert<std::uint32_t>();
+      }
+
      private:
       KvHandle value;
    };

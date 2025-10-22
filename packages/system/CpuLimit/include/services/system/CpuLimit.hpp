@@ -13,9 +13,8 @@ namespace SystemService
    class CpuLimit : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("cpu-limit");
-      static constexpr auto serviceFlags =
-          psibase::CodeRow::runModeRpc | psibase::CodeRow::isPrivileged;
+      static constexpr auto service      = psibase::AccountNumber("cpu-limit");
+      static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
       std::chrono::nanoseconds getCpuTime();
       void                     setCpuLimit(psibase::AccountNumber account);

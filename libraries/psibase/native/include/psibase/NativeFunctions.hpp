@@ -13,7 +13,7 @@ namespace psibase
    {
       Database&           database;
       TransactionContext& transactionContext;
-      DbMode              dbMode;
+      const DbMode&       dbMode;
       CodeRow             code               = {};
       ActionContext*      currentActContext  = nullptr;  // Changes during recursion
       ExecutionContext*   currentExecContext = nullptr;
@@ -43,11 +43,13 @@ namespace psibase
       void     getRandom(eosio::vm::span<char> dest);
       void     setMaxTransactionTime(uint64_t nanoseconds);
       uint32_t getCurrentAction();
-      uint32_t call(eosio::vm::span<const char> data);
+      uint32_t call(eosio::vm::span<const char> data, std::uint64_t flags);
       void     setRetval(eosio::vm::span<const char> data);
       uint32_t kvOpen(uint32_t db, eosio::vm::span<const char> prefix, uint32_t mode);
       uint32_t kvOpenAt(uint32_t handle, eosio::vm::span<const char> prefix, uint32_t mode);
       void     kvClose(uint32_t handle);
+      void     exportHandles(eosio::vm::span<const char> data);
+      uint32_t importHandles();
       void     kvPut(uint32_t                    handle,
                      eosio::vm::span<const char> key,
                      eosio::vm::span<const char> value);

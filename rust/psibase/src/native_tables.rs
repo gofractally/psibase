@@ -101,8 +101,6 @@ impl CodeRow {
     pub const DB: DbId = DbId::Native;
     pub const IS_PRIVILEGED: u64 = 1u64 << 0;
     pub const IS_VERIFY: u64 = 1u64 << 1;
-    pub const RUN_MODE_RPC: u64 = 1u64 << 2;
-    pub const RUN_MODE_CALLBACK: u64 = 2u64 << 2;
     pub const IS_REPLACEMENT: u64 = 1u64 << 32;
     pub fn key(&self) -> (NativeTable, NativeIndex, AccountNumber) {
         (CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.codeNum)

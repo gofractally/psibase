@@ -119,10 +119,7 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
    if (useHooks)
    {
       auto service = Native::tables(KvMode::read).open<CodeTable>().get(invite.inviter);
-      check(
-          service.has_value(),
-          "To enable hooks, the invite creator must be a service that implements the 'InviteHooks' "
-          "interface");
+      check(service.has_value(), inviteHooksRequired.data());
    }
 
    emit().history().updated(invite.id, invite.inviter, InviteEventType::created);
@@ -143,8 +140,8 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    invite->numAccounts -= 1;
    inviteTable.put(*invite);
 
-   Spki claim = to<Credentials>().get_claim(cid);
-   check(claim != newAccountKey, needUniquePubkey.data());
+   Spki pubkey = to<Credentials>().get_pubkey(cid);
+   check(pubkey != newAccountKey, needUniquePubkey.data());
    to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
 
    emit().history().updated(invite->id, newAccount, InviteEventType::accountRedeemed);
@@ -164,11 +161,6 @@ void Invite::accept()
    emit().history().updated(invite->id, accepter, InviteEventType::accepted);
    hookOnInvAccept(*invite, accepter);
 }
-
-///////////////////////////////////// TODO
-// * Check invite doc comments for out of date info
-// * Add string_views for errors
-// * Fix unit tests
 
 void Invite::delInvite(uint32_t inviteId)
 {

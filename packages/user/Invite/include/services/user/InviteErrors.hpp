@@ -15,5 +15,8 @@ namespace UserService
       constexpr std::string_view noActiveCredential       = "No active credential";
       constexpr std::string_view canOnlyCallCreateAccount = "can only call createAccount";
       constexpr std::string_view outOfNewAccounts = "Invite cannot be used to create more accounts";
+      constexpr std::string_view inviteHooksRequired =
+          "To enable hooks, the invite creator must be a service that implements the 'InviteHooks' "
+          "interface";
    }  // namespace Errors
 }  // namespace UserService
