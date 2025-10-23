@@ -6,9 +6,10 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.21.0", path = "../../../../rust/psibase_macros" }
+psibase.workspace = true
+psibase_macros.workspace = true
 serde = { version = "1.0.208", features = ["derive"] }
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
 subgroups-pkg = { path = "..", version = "0.21.0" }

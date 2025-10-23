@@ -1030,6 +1030,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fractal-core"
+version = "0.21.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt 0.30.0",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
