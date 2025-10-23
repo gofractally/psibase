@@ -56,4 +56,7 @@ psibase_names = { path = "./psibase_names" }
 psibase_macros = { path = "./psibase_macros" }
 psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive", version = "0.21.0" }
 url = "2.5.4"
-psibase-rust-workspace-hack = { path = "rust-workspace-hack" }
+psibase-rust-workspace-hack = { version = "0.21.0" }
+
+[patch.crates-io.psibase-rust-workspace-hack]
+path = "rust-workspace-hack"

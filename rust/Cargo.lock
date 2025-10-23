@@ -2843,7 +2843,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-rust-workspace-hack"
-version = "0.1.0"
+version = "0.21.0"
 dependencies = [
  "aho-corasick",
  "bitflags 2.5.0",
@@ -2879,6 +2879,7 @@ dependencies = [
  "rustix",
  "scopeguard",
  "serde",
+ "serde_core",
  "serde_json",
  "smallvec",
  "stable_deref_trait",
