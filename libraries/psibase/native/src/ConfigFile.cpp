@@ -604,7 +604,7 @@ boost::program_options::parsed_options psibase::parse_config_file(
             boost::program_options::option opt{k, {eval(cfg, k, value)}};
             opt.original_tokens = {k, std::string(value)};
             opt.unregistered    = !allowedOption(k);
-            if (!opt.unregistered && !cfg.allowUnregistered)
+            if (opt.unregistered && !cfg.allowUnregistered)
             {
                throw std::runtime_error(filename + ":" + std::to_string(line_number) +
                                         ": Unknown option " + k);
