@@ -7,10 +7,10 @@ publish.workspace = true
 
 [dependencies]
 {{project-name}} = { path = "../service/", version = "{{version}}" }
-psibase.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-wit-bindgen-rt.workspace = true
+psibase = { path = "../../../../rust/psibase/", version = "{{version}}" }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
 
 [lib]
 crate-type = ["cdylib"]

@@ -22,4 +22,4 @@ test_fracpack_macros = { path = "../test_fracpack_macros", version = "0.21.0" }
 psibase-rust-workspace-hack.workspace = true
 
 [build-dependencies]
-cxx-build = "1.0"
+cxx-build = ">=1, <1.0.187"

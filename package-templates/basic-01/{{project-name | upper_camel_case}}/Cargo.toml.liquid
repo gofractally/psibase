@@ -8,17 +8,6 @@ rust-version = "1.64"
 edition = "2021"
 publish = false
 
-[workspace.dependencies]
-# Pin cxx-build to avoid 1.0.187 which requires Rust 1.87
-cxx-build = ">=1, <1.0.187"
-# Standard dependencies used across services
-psibase = { path = "../../../rust/psibase/", version = "{{version}}" }
-psibase_macros = { path = "../../../rust/psibase_macros/", version = "{{version}}" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.125"
-wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
-
 [package]
 name = "{{project-name}}-pkg"                      # Crate name
 description = "{{description}}"
