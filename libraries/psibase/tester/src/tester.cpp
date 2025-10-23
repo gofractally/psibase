@@ -227,7 +227,7 @@ namespace
 
 }  // namespace
 
-psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init)
+psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init, bool writable)
     : id{clone ? tester::raw::cloneChain(chain_id) : chain_id}, isPublicChain(pub)
 {
    if (pub && numPublicChains++ == 0)
@@ -236,7 +236,7 @@ psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init
    {
       loadLocalServices(*this);
    }
-   if (init || clone)
+   if (writable)
    {
       startSession(*this);
    }
@@ -273,7 +273,8 @@ psibase::TestChain::TestChain(std::string_view path, int flags, const DatabaseCo
                                        &cfg),
                 false,
                 pub,
-                (flags & (O_CREAT | O_TRUNC)) != 0)
+                (flags & (O_CREAT | O_TRUNC)) != 0,
+                (get_wasi_rights(flags) & __WASI_RIGHTS_FD_WRITE) != 0)
 {
 }
 
