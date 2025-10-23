@@ -1119,6 +1119,7 @@ void from_json(ExtraConfigField& field, auto& stream)
       case psio::json_token_type::type_start_array:
       {
          std::vector<std::string> values;
+         stream.eat_token();
          while (!stream.get_end_array_pred())
          {
             // bool or string
