@@ -194,7 +194,7 @@ impl Chain {
                 self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
             }
 
-            let root_host = "psibase";
+            let root_host = "\0";
 
             for (account, path, file) in package.data() {
                 let Some(mime_type) = mime_guess::from_path(&path).first() else {

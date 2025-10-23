@@ -17,14 +17,6 @@ namespace LocalService
 
       static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)
       {
-         if (rootHost.empty())
-         {
-            auto pos = host.find('.');
-            if (pos == std::string_view::npos)
-               return psibase::AccountNumber{host};
-            else
-               return psibase::AccountNumber{host.substr(0, pos)};
-         }
          if (host.size() > rootHost.size() + 1 && host.ends_with(rootHost) &&
              host[host.size() - rootHost.size() - 1] == '.')
          {

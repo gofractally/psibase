@@ -174,7 +174,7 @@ namespace
             self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
          }
 
-         std::string rootHost = "psibase";
+         std::string rootHost("", 1);
 
          for (const auto& [account, header] : package.data)
          {

@@ -25,18 +25,23 @@ namespace
       std::string_view                result;
 
       // Find the most specific host name that matches the request
-      std::string_view root_host;
       for (const auto& name : hosts)
       {
          if (host.ends_with(name) &&
              (host.size() == name.size() || host[host.size() - name.size() - 1] == '.'))
          {
-            if (name.size() > root_host.size())
+            if (name.size() > result.size())
             {
                result = name;
             }
          }
       }
+      using namespace std::literals::string_view_literals;
+      // Special hostname that is not valid HTTP syntax, used by psinode
+      // and psitest for internally generated requests that should
+      // work even when there is no host name configured.
+      if (result.empty() && host == "\0"sv || host.ends_with(".\0"sv))
+         result = "\0"sv;
       // If there isn't a matching host, default to the first host
       if (result.empty() && !hosts.empty())
       {
@@ -210,6 +215,12 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    auto owned    = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
    auto rootHost = getRootHost(req.host());
+
+   if (rootHost.empty())
+   {
+      sendNotFound(sock, req);
+      return;
+   }
 
    if (auto service = XHttp::getService(req.host(), rootHost); service != AccountNumber{})
    {
