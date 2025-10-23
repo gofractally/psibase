@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "plugin-workspace-hack",
     "system/Accounts/plugin/accounts/",
     "system/Accounts/plugin/account_tokens/",
     "system/AuthAny/plugin/",
