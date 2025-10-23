@@ -34,9 +34,26 @@ default-members = [
 
 [workspace.package]
 version = "0.21.0"
+edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+license = "MIT"
+publish = false
 
 [workspace.dependencies]
+anyhow = "1.0"
 async-graphql = "=7.0.17"
+clap = { version = "4.5", features = ["derive"] }
+fracpack = { version = "0.21.0", path = "./fracpack" }
+indexmap = { version = "2.2.6", features = ["std", "serde"] }
+regex = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.132"
+serde-aux = "4.5"
+psibase = { path = "./psibase" }
+psibase_names = { path = "./psibase_names" }
+psibase_macros = { path = "./psibase_macros" }
+psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive", version = "0.21.0" }
+url = "2.5.4"
+psibase-rust-workspace-hack = { path = "rust-workspace-hack" }

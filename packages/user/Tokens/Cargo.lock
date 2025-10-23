@@ -869,8 +869,8 @@ dependencies = [
  "custom_error",
  "hex",
  "indexmap",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
- "rust-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
@@ -1879,6 +1879,7 @@ dependencies = [
  "pem",
  "percent-encoding",
  "pkcs8",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
  "rand_core",
@@ -1887,7 +1888,6 @@ dependencies = [
  "ring",
  "ripemd",
  "rpassword",
- "rust-workspace-hack",
  "scopeguard",
  "sec1",
  "secp256k1",
@@ -1913,9 +1913,9 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "psibase-macros-lib",
+ "psibase-rust-workspace-hack",
  "psibase_names",
  "quote",
- "rust-workspace-hack",
  "syn 1.0.109",
  "toml",
 ]
@@ -1928,9 +1928,60 @@ dependencies = [
  "darling 0.20.11",
  "proc-macro-error",
  "proc-macro2",
+ "psibase-rust-workspace-hack",
  "quote",
- "rust-workspace-hack",
  "syn 2.0.102",
+]
+
+[[package]]
+name = "psibase-rust-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "bitflags 2.9.1",
+ "bytes",
+ "cc",
+ "chrono",
+ "clap",
+ "clap_builder",
+ "console",
+ "cxx-build",
+ "darling_core 0.20.11",
+ "digest",
+ "either",
+ "futures-channel",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "generic-array",
+ "getrandom 0.2.16",
+ "hyper",
+ "indexmap",
+ "itertools",
+ "libc",
+ "log",
+ "memchr",
+ "mio 0.8.11",
+ "num-traits",
+ "once_cell",
+ "proc-macro2",
+ "rand",
+ "regex-automata",
+ "regex-syntax",
+ "rustix 0.38.44",
+ "scopeguard",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "stable_deref_trait",
+ "subtle",
+ "syn 1.0.109",
+ "syn 2.0.102",
+ "tokio",
+ "toml_datetime",
+ "tracing",
+ "wasi 0.11.1+wasi-snapshot-preview1",
+ "zeroize",
 ]
 
 [[package]]
@@ -1938,14 +1989,14 @@ name = "psibase_macros"
 version = "0.21.0"
 dependencies = [
  "psibase-macros-derive",
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
 ]
 
 [[package]]
 name = "psibase_names"
 version = "0.21.0"
 dependencies = [
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
  "seahash",
 ]
 
@@ -2139,57 +2190,6 @@ checksum = "a7cc970b249fbe527d6e02e0a227762c9108b2f49d81094fe357ffc6d14d7f6f"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rust-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "bitflags 2.9.1",
- "bytes",
- "cc",
- "chrono",
- "clap",
- "clap_builder",
- "console",
- "cxx-build",
- "darling_core 0.20.11",
- "digest",
- "either",
- "futures-channel",
- "futures-core",
- "futures-sink",
- "futures-util",
- "generic-array",
- "getrandom 0.2.16",
- "hyper",
- "indexmap",
- "itertools",
- "libc",
- "log",
- "memchr",
- "mio 0.8.11",
- "num-traits",
- "once_cell",
- "proc-macro2",
- "rand",
- "regex-automata",
- "regex-syntax",
- "rustix 0.38.44",
- "scopeguard",
- "serde",
- "serde_json",
- "smallvec",
- "stable_deref_trait",
- "subtle",
- "syn 1.0.109",
- "syn 2.0.102",
- "tokio",
- "toml_datetime",
- "tracing",
- "wasi 0.11.1+wasi-snapshot-preview1",
- "zeroize",
 ]
 
 [[package]]

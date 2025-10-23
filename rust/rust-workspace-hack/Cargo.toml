@@ -3,12 +3,15 @@
 #     cargo hakari generate
 
 [package]
-name = "rust-workspace-hack"
+name = "psibase-rust-workspace-hack"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 description = "workspace-hack package, managed by hakari"
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
 # You can choose to publish this crate: see https://docs.rs/cargo-hakari/latest/cargo_hakari/publishing.
-publish = false
+publish.workspace = true
 
 # The parts of the file between the BEGIN HAKARI SECTION and END HAKARI SECTION comments
 # are managed by hakari.

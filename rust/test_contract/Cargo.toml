@@ -4,8 +4,9 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition = "2021"
-publish = false
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 
 [package.metadata.psibase]
 package-name = "test_contract"
@@ -14,7 +15,7 @@ package-name = "test_contract"
 crate-type = ["cdylib"]
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../psibase" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-rust-workspace-hack.workspace = true

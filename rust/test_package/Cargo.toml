@@ -5,8 +5,9 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition = "2021"
-publish = false
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [package.metadata.psibase]
 package-name = "TestPackage"
@@ -18,4 +19,4 @@ crate-type = ["rlib"]
 [dependencies]
 tpack = { path = "service", version = "0.21.0" }
 r-tpack = { path = "query", version = "0.21.0" }
-rust-workspace-hack = { version = "0.1", path = "../rust-workspace-hack" }
+psibase-rust-workspace-hack.workspace = true

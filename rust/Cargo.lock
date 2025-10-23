@@ -18,9 +18,9 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psimacrotest",
- "rust-workspace-hack",
  "serde",
 ]
 
@@ -354,9 +354,9 @@ dependencies = [
  "async-graphql",
  "mincallrecvr",
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psimacrotest",
- "rust-workspace-hack",
  "serde",
 ]
 
@@ -443,9 +443,9 @@ dependencies = [
  "clap",
  "futures",
  "psibase",
+ "psibase-rust-workspace-hack",
  "rand",
  "reqwest",
- "rust-workspace-hack",
  "serde",
  "serde_json",
  "tokio",
@@ -500,8 +500,8 @@ dependencies = [
  "clap",
  "console",
  "psibase",
+ "psibase-rust-workspace-hack",
  "regex",
- "rust-workspace-hack",
  "serde",
  "serde_json",
  "sha2",
@@ -1106,8 +1106,8 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
- "rust-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
@@ -1188,8 +1188,8 @@ dependencies = [
  "custom_error",
  "hex",
  "indexmap 2.2.6",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
- "rust-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
@@ -1317,9 +1317,9 @@ dependencies = [
  "clang",
  "clap",
  "mdbook",
+ "psibase-rust-workspace-hack",
  "pulldown-cmark 0.9.6",
  "regex",
- "rust-workspace-hack",
  "serde_json",
  "svgbob",
 ]
@@ -2112,8 +2112,8 @@ name = "md2man"
 version = "0.21.0"
 dependencies = [
  "clap",
+ "psibase-rust-workspace-hack",
  "pulldown-cmark 0.9.6",
- "rust-workspace-hack",
 ]
 
 [[package]]
@@ -2179,9 +2179,9 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psimacrotest",
- "rust-workspace-hack",
  "serde",
 ]
 
@@ -2785,6 +2785,7 @@ dependencies = [
  "pem",
  "percent-encoding",
  "pkcs8",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
  "rand_core",
@@ -2793,7 +2794,6 @@ dependencies = [
  "ring",
  "ripemd",
  "rpassword",
- "rust-workspace-hack",
  "scopeguard",
  "sec1",
  "secp256k1",
@@ -2819,9 +2819,9 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "psibase-macros-lib",
+ "psibase-rust-workspace-hack",
  "psibase_names",
  "quote",
- "rust-workspace-hack",
  "syn 1.0.109",
  "toml 0.8.19",
 ]
@@ -2834,9 +2834,60 @@ dependencies = [
  "darling 0.20.10",
  "proc-macro-error",
  "proc-macro2",
+ "psibase-rust-workspace-hack",
  "quote",
- "rust-workspace-hack",
  "syn 2.0.79",
+]
+
+[[package]]
+name = "psibase-rust-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "bitflags 2.5.0",
+ "bytes",
+ "cc",
+ "chrono",
+ "clap",
+ "clap_builder",
+ "console",
+ "cxx-build",
+ "darling_core 0.20.10",
+ "digest",
+ "either",
+ "futures-channel",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "generic-array",
+ "getrandom",
+ "hyper",
+ "indexmap 2.2.6",
+ "itertools",
+ "libc",
+ "log",
+ "memchr",
+ "mio",
+ "num-traits",
+ "once_cell",
+ "proc-macro2",
+ "rand",
+ "regex-automata",
+ "regex-syntax",
+ "rustix",
+ "scopeguard",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "stable_deref_trait",
+ "subtle",
+ "syn 1.0.109",
+ "syn 2.0.79",
+ "tokio",
+ "toml_datetime",
+ "tracing",
+ "wasi",
+ "zeroize",
 ]
 
 [[package]]
@@ -2844,14 +2895,14 @@ name = "psibase_macros"
 version = "0.21.0"
 dependencies = [
  "psibase-macros-derive",
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
 ]
 
 [[package]]
 name = "psibase_names"
 version = "0.21.0"
 dependencies = [
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
  "seahash",
 ]
 
@@ -2864,8 +2915,8 @@ dependencies = [
  "basicwquery",
  "mincallrecvr",
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
- "rust-workspace-hack",
  "serde",
  "serde_json",
 ]
@@ -2914,7 +2965,7 @@ name = "r-tpack"
 version = "0.21.0"
 dependencies = [
  "psibase",
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
  "serde",
  "tpack",
 ]
@@ -3097,57 +3148,6 @@ checksum = "c247d24e63230cdb56463ae328478bd5eac8b8faa8c69461a77e8e323afac90e"
 dependencies = [
  "libc",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "rust-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "bitflags 2.5.0",
- "bytes",
- "cc",
- "chrono",
- "clap",
- "clap_builder",
- "console",
- "cxx-build",
- "darling_core 0.20.10",
- "digest",
- "either",
- "futures-channel",
- "futures-core",
- "futures-sink",
- "futures-util",
- "generic-array",
- "getrandom",
- "hyper",
- "indexmap 2.2.6",
- "itertools",
- "libc",
- "log",
- "memchr",
- "mio",
- "num-traits",
- "once_cell",
- "proc-macro2",
- "rand",
- "regex-automata",
- "regex-syntax",
- "rustix",
- "scopeguard",
- "serde",
- "serde_json",
- "smallvec",
- "stable_deref_trait",
- "subtle",
- "syn 1.0.109",
- "syn 2.0.79",
- "tokio",
- "toml_datetime",
- "tracing",
- "wasi",
- "zeroize",
 ]
 
 [[package]]
@@ -3627,8 +3627,8 @@ name = "subjective"
 version = "0.21.0"
 dependencies = [
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
- "rust-workspace-hack",
  "serde",
 ]
 
@@ -3783,7 +3783,7 @@ name = "test-contract"
 version = "0.21.0"
 dependencies = [
  "psibase",
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
  "serde",
  "serde_json",
 ]
@@ -3798,8 +3798,8 @@ dependencies = [
  "hex",
  "indexmap 2.2.6",
  "psibase",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
- "rust-workspace-hack",
  "serde",
  "serde-aux",
  "serde_json",
@@ -3815,9 +3815,9 @@ dependencies = [
  "hex",
  "proc-macro-error",
  "proc-macro2",
+ "psibase-rust-workspace-hack",
  "quote",
  "regex",
- "rust-workspace-hack",
  "serde",
  "serde_json",
  "syn 1.0.109",
@@ -3827,8 +3827,8 @@ dependencies = [
 name = "test_package"
 version = "0.21.0"
 dependencies = [
+ "psibase-rust-workspace-hack",
  "r-tpack",
- "rust-workspace-hack",
  "tpack",
 ]
 
@@ -4009,7 +4009,7 @@ name = "tpack"
 version = "0.21.0"
 dependencies = [
  "psibase",
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
  "serde",
  "test_package",
 ]
@@ -4019,7 +4019,7 @@ name = "tpack-plugin"
 version = "0.21.0"
 dependencies = [
  "psibase",
- "rust-workspace-hack",
+ "psibase-rust-workspace-hack",
  "wit-bindgen-rt",
 ]
 
