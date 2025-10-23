@@ -80,7 +80,7 @@ pub mod service {
 
         configure_new_fractal_account(fractal_account);
 
-        Fractal::add(fractal_account, name, mission);
+        Fractal::add(fractal_account, name, mission, guild_account);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
         let genesis_guild = Guild::add(
             fractal_account,
@@ -353,10 +353,15 @@ pub mod service {
     /// Exile a fractal member.
     ///
     /// # Arguments
+    /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
     #[action]
-    fn exile_member(member: AccountNumber) {
-        FractalMember::get_assert(get_sender(), member).exile();
+    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can exile members",
+        );
+        FractalMember::get_assert(fractal, member).exile();
     }
 
     #[event(history)]

@@ -103,6 +103,7 @@ impl AdminFractal for FractallyPlugin {
     fn exile_member(member: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
         let packed_args = fractals::action_structs::exile_member {
+            fractal: get_sender_app()?,
             member: member.parse().unwrap(),
         }
         .packed();
