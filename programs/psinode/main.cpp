@@ -11,7 +11,9 @@
 #include <psibase/version.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
+#include <psio/from_json/map.hpp>
 #include <psio/to_json.hpp>
+#include <psio/to_json/map.hpp>
 
 #include "connect.hpp"
 #include "connection.hpp"
@@ -331,12 +333,14 @@ void from_json(Timeout& obj, auto& stream)
 }
 
 std::filesystem::path option_path;
-ConfigFileOptions     config_options{.expandValue = [](std::string_view key)
+ConfigFileOptions     config_options{.expandValue =
+                                     [](std::string_view key)
                                  {
                                     // shell commands are processed by the shell. They should not go
                                     // through another round of expansion.
                                     return !key.ends_with(".command");
-                                 }};
+                                 },
+                                     .allowUnregistered = true};
 std::filesystem::path parse_path(std::string_view             s,
                                  const std::filesystem::path& context = option_path)
 {
@@ -1091,9 +1095,85 @@ struct TLSConfig
 };
 PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
 
+struct ExtraConfigField
+{
+   std::variant<std::string, std::vector<std::string>> value;
+};
+
+void to_json(const ExtraConfigField& field, auto& stream)
+{
+   std::visit([&](auto& v) { to_json(v, stream); }, field.value);
+}
+
+void from_json(ExtraConfigField& field, auto& stream)
+{
+   auto t = stream.peek_token();
+   switch (t.get().type)
+   {
+      case psio::json_token_type::type_bool:
+         field.value = stream.get_bool() ? "true" : "false";
+         break;
+      case psio::json_token_type::type_string:
+         field.value = std::string(stream.get_string());
+         break;
+      case psio::json_token_type::type_start_array:
+      {
+         std::vector<std::string> values;
+         stream.eat_token();
+         while (!stream.get_end_array_pred())
+         {
+            // bool or string
+            auto t = stream.peek_token();
+            if (t.get().type == psio::json_token_type::type_bool)
+            {
+               values.push_back(stream.get_bool() ? "true" : "false");
+            }
+            else
+            {
+               values.push_back(std::string(stream.get_string()));
+            }
+         }
+         field.value = std::move(values);
+         break;
+      }
+      default:
+         throw std::runtime_error("Expected string or array");
+         break;
+   }
+}
+
+using ExtraConfigFields = std::map<std::string, ExtraConfigField>;
+
+ExtraConfigFields extraConfig(const std::vector<boost::program_options::option>& opts)
+{
+   ExtraConfigFields result;
+   for (const auto& option : opts)
+   {
+      if (!option.unregistered || option.value.empty())
+         continue;
+      std::string_view prefix{"service."};
+      std::string_view key{option.string_key};
+      if (key.starts_with(prefix))
+         key.remove_prefix(prefix.size());
+      auto [pos, inserted] = result.try_emplace(std::string(key), option.value);
+      if (!inserted)
+      {
+         auto& value = std::get<std::vector<std::string>>(pos->second.value);
+         value.insert(value.end(), option.value.begin(), option.value.end());
+      }
+   }
+   return result;
+}
+
+struct PsinodeServiceConfig
+{
+   std::vector<std::string> argv;
+   ExtraConfigFields        config;
+   PSIO_REFLECT(PsinodeServiceConfig, argv, config)
+};
+
 struct PsinodeConfig
 {
-   bool                        p2p = false;
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
    AccountNumber               producer;
@@ -1105,9 +1185,18 @@ struct PsinodeConfig
    Timeout                     http_timeout;
    std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
+
+   static bool isNative(std::string_view name)
+   {
+      constexpr std::string_view opts[] = {
+          "peers",        "autoconnect",     "producer", "pkcs11-modules",     "host",
+          "listen",       "tls-key",         "tls-cert", "tls-trustfile",      "service",
+          "http-timeout", "service-threads", "key",      "database-cache-size"};
+      return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
+             name.starts_with("service.");
+   }
 };
 PSIO_REFLECT(PsinodeConfig,
-             p2p,
              peers,
              autoconnect,
              producer,
@@ -1124,7 +1213,6 @@ PSIO_REFLECT(PsinodeConfig,
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
-   file.set("", "p2p", config.p2p ? "on" : "off", "Whether to accept incoming P2P connections");
    if (!config.peers.empty())
    {
       file.set(
@@ -1199,6 +1287,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    }
    file.set("", "service-threads", std::to_string(config.service_threads),
             "The number of threads that run async actions posted by services");
+
    // TODO: Not implemented yet.  Sign needs some thought,
    // because it's probably a bad idea to reveal the
    // private keys.
@@ -1208,14 +1297,36 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    to_config(config.loggers, file);
 }
 
-HostConfigRow toHostConfig(const PsinodeConfig& config)
+struct PsinodeCombinedConfig
+{
+   PsinodeConfig        host;
+   PsinodeServiceConfig service;
+   PSIO_REFLECT(PsinodeCombinedConfig, host, service)
+};
+
+void to_config(const PsinodeCombinedConfig& config, ConfigFile& file)
+{
+   to_config(config.host, file);
+   for (const auto& [key, value] : config.service.config)
+   {
+      std::string_view section = PsinodeConfig::isNative(key) ? "service" : "";
+      if (auto* s = std::get_if<std::string>(&value.value))
+         file.set(section, key, *s, "Service defined option");
+      else if (auto* v = std::get_if<std::vector<std::string>>(&value.value))
+         file.set(
+             section, key, *v, [](std::string_view text) { return std::string(text); },
+             "Service defined option");
+   }
+}
+
+HostConfigRow toHostConfig(const PsinodeConfig& config, const PsinodeServiceConfig& extra)
 {
    HostConfigRow result{
        .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
    };
    std::vector<char>   configText;
    psio::vector_stream stream(configText);
-   psio::to_json(config, stream);
+   psio::to_json(PsinodeCombinedConfig{config, extra}, stream);
    result.config = std::string(configText.begin(), configText.end());
    return result;
 }
@@ -1277,7 +1388,6 @@ void run(const std::string&              db_path,
          std::vector<std::string>&       pkcs11_modules,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
-         bool                            enable_incoming_p2p,
          std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
@@ -1286,6 +1396,7 @@ void run(const std::string&              db_path,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
+         const PsinodeServiceConfig&     extra_options,
          RestartInfo&                    runResult)
 {
    ExecutionContext::registerHostFunctions();
@@ -1322,40 +1433,50 @@ void run(const std::string&              db_path,
       }
    }
 
-   // If this is a new database, initialize subjective services
-   initialize_database(*system, db_template);
    {
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;
       auto               session = db.startWrite(system->sharedDatabase.createWriter());
       db.checkoutSubjective();
       load_environment(db);
-      HostConfigRow hostConfig = toHostConfig(PsinodeConfig{
-          .p2p            = enable_incoming_p2p,
-          .peers          = peers,
-          .autoconnect    = autoconnect,
-          .producer       = producer,
-          .pkcs11_modules = pkcs11_modules,
-          .hosts          = hosts,
-          .listen         = listen,
+      HostConfigRow hostConfig = toHostConfig(
+          PsinodeConfig{
+              .peers          = peers,
+              .autoconnect    = autoconnect,
+              .producer       = producer,
+              .pkcs11_modules = pkcs11_modules,
+              .hosts          = hosts,
+              .listen         = listen,
 #ifdef PSIBASE_ENABLE_SSL
-          .tls =
-              {
-                  .certificate = tls_cert,
-                  .key         = tls_key,
-                  .trustfiles  = root_ca,
-              },
+              .tls =
+                  {
+                      .certificate = tls_cert,
+                      .key         = tls_key,
+                      .trustfiles  = root_ca,
+                  },
 #endif
-          .services        = services,
-          .http_timeout    = http_timeout,
-          .service_threads = service_threads,
-          .loggers         = loggers::Config::get(),
-      });
+              .services        = services,
+              .http_timeout    = http_timeout,
+              .service_threads = service_threads,
+              .loggers         = loggers::Config::get(),
+          },
+          extra_options);
       db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
       if (!db.commitSubjective(*system->sockets, autoClose))
       {
          throw std::runtime_error("Failed to initialize database");
       }
+   }
+   // If this is a new database, initialize subjective services
+   initialize_database(*system, db_template);
+   {
+      Action act{.service = proxyServiceNum, .rawData = psio::to_frac(std::tuple())};
+
+      BlockContext bc{*system, system->sharedDatabase.getHead(),
+                      system->sharedDatabase.createWriter(), true};
+
+      TransactionTrace trace;
+      bc.execAsyncExport("startSession", std::move(act), trace);
    }
 
    // Manages the session and and unlinks all keys from prover on destruction
@@ -1558,7 +1679,9 @@ void run(const std::string&              db_path,
                  auto row    = system->sharedDatabase.kvGetSubjective(
                      *writer, HostConfigRow::db, psio::convert_to_key(hostConfigKey()));
                  auto hostConfig = psio::from_frac<HostConfigRow>(row.value());
-                 auto config     = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+                 auto combinedConfig =
+                     psio::convert_from_json<PsinodeCombinedConfig>(hostConfig.config);
+                 auto& config = combinedConfig.host;
 
                  std::optional<http::services_t> new_services;
                  for (auto& entry : config.services)
@@ -1580,7 +1703,6 @@ void run(const std::string&              db_path,
                  setPKCS11Libs(config.pkcs11_modules);
                  node.set_producer_id(config.producer);
                  node.set_hostnames(config.hosts);
-                 http_config->enable_p2p = config.p2p;
                  if (!http_config->status.load().shutdown)
                  {
                     node.autoconnect(std::vector(config.peers), config.autoconnect.value,
@@ -1618,7 +1740,7 @@ void run(const std::string&              db_path,
                        std::ifstream in(path);
                        file.parse(in);
                     }
-                    to_config(config, file);
+                    to_config(combinedConfig, file);
                     {
                        std::ofstream out(path);
                        file.write(out);
@@ -2053,7 +2175,6 @@ void run(const std::string&              db_path,
                                              }};
 
    node.set_producer_id(producer);
-   http_config->enable_p2p = enable_incoming_p2p;
    {
       atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
@@ -2115,7 +2236,7 @@ void run(const std::string&              db_path,
    chainContext.run();
 }
 
-const char usage[] = "USAGE: psinode [OPTIONS] database";
+const char usage[] = "USAGE: psinode database [OPTIONS]";
 
 int main(int argc, char* argv[])
 {
@@ -2126,7 +2247,6 @@ int main(int argc, char* argv[])
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
    }
 
-   std::string                 db_path;
    std::string                 db_template;
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
@@ -2135,7 +2255,6 @@ int main(int argc, char* argv[])
    std::vector<listen_spec>    listen;
    std::vector<std::string>    peers;
    autoconnect_t               autoconnect;
-   bool                        enable_incoming_p2p = false;
    std::vector<native_service> services;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
@@ -2144,6 +2263,7 @@ int main(int argc, char* argv[])
    byte_size                   db_size;
    Timeout                     http_timeout;
    std::size_t                 service_threads;
+   PsinodeServiceConfig        extra_options;
 
    namespace po = boost::program_options;
 
@@ -2158,8 +2278,6 @@ int main(int argc, char* argv[])
        "Root host name for the http server");
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
-   opt("p2p", po::bool_switch(&enable_incoming_p2p)->default_value(false, "off"),
-       "Enable incoming p2p connections");
    opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
    opt("autoconnect", po::value(&autoconnect)->default_value({}, "")->value_name("num"),
        "Limits the number of peers to be connected automatically");
@@ -2189,37 +2307,46 @@ int main(int argc, char* argv[])
        "The number of threads that run async actions posted by services");
    desc.add(common_opts);
    opt = desc.add_options();
-   // Options that can only be specified on the command line
-   // database should be available on the command line, but should not be listed in help
-   opt("database", po::value<std::string>(&db_path)->value_name("path")->required(),
-       "Path to database");
    // These should be usable on the command line and shown in help
    auto add_cmdonly = [](auto& opts)
    { opts.add_options()("help,h", "Show this message")("version,V", "Print version information"); };
    add_cmdonly(desc);
-
-   po::positional_options_description p;
-   p.add("database", 1);
 
    // Options that are only allowed in the config file
    po::options_description cfg_opts("psinode");
    cfg_opts.add(common_opts);
    cfg_opts.add_options()("logger.*", po::value<std::string>(), "Log configuration");
 
-   auto parse_args =
-       [&desc, &p, &cfg_opts](int argc, const char* const* argv, po::variables_map& vm)
+   std::optional<std::string_view> database;
+   std::vector<std::string>        args;
+   if (argc >= 2 && argv[1][0] != '-')
    {
-      option_path = std::filesystem::current_path();
-      po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-      if (vm.count("database"))
+      database = argv[1];
+      args     = {argv + 2, argv + argc};
+   }
+   else
+   {
+      args = {argv + 1, argv + argc};
+   }
+
+   auto parse_args = [&desc, &cfg_opts, &extra_options, &database](
+                         const std::vector<std::string>& args, po::variables_map& vm)
+   {
+      option_path        = std::filesystem::current_path();
+      auto parsed        = po::command_line_parser(args).options(desc).allow_unregistered().run();
+      extra_options.argv = po::collect_unrecognized(parsed.options, po::include_positional);
+      po::store(parsed, vm);
+      if (database)
       {
-         auto db_root     = std::filesystem::path(vm["database"].as<std::string>());
+         auto db_root     = std::filesystem::path(*database);
          option_path      = option_path / db_root;
          auto config_path = db_root / "config";
          if (std::filesystem::is_regular_file(config_path))
          {
             std::ifstream in(config_path);
-            po::store(psibase::parse_config_file(in, cfg_opts, config_options, config_path), vm);
+            auto parsed = psibase::parse_config_file(in, cfg_opts, config_options, config_path);
+            extra_options.config = extraConfig(parsed.options);
+            po::store(parsed, vm);
          }
          else if (!exists(config_path))
          {
@@ -2227,10 +2354,15 @@ int main(int argc, char* argv[])
             if (std::filesystem::is_regular_file(template_path))
             {
                std::ifstream in(template_path);
-               po::store(psibase::parse_config_file(in, cfg_opts, config_options, template_path),
-                         vm);
+               auto parsed = psibase::parse_config_file(in, cfg_opts, config_options, config_path);
+               extra_options.config = extraConfig(parsed.options);
+               po::store(parsed, vm);
             }
          }
+      }
+      else
+      {
+         throw std::runtime_error("database is required");
       }
       po::notify(vm);
    };
@@ -2238,7 +2370,7 @@ int main(int argc, char* argv[])
    po::variables_map vm;
    try
    {
-      parse_args(argc, argv, vm);
+      parse_args(args, vm);
    }
    catch (std::exception& e)
    {
@@ -2264,6 +2396,8 @@ int main(int argc, char* argv[])
       return 1;
    }
 
+   std::string db_path{*database};
+
    try
    {
       psibase::loggers::set_path(db_path);
@@ -2273,8 +2407,8 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, peers, autoconnect, enable_incoming_p2p, hosts, listen, services,
-             http_timeout, service_threads, root_ca, tls_cert, tls_key, restart);
+             pkcs11_modules, peers, autoconnect, hosts, listen, services, http_timeout,
+             service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
@@ -2284,31 +2418,31 @@ int main(int argc, char* argv[])
          {
             // Forward the command line, but remove any arguments that were
             // written to the config file.
-            std::vector<const char*> args;
+            std::vector<std::string> newArgs;
             auto                     original_args =
-                po::command_line_parser(argc, argv).options(desc).positional(p).run();
+                po::command_line_parser(args).options(desc).allow_unregistered().run();
             auto keep_opt = [&restart](const auto& opt)
             {
-               if (opt.string_key == "database")
-                  return true;
-               else if (opt.string_key == "key")
+               if (opt.string_key == "key")
                   return !restart.keysChanged;
                else
-                  return !restart.configChanged;
+                  return !restart.configChanged && !opt.unregistered;
             };
-            if (argc > 0)
+            for (const auto& opt : original_args.options)
             {
-               args.push_back(argv[0]);
-               for (const auto& opt : original_args.options)
+               if (keep_opt(opt))
                {
-                  if (keep_opt(opt))
+                  for (const auto& s : opt.original_tokens)
                   {
-                     for (const auto& s : opt.original_tokens)
-                     {
-                        args.push_back(s.c_str());
-                     }
+                     newArgs.push_back(s);
                   }
                }
+            }
+
+            if (restart.args && restart.args->restart)
+            {
+               newArgs.insert(newArgs.end(), restart.args->restart->begin(),
+                              restart.args->restart->end());
             }
 
             if (restart.args && restart.args->soft)
@@ -2316,17 +2450,22 @@ int main(int argc, char* argv[])
                PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Soft restart";
                po::variables_map tmp;
                // Reload the config file
-               parse_args(args.size(), args.data(), tmp);
+               parse_args(newArgs, tmp);
             }
             else
             {
+               std::vector<const char*> cArgs;
+               cArgs.push_back(argv[0]);
+               cArgs.push_back(db_path.c_str());
+               for (const std::string& s : newArgs)
+                  cArgs.push_back(s.c_str());
+               cArgs.push_back(nullptr);
                PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Restart";
-               args.push_back(nullptr);
                // Cleanup that would normally happen in exit()
                boost::log::core::get()->remove_all_sinks();
                std::fflush(stdout);
                std::fflush(stderr);
-               ::execvp(argv[0], const_cast<char**>(args.data()));
+               ::execvp(argv[0], const_cast<char**>(cArgs.data()));
                break;
             }
          }
