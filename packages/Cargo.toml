@@ -58,6 +58,6 @@ async-graphql = "=7.0.17"
 psibase = { path = "../rust/psibase", version = "0.21.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
-psibase-plugin-workspace-hack = { version = "0.1" }
+psibase-plugin-workspace-hack = { version = "0.21.0", path = "plugin-workspace-hack" }
 # Standard version for cargo-component 0.15.0
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
