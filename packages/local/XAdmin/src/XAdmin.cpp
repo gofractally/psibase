@@ -213,7 +213,7 @@ namespace LocalService
       template <typename T>
       std::vector<T> parseOptionList(const psio::json::any& opt, const std::vector<T>& default_)
       {
-         T result;
+         std::vector<T> result;
          if (auto* l = opt.get_if<psio::json::any_array>())
          {
             for (const auto& item : *l)
@@ -391,8 +391,7 @@ namespace LocalService
          AdminOptionsRow adminOpts{};
          if (auto* hosts = json.hostOption("hosts"))
          {
-            adminOpts.hosts =
-                psio::convert_from_json<std::vector<std::string>>(psio::convert_to_json(*hosts));
+            adminOpts.hosts = parseOptionList(*hosts, std::vector<std::string>());
          }
          if (auto* config = json.serviceConfig())
          {
