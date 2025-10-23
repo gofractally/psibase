@@ -276,7 +276,7 @@ namespace LocalService
          {
             for (auto& entry : *host)
             {
-               // Rename host options that conflict with the ours.
+               // Rename host options that conflict with ours.
                // Note that we preserve the service defined options here,
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
