@@ -282,6 +282,8 @@ namespace LocalService
                // service. Unknown host options will not be displayed and
                // will be round-tripped unmodified.
                if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+                   // In the unlikely event that the host has a option that
+                   // begins with "host.", writeConfig should not remove it
                    entry.key.starts_with("host."))
                   entry.key = "host." + entry.key;
                result.push_back(std::move(entry));
