@@ -161,12 +161,6 @@ namespace LocalService
          return false;
       }
 
-      struct CliArgs
-      {
-         std::vector<std::string> argv;
-         PSIO_REFLECT(CliArgs, argv)
-      };
-
       bool parseOptionValue(std::string_view value, const bool& default_)
       {
          if (value == "yes" || value == "true" || value == "on" || value == "1")
@@ -321,7 +315,7 @@ namespace LocalService
          {
             for (auto& entry : *host)
             {
-               // Rename host options that conflict with the ours.
+               // Rename host options that conflict with ours.
                // Note that we preserve the service defined options here,
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
@@ -329,6 +323,8 @@ namespace LocalService
                if (entry.key == "hosts")
                   continue;
                else if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+                        // In the unlikely event that the host has a option that
+                        // begins with "host.", writeConfig should not remove it
                         entry.key.starts_with("host."))
                   entry.key = "host." + entry.key;
                result.push_back(std::move(entry));
@@ -523,6 +519,9 @@ namespace LocalService
       }
       else if (target == "/shutdown")
       {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
          if (req.method != "POST")
          {
             return HttpReply::methodNotAllowed(req);
@@ -554,10 +553,7 @@ namespace LocalService
             PendingShutdownRow row{.args = psio::convert_to_json(args)};
 
             auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
-            PSIBASE_SUBJECTIVE_TX
-            {
-               table.put(row);
-            }
+            table.put(row);
          }
          return HttpReply{};
       }

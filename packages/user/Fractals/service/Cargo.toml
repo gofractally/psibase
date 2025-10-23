@@ -7,19 +7,20 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-fractals"
-plugin = "plugin"
+plugin = "fractals-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
 ]
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.21.0", path = "../../../../rust/psibase_macros" }
+psibase.workspace = true
+psibase_macros.workspace = true
 evaluations = { path = "../../Evaluations/service", version = "0.21.0" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.120"
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
 fractals-pkg = { path = "..", version = "0.21.0" }
