@@ -4,7 +4,8 @@ plugin_error! {
     pub ErrorType
     QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
     NoSender => "No sender app",
-    InvalidSender(sender: String) => "Sender origin app must be evaluation owner or evaluations plugin, received: {sender}",
+    InvalidSender(sender: String) => "Sender origin app must be fractals or fractal, received: {sender}",
     InvalidAccountNumber => "Invalid account number",
-
+    GraphQLParseError(msg: String) => "GraphQL parsing error: {msg}",
+    NoPendingEvaluation => "No pending evaluation for guild"
 }
