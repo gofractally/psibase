@@ -192,13 +192,13 @@ std::string XHttp::rootHost(psio::view<const std::string> host)
    return std::string(getRootHost(host));
 }
 
-#ifndef PSIBASE_GENERATE_SCHEMA
-
-extern "C" [[clang::export_name("startSession")]] void startSession()
+void XHttp::startSession()
 {
-   psibase::internal::receiver = XHttp::service;
+   check(getSender() == AccountNumber{}, "Wrong sender");
    to<XAdmin>().startSession();
 }
+
+#ifndef PSIBASE_GENERATE_SCHEMA
 
 extern "C" [[clang::export_name("serve")]] void serve()
 {

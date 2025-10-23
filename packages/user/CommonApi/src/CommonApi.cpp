@@ -99,9 +99,11 @@ namespace SystemService
             psio::json_token_stream jstream{request.body.data()};
             auto                    params = psio::from_json<cookie_data>(jstream);
 
-            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
-            bool                    isLocalhost = psibase::isLocalhost(request);
-            std::string             cookieName  = "__Host-SESSION";
+            std::vector<HttpHeader> headers =
+                allowCors(request, AccountNumber{"supervisor"},
+                          to<HttpServer>().rootHost(request.host) != request.host);
+            bool        isLocalhost = psibase::isLocalhost(request);
+            std::string cookieName  = "__Host-SESSION";
 
             std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" +
                                         std::to_string(getCookieMaxAge());
@@ -118,9 +120,11 @@ namespace SystemService
          }
          if (request.target == "/common/remove-auth-cookie")
          {
-            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
-            bool                    isLocalhost = psibase::isLocalhost(request);
-            std::string             cookieName  = "__Host-SESSION";
+            std::vector<HttpHeader> headers =
+                allowCors(request, AccountNumber{"supervisor"},
+                          to<HttpServer>().rootHost(request.host) != request.host);
+            bool        isLocalhost = psibase::isLocalhost(request);
+            std::string cookieName  = "__Host-SESSION";
 
             std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
             if (isLocalhost)

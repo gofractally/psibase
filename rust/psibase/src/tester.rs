@@ -13,9 +13,9 @@ use crate::MicroSeconds;
 use crate::{
     check, create_boot_transactions, get_optional_result_bytes, get_result_bytes, services,
     status_key, tester_raw, AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow,
-    CodeRow, DbId, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest, InnerTraceEnum,
-    PackageRegistry, Seconds, SignedTransaction, StatusRow, TimePointSec, TimePointUSec, ToKey,
-    Transaction, TransactionTrace,
+    CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpReply, HttpRequest,
+    InnerTraceEnum, PackageRegistry, RunMode, Seconds, SignedTransaction, StatusRow, TimePointSec,
+    TimePointUSec, ToKey, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
@@ -139,6 +139,7 @@ impl Chain {
             is_auto_block_start: true,
         };
         result.load_local_services();
+        result.start_session();
         result
     }
 
@@ -201,7 +202,6 @@ impl Chain {
                 };
                 requests.push(HttpRequest {
                     host: account.to_string() + "." + root_host,
-                    rootHost: root_host.to_string(),
                     method: "PUT".to_string(),
                     target: path,
                     contentType: mime_type.to_string(),
@@ -220,6 +220,28 @@ impl Chain {
                 panic!("PUT failed: {}", reply.text().unwrap());
             }
         }
+    }
+
+    fn start_session(&mut self) {
+        let row = HostConfigRow {
+            hostVersion: format!("psitest-{}", env!("CARGO_PKG_VERSION")),
+            config: r#"{"host":{"hosts":["psibase.io"]}}"#.to_string(),
+        };
+
+        unsafe {
+            tester_raw::checkoutSubjective(self.chain_handle);
+        }
+        self.kv_put(DbId::NativeSession, &row.key(), &row);
+        check(
+            unsafe { tester_raw::commitSubjective(self.chain_handle) },
+            "Failed to commit changes",
+        );
+        let trace = self.run_action(
+            RunMode::RPC,
+            true,
+            services::x_http::Wrapper::pack_from(AccountNumber::default()).startSession(),
+        );
+        ChainEmptyResult { trace }.get().unwrap()
     }
 
     /// Advance the blockchain time by the specified number of microseconds and start a new block.
@@ -332,6 +354,14 @@ impl Chain {
         let transaction = transaction.packed();
         let size = unsafe {
             tester_raw::pushTransaction(self.chain_handle, transaction.as_ptr(), transaction.len())
+        };
+        TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
+    }
+
+    pub fn run_action(&mut self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
+        let packed = action.packed();
+        let size = unsafe {
+            tester_raw::runAction(self.chain_handle, mode, head, packed.as_ptr(), packed.len())
         };
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
@@ -462,7 +492,6 @@ impl Chain {
     pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {
         self.http(&HttpRequest {
             host: format!("{}.psibase.io", account),
-            rootHost: "psibase.io".into(),
             method: "GET".into(),
             target: target.into(),
             contentType: "".into(),
@@ -479,7 +508,6 @@ impl Chain {
     ) -> Result<HttpReply, anyhow::Error> {
         self.http(&HttpRequest {
             host: format!("{}.psibase.io", account),
-            rootHost: "psibase.io".into(),
             method: "POST".into(),
             target: target.into(),
             contentType: data.contentType,

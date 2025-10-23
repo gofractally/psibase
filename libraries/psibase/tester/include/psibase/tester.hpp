@@ -380,9 +380,8 @@ namespace psibase
       template <typename T>
       HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
       {
-         HttpRequest         req{.host     = account.str() + ".psibase.io",
-                                 .rootHost = "psibase.io",
-                                 .method   = "POST",
+         HttpRequest         req{.host   = account.str() + ".psibase.io",
+                                 .method = "POST",
                                  .target{target},
                                  .contentType = "application/json"};
          psio::vector_stream stream{req.body};
@@ -397,9 +396,8 @@ namespace psibase
       template <HttpRequestBody T>
       HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
       {
-         return {.host     = account.str() + ".psibase.io",
-                 .rootHost = "psibase.io",
-                 .method   = "POST",
+         return {.host   = account.str() + ".psibase.io",
+                 .method = "POST",
                  .target{target},
                  .contentType = data.contentType(),
                  .body        = data.body()};
@@ -410,10 +408,7 @@ namespace psibase
        */
       HttpRequest makeGet(AccountNumber account, std::string_view target) const
       {
-         return {.host     = account.str() + ".psibase.io",
-                 .rootHost = "psibase.io",
-                 .method   = "GET",
-                 .target{target}};
+         return {.host = account.str() + ".psibase.io", .method = "GET", .target{target}};
       }
 
       /**

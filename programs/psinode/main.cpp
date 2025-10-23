@@ -1469,13 +1469,14 @@ void run(const std::string&              db_path,
    // If this is a new database, initialize subjective services
    initialize_database(*system, db_template);
    {
-      Action act{.service = proxyServiceNum, .rawData = psio::to_frac(std::tuple())};
+      Action act{.service = proxyServiceNum,
+                 .method  = MethodNumber{"startSession"},
+                 .rawData = psio::to_frac(std::tuple())};
 
       BlockContext bc{*system, system->sharedDatabase.getHead(),
                       system->sharedDatabase.createWriter(), true};
 
-      TransactionTrace trace;
-      bc.execAsyncExport("startSession", std::move(act), trace);
+      bc.execAsyncAction(std::move(act));
    }
 
    // Manages the session and and unlinks all keys from prover on destruction

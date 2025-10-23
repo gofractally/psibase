@@ -1526,6 +1526,8 @@ struct callbacks
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
          case uint32_t(psibase::DbId::nativeSubjective):
+         case uint32_t(psibase::DbId::session):
+         case uint32_t(psibase::DbId::nativeSession):
             return {chain, (psibase::DbId)db};
          default:
             throw std::runtime_error("may not read this db, or must use another intrinsic");
@@ -1543,6 +1545,8 @@ struct callbacks
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
          case uint32_t(psibase::DbId::nativeSubjective):
+         case uint32_t(psibase::DbId::session):
+         case uint32_t(psibase::DbId::nativeSession):
             return {chain, (psibase::DbId)db};
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):

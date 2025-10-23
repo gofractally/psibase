@@ -77,7 +77,6 @@ void load_local_packages(TransactionContext& tc, const std::vector<PackagedServi
 
          requests.push_back(HttpRequest{
              .host        = account.str() + "." + rootHost,
-             .rootHost    = rootHost,
              .method      = "PUT",
              .target      = std::string(path),
              .contentType = std::string(mimeType),

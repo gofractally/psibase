@@ -51,12 +51,16 @@ namespace LocalService
 
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
+
+      /// Called by the host at the beginning of a session
+      void startSession();
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
                 method(autoClose, socket, value),
                 method(sendReply, socket, response),
-                method(rootHost, host))
+                method(rootHost, host),
+                method(startSession))
 
    PSIBASE_REFLECT_TABLES(XHttp, XHttp::Session)
 

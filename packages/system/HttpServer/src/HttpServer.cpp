@@ -201,7 +201,7 @@ namespace SystemService
    {
       check(getSender() == XHttp::service, "Wrong sender");
 
-      auto user = to<RTransact>().getUser(req);
+      auto user = recurse().to<RTransact>().getUser(req);
 
       // Remove sensitive headers
       req.removeCookie("__HOST-SESSION");

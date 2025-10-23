@@ -720,7 +720,7 @@ namespace LocalService
 
          HttpReply           reply{.contentType = "application/json"};
          psio::vector_stream stream{reply.body};
-         to_json(LoginReply{to<RTransact>().login(req.rootHost)}, stream);
+         to_json(LoginReply{to<RTransact>().login(to<XHttp>().rootHost(req.host))}, stream);
          return reply;
       }
       return {};
