@@ -52,9 +52,10 @@ pub mod Service {
     /// Exile a fractal member.
     ///
     /// # Arguments
+    /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
     #[action]
-    fn exile_member(member: AccountNumber) {
+    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
         unimplemented!()
     }
 
