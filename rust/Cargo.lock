@@ -2886,7 +2886,6 @@ dependencies = [
  "subtle",
  "syn 1.0.109",
  "syn 2.0.87",
- "tokio",
  "toml_datetime",
  "tracing",
  "wasi",

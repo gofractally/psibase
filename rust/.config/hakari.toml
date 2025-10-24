@@ -27,5 +27,6 @@ platforms = [
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
 # exact-versions = true
-# Exclude tokio from workspace-hack (only used on native platforms)
+
+# Exclude tokio from workspace-hack - psibase handles platform-specific tokio features directly
 omitted-packages = ["tokio"]
