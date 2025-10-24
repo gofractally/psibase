@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { graphql } from "./graphql";
+import { derp } from "./graphql";
 import { Account } from "./zod/Account";
 
 const zRes = z.object({
@@ -17,7 +17,7 @@ const zRes = z.object({
 });
 
 export const getStagedByProposer = async (account: Account) => {
-    const res = await graphql(
+    const res = await derp(
         ` { 
         getStagedByProposer(proposer: "${account}") {
                 nodes {

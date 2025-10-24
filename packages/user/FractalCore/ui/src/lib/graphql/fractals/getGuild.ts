@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fractalsService } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 
-import { graphql } from "../../graphql";
+import { derp } from "../../graphql";
 
 export const zGuild = z.object({
     account: zAccount,
@@ -21,7 +21,7 @@ export const zGuild = z.object({
 });
 
 export const getGuild = async (guildAccount: Account) => {
-    const res = await graphql(
+    const res = await derp(
         `
         {
             guild(guild:"${guildAccount}") {
@@ -42,6 +42,8 @@ export const getGuild = async (guildAccount: Account) => {
     `,
         fractalsService,
     );
+
+    console.log("derp");
 
     return z
         .object({

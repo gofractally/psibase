@@ -15,10 +15,8 @@ import {
 export const Guilds = () => {
     const { data: fractal } = useFractal();
 
-    console.log({ fractal }, "is the fractal guilds");
-
     const navigate = useNavigate();
-    const guildsData = fractal?.guilds.nodes;
+    const guildsData = fractal?.guilds?.nodes;
 
     const guilds = guildsData || [];
 

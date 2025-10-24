@@ -3,15 +3,12 @@ import { useState } from "react";
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
 
 import { useEvaluationInstance } from "./fractals/use-evaluation-instance";
-import { useFractal } from "./fractals/use-fractal";
 import { useUsersAndGroups } from "./fractals/use-users-and-groups";
 import { useCurrentUser } from "./use-current-user";
 
 export const useEvaluationStatus = (
     now: number,
 ): EvaluationStatus | undefined => {
-    const { isLoading: isLoadingFractal, error: fractalError } = useFractal();
-
     const { evaluation, guild } = useEvaluationInstance();
 
     const { data: currentUser } = useCurrentUser();
@@ -33,10 +30,10 @@ export const useEvaluationStatus = (
         return undefined;
     }
 
-    const isLoading = isLoadingFractal || isLoadingUsersAndGroups;
+    const isLoading = isLoadingUsersAndGroups;
 
     if (isLoading) return undefined;
-    if (usersAndGroupsError || fractalError || !evaluation) {
+    if (usersAndGroupsError || !evaluation) {
         return undefined;
     }
 

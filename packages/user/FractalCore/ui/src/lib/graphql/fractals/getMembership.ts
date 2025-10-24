@@ -5,7 +5,7 @@ import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
 
-import { graphql } from "../../graphql";
+import { derp } from "../../graphql";
 
 export const zMember = z
     .object({
@@ -22,7 +22,7 @@ export const getMembership = async (
     fractalAccount: Account,
     account: Account,
 ): Promise<Membership> => {
-    const member = await graphql(
+    const member = await derp(
         `
     {
         member(fractal: "${fractalAccount}", member: "${account}") {     

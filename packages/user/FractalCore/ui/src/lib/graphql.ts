@@ -18,10 +18,7 @@ interface GraphqlResponse<T> {
     errors?: Error[];
 }
 
-export const graphql = async <T>(
-    query: string,
-    service: Account,
-): Promise<T> => {
+export const derp = async <T>(query: string, service: Account): Promise<T> => {
     const response = (await fetch(gqlEndpoint(service), {
         method: "POST",
         headers: { "Content-Type": "application/json" },

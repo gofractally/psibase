@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import { z } from "zod";
 
 import { fractalsService } from "@/lib/constants";
-import { graphql } from "@/lib/graphql";
+import { derp } from "@/lib/graphql";
 import { Account, zAccount } from "@/lib/zod/Account";
 
 export const zCompletedEvaluation = z.object({
@@ -24,7 +24,7 @@ const getCompletedEvaluationIds = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, fractalsService);
+    const evaluations = await derp(gql, fractalsService);
 
     const response = z
         .object({
@@ -54,7 +54,7 @@ const getEvaluationsMetadata = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, fractalsService);
+    const evaluations = await derp(gql, fractalsService);
 
     const response = z
         .object({

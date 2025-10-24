@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { evaluationsService, fractalsService } from "@/lib/constants";
-import { graphql } from "@/lib/graphql";
+import { derp } from "@/lib/graphql";
 import { zAccount } from "@/lib/zod/Account";
 import { zUnix } from "@/lib/zod/Unix";
 
@@ -21,7 +21,7 @@ export const zEvaluation = z.object({
 export type Evaluation = z.infer<typeof zEvaluation>;
 
 export const getEvaluation = async (id: number) => {
-    const evaluation = await graphql(
+    const evaluation = await derp(
         `
     {
         getEvaluation(owner: "${fractalsService}", evaluationId: ${id}) {     

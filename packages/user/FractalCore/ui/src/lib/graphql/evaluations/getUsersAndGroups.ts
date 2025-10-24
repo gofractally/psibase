@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { evaluationsService } from "@/lib/constants";
-import { graphql } from "@/lib/graphql";
+import { derp } from "@/lib/graphql";
 import { Account, zAccount } from "@/lib/zod/Account";
 
 export const zUser = z.object({
@@ -38,7 +38,7 @@ export const getUsersAndGroups = async (
     owner: Account,
     evaluationId: number,
 ): Promise<UsersAndGroups> => {
-    const res = await graphql(
+    const res = await derp(
         `{ 
             getUsers(owner: "${owner}", evaluationId: ${evaluationId}) {
                 nodes { 

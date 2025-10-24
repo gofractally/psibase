@@ -1,4 +1,3 @@
-import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
@@ -36,12 +35,6 @@ export const MyMembership = () => {
     } = useCurrentUser();
 
     const {
-        data: fractal,
-        isLoading: isLoadingFractal,
-        error: errorFractal,
-    } = useFractal();
-
-    const {
         data: membership,
         isLoading: isLoadingMembership,
         error: errorMembership,
@@ -53,19 +46,14 @@ export const MyMembership = () => {
         error: errorChainId,
     } = useChainId();
 
-    console.log({ errorFractal, errorMembership, errorChainId }, "x", {
-        fractal,
-        membership,
-    });
 
     const isLoading =
         isLoadingCurrentUser ||
-        isLoadingFractal ||
         isLoadingMembership ||
         isLoadingChainId;
 
     const error =
-        errorCurrentUser || errorFractal || errorMembership || errorChainId;
+        errorCurrentUser || errorMembership || errorChainId;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -86,7 +74,6 @@ export const MyMembership = () => {
                 ) : (
                     <>
                         <FractalOverviewCard
-                            fractal={fractal}
                             fractalAccount={fractalAccount}
                             chainId={chainId}
                         />
@@ -102,14 +89,14 @@ export const MyMembership = () => {
 };
 
 const FractalOverviewCard = ({
-    fractal,
     fractalAccount,
     chainId,
 }: {
-    fractal?: FractalRes;
     fractalAccount?: string;
     chainId: string;
 }) => {
+
+    const { data: fractal } = useFractal();
     return (
         <Card>
             <CardHeader>
@@ -153,8 +140,8 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
         membership == null
             ? "Not a member"
             : membership
-              ? getMemberLabel(membership.memberStatus)
-              : "Loading...";
+                ? getMemberLabel(membership.memberStatus)
+                : "Loading...";
     return (
         <Card>
             <CardHeader>

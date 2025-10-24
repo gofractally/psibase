@@ -1,6 +1,6 @@
 import z from "zod";
 
-import { graphql } from "./graphql";
+import { derp } from "./graphql";
 import { Account, zAccount } from "./zod/Account";
 import { zDateTime } from "./zod/DateTime";
 
@@ -25,7 +25,7 @@ const response = z.object({
 });
 
 export const getActorHistory = async (account: Account) => {
-    const res = await graphql(
+    const res = await derp(
         `{ 
                 actorHistory(actor: "${account}", last: 8) {
                     nodes {

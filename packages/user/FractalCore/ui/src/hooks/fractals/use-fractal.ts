@@ -1,26 +1,54 @@
+import { graphql } from "@/gql";
+import {
+    GetFractalGuildQuery,
+    GetFractalGuildQueryVariables,
+} from "@/gql/graphql";
 import { useQuery } from "@tanstack/react-query";
 
-import { FractalRes, getFractal } from "@/lib/graphql/fractals/getFractal";
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+import { client } from "@/lib/graphql/client";
 
 import { useFractalAccount } from "./use-fractal-account";
 
-const queryFn = async (account: string) => {
-    try {
-        return await getFractal(zAccount.parse(account));
-    } catch (error) {
-        const message = "Error getting fractal";
-        console.error(message, error);
-        throw new Error(message);
+const query = graphql(`
+    query GetFractalGuild($fractal: AccountNumber!) {
+        fractal(fractal: $fractal) {
+            account
+            createdAt
+            mission
+            name
+        }
+        guilds(fractal: $fractal) {
+            nodes {
+                account
+                rep {
+                    member
+                }
+                displayName
+                bio
+                evalInstance {
+                    evaluationId
+                }
+            }
+        }
     }
-};
+`);
 
 export const useFractal = () => {
     const currentFractal = useFractalAccount();
-    return useQuery<FractalRes>({
-        queryKey: QueryKey.fractal(currentFractal),
+    const res = useQuery({
+        queryKey: ["fractal", currentFractal],
         enabled: Boolean(currentFractal),
-        queryFn: () => queryFn(currentFractal!),
+        queryFn: async () => {
+            const res = await client.request<
+                GetFractalGuildQuery,
+                GetFractalGuildQueryVariables
+            >(query, {
+                fractal: currentFractal,
+            });
+
+            return res;
+        },
     });
+
+    return res;
 };
