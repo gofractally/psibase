@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-fractals = { path = "../service/", version = "0.21.0" }
+fractals = { path = "../service/", version = "0.22.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -32,4 +32,4 @@ world = "impl"
 
 
 [dev-dependencies]
-fractals-pkg = { path = "..", version = "0.21.0" }
+fractals-pkg = { path = "..", version = "0.22.0" }

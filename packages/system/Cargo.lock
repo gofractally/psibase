@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "credentials"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "credentials-pkg",
  "psibase",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "credentials-pkg"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "credentials",
  "credentials-plugin",
@@ -579,7 +579,7 @@ dependencies = [
 
 [[package]]
 name = "credentials-plugin"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "credentials",
  "psibase",
@@ -886,7 +886,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1823,7 +1823,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1882,7 +1882,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1896,7 +1896,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1908,14 +1908,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "seahash",
 ]
@@ -1937,7 +1937,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-staged-tx"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2408,7 +2408,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "staged-tx"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-graphql",
  "pem",
@@ -2422,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-pkg"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "r-staged-tx",
  "staged-tx",
@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-plugin"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "psibase",
  "serde",

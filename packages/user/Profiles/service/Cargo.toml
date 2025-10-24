@@ -1,6 +1,6 @@
 [package]
 name = "profiles"             # Crate name
-version = "0.21.1"
+version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
@@ -18,4 +18,4 @@ serde_json.workspace = true
 user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.21.1" }
+profiles-pkg = { path = "..", version = "0.22.0" }

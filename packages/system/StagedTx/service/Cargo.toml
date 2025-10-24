@@ -23,4 +23,4 @@ pem = { version = "3.0.4" }
 system-workspace-hack = { version = "0.1", path = "../../system-workspace-hack" }
 
 [dev-dependencies]
-staged-tx-pkg = { path = "..", version = "0.21.0" }
+staged-tx-pkg = { path = "..", version = "0.22.0" }

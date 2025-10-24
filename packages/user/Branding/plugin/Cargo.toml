@@ -1,6 +1,6 @@
 [package]
 name = "branding-plugin"
-version = "0.21.1"
+version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -12,7 +12,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
-branding = { path = "../service/", version = "0.21.1" }
+branding = { path = "../service/", version = "0.22.0" }
 user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [lib]
@@ -32,4 +32,4 @@ world = "impl"
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 
 [dev-dependencies]
-branding-pkg = { path = "..", version = "0.21.1" }
+branding-pkg = { path = "..", version = "0.22.0" }

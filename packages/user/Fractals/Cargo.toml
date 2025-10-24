@@ -13,14 +13,14 @@ package-name = "Fractals"
 services = ["fractals"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.21.0"
-Sites = "0.21.0"
+HttpServer = "0.22.0"
+Sites = "0.22.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-fractals = { path = "service", version = "0.21.0" }
-r-fractals = { path = "query-service", version = "0.21.0" }
-fractals-plugin = { path = "plugin", version = "0.21.0" }
+fractals = { path = "service", version = "0.22.0" }
+r-fractals = { path = "query-service", version = "0.22.0" }
+fractals-plugin = { path = "plugin", version = "0.22.0" }
 user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }

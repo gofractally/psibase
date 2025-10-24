@@ -13,15 +13,15 @@ package-name = "BrotliCodec"
 services = ["brotli-codec"]
 
 [package.metadata.psibase.dependencies]
-Supervisor = "0.21.0"
-Sites = "0.21.0"
-HttpServer = "0.21.0"
+Supervisor = "0.22.0"
+Sites = "0.22.0"
+HttpServer = "0.22.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-brotli-codec = { path = "service", version = "0.21.0" }
-brotli-codec-plugin = { path = "plugin", version = "0.21.0" }
+brotli-codec = { path = "service", version = "0.22.0" }
+brotli-codec-plugin = { path = "plugin", version = "0.22.0" }
 serde = { version = "1.0", features = ["derive"] }
 user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }

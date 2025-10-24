@@ -24,4 +24,4 @@ serde_json.workspace = true
 user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
-token-stream-pkg = { path = "..", version = "0.21.0" }
+token-stream-pkg = { path = "..", version = "0.22.0" }

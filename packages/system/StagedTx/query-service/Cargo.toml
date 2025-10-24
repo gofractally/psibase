@@ -12,6 +12,6 @@ publish = false
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-staged-tx = { path = "../service", version = "0.21.0" }
+staged-tx = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
 system-workspace-hack = { version = "0.1", path = "../../system-workspace-hack" }

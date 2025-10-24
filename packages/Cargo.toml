@@ -44,7 +44,7 @@ strip = true
 lto = true
 
 [workspace.package]
-version = "0.21.0"
+version = "0.22.0"
 edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
@@ -54,7 +54,7 @@ publish = false
 [workspace.dependencies]
 # Common dependencies for plugins
 async-graphql = "=7.0.17"
-psibase = { path = "../rust/psibase", version = "0.21.0" }
+psibase = { path = "../rust/psibase", version = "0.22.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
 # Standard version for cargo-component 0.15.0

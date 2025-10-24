@@ -16,7 +16,7 @@ services = ["registry"]
 crate-type = ["rlib"]
 
 [dependencies]
-registry = { path = "service", version = "0.21.0" }
-r-registry = { path = "query", version = "0.21.0" }
-registry-plugin = { path = "plugin", version = "0.21.0" }
+registry = { path = "service", version = "0.22.0" }
+r-registry = { path = "query", version = "0.22.0" }
+registry-plugin = { path = "plugin", version = "0.22.0" }
 user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }

@@ -10,7 +10,7 @@ publish.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-fractals = { path = "../service", version = "0.21.0" }
+fractals = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
 serde-aux.workspace = true
 user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
