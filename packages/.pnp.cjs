@@ -160,6 +160,7 @@ const RAW_RUNTIME_STATE =
           ["axios", "npm:1.12.2"],\
           ["class-variance-authority", "npm:0.7.1"],\
           ["clsx", "npm:2.1.1"],\
+          ["cmdk", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.1.1"],\
           ["concurrently", "npm:9.2.1"],\
           ["date-fns", "npm:4.1.0"],\
           ["dayjs", "npm:1.11.18"],\
@@ -2847,6 +2848,7 @@ const RAW_RUNTIME_STATE =
           ["@types/react", "npm:19.1.13"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
           ["@types/react-router-dom", "npm:5.3.3"],\
+          ["cmdk", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.1.1"],\
           ["dayjs", "npm:1.11.18"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.36.0"],\
           ["framer-motion", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:11.18.2"],\
@@ -8235,6 +8237,36 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/clsx-npm-2.1.1-96125b98be-c4c8eb865f.zip/node_modules/clsx/",\
         "packageDependencies": [\
           ["clsx", "npm:2.1.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["cmdk", [\
+      ["npm:1.1.1", {\
+        "packageLocation": "../.caches/yarn/cmdk-npm-1.1.1-74d5ea4bf9-5605ac4396.zip/node_modules/cmdk/",\
+        "packageDependencies": [\
+          ["cmdk", "npm:1.1.1"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.1.1", {\
+        "packageLocation": "./.yarn/__virtual__/cmdk-virtual-d5b6614f60/2/.caches/yarn/cmdk-npm-1.1.1-74d5ea4bf9-5605ac4396.zip/node_modules/cmdk/",\
+        "packageDependencies": [\
+          ["@radix-ui/react-compose-refs", "virtual:dc832c60dbea12d24abda64d82dd41621a1404783ffb6b941fdecd260865d70397d0aba53003ceaf38753184233e0a96ae7bf72c48a62812e9a83dca741a636b#npm:1.1.2"],\
+          ["@radix-ui/react-dialog", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.1.15"],\
+          ["@radix-ui/react-id", "virtual:dc832c60dbea12d24abda64d82dd41621a1404783ffb6b941fdecd260865d70397d0aba53003ceaf38753184233e0a96ae7bf72c48a62812e9a83dca741a636b#npm:1.1.1"],\
+          ["@radix-ui/react-primitive", "virtual:dc832c60dbea12d24abda64d82dd41621a1404783ffb6b941fdecd260865d70397d0aba53003ceaf38753184233e0a96ae7bf72c48a62812e9a83dca741a636b#npm:2.1.3"],\
+          ["@types/react", "npm:19.1.13"],\
+          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
+          ["cmdk", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.1.1"],\
+          ["react", "npm:19.1.1"],\
+          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.1"]\
+        ],\
+        "packagePeers": [\
+          "@types/react-dom",\
+          "@types/react",\
+          "react-dom",\
+          "react"\
         ],\
         "linkType": "HARD"\
       }]\
@@ -14958,6 +14990,7 @@ const RAW_RUNTIME_STATE =
           ["axios", "npm:1.12.2"],\
           ["class-variance-authority", "npm:0.7.1"],\
           ["clsx", "npm:2.1.1"],\
+          ["cmdk", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.1.1"],\
           ["concurrently", "npm:9.2.1"],\
           ["date-fns", "npm:4.1.0"],\
           ["dayjs", "npm:1.11.18"],\

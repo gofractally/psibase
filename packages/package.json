@@ -59,6 +59,7 @@
         "axios": "^1.7.8",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "cmdk": "^1.1.1",
         "date-fns": "^4.1.0",
         "dayjs": "^1.11.13",
         "elliptic": "^6.5.4",

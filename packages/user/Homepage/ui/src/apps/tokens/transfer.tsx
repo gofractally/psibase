@@ -10,12 +10,12 @@ import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { GlowingCard } from "@/components/glowing-card";
 
 import { useAppForm } from "@shared/components/form/app-form";
-import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { CreditTable } from "./components/credit-table";
+import { ComboboxFieldAccountExisting } from "./components/transfer/account-field";
 import { useCredit } from "./hooks/tokensPlugin/use-credit";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
@@ -159,28 +159,33 @@ const TransferPageContents = () => {
             <GlowingCard>
                 <form.AppForm>
                     <form>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <FieldAccountExisting
-                                    form={form}
-                                    fields="to"
-                                    label="Recipient"
-                                    description={undefined}
-                                    placeholder="Account"
-                                    disabled={disableForm}
-                                    supervisor={supervisor}
-                                />
-                                <FieldTokenAmount
-                                    form={form}
-                                    fields="amount"
-                                    precision={selectedToken?.precision ?? 0}
-                                    balance={
-                                        selectedToken?.balance?.amount ?? 0
-                                    }
-                                    disabled={disableForm}
-                                    description={null}
-                                    onMaxAmountClick={handleSetMaxAmount}
-                                />
+                        <CardContent className="@container space-y-4">
+                            <div className="@xl:flex-row flex w-full flex-col gap-4">
+                                <div className="flex-1">
+                                    <ComboboxFieldAccountExisting
+                                        form={form}
+                                        fields="to"
+                                        label="Recipient"
+                                        placeholder="Account"
+                                        disabled={disableForm}
+                                        supervisor={supervisor}
+                                    />
+                                </div>
+                                <div className="min-w-56">
+                                    <FieldTokenAmount
+                                        form={form}
+                                        fields="amount"
+                                        precision={
+                                            selectedToken?.precision ?? 0
+                                        }
+                                        balance={
+                                            selectedToken?.balance?.amount ?? 0
+                                        }
+                                        disabled={disableForm}
+                                        description={null}
+                                        onMaxAmountClick={handleSetMaxAmount}
+                                    />
+                                </div>
                             </div>
                             <form.AppField
                                 name="memo"
