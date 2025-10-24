@@ -1,0 +1,12 @@
+[package]
+name = "query-schema"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Dependency on the generated RPC crate for the fractals service
+r-fractals = { path = "../query-service", version = "0.21.0" }
+# Match async-graphql exact version used by r-fractals
+async-graphql = { version = "=7.0.17" }
