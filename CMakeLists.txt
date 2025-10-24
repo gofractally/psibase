@@ -442,11 +442,6 @@ cargo_psibase_package(
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
-cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    PATH packages/user/Symbol
-)
-
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
@@ -484,6 +479,13 @@ cargo_psibase_package(
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    PATH packages/user/Symbol
+)
+
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
@@ -1106,7 +1108,6 @@ install(
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Credentials.psi
           ${SERVICE_DIR}/DevDefault.psi
-          ${SERVICE_DIR}/DiffAdjust.psi
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
@@ -1135,10 +1136,11 @@ install(
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
-          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
+          ${SERVICE_DIR}/DiffAdjust.psi
+          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
