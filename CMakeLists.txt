@@ -443,6 +443,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    PATH packages/user/Symbol
+)
+
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
@@ -840,19 +846,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    NAME Symbol
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
-    SERVICE symbol
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
-        INIT
-    DEPENDS wasm
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
     NAME Workshop
     VERSION ${PSIBASE_VERSION}.0
@@ -1095,7 +1088,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor TestFractal TokenUsers Tokens TokenStream Symbol Transact Homepage WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XRun XSites XTransact)
 
 install(

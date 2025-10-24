@@ -13,22 +13,16 @@ namespace UserService
    {
      public:
       using Tables = psibase::
-          ServiceTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
+          ServiceTables<SymbolTable, SymbolLengthTable, InitTable>;
 
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
       Symbol(psio::shared_view_ptr<psibase::Action> action);
 
-      //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);
-      //void configSymType(uint8_t symbolLength, Quantity startPrice, Quantity floorPrice, uint8_t targetCreatedPerDay);
-
       void init();
 
-      void create(SID newSymbol, Quantity maxDebit);
-      void listSymbol(SID symbol, Quantity price);
-      void buySymbol(SID symbol);
-      void unlistSymbol(SID symbol);
+      void create(SID newSymbol);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
@@ -36,7 +30,6 @@ namespace UserService
       bool               exists(SID symbol);
       Quantity           getPrice(uint8_t numChars);
       SymbolLengthRecord getSymbolType(uint8_t numChars);
-      void               updatePrices();
 
       // clang-format off
       struct Events
@@ -56,17 +49,13 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Symbol,
       method(init),
-      method(create, newSymbol, maxDebit),
-      method(listSymbol, symbol, price),
-      method(buySymbol, symbol),
-      method(unlistSymbol, symbol),
+      method(create, newSymbol),
       method(serveSys, request),
 
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),
       method(getSymbolType, numChars),
-      method(updatePrices)
    );
    PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,

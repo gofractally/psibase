@@ -3,10 +3,10 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-use crate::services::{nft, tokens};
-use crate::{AccountNumber, BlockTime};
+use crate::services::nft;
+use crate::services::tokens::TID;
+use crate::AccountNumber;
 use nft::NID;
-use tokens::Quantity;
 
 pub type SID = AccountNumber;
 
@@ -14,24 +14,9 @@ pub type SID = AccountNumber;
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-struct SymbolLengthRecord {
+struct SymbolLength {
     symbolLength: u8,
-    targetCreatedPerDay: u8,
-    floorPrice: Quantity,
-    activePrice: Quantity,
-
-    createCounter: u8,
-    lastPriceUpdateTime: BlockTime,
-}
-
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct SaleDetails {
-    pub salePrice: Quantity,
-
-    pub seller: AccountNumber,
+    nftId: u32,
 }
 
 #[derive(
@@ -41,14 +26,15 @@ pub struct SaleDetails {
 pub struct SymbolRecord {
     pub symbolId: SID,
     pub ownerNft: NID,
-    pub saleDetails: SaleDetails,
+    pub tokenId: Option<TID>,
 }
 
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod Service {
-    use crate::services::symbol::{SymbolLengthRecord, SymbolRecord, SID};
-    use crate::{services::tokens::Quantity, AccountNumber, HttpReply, HttpRequest};
+    use crate::services::symbol::{SymbolLength, SymbolRecord, SID};
+    use crate::services::tokens::TID;
+    use crate::{services::tokens::Quantity, AccountNumber};
 
     #[action]
     fn init() {
@@ -56,22 +42,12 @@ pub mod Service {
     }
 
     #[action]
-    fn create(new_symbol: AccountNumber, max_debit: Quantity) {
+    fn create(new_symbol: AccountNumber) {
         unimplemented!()
     }
 
     #[action]
-    fn listSymbol(symbol: AccountNumber, price: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn buySymbol(symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn unlistSymbol(symbol: AccountNumber) {
+    fn map_token(symbol: AccountNumber, token_id: TID) {
         unimplemented!()
     }
 
@@ -91,26 +67,12 @@ pub mod Service {
     }
 
     #[action]
-    fn updatePrices() {
-        unimplemented!()
-    }
-
-    #[action]
-    fn getSymbolType(numChars: u8) -> SymbolLengthRecord {
-        unimplemented!()
-    }
-
-    #[action]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+    fn getSymbolType(numChars: u8) -> SymbolLength {
         unimplemented!()
     }
 
     #[event(history)]
     fn symCreated(symbol: SID, owner: AccountNumber, cost: Quantity) {
-        unimplemented!()
-    }
-    #[event(history)]
-    fn symSold(symbol: SID, buyer: AccountNumber, seller: AccountNumber, cost: Quantity) {
         unimplemented!()
     }
 }

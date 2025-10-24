@@ -51,7 +51,10 @@ pub mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::read();
-        check_some(table.get_index_pk().get(&()), "service not initiated");
+        check_some(
+            table.get_index_pk().get(&()),
+            format!("service not ready but '{}'.", get_sender()).as_str(),
+        );
     }
 
     /// Create a new token

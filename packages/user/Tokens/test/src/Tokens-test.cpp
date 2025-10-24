@@ -697,7 +697,7 @@ SCENARIO("Mapping a symbol to a token")
       auto symbolCost = alice.to<Symbol>().getPrice(3).returnVal();
       a.credit(sysToken, Symbol::service, symbolCost, memo);
       auto symbolId = "abc"_a;
-      auto create   = alice.to<Symbol>().create(symbolId, symbolCost);
+      auto create   = alice.to<Symbol>().create(symbolId);
       CHECK(create.succeeded());
       auto symbolRecord = alice.to<Symbol>().getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
@@ -760,7 +760,7 @@ SCENARIO("Mapping a symbol to a token")
          {
             a.credit(sysToken, Symbol::service, symbolCost, memo);
             auto newSymbol = "bcd"_a;
-            alice.to<Symbol>().create(newSymbol, symbolCost);
+            alice.to<Symbol>().create(newSymbol);
             auto newNft = alice.to<Symbol>().getSymbol(newSymbol).returnVal().ownerNft;
 
             alice.to<Nft>().credit(newNft, Tokens::service, memo);
