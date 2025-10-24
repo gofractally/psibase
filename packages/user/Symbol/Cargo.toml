@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "symbol-pkg"                      # Crate name
+name = "symbol-pkg"                    # Crate name
 description = "An example application"
 version.workspace = true
 rust-version.workspace = true
@@ -31,6 +31,9 @@ services = ["symbol"]
 HttpServer = "0.21.0"
 Sites = "0.21.0"
 Permissions = "0.21.0"
+DiffAdjust = "0.21.0"
+Tokens = "0.21.0"
+
 
 [lib]
 crate-type = ["rlib"]
