@@ -135,7 +135,7 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTransact SetCode Symbol
+        RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
