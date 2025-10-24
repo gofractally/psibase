@@ -8,7 +8,6 @@ members = [
     "StagedTx/service",
     "StagedTx/query-service",
     "StagedTx/plugin",
-    "system-workspace-hack",
 ]
 
 [workspace.package]
