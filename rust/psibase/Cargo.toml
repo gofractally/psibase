@@ -78,12 +78,3 @@ pkcs8 = { version = "0.10", features = ["pem"] }
 subprocess = "0.2"
 cryptoki = "0.6"
 cryptoki-sys = "0.1"
-
-[target.'cfg(target_family = "wasm")'.dependencies]
-tokio = { version = "1", features = [
-    "sync",
-    "macros",
-    "io-util",
-    "rt",
-    "time",
-] }

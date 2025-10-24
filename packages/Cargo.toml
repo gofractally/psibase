@@ -52,6 +52,7 @@ homepage = "https://psibase.io"
 publish = false
 
 [workspace.dependencies]
+# Common dependencies for plugins
 async-graphql = "=7.0.17"
 psibase = { path = "../rust/psibase", version = "0.21.0" }
 serde = { version = "1.0.208", features = ["derive"] }
