@@ -1728,6 +1728,36 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@psibase/fractal-core-ui@workspace:user/FractalCore/ui":
+  version: 0.0.0-use.local
+  resolution: "@psibase/fractal-core-ui@workspace:user/FractalCore/ui"
+  dependencies:
+    "@dicebear/collection": "npm:^9.2.2"
+    "@dicebear/core": "npm:^9.2.2"
+    "@tanstack/react-form": "npm:^1.11.1"
+    "@tanstack/react-pacer": "npm:^0.6.0"
+    "@tanstack/react-query": "npm:^5.75.7"
+    "@types/humanize-duration": "npm:^3.27.4"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    "@uidotdev/usehooks": "npm:^2.4.1"
+    dayjs: "npm:^1.11.13"
+    eslint: "npm:^9.15.0"
+    humanize-duration: "npm:^3.32.2"
+    lucide-react: "npm:^0.475.0"
+    nuqs: "npm:^2.4.3"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    react-easy-sort: "npm:^1.6.0"
+    react-router-dom: "npm:^6.26.1"
+    typescript: "npm:^5.7.3"
+    usehooks-ts: "npm:^3.1.1"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.24.2"
+  languageName: unknown
+  linkType: soft
+
 "@psibase/fractals-ui@workspace:user/Fractals/ui":
   version: 0.0.0-use.local
   resolution: "@psibase/fractals-ui@workspace:user/Fractals/ui"

@@ -1,6 +1,7 @@
 #include <services/local/XAdmin.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <psio/json/any.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
@@ -66,6 +67,22 @@ namespace LocalService
       };
       PSIO_REFLECT(LoginReply, access_token, token_type)
 
+      struct ShutdownRequest
+      {
+         bool restart = false;
+         bool force   = false;
+         bool soft    = false;
+      };
+      PSIO_REFLECT(ShutdownRequest, restart, force, soft);
+
+      struct PsinodeShutdownArgs
+      {
+         std::optional<std::vector<std::string>> restart;
+         bool                                    soft = false;
+         std::optional<MicroSeconds>             deadline;
+      };
+      PSIO_REFLECT(PsinodeShutdownArgs, restart, soft, deadline)
+
       void initRefCounts()
       {
          auto refs      = XAdmin{}.open<CodeRefCountTable>();
@@ -91,60 +108,279 @@ namespace LocalService
          return row && row->head;
       }
 
+      bool isAdminSocket(std::optional<std::int32_t> socket)
+      {
+         if (socket)
+         {
+            std::optional<SocketRow> row;
+            auto                     native = Native::session(KvMode::read);
+            PSIBASE_SUBJECTIVE_TX
+            {
+               row = native.open<SocketTable>().get(*socket);
+            }
+            check(row.has_value(), "Missing socket row");
+            check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
+            const auto& info = std::get<HttpSocketInfo>(row.value().info);
+            check(info.endpoint.has_value(), "Missing endpoint for socket");
+            const auto& endpoint = info.endpoint.value();
+            if (isLoopback(endpoint))
+               return true;
+
+            std::optional<EnvRow> env;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               env = native.open<EnvTable>().get(std::string("PSIBASE_ADMIN_IP"));
+            }
+            if (env)
+            {
+               std::string_view            addrs = env->value;
+               std::string_view::size_type prev  = 0;
+               while (true)
+               {
+                  auto pos     = addrs.find(prev, ',');
+                  auto addrStr = addrs.substr(prev, pos);
+                  if (auto prefix = parseIPAddressPrefix(addrStr))
+                  {
+                     if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
+                     {
+                        if (prefix->contains(v4->address))
+                           return true;
+                     }
+                     else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
+                     {
+                        if (prefix->contains(v6->address))
+                           return true;
+                     }
+                  }
+                  if (pos == std::string_view::npos)
+                     break;
+                  prev = pos + 1;
+               }
+            }
+         }
+         return false;
+      }
+
+      bool parseOptionValue(std::string_view value, const bool& default_)
+      {
+         if (value == "yes" || value == "true" || value == "on" || value == "1")
+            return true;
+         else if (value == "no" || value == "false" || value == "off" || value == "0")
+            return false;
+         else
+            return default_;
+      }
+
+      bool parseOption(std::string_view name, std::string_view arg, bool& result)
+      {
+         if (arg.starts_with(name))
+         {
+            arg.remove_prefix(name.size());
+            if (arg.empty())
+            {
+               result = true;
+               return true;
+            }
+            else if (arg.starts_with('='))
+            {
+               result = parseOptionValue(arg.substr(1), false);
+               return true;
+            }
+         }
+         return false;
+      }
+
+      bool parseOption(const psio::json::any& opt, bool default_)
+      {
+         if (auto* b = opt.get_if<bool>())
+            return *b;
+         else if (auto* s = opt.get_if<std::string>())
+         {
+            return parseOptionValue(*s, default_);
+         }
+         return default_;
+      }
+
+      template <typename T>
+      T parseOptionList(const psio::json::any& opt, const T& default_)
+      {
+         if (auto* l = opt.get_if<psio::json::any_array>())
+         {
+            if (!l->empty())
+               return parseOption(l->back(), default_);
+            else
+               return default_;
+         }
+         else
+         {
+            return parseOption(opt, default_);
+         }
+      }
+
+      struct PsinodeConfig
+      {
+         psio::json::any         host;
+         psio::json::any         service;
+         psio::json::any_object* serviceConfig()
+         {
+            if (auto* s = service.get_if<psio::json::any_object>())
+            {
+               auto pos =
+                   std::ranges::find_if(*s, [](auto& entry) { return entry.key == "config"; });
+               if (pos != s->end())
+               {
+                  return pos->value.get_if<psio::json::any_object>();
+               }
+            }
+            return nullptr;
+         }
+         std::vector<std::string> serviceArgv()
+         {
+            if (auto* s = service.get_if<psio::json::any_object>())
+            {
+               auto pos = std::ranges::find_if(*s, [](auto& entry) { return entry.key == "argv"; });
+               if (pos != s->end())
+               {
+                  if (auto* arr = pos->value.get_if<psio::json::any_array>())
+                  {
+                     std::vector<std::string> result;
+                     for (const auto& arg : *arr)
+                     {
+                        if (auto* s = arg.get_if<std::string>())
+                           result.push_back(*s);
+                        else
+                           return {};
+                     }
+                     return result;
+                  }
+               }
+            }
+            return {};
+         }
+         PSIO_REFLECT(PsinodeConfig, host, service)
+      };
+
+      // The result of /config merges the host psinode config with the AdminOptions row
+      std::string readConfig()
+      {
+         AdminOptionsRow adminOpts;
+         PsinodeConfig   json;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
+            json                     = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+            adminOpts = XAdmin{}.open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
+         }
+         psio::json::any_object result;
+         if (auto* host = json.host.get_if<psio::json::any_object>())
+         {
+            for (auto& entry : *host)
+            {
+               // Rename host options that conflict with ours.
+               // Note that we preserve the service defined options here,
+               // because they are used by the UI, which is part of this
+               // service. Unknown host options will not be displayed and
+               // will be round-tripped unmodified.
+               if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+                   // In the unlikely event that the host has a option that
+                   // begins with "host.", writeConfig should not remove it
+                   entry.key.starts_with("host."))
+                  entry.key = "host." + entry.key;
+               result.push_back(std::move(entry));
+            }
+         }
+         result.push_back({"p2p", adminOpts.p2p});
+         return psio::convert_to_json(psio::json::any{std::move(result)});
+      }
+      void writeConfig(std::string config)
+      {
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto            table      = Native::session().open<HostConfigTable>();
+            HostConfigRow   hostConfig = table.get({}).value();
+            AdminOptionsRow adminConfig{};
+            auto json = psio::convert_from_json<psio::json::any_object>(std::move(config));
+            psio::json::any_object host;
+            psio::json::any_object service;
+            for (auto& entry : json)
+            {
+               if (entry.key == "p2p")
+               {
+                  if (const bool* b = entry.value.get_if<bool>())
+                  {
+                     adminConfig.p2p = *b;
+                     entry.value     = std::string(*b ? "on" : "off");
+                     service.push_back(std::move(entry));
+                  }
+               }
+               else
+               {
+                  if (entry.key.starts_with("host."))
+                     entry.key = entry.key.substr(5);
+
+                  host.push_back(std::move(entry));
+               }
+            }
+            hostConfig.config = psio::convert_to_json(PsinodeConfig{
+                .host = std::move(host),
+                .service =
+                    psio::json::any_object{psio::json::entry{"config", std::move(service)}}});
+            table.put(hostConfig);
+            XAdmin{}.open<AdminOptionsTable>().put(adminConfig);
+         }
+      }
    }  // namespace
+
+   void XAdmin::startSession()
+   {
+      check(getSender() == XHttp::service, "Wrong sender");
+      PSIBASE_SUBJECTIVE_TX
+      {
+         HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
+         auto          json       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+
+         AdminOptionsRow adminOpts{};
+         if (auto* config = json.serviceConfig())
+         {
+            for (const auto& entry : *config)
+            {
+               if (entry.key == "p2p")
+               {
+                  adminOpts.p2p = parseOptionList(entry.value, false);
+               }
+               else
+               {
+                  abortMessage(std::format("Unknown option: {}", entry.key));
+               }
+            }
+         }
+         for (const auto& opt : json.serviceArgv())
+         {
+            if (!parseOption("--p2p", opt, adminOpts.p2p))
+            {
+               abortMessage(std::format("Unknown option: {}", opt));
+            }
+         }
+         open<AdminOptionsTable>().put(adminOpts);
+      }
+   }
+
+   AdminOptionsRow XAdmin::options()
+   {
+      check(getSender() == XHttp::service, "Wrong sender");
+      PSIBASE_SUBJECTIVE_TX
+      {
+         return open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
+      }
+      __builtin_unreachable();
+   }
 
    // Returns nullopt on success, an appropriate error on failure
    std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
                                               std::optional<std::int32_t> socket)
    {
-      if (socket)
-      {
-         std::optional<SocketRow> row;
-         auto                     native = Native::session(KvMode::read);
-         PSIBASE_SUBJECTIVE_TX
-         {
-            row = native.open<SocketTable>().get(*socket);
-         }
-         check(row.has_value(), "Missing socket row");
-         check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
-         const auto& info = std::get<HttpSocketInfo>(row.value().info);
-         check(info.endpoint.has_value(), "Missing endpoint for socket");
-         const auto& endpoint = info.endpoint.value();
-         if (isLoopback(endpoint))
-            return {};
-
-         std::optional<EnvRow> env;
-         PSIBASE_SUBJECTIVE_TX
-         {
-            env = native.open<EnvTable>().get(std::string("PSIBASE_ADMIN_IP"));
-         }
-         if (env)
-         {
-            std::string_view            addrs = env->value;
-            std::string_view::size_type prev  = 0;
-            while (true)
-            {
-               auto pos     = addrs.find(prev, ',');
-               auto addrStr = addrs.substr(prev, pos);
-               if (auto prefix = parseIPAddressPrefix(addrStr))
-               {
-                  if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
-                  {
-                     if (prefix->contains(v4->address))
-                        return {};
-                  }
-                  else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
-                  {
-                     if (prefix->contains(v6->address))
-                        return {};
-                  }
-               }
-               if (pos == std::string_view::npos)
-                  break;
-               prev = pos + 1;
-            }
-         }
-      }
+      if (isAdminSocket(socket))
+         return {};
 
       if (chainIsBooted())
       {
@@ -166,15 +402,19 @@ namespace LocalService
                        .body        = toVec("Not authorized")};
    }
 
-   bool XAdmin::isAdmin(AccountNumber account)
+   bool XAdmin::isAdmin(std::optional<AccountNumber> account, std::optional<std::int32_t> socket)
    {
-      if (account == XAdmin::service)
-         return true;
-      PSIBASE_SUBJECTIVE_TX
+      if (account)
       {
-         return open<AdminAccountTable>().get(account).has_value();
+         if (*account == XAdmin::service)
+            return true;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            if (open<AdminAccountTable>().get(*account).has_value())
+               return true;
+         }
       }
-      __builtin_unreachable();
+      return isAdminSocket(socket);
    }
 
    std::optional<HttpReply> XAdmin::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
@@ -196,17 +436,11 @@ namespace LocalService
 
          if (req.method == "GET")
          {
-            auto          native = Native::session(KvMode::read);
-            auto          table  = native.open<HostConfigTable>();
-            HostConfigRow row;
-            PSIBASE_SUBJECTIVE_TX
-            {
-               row = table.get({}).value();
-            }
+            auto config = readConfig();
             return HttpReply{
                 .status      = HttpStatus::ok,
                 .contentType = "application/json",
-                .body        = std::vector(row.config.begin(), row.config.end()),
+                .body        = std::vector(config.begin(), config.end()),
             };
          }
          else if (req.method == "PUT")
@@ -219,13 +453,7 @@ namespace LocalService
                    .body        = toVec("Content-Type must be application/json\n"),
                };
             }
-            auto table = Native::session(KvMode::readWrite).open<HostConfigTable>();
-            PSIBASE_SUBJECTIVE_TX
-            {
-               auto row   = table.get({}).value();
-               row.config = std::string(req.body.begin(), req.body.end());
-               table.put(row);
-            }
+            writeConfig(std::string(req.body.begin(), req.body.end()));
             return HttpReply{
                 .status = HttpStatus::ok,
             };
@@ -234,6 +462,46 @@ namespace LocalService
          {
             return HttpReply::methodNotAllowed(req);
          }
+      }
+      else if (target == "/shutdown")
+      {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
+         if (req.method != "POST")
+         {
+            return HttpReply::methodNotAllowed(req);
+         }
+         if (req.contentType != "application/json")
+         {
+            return HttpReply{
+                .status      = HttpStatus::unsupportedMediaType,
+                .contentType = "text/html",
+                .body        = toVec("Content-Type must be application/json\n"),
+            };
+         }
+         auto body = psio::convert_from_json<ShutdownRequest>(
+             std::string{req.body.begin(), req.body.end()});
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now())
+                           .time_since_epoch();
+
+            PsinodeShutdownArgs args{.restart  = std::nullopt,
+                                     .soft     = body.soft,
+                                     .deadline = body.force ? now : now + std::chrono::seconds{10}};
+            if (body.restart)
+            {
+               HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
+               auto          opts       = psio::convert_from_json<PsinodeConfig>(hostConfig.config);
+               args.restart             = opts.serviceArgv();
+            }
+            PendingShutdownRow row{.args = psio::convert_to_json(args)};
+
+            auto table = Native::session(KvMode::readWrite).open<PendingShutdownTable>();
+            table.put(row);
+         }
+         return HttpReply{};
       }
       else if (target.starts_with("/services/"))
       {

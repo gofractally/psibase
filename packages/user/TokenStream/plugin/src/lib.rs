@@ -44,7 +44,7 @@ impl Api for TokenStreamPlugin {
     fn deposit(nft_id: u32, token_id: u32, amount: String, memo: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::deposit)?;
 
-        bindings::tokens::plugin::transfer::credit(
+        bindings::tokens::plugin::user::credit(
             token_id,
             &"token-stream".to_string(),
             &amount,

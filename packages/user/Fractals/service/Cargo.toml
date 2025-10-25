@@ -13,7 +13,6 @@ postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
 ]
 
-
 [dependencies]
 psibase.workspace = true
 psibase_macros.workspace = true

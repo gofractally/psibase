@@ -4,8 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
+plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]

@@ -17,6 +17,7 @@ import {
 import { Separator } from "@shared/shadcn/ui/separator";
 
 import { usePerformance } from "../hooks/usePerformance";
+import { useTransactStats } from "../hooks/useTransactStats";
 
 const chartConfig = {
     database: {
@@ -49,6 +50,7 @@ const bytesToMb = (bytes: number): number => Math.ceil(bytes / 1024 / 1024);
 
 export function Component() {
     const { data } = usePerformance();
+    const { data: txStats } = useTransactStats();
 
     const chartData = [
         {
@@ -157,7 +159,7 @@ export function Component() {
                             Failed
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {data?.transactions.failed}
+                            {txStats?.failed}
                             <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
@@ -169,10 +171,10 @@ export function Component() {
                     />
                     <div className="grid flex-1 auto-rows-min gap-0.5">
                         <div className="text-muted-foreground text-xs">
-                            Skipped
+                            Expired
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {data?.transactions.skipped}
+                            {txStats?.expired}
                             <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
@@ -187,7 +189,7 @@ export function Component() {
                             Unprocessed
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {data?.transactions.unprocessed}
+                            {txStats?.unprocessed}
                             <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
@@ -202,7 +204,7 @@ export function Component() {
                             Succeeded
                         </div>
                         <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {data?.transactions.succeeded}
+                            {txStats?.succeeded}
                             <span className="text-muted-foreground text-sm font-normal">
                                 transactions
                             </span>
