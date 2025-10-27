@@ -13,7 +13,7 @@ import Router from "./router";
 
 export const supervisor = getSupervisor();
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>

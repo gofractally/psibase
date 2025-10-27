@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getSupervisor } from "@psibase/common-lib";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export type GetCurrentUserRes = string | null;
 
@@ -17,7 +17,7 @@ export const queryFn = async () => {
         service: "accounts",
         intf: "api",
     });
-    return res ? Account.parse(res) : null;
+    return res ? zAccount.parse(res) : null;
 };
 
 export const useCurrentUser = () => {
@@ -27,9 +27,9 @@ export const useCurrentUser = () => {
         queryFn,
         staleTime: 60000,
     });
-    const setCurrentUser = (accountName: z.infer<typeof Account> | null) => {
+    const setCurrentUser = (accountName: z.infer<typeof zAccount> | null) => {
         queryClient.setQueryData(QueryKey.currentUser(), () =>
-            accountName === null ? null : Account.parse(accountName),
+            accountName === null ? null : zAccount.parse(accountName),
         );
     };
     return [data, setCurrentUser, queryRest] as const;
