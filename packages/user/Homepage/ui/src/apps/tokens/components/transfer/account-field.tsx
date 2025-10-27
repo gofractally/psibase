@@ -122,7 +122,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                 </Label>
                             </div>
                             <Popover open={open} onOpenChange={setOpen}>
-                                <PopoverTrigger asChild>
+                                <PopoverTrigger asChild disabled={disabled}>
                                     <Button
                                         variant="outline"
                                         role="combobox"
@@ -322,8 +322,6 @@ const NoContactItem = ({
 
 const NoAccountsFound = ({ currentUser }: { currentUser?: string | null }) => {
     const search = useCommandState((state) => state.search);
-    console.log("search", search);
-    console.log("currentUser", currentUser);
     return (
         <CommandEmpty>
             {currentUser === search
