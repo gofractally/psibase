@@ -59,6 +59,7 @@ interface user-guild {
 world imports {
     import user-guild;
     import admin-guild;
+    import admin-fractal;
     import user-fractal;
     import user-eval;
 }
