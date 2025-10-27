@@ -164,10 +164,10 @@ export const AccountSelection = () => {
         }
     };
 
-    const { data: inviteToken, isLoading: isLoadingInvite } =
+    const { data: inviteToken, isLoading: isLoadingInvite, error: inviteTokenError } =
         useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
 
-    const { data: connectionToken, isLoading: isLoadingConnectionToken } =
+    const { data: connectionToken, isLoading: isLoadingConnectionToken, error: connectionTokenError } =
         useDecodeConnectionToken(
             token,
             decodedToken?.tag == "connection-token",
@@ -213,13 +213,16 @@ export const AccountSelection = () => {
 
     const isTxInProgress = isRejecting || isAccepting || isLoggingIn;
 
+    const error = decodeTokenError || (isInviteToken ? inviteTokenError : connectionTokenError);
+
+    if (error) {
+        return <ErrorCard errorMessage={error.message} />
+    }
+
     if (isLoadingInvite) {
         return <LoadingCard />;
     }
 
-    if (decodeTokenError) {
-        return <ErrorCard errorMessage={decodeTokenError.message} />
-    }
 
     if (inviteToken?.state == "accepted" && !isInviteClaimed) {
         return <InviteAlreadyAcceptedCard token={token} />;
