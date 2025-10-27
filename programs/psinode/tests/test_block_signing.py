@@ -21,13 +21,13 @@ class TestBlockSigning(unittest.TestCase):
         prods[0].boot(packages=['Minimal', 'Explorer', 'AuthSig'])
 
         print("Setting up automatic reconnection")
-        with prods[3].get('/native/admin/config', service='x-admin') as reply:
+        with prods[3].get('/config', service='x-admin') as reply:
             reply.raise_for_status()
             cfgd = reply.json()
         print(cfgd)
         cfgd["peers"] = [prods[0].socketpath, prods[1].socketpath, prods[2].socketpath]
         print(cfgd)
-        with prods[3].put('/native/admin/config', service='x-admin', headers={'Content-Type': 'application/json'}, json=cfgd) as reply:
+        with prods[3].put('/config', service='x-admin', headers={'Content-Type': 'application/json'}, json=cfgd) as reply:
             reply.raise_for_status()
 
         print("setting producers")

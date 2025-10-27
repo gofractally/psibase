@@ -248,15 +248,12 @@ namespace psibase::http
       get_peers_t            get_peers            = {};
       connect_t              connect              = {};
       connect_t              disconnect           = {};
-      get_config_t           get_config           = {};
-      connect_t              set_config           = {};
       get_config_t           get_keys             = {};
       generic_json_t         new_key              = {};
       unlock_keyring_t       unlock_keyring       = {};
       lock_keyring_t         lock_keyring         = {};
       get_pkcs11_tokens_t    get_pkcs11_tokens    = {};
       services_t             services;
-      std::atomic<bool>      enable_p2p;
       std::atomic<bool>      enable_transactions;
       // This contains some cached state that the reader thread might modify
       mutable std::atomic<http_status> status;

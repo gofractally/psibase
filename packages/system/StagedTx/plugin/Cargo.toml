@@ -1,16 +1,19 @@
 [package]
-name = "plugin"
+name = "staged-tx-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
 
 [dependencies]
 staged-tx = { path = "../service/", version = "0.21.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = { version = "1.0.125" }
-wit-bindgen-rt = { version = "0.36.0", features = ["bitflags"] }
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wit-bindgen-rt.workspace = true
+system-workspace-hack = { version = "0.1", path = "../../system-workspace-hack" }
 
 [lib]
 crate-type = ["cdylib"]

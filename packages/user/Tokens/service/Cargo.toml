@@ -1,24 +1,25 @@
 [package]
 name = "tokens"
-version.workspace = true
+version = "0.21.1"
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-tokens"
-plugin = "plugin"
+plugin = "tokens-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "tokens", service = "tokens", method = "init", data = {} },
 ]
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.21.0", path = "../../../../rust/psibase_macros" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.120"
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
 tokens-pkg = { path = "..", version = "0.21.0" }

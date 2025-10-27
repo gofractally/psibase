@@ -19,7 +19,7 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
-import { fractalMenus } from "./nav-main";
+import { staticFractalMenus } from "./nav-main";
 
 export const Layout = () => {
     const fractal = useCurrentFractal();
@@ -29,7 +29,7 @@ export const Layout = () => {
         return location.pathname.split("/")[index];
     };
 
-    const selectedGroup = fractalMenus.find(
+    const selectedGroup = staticFractalMenus.find(
         (menu) => pathNameIndex(3) == menu.path,
     );
 

@@ -43,12 +43,13 @@ namespace SystemService
 
    struct SiteConfigRow
    {
-      psibase::AccountNumber     account;
-      bool                       spa       = false;
-      bool                       cache     = true;
-      std::optional<std::string> globalCsp = std::nullopt;
+      psibase::AccountNumber                account;
+      bool                                  spa          = false;
+      bool                                  cache        = true;
+      std::optional<std::string>            globalCsp    = std::nullopt;
+      std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
@@ -129,9 +130,14 @@ namespace SystemService
       /// - If the hash does not match, the new content is returned with an updated `ETag` header
       void enableCache(bool enable);
 
+      /// If content requested for the sender service is not found, proxy the request to the
+      /// specified proxy.
+      void setProxy(psibase::AccountNumber proxy);
+
+      /// Removes the proxy set with `setProxy`.
+      void clearProxy();
+
      private:
-      std::optional<SitesContentRow>    useDefaultProfile(const std::string& target);
-      bool                              useSpa(const psibase::AccountNumber& account);
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
       std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
@@ -147,7 +153,9 @@ namespace SystemService
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
                 method(deleteCsp, path),
-                method(enableCache, enable))
+                method(enableCache, enable),
+                method(setProxy, proxy),
+                method(clearProxy))
 
    PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService

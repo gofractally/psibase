@@ -88,11 +88,11 @@ class XAdmin(Service):
             reply.raise_for_status()
             return reply.json()["access_token"]
     def get_config(self):
-        with self.get('/native/admin/config') as reply:
+        with self.get('/config') as reply:
             reply.raise_for_status()
             return reply.json()
     def set_config(self, json):
-        with self.put('/native/admin/config', json=json) as reply:
+        with self.put('/config', json=json) as reply:
             reply.raise_for_status()
     def install(self, file):
         from zipfile import ZipFile
