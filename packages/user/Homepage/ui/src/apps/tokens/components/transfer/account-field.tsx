@@ -124,7 +124,10 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                         variant="outline"
                                         role="combobox"
                                         aria-expanded={open}
-                                        className="justify-between"
+                                        aria-invalid={!field.state.meta.isValid}
+                                        className="aria-expanded:border-ring aria-expanded:ring-ring/50 aria-expanded:dark:border-ring
+                                        aria-expanded:dark:ring-ring/50 aria-invalid:ring-destructive/20 aria-invalid:dark:ring-destructive/40
+                                        aria-invalid:border-destructive aria-invalid:dark:border-destructive justify-between aria-expanded:ring-[3px]"
                                     >
                                         <Placeholder
                                             placeholder={placeholder}
@@ -150,11 +153,11 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                         <ChevronsUpDown className="opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-full">
+                                <PopoverContent className="w-full p-2">
                                     <Command>
                                         <CommandInput
                                             placeholder="Search account..."
-                                            className="h-9"
+                                            className="h-9 border-none ring-0"
                                         />
                                         <CommandList>
                                             <NoAccountsFound
