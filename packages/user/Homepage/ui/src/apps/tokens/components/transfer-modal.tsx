@@ -4,12 +4,15 @@ import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
 import { useMemo } from "react";
 
+import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 import { Quantity } from "@/apps/tokens/lib/quantity";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useProfile } from "@/hooks/use-profile";
 
 import { Avatar } from "@shared/components/avatar";
 import { withForm } from "@shared/components/form/app-form";
+import { cn } from "@shared/lib/utils";
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -39,12 +42,47 @@ export const TransferModal = withForm({
         onSubmit,
     }) {
         const { data: currentUser } = useCurrentUser();
+        const { data: profile } = useProfile(currentUser);
+        const { data: contacts } = useContacts(currentUser);
+
+        console.log("contacts:", contacts);
 
         const [to, amount, isSubmitting] = useStore(form.store, (state) => [
             state.values.to.account,
             state.values.amount,
             state.isSubmitting,
         ]);
+
+        // Helper function to get contact info for display
+        const getContactDisplay = (account: string) => {
+            const contact = contacts?.find((c) => c.account === account);
+            if (contact?.nickname) {
+                return {
+                    primary: contact.nickname,
+                    secondary: account,
+                };
+            }
+            return {
+                primary: account,
+                secondary: undefined,
+            };
+        };
+
+        // For the current user (from), use profile displayName if available
+        const fromContact = (() => {
+            if (profile?.profile?.displayName) {
+                return {
+                    primary: profile.profile.displayName,
+                    secondary: currentUser || "",
+                };
+            }
+            return {
+                primary: currentUser || "",
+                secondary: undefined,
+            };
+        })();
+
+        const toContact = getContactDisplay(to);
 
         const quantity = useMemo(() => {
             if (!selectedToken) return null;
@@ -72,9 +110,9 @@ export const TransferModal = withForm({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
-                    <div className="my-6 space-y-4 sm:flex sm:items-center sm:gap-4 sm:space-y-0">
+                    <div className="my-6 space-y-4">
                         {/* From Account */}
-                        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-1 dark:border-slate-700 dark:bg-slate-800">
+                        <div className="flex items-center gap-4 rounded-xl border border-gray-300 bg-gray-100/70 p-4 dark:border-gray-800 dark:bg-gray-900/50">
                             <div className="flex-shrink-0">
                                 <Avatar
                                     account={currentUser || ""}
@@ -86,19 +124,30 @@ export const TransferModal = withForm({
                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                                     From
                                 </p>
-                                <p className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                    {currentUser}
-                                </p>
+                                <div className="break-words text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    {fromContact.secondary ? (
+                                        <>
+                                            <span className="font-medium">
+                                                {fromContact.primary}
+                                            </span>{" "}
+                                            <span className="font-normal text-slate-600 dark:text-slate-400">
+                                                ({fromContact.secondary})
+                                            </span>
+                                        </>
+                                    ) : (
+                                        fromContact.primary
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         {/* Arrow */}
                         <div className="flex justify-center">
-                            <ArrowDown className="text-slate-600 sm:-rotate-90 dark:text-slate-400" />
+                            <ArrowDown className="text-slate-600 dark:text-slate-400" />
                         </div>
 
                         {/* To Account */}
-                        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-1 dark:border-slate-700 dark:bg-slate-800">
+                        <div className="flex items-center gap-4 rounded-xl border border-gray-300 bg-gray-100/70 p-4 dark:border-gray-800 dark:bg-gray-900/50">
                             <div className="flex-shrink-0">
                                 <Avatar
                                     account={to}
@@ -110,20 +159,44 @@ export const TransferModal = withForm({
                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                                     To
                                 </p>
-                                <p className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                    {to}
-                                </p>
+                                <div className="break-words text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    {toContact.secondary ? (
+                                        <>
+                                            <span className="font-medium">
+                                                {toContact.primary}
+                                            </span>{" "}
+                                            <span className="font-normal text-slate-600 dark:text-slate-400">
+                                                ({toContact.secondary})
+                                            </span>
+                                        </>
+                                    ) : (
+                                        toContact.primary
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Amount Display */}
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-800">
-                        <p className="mb-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                    <div className="rounded-xl border border-gray-300 bg-gray-100/70 p-6 text-center dark:border-gray-800 dark:bg-gray-900/50">
+                        <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">
                             Transfer Amount
                         </p>
-                        <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
-                            {quantity.format()}
+                        <p className="text-2xl">
+                            <span className="font-mono">
+                                {quantity.format({
+                                    fullPrecision: true,
+                                    includeLabel: false,
+                                })}
+                            </span>{" "}
+                            <span
+                                className={cn(
+                                    "text-muted-foreground",
+                                    !quantity?.hasTokenSymbol() && "italic",
+                                )}
+                            >
+                                {quantity.getDisplayLabel()}
+                            </span>
                         </p>
                     </div>
 
