@@ -1,6 +1,7 @@
 #include "services/user/Sites.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -9,6 +10,7 @@
 #include <regex>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
+#include <set>
 
 using namespace psibase;
 
@@ -330,6 +332,63 @@ namespace SystemService
          return exists;
       }
 
+      std::optional<psibase::AccountNumber> getProxy(const psibase::AccountNumber& account)
+      {
+         auto table      = Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>();
+         auto siteConfig = table.get(account);
+
+         if (!siteConfig || !siteConfig->proxyAccount)
+         {
+            return std::nullopt;
+         }
+
+         return *siteConfig->proxyAccount;
+      }
+
+      bool useSpa(const psibase::AccountNumber& account)
+      {
+         auto siteConfig =
+             Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>().get(account);
+         return siteConfig && siteConfig->spa;
+      }
+
+      std::optional<SitesContentRow> getContent(const psibase::AccountNumber& account,
+                                                const std::string&            target)
+      {
+         auto tables = Sites::Tables{getReceiver(), KvMode::read};
+         auto isSpa  = useSpa(account);
+
+         std::optional<SitesContentRow> content;
+
+         auto index = tables.open<SitesContentTable>().getIndex<0>();
+
+         if (isSpa)
+         {
+            auto t  = isStaticAsset(target) ? target : "/index.html";
+            content = index.get(SitesContentKey{account, t});
+         }
+         else
+         {
+            content = index.get(SitesContentKey{account, target});
+            if (!content)
+            {
+               auto t  = target.ends_with('/') ? target : target + '/';
+               content = index.get(SitesContentKey{account, t + "index.html"});
+            }
+         }
+
+         if (!content)
+         {
+            auto proxyTarget = getProxy(account);
+            if (proxyTarget)
+            {
+               content = getContent(*proxyTarget, target);
+            }
+         }
+
+         return content;
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -346,42 +405,14 @@ namespace SystemService
          Tables tables{getReceiver(), KvMode::read};
          auto   target = request.path();
 
-         std::optional<SitesContentRow> content;
-         auto                           isSpa = useSpa(account);
-         if (isSpa)
-         {
-            if (!isStaticAsset(target))
-            {
-               target = "/index.html";
-            }
-
-            auto index = tables.open<SitesContentTable>().getIndex<0>();
-            content    = index.get(SitesContentKey{account, target});
-         }
-         else
-         {
-            auto index = tables.open<SitesContentTable>().getIndex<0>();
-            content    = index.get(SitesContentKey{account, target});
-            if (!content)
-            {
-               if (target.ends_with('/'))
-                  content = index.get(SitesContentKey{account, target + "index.html"});
-               else
-                  content = index.get(SitesContentKey{account, target + "/index.html"});
-            }
-
-            if (!content)
-            {
-               content = useDefaultProfile(target);
-            }
-         }
+         auto content = getContent(account, target);
 
          if (content)
          {
-            std::string cspHeader = getCspHeader(content, account);
+            std::string cspHeader = getCspHeader(content, content->account);
             auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
-            if (useCache(account) && shouldCache(request, etag))
+            if (useCache(content->account) && shouldCache(request, etag))
             {
                // https://issues.chromium.org/issues/40132719
                // Chrome bug - Devtools still shows 200 status code sometimes
@@ -539,35 +570,9 @@ namespace SystemService
 
    bool Sites::isValidPath(AccountNumber site, std::string path)
    {
-      auto target = normalizeTarget(path);
-      auto isSpa  = useSpa(site);
-
-      // For a single-page application, all we can do is verify static assets and the root document
-      if (isSpa)
-      {
-         if (!isStaticAsset(target))
-         {
-            target = "/index.html";
-         }
-
-         auto content = open<SitesContentTable>(KvMode::read).get(SitesContentKey{site, target});
-         return !!content;
-      }
-      else
-      {
-         // For traditional multi-page apps, we verify the path, and if it's not a static asset then we also
-         // automatically check for `target/index.html`
-         auto index   = open<SitesContentTable>(KvMode::read).getIndex<0>();
-         auto content = index.get(SitesContentKey{site, target});
-         if (!content)
-         {
-            if (target.ends_with('/'))
-               content = index.get(SitesContentKey{site, target + "index.html"});
-            else if (!isStaticAsset(target))
-               content = index.get(SitesContentKey{site, target + "/index.html"});
-         }
-         return !!content;
-      }
+      auto target  = normalizeTarget(path);
+      auto content = getContent(site, target);
+      return !!content;
    }
 
    void Sites::enableSpa(bool enable)
@@ -635,23 +640,43 @@ namespace SystemService
       table.put(row);
    }
 
-   std::optional<SitesContentRow> Sites::useDefaultProfile(const std::string& target)
+   void Sites::setProxy(psibase::AccountNumber proxy)
    {
-      auto index = open<SitesContentTable>(KvMode::read).getIndex<0>();
+      auto self = getSender();
 
-      std::optional<SitesContentRow> content;
-      if (target == "/" || target.starts_with("/default-profile/"))
+      std::set<psibase::AccountNumber> visited{self};
+      psibase::AccountNumber           current = proxy;
+
+      auto table = open<SiteConfigTable>();
+      while (true)
       {
-         content =
-             index.get(SitesContentKey{getReceiver(), "/default-profile/default-profile.html"});
+         auto [_, inserted] = visited.insert(current);
+         check(inserted, "Proxy chain would create a cycle");
+
+         auto siteConfig = table.get(current);
+         if (!siteConfig || !siteConfig->proxyAccount)
+         {
+            break;
+         }
+
+         current = *siteConfig->proxyAccount;
       }
-      return content;
+
+      auto row         = table.get(self).value_or(SiteConfigRow{.account = self});
+      row.proxyAccount = std::optional{std::move(proxy)};
+      table.put(row);
    }
 
-   bool Sites::useSpa(const psibase::AccountNumber& account)
+   void Sites::clearProxy()
    {
-      auto siteConfig = open<SiteConfigTable>(KvMode::read).get(account);
-      return siteConfig && siteConfig->spa;
+      auto table = Tables{}.open<SiteConfigTable>();
+      auto row   = table.get(getSender());
+      if (!row || !row->proxyAccount)
+      {
+         return;
+      }
+      row->proxyAccount = std::nullopt;
+      table.put(*row);
    }
 
    std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
@@ -689,6 +714,7 @@ namespace SystemService
          bool                   spa       = false;
          bool                   cache     = true;
          std::string            globalCsp = "";
+         std::string            proxy     = "";
       };
       PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
 
@@ -708,7 +734,8 @@ namespace SystemService
             return SiteConfig{.account   = record.account,
                               .spa       = record.spa,
                               .cache     = record.cache,
-                              .globalCsp = record.globalCsp.value_or("")};
+                              .globalCsp = record.globalCsp.value_or(""),
+                              .proxy     = record.proxyAccount ? record.proxyAccount->str() : ""};
          }
 
          auto getContent(AccountNumber account) const

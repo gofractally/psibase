@@ -2,29 +2,100 @@
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::AccountNumber;
+    use crate::Memo;
 
     /// Creates a new account and fractal.
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
+    /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
-    fn create_fractal(fractal_account: AccountNumber, name: String, mission: String) {
+    fn create_fractal(
+        fractal_account: AccountNumber,
+        guild_account: AccountNumber,
+        name: String,
+        mission: String,
+    ) {
         unimplemented!()
     }
 
-    /// Starts an evaluation for the specified fractal and evaluation type.
+    /// Apply to join a guild
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `evaluation_type` - The type of evaluation to start.
+    /// * `guild_account` - The account number for the guild.
+    /// * `extra_info` - Relevant information to the application.
     #[action]
-    fn start_eval(fractal: AccountNumber, evaluation_type: u8) {
+    fn apply_guild(guild_account: AccountNumber, extra_info: String) {
+        unimplemented!()
+    }
+
+    /// Set guild display name
+    ///
+    /// # Arguments
+    /// * `display_name` - New display name of the guild.
+    #[action]
+    fn set_g_disp(display_name: Memo) {
+        unimplemented!()
+    }
+
+    /// Set guild bio
+    ///
+    /// # Arguments
+    /// * `bio` - New bio of the guild.
+    #[action]
+    fn set_g_bio(bio: Memo) {
+        unimplemented!()
+    }
+
+    /// Set guild description
+    ///
+    /// # Arguments
+    /// * `description` - New description of the guild.
+    #[action]
+    fn set_g_desc(description: String) {
+        unimplemented!()
+    }
+
+    /// Kick member from guild
+    ///
+    /// # Arguments
+    /// * `member` - Guild member to be kicked.
+    #[action]
+    fn guild_kick(member: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Attest Guild Membership application
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    /// * `member` - Member to attest.
+    /// * `comment` - Any comment relevant to application.
+    /// * `endorses` - True if in favour of application.
+    #[action]
+    fn at_mem_app(
+        guild_account: AccountNumber,
+        member: AccountNumber,
+        comment: String,
+        endorses: bool,
+    ) {
+        unimplemented!()
+    }
+
+    /// Starts an evaluation for the specified guild.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    #[action]
+    fn start_eval(guild_account: AccountNumber) {
         unimplemented!()
     }
 
     /// Allows a user to join a fractal and immediately become a citizen.
+    ///
+    /// Cannot be called by a fractal.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal to join.
@@ -36,7 +107,6 @@ pub mod Service {
     /// Sets the schedule for an evaluation type within a fractal.
     ///
     /// # Arguments
-    /// * `evaluation_type` - The type of evaluation.
     /// * `registration` - Unix seconds timestamp for the start of the registration phase.
     /// * `deliberation` - Unix seconds timestamp for the start of the deliberation phase.
     /// * `submission` - Unix seconds timestamp for the start of the submission phase.
@@ -44,7 +114,6 @@ pub mod Service {
     /// * `interval_seconds` - Interval in seconds for recurring evaluations.
     #[action]
     fn set_schedule(
-        evaluation_type: u8,
         registration: u32,
         deliberation: u32,
         submission: u32,
@@ -106,6 +175,17 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Creates a guild within a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guild_account` - The account number for the new guild.
+    /// * `display_name` - The display name of the guild.
+    #[action]
+    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
+        unimplemented!()
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 
@@ -113,11 +193,17 @@ pub mod Service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(fractal_account: AccountNumber, evaluation_id: u32) {}
+    pub fn evaluation_finished(
+        fractal_account: AccountNumber,
+        guild_account: AccountNumber,
+        evaluation_id: u32,
+    ) {
+    }
 
     #[event(history)]
     pub fn scheduled_evaluation(
         fractal_account: AccountNumber,
+        guild_account: AccountNumber,
         evaluation_id: u32,
         registration: u32,
         deliberation: u32,

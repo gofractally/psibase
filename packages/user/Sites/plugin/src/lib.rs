@@ -7,7 +7,7 @@ use bindings::sites::plugin::types::File;
 use bindings::transact::plugin::intf as Transact;
 use psibase::compress_content;
 use psibase::fracpack::Pack;
-use psibase::services::sites as SitesService;
+use psibase::services::sites::action_structs as Actions;
 use psibase::Hex;
 
 mod errors;
@@ -50,7 +50,7 @@ impl Sites for SitesPlugin {
             (file.content, None)
         };
 
-        let packed = SitesService::action_structs::storeSys {
+        let packed = Actions::storeSys {
             path: file.path.clone(),
             contentType: file.content_type,
             contentEncoding: content_encoding,
@@ -62,12 +62,11 @@ impl Sites for SitesPlugin {
             return Err(ErrorType::FileTooLarge(&file.path).into());
         }
 
-        Transact::add_action_to_transaction("storeSys", &packed)?;
-        Ok(())
+        Transact::add_action_to_transaction("storeSys", &packed)
     }
 
     fn upload_encoded(file: File, content_encoding: String) -> Result<(), Error> {
-        let packed = SitesService::action_structs::storeSys {
+        let packed = Actions::storeSys {
             path: file.path.clone(),
             contentType: file.content_type,
             contentEncoding: Some(content_encoding),
@@ -79,8 +78,7 @@ impl Sites for SitesPlugin {
             return Err(ErrorType::FileTooLarge(&file.path).into());
         }
 
-        Transact::add_action_to_transaction("storeSys", &packed)?;
-        Ok(())
+        Transact::add_action_to_transaction("storeSys", &packed)
     }
 
     fn upload_tree(files: Vec<File>, compression_quality: u8) -> Result<u16, Error> {
@@ -98,7 +96,7 @@ impl Sites for SitesPlugin {
                 (file.content, None)
             };
 
-            let packed = SitesService::action_structs::storeSys {
+            let packed = Actions::storeSys {
                 path: normalize_path(&file.path),
                 contentType: file.content_type.clone(),
                 contentEncoding: content_encoding,
@@ -122,43 +120,37 @@ impl Sites for SitesPlugin {
     }
 
     fn remove(path: String) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "remove",
-            &SitesService::action_structs::remove { path }.packed(),
-        )?;
-        Ok(())
+        Transact::add_action_to_transaction("remove", &Actions::remove { path }.packed())
     }
 
     fn enable_spa(enable: bool) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "enableSpa",
-            &SitesService::action_structs::enableSpa { enable }.packed(),
-        )?;
-        Ok(())
+        Transact::add_action_to_transaction("enableSpa", &Actions::enableSpa { enable }.packed())
     }
 
     fn set_csp(path: String, csp: String) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "setCsp",
-            &SitesService::action_structs::setCsp { path, csp }.packed(),
-        )?;
-        Ok(())
+        Transact::add_action_to_transaction("setCsp", &Actions::setCsp { path, csp }.packed())
     }
 
     fn set_cache_mode(enable: bool) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "enableCache",
-            &SitesService::action_structs::enableCache { enable }.packed(),
-        )?;
-        Ok(())
+            &Actions::enableCache { enable }.packed(),
+        )
     }
 
     fn delete_csp(path: String) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "deleteCsp",
-            &SitesService::action_structs::deleteCsp { path }.packed(),
-        )?;
-        Ok(())
+        Transact::add_action_to_transaction("deleteCsp", &Actions::deleteCsp { path }.packed())
+    }
+
+    fn set_proxy(proxy: String) {
+        let proxy = psibase::AccountNumber::from(proxy.as_str());
+        Transact::add_action_to_transaction("setProxy", &Actions::setProxy { proxy }.packed())
+            .unwrap();
+    }
+
+    fn clear_proxy() {
+        Transact::add_action_to_transaction("clearProxy", &Actions::clearProxy {}.packed())
+            .unwrap();
     }
 }
 

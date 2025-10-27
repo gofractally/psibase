@@ -516,8 +516,7 @@ namespace psibase::http
             runNativeHandlerJson(server.http_config->push_boot_async);
          }  // push_boot
          else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
-                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
-                  server.http_config->enable_p2p)
+                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket))
          {
             if (forbidCrossOrigin())
                return;
@@ -548,20 +547,6 @@ namespace psibase::http
             {
                send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
             }
-         }
-         else if (req_target == "/native/admin/shutdown")
-         {
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
-            }
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               return send(builder.error(bhttp::status::unsupported_media_type,
-                                         "Content-Type must be application/json\n"));
-            }
-            server.http_config->shutdown(std::move(req.body()));
-            return send(builder.accepted());
          }
          else if (req_target == "/native/admin/perf" && server.http_config->get_perf)
          {
@@ -637,27 +622,6 @@ namespace psibase::http
                     server.register_connection(session);
                     websocket_log_session<stream_type>::run(std::move(session));
                  });
-         }
-         else if (req_target == "/native/admin/config")
-         {
-            if (req.method() == bhttp::verb::get)
-            {
-               runNativeHandlerGenericNoFail(server.http_config->get_config, "application/json");
-            }
-            else if (req.method() == bhttp::verb::put)
-            {
-               if (req[bhttp::field::content_type] != "application/json")
-               {
-                  return send(builder.error(bhttp::status::unsupported_media_type,
-                                            "Content-Type must be application/json\n"));
-               }
-               runNativeHandlerNoContent(server.http_config->set_config);
-            }
-            else
-            {
-               send(builder.methodNotAllowed(req.target(), req.method_string(), "GET, PUT"));
-            }
-            return;
          }
          else if (req_target == "/native/admin/keys")
          {

@@ -592,8 +592,9 @@ namespace SystemService
       // TODO: subjective mitigation hooks
       // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
-      auto top_act = getCurrentActionView();
-      auto args    = psio::view<const ProcessTransactionArgs>(top_act->rawData());
+      auto top_act                = getCurrentActionView();
+      auto args                   = psio::view<const ProcessTransactionArgs>(top_act->rawData());
+      psibase::internal::receiver = Transact::service;
       processTransactionImpl(args.transaction(), false);
    }
 

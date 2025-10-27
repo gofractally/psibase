@@ -69,8 +69,6 @@ export const getUsersAndGroups = async (
         siblingUrl(null, "evaluations", "/graphql"),
     );
 
-    console.log(res, "was the res");
-
     const response = z
         .object({
             getUsers: z.object({
@@ -85,7 +83,6 @@ export const getUsersAndGroups = async (
         })
         .parse(res);
 
-    console.log({ response });
 
     return zUsersAndGroupsResponse.parse({
         users: response.getUsers.nodes,

@@ -85,6 +85,12 @@ interface api {
     /// - If the hash matches, a 304 Not Modified response is returned
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
     set-cache-mode: func(enable: bool) -> result<_, error>;
+
+    /// Reverse proxies the sender account UI to the specified proxy account
+    set-proxy: func(proxy: string);
+
+    /// Clears the reverse-proxy set with `set-proxy`
+    clear-proxy: func();
 }
 
 world imports {

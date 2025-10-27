@@ -3,6 +3,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
 #include <services/local/XAdmin.hpp>
+#include <services/local/XDb.hpp>
 #include <services/local/XSites.hpp>
 
 using namespace psibase;
@@ -90,7 +91,10 @@ namespace
 
    bool chainIsBooted()
    {
-      auto row = Native::tables(KvMode::read).open<StatusTable>().get({});
+      auto mode   = KvMode::read;
+      auto prefix = std::span<const char>();
+      auto native = Native::Tables{to<XDb>().open(DbId::native, prefix, mode), mode};
+      auto row    = native.open<StatusTable>().get({});
       return row && row->head;
    }
 }  // namespace
@@ -158,9 +162,16 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 
 #ifndef PSIBASE_GENERATE_SCHEMA
 
+extern "C" [[clang::export_name("startSession")]] void startSession()
+{
+   psibase::internal::receiver = XHttp::service;
+   to<XAdmin>().startSession();
+}
+
 extern "C" [[clang::export_name("serve")]] void serve()
 {
-   auto act = getCurrentActionView();
+   auto act                    = getCurrentActionView();
+   psibase::internal::receiver = XHttp::service;
 
    auto [sockview, req] = psio::view<const std::tuple<std::int32_t, HttpRequest>>(act->rawData());
    auto sock            = sockview.unpack();
@@ -214,12 +225,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (std::string_view{req.target()} == "/native/p2p")
-   {
-      // p2p is accepted regardless of the host name
-      return;
-   }
-   else if (req.rootHost() != req.host())
+   else if (req.rootHost() != req.host() && std::string_view{req.target()} != "/native/p2p")
    {
       if (!req.rootHost().empty())
       {
@@ -238,6 +244,9 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    if (std::string_view{req.target()} == "/native/p2p")
    {
+      auto opts = to<XAdmin>().options();
+      if (!opts.p2p)
+         sendNotFound(sock, req);
       return;
    }
    else if (std::string_view{req.target()}.starts_with("/native/"))

@@ -7,11 +7,6 @@ interface types {
         generic(claim),
     }
 
-    record producer {
-        name: string,
-        auth-claim: claim-type,
-    }
-
     record claim {
         verify-service: string,
         raw-data: list<u8>,
@@ -19,20 +14,26 @@ interface types {
 }
 
 interface api {
-    use types.{producer, claim};
+    use types.{claim-type};
     use host:types/types.{error};
 
     /// Set the producers for CFT consensus.
     /// This also changes the current consensus mode to CFT (crash fault tolerant).
-    /// The keys used in the specified auth claims must 
-    set-cft-consensus: func(prods: list<producer>) -> result<_, error>;
+    set-cft-consensus: func(prods: list<string>) -> result<_, error>;
 
     /// Set the producers for BFT consensus.
     /// This also changes the current consensus mode to BFT (byzantine fault tolerant).
-    set-bft-consensus: func(prods: list<producer>) -> result<_, error>;
+    set-bft-consensus: func(prods: list<string>) -> result<_, error>;
 
     /// Set the producers for the current consensus mode.
-    set-producers: func(prods: list<producer>) -> result<_, error>;
+    set-producers: func(prods: list<string>) -> result<_, error>;
+
+    /// Register as a candidate for election to the active set of infrastructure providers
+    register-candidate: func(endpoint: string, claim: claim-type) -> result<_, error>;
+
+    /// Unregister as a candidate for election to the active set of infrastructure providers
+    unregister-candidate: func();
+
 }
 
 world imports {

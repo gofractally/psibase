@@ -132,11 +132,11 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
-        CpuLimit Events EventIndex Explorer Invite Nft
+        CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode Symbol
-        Transact VerifySig XAdmin XHttp XRun XSites XTransact
+        Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XSocketListService)
@@ -291,6 +291,7 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
+    fractal-core
     config
     producers
 )
@@ -316,6 +317,8 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/package
 include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
+set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
+set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
 set(PSIBASE_VERSION 0.21)
 
@@ -337,7 +340,7 @@ psibase_package(
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -435,65 +438,81 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
     PATH packages/user/Chainmail
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenStream.psi
     PATH packages/user/TokenStream
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${TokenStream_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/DiffAdjust.psi
+    PATH packages/user/DiffAdjust
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Profiles.psi
     PATH packages/user/Profiles
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Evaluations.psi
     PATH packages/user/Evaluations
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Evaluations_js_DEP}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
     PATH packages/user/Fractals
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Fractals_js_DEP}
 )
-
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
     PATH packages/user/BrotliCodec
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH packages/user/Registry
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/StagedTx.psi
     PATH packages/system/StagedTx
+    TARGET_DIR  ${SYSTEM_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 psibase_package(
@@ -602,6 +621,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Db.psi
+    NAME Db
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages service access to the KV database"
+    SERVICE db
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Db.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Db-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Docs.psi
     NAME Docs
     VERSION ${PSIBASE_VERSION}.0
@@ -627,6 +658,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Identity.psi
     PATH packages/user/Identity
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Identity_js_DEP}
 )
 
@@ -864,6 +896,35 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/FractalCore.psi
+    NAME FractalCore
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Vanilla fractal instance deployment"
+    PACKAGE_DEPENDS 
+        "HttpServer(^${PSIBASE_VERSION})" 
+        "Sites(^${PSIBASE_VERSION})" 
+        "Accounts(^${PSIBASE_VERSION})" 
+        "CommonApi(^${PSIBASE_VERSION})" 
+        "StagedTx(^${PSIBASE_VERSION})" 
+        "Transact(^${PSIBASE_VERSION})"
+        "Fractals(^${PSIBASE_VERSION})"
+    SERVICE fractal-core
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_fractal_core} /plugin.wasm
+    DEPENDS ${FractalCore_js_DEP}
+    DEPENDS ${Plugins_DEP}
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/postinstall.json
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/TestFractal.psi
+    NAME TestFractal
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "A test fractal"
+    PACKAGE_DEPENDS "FractalCore(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION})" "Fractals(^${PSIBASE_VERSION})"
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
@@ -906,6 +967,18 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
     DEPENDS wasm ${XAdmin_js_DEP}
     PACKAGE_DEPENDS XHttp XSites
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XDb.psi
+    NAME XDb
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages access to subjective databases"
+    SERVICE x-db
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XDb.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDb-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -960,9 +1033,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials
-                    Docs Evaluations Events Fractals Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact Homepage WebCrypto Workshop Config
 )
 
 psibase_package(
@@ -970,8 +1043,8 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials
-                    Docs Evaluations Events Explorer Fractals Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
 
@@ -981,7 +1054,7 @@ psibase_package(
     NAME Minimal
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Minimum packages for a functional chain"
-    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
+    PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Db Packages Producers HttpServer
                     SetCode Transact
 )
 
@@ -990,7 +1063,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Packages used in the tester"
-    PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS AuthSig BrotliCodec Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
 psibase_package(
@@ -998,7 +1071,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XRun XSites XTransact
 )
 
 function(write_package_index target dir)
@@ -1015,10 +1088,10 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials DevDefault ProdDefault
-    Docs Events Evaluations Fractals Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
-    XAdmin XDefault XHttp XRun XSites XTransact)
+    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
+    Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    XAdmin XDb XDefault XHttp XRun XSites XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1035,13 +1108,16 @@ install(
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Credentials.psi
           ${SERVICE_DIR}/DevDefault.psi
+          ${SERVICE_DIR}/DiffAdjust.psi
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
+          ${SERVICE_DIR}/Db.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractals.psi
+          ${SERVICE_DIR}/FractalCore.psi
           ${SERVICE_DIR}/Host.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
@@ -1063,6 +1139,7 @@ install(
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
+          ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
@@ -1071,6 +1148,7 @@ install(
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
+          ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XRun.psi
