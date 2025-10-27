@@ -67,5 +67,4 @@ ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubu
 echo =====
 ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
 echo =====
-echo "TODO: Generate and build package template"
-# ${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --allow-commands --no-workspace --name Buildtest --silent basic-01 && cd packages/user/Buildtest && ${WORKSPACE_ROOT}/build/rust/release/cargo-psibase package"
+${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --allow-commands --name Buildtest --silent basic-01 ; cd packages/user/Buildtest && ${WORKSPACE_ROOT}/build/rust/release/cargo-psibase package"
