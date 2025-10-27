@@ -113,7 +113,9 @@ clap_builder = { version = "4", default-features = false, features = [
     "usage",
     "wrap_help",
 ] }
-cxx-build = { version = "1", default-features = false, features = ["parallel"] }
+cxx-build = { version = ">=1, <1.0.187", default-features = false, features = [
+    "parallel",
+] }
 darling_core = { version = "0.20", default-features = false, features = [
     "suggestions",
 ] }
