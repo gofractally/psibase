@@ -94,7 +94,10 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
 
         const { data } = useCurrentUser();
         const currentUser = data;
-        const contacts = useContacts(currentUser);
+        const { data: contacts } = useContacts(currentUser);
+        const contactsExcludingCurrentUser = contacts?.filter(
+            (c) => c.account !== currentUser,
+        );
 
         const [open, setOpen] = useState(false);
 
@@ -137,7 +140,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                             <Contact
                                                 value={field.state.value}
                                                 name={
-                                                    contacts.data?.find(
+                                                    contacts?.find(
                                                         (contact) =>
                                                             contact.account ===
                                                             field.state.value,
@@ -153,7 +156,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                         <ChevronsUpDown className="opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-full p-2">
+                                <PopoverContent className="w-full min-w-96 p-2">
                                     <Command>
                                         <CommandInput
                                             placeholder="Search account..."
@@ -163,14 +166,15 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                             <NoAccountsFound
                                                 currentUser={currentUser}
                                             />
-                                            <CommandGroup heading="From your contacts">
-                                                {contacts.data
-                                                    ?.filter(
-                                                        (c) =>
-                                                            c.account !==
-                                                            currentUser,
-                                                    )
-                                                    .map((c) => (
+                                            <CommandGroup
+                                                heading="From your contacts"
+                                                className={cn(
+                                                    contactsExcludingCurrentUser?.length ===
+                                                        0 && "hidden",
+                                                )}
+                                            >
+                                                {contactsExcludingCurrentUser?.map(
+                                                    (c) => (
                                                         <ContactItem
                                                             key={c.account}
                                                             account={c.account}
@@ -188,10 +192,12 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                                                 setOpen(false);
                                                             }}
                                                         />
-                                                    ))}
+                                                    ),
+                                                )}
                                             </CommandGroup>
                                             <NoContactItem
                                                 value={field.state.value}
+                                                currentUser={currentUser}
                                                 onSelect={(currentValue) => {
                                                     field.handleChange(
                                                         currentValue,
@@ -199,7 +205,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                                     setOpen(false);
                                                 }}
                                                 contactAccounts={
-                                                    contacts.data?.map(
+                                                    contacts?.map(
                                                         (c) => c.account,
                                                     ) ?? []
                                                 }
@@ -277,15 +283,22 @@ const NoContactItem = ({
     value,
     onSelect,
     contactAccounts,
+    currentUser,
 }: {
     value: string;
     onSelect: (value: string) => void;
     contactAccounts: string[];
+    currentUser?: string | null;
 }) => {
     const search = useCommandState((state) => state.search);
     const isValidAccountName = zAccount.safeParse(search).success;
 
-    if (!search || contactAccounts.includes(search) || !isValidAccountName) {
+    if (
+        !search ||
+        contactAccounts.includes(search) ||
+        !isValidAccountName ||
+        search === currentUser
+    ) {
         return null;
     }
     return (
@@ -309,11 +322,13 @@ const NoContactItem = ({
 
 const NoAccountsFound = ({ currentUser }: { currentUser?: string | null }) => {
     const search = useCommandState((state) => state.search);
+    console.log("search", search);
+    console.log("currentUser", currentUser);
     return (
         <CommandEmpty>
             {currentUser === search
                 ? "Cannot send to yourself"
-                : "No account found."}
+                : "Enter an account name"}
         </CommandEmpty>
     );
 };
