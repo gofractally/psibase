@@ -23,4 +23,4 @@ crate-type = ["rlib"]
 fractals = { path = "service", version = "0.21.0" }
 r-fractals = { path = "query-service", version = "0.21.0" }
 fractals-plugin = { path = "plugin", version = "0.21.0" }
-user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true

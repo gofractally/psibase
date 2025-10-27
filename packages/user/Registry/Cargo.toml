@@ -19,4 +19,4 @@ crate-type = ["rlib"]
 registry = { path = "service", version = "0.21.0" }
 r-registry = { path = "query", version = "0.21.0" }
 registry-plugin = { path = "plugin", version = "0.21.0" }
-user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true

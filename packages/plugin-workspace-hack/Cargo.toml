@@ -3,23 +3,37 @@
 #     cargo hakari generate
 
 [package]
-name = "plugin-workspace-hack"
+name = "psibase-plugin-workspace-hack"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 description = "workspace-hack package, managed by hakari"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
 # You can choose to publish this crate: see https://docs.rs/cargo-hakari/latest/cargo_hakari/publishing.
-publish = false
+publish.workspace = true
 
 # The parts of the file between the BEGIN HAKARI SECTION and END HAKARI SECTION comments
 # are managed by hakari.
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-crypto-common = { version = "0.1", default-features = false, features = ["getrandom", "std"] }
+crypto-common = { version = "0.1", default-features = false, features = [
+    "getrandom",
+    "std",
+] }
 digest = { version = "0.10", features = ["mac", "oid", "std"] }
-generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "zeroize"] }
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std"] }
-getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2", default-features = false, features = ["js", "std"] }
+generic-array = { version = "0.14", default-features = false, features = [
+    "more_lengths",
+    "zeroize",
+] }
+getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = [
+    "std",
+] }
+getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2", default-features = false, features = [
+    "js",
+    "std",
+] }
 hmac = { version = "0.12", default-features = false, features = ["reset"] }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
@@ -36,7 +50,13 @@ proc-macro2 = { version = "1" }
 quote = { version = "1" }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+syn = { version = "2", features = [
+    "extra-traits",
+    "fold",
+    "full",
+    "visit",
+    "visit-mut",
+] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
