@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "plugin-workspace-hack",
     "system/Accounts/plugin/accounts/",
     "system/Accounts/plugin/account_tokens/",
     "system/AuthAny/plugin/",
@@ -49,6 +48,7 @@ edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+license = "MIT"
 publish = false
 
 [workspace.dependencies]
@@ -57,6 +57,6 @@ async-graphql = "=7.0.17"
 psibase = { path = "../rust/psibase", version = "0.21.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
-wit-bindgen-rt = { version = "0.30.0", features = [
-    "bitflags",
-] } # Standard version for cargo-component 0.15.0
+psibase-plugin-workspace-hack = { version = "0.1.0", path = "plugin-workspace-hack" }
+# Standard version for cargo-component 0.15.0
+wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }

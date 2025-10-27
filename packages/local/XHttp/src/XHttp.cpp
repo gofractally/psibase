@@ -162,6 +162,12 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 
 #ifndef PSIBASE_GENERATE_SCHEMA
 
+extern "C" [[clang::export_name("startSession")]] void startSession()
+{
+   psibase::internal::receiver = XHttp::service;
+   to<XAdmin>().startSession();
+}
+
 extern "C" [[clang::export_name("serve")]] void serve()
 {
    auto act                    = getCurrentActionView();
@@ -219,12 +225,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (std::string_view{req.target()} == "/native/p2p")
-   {
-      // p2p is accepted regardless of the host name
-      return;
-   }
-   else if (req.rootHost() != req.host())
+   else if (req.rootHost() != req.host() && std::string_view{req.target()} != "/native/p2p")
    {
       if (!req.rootHost().empty())
       {
@@ -243,6 +244,9 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    if (std::string_view{req.target()} == "/native/p2p")
    {
+      auto opts = to<XAdmin>().options();
+      if (!opts.p2p)
+         sendNotFound(sock, req);
       return;
    }
    else if (std::string_view{req.target()}.starts_with("/native/"))

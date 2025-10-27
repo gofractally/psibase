@@ -516,8 +516,7 @@ namespace psibase::http
             runNativeHandlerJson(server.http_config->push_boot_async);
          }  // push_boot
          else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
-                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
-                  server.http_config->enable_p2p)
+                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket))
          {
             if (forbidCrossOrigin())
                return;
