@@ -2,7 +2,7 @@ import type { Token } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-bala
 
 import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 import { Quantity } from "@/apps/tokens/lib/quantity";
@@ -32,7 +32,15 @@ export const TransferModal = withForm({
         open: false,
         onClose: () => {},
         selectedToken: undefined as Token | undefined,
-        onSubmit: () => {},
+        onSubmit: ({
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            addToContacts,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            closeConfirmationModal,
+        }: {
+            addToContacts: boolean;
+            closeConfirmationModal: () => void;
+        }) => {},
     },
     render: function TransferModal({
         form,
@@ -44,8 +52,6 @@ export const TransferModal = withForm({
         const { data: currentUser } = useCurrentUser();
         const { data: profile } = useProfile(currentUser);
         const { data: contacts } = useContacts(currentUser);
-
-        console.log("contacts:", contacts);
 
         const [to, amount, isSubmitting] = useStore(form.store, (state) => [
             state.values.to.account,
@@ -84,6 +90,10 @@ export const TransferModal = withForm({
 
         const toContact = getContactDisplay(to);
 
+        // Check if recipient is in contacts
+        const isRecipientInContacts = contacts?.some((c) => c.account === to);
+        const [addToContacts, setAddToContacts] = useState(false);
+
         const quantity = useMemo(() => {
             if (!selectedToken) return null;
             const { precision, id, symbol } = selectedToken;
@@ -94,6 +104,11 @@ export const TransferModal = withForm({
                 return null;
             }
         }, [amount.amount, selectedToken]);
+
+        const handleClose = () => {
+            setAddToContacts(false);
+            onClose();
+        };
 
         if (!quantity) return <></>;
 
@@ -110,7 +125,7 @@ export const TransferModal = withForm({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
-                    <div className="my-6 space-y-4">
+                    <div className="mt-3 space-y-4">
                         {/* From Account */}
                         <div className="flex items-center gap-4 rounded-xl border border-gray-300 bg-gray-100/70 p-4 dark:border-gray-800 dark:bg-gray-900/50">
                             <div className="flex-shrink-0">
@@ -177,8 +192,51 @@ export const TransferModal = withForm({
                         </div>
                     </div>
 
+                    {/* Add to contacts section - only show if recipient is not in contacts */}
+                    {!isRecipientInContacts && (
+                        <div
+                            className="cursor-pointer rounded-xl border border-yellow-200 bg-yellow-50 p-4 transition-colors hover:bg-yellow-100 dark:border-yellow-700/30 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30"
+                            onClick={() => setAddToContacts(!addToContacts)}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-800/30">
+                                        <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">
+                                            !
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                        This recipient is not in your contacts.
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="add-to-contacts"
+                                            checked={addToContacts}
+                                            onChange={(e) => {
+                                                e.stopPropagation();
+                                                setAddToContacts(
+                                                    e.target.checked,
+                                                );
+                                            }}
+                                            className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 dark:border-yellow-600/50 dark:bg-yellow-800/20 dark:ring-yellow-500/50"
+                                        />
+                                        <label
+                                            htmlFor="add-to-contacts"
+                                            className="cursor-pointer text-sm text-yellow-800 dark:text-yellow-200"
+                                        >
+                                            Add this account to my contacts
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Amount Display */}
-                    <div className="rounded-xl border border-gray-300 bg-gray-100/70 p-6 text-center dark:border-gray-800 dark:bg-gray-900/50">
+                    <div className="mt-3 rounded-xl border border-gray-300 bg-gray-100/70 p-6 text-center dark:border-gray-800 dark:bg-gray-900/50">
                         <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">
                             Transfer Amount
                         </p>
@@ -202,14 +260,19 @@ export const TransferModal = withForm({
 
                     <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
                         <AlertDialogCancel
-                            onClick={() => onClose()}
+                            onClick={handleClose}
                             className="order-2 w-full sm:order-1 sm:w-auto"
                         >
                             Cancel
                         </AlertDialogCancel>
                         <Button
                             type="button"
-                            onClick={onSubmit}
+                            onClick={() => {
+                                onSubmit({
+                                    addToContacts,
+                                    closeConfirmationModal: handleClose,
+                                });
+                            }}
                             disabled={isSubmitting}
                             className="order-1 sm:order-2"
                         >

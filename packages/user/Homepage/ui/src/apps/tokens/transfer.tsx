@@ -14,6 +14,7 @@ import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
+import { useCreateContact } from "../contacts/hooks/use-create-contact";
 import { CreditTable } from "./components/credit-table";
 import { ComboboxFieldAccountExisting } from "./components/transfer/account-field";
 import { useCredit } from "./hooks/tokensPlugin/use-credit";
@@ -34,16 +35,25 @@ const TransferPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
     const { selectedToken, currentUser, isLoading } = context;
     const { mutateAsync: credit } = useCredit(currentUser);
+    const { mutateAsync: createContact } = useCreateContact();
 
     const { setHandleSetMaxAmount, setClearAmountErrors } =
         useTransferActions();
 
     const handleConfirm = async ({
         value,
+        meta,
     }: {
         value: typeof defaultTransferValues;
+        meta: { addToContacts: boolean; closeConfirmationModal: () => void };
     }) => {
         const selectedTokenId = selectedToken.id.toString();
+
+        if (meta.addToContacts) {
+            await createContact({
+                account: value.to.account,
+            });
+        }
 
         // Pad with 0 if the amount string starts with a dot (e.g., ".01" -> "0.01")
         const paddedAmount = value.amount.amount.startsWith(".")
@@ -68,9 +78,9 @@ const TransferPageContents = () => {
             form.resetField("to");
             form.resetField("memo");
 
-            setTransferModal(false);
+            meta.closeConfirmationModal();
         } catch (e) {
-            setTransferModal(false);
+            meta.closeConfirmationModal();
             toast.error("Token transfer failed", {
                 closeButton: true,
                 richColors: true,
@@ -85,6 +95,10 @@ const TransferPageContents = () => {
 
     const form = useAppForm({
         defaultValues: defaultTransferValues,
+        onSubmitMeta: {
+            addToContacts: false,
+            closeConfirmationModal: () => {},
+        },
         onSubmit: handleConfirm,
         validators: {
             onSubmit: zTransferForm(currentUser),
@@ -154,7 +168,18 @@ const TransferPageContents = () => {
                 onClose={() => setTransferModal(false)}
                 open={isTransferModalOpen}
                 selectedToken={selectedToken}
-                onSubmit={form.handleSubmit}
+                onSubmit={async ({
+                    addToContacts,
+                    closeConfirmationModal,
+                }: {
+                    addToContacts: boolean;
+                    closeConfirmationModal: () => void;
+                }) => {
+                    await form.handleSubmit({
+                        addToContacts,
+                        closeConfirmationModal,
+                    });
+                }}
             />
             <GlowingCard>
                 <form.AppForm>
