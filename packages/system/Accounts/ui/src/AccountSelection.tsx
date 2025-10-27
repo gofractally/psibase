@@ -40,6 +40,7 @@ import { useCreateAccount } from "./hooks/useCreateAccount";
 import { useImportAccount } from "./hooks/useImportAccount";
 import { useRejectInvite } from "./hooks/useRejectInvite";
 import { zAccount } from "./lib/zod/Account";
+import { ErrorCard } from "./components/error-card";
 
 dayjs.extend(relativeTime);
 
@@ -142,7 +143,7 @@ export const AccountSelection = () => {
         (account) => account.id == selectedAccountId,
     );
 
-    const { data: decodedToken, isLoading: isLoadingToken } =
+    const { data: decodedToken, isLoading: isLoadingToken, error: decodeTokenError } =
         useDecodeToken(token);
     const isInviteToken = decodedToken?.tag === "invite-token";
 
@@ -214,6 +215,10 @@ export const AccountSelection = () => {
 
     if (isLoadingInvite) {
         return <LoadingCard />;
+    }
+
+    if (decodeTokenError) {
+        return <ErrorCard errorMessage={decodeTokenError.message} />
     }
 
     if (inviteToken?.state == "accepted" && !isInviteClaimed) {

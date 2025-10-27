@@ -18,24 +18,29 @@ const InviteToken = z.object({
     }),
 });
 
-export const useDecodeToken = (token: string | undefined | null) => {
-    return useQuery({
+export const useDecodeToken = (token: string | undefined | null) =>
+    useQuery({
         queryKey: ["tokenInfo", token],
         enabled: !!token,
         queryFn: async () => {
             await supervisor.onLoaded();
 
-            const res = InviteToken.or(ConnectionToken).parse(
-                await supervisor.functionCall({
-                    method: "deserializeToken",
-                    params: [token],
-                    service: "accounts",
-                    intf: "api",
-                    plugin: "account-tokens",
-                }),
-            );
+            const res = InviteToken.or(ConnectionToken)
+                .optional()
+                .parse(
+                    await supervisor.functionCall({
+                        method: "deserializeToken",
+                        params: [token],
+                        service: "accounts",
+                        intf: "api",
+                        plugin: "account-tokens",
+                    }),
+                );
+
+            if (res === undefined) {
+                throw new Error(`Failed decoding token`);
+            }
 
             return res;
         },
     });
-};
