@@ -127,7 +127,7 @@ SCENARIO("Creating an invite")
       THEN("Credential account cannot create an invite")
       {
          CHECK(createInvite(a, invPub).succeeded());
-         CHECK(createInvite(i, userPub).failed(canOnlyCallCreateAccount));
+         CHECK(createInvite(i, userPub).failed("not allowed using this credential"));
       }
    }
 }

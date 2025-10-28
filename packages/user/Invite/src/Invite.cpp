@@ -60,15 +60,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 
-   if (getSender() == Credentials::CREDENTIAL_SENDER)
-   {
-      if (m != "createAccount"_m)
-      {
-         string error = Credentials::CREDENTIAL_SENDER.str() + canOnlyCallCreateAccount.data();
-         abortMessage(error);
-      }
-   }
-   else
+   if (getSender() != Credentials::CREDENTIAL_SENDER)
    {
       if (m == "createAccount"_m)
       {
@@ -108,7 +100,8 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
    auto         inviteTable = Tables().open<InviteTable>();
    InviteRecord invite{
        .id          = inviteId,
-       .cid         = to<Credentials>().create(inviteKey, ONE_WEEK.count()),
+       .cid         = to<Credentials>().create(inviteKey, ONE_WEEK.count(),
+                                               std::vector<psibase::MethodNumber>{"createAccount"_m}),
        .inviter     = getSender(),
        .numAccounts = numAccounts,
        .useHooks    = useHooks,
