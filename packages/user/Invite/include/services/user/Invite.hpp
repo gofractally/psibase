@@ -70,8 +70,8 @@ namespace UserService
 
          /// The sender accepts an invite.
          /// Calling this action also requires that the sender authorizes the transaction with the
-         /// proof for the credential associated with an invite.
-         void accept();
+         /// proof for the credential associated with the invite.
+         void accept(uint32_t inviteId);
 
          /// Delete the invite and its secret (if applicable).
          /// Can only be called by the invite creator.
@@ -98,7 +98,7 @@ namespace UserService
          method(init),
          method(createInvite, inviteId, inviteKey, numAccounts, useHooks, secret),
          method(createAccount, account, accountKey),
-         method(accept),
+         method(accept, inviteId),
          method(delInvite, inviteId),
          method(getInvite, inviteId),
       );

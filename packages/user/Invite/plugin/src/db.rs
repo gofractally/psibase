@@ -22,7 +22,7 @@ impl InviteTokensTable {
     }
 
     // Details about this device's interactions with invites.
-    fn device_memory() -> Bucket {
+    fn device_history() -> Bucket {
         Bucket::new(
             Database {
                 mode: DbMode::NonTransactional,
@@ -127,7 +127,7 @@ impl InviteTokensTable {
     }
 
     fn is_valid(invite_id: u32, sym_key: &Vec<u8>) -> bool {
-        if let Some(device) = Self::device_memory().get(&invite_id.to_string()) {
+        if let Some(device) = Self::device_history().get(&invite_id.to_string()) {
             let device = <DeviceDetails>::unpacked(&device).unwrap();
             if device.accepted {
                 // Already accepted
@@ -204,7 +204,7 @@ impl InviteTokensTable {
         }
         let invite_id = invite_id.unwrap();
 
-        if let Some(device) = Self::device_memory().get(&invite_id.to_string()) {
+        if let Some(device) = Self::device_history().get(&invite_id.to_string()) {
             let device = <DeviceDetails>::unpacked(&device).unwrap();
             if device.account_created {
                 return false;
@@ -220,38 +220,22 @@ impl InviteTokensTable {
 
     pub fn account_created() {
         let invite_id = Self::active_invite_id().expect("No active invite token");
-        if let Some(device) = Self::device_memory().get(&invite_id.to_string()) {
-            let mut device = <DeviceDetails>::unpacked(&device).unwrap();
-            device.account_created = true;
-            Self::device_memory().set(&invite_id.to_string(), &device.packed());
-        } else {
-            Self::device_memory().set(
-                &invite_id.to_string(),
-                &DeviceDetails {
-                    account_created: true,
-                    accepted: false,
-                }
-                .packed(),
-            );
-        }
+        let mut device = Self::device_history()
+            .get(&invite_id.to_string())
+            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .unwrap_or_default();
+        device.account_created = true;
+        Self::device_history().set(&invite_id.to_string(), &device.packed());
     }
 
     pub fn accepted() {
         let invite_id = Self::active_invite_id().expect("No active invite token");
-        if let Some(device) = Self::device_memory().get(&invite_id.to_string()) {
-            let mut device = <DeviceDetails>::unpacked(&device).unwrap();
-            device.accepted = true;
-            Self::device_memory().set(&invite_id.to_string(), &device.packed());
-        } else {
-            Self::device_memory().set(
-                &invite_id.to_string(),
-                &DeviceDetails {
-                    account_created: false,
-                    accepted: true,
-                }
-                .packed(),
-            );
-        }
+        let mut device = Self::device_history()
+            .get(&invite_id.to_string())
+            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .unwrap_or_default();
+        device.accepted = true;
+        Self::device_history().set(&invite_id.to_string(), &device.packed());
         Self::delete_active();
     }
 

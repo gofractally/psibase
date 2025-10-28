@@ -12,7 +12,9 @@ namespace UserService
       constexpr std::string_view secretDNE        = "Secret does not exist";
       constexpr std::string_view mustUseInviteCredential =
           "To create a new account, you must accept the invite using the invite credential";
-      constexpr std::string_view noActiveCredential       = "No active credential";
+      constexpr std::string_view noActiveCredential = "No active credential";
+      constexpr std::string_view credentialMismatch =
+          "Missing credential for the specified invite id";
       constexpr std::string_view canOnlyCallCreateAccount = "can only call createAccount";
       constexpr std::string_view outOfNewAccounts = "Invite cannot be used to create more accounts";
       constexpr std::string_view inviteHooksRequired =

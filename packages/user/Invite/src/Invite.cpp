@@ -60,15 +60,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 
-   if (getSender() == Credentials::CREDENTIAL_SENDER)
-   {
-      if (m != "createAccount"_m)
-      {
-         string error = Credentials::CREDENTIAL_SENDER.str() + canOnlyCallCreateAccount.data();
-         abortMessage(error);
-      }
-   }
-   else
+   if (getSender() != Credentials::CREDENTIAL_SENDER)
    {
       if (m == "createAccount"_m)
       {
@@ -108,7 +100,8 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
    auto         inviteTable = Tables().open<InviteTable>();
    InviteRecord invite{
        .id          = inviteId,
-       .cid         = to<Credentials>().create(inviteKey, ONE_WEEK.count()),
+       .cid         = to<Credentials>().create(inviteKey, ONE_WEEK.count(),
+                                               std::vector<psibase::MethodNumber>{"createAccount"_m}),
        .inviter     = getSender(),
        .numAccounts = numAccounts,
        .useHooks    = useHooks,
@@ -147,7 +140,7 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    emit().history().updated(invite->id, newAccount, InviteEventType::accountRedeemed);
 }
 
-void Invite::accept()
+void Invite::accept(uint32_t inviteId)
 {
    auto cid_opt = to<Credentials>().get_active();
    check(cid_opt.has_value(), noActiveCredential.data());
@@ -156,6 +149,7 @@ void Invite::accept()
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.getIndex<2>().get(cid);
    check(invite.has_value(), inviteDNE.data());
+   check(invite->id == inviteId, credentialMismatch.data());
 
    auto accepter = getSender();
    emit().history().updated(invite->id, accepter, InviteEventType::accepted);
