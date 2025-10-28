@@ -53,7 +53,6 @@ stable_deref_trait = { version = "1", default-features = false, features = ["std
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
-tokio = { version = "1", features = ["full"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
@@ -95,7 +94,6 @@ stable_deref_trait = { version = "1", default-features = false, features = ["std
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
-tokio = { version = "1", features = ["full"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
@@ -108,6 +106,7 @@ getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-f
 libc = { version = "0.2" }
 mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "1", features = ["fs", "termios"] }
+tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 
@@ -120,6 +119,7 @@ getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-f
 libc = { version = "0.2" }
 mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "1", features = ["fs", "termios"] }
+tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 
@@ -132,6 +132,7 @@ getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-f
 libc = { version = "0.2" }
 mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "1", features = ["fs", "termios"] }
+tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 
@@ -144,6 +145,7 @@ getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-f
 libc = { version = "0.2" }
 mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "1", features = ["fs", "termios"] }
+tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 
@@ -167,6 +169,7 @@ console = { version = "0.15" }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std"] }
 libc = { version = "0.2" }
 rustix = { version = "1", features = ["fs", "termios"] }
+tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 
@@ -178,6 +181,7 @@ console = { version = "0.15" }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std"] }
 libc = { version = "0.2" }
 rustix = { version = "1", features = ["fs", "termios"] }
+tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 

@@ -2235,7 +2235,6 @@ name = "psibase-plugin-workspace-hack"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.10.0",
- "bytes",
  "crypto-common",
  "digest",
  "generic-array",
@@ -2248,15 +2247,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rand_core 0.6.4",
- "rustix",
- "scopeguard",
  "serde",
  "serde_core",
  "serde_json",
- "smallvec",
  "subtle",
  "syn 2.0.108",
- "tokio",
  "wasi",
  "zeroize",
 ]

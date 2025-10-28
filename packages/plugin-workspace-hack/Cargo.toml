@@ -30,8 +30,8 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = { version = "1" }
 rand_core = { version = "0.6", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_core = { version = "1", default-features = false, features = ["alloc", "rc", "result", "std"] }
-serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
+serde_core = { version = "1", features = ["alloc", "rc"] }
+serde_json = { version = "1", features = ["preserve_order", "raw_value", "unbounded_depth"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
@@ -47,47 +47,27 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = { version = "1" }
 rand_core = { version = "0.6", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_core = { version = "1", default-features = false, features = ["alloc", "rc", "result", "std"] }
-serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
+serde_core = { version = "1", features = ["alloc", "rc"] }
+serde_json = { version = "1", features = ["preserve_order", "raw_value", "unbounded_depth"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-bytes = { version = "1", features = ["serde"] }
 libc = { version = "0.2" }
-rustix = { version = "1", features = ["fs", "termios"] }
-scopeguard = { version = "1" }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-tokio = { version = "1", features = ["full"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-bytes = { version = "1", features = ["serde"] }
 libc = { version = "0.2" }
-rustix = { version = "1", features = ["fs", "termios"] }
-scopeguard = { version = "1" }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-tokio = { version = "1", features = ["full"] }
 
 [target.aarch64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-bytes = { version = "1", features = ["serde"] }
 libc = { version = "0.2" }
-rustix = { version = "1", features = ["fs", "termios"] }
-scopeguard = { version = "1" }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-tokio = { version = "1", features = ["full"] }
 
 [target.aarch64-unknown-linux-gnu.build-dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-bytes = { version = "1", features = ["serde"] }
 libc = { version = "0.2" }
-rustix = { version = "1", features = ["fs", "termios"] }
-scopeguard = { version = "1" }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-tokio = { version = "1", features = ["full"] }
 
 [target.wasm32-wasip1.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -99,20 +79,10 @@ wasi = { version = "0.11" }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-bytes = { version = "1", features = ["serde"] }
-libc = { version = "0.2", features = ["extra_traits"] }
-rustix = { version = "1", features = ["fs", "termios"] }
-scopeguard = { version = "1" }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-tokio = { version = "1", features = ["full"] }
+libc = { version = "0.2" }
 
 [target.aarch64-apple-darwin.build-dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-bytes = { version = "1", features = ["serde"] }
-libc = { version = "0.2", features = ["extra_traits"] }
-rustix = { version = "1", features = ["fs", "termios"] }
-scopeguard = { version = "1" }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
-tokio = { version = "1", features = ["full"] }
+libc = { version = "0.2" }
 
 ### END HAKARI SECTION
