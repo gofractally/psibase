@@ -18,59 +18,101 @@ publish.workspace = true
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-crypto-common = { version = "0.1", default-features = false, features = [
-    "getrandom",
-    "std",
-] }
+crypto-common = { version = "0.1", default-features = false, features = ["getrandom", "std"] }
 digest = { version = "0.10", features = ["mac", "oid", "std"] }
-generic-array = { version = "0.14", default-features = false, features = [
-    "more_lengths",
-    "zeroize",
-] }
-getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = [
-    "std",
-] }
-getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2", default-features = false, features = [
-    "js",
-    "std",
-] }
+generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "zeroize"] }
+getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std"] }
+getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2", default-features = false, features = ["js", "std"] }
 hmac = { version = "0.12", default-features = false, features = ["reset"] }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = { version = "1" }
 rand_core = { version = "0.6", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+serde_core = { version = "1", default-features = false, features = ["alloc", "rc", "result", "std"] }
+serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
+syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [build-dependencies]
+crypto-common = { version = "0.1", default-features = false, features = ["getrandom", "std"] }
+digest = { version = "0.10", features = ["mac", "oid", "std"] }
+generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "zeroize"] }
+getrandom-6f8ce4dd05d13bba = { package = "getrandom", version = "0.2", default-features = false, features = ["js", "std"] }
 indexmap = { version = "2", features = ["serde"] }
 memchr = { version = "2" }
-proc-macro2 = { version = "1" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = { version = "1" }
+rand_core = { version = "0.6", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1", features = ["preserve_order"] }
-syn = { version = "2", features = [
-    "extra-traits",
-    "fold",
-    "full",
-    "visit",
-    "visit-mut",
-] }
+serde_core = { version = "1", default-features = false, features = ["alloc", "rc", "result", "std"] }
+serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
+subtle = { version = "2", default-features = false, features = ["i128"] }
+syn = { version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
+bytes = { version = "1", features = ["serde"] }
 libc = { version = "0.2" }
+rustix = { version = "1", features = ["fs", "termios"] }
+scopeguard = { version = "1" }
+smallvec = { version = "1", default-features = false, features = ["const_generics"] }
+tokio = { version = "1", features = ["full"] }
+
+[target.x86_64-unknown-linux-gnu.build-dependencies]
+bitflags = { version = "2", default-features = false, features = ["std"] }
+bytes = { version = "1", features = ["serde"] }
+libc = { version = "0.2" }
+rustix = { version = "1", features = ["fs", "termios"] }
+scopeguard = { version = "1" }
+smallvec = { version = "1", default-features = false, features = ["const_generics"] }
+tokio = { version = "1", features = ["full"] }
 
 [target.aarch64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
+bytes = { version = "1", features = ["serde"] }
 libc = { version = "0.2" }
+rustix = { version = "1", features = ["fs", "termios"] }
+scopeguard = { version = "1" }
+smallvec = { version = "1", default-features = false, features = ["const_generics"] }
+tokio = { version = "1", features = ["full"] }
+
+[target.aarch64-unknown-linux-gnu.build-dependencies]
+bitflags = { version = "2", default-features = false, features = ["std"] }
+bytes = { version = "1", features = ["serde"] }
+libc = { version = "0.2" }
+rustix = { version = "1", features = ["fs", "termios"] }
+scopeguard = { version = "1" }
+smallvec = { version = "1", default-features = false, features = ["const_generics"] }
+tokio = { version = "1", features = ["full"] }
 
 [target.wasm32-wasip1.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
+wasi = { version = "0.11" }
+
+[target.wasm32-wasip1.build-dependencies]
+bitflags = { version = "2", default-features = false, features = ["std"] }
+wasi = { version = "0.11" }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-libc = { version = "0.2" }
+bytes = { version = "1", features = ["serde"] }
+libc = { version = "0.2", features = ["extra_traits"] }
+rustix = { version = "1", features = ["fs", "termios"] }
+scopeguard = { version = "1" }
+smallvec = { version = "1", default-features = false, features = ["const_generics"] }
+tokio = { version = "1", features = ["full"] }
+
+[target.aarch64-apple-darwin.build-dependencies]
+bitflags = { version = "2", default-features = false, features = ["std"] }
+bytes = { version = "1", features = ["serde"] }
+libc = { version = "0.2", features = ["extra_traits"] }
+rustix = { version = "1", features = ["fs", "termios"] }
+scopeguard = { version = "1" }
+smallvec = { version = "1", default-features = false, features = ["const_generics"] }
+tokio = { version = "1", features = ["full"] }
 
 ### END HAKARI SECTION
