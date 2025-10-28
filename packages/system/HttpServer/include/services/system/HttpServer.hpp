@@ -79,6 +79,9 @@ namespace SystemService
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
       // Entry point for HTTP requests
       void serve(std::int32_t socket, psibase::HttpRequest req);
+
+      /// Returns the root host for a given host
+      std::string rootHost(psio::view<const std::string> host);
    };
    PSIO_REFLECT(HttpServer,
                 method(sendProds, action),
@@ -87,7 +90,8 @@ namespace SystemService
                 method(sendReply, socket, response),
                 method(registerServer, server),
                 method(recv, socket, data),
-                method(serve, socket, req))
+                method(serve, socket, req),
+                method(rootHost, host))
 
    PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Session)
 }  // namespace SystemService

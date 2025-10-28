@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env -S direnv exec . bash
+set -euo pipefail
 
 # Continue/resume a chain
 # Same as launch but doesn't first delete the db.
