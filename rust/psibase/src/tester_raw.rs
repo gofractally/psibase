@@ -70,6 +70,17 @@ extern "C" {
     /// the most recent.
     pub fn startBlock(chain_handle: u32, time_us: i64, producer: u64, term: u32, commit_num: u32);
 
+    /// Runs an action
+    ///
+    /// Stores the transaction trace into result and returns the result size
+    pub fn runAction(
+        chain_index: u32,
+        mode: crate::RunMode,
+        head: bool,
+        args_packed: *const u8,
+        args_packed_size: usize,
+    ) -> u32;
+
     /// Runs an HttpRequest and returns a socket
     pub fn httpRequest(
         chain_handle: u32,

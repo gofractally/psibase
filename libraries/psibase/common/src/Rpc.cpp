@@ -72,14 +72,14 @@ namespace
          return scheme == "https" || host == "localhost" || host.ends_with(".localhost");
       }
 
-      bool isService(const std::string& rootHost, psibase::AccountNumber account)
+      bool isService(std::string_view rootHost, psibase::AccountNumber account)
       {
-         return isSecure() && account.str() + '.' + rootHost == host;
+         return isSecure() && account.str() + '.' + std::string(rootHost) == host;
       }
 
-      bool isSubdomain(const std::string& rootHost)
+      bool isSubdomain(std::string_view rootHost)
       {
-         return isSecure() && host == rootHost || host.ends_with('.' + rootHost);
+         return isSecure() && host == rootHost || host.ends_with('.' + std::string(rootHost));
       }
    };
 }  // namespace
@@ -211,6 +211,20 @@ namespace psibase
       return false;
    }
 
+   std::string_view rootHost(const HttpRequest& request, bool hostIsSubdomain)
+   {
+      if (hostIsSubdomain)
+      {
+         auto pos = request.host.find('.');
+         psibase::check(pos != std::string_view::npos, "Subdomain expected");
+         return request.host.substr(pos + 1);
+      }
+      else
+      {
+         return request.host;
+      }
+   }
+
    std::vector<HttpHeader> allowCors(std::string_view origin)
    {
       return {
@@ -220,20 +234,22 @@ namespace psibase
       };
    }
 
-   std::vector<HttpHeader> allowCors(const HttpRequest& req, AccountNumber account)
+   std::vector<HttpHeader> allowCors(const HttpRequest& req,
+                                     AccountNumber      account,
+                                     bool               hostIsSubdomain)
    {
       if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isService(req.rootHost, account))
+          origin && Origin(*origin).isService(rootHost(req, hostIsSubdomain), account))
       {
          return allowCors(*origin);
       }
       return {};
    }
 
-   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req)
+   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain)
    {
       if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isSubdomain(req.rootHost))
+          origin && Origin(*origin).isSubdomain(rootHost(req, hostIsSubdomain)))
       {
          return allowCors(*origin);
       }

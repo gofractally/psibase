@@ -19,7 +19,6 @@ using namespace psio::schema_types;
 HttpRequest makeQuery(std::string_view s)
 {
    return {.host        = "events.psibase.io",
-           .rootHost    = "psibase.io",
            .method      = "POST",
            .target      = "/sql",
            .contentType = "application/sql",
