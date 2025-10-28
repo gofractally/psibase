@@ -2,7 +2,6 @@
 name = "invite"
 version.workspace = true
 edition.workspace = true
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 pem = "3.0.4"
@@ -14,7 +13,6 @@ serde.workspace = true
 serde_json.workspace = true
 chrono = "0.4"
 rand = "0.9.0"
-hex = "0.4.3"
 plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
 
 [lib]
@@ -31,9 +29,8 @@ world = "impl"
 "host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
-"accounts:account-tokens" = { path = "../../../system/Accounts/plugin/account_tokens/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-"auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
-"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
+"credentials:plugin" = { path = "../../../system/Credentials/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
