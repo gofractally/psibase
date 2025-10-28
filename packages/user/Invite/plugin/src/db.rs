@@ -220,38 +220,22 @@ impl InviteTokensTable {
 
     pub fn account_created() {
         let invite_id = Self::active_invite_id().expect("No active invite token");
-        if let Some(device) = Self::device_history().get(&invite_id.to_string()) {
-            let mut device = <DeviceDetails>::unpacked(&device).unwrap();
-            device.account_created = true;
-            Self::device_history().set(&invite_id.to_string(), &device.packed());
-        } else {
-            Self::device_history().set(
-                &invite_id.to_string(),
-                &DeviceDetails {
-                    account_created: true,
-                    accepted: false,
-                }
-                .packed(),
-            );
-        }
+        let mut device = Self::device_history()
+            .get(&invite_id.to_string())
+            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .unwrap_or_default();
+        device.account_created = true;
+        Self::device_history().set(&invite_id.to_string(), &device.packed());
     }
 
     pub fn accepted() {
         let invite_id = Self::active_invite_id().expect("No active invite token");
-        if let Some(device) = Self::device_history().get(&invite_id.to_string()) {
-            let mut device = <DeviceDetails>::unpacked(&device).unwrap();
-            device.accepted = true;
-            Self::device_history().set(&invite_id.to_string(), &device.packed());
-        } else {
-            Self::device_history().set(
-                &invite_id.to_string(),
-                &DeviceDetails {
-                    account_created: false,
-                    accepted: true,
-                }
-                .packed(),
-            );
-        }
+        let mut device = Self::device_history()
+            .get(&invite_id.to_string())
+            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .unwrap_or_default();
+        device.accepted = true;
+        Self::device_history().set(&invite_id.to_string(), &device.packed());
         Self::delete_active();
     }
 

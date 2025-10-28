@@ -34,7 +34,7 @@ pub struct CurrentDetailsResponse {
     pub numAccounts: u16,
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Default, Pack, Unpack)]
 pub struct DeviceDetails {
     // Whether this device created an account with this invite
     pub account_created: bool,
