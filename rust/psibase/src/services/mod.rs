@@ -33,3 +33,4 @@ pub mod transact;
 pub mod verify_sig;
 pub mod x_admin;
 pub mod x_db;
+pub mod x_http;

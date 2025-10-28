@@ -45,7 +45,7 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         run: |
-          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:073ffc7576039990f47c4389c1258b5033190d60"
+          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:c3bf3ba89c5be07279112babbd5b21a60339e516"
           bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} "$BUILDER_IMAGE" ${{ matrix.ubuntu-version }}
       - name: Publish packages
         if: fromJSON(env.can-publish) && matrix.ubuntu-version == '2404'

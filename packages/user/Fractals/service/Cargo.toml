@@ -20,7 +20,7 @@ evaluations = { path = "../../Evaluations/service", version = "0.21.0" }
 async-graphql.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 fractals-pkg = { path = "..", version = "0.21.0" }

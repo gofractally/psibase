@@ -54,9 +54,6 @@ pub struct HttpRequest {
     /// Fully-qualified domain name
     pub host: String,
 
-    /// host name, but without service subdomain
-    pub rootHost: String,
-
     /// "GET" or "POST"
     pub method: String,
 

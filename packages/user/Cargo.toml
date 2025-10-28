@@ -49,6 +49,7 @@ rust-version = "1.64"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+license = "MIT"
 publish = false
 
 [workspace.dependencies]
@@ -58,6 +59,7 @@ async-graphql = "=7.0.17"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.120"
 serde-aux = "4.7.0"
+psibase-user-workspace-hack = { version = "0.1.0", path = "user-workspace-hack" }
 # Standard version for cargo-component 0.15.0
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
 

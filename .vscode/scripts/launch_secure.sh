@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env -S direnv exec . bash
+set -euo pipefail
 
 # Launch a secure chain
 
