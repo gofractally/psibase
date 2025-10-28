@@ -254,7 +254,6 @@ namespace psibase::http
       lock_keyring_t         lock_keyring         = {};
       get_pkcs11_tokens_t    get_pkcs11_tokens    = {};
       services_t             services;
-      std::atomic<bool>      enable_p2p;
       std::atomic<bool>      enable_transactions;
       // This contains some cached state that the reader thread might modify
       mutable std::atomic<http_status> status;

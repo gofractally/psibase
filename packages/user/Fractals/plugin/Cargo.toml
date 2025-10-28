@@ -1,5 +1,5 @@
 [package]
-name = "plugin"
+name = "fractals-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -7,10 +7,11 @@ publish.workspace = true
 
 [dependencies]
 fractals = { path = "../service/", version = "0.21.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = { version = "1.0.125" }
-wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wit-bindgen-rt.workspace = true
+psibase-user-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -26,8 +27,8 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
-"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 "evaluations:plugin" = { path = "../../Evaluations/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 
 [dev-dependencies]

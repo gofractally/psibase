@@ -516,8 +516,7 @@ namespace psibase::http
             runNativeHandlerJson(server.http_config->push_boot_async);
          }  // push_boot
          else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
-                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
-                  server.http_config->enable_p2p)
+                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket))
          {
             if (forbidCrossOrigin())
                return;
@@ -548,20 +547,6 @@ namespace psibase::http
             {
                send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
             }
-         }
-         else if (req_target == "/native/admin/shutdown")
-         {
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
-            }
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               return send(builder.error(bhttp::status::unsupported_media_type,
-                                         "Content-Type must be application/json\n"));
-            }
-            server.http_config->shutdown(std::move(req.body()));
-            return send(builder.accepted());
          }
          else if (req_target == "/native/admin/perf" && server.http_config->get_perf)
          {
@@ -765,25 +750,6 @@ namespace psibase::http
                }
             }
 
-            // Find the most specific host name that matches the request
-            std::string_view root_host;
-            for (const auto& name : server.http_config->hosts)
-            {
-               if (host.ends_with(name) &&
-                   (host.size() == name.size() || host[host.size() - name.size() - 1] == '.'))
-               {
-                  if (name.size() > root_host.size())
-                  {
-                     root_host = name;
-                  }
-               }
-            }
-            // If there isn't a matching host, default to the first host
-            if (root_host.empty() && !server.http_config->hosts.empty())
-            {
-               root_host = server.http_config->hosts.front();
-            }
-
             auto        startTime = steady_clock::now();
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
@@ -813,7 +779,6 @@ namespace psibase::http
                return send(builder.methodNotAllowed(req.target(), req.method_string(),
                                                     "GET, POST, OPTIONS", true));
             data.host        = {host.begin(), host.size()};
-            data.rootHost    = root_host;
             data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = req.body();

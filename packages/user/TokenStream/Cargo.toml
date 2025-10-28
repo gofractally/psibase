@@ -1,27 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin", "query-service"]
-
-[workspace.package]
-version = "0.21.0"
-rust-version = "1.64"
-edition = "2021"
-publish = false
-
 [package]
 name = "token-stream-pkg"                          # Crate name
 description = "Stream tokens by exponential decay"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "TokenStream"
@@ -40,3 +25,4 @@ crate-type = ["rlib"]
 token-stream = { path = "service", version = "0.21.0" }
 r-token-stream = { path = "query-service", version = "0.21.0" }
 token-stream-plugin = { path = "plugin", version = "0.21.0" }
+psibase-user-workspace-hack.workspace = true

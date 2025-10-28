@@ -7,11 +7,12 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase", version = "0.21.0" }
-serde = "1.0"
-serde-aux = "4.7.0"
+psibase.workspace = true
+serde.workspace = true
+serde-aux.workspace = true
 registry = { path = "../service", version = "0.21.0" }
-async-graphql = "=7.0.17"
+async-graphql.workspace = true
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 registry-pkg = { path = "..", version = "0.21.0" }

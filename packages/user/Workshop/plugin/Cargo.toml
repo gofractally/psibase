@@ -10,6 +10,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

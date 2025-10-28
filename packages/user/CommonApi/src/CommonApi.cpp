@@ -39,18 +39,17 @@ namespace SystemService
       {
          if (request.target == "/common/thisservice")
          {
+            auto        rootHost = to<HttpServer>().rootHost(request.host);
             std::string serviceName;
-            if (request.host.size() > request.rootHost.size() + 1 &&
-                request.host.ends_with(request.rootHost) &&
-                request.host[request.host.size() - request.rootHost.size() - 1] == '.')
-               serviceName.assign(request.host.begin(),
-                                  request.host.end() - request.rootHost.size() - 1);
+            if (request.host.size() > rootHost.size() + 1 && request.host.ends_with(rootHost) &&
+                request.host[request.host.size() - rootHost.size() - 1] == '.')
+               serviceName.assign(request.host.begin(), request.host.end() - rootHost.size() - 1);
             else
                serviceName = HttpServer::homepageService.str();
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
-            return to_json(request.rootHost);
+            return to_json(to<HttpServer>().rootHost(request.host));
          if (request.target == "/common/tapos/head")
          {
             auto [index, suffix] = headTapos();
@@ -100,9 +99,11 @@ namespace SystemService
             psio::json_token_stream jstream{request.body.data()};
             auto                    params = psio::from_json<cookie_data>(jstream);
 
-            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
-            bool                    isLocalhost = psibase::isLocalhost(request);
-            std::string             cookieName  = "__Host-SESSION";
+            std::vector<HttpHeader> headers =
+                allowCors(request, AccountNumber{"supervisor"},
+                          to<HttpServer>().rootHost(request.host) != request.host);
+            bool        isLocalhost = psibase::isLocalhost(request);
+            std::string cookieName  = "__Host-SESSION";
 
             std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" +
                                         std::to_string(getCookieMaxAge());
@@ -119,9 +120,11 @@ namespace SystemService
          }
          if (request.target == "/common/remove-auth-cookie")
          {
-            std::vector<HttpHeader> headers     = allowCors(request, AccountNumber{"supervisor"});
-            bool                    isLocalhost = psibase::isLocalhost(request);
-            std::string             cookieName  = "__Host-SESSION";
+            std::vector<HttpHeader> headers =
+                allowCors(request, AccountNumber{"supervisor"},
+                          to<HttpServer>().rootHost(request.host) != request.host);
+            bool        isLocalhost = psibase::isLocalhost(request);
+            std::string cookieName  = "__Host-SESSION";
 
             std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
             if (isLocalhost)

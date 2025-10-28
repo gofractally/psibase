@@ -1,27 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin"]
-
-[workspace.package]
-version = "0.21.1"
-rust-version = "1.64"
-edition = "2021"
-publish = false
-
 [package]
-name = "profiles-pkg"         # Crate name
+name = "profiles-pkg"
 description = "Add profiles"
-version.workspace = true
+version = "0.21.1"
 rust-version.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "Profiles"
@@ -37,4 +22,5 @@ crate-type = ["rlib"]
 [dependencies]
 profiles = { path = "service", version = "0.21.1" }
 r-profiles = { path = "query-service", version = "0.21.1" }
-plugin = { path = "plugin", version = "0.21.1" }
+profiles-plugin = { path = "plugin", version = "0.21.1" }
+psibase-user-workspace-hack.workspace = true

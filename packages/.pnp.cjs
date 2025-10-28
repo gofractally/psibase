@@ -51,6 +51,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:user/Explorer/ui"\
     },\
     {\
+      "name": "@psibase/fractal-core-ui",\
+      "reference": "workspace:user/FractalCore/ui"\
+    },\
+    {\
       "name": "@psibase/fractals-ui",\
       "reference": "workspace:user/Fractals/ui"\
     },\
@@ -93,6 +97,7 @@ const RAW_RUNTIME_STATE =
     ["@psibase/config-ui", ["workspace:user/Config/ui"]],\
     ["@psibase/evaluations-ui", ["workspace:user/Evaluations/ui"]],\
     ["@psibase/explorer-ui", ["workspace:user/Explorer/ui"]],\
+    ["@psibase/fractal-core-ui", ["workspace:user/FractalCore/ui"]],\
     ["@psibase/fractals-ui", ["workspace:user/Fractals/ui"]],\
     ["@psibase/homepage-ui", ["workspace:user/Homepage/ui"]],\
     ["@psibase/identity-ui", ["workspace:user/Identity/ui"]],\
@@ -2801,6 +2806,38 @@ const RAW_RUNTIME_STATE =
         "linkType": "SOFT"\
       }]\
     ]],\
+    ["@psibase/fractal-core-ui", [\
+      ["workspace:user/FractalCore/ui", {\
+        "packageLocation": "./user/FractalCore/ui/",\
+        "packageDependencies": [\
+          ["@dicebear/collection", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.2.4"],\
+          ["@dicebear/core", "npm:9.2.4"],\
+          ["@psibase/fractal-core-ui", "workspace:user/FractalCore/ui"],\
+          ["@tanstack/react-form", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:1.23.8"],\
+          ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0"],\
+          ["@tanstack/react-query", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:5.90.2"],\
+          ["@types/humanize-duration", "npm:3.27.4"],\
+          ["@types/node", "npm:22.18.6"],\
+          ["@types/react", "npm:19.1.13"],\
+          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
+          ["@uidotdev/usehooks", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.4.1"],\
+          ["dayjs", "npm:1.11.18"],\
+          ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.36.0"],\
+          ["humanize-duration", "npm:3.33.1"],\
+          ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
+          ["nuqs", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.6.0"],\
+          ["react", "npm:19.1.1"],\
+          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.1"],\
+          ["react-easy-sort", "virtual:5264730febc38ea13beab048700e07e89dd640fc95f2142de4f9ebfe260da3e26c04b01eb44fe61468f43fb10b46bb2778c5ee5176df2376ca0cc3606d7339a2#npm:1.7.0"],\
+          ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.1"],\
+          ["typescript", "patch:typescript@npm%3A5.9.2#optional!builtin<compat/typescript>::version=5.9.2&hash=5786d5"],\
+          ["usehooks-ts", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.1.1"],\
+          ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.20"],\
+          ["zod", "npm:3.25.76"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
     ["@psibase/fractals-ui", [\
       ["workspace:user/Fractals/ui", {\
         "packageLocation": "./user/Fractals/ui/",\
@@ -2814,12 +2851,12 @@ const RAW_RUNTIME_STATE =
           ["@types/node", "npm:22.18.6"],\
           ["@types/react", "npm:19.1.13"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
-          ["@uidotdev/usehooks", "virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.4.1"],\
+          ["@uidotdev/usehooks", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.4.1"],\
           ["dayjs", "npm:1.11.18"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.36.0"],\
           ["humanize-duration", "npm:3.33.1"],\
           ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
-          ["nuqs", "virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.6.0"],\
+          ["nuqs", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.6.0"],\
           ["react", "npm:19.1.1"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.1"],\
           ["react-easy-sort", "virtual:5264730febc38ea13beab048700e07e89dd640fc95f2142de4f9ebfe260da3e26c04b01eb44fe61468f43fb10b46bb2778c5ee5176df2376ca0cc3606d7339a2#npm:1.7.0"],\
@@ -2975,7 +3012,7 @@ const RAW_RUNTIME_STATE =
           ["@types/react", "npm:19.1.13"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
           ["@types/react-router-dom", "npm:5.3.3"],\
-          ["@uidotdev/usehooks", "virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.4.1"],\
+          ["@uidotdev/usehooks", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.4.1"],\
           ["dayjs", "npm:1.11.18"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.36.0"],\
           ["humanize-duration", "npm:3.33.1"],\
@@ -5757,6 +5794,13 @@ const RAW_RUNTIME_STATE =
           ["@tanstack/devtools-event-client", "npm:0.3.1"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["npm:0.3.4", {\
+        "packageLocation": "../.caches/yarn/@tanstack-devtools-event-client-npm-0.3.4-d1447abd0b-29868fcc70.zip/node_modules/@tanstack/devtools-event-client/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.3.4"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["@tanstack/form-core", [\
@@ -5769,6 +5813,16 @@ const RAW_RUNTIME_STATE =
           ["uuid", "npm:13.0.0"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["npm:1.24.4", {\
+        "packageLocation": "../.caches/yarn/@tanstack-form-core-npm-1.24.4-a7af0074d7-ce20ae8ff9.zip/node_modules/@tanstack/form-core/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.3.4"],\
+          ["@tanstack/form-core", "npm:1.24.4"],\
+          ["@tanstack/pacer", "npm:0.15.4"],\
+          ["@tanstack/store", "npm:0.7.7"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["@tanstack/pacer", [\
@@ -5778,6 +5832,22 @@ const RAW_RUNTIME_STATE =
           ["@tanstack/devtools-event-client", "npm:0.2.5"],\
           ["@tanstack/pacer", "npm:0.15.3"],\
           ["@tanstack/store", "npm:0.7.7"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:0.15.4", {\
+        "packageLocation": "../.caches/yarn/@tanstack-pacer-npm-0.15.4-c480cbd6ef-0f926f5082.zip/node_modules/@tanstack/pacer/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.3.4"],\
+          ["@tanstack/pacer", "npm:0.15.4"],\
+          ["@tanstack/store", "npm:0.7.7"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:0.6.0", {\
+        "packageLocation": "../.caches/yarn/@tanstack-pacer-npm-0.6.0-5277b1d1dd-4deae6181d.zip/node_modules/@tanstack/pacer/",\
+        "packageDependencies": [\
+          ["@tanstack/pacer", "npm:0.6.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -5805,6 +5875,34 @@ const RAW_RUNTIME_STATE =
           ["@tanstack/react-form", "npm:1.23.2"]\
         ],\
         "linkType": "SOFT"\
+      }],\
+      ["npm:1.23.8", {\
+        "packageLocation": "../.caches/yarn/@tanstack-react-form-npm-1.23.8-0b0788545d-ac1b5d658a.zip/node_modules/@tanstack/react-form/",\
+        "packageDependencies": [\
+          ["@tanstack/react-form", "npm:1.23.8"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:1.23.8", {\
+        "packageLocation": "./.yarn/__virtual__/@tanstack-react-form-virtual-7fe9fc3e6f/2/.caches/yarn/@tanstack-react-form-npm-1.23.8-0b0788545d-ac1b5d658a.zip/node_modules/@tanstack/react-form/",\
+        "packageDependencies": [\
+          ["@tanstack/form-core", "npm:1.24.4"],\
+          ["@tanstack/react-form", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:1.23.8"],\
+          ["@tanstack/react-start", null],\
+          ["@tanstack/react-store", "virtual:63566c2f6ad6d064f8ecaf329e47e9506688e8ce347b63080ee569c9cdcf1c03eb60b31e3fa0f9d93177113491493d868219f6e8ce6d2f33c19a91aabcf2e978#npm:0.7.7"],\
+          ["@types/react", "npm:19.1.13"],\
+          ["@types/tanstack__react-start", null],\
+          ["decode-formdata", "npm:0.9.0"],\
+          ["devalue", "npm:5.3.2"],\
+          ["react", "npm:19.1.1"]\
+        ],\
+        "packagePeers": [\
+          "@tanstack/react-start",\
+          "@types/react",\
+          "@types/tanstack__react-start",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
       }],\
       ["virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.23.2", {\
         "packageLocation": "./.yarn/__virtual__/@tanstack-react-form-virtual-63566c2f6a/2/.caches/yarn/@tanstack-react-form-npm-1.23.2-d30784ef6b-871419c2aa.zip/node_modules/@tanstack/react-form/",\
@@ -5835,6 +5933,31 @@ const RAW_RUNTIME_STATE =
           ["@tanstack/react-pacer", "npm:0.16.3"]\
         ],\
         "linkType": "SOFT"\
+      }],\
+      ["npm:0.6.0", {\
+        "packageLocation": "../.caches/yarn/@tanstack-react-pacer-npm-0.6.0-71514f509f-4854e329ad.zip/node_modules/@tanstack/react-pacer/",\
+        "packageDependencies": [\
+          ["@tanstack/react-pacer", "npm:0.6.0"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0", {\
+        "packageLocation": "./.yarn/__virtual__/@tanstack-react-pacer-virtual-a3ec775812/2/.caches/yarn/@tanstack-react-pacer-npm-0.6.0-71514f509f-4854e329ad.zip/node_modules/@tanstack/react-pacer/",\
+        "packageDependencies": [\
+          ["@tanstack/pacer", "npm:0.6.0"],\
+          ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0"],\
+          ["@types/react", "npm:19.1.13"],\
+          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
+          ["react", "npm:19.1.1"],\
+          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.1"]\
+        ],\
+        "packagePeers": [\
+          "@types/react-dom",\
+          "@types/react",\
+          "react-dom",\
+          "react"\
+        ],\
+        "linkType": "HARD"\
       }],\
       ["virtual:5264730febc38ea13beab048700e07e89dd640fc95f2142de4f9ebfe260da3e26c04b01eb44fe61468f43fb10b46bb2778c5ee5176df2376ca0cc3606d7339a2#npm:0.16.3", {\
         "packageLocation": "./.yarn/__virtual__/@tanstack-react-pacer-virtual-4da779d534/2/.caches/yarn/@tanstack-react-pacer-npm-0.16.3-c6274c4141-de33850c9f.zip/node_modules/@tanstack/react-pacer/",\
@@ -7085,12 +7208,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.4.1", {\
-        "packageLocation": "./.yarn/__virtual__/@uidotdev-usehooks-virtual-622813d93c/2/.caches/yarn/@uidotdev-usehooks-npm-2.4.1-c11868da60-181c43fb32.zip/node_modules/@uidotdev/usehooks/",\
+      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.4.1", {\
+        "packageLocation": "./.yarn/__virtual__/@uidotdev-usehooks-virtual-f45e66bb53/2/.caches/yarn/@uidotdev-usehooks-npm-2.4.1-c11868da60-181c43fb32.zip/node_modules/@uidotdev/usehooks/",\
         "packageDependencies": [\
           ["@types/react", "npm:19.1.13"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.9"],\
-          ["@uidotdev/usehooks", "virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.4.1"],\
+          ["@uidotdev/usehooks", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.4.1"],\
           ["react", "npm:19.1.1"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.1"]\
         ],\
@@ -12962,8 +13085,8 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.6.0", {\
-        "packageLocation": "./.yarn/__virtual__/nuqs-virtual-6159eeeed8/2/.caches/yarn/nuqs-npm-2.6.0-0b7e2d6f25-b97647fc26.zip/node_modules/nuqs/",\
+      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.6.0", {\
+        "packageLocation": "./.yarn/__virtual__/nuqs-virtual-a6a12b7f4c/2/.caches/yarn/nuqs-npm-2.6.0-0b7e2d6f25-b97647fc26.zip/node_modules/nuqs/",\
         "packageDependencies": [\
           ["@remix-run/react", null],\
           ["@standard-schema/spec", "npm:1.0.0"],\
@@ -12975,7 +13098,7 @@ const RAW_RUNTIME_STATE =
           ["@types/remix-run__react", null],\
           ["@types/tanstack__react-router", null],\
           ["next", null],\
-          ["nuqs", "virtual:d49df60a59e4ed88e0bf4207a403e05a83f24462577a53e7f41ce4fa5e2022c103a380be48235d65bb49db2fe19e860baf66ac4ccd5f6eafd703b9f241ddad9c#npm:2.6.0"],\
+          ["nuqs", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.6.0"],\
           ["react", "npm:19.1.1"],\
           ["react-router", null],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.1"]\

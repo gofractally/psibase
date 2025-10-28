@@ -161,6 +161,10 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                         <CommandInput
                                             placeholder="Search account..."
                                             className="h-9 border-none ring-0"
+                                            autoComplete="off"
+                                            autoCorrect="off"
+                                            autoCapitalize="off"
+                                            spellCheck="false"
                                         />
                                         <CommandList>
                                             <NoAccountsFound

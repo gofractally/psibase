@@ -33,14 +33,15 @@ export const CreateFractalModal = ({
 
     const form = useAppForm({
         defaultValues: {
-            account: "",
+            fractalAccount: "",
+            guildAccount: '',
             mission: "",
             name: "",
         },
         onSubmit: async (data) => {
             await createFractal(data.value);
             openChange(false);
-            navigate(`/fractal/${data.value.account}`);
+            navigate(`/fractal/${data.value.fractalAccount}`);
             refetch();
         },
         validators: {
@@ -79,7 +80,7 @@ export const CreateFractalModal = ({
                             )}
                         />
                         <form.AppField
-                            name="account"
+                            name="fractalAccount"
                             validators={{
                                 onChangeAsyncDebounceMs: 1000,
                                 onChangeAsync: async ({ value }) => {
@@ -96,11 +97,36 @@ export const CreateFractalModal = ({
                             }}
                             children={(field) => (
                                 <field.TextField
-                                    label="Account name"
+                                    label="Fractal account name"
                                     description="Unique identifier"
                                 />
                             )}
                         />
+
+                        <form.AppField
+                            name="guildAccount"
+                            validators={{
+                                onChangeAsyncDebounceMs: 1000,
+                                onChangeAsync: async ({ value }) => {
+                                    const status =
+                                        await isAccountAvailable(value);
+                                    if (status === "Taken") {
+                                        return "Account name is already taken";
+                                    }
+                                    if (status === "Invalid") {
+                                        return "Invalid account name";
+                                    }
+                                    return undefined;
+                                },
+                            }}
+                            children={(field) => (
+                                <field.TextField
+                                    label="Genesis guild account name"
+                                    description="Unique identifier"
+                                />
+                            )}
+                        />
+
 
                         <form.AppForm>
                             <form.SubmitButton

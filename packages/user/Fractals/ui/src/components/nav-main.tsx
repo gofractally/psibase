@@ -1,10 +1,4 @@
-import {
-    CalendarCheck,
-    CalendarClock,
-    Contact,
-    Search,
-    Users,
-} from "lucide-react";
+import { Contact, LucideIcon, Search } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
@@ -18,7 +12,21 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
-const browseMenu = [
+interface MenuItem {
+    groupLabel: string;
+    path: string;
+    menus: {
+        title: string;
+        icon: LucideIcon;
+        path: string;
+    }[];
+    button?: {
+        label: string;
+        onClick: () => void;
+    };
+}
+
+const browseMenu: MenuItem[] = [
     {
         groupLabel: "Global",
         path: "",
@@ -32,7 +40,7 @@ const browseMenu = [
     },
 ];
 
-export const fractalMenus = [
+export const staticFractalMenus: MenuItem[] = [
     {
         groupLabel: "Membership",
         path: "membership",
@@ -42,27 +50,6 @@ export const fractalMenus = [
                 icon: Contact,
                 path: "",
             },
-            {
-                title: "All members",
-                icon: Users,
-                path: "members",
-            },
-        ],
-    },
-    {
-        groupLabel: "Evaluations",
-        path: "evaluations",
-        menus: [
-            {
-                title: "Active & upcoming",
-                icon: CalendarClock,
-                path: "",
-            },
-            {
-                title: "Completed",
-                icon: CalendarCheck,
-                path: "completed",
-            },
         ],
     },
 ] as const;
@@ -71,6 +58,8 @@ export function NavMain() {
     const location = useLocation();
 
     const fractalName = useCurrentFractal();
+
+    const fractalMenus = [...staticFractalMenus];
 
     const isBrowse = !location.pathname.startsWith("/fractal");
 
@@ -82,12 +71,12 @@ export function NavMain() {
                 <SidebarGroup>
                     <SidebarGroupLabel>{item.groupLabel}</SidebarGroupLabel>
                     <SidebarMenu>
-                        {item.menus.map((menu) => (
+                        {item.menus?.map((menu) => (
                             <NavLink
                                 to={
                                     isBrowse
                                         ? item.path
-                                        : `/fractal/${fractalName}/${item.path}/${menu.path}`
+                                        : `/fractal/${fractalName}`
                                 }
                                 end
                             >
@@ -106,6 +95,14 @@ export function NavMain() {
                                 )}
                             </NavLink>
                         ))}
+                        {item.button && (
+                            <button
+                                onClick={() => {}}
+                                className="border-muted-foreground/50 hover:border-primary rounded-sm border border-dashed py-3 text-sm"
+                            >
+                                Create Guild
+                            </button>
+                        )}
                     </SidebarMenu>
                 </SidebarGroup>
             ))}

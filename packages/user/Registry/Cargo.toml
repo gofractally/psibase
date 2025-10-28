@@ -1,27 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["service", "query", "plugin"]
-
-[workspace.package]
-version = "0.21.0"
-rust-version = "1.64"
-edition = "2021"
-publish = false
-
 [package]
-name = "registry-pkg"
+name = "registry-pkg"                     # Crate name
 description = "Registry for psibase apps"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "Registry"
@@ -33,4 +18,5 @@ crate-type = ["rlib"]
 [dependencies]
 registry = { path = "service", version = "0.21.0" }
 r-registry = { path = "query", version = "0.21.0" }
-plugin = { path = "plugin", version = "0.21.0" }
+registry-plugin = { path = "plugin", version = "0.21.0" }
+psibase-user-workspace-hack.workspace = true

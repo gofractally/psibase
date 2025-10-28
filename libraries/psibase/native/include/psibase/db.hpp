@@ -66,9 +66,11 @@ namespace psibase
       std::function<void()>                      runQueue;
       std::function<void(std::span<const char>)> validateHostConfig;
       std::function<void()>                      hostConfig;
+      std::function<void()>                      shutdown;
       static const unsigned                      nextTransactionFlag = 1;
       static const unsigned                      runQueueFlag        = 2;
       static const unsigned                      hostConfigFlag      = 4;
+      static const unsigned                      shutdownFlag        = 8;
       using Flags                                                    = unsigned;
       void run(Flags& flags)
       {
@@ -83,6 +85,10 @@ namespace psibase
          if ((flags & hostConfigFlag) && hostConfig)
          {
             hostConfig();
+         }
+         if ((flags & shutdownFlag) && shutdown)
+         {
+            shutdown();
          }
          flags = 0;
       }

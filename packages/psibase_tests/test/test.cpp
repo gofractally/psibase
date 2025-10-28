@@ -54,8 +54,7 @@ TEST_CASE("import/export handles")
    t.addService(TestExport::service, "TestExport.wasm", TestExport::flags);
    t.addService(TestImport::service, "TestImport.wasm", TestImport::flags);
    t.http(HttpRequest{
-       .host        = "x-admin.psibase",
-       .rootHost    = "psibase",
+       .host        = "x-admin.psibase.io",
        .method      = "PUT",
        .target      = "/services/" + TestExport::service.str(),
        .contentType = "application/wasm",
