@@ -74,9 +74,9 @@ mod service {
 
     /// The sender accepts an invite.
     /// Calling this action also requires that the sender authorizes the transaction with the
-    /// proof for the credential associated with an invite.
+    /// proof for the credential associated with the invite.
     #[action]
-    fn accept() {
+    fn accept(inviteId: u32) {
         unimplemented!()
     }
 

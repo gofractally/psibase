@@ -207,7 +207,7 @@ SCENARIO("Expired invites")
 
             THEN("It cannot be accepted")
             {
-               CHECK(b.accept().failed("Credential expired"));
+               CHECK(b.accept(id).failed("Credential expired"));
             }
             THEN("It can be deleted by the creator")
             {
@@ -269,7 +269,7 @@ SCENARIO("Accepting an invite")
 
          THEN("The invite can be accepted by a normal user")
          {
-            CHECK(b.accept().succeeded());
+            CHECK(b.accept(id).succeeded());
          }
          THEN("An invite can be used to create a new account")
          {
@@ -277,7 +277,7 @@ SCENARIO("Accepting an invite")
             AND_THEN(
                 "The invite can be accepted by the new account (tx also signed using credential)")
             {
-               CHECK(r.accept().succeeded());
+               CHECK(r.accept(id).succeeded());
             }
          }
          THEN("A normal user may not create a new account")
@@ -288,31 +288,31 @@ SCENARIO("Accepting an invite")
          }
          THEN("Credential account may not accept an invite")
          {
-            CHECK(i.accept().failed(canOnlyCallCreateAccount));
+            CHECK(i.accept(id).failed("not allowed using this credential"));
          }
          WHEN("An invite is accepted with an existing account")
          {
-            b.accept();
+            b.accept(id);
 
             THEN("An accepted invite can be accepted again with a different account")
             {
-               CHECK(c.accept().succeeded());
+               CHECK(c.accept(id).succeeded());
             }
             THEN("An accepted invite can be accepted again with a created account")
             {
                CHECK(i.createAccount("alexandria"_a, userPub).succeeded());
-               CHECK(r.accept().succeeded());
+               CHECK(r.accept(id).succeeded());
             }
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
          {
-            CHECK(bob.with(userKeys).to<Invite>().accept().failed(noActiveCredential));
+            CHECK(bob.with(userKeys).to<Invite>().accept(id).failed(noActiveCredential));
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey proof")
          {
             // Manually constructing the transaction to avoid adding the proper proof
             transactor<Invite> service(bob, Invite::service);
-            auto               trx = t.makeTransaction({service.accept()});
+            auto               trx = t.makeTransaction({service.accept(id)});
             for (const auto& key : combinedKeyList)
             {
                trx.claims.push_back({

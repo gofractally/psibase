@@ -140,7 +140,7 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    emit().history().updated(invite->id, newAccount, InviteEventType::accountRedeemed);
 }
 
-void Invite::accept()
+void Invite::accept(uint32_t inviteId)
 {
    auto cid_opt = to<Credentials>().get_active();
    check(cid_opt.has_value(), noActiveCredential.data());
@@ -149,6 +149,7 @@ void Invite::accept()
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.getIndex<2>().get(cid);
    check(invite.has_value(), inviteDNE.data());
+   check(invite->id == inviteId, credentialMismatch.data());
 
    auto accepter = getSender();
    emit().history().updated(invite->id, accepter, InviteEventType::accepted);

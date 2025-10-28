@@ -176,7 +176,13 @@ impl Redemption for InvitePlugin {
 
         use_active_invite();
 
-        Transact::add_action_to_transaction(accept::ACTION_NAME, &accept {}.packed()).unwrap();
+        let Some(inviteId) = InviteTokensTable::active_invite_id() else {
+            println!("No active invite token");
+            return;
+        };
+
+        Transact::add_action_to_transaction(accept::ACTION_NAME, &accept { inviteId }.packed())
+            .unwrap();
 
         InviteTokensTable::accepted();
     }
