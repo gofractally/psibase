@@ -10,7 +10,7 @@ serde_json.workspace = true
 url = "2.4"
 psibase.workspace = true
 regex = "1.0"
-plugin-workspace-hack = { version = "0.1", path = "../../../../plugin-workspace-hack" }
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

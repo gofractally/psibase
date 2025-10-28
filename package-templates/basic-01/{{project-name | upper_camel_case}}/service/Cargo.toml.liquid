@@ -14,11 +14,12 @@ postinstall = [
 ]
 
 [dependencies]
-psibase = { version = "{{version}}", path = "../../../../rust/psibase" }
-psibase_macros = { version = "{{version}}", path = "../../../../rust/psibase_macros" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.120"
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
 
 [dev-dependencies]
 {{project-name}}-pkg = { path = "..", version = "{{version}}" }

@@ -9,7 +9,7 @@ publish.workspace = true
 psibase.workspace = true
 psibase_macros.workspace = true
 serde = { version = "1.0.208", features = ["derive"] }
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 subgroups-pkg = { path = "..", version = "0.21.0" }
