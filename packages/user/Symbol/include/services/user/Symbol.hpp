@@ -30,6 +30,8 @@ namespace UserService
       bool               exists(SID symbol);
       Quantity           getPrice(uint8_t numChars);
       SymbolLengthRecord getSymbolType(uint8_t numChars);
+      void               mapSymbol(TID tokenId, SID symbol);
+
 
       // clang-format off
       struct Events
@@ -50,6 +52,7 @@ namespace UserService
       method(init),
       method(create, newSymbol),
       method(serveSys, request),
+      method(mapSymbol, tokenId, symbol),
 
       method(getSymbol, symbol),
       method(exists, symbol),

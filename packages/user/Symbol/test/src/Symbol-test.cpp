@@ -302,7 +302,7 @@ SCENARIO("Buying and selling symbols")
       // Map system symbol to system token
       auto sysSymbolNft = alice.to<Symbol>().getSymbol(sysSymbol).returnVal().ownerNft;
       alice.to<Nft>().credit(sysSymbolNft, Tokens::service, memo);
-      alice.to<Tokens>().mapSymbol(sysToken, sysSymbol);
+      alice.to<Symbol>().mapSymbol(sysToken, sysSymbol);
 
  
    }

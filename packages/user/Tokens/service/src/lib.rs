@@ -122,30 +122,7 @@ pub mod service {
     /// * `symbol` - Symbol e.g. "BTC"
     #[action]
     #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        let mut token = Token::get_assert(token_id);
-
-        token.map_symbol(symbol);
-
-        let symbol_owner_nft = Symbol::call().getSymbol(symbol).ownerNft;
-        check(symbol_owner_nft != 0, "Symbol does not exist");
-
-        Nfts::call().debit(
-            symbol_owner_nft,
-            format!(
-                "Mapping symbol {} to token {}",
-                symbol.to_string(),
-                token_id
-            ),
-        );
-        Nfts::call().burn(symbol_owner_nft);
-
-        Wrapper::emit().history().configured(
-            token.id,
-            "named".to_string(),
-            Memo::new(format!("{}", symbol.to_string())).unwrap(),
-        );
-    }
+    fn mapSymbol(token_id: TID, symbol: AccountNumber) {}
 
     /// Get user's token-specific balance configuration
     ///

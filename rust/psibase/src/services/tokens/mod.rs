@@ -220,21 +220,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Map a symbol to a token
-    ///
-    /// By default, tokens are only identifiable by their TID.
-    /// Symbols may be mapped to improve usability. Once a symbol
-    /// is mapped, it is permanent.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        unimplemented!()
-    }
-
     /// Get user's global configuration.
     ///
     /// Settings apply to all tokens without a specific balance configuration.

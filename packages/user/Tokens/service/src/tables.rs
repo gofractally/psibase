@@ -72,13 +72,6 @@ pub mod tables {
             check(account == holder, "Missing required authority");
         }
 
-        pub fn map_symbol(&mut self, symbol: AccountNumber) {
-            check_none(self.symbol, "Token already has a symbol");
-            let sender = get_sender();
-            self.check_is_owner(sender);
-            self.symbol = Some(symbol);
-            self.save();
-        }
 
         pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
             let init_table = InitTable::new();

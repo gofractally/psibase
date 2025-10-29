@@ -196,6 +196,7 @@ pub mod service {
     }
 
     #[action]
+    #[allow(non_snake_case)]
     fn getSymbol(symbol: AccountNumber) -> Symbol {
         Symbol::get_assert(symbol)
     }
@@ -206,7 +207,8 @@ pub mod service {
     }
 
     #[action]
-    fn map_token(symbol: AccountNumber, token_id: TID) {
+    #[allow(non_snake_case)]
+    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
         Symbol::get_assert(symbol).map_token(token_id);
     }
 
