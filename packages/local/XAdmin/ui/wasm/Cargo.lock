@@ -1553,23 +1553,12 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
-dependencies = [
- "libc",
- "log",
- "wasi 0.11.0+wasi-snapshot-preview1",
- "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mio"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2886843bf800fba2e3377cff24abf6379b4c4d5c6681eaf9ea5b0d15090450bd"
 dependencies = [
  "libc",
+ "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
 ]
@@ -1763,6 +1752,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "phf_shared"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1941,6 +1939,8 @@ dependencies = [
 [[package]]
 name = "psibase-rust-workspace-hack"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "573927f36c452146ac14bc82f109e3bec2610c2b3a5a6a38e658dbf2bb5c8b25"
 dependencies = [
  "aho-corasick",
  "bitflags 2.8.0",
@@ -1960,20 +1960,22 @@ dependencies = [
  "futures-util",
  "generic-array",
  "getrandom 0.2.15",
- "hyper",
+ "getrandom 0.3.1",
  "indexmap",
  "itertools",
  "libc",
  "log",
  "memchr",
- "mio 0.8.11",
+ "mime_guess",
+ "mio",
  "num-traits",
  "once_cell",
+ "phf_shared",
  "proc-macro2",
  "rand",
  "regex-automata",
  "regex-syntax",
- "rustix 0.38.44",
+ "rustix 1.0.8",
  "scopeguard",
  "serde",
  "serde_core",
@@ -1983,6 +1985,8 @@ dependencies = [
  "subtle",
  "syn 1.0.109",
  "syn 2.0.98",
+ "tokio",
+ "tokio-util",
  "toml_datetime",
  "tracing",
  "wasi 0.11.0+wasi-snapshot-preview1",
@@ -2214,7 +2218,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2451,6 +2455,12 @@ dependencies = [
  "digest",
  "rand_core",
 ]
+
+[[package]]
+name = "siphasher"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "slab"
@@ -2719,7 +2729,7 @@ dependencies = [
  "backtrace",
  "bytes",
  "libc",
- "mio 1.0.3",
+ "mio",
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
@@ -3135,7 +3145,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]

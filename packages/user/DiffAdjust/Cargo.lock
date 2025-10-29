@@ -1917,6 +1917,8 @@ dependencies = [
 [[package]]
 name = "psibase-rust-workspace-hack"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "573927f36c452146ac14bc82f109e3bec2610c2b3a5a6a38e658dbf2bb5c8b25"
 dependencies = [
  "aho-corasick",
  "bitflags 2.10.0",
