@@ -24,13 +24,12 @@ namespace psibase
    struct HttpRequest
    {
       std::string             host;         ///< Fully-qualified domain name
-      std::string             rootHost;     ///< host, but without service subdomain
       std::string             method;       ///< "GET", "POST", "OPTIONS", "HEAD"
       std::string             target;       ///< Absolute path, e.g. "/index.js"
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<HttpHeader> headers;      ///< HTTP Headers
       std::vector<char>       body;         ///< Request body, e.g. POST data
-      PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, headers, body)
+      PSIO_REFLECT(HttpRequest, host, method, target, contentType, headers, body)
 
       static std::pair<std::string, std::string> readQueryItem(std::string_view&);
 
@@ -80,6 +79,18 @@ namespace psibase
    /// Checks if the host indicates a development chain
    /// by looking for "localhost" in the host header
    bool isLocalhost(const HttpRequest& request);
+
+   /// Return the root host for the request.
+   /// - isSubdomain: indicates whether the host of the request is a
+   ///   subdomain. If the host is not a subdomain, then the host
+   ///   is the root host.
+   ///
+   /// Note: In most services, isSubdomain will be true, because
+   /// the subdomain is used to dispatch serveSys. However, there
+   /// are a few places that handle requests for any domain. These
+   /// should typically use to<HttpServer>().rootHost (or XHttp for
+   /// local services).
+   std::string_view rootHost(const HttpRequest& request, bool isSubdomain = true);
 
    struct URIPath
    {
@@ -131,8 +142,10 @@ namespace psibase
    };
 
    std::vector<HttpHeader> allowCors(std::string_view origin = "*");
-   std::vector<HttpHeader> allowCors(const HttpRequest& req, AccountNumber account);
-   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req);
+   std::vector<HttpHeader> allowCors(const HttpRequest& req,
+                                     AccountNumber      account,
+                                     bool               hostIsSubdomain = true);
+   std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain = true);
 
    using HttpReply = BasicHttpReply<std::vector<char>>;
 

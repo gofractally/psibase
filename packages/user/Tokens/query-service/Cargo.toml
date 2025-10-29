@@ -13,4 +13,4 @@ serde_json.workspace = true
 tokens = { path = "../service", version = "0.21.1" }
 async-graphql.workspace = true
 serde-aux.workspace = true
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
