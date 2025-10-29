@@ -113,10 +113,18 @@ pub mod tables {
             new_instance
         }
 
-        pub fn map_token(&mut self, token_id: TID) {
-            check_none(self.tokenId, "Symbol already exists");
-            let nft = Nft::call().getNft(self.ownerNft);
-            check(nft.owner == get_sender(), "only owner can map token");
+        pub fn map_symbol(&mut self, token_id: TID) {
+            let token_owner_nft = psibase::services::tokens::Wrapper::call()
+                .getToken(token_id)
+                .nft_id;
+            check(
+                Nft::call().getNft(token_owner_nft).owner == get_sender(),
+                "only token owner can map token",
+            );
+
+            let symbol_owner_nft = self.ownerNft;
+            Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
+            Nft::call().burn(symbol_owner_nft);
             self.tokenId = Some(token_id);
             self.save();
         }
@@ -169,7 +177,7 @@ pub mod service {
         // Map PSI as the system token symbol
         let symbol = "psi".into();
         let mut symbol_record = Symbol::add(symbol, false);
-        symbol_record.map_token(system_token_id);
+        symbol_record.map_symbol(system_token_id);
 
         Nft::call_from(Wrapper::SERVICE).credit(
             symbol_record.ownerNft,
@@ -209,7 +217,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        Symbol::get_assert(symbol).map_token(token_id);
+        Symbol::get_assert(symbol).map_symbol(token_id);
     }
 
     #[pre_action(exclude(init))]
