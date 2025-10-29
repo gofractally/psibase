@@ -1,18 +1,10 @@
-import { Inbox, LoaderCircle, Mail } from "lucide-react";
+import { Inbox, Mail } from "lucide-react";
 
 export const EmptyBox = ({ children }: { children: string }) => {
     return (
         <div className="flex h-full select-none flex-col items-center justify-center pb-[7%] text-gray-300">
             <Inbox size={80} />
             <p className="text-3xl">{children}</p>
-        </div>
-    );
-};
-
-export const LoadingBox = () => {
-    return (
-        <div className="flex h-full select-none flex-col items-center justify-center pb-[7%] text-gray-300">
-            <LoaderCircle size={80} className="animate-spin" />
         </div>
     );
 };
