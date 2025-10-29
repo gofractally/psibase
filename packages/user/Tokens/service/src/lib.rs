@@ -22,11 +22,9 @@ pub mod service {
 
     #[action]
     fn init() {
-        let table = InitTable::read();
+        let table = InitTable::new();
 
         if table.get_index_pk().get(&()).is_none() {
-            let table = InitTable::new();
-
             let init_instance = InitRow { last_used_id: 0 };
             table.put(&init_instance).unwrap();
 
