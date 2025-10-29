@@ -8,17 +8,18 @@ publish.workspace = true
 [package.metadata.psibase]
 server = "r-symbol"
 plugin = "symbol-plugin"
-data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "symbol", service = "symbol", method = "init", data = {} },
 ]
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.21.0", path = "../../../../rust/psibase_macros" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.120"
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+
 
 [dev-dependencies]
 symbol-pkg = { path = "..", version = "0.21.0" }

@@ -2473,6 +2473,7 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
  "symbol",
@@ -3119,6 +3120,7 @@ version = "0.21.0"
 dependencies = [
  "async-graphql",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
@@ -3140,6 +3142,7 @@ name = "symbol-plugin"
 version = "0.21.0"
 dependencies = [
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
  "symbol",
