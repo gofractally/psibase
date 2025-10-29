@@ -15,6 +15,7 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
+import { useContacts } from "../contacts/hooks/use-contacts";
 import { AcceptButton } from "./components/pending/button-accept";
 import { CancelButton } from "./components/pending/button-cancel";
 import { RejectButton } from "./components/pending/button-reject";
@@ -72,7 +73,7 @@ export const PendingPageContents = () => {
             <CardHeader>
                 <CardTitle>Pending Transactions</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="@container">
                 <Table>
                     <TableCaption>
                         A list of your pending transactions.
@@ -92,95 +93,24 @@ export const PendingPageContents = () => {
                         {pendingTransactions.map((pt, index) => (
                             <TableRow key={`${pt.counterParty}-${index}`}>
                                 <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2">
-                                        <Avatar
-                                            account={pt.counterParty}
-                                            className="h-5 w-5"
-                                            alt="Counterparty avatar"
-                                        />
-                                        {pt.counterParty}
-                                    </div>
+                                    <CellCounterparty
+                                        account={pt.counterParty}
+                                        currentUser={currentUser}
+                                    />
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {pt.debit ? (
-                                            <>
-                                                <span className="font-mono">
-                                                    {pt.debit.balance.format({
-                                                        fullPrecision: true,
-                                                        includeLabel: false,
-                                                    })}
-                                                </span>{" "}
-                                                <span
-                                                    className={cn(
-                                                        "text-muted-foreground",
-                                                        !pt.debit.balance.hasTokenSymbol() &&
-                                                            "italic",
-                                                    )}
-                                                >
-                                                    {pt.debit.balance.getDisplayLabel()}
-                                                </span>
-                                                <div className="flex gap-1">
-                                                    <AcceptButton
-                                                        currentUser={
-                                                            currentUser
-                                                        }
-                                                        pt={pt.debit}
-                                                        counterParty={
-                                                            pt.counterParty
-                                                        }
-                                                    />
-                                                    <RejectButton
-                                                        currentUser={
-                                                            currentUser
-                                                        }
-                                                        pt={pt.debit}
-                                                        counterParty={
-                                                            pt.counterParty
-                                                        }
-                                                    />
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                -
-                                            </span>
-                                        )}
-                                    </div>
+                                    <CellIncoming
+                                        debit={pt.debit}
+                                        counterParty={pt.counterParty}
+                                        currentUser={currentUser}
+                                    />
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {pt.credit ? (
-                                            <>
-                                                <span className="font-mono">
-                                                    {pt.credit.balance.format({
-                                                        fullPrecision: true,
-                                                        includeLabel: false,
-                                                    })}
-                                                </span>{" "}
-                                                <span
-                                                    className={cn(
-                                                        "text-muted-foreground",
-                                                        !pt.credit.balance.hasTokenSymbol() &&
-                                                            "italic",
-                                                    )}
-                                                >
-                                                    {pt.credit.balance.getDisplayLabel()}
-                                                </span>
-                                                <CancelButton
-                                                    currentUser={currentUser}
-                                                    pt={pt.credit}
-                                                    counterParty={
-                                                        pt.counterParty
-                                                    }
-                                                />
-                                            </>
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                -
-                                            </span>
-                                        )}
-                                    </div>
+                                    <CellOutgoing
+                                        credit={pt.credit}
+                                        counterParty={pt.counterParty}
+                                        currentUser={currentUser}
+                                    />
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -188,5 +118,122 @@ export const PendingPageContents = () => {
                 </Table>
             </CardContent>
         </GlowingCard>
+    );
+};
+
+const CellCounterparty = ({
+    account,
+    currentUser,
+}: {
+    account: string;
+    currentUser: string | null;
+}) => {
+    const { data: contacts } = useContacts(currentUser);
+    const contact = contacts?.find((contact) => contact.account === account);
+    return (
+        <div className="flex items-center gap-2">
+            <Avatar
+                account={account}
+                className="@xl:h-5 @xl:w-5 h-8 w-8"
+                alt="Counterparty avatar"
+            />
+            {contact?.nickname ? (
+                <div className="@xl:flex-row @xl:gap-1 flex flex-col">
+                    <div className="font-medium">{contact.nickname}</div>
+                    <div className="text-muted-foreground italic">
+                        {account}
+                    </div>
+                </div>
+            ) : (
+                <div className="italic">{account}</div>
+            )}
+        </div>
+    );
+};
+
+const CellIncoming = ({
+    debit,
+    counterParty,
+    currentUser,
+}: {
+    debit?: LineOfCredit;
+    counterParty: string;
+    currentUser: string | null;
+}) => {
+    return (
+        <div className="flex items-center justify-end gap-2">
+            {debit ? (
+                <>
+                    <span className="font-mono">
+                        {debit.balance.format({
+                            fullPrecision: true,
+                            includeLabel: false,
+                        })}
+                    </span>{" "}
+                    <span
+                        className={cn(
+                            "text-muted-foreground",
+                            !debit.balance.hasTokenSymbol() && "italic",
+                        )}
+                    >
+                        {debit.balance.getDisplayLabel()}
+                    </span>
+                    <div className="flex gap-1">
+                        <AcceptButton
+                            currentUser={currentUser}
+                            pt={debit}
+                            counterParty={counterParty}
+                        />
+                        <RejectButton
+                            currentUser={currentUser}
+                            pt={debit}
+                            counterParty={counterParty}
+                        />
+                    </div>
+                </>
+            ) : (
+                <span className="text-muted-foreground">-</span>
+            )}
+        </div>
+    );
+};
+
+const CellOutgoing = ({
+    credit,
+    counterParty,
+    currentUser,
+}: {
+    credit?: LineOfCredit;
+    counterParty: string;
+    currentUser: string | null;
+}) => {
+    return (
+        <div className="flex items-center justify-end gap-2">
+            {credit ? (
+                <>
+                    <span className="font-mono">
+                        {credit.balance.format({
+                            fullPrecision: true,
+                            includeLabel: false,
+                        })}
+                    </span>{" "}
+                    <span
+                        className={cn(
+                            "text-muted-foreground",
+                            !credit.balance.hasTokenSymbol() && "italic",
+                        )}
+                    >
+                        {credit.balance.getDisplayLabel()}
+                    </span>
+                    <CancelButton
+                        currentUser={currentUser}
+                        pt={credit}
+                        counterParty={counterParty}
+                    />
+                </>
+            ) : (
+                <span className="text-muted-foreground">-</span>
+            )}
+        </div>
     );
 };

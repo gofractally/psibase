@@ -1,5 +1,11 @@
+import type {
+    ActionType,
+    Transaction,
+} from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
+
 import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
 
+import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 
 import { GlowingCard } from "@/components/glowing-card";
@@ -58,7 +64,7 @@ export function CreditTable({ user, token }: Props) {
             <CardHeader>
                 <CardTitle>Recent Transactions</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="@container">
                 <Table>
                     <TableCaption>
                         A list of your credit and debits.
@@ -73,78 +79,23 @@ export function CreditTable({ user, token }: Props) {
                                         className="w-6 text-center"
                                         title={transaction.action}
                                     >
-                                        <Tooltip>
-                                            <TooltipContent>
-                                                {transaction.action
-                                                    .charAt(0)
-                                                    .toUpperCase() +
-                                                    transaction.action.slice(1)}
-                                            </TooltipContent>
-                                            {transaction.action ===
-                                            "credited" ? (
-                                                <TooltipTrigger className="block">
-                                                    <ArrowUp className="h-4 w-4" />
-                                                </TooltipTrigger>
-                                            ) : transaction.action ===
-                                              "debited" ? (
-                                                <TooltipTrigger className="block">
-                                                    <ArrowDown className="h-4 w-4" />
-                                                </TooltipTrigger>
-                                            ) : transaction.action ===
-                                              "uncredited" ? (
-                                                <TooltipTrigger className="block">
-                                                    <Undo2 className="h-4 w-4" />
-                                                </TooltipTrigger>
-                                            ) : transaction.action ===
-                                              "rejected" ? (
-                                                <TooltipTrigger className="block">
-                                                    <X className="h-4 w-4" />
-                                                </TooltipTrigger>
-                                            ) : null}
-                                        </Tooltip>
+                                        <CellAction
+                                            action={transaction.action}
+                                        />
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Avatar
-                                                account={
-                                                    transaction.counterParty
-                                                }
-                                                className="h-5 w-5"
-                                                alt="Counterparty avatar"
-                                            />
-                                            {transaction.counterParty}
-                                        </div>
+                                        <CellCounterparty
+                                            counterParty={
+                                                transaction.counterParty
+                                            }
+                                            user={user}
+                                        />
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <span className="font-mono">
-                                            {transaction.direction ===
-                                                "outgoing" && "-"}
-                                            {transaction?.amount?.format({
-                                                fullPrecision: true,
-                                                includeLabel: false,
-                                            })}
-                                        </span>{" "}
-                                        <span
-                                            className={cn(
-                                                "text-muted-foreground",
-                                                !transaction?.amount?.hasTokenSymbol() &&
-                                                    "italic",
-                                            )}
-                                        >
-                                            {transaction?.amount.getDisplayLabel()}
-                                        </span>
+                                        <CellAmount transaction={transaction} />
                                     </TableCell>
                                     <TableCell className="h-full w-6 text-center">
-                                        {transaction.memo && (
-                                            <Tooltip>
-                                                <TooltipContent>
-                                                    {transaction.memo}
-                                                </TooltipContent>
-                                                <TooltipTrigger className="block">
-                                                    <ReceiptText className="h-4 w-4" />
-                                                </TooltipTrigger>
-                                            </Tooltip>
-                                        )}
+                                        <CellMemo memo={transaction.memo} />
                                     </TableCell>
                                 </TableRow>
                             );
@@ -155,3 +106,96 @@ export function CreditTable({ user, token }: Props) {
         </GlowingCard>
     );
 }
+
+const CellAction = ({ action }: { action: ActionType }) => {
+    return (
+        <Tooltip>
+            <TooltipContent>
+                {action.charAt(0).toUpperCase() + action.slice(1)}
+            </TooltipContent>
+            {action === "credited" ? (
+                <TooltipTrigger className="block">
+                    <ArrowUp className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : action === "debited" ? (
+                <TooltipTrigger className="block">
+                    <ArrowDown className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : action === "uncredited" ? (
+                <TooltipTrigger className="block">
+                    <Undo2 className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : action === "rejected" ? (
+                <TooltipTrigger className="block">
+                    <X className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : null}
+        </Tooltip>
+    );
+};
+
+const CellCounterparty = ({
+    counterParty,
+    user,
+}: {
+    counterParty: string;
+    user: string;
+}) => {
+    const { data: contacts } = useContacts(user);
+    const contact = contacts?.find(
+        (contact) => contact.account === counterParty,
+    );
+    return (
+        <div className="@lg:h-auto flex h-10 items-center gap-2">
+            <Avatar
+                account={counterParty}
+                className="@lg:h-5 @lg:w-5 h-8 w-8"
+                alt="Counterparty avatar"
+            />
+            {contact?.nickname ? (
+                <div className="@lg:flex-row @lg:gap-1 flex flex-col">
+                    <div className="font-medium">{contact.nickname}</div>
+                    <div className="text-muted-foreground italic">
+                        {counterParty}
+                    </div>
+                </div>
+            ) : (
+                <div className="italic">{counterParty}</div>
+            )}
+        </div>
+    );
+};
+
+const CellAmount = ({ transaction }: { transaction: Transaction }) => {
+    return (
+        <>
+            <span className="font-mono">
+                {transaction.direction === "outgoing" && "-"}
+                {transaction?.amount?.format({
+                    fullPrecision: true,
+                    includeLabel: false,
+                })}
+            </span>{" "}
+            <span
+                className={cn(
+                    "text-muted-foreground",
+                    !transaction?.amount?.hasTokenSymbol() && "italic",
+                )}
+            >
+                {transaction?.amount.getDisplayLabel()}
+            </span>
+        </>
+    );
+};
+
+const CellMemo = ({ memo }: { memo: string }) => {
+    if (!memo) return null;
+    return (
+        <Tooltip>
+            <TooltipContent>{memo}</TooltipContent>
+            <TooltipTrigger className="block">
+                <ReceiptText className="h-4 w-4" />
+            </TooltipTrigger>
+        </Tooltip>
+    );
+};

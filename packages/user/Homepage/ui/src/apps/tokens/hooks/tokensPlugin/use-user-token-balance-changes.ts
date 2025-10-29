@@ -9,7 +9,7 @@ import { Quantity } from "@/apps/tokens/lib/quantity";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
-export const ActionType = z.enum([
+export const zActionType = z.enum([
     "credited",
     "debited",
     "uncredited",
@@ -17,9 +17,11 @@ export const ActionType = z.enum([
 ]);
 export const zDirection = z.enum(["outgoing", "incoming"]);
 
+export type ActionType = z.infer<typeof zActionType>;
+
 export interface Transaction {
     counterParty: string;
-    action: z.infer<typeof ActionType>;
+    action: ActionType;
     direction: z.infer<typeof zDirection>;
     amount: Quantity;
     memo: string;
