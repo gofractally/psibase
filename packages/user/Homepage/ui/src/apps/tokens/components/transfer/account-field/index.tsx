@@ -1,7 +1,5 @@
-import { useCommandState } from "cmdk";
-import { Check, ChevronsUpDown, User, UserX } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
-import { z } from "zod";
 
 import { Supervisor } from "@psibase/common-lib";
 
@@ -9,7 +7,6 @@ import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-import { Avatar } from "@shared/components/avatar";
 import { withFieldGroup } from "@shared/components/form/app-form";
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import { zAccount } from "@shared/lib/schemas/account";
@@ -17,10 +14,8 @@ import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Command,
-    CommandEmpty,
     CommandGroup,
     CommandInput,
-    CommandItem,
     CommandList,
 } from "@shared/shadcn/ui/command";
 import { Label } from "@shared/shadcn/ui/label";
@@ -29,6 +24,13 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@shared/shadcn/ui/popover";
+
+import { Contact } from "./contact";
+import { ContactListAccountItem } from "./contact-list-account-item";
+import { ContactListContactItem } from "./contact-list-contact-item";
+import { ContactListNoAccounts } from "./contact-list-no-accounts";
+import { doesAccountExist } from "./helpers";
+import { Placeholder } from "./placeholder";
 
 /**
  * A field for entering an existing account name for use in a tanstack/react-form form
@@ -72,7 +74,7 @@ import {
  * @param supervisor - Consuming app's supervisor instance for account validation
  * @returns A field for entering an existing account name with validation
  */
-export const ComboboxFieldAccountExisting = withFieldGroup({
+export const FieldAccount = withFieldGroup({
     defaultValues: {
         account: "",
     },
@@ -167,7 +169,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                             spellCheck="false"
                                         />
                                         <CommandList>
-                                            <NoAccountsFound
+                                            <ContactListNoAccounts
                                                 currentUser={currentUser}
                                             />
                                             <CommandGroup
@@ -179,7 +181,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                             >
                                                 {contactsExcludingCurrentUser?.map(
                                                     (c) => (
-                                                        <ContactItem
+                                                        <ContactListContactItem
                                                             key={c.account}
                                                             account={c.account}
                                                             name={c.nickname}
@@ -199,7 +201,7 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
                                                     ),
                                                 )}
                                             </CommandGroup>
-                                            <NoContactItem
+                                            <ContactListAccountItem
                                                 value={field.state.value}
                                                 currentUser={currentUser}
                                                 onSelect={(currentValue) => {
@@ -253,192 +255,3 @@ export const ComboboxFieldAccountExisting = withFieldGroup({
         );
     },
 });
-
-const ContactItem = ({
-    account,
-    name,
-    value,
-    onSelect,
-}: {
-    account: string;
-    name?: string;
-    value: string;
-    onSelect: (value: string) => void;
-}) => {
-    return (
-        <CommandItem
-            key={account}
-            value={account}
-            onSelect={onSelect}
-            keywords={[name ?? "", account]}
-        >
-            <Contact value={account} name={name} />
-            <Check
-                className={cn(
-                    "ml-auto",
-                    value === account ? "opacity-100" : "opacity-0",
-                )}
-            />
-        </CommandItem>
-    );
-};
-
-const NoContactItem = ({
-    value,
-    onSelect,
-    contactAccounts,
-    currentUser,
-}: {
-    value: string;
-    onSelect: (value: string) => void;
-    contactAccounts: string[];
-    currentUser?: string | null;
-}) => {
-    const search = useCommandState((state) => state.search);
-    const isValidAccountName = zAccount.safeParse(search).success;
-
-    if (
-        !search ||
-        contactAccounts.includes(search) ||
-        !isValidAccountName ||
-        search === currentUser
-    ) {
-        return null;
-    }
-    return (
-        <CommandGroup heading="Other account">
-            <CommandItem
-                key={`no-contact-found-${search}`}
-                value={search}
-                onSelect={onSelect}
-            >
-                <Contact value={search} isValidating />
-                <Check
-                    className={cn(
-                        "ml-auto",
-                        value === search ? "opacity-100" : "opacity-0",
-                    )}
-                />
-            </CommandItem>
-        </CommandGroup>
-    );
-};
-
-const NoAccountsFound = ({ currentUser }: { currentUser?: string | null }) => {
-    const search = useCommandState((state) => state.search);
-    return (
-        <CommandEmpty>
-            {currentUser === search
-                ? "Cannot send to yourself"
-                : "Enter an account name"}
-        </CommandEmpty>
-    );
-};
-
-const Contact = ({
-    value,
-    name,
-    userNotFound = false,
-    isValid = true,
-    isValidating = false,
-}: {
-    value: string;
-    name?: string;
-    userNotFound?: boolean;
-    isValid?: boolean;
-    isValidating?: boolean;
-}) => {
-    return (
-        <div className="flex items-center gap-1.5">
-            <UserStartContent
-                userNotFound={userNotFound}
-                value={value}
-                isValid={isValid}
-                isValidating={isValidating}
-            />
-            {name ? (
-                <div className="font-normal">
-                    <span className="font-medium">{name}</span>{" "}
-                    <span className="text-muted-foreground">({value})</span>
-                </div>
-            ) : (
-                <div className="font-normal">{value}</div>
-            )}
-        </div>
-    );
-};
-
-const Placeholder = ({
-    placeholder,
-    hidden,
-}: {
-    placeholder?: string;
-    hidden: boolean;
-}) => {
-    if (hidden) return null;
-    return (
-        <span className="text-muted-foreground">
-            {placeholder || "Select account..."}
-        </span>
-    );
-};
-
-const zGetAccountReturn = z
-    .object({
-        accountNum: z.string(),
-        authService: z.string(),
-        resourceBalance: z.boolean().or(z.bigint()),
-    })
-    .optional();
-
-export const doesAccountExist = async (
-    accountName: string,
-    supervisor: Supervisor,
-): Promise<boolean> => {
-    try {
-        const res = zGetAccountReturn.parse(
-            await supervisor.functionCall({
-                method: "getAccount",
-                params: [accountName],
-                service: "accounts",
-                intf: "api",
-            }),
-        );
-
-        return Boolean(res?.accountNum);
-    } catch (e) {
-        // TODO: read this error, actually throw if there's something wrong, other than being invalid
-        console.error(e);
-        return false;
-    }
-};
-
-const UserStartContent = ({
-    userNotFound,
-    value,
-    isValid,
-    isValidating,
-}: {
-    userNotFound: boolean;
-    value: string;
-    isValid: boolean;
-    isValidating: boolean;
-}) => {
-    return (
-        <div className="flex h-5 w-5 items-center justify-center">
-            {isValidating ? (
-                <User size={16} />
-            ) : userNotFound ? (
-                <UserX size={16} className="text-destructive" />
-            ) : isValid && value ? (
-                <Avatar
-                    account={value}
-                    className="h-5 w-5"
-                    alt="Recipient avatar"
-                />
-            ) : (
-                <User size={16} />
-            )}
-        </div>
-    );
-};

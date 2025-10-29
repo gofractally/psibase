@@ -16,7 +16,7 @@ import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useCreateContact } from "../contacts/hooks/use-create-contact";
 import { CreditTable } from "./components/credit-table";
-import { ComboboxFieldAccountExisting } from "./components/transfer/account-field";
+import { FieldAccount } from "./components/transfer/account-field";
 import { useCredit } from "./hooks/tokensPlugin/use-credit";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
@@ -187,7 +187,7 @@ const TransferPageContents = () => {
                         <CardContent className="@container space-y-4">
                             <div className="@xl:flex-row flex w-full flex-col gap-4">
                                 <div className="flex-1">
-                                    <ComboboxFieldAccountExisting
+                                    <FieldAccount
                                         form={form}
                                         fields="to"
                                         label="Recipient"
