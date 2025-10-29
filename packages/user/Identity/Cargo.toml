@@ -22,4 +22,4 @@ crate-type = ["rlib"]
 [dependencies]
 identity = { path = "service", version = "0.22.0" }
 identity-plugin = { path = "plugin", version = "0.22.0" }
-user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true

@@ -20,7 +20,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2 = { version = "0.10" }
 pem = { version = "3.0.4" }
-system-workspace-hack = { version = "0.1", path = "../../system-workspace-hack" }
+psibase-system-workspace-hack.workspace = true
 
 [dev-dependencies]
 staged-tx-pkg = { path = "..", version = "0.22.0" }

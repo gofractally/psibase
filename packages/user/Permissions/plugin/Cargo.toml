@@ -11,7 +11,7 @@ serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
 chrono = "0.4"
-plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

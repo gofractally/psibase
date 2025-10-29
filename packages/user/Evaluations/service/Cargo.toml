@@ -23,6 +23,6 @@ rand = "0.9.1"
 ecies = { version = "0.2", default-features = false, features = ["pure"] }
 average = "0.16.0"
 serde-aux.workspace = true
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]

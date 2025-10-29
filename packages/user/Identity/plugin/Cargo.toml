@@ -11,7 +11,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 identity = { path = "../service/", version = "0.22.0" }
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

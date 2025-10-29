@@ -25,4 +25,4 @@ crate-type = ["rlib"]
 token-stream = { path = "service", version = "0.22.0" }
 r-token-stream = { path = "query-service", version = "0.22.0" }
 token-stream-plugin = { path = "plugin", version = "0.22.0" }
-user-workspace-hack = { version = "0.1", path = "../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true

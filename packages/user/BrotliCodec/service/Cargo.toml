@@ -16,7 +16,7 @@ base64 = { version = "0.22" }
 anyhow = { version = "1.0" }
 psibase.workspace = true
 serde.workspace = true
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 brotli-codec-pkg = { path = "..", version = "0.22.0" }
