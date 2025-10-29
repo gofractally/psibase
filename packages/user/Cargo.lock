@@ -3129,10 +3129,10 @@ dependencies = [
 name = "symbol-pkg"
 version = "0.21.0"
 dependencies = [
+ "psibase-user-workspace-hack",
  "r-symbol",
  "symbol",
  "symbol-plugin",
- "user-workspace-hack",
 ]
 
 [[package]]

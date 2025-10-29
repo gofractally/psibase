@@ -446,7 +446,6 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Symbol.psi
     PATH packages/user/Symbol
     TARGET_DIR ${USER_WORKSPACE_TARGET}
-    DEPENDS ${Symbol_js_DEP}
 )
 
 cargo_psibase_package(

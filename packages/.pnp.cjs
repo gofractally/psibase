@@ -79,10 +79,6 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:user/Supervisor/ui"\
     },\
     {\
-      "name": "symbol",\
-      "reference": "workspace:user/Symbol/ui"\
-    },\
-    {\
       "name": "token-stream",\
       "reference": "workspace:user/TokenStream/ui"\
     },\
@@ -112,7 +108,6 @@ const RAW_RUNTIME_STATE =
     ["@psibase/xadmin-ui", ["workspace:local/XAdmin/ui"]],\
     ["packages", ["workspace:user/Packages/ui"]],\
     ["root-workspace-0b6124", ["workspace:."]],\
-    ["symbol", ["workspace:user/Symbol/ui"]],\
     ["token-stream", ["workspace:user/TokenStream/ui"]],\
     ["wasm-transpiled", ["workspace:local/XAdmin/ui/wasm"]]\
   ],\
@@ -15752,26 +15747,6 @@ const RAW_RUNTIME_STATE =
           ["svgo", "npm:4.0.0"]\
         ],\
         "linkType": "HARD"\
-      }]\
-    ]],\
-    ["symbol", [\
-      ["workspace:user/Symbol/ui", {\
-        "packageLocation": "./user/Symbol/ui/",\
-        "packageDependencies": [\
-          ["@tanstack/react-query", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:5.81.2"],\
-          ["@types/node", "npm:22.15.33"],\
-          ["@types/react", "npm:19.1.8"],\
-          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.6"],\
-          ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.29.0"],\
-          ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
-          ["react", "npm:19.1.0"],\
-          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.1.0"],\
-          ["symbol", "workspace:user/Symbol/ui"],\
-          ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
-          ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.19"],\
-          ["zod", "npm:3.25.67"]\
-        ],\
-        "linkType": "SOFT"\
       }]\
     ]],\
     ["symbol-observable", [\

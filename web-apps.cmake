@@ -31,7 +31,6 @@ set(UI_PROJECTS
     system/AuthSig/ui:AuthSig_js
     user/Evaluations/ui:Evaluations_js
     user/Fractals/ui:Fractals_js
-    user/Symbol/ui:Symbol_js
     user/FractalCore/ui:FractalCore_js
     user/TokenStream/ui:TokenStream_js
     user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
