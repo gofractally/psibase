@@ -2445,6 +2445,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-symbol"
+version = "0.21.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "serde",
+ "serde_json",
+ "symbol",
+]
+
+[[package]]
 name = "r-token-stream"
 version = "0.21.0"
 dependencies = [
@@ -3078,6 +3089,39 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "symbol"
+version = "0.21.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+ "symbol-pkg",
+]
+
+[[package]]
+name = "symbol-pkg"
+version = "0.21.0"
+dependencies = [
+ "r-symbol",
+ "symbol",
+ "symbol-plugin",
+ "user-workspace-hack",
+]
+
+[[package]]
+name = "symbol-plugin"
+version = "0.21.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "symbol",
+ "wit-bindgen-rt",
+]
 
 [[package]]
 name = "syn"

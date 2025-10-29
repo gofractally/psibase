@@ -42,12 +42,7 @@ pub mod Service {
     }
 
     #[action]
-    fn create(new_symbol: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn map_token(symbol: AccountNumber, token_id: TID) {
+    fn create(symbol: AccountNumber) {
         unimplemented!()
     }
 
@@ -63,6 +58,11 @@ pub mod Service {
 
     #[action]
     fn getPrice(num_chars: u8) -> Quantity {
+        unimplemented!()
+    }
+
+    #[action]
+    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
         unimplemented!()
     }
 
