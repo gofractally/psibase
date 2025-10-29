@@ -1,27 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["service", "query-service"]
-
-[workspace.package]
-version = "0.22.0"
-rust-version = "1.64"
-edition = "2021"
-publish = false
-
 [package]
 name = "diff-adjust-pkg"                               # Crate name
 description = "Bitcoin inspired difficulty adjustment"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 publish.workspace = true
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.psibase]
 package-name = "DiffAdjust"
@@ -37,3 +22,4 @@ crate-type = ["rlib"]
 [dependencies]
 diff-adjust = { path = "service", version = "0.22.0" }
 r-diff-adjust = { path = "query-service", version = "0.22.0" }
+psibase-user-workspace-hack.workspace = true

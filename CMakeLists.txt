@@ -458,6 +458,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/DiffAdjust.psi
     PATH packages/user/DiffAdjust
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
