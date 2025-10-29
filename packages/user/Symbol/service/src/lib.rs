@@ -67,6 +67,11 @@ pub mod tables {
     }
 
     impl Symbol {
+        #[secondary_key(1)]
+        fn by_token(&self) -> (Option<TID>, AccountNumber) {
+            (self.tokenId, self.symbolId)
+        }
+
         fn new(symbolId: AccountNumber, ownerNft: NID) -> Self {
             Self {
                 symbolId,
