@@ -13,6 +13,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { CardContent } from "@shared/shadcn/ui/card";
 
+import { LoadingBox } from "../chainmail/components";
 import { TokenSelector } from "./components/token-selector";
 import { AutoDebitSwitch } from "./components/transfer/auto-debit-switch";
 import { UntransferableTokenWarning } from "./components/transfer/untransferable-warning";
@@ -54,6 +55,14 @@ export const TokensLayout = () => {
     );
 
     const isLoading = !isSuccess || isLoadingBalances;
+
+    if (isLoading) {
+        return (
+            <div className="flex-1">
+                <LoadingBox />
+            </div>
+        );
+    }
 
     return (
         <div className="p-4">
