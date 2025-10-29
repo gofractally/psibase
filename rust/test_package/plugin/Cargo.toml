@@ -1,11 +1,13 @@
 [package]
 name = "tpack-plugin"
 version = "0.21.0"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
-psibase = { path = "../../psibase/" }
+psibase.workspace = true
+psibase-rust-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
