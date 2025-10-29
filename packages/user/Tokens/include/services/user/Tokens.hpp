@@ -327,7 +327,6 @@ namespace UserService
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),
       method(getTokenConf, tokenId, index),
-      // method(mapSymbol, tokenId, symbol),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
