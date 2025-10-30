@@ -1,10 +1,12 @@
 [package]
 name = "psimacrotest"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
+publish.workspace = true
 
 [lib]
 crate-type = ["rlib"]
@@ -16,11 +18,12 @@ package-name = "PsiMacroTest"
 services = ["basicwquery", "mincallrecvr", "addcheckinit"]
 
 [dependencies]
-psibase = { path = "../psibase" }
-psibase_macros = { path = "../psibase_macros" }
+psibase.workspace = true
+psibase_macros.workspace = true
 async-graphql.workspace = true
 serde = { version = "1.0.209", features = ["derive"] }
-serde_json = "1.0.132"
+serde_json.workspace = true
 basicwquery = { path = "services/basic-w-query" }
 mincallrecvr = { path = "services/min-call-recvr" }
 addcheckinit = { path = "services/add-check-init" }
+psibase-rust-workspace-hack.workspace = true
