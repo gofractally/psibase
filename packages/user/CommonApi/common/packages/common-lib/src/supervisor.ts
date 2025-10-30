@@ -30,7 +30,7 @@ interface Options {
     supervisorSrc?: string;
 }
 
-type AutoRedirectConfig = {
+export type AutoRedirectConfig = {
     enabled: boolean;
     returnPath: string;
 };

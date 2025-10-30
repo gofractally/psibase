@@ -34,6 +34,10 @@ interface actions {
     /// Updates the key used by the current user to the specified public key
     /// The specified public key should be the PEM representation of the public key
     set-key: func(public-key: pem) -> result<_, error>;
+
+    /// Creates a new account with the specified name.
+    /// This can only be called if there is already a logged-in user.
+    create-account: func(new-account-name: string) -> result<string, error>;
 }
 
 world imports {
