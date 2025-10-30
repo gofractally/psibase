@@ -40,6 +40,9 @@ impl Prompt for AccountsPlugin {
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);
         } else {
+            println!("Neither logged in nor has active invite");
+            // TODO: Only mark the invite as having created an account if the account
+            //       creation was successful.
             return Err(ErrorType::CannotCreateAccount().into());
         }
 
