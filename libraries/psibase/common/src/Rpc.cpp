@@ -215,13 +215,14 @@ namespace psibase
    {
       if (hostIsSubdomain)
       {
-         auto pos = request.host.find('.');
+         auto sv  = std::string_view(request.host);
+         auto pos = sv.find('.');
          psibase::check(pos != std::string_view::npos, "Subdomain expected");
-         return request.host.substr(pos + 1);
+         return sv.substr(pos + 1);
       }
       else
       {
-         return request.host;
+         return std::string_view(request.host);
       }
    }
 
