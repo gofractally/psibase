@@ -11,13 +11,12 @@
     "dependencies": {
         "@hookform/resolvers": "^5.1.1",
         "@psibase/common-lib": "workspace:*",
-        "@tanstack/react-query": "^5.52.0",
+        "@tanstack/react-form": "^1.23.8",
+        "@tanstack/react-query": "^5.90.5",
         "dayjs": "^1.11.13",
-        "debounce": "^2.1.0",
         "lucide-react": "^0.429.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
-        "react-hook-form": "^7.58.1",
         "react-router-dom": "^6.26.1",
         "zod": "^3.23.8"
     },

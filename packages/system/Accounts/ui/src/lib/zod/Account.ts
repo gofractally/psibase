@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const Account = z
+export const zAccount = z
     .string()
     .min(1, { message: "Account must be at least 1 character." })
     .max(18, { message: "Account must be at most 18 characters." })
