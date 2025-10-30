@@ -2196,7 +2196,6 @@ dependencies = [
  "serde_json",
  "subtle",
  "syn 2.0.108",
- "wasi",
  "zeroize",
 ]
 
