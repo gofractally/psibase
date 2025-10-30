@@ -24,4 +24,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-token-stream-pkg = { path = "..", version = "0.21.0" }
+token-stream-pkg = { path = "..", version = "0.22.0" }

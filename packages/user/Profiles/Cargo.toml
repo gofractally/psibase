@@ -1,7 +1,7 @@
 [package]
 name = "profiles-pkg"
 description = "Add profiles"
-version = "0.21.1"
+version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 repository.workspace = true
@@ -13,14 +13,14 @@ package-name = "Profiles"
 services = ["profiles"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.21.0"
-Sites = "0.21.0"
+HttpServer = "0.22.0"
+Sites = "0.22.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-profiles = { path = "service", version = "0.21.1" }
-r-profiles = { path = "query-service", version = "0.21.1" }
-profiles-plugin = { path = "plugin", version = "0.21.1" }
+profiles = { path = "service", version = "0.22.0" }
+r-profiles = { path = "query-service", version = "0.22.0" }
+profiles-plugin = { path = "plugin", version = "0.22.0" }
 psibase-user-workspace-hack.workspace = true
