@@ -10,6 +10,17 @@ members = [
     "StagedTx/plugin",
 ]
 
+exclude = [
+    "Accounts/plugin/accounts",
+    "Accounts/plugin/account_tokens/",
+    "AuthAny/plugin/",
+    "AuthDelegate/plugin/",
+    "AuthSig/plugin/",
+    "Transact/plugin/",
+    "SetCode/plugin/",
+    "Producers/plugin/"
+]
+
 [workspace.package]
 version = "0.21.0"
 rust-version = "1.64"

@@ -4,8 +4,9 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition = "2021"
-publish = false
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
 
 [package.metadata.psibase]
 package-name = "mincallrecvr"
@@ -14,10 +15,11 @@ package-name = "mincallrecvr"
 HttpServer = "0.21.0"
 
 [dependencies]
-psibase = { path = "../../../psibase" }
-psibase_macros = { path = "../../../psibase_macros" }
+psibase.workspace = true
+psibase_macros.workspace = true
 async-graphql.workspace = true
-serde = { version = "1.0.209", features = ["derive"] }
+serde.workspace = true
+psibase-rust-workspace-hack.workspace = true
 
 [dev-dependencies]
 psimacrotest = { path = "../.." }
