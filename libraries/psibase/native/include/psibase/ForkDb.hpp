@@ -2020,6 +2020,7 @@ namespace psibase
       void onChangeHostConfig(auto&& fn) { dbCallbacks.hostConfig = fn; };
       void onValidateHostConfig(auto&& fn) { dbCallbacks.validateHostConfig = fn; }
       void onChangeShutdown(auto&& fn) { dbCallbacks.shutdown = fn; }
+      void onSocketOpen(auto&& fn) { dbCallbacks.socketOpen = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {

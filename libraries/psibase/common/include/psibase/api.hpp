@@ -287,6 +287,15 @@ namespace psibase
       /// the subjective database
       PSIBASE_NATIVE(abortSubjective) void abortSubjective();
 
+      /// Starts a new HTTP request
+      ///
+      /// Returns a socket on success or a negative error code on failure
+      ///
+      /// Errors:
+      /// - `ENOSYS`: the host does not support sockets
+      PSIBASE_NATIVE(socketOpen)
+      std::int32_t socketOpen(const void* data, std::size_t size);
+
       /// Send a message to a socket
       ///
       /// Returns 0 on success or an error code on failure
@@ -755,6 +764,9 @@ namespace psibase
    /// subjective database.
 #define PSIBASE_SUBJECTIVE_TX \
    for (::psibase::SubjectiveTransaction _psibase_s_tx; !_psibase_s_tx.done; _psibase_s_tx.commit())
+
+   struct HttpRequest;
+   std::int32_t socketOpen(const HttpRequest& request);
 
    /// Send a message to a socket
    ///

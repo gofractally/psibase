@@ -9,6 +9,7 @@
 #include "psibase/log.hpp"
 
 #include "http_session.hpp"
+#include "send_request.hpp"
 #include "server_state.hpp"
 #include "tcp_http_session.hpp"
 #include "tls_http_session.hpp"
@@ -437,6 +438,50 @@ namespace psibase::http
       auto server = std::make_shared<server_impl>(http_config, sharedState);
       if (server->start())
          impl = std::move(server);
+   }
+
+   HttpConnector server_service::get_connector()
+   {
+      return HttpConnector{impl.get()};
+   }
+
+   HttpConnector::HttpConnector(server_impl* state) : state(state) {}
+
+   void HttpConnector::operator()(std::span<const char> args, const AddSocketFn& add)
+   {
+      using Args = std::tuple<HttpRequest, std::optional<TLSInfo>, std::optional<SocketEndpoint>>;
+      auto [request, tls, endpoint] = psio::from_frac<Args>(args);
+      if (!endpoint)
+      {
+         std::string_view target = request.target;
+         if (target.starts_with('/') || target == "*")
+         {
+            // origin-form and asterisk-form do not include a host
+            // in the target
+         }
+         else if (request.method == "CONNECT")
+         {
+            // authority-form
+         }
+         else
+         {
+            // absolute-form
+            auto [scheme, host, path] = splitURL(target);
+            if (scheme == "https")
+            {
+               if (!tls)
+                  tls.emplace();
+            }
+            else
+            {
+               check(!tls, "Cannot specify TLS options for HTTP connection");
+            }
+            request.target = path;
+            request.host   = host;
+         }
+      }
+      send_request(static_cast<server_impl*>(state)->ioc, *state, std::move(request),
+                   std::move(tls), std::move(endpoint), add);
    }
 
 }  // namespace psibase::http

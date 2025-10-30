@@ -92,6 +92,14 @@ namespace psibase
    /// local services).
    std::string_view rootHost(const HttpRequest& request, bool isSubdomain = true);
 
+   struct SplitURL
+   {
+      std::string_view scheme;
+      std::string_view host;
+      std::string_view path;
+   };
+   SplitURL splitURL(std::string_view url);
+
    struct URIPath
    {
       std::string path;

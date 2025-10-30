@@ -225,6 +225,31 @@ namespace psibase
       }
    }
 
+   SplitURL splitURL(std::string_view uri)
+   {
+      std::string_view scheme;
+      if (uri.starts_with("http://"))
+      {
+         scheme = uri.substr(0, 4);
+         uri    = uri.substr(7);
+      }
+      else if (uri.starts_with("https://"))
+      {
+         scheme = uri.substr(0, 5);
+         uri    = uri.substr(8);
+      }
+      else
+      {
+         return {};
+      }
+      auto pos         = uri.find('/');
+      auto authority   = uri.substr(0, pos);
+      auto path        = pos == std::string::npos ? "/" : uri.substr(pos);
+      auto enduserinfo = authority.find('@');
+      auto host = enduserinfo == std::string::npos ? authority : authority.substr(enduserinfo + 1);
+      return {scheme, host, path};
+   }
+
    std::vector<HttpHeader> allowCors(std::string_view origin)
    {
       return {

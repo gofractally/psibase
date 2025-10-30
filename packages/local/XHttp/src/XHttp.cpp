@@ -133,7 +133,34 @@ namespace
 
 extern "C" [[clang::export_name("recv")]] void recv()
 {
-   auto act       = getCurrentActionView();
+   psibase::internal::receiver = XHttp::service;
+   auto act                    = getCurrentActionView();
+
+   auto [socket, data] =
+       psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
+   // if this is a response to an HTTP request, send it to the owner
+   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+   std::optional<ResponseHandlerRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = requests.get(socket.unpack());
+      if (row)
+      {
+         requests.remove(*row);
+      }
+      socketAutoClose(socket, true);
+   }
+
+   if (row)
+   {
+      call(Action{.sender  = XHttp::service,
+                  .service = row->service,
+                  .method  = row->method,
+                  .rawData = psio::to_frac(
+                      std::tuple(socket, psio::view<const psibase::HttpReply>(data)))});
+      return;
+   }
+
    act->sender()  = XHttp::service;
    act->service() = HttpServer::service;
    act->method()  = MethodNumber{"recv"};
@@ -145,6 +172,21 @@ void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket == producer_multicast, "Cannot call send on this socket");
    psibase::socketSend(socket, data);
+}
+
+std::int32_t XHttp::sendRequest(HttpRequest request, MethodNumber callback)
+{
+   // TODO: set Origin
+   // TODO: ban forbidden request headers
+   auto requests = Session{}.open<ResponseHandlerTable>();
+   auto sock     = socketOpen(request);
+   check(sock >= 0, "Failed to open socket");
+   PSIBASE_SUBJECTIVE_TX
+   {
+      requests.put({sock, getSender(), callback});
+      socketAutoClose(sock, false);
+   }
+   return sock;
 }
 
 void XHttp::autoClose(std::int32_t socket, bool value)

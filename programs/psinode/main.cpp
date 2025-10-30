@@ -1786,8 +1786,6 @@ void run(const std::string&              db_path,
               });
        });
 
-   tpool.setNumThreads(service_threads);
-
    if (!listen.empty())
    {
       // TODO: command-line options
@@ -2154,7 +2152,9 @@ void run(const std::string&              db_path,
                            });
       };
 
-      boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
+      auto& service =
+          boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
+      node.chain().onSocketOpen(service.get_connector());
    }
    else
    {
@@ -2163,6 +2163,8 @@ void run(const std::string&              db_path,
              "<port> to add a listener.";
       boost::asio::post(chainContext, [&server_work] { server_work.reset(); });
    }
+
+   tpool.setNumThreads(service_threads);
 
    auto remove_http_handlers = psio::finally{[&http_config, &system]
                                              {
