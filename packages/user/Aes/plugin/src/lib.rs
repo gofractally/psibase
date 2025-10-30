@@ -4,7 +4,7 @@ use bindings::*;
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes128Gcm, Aes256Gcm, Key, Nonce,
+    Aes128Gcm, Aes256Gcm, Nonce,
 };
 use exports::aes::plugin::types as AesTypes;
 use exports::aes::plugin::with_key::Guest as WithKey;
@@ -18,9 +18,8 @@ fn encrypt_with_aes<C>(key: &[u8], data: &[u8]) -> Vec<u8>
 where
     C: AeadCore + Aead + KeyInit,
 {
-    let aes_key = Key::<C>::from_slice(key);
-    let cipher = C::new(aes_key);
-    let nonce = C::generate_nonce(&mut OsRng);
+    let cipher = <C>::new_from_slice(key).unwrap();
+    let nonce = <C>::generate_nonce(&mut OsRng);
 
     let ciphertext = match cipher.encrypt(&nonce, data) {
         Ok(ct) => ct,
@@ -30,7 +29,7 @@ where
     };
 
     let mut result = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
-    result.extend_from_slice(nonce.as_slice());
+    result.extend_from_slice(nonce.as_ref());
     result.extend_from_slice(&ciphertext);
     result
 }
@@ -45,13 +44,12 @@ where
 
     // The first NONCE_SIZE bytes are the nonce, the rest is the ciphertext
     let nonce_bytes = &encrypted_data[..NONCE_SIZE];
-    let nonce = Nonce::from_slice(nonce_bytes);
-
-    let aes_key = Key::<C>::from_slice(key);
-    let cipher = C::new(aes_key);
+    let mut nonce = Nonce::default();
+    nonce.copy_from_slice(nonce_bytes);
+    let cipher = <C>::new_from_slice(key).unwrap();
 
     let ciphertext = &encrypted_data[NONCE_SIZE..];
-    let decrypted = match cipher.decrypt(nonce, ciphertext) {
+    let decrypted = match cipher.decrypt(&nonce, ciphertext) {
         Ok(pt) => pt,
         Err(_) => {
             return Err(Error {

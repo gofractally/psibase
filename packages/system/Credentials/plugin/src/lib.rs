@@ -37,7 +37,7 @@ impl Api for Credentials {
         public_keys().set(&Client::get_sender(), &credential.p256_pub);
 
         let hash = Sha256::digest(credential.p256_pub.as_slice());
-        private_keys().set(&base64::encode(hash.as_slice()), &credential.p256_priv);
+        private_keys().set(&base64::encode(hash.as_ref()), &credential.p256_priv);
 
         hook_action_auth();
     }
@@ -67,7 +67,7 @@ impl HookActionAuth for Credentials {
         let mut result = Vec::new();
         for claim in claims {
             let hash = Sha256::digest(claim.raw_data.as_slice());
-            if let Some(private_key) = private_keys().get(&base64::encode(hash.as_slice())) {
+            if let Some(private_key) = private_keys().get(&base64::encode(hash.as_ref())) {
                 result.push(Proof {
                     signature: sign_explicit(&transaction_hash, &private_key)?,
                 });

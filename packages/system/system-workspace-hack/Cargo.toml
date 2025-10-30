@@ -17,4 +17,37 @@ publish.workspace = true
 # are managed by hakari.
 
 ### BEGIN HAKARI SECTION
+[dependencies]
+indexmap = { version = "2", features = ["serde"] }
+memchr = { version = "2" }
+serde = { version = "1", features = ["alloc", "derive", "rc"] }
+serde_core = { version = "1", default-features = false, features = [
+    "alloc",
+    "rc",
+    "result",
+    "std",
+] }
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[build-dependencies]
+indexmap = { version = "2", features = ["serde"] }
+memchr = { version = "2" }
+proc-macro2 = { version = "1" }
+quote = { version = "1" }
+serde = { version = "1", features = ["alloc", "derive", "rc"] }
+serde_core = { version = "1", default-features = false, features = [
+    "alloc",
+    "rc",
+    "result",
+    "std",
+] }
+serde_json = { version = "1", features = ["preserve_order"] }
+syn = { version = "2", features = [
+    "extra-traits",
+    "fold",
+    "full",
+    "visit",
+    "visit-mut",
+] }
+
 ### END HAKARI SECTION
