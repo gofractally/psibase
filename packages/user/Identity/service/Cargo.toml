@@ -18,4 +18,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.21.0" }
+identity-pkg = { path = "..", version = "0.22.0" }

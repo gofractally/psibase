@@ -1,6 +1,6 @@
 [package]
 name = "chainmail"
-version = "0.21.1"
+version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -20,4 +20,4 @@ serde.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.21.1" }
+chainmail_package = { path = "..", version = "0.22.0" }

@@ -13,15 +13,16 @@ package-name = "StagedTx"
 services = ["staged-tx"]
 
 [package.metadata.psibase.dependencies]
-Supervisor = "0.21.0"
-Sites = "0.21.0"
-HttpServer = "0.21.0"
+Supervisor = "0.22.0"
+Sites = "0.22.0"
+HttpServer = "0.22.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-staged-tx = { path = "service", version = "0.21.0" }
-r-staged-tx = { path = "query-service", version = "0.21.0" }
-staged-tx-plugin = { path = "plugin", version = "0.21.0" }
+staged-tx = { path = "service", version = "0.22.0" }
+r-staged-tx = { path = "query-service", version = "0.22.0" }
+staged-tx-plugin = { path = "plugin", version = "0.22.0" }
 psibase-system-workspace-hack.workspace = true
+

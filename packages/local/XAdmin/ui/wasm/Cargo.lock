@@ -835,12 +835,11 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "custom_error",
  "hex",
  "indexmap",
- "psibase-rust-workspace-hack",
  "psibase_macros",
  "serde",
  "serde-aux",
@@ -1780,7 +1779,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1812,7 +1811,6 @@ dependencies = [
  "pem",
  "percent-encoding",
  "pkcs8",
- "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
  "rand_core",
@@ -1840,13 +1838,12 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
  "proc-macro2",
  "psibase-macros-lib",
- "psibase-rust-workspace-hack",
  "psibase_names",
  "quote",
  "syn 1.0.109",
@@ -1855,36 +1852,27 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
  "proc-macro-error",
  "proc-macro2",
- "psibase-rust-workspace-hack",
  "quote",
  "syn 2.0.98",
 ]
 
 [[package]]
-name = "psibase-rust-workspace-hack"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
-
-[[package]]
 name = "psibase_macros"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "psibase-macros-derive",
- "psibase-rust-workspace-hack",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
- "psibase-rust-workspace-hack",
  "seahash",
 ]
 
@@ -3166,7 +3154,7 @@ checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
 
 [[package]]
 name = "x-admin"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "chrono",
  "pem",

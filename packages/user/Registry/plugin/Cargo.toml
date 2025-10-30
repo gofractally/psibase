@@ -8,7 +8,7 @@ publish.workspace = true
 [dependencies]
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
-registry = { path = "../service", version = "0.21.0" }
+registry = { path = "../service", version = "0.22.0" }
 serde.workspace = true
 serde_json.workspace = true
 chrono = "0.4"
@@ -31,4 +31,4 @@ package = "registry:plugin"
 world = "impl"
 
 [dev-dependencies]
-registry-pkg = { path = "..", version = "0.21.0" }
+registry-pkg = { path = "..", version = "0.22.0" }

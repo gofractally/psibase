@@ -10,7 +10,7 @@ publish.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-evaluations = { path = "../service", version = "0.21.0" }
+evaluations = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
 serde-aux.workspace = true
 ecies = { version = "0.2", default-features = false, features = ["pure"] }

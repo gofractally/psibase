@@ -13,16 +13,16 @@ package-name = "TokenStream"
 services = ["token-stream"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.21.0"
-Sites = "0.21.0"
-Tokens = "0.21.0"
+HttpServer = "0.22.0"
+Sites = "0.22.0"
+Tokens = "0.22.0"
 
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-token-stream = { path = "service", version = "0.21.0" }
-r-token-stream = { path = "query-service", version = "0.21.0" }
-token-stream-plugin = { path = "plugin", version = "0.21.0" }
+token-stream = { path = "service", version = "0.22.0" }
+r-token-stream = { path = "query-service", version = "0.22.0" }
+token-stream-plugin = { path = "plugin", version = "0.22.0" }
 psibase-user-workspace-hack.workspace = true
