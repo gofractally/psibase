@@ -5,9 +5,8 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
+edition = "2021"
+publish = false
 
 [package.metadata.psibase]
 server = "r-tpack"
@@ -18,9 +17,8 @@ HttpServer = "0.21.0"
 Sites = "0.21.0"
 
 [dependencies]
-psibase.workspace = true
-serde.workspace = true
-psibase-rust-workspace-hack.workspace = true
+psibase = { path = "../../psibase", version = "0.21.0" }
+serde = "1.0"
 
 [dev-dependencies]
 test_package = { path = "..", version = "0.21.0" }

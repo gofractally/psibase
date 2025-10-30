@@ -4,11 +4,9 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition.workspace = true
+edition = "2021"
 description = "Macros to support psibase development"
-license.workspace = true
-publish.workspace = true
+license = "MIT"
 
 [dependencies]
-psibase-macros-derive.workspace = true
-psibase-rust-workspace-hack.workspace = true
+psibase-macros-derive = { path = "psibase-macros-derive", version = "0.21.0" }

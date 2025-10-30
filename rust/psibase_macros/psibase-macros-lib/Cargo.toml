@@ -1,12 +1,11 @@
 [package]
 name = "psibase-macros-lib"
 version = "0.21.0"
-edition.workspace = true
-license.workspace = true
+edition = "2021"
+license = "MIT"
 description = "Macros to support psibase development"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
-publish.workspace = true
 
 [dependencies]
 colored-diff = "0.2.3"
@@ -15,4 +14,3 @@ proc-macro2 = "1.0.36"
 syn = { version = "2.0.79" }
 quote = "1.0.15"
 proc-macro-error = "1.0.4"
-psibase-rust-workspace-hack.workspace = true
