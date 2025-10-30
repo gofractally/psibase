@@ -4,9 +4,8 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
+edition = "2021"
+publish = false
 
 [package.metadata.psibase]
 package-name = "basicwquery"
@@ -16,12 +15,11 @@ server = "basicwquery"
 HttpServer = "0.21.0"
 
 [dependencies]
-psibase.workspace = true
-psibase_macros.workspace = true
+psibase = { path = "../../../psibase" }
+psibase_macros = { path = "../../../psibase_macros" }
 async-graphql.workspace = true
-serde.workspace = true
+serde = { version = "1.0.209", features = ["derive"] }
 mincallrecvr = { path = "../min-call-recvr" }
-psibase-rust-workspace-hack.workspace = true
 
 [dev-dependencies]
 psimacrotest = { path = "../.." }

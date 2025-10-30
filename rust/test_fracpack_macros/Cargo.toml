@@ -1,25 +1,23 @@
 [package]
 name = "test_fracpack_macros"
 version = "0.21.0"
-edition.workspace = true
-license.workspace = true
+edition = "2021"
+license = "MIT"
 description = "Macros to support psibase development"
-repository.workspace = true
-homepage.workspace = true
-publish.workspace = true
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-anyhow.workspace = true
-fracpack.workspace = true
+anyhow = "1.0"
+fracpack = { version = "0.21.0", path = "../fracpack" }
 hex = "0.3.1"
 proc-macro-error = "1.0.4"
 proc-macro2 = "1.0.36"
 quote = "1.0.15"
-regex.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+regex = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 syn = { version = "1.0.86", features = ["full"] }
-psibase-rust-workspace-hack.workspace = true
