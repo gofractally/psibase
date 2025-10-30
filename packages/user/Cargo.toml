@@ -41,7 +41,27 @@ members = [
     "Tokens/query-service",
 ]
 
-exclude = ["CommonApi/common/packages/component-parser"]
+exclude = [
+    "CommonApi/common/packages/component-parser", 
+    "Aes/plugin",
+    "Base64/plugin",
+    "ClientData/plugin",
+    "Host/plugin/auth",
+    "Host/plugin/crypto",
+    "Host/plugin/common",
+    "Host/plugin/prompt",
+    "Host/plugin/types",
+    "Invite/plugin",
+    "Invite/plugin_AuthInvite",
+    "Kdf/plugin",
+    "Sites/plugin",
+    "Packages/plugin",
+    "Permissions/plugin",
+    "WebCrypto/plugin",
+    "FractalCore/plugin",
+    "Workshop/plugin",
+    "Config/plugin",
+]
 
 [workspace.package]
 version = "0.21.0"
