@@ -16,6 +16,13 @@ impl ConnectedAccounts {
 
         self.accounts.push(account.to_string());
     }
+
+    pub fn remove(&mut self, account: &str) {
+        let account = account.to_string();
+        if let Some(idx) = self.accounts.iter().position(|a| a == &account) {
+            self.accounts.swap_remove(idx);
+        }
+    }
 }
 
 // A database with a separate namespace for each app within the `accounts` namespace
@@ -56,6 +63,19 @@ impl AppsTable {
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
         connected_accounts.add(user);
+
+        Keyvalue::set(
+            &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),
+            &connected_accounts.packed(),
+        );
+    }
+
+    pub fn disconnect(&self, user: &str) {
+        let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
+        let mut connected_accounts = connected_accounts
+            .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
+            .unwrap_or_default();
+        connected_accounts.remove(user);
 
         Keyvalue::set(
             &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),

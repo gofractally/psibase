@@ -12,6 +12,7 @@ use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
+use std::collections::HashSet;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn get_assert_caller_admin(context: &str) -> String {
@@ -26,6 +27,13 @@ fn get_assert_caller_admin(context: &str) -> String {
 
 fn assert_caller_admin(context: &str) {
     let _ = get_assert_caller_admin(context);
+}
+
+fn prune_invalid_accounts(accounts: Vec<String>) {
+    let app = AppsTable::new(&Client::get_receiver());
+    for account in accounts {
+        app.disconnect(&account);
+    }
 }
 
 impl Admin for AccountsPlugin {
@@ -98,13 +106,14 @@ impl Admin for AccountsPlugin {
 
         let connected_accounts = Self::get_all_accounts();
         let accounts = connected_accounts
-            .into_iter()
+            .iter()
             .map(|a| format!("\"{}\"", a))
             .collect::<Vec<String>>()
             .join(",");
         let graphql_query = format!(
             "query {{
                 getAccounts(accountNames: [{}]) {{
+                    accountNum,
                     authService
                 }}
             }}",
@@ -125,17 +134,36 @@ impl Admin for AccountsPlugin {
         #[allow(non_snake_case)]
         #[derive(Deserialize, Debug)]
         struct Accnt {
+            accountNum: String,
             authService: String,
         }
 
         let auth_services_res = post_graphql_get_json(&graphql_query)?;
         let response_root = serde_json::from_str::<ResponseRoot>(&auth_services_res)
             .map_err(|e| DeserializationError(e.to_string()))?;
-        let auth_services = response_root
+
+        let valid_account_nums: HashSet<String> = response_root
+            .data
+            .getAccounts
+            .iter()
+            .filter_map(|opt_acc| opt_acc.as_ref().map(|accnt| accnt.accountNum.clone()))
+            .collect();
+
+        let invalid_accounts: Vec<String> = connected_accounts
+            .iter()
+            .filter(|account| !valid_account_nums.contains(*account))
+            .cloned()
+            .collect();
+
+        if !invalid_accounts.is_empty() {
+            prune_invalid_accounts(invalid_accounts);
+        }
+
+        let auth_services: Vec<String> = response_root
             .data
             .getAccounts
             .into_iter()
-            .map(|a| a.unwrap().authService)
+            .filter_map(|opt_accnt| opt_accnt.map(|accnt| accnt.authService))
             .collect();
         Ok(auth_services)
     }
