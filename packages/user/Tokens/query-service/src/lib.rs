@@ -175,16 +175,43 @@ mod service {
             &self,
             token_id: TID,
             account: AccountNumber,
+            counter_party: Option<String>,
+            action: Option<String>,
+            amount_min: Option<String>,
+            amount_max: Option<String>,
+            memo: Option<String>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+            let mut conditions = vec![
+                format!("token_id = {}", token_id),
+                format!("account = '{}'", account),
+            ];
+
+            if let Some(cp) = &counter_party {
+                conditions.push(format!("counter_party LIKE '%{}%'", cp));
+            }
+
+            if let Some(act) = &action {
+                conditions.push(format!("action = '{}'", act));
+            }
+
+            if let Some(min) = &amount_min {
+                conditions.push(format!("amount >= '{}'", min));
+            }
+
+            if let Some(max) = &amount_max {
+                conditions.push(format!("amount <= '{}'", max));
+            }
+
+            if let Some(m) = &memo {
+                conditions.push(format!("memo LIKE '%{}%'", m));
+            }
+
             EventQuery::new("history.tokens.balChanged")
-                .condition(format!(
-                    "token_id = {} AND account = '{}'",
-                    token_id, account
-                ))
+                .condition(conditions.join(" AND "))
                 .first(first)
                 .last(last)
                 .before(before)
