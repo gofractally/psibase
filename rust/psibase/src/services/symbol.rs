@@ -37,7 +37,7 @@ pub mod Service {
     use crate::{services::tokens::Quantity, AccountNumber};
 
     #[action]
-    fn init() {
+    fn init(billing_token: TID) {
         unimplemented!()
     }
 
@@ -53,6 +53,16 @@ pub mod Service {
 
     #[action]
     fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getByToken(token_id: TID) -> Option<SymbolRecord> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getTokenSym(token_id: TID) -> SID {
         unimplemented!()
     }
 

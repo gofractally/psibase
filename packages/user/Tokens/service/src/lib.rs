@@ -96,21 +96,6 @@ pub mod service {
         Token::get_assert(token_id)
     }
 
-    /// Lookup token symbol
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    ///
-    /// Returns token symbol
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        check_some(
-            Token::get_assert(token_id).symbol,
-            "token does not have symbol",
-        )
-    }
-
     /// Get user's token-specific balance configuration
     ///
     /// # Arguments

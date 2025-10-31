@@ -40,9 +40,9 @@ SCENARIO("Minting & burning nfts")
          AND_THEN("The NFT exists")
          {
             NftRecord expected{
-                .id     = 2,         // Second minted NFT (first is the system token)
-                .issuer = alice.id,  //
-                .owner  = alice.id   //
+                .id     = 1,         
+                .issuer = alice.id,  
+                .owner  = alice.id  
             };
 
             auto nft = a.getNft(mint.returnVal()).returnVal();

@@ -194,8 +194,6 @@ namespace UserService
       /// * `memo`     - Memo
       void recall(TID tokenId, psibase::AccountNumber from, Quantity amount, Memo memo);
 
-
-
       // Read-only interface:
 
       /// Lookup token details
@@ -205,7 +203,6 @@ namespace UserService
       ///
       /// Returns token information including current, burned supply and precision
       TokenRecord getToken(TID tokenId);
-      SID         getTokenSym(TID tokenId);
 
       /// Get user token balance
       ///
@@ -307,7 +304,7 @@ namespace UserService
 
    // clang-format off
    PSIO_REFLECT(Tokens,
-      method(init),
+      method(init, billing_token),
       method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),
       method(burn, tokenId, amount, memo),
@@ -322,7 +319,6 @@ namespace UserService
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
-      method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),

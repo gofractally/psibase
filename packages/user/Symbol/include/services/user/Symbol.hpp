@@ -12,15 +12,14 @@ namespace UserService
    class Symbol : public psibase::Service
    {
      public:
-      using Tables = psibase::
-          ServiceTables<SymbolTable, SymbolLengthTable, InitTable>;
+      using Tables = psibase::ServiceTables<SymbolTable, SymbolLengthTable, InitTable>;
 
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
       Symbol(psio::shared_view_ptr<psibase::Action> action);
 
-      void init();
+      void init(TID billing_token);
 
       void create(SID newSymbol);
 
@@ -31,7 +30,7 @@ namespace UserService
       Quantity           getPrice(uint8_t numChars);
       SymbolLengthRecord getSymbolType(uint8_t numChars);
       void               mapSymbol(TID tokenId, SID symbol);
-
+      SID                getTokenSym(TID tokenId);
 
       // clang-format off
       struct Events
@@ -57,6 +56,7 @@ namespace UserService
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),
+      method(getTokenSym, tokenId),
       method(getSymbolType, numChars),
    );
    PSIBASE_REFLECT_EVENTS(Symbol);

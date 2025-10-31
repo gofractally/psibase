@@ -34,7 +34,6 @@ pub struct TokenRecord {
     pub issued_supply: Quantity,
     pub burned_supply: Quantity,
     pub max_issued_supply: Quantity,
-    pub symbol: Option<AccountNumber>,
 }
 
 #[derive(
@@ -205,18 +204,6 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> TokenRecord {
-        unimplemented!()
-    }
-
-    /// Lookup token symbol
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    ///
-    /// Returns token symbol
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
         unimplemented!()
     }
 

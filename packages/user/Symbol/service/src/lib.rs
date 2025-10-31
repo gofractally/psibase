@@ -6,7 +6,7 @@ pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Quantity;
     use psibase::{
-        check, check_none, check_some, get_sender,
+        check, check_some, get_sender,
         services::{nft::NID, tokens::TID},
         AccountNumber, Fracpack, Table, ToSchema,
     };
@@ -14,7 +14,36 @@ pub mod tables {
 
     use crate::SYSTEM_TOKEN;
 
-    #[table(name = "SymbolLengthTable", index = 0)]
+    #[table(name = "ConfigTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct Config {
+        pub network_token: TID,
+    }
+
+    impl Config {
+        #[primary_key]
+        fn pk(&self) {}
+
+        fn new(network_token: TID) -> Self {
+            Self { network_token }
+        }
+
+        pub fn add(network_token: TID) -> Self {
+            let new_instance = Self::new(network_token);
+            new_instance.save();
+            new_instance
+        }
+
+        pub fn get() -> Option<Self> {
+            ConfigTable::read().get_index_pk().get(&())
+        }
+
+        pub fn save(&self) {
+            ConfigTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[table(name = "SymbolLengthTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct SymbolLength {
         #[primary_key]
@@ -39,8 +68,8 @@ pub mod tables {
         }
 
         pub fn add(symbol_length: u8) -> Self {
-            let nft_id =
-                psibase::services::diff_adjust::Wrapper::call().create(123, 86400, 5, 10, 0, 50000);
+            let nft_id = psibase::services::diff_adjust::Wrapper::call()
+                .create(50000, 86400, 5, 10, 0, 50000);
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();
             new_instance
@@ -57,7 +86,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "SymbolTable", index = 1)]
+    #[table(name = "SymbolTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Symbol {
         #[primary_key]
@@ -88,6 +117,18 @@ pub mod tables {
             check_some(Self::get(symbol), "Symbol does not exist")
         }
 
+        pub fn get_by_token(token_id: TID) -> Option<Self> {
+            let mut symbols: Vec<Symbol> = SymbolTable::read()
+                .get_index_by_token()
+                .range(
+                    (Some(token_id), AccountNumber::new(0))
+                        ..=(Some(token_id), AccountNumber::new(u64::MAX)),
+                )
+                .collect();
+
+            symbols.pop()
+        }
+
         pub fn add(symbol: AccountNumber, billable: bool) -> Self {
             let length_record = check_some(
                 SymbolLength::get(symbol.to_string().len() as u8),
@@ -115,6 +156,12 @@ pub mod tables {
             let new_instance = Self::new(symbol, Nft::call().mint());
             new_instance.save();
 
+            Nft::call().credit(
+                new_instance.ownerNft,
+                get_sender(),
+                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+            );
+
             new_instance
         }
 
@@ -124,7 +171,7 @@ pub mod tables {
                 .nft_id;
             check(
                 Nft::call().getNft(token_owner_nft).owner == get_sender(),
-                "only token owner can map token",
+                "Missing required authority",
             );
 
             let symbol_owner_nft = self.ownerNft;
@@ -142,53 +189,35 @@ pub mod tables {
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{Symbol, SymbolLength};
+    use crate::tables::{Config, Symbol, SymbolLength};
     use crate::SYSTEM_TOKEN;
+    use psibase::services::symbol::SID;
     use psibase::services::tokens::{Quantity, TID};
     use psibase::*;
 
     use psibase::services::nft::Wrapper as Nft;
-    use psibase::services::tokens::Precision;
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
-    fn init() {
-        Tokens::call_from(Wrapper::SERVICE).setUserConf(0, true);
-        Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
-
-        // Create system token
-        let system_token_precision = Precision::new(4).unwrap();
-        let system_token_id = Tokens::call_from(Wrapper::SERVICE)
-            .create(system_token_precision, 10000000000000.into());
-
-        check(system_token_id == SYSTEM_TOKEN, "expected matching ID");
-
-        let system_token_nft_id = Tokens::call_from(Wrapper::SERVICE)
-            .getToken(system_token_id)
-            .nft_id;
-        Nft::call_from(Wrapper::SERVICE).debit(
-            system_token_nft_id,
-            "Taking ownership of system token".into(),
+    fn init(billing_token: TID) {
+        check(
+            Tokens::call().getToken(billing_token).nft_id != 0,
+            "billing token does not exist",
+        );
+        check_none(Config::get(), "service already initialized");
+        check(
+            get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
+            "only root account can call init",
         );
 
-        // Make system token untransferable
-        Tokens::call_from(Wrapper::SERVICE).setTokenConf(system_token_id, 0, true);
+        Config::add(billing_token);
+        Tokens::call_from(Wrapper::SERVICE).setUserConf(0, true);
+        Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
 
         // Populate default settings for each token symbol length
         for length in 3u8..7 {
             SymbolLength::add(length);
         }
-
-        // Map PSI as the system token symbol
-        let symbol = "psi".into();
-        let mut symbol_record = Symbol::add(symbol, false);
-        symbol_record.map_symbol(system_token_id);
-
-        Nft::call_from(Wrapper::SERVICE).credit(
-            symbol_record.ownerNft,
-            psibase::services::tokens::SERVICE,
-            "System token symbol ownership nft".into(),
-        );
     }
 
     #[action]
@@ -212,6 +241,18 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getSymbol(symbol: AccountNumber) -> Symbol {
         Symbol::get_assert(symbol)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getTokenSym(token_id: TID) -> SID {
+        Symbol::get_by_token(token_id).unwrap().symbolId
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getByToken(token_id: TID) -> Option<Symbol> {
+        Symbol::get_by_token(token_id)
     }
 
     #[action]

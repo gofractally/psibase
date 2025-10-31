@@ -35,7 +35,6 @@ pub mod tables {
         pub burned_supply: Quantity,
         #[graphql(skip)]
         pub max_issued_supply: Quantity,
-        pub symbol: Option<AccountNumber>,
     }
 
     define_flags!(TokenFlags, u8, {
@@ -44,11 +43,6 @@ pub mod tables {
     });
 
     impl Token {
-        #[secondary_key(1)]
-        fn by_symbol(&self) -> (Option<AccountNumber>, TID) {
-            (self.symbol, self.id)
-        }
-
         pub fn get(id: TID) -> Option<Self> {
             TokenTable::read().get_index_pk().get(&id)
         }
@@ -58,12 +52,8 @@ pub mod tables {
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
-            let mut tokens: Vec<Token> = TokenTable::read()
-                .get_index_by_symbol()
-                .range((Some(symbol), 0 as u32)..=(Some(symbol), u32::MAX))
-                .collect();
-
-            tokens.pop()
+            let token = psibase::services::symbol::Wrapper::call().getSymbol(symbol);
+            Self::get(token.tokenId?)
         }
 
         fn check_is_owner(&self, account: AccountNumber) {
@@ -71,7 +61,6 @@ pub mod tables {
 
             check(account == holder, "Missing required authority");
         }
-
 
         pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
             let init_table = InitTable::new();
@@ -89,7 +78,6 @@ pub mod tables {
                 max_issued_supply,
                 precision,
                 settings_value: 0,
-                symbol: None,
             };
 
             new_instance.save();
@@ -196,6 +184,12 @@ pub mod tables {
         pub async fn burned_supply(&self) -> Decimal {
             Decimal::new(self.burned_supply, self.precision.try_into().unwrap())
         }
+
+        pub async fn symbol(&self) -> Option<AccountNumber> {
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.id)
+                .map(|s| s.symbolId)
+        }
     }
 
     #[table(name = "BalanceTable", index = 2)]
@@ -291,7 +285,9 @@ pub mod tables {
         }
 
         pub async fn symbol(&self) -> Option<AccountNumber> {
-            Token::get_assert(self.token_id).symbol
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.token_id)
+                .map(|s| s.symbolId)
         }
 
         pub async fn precision(&self) -> Precision {
@@ -336,7 +332,9 @@ pub mod tables {
         }
 
         pub async fn symbol(&self) -> Option<AccountNumber> {
-            Token::get_assert(self.token_id).symbol
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.token_id)
+                .map(|s| s.symbolId)
         }
 
         pub async fn precision(&self) -> Precision {
