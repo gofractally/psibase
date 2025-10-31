@@ -93,7 +93,7 @@ export const useInstallPackages = () => {
             return toast.loading("Loading...");
         },
         mutationFn: async (packages) => {
-              await installPackages("root", packages, "best", "current");
+            await installPackages("root", packages, "best", "current");
         },
         onError: (errorObj, _, id) => {
             toast.error("Failed installing", {

@@ -609,6 +609,7 @@ namespace SystemService
          contentTable.put(*content);
       }
    }
+
    void Sites::deleteCsp(std::string path)
    {
       Tables tables{};
