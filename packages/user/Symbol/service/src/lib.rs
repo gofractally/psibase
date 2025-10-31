@@ -3,6 +3,7 @@ const SYSTEM_TOKEN: u32 = 1;
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
+    use psibase::check_none;
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Quantity;
     use psibase::{
@@ -69,7 +70,7 @@ pub mod tables {
 
         pub fn add(symbol_length: u8) -> Self {
             let nft_id = psibase::services::diff_adjust::Wrapper::call()
-                .create(50000, 86400, 5, 10, 0, 50000);
+                .create(10000000, 86400, 24, 24, 0, 50000);
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();
             new_instance
@@ -130,6 +131,11 @@ pub mod tables {
         }
 
         pub fn add(symbol: AccountNumber, billable: bool) -> Self {
+            check_none(Symbol::get(symbol), "Symbol already exists");
+            check(
+                symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
+                "Symbol may only contain 3 to 7 lowercase alphabetic characters",
+            );
             let length_record = check_some(
                 SymbolLength::get(symbol.to_string().len() as u8),
                 "symbol length not supported",
