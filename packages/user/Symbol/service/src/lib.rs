@@ -206,10 +206,7 @@ pub mod service {
 
     #[action]
     fn init(billing_token: TID) {
-        check(
-            Tokens::call().getToken(billing_token).nft_id != 0,
-            "billing token does not exist",
-        );
+        Tokens::call().getToken(billing_token); // Validate token exists
         check_none(Config::get(), "service already initialized");
         check(
             get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
