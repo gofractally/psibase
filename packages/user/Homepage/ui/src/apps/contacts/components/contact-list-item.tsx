@@ -1,9 +1,7 @@
-import { useAvatar } from "@/hooks/use-avatar";
 import { useProfile } from "@/hooks/use-profile";
 
+import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
-import { AvatarImage } from "@shared/shadcn/ui/avatar";
-import { Avatar } from "@shared/shadcn/ui/avatar";
 
 import { LocalContact } from "../types";
 import { formatNames } from "../utils/formatNames";
@@ -18,7 +16,6 @@ export const ContactItem = ({
     onSelect: () => void;
 }) => {
     const { data: profile } = useProfile(contact.account);
-    const { avatarSrc } = useAvatar(contact.account);
 
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,
@@ -37,9 +34,7 @@ export const ContactItem = ({
             )}
         >
             <div className="flex items-center gap-2">
-                <Avatar className={cn("rounded-none")}>
-                    <AvatarImage src={avatarSrc} className="object-cover" />
-                </Avatar>
+                <Avatar account={contact.account} className="w-8" />
                 <div className="flex flex-col">
                     <p className="text-md font-medium">{primaryName}</p>
                 </div>

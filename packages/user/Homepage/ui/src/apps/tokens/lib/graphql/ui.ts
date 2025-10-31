@@ -1,118 +1,183 @@
 import { graphql } from "@/lib/graphql";
 
-export interface Root {
-    data: Data;
+const qs = {
+    userTokenBalances: (username: string) => `
+        userBalances(user: "${username}") {
+            nodes {
+                tokenId
+                balance
+                symbol
+                precision
+                account
+            }
+        }	
+    `,
+    tokenMeta: (tokenId: string) => `
+        token(tokenId: "${tokenId}") {
+            id
+            settings {
+                untransferable
+                unrecallable
+            }
+        }
+    `,
+    userTokenBalanceChanges: (username: string, tokenId: number) => `
+        balChanges(tokenId: ${tokenId}, account: "${username}") {
+            nodes {
+                tokenId
+                account
+                counterParty
+                action
+                amount
+                memo
+            }
+        }
+    `,
+    userCredits: (username: string) => `
+        userCredits(user: "${username}") {
+            nodes {
+                token {
+                    id
+                    symbol
+                    precision
+                }
+                balance
+                creditor
+                debitor
+            }
+        }
+    `,
+    userDebits: (username: string) => `
+        userDebits(user: "${username}") {
+            nodes {
+                token {
+                    id
+                    symbol
+                    precision
+                }
+                balance
+                creditor
+                debitor
+            }
+        }
+    `,
+    userSettings: (username: string) => `
+        userSettings(user: "${username}") {
+            settings {
+                manualDebit
+            }
+        }
+    `,
+};
+
+interface UserSettingsRes {
+    userSettings: {
+        settings: {
+            manualDebit: boolean;
+        };
+    };
 }
 
-export interface Data {
-    userBalances: User;
-    userTokens: UserTokens;
-    userCredits: User;
-    userDebits: User;
+export const fetchUserSettings = async (username: string) => {
+    const query = `{${qs.userSettings(username)}}`;
+    const res = await graphql<UserSettingsRes>(query, "tokens");
+    return res.userSettings.settings;
+};
+
+// User Token Balances
+interface UserTokenBalanceRes {
+    userBalances: UserTokenBalance;
 }
 
-export interface User {
-    edges: UserBalancesEdge[];
+interface UserTokenBalance {
+    nodes: UserTokenBalanceNode[];
 }
 
-export interface UserBalancesEdge {
-    node: SharedBalanceNode;
-}
-
-export interface SharedBalanceNode {
+export interface UserTokenBalanceNode {
     tokenId: number;
     balance: string;
-    symbolId: string;
-    precision: Precision;
-    creditedTo?: string;
-    debitableFrom?: string;
+    symbol: string;
+    precision: number;
+    account: string;
 }
 
-export interface Precision {
-    value: number;
+export const fetchUserTokenBalances = async (username: string) => {
+    const query = `{${qs.userTokenBalances(username)}}`;
+    const res = await graphql<UserTokenBalanceRes>(query, "tokens");
+    return res.userBalances.nodes;
+};
+
+interface TokenMetaRes {
+    token: TokenMetaNode;
 }
 
-export interface UserTokens {
-    edges: UserTokensEdge[];
-}
-
-export interface UserTokensEdge {
-    node: UserBalanceToken;
-}
-
-export interface UserBalanceToken {
+interface TokenMetaNode {
     id: number;
-    precision: Precision;
-    symbolId: string;
+    settings: {
+        untransferable: boolean;
+        unrecallable: boolean;
+    };
 }
 
-const queryString = (username: string) => `
-{
-	
-	userBalances(user: "${username}") {
-		edges {
-			node {
-				tokenId
-				balance
-				symbolId
-				precision {
-					value
-				}
-			}
-		}
-	}
+export const fetchTokenMeta = async (tokenId: string) => {
+    const query = `{${qs.tokenMeta(tokenId)}}`;
+    const res = await graphql<TokenMetaRes>(query, "tokens");
+    return res.token;
+};
 
-	userTokens(user: "${username}") {
-		edges {
-			node {
-				id
-				precision { 
-				  value
-				}
-				symbolId
-			}
-		}
-	}
-	
-	userCredits(user: "${username}") {
-		edges {
-			node {
-				symbolId
-				tokenId
-				precision {
-					value
-				}
-				balance
-				creditedTo
-			}
-		}
-	}
-	
-	userDebits(user: "${username}") {
-		edges {
-			node {
-				symbolId
-				tokenId
-				precision {
-					value
-				}
-				balance
-				debitableFrom
-			}
-		}
-	}
-	
+// User Token Balance Changes
+interface BalChangeRes {
+    balChanges: BalChange;
 }
 
-`;
+export interface BalChange {
+    nodes: BalChangeNode[];
+}
 
-export const fetchUi = async (username: string) => {
-    const res = await graphql<Data>(queryString(username), "tokens");
+export interface BalChangeNode {
+    tokenId: number;
+    account: string;
+    counterParty: string;
+    action: "credited" | "debited" | "uncredited" | "rejected";
+    amount: string;
+    memo: string;
+}
 
+export const fetchUserTokenBalanceChanges = async (
+    username: string,
+    tokenId: number,
+) => {
+    const query = `{${qs.userTokenBalanceChanges(username, tokenId)}}`;
+    const res = await graphql<BalChangeRes>(query, "tokens");
+    return res.balChanges.nodes;
+};
+
+// Open Lines of Credit
+interface OpenLinesOfCreditRes {
+    userCredits: LineOfCredit;
+    userDebits: LineOfCredit;
+}
+
+interface LineOfCredit {
+    nodes: LineOfCreditNode[];
+}
+
+export interface LineOfCreditNode {
+    token: { id: number; symbol: string; precision: number };
+    balance: string;
+    creditor: string;
+    debitor: string;
+}
+
+export const fetchOpenLinesOfCredit = async (username: string) => {
+    const query = `{
+        ${qs.userCredits(username)}
+        ${qs.userDebits(username)}
+    }`;
+
+    const res = await graphql<OpenLinesOfCreditRes>(query, "tokens");
     return {
-        userDebits: res.userDebits.edges.map(({ node }) => node),
-        userCredits: res.userCredits.edges.map(({ node }) => node),
-        userBalances: res.userBalances.edges.map(({ node }) => node),
-        userTokens: res.userTokens.edges.map(({ node }) => node),
+        credits: res.userCredits.nodes,
+        debits: res.userDebits.nodes,
     };
 };

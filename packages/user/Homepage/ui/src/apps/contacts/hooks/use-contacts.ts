@@ -11,6 +11,7 @@ import { LocalContact, zLocalContact } from "../types";
 
 export const useContacts = (
     username?: z.infer<typeof Account> | null | undefined,
+    enabled = true,
 ) =>
     useQuery({
         queryKey: QueryKey.contacts(username),
@@ -24,7 +25,7 @@ export const useContacts = (
 
             return zLocalContact.array().parse(res);
         },
-        enabled: !!username,
+        enabled: !!username && enabled,
     });
 
 export const upsertUserToCache = (

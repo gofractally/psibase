@@ -125,3 +125,8 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* Sonner description color */
+[data-description] {
+    color: var(--muted-foreground) !important;
+}
