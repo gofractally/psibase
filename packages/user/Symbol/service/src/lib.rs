@@ -18,19 +18,19 @@ pub mod tables {
     #[table(name = "ConfigTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct Config {
-        pub network_token: TID,
+        pub billing_token: TID,
     }
 
     impl Config {
         #[primary_key]
         fn pk(&self) {}
 
-        fn new(network_token: TID) -> Self {
-            Self { network_token }
+        fn new(billing_token: TID) -> Self {
+            Self { billing_token }
         }
 
-        pub fn add(network_token: TID) -> Self {
-            let new_instance = Self::new(network_token);
+        pub fn add(billing_token: TID) -> Self {
+            let new_instance = Self::new(billing_token);
             new_instance.save();
             new_instance
         }
