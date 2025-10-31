@@ -18,8 +18,7 @@ impl ConnectedAccounts {
     }
 
     pub fn remove(&mut self, account: &str) {
-        let account = account.to_string();
-        if let Some(idx) = self.accounts.iter().position(|a| a == &account) {
+        if let Some(idx) = self.accounts.iter().position(|a| a.as_str() == account) {
             self.accounts.swap_remove(idx);
         }
     }
