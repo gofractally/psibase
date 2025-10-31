@@ -174,12 +174,15 @@ void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
    psibase::socketSend(socket, data);
 }
 
-std::int32_t XHttp::sendRequest(HttpRequest request, MethodNumber callback)
+std::int32_t XHttp::sendRequest(HttpRequest                   request,
+                                MethodNumber                  callback,
+                                std::optional<TLSInfo>        tls,
+                                std::optional<SocketEndpoint> endpoint)
 {
    // TODO: set Origin
    // TODO: ban forbidden request headers
    auto requests = Session{}.open<ResponseHandlerTable>();
-   auto sock     = socketOpen(request);
+   auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
    PSIBASE_SUBJECTIVE_TX
    {

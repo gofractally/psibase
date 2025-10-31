@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/Service.hpp>
+#include <psibase/SocketInfo.hpp>
 #include <psibase/Table.hpp>
 #include <services/system/HttpServer.hpp>
 
@@ -48,7 +49,10 @@ namespace LocalService
       /// Returns the new socket
       ///
       /// TODO: decide how to report connection errors
-      std::int32_t sendRequest(psibase::HttpRequest request, psibase::MethodNumber callback);
+      std::int32_t sendRequest(psibase::HttpRequest                   request,
+                               psibase::MethodNumber                  callback,
+                               std::optional<psibase::TLSInfo>        tls,
+                               std::optional<psibase::SocketEndpoint> endpoint);
 
       /// Enables or disables automatic closing of the socket
       /// when the transaction context exits.
@@ -67,7 +71,7 @@ namespace LocalService
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
-                method(sendRequest, request, callback),
+                method(sendRequest, request, callback, tls, endpoint),
                 method(autoClose, socket, value),
                 method(sendReply, socket, response),
                 method(rootHost, host),

@@ -766,7 +766,16 @@ namespace psibase
    for (::psibase::SubjectiveTransaction _psibase_s_tx; !_psibase_s_tx.done; _psibase_s_tx.commit())
 
    struct HttpRequest;
+   struct IPV4Endpoint;
+   struct IPV6Endpoint;
+   struct LocalEndpoint;
+   struct TLSInfo;
    std::int32_t socketOpen(const HttpRequest& request);
+   std::int32_t socketOpen(const HttpRequest& request, const std::optional<TLSInfo>& tls);
+   std::int32_t socketOpen(
+       const HttpRequest&                                                            request,
+       const std::optional<TLSInfo>&                                                 tls,
+       const std::optional<std::variant<IPV4Endpoint, IPV6Endpoint, LocalEndpoint>>& endpoint);
 
    /// Send a message to a socket
    ///
