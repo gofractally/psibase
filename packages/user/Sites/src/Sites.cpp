@@ -603,7 +603,7 @@ namespace SystemService
       {
          auto contentTable = tables.open<SitesContentTable>();
          auto content      = contentTable.get(SitesContentKey{getSender(), path});
-         check(!!content, "Invalid path for account " + getSender().str() + " and path \"" + path + "\"");
+         check(!!content, "Invalid path");
 
          content->csp = std::optional{std::move(csp)};
          contentTable.put(*content);
