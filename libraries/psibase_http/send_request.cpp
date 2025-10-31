@@ -40,7 +40,7 @@ namespace
           : stream(boost::asio::make_strand(context), std::forward<A>(a)...)
       {
       }
-      void do_write(HttpRequest&& req)
+      void do_write(std::shared_ptr<HttpClientSocket>&& self, HttpRequest&& req)
       {
          auto  requestPtr = std::make_shared<bhttp::request<bhttp::vector_body<char>>>();
          auto& request    = *requestPtr;
@@ -54,8 +54,14 @@ namespace
             request.insert(name, value);
          request.body() = std::move(req.body);
          bhttp::async_write(stream, request,
-                            [_ = std::move(requestPtr)](const std::error_code& ec,
-                                                        std::size_t bytes_transferred) {});
+                            [self = std::move(self), _ = std::move(requestPtr)](
+                                const std::error_code& ec, std::size_t bytes_transferred)
+                            {
+                               if (ec)
+                               {
+                                  PSIBASE_LOG(self->logger, warning) << "Failed to send request";
+                               }
+                            });
       }
       void do_read(std::shared_ptr<HttpClientSocket>&& self, server_state& server)
       {
@@ -70,6 +76,8 @@ namespace
              {
                 if (ec)
                 {
+                   PSIBASE_LOG(self->logger, warning)
+                       << "Failed to read HTTP response: " << ec.message();
                 }
                 else
                 {
@@ -289,7 +297,7 @@ void psibase::http::send_request(boost::asio::io_context&        context,
       }
       else
       {
-         socket->do_write(std::move(req));
+         socket->do_write(std::shared_ptr{socket}, std::move(req));
          socket->do_read(std::move(socket), state);
       }
    };

@@ -417,12 +417,13 @@ format = %s
 _default_log_filter = 'Severity >= info'
 _default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
-def _write_config(dir, log_filter, log_format, softhsm):
+def _write_config(dir, log_filter, log_format, softhsm, trustfile):
     logfile = os.path.join(dir, 'config')
+    extra = ''
     if softhsm:
-        extra = 'pkcs11-module = %s\n' % softhsm
-    else:
-        extra = ''
+        extra += 'pkcs11-module = %s\n' % softhsm
+    if trustfile:
+        extra += 'tls-trustfile = %s\n' & trustfile
     if not os.path.exists(logfile):
         if log_filter is None:
             log_filter = _default_log_filter
@@ -444,7 +445,7 @@ def _init_softhsm(dir, pin):
     return env
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -467,7 +468,7 @@ class Node(API):
         if softhsm is not None:
             self.softhsm_pin = 'Ch4ng#Me!'
             self.env.update(_init_softhsm(os.path.join(self.dir, 'softhsm'), self.softhsm_pin))
-        _write_config(self.dir, log_filter, log_format, softhsm)
+        _write_config(self.dir, log_filter, log_format, softhsm, trustfile)
         if isinstance(listen, str):
             listen = [listen]
         self.listen = listen
