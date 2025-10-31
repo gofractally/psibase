@@ -72,19 +72,19 @@ SCENARIO("Buying a symbol")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"aBc"};
-         CHECK(a.create(symbolId).failed(symbolLengthNotSupported));
+         CHECK(a.create(symbolId).failed(invalidSymbol));
       }
       THEN("Alice cannot create a symbol with fewer than 3 characters")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"ab"};
-         CHECK(a.create(symbolId).failed(symbolLengthNotSupported));
+         CHECK(a.create(symbolId).failed(invalidSymbol));
       }
       THEN("Alice cannot create a symbol with greater than 7 characters")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"abcdefgh"};
-         CHECK(a.create(symbolId).failed(symbolLengthNotSupported));
+         CHECK(a.create(symbolId).failed(invalidSymbol));
       }
       THEN("Alice can create a symbol")
       {

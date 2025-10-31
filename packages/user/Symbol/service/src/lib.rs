@@ -132,14 +132,13 @@ pub mod tables {
 
         pub fn add(symbol: AccountNumber, billable: bool) -> Self {
             check_none(Symbol::get(symbol), "Symbol already exists");
+            let length_record = SymbolLength::get(symbol.to_string().len() as u8);
             check(
-                symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
+                length_record.is_some()
+                    && symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
                 "Symbol may only contain 3 to 7 lowercase alphabetic characters",
             );
-            let length_record = check_some(
-                SymbolLength::get(symbol.to_string().len() as u8),
-                "symbol length not supported",
-            );
+            let length_record = length_record.unwrap();
 
             if billable {
                 let price = psibase::services::diff_adjust::Wrapper::call()
