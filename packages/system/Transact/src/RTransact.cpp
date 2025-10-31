@@ -1446,6 +1446,15 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
           .headers = allowCors(request, AccountNumber{"supervisor"}),
       };
    };
+   auto make415 = [&](std::string_view message)
+   {
+      return HttpReply{
+          .status      = HttpStatus::unsupportedMediaType,
+          .contentType = "text/html",
+          .body{message.begin(), message.end()},
+          .headers = allowCors(request, AccountNumber{"supervisor"}),
+      };
+   };
 
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
@@ -1468,7 +1477,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          };
       }
       if (request.contentType != "application/octet-stream")
-         return make400("Expected fracpack encoded signed transaction (application/octet-stream)");
+         return make415("Expected fracpack encoded signed transaction (application/octet-stream)");
 
       auto query       = request.query<WaitFor>();
       auto trx         = psio::from_frac<SignedTransaction>(request.body);
