@@ -2,7 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildAttest, GuildMember, GuildMemberTable};
+use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -45,12 +45,31 @@ impl GuildMember {
     }
 
     pub fn kick(&self) {
-        GuildAttest::drop_user_attestations(self.guild, self.member);
-
         self.remove();
     }
 
+    pub fn guild_memberships(member: AccountNumber) -> Vec<Self> {
+        GuildMemberTable::read()
+            .get_index_by_member()
+            .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
+            .collect()
+    }
+
+    pub fn remove_all_by_member(member: AccountNumber) {
+        let table = GuildMemberTable::read_write();
+        for membership in Self::guild_memberships(member) {
+            table.remove(&membership);
+        }
+    }
+
     fn remove(&self) {
+        let table = GuildAttestTable::read_write();
+        let members = GuildAttest::attestations_by_guild_member(self.guild, self.member);
+
+        for attest in members {
+            table.remove(&attest);
+        }
+
         GuildMemberTable::read_write().remove(&self);
     }
 
