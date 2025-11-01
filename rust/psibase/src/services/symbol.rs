@@ -67,7 +67,7 @@ pub mod Service {
     }
 
     #[action]
-    fn getPrice(num_chars: u8) -> Quantity {
+    fn getPrice(length: u8) -> Quantity {
         unimplemented!()
     }
 
@@ -77,12 +77,12 @@ pub mod Service {
     }
 
     #[action]
-    fn getSymbolType(numChars: u8) -> SymbolLength {
+    fn getSymbolType(length: u8) -> SymbolLength {
         unimplemented!()
     }
 
     #[event(history)]
-    fn symCreated(symbol: SID, owner: AccountNumber, cost: Quantity) {
+    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {
         unimplemented!()
     }
 }

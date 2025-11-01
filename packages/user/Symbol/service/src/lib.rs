@@ -304,7 +304,7 @@ pub mod service {
     }
 
     #[event(history)]
-    fn symCreated(symbol: AccountNumber, owner: AccountNumber, cost: String) {}
+    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {}
 }
 
 #[cfg(test)]
