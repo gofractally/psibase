@@ -103,14 +103,6 @@ impl Issuer for TokensPlugin {
         add_action_to_transaction(Actions::mint::ACTION_NAME, &packed_args)
     }
 
-    fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
-        let packed_args = Actions::mapSymbol {
-            token_id,
-            symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(Actions::mapSymbol::ACTION_NAME, &packed_args)
-    }
 
     fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {
         Self::set_token_flag(token_id, TokenFlags::UNTRANSFERABLE, enable)

@@ -135,7 +135,7 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTransact SetCode Symbol
+        RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
@@ -443,6 +443,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    PATH packages/user/Symbol
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
@@ -479,6 +485,7 @@ cargo_psibase_package(
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
@@ -840,18 +847,6 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    NAME Symbol
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
-    SERVICE symbol
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
-        INIT
-    DEPENDS wasm
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
@@ -1096,7 +1091,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor TestFractal TokenUsers Tokens TokenStream Symbol Transact Homepage WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XRun XSites XTransact)
 
 install(
@@ -1114,7 +1109,6 @@ install(
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Credentials.psi
           ${SERVICE_DIR}/DevDefault.psi
-          ${SERVICE_DIR}/DiffAdjust.psi
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
@@ -1143,10 +1137,11 @@ install(
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
-          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
+          ${SERVICE_DIR}/DiffAdjust.psi
+          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
