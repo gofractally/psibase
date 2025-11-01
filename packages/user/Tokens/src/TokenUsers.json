@@ -31,5 +31,11 @@
         "service": "tokens",
         "method": "credit",
         "rawData": "140001000000BE52800000000000080000000E000000080080969800000000001500000054657374202D20696E697469616C20637265646974"
+    },
+    {
+        "sender": "symbol",
+        "service": "symbol",
+        "method": "init",
+        "data": { "billing_token": 1 }
     }
 ]

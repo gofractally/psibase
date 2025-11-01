@@ -2,15 +2,12 @@ package symbol:plugin;
 
 interface api {
     use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
-}
 
-interface queries {
-    use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
+    create: func(symbol: string) -> result<_, error>;
+    init: func(token-id: u32) -> result<_, error>;
+    map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
 }
 
 world imports {
     import api;
-    import queries;
 }

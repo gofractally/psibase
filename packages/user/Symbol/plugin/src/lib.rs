@@ -2,70 +2,59 @@
 mod bindings;
 
 use bindings::exports::symbol::plugin::api::Guest as Api;
-use bindings::exports::symbol::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::{define_trust, AccountNumber};
 
 mod errors;
-use errors::ErrorType;
 
 define_trust! {
     descriptions {
-        Low => "
-        Low trust grants these abilities:
-            - Reading the value of the example-thing
-        ",
+        Low => "",
         Medium => "",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Setting the example thing
+        Creates new symbols and map them to tokens.
         ",
     }
     functions {
-        Low => [get_example_thing],
-        High => [set_example_thing],
+        High => [create, init, map_symbol],
     }
 }
 
 struct SymbolPlugin;
 
 impl Api for SymbolPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
+    fn create(symbol: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::create)?;
 
-        Ok(())
+        let packed_args = symbol::action_structs::create {
+            symbol: AccountNumber::from(symbol.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(symbol::action_structs::create::ACTION_NAME, &packed_args)
     }
-}
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
+    fn init(token_id: u32) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::init)?;
 
-impl Queries for SymbolPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
+        let packed_args = symbol::action_structs::init {
+            billing_token: token_id,
+        }
+        .packed();
+        add_action_to_transaction(symbol::action_structs::init::ACTION_NAME, &packed_args)
+    }
 
-        let graphql_str = "query { exampleThing }";
+    fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::map_symbol)?;
 
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let examplething_val =
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(examplething_val.data.example_thing)
+        let packed_args = symbol::action_structs::mapSymbol {
+            token_id,
+            symbol: AccountNumber::from(symbol.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(symbol::action_structs::mapSymbol::ACTION_NAME, &packed_args)
     }
 }
 

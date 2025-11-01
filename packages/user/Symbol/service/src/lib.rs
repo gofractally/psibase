@@ -1,19 +1,16 @@
-const SYSTEM_TOKEN: u32 = 1;
-
 #[psibase::service_tables]
 pub mod tables {
-    use async_graphql::SimpleObject;
+    use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
-    use psibase::services::nft::Wrapper as Nft;
-    use psibase::services::tokens::Quantity;
+    use psibase::services::nft::{NftRecord, Wrapper as Nft};
+    use psibase::services::tokens::Wrapper as Tokens;
+    use psibase::services::tokens::{Decimal, Quantity};
     use psibase::{
         check, check_some, get_sender,
         services::{nft::NID, tokens::TID},
         AccountNumber, Fracpack, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
-
-    use crate::SYSTEM_TOKEN;
 
     #[table(name = "ConfigTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
@@ -39,13 +36,18 @@ pub mod tables {
             ConfigTable::read().get_index_pk().get(&())
         }
 
+        pub fn get_assert() -> Self {
+            check_some(Self::get(), "Config not found")
+        }
+
         pub fn save(&self) {
             ConfigTable::read_write().put(&self).unwrap();
         }
     }
 
     #[table(name = "SymbolLengthTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[graphql(complex)]
     pub struct SymbolLength {
         #[primary_key]
         pub symbolLength: u8,
@@ -87,11 +89,25 @@ pub mod tables {
         }
     }
 
+    #[ComplexObject]
+    impl SymbolLength {
+        pub async fn current_price(&self) -> Decimal {
+            Decimal::new(
+                self.price(),
+                Tokens::call()
+                    .getToken(Config::get_assert().billing_token)
+                    .precision,
+            )
+        }
+    }
+
     #[table(name = "SymbolTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[graphql(complex)]
     pub struct Symbol {
         #[primary_key]
         pub symbolId: AccountNumber,
+        #[graphql(skip)]
         pub ownerNft: NID,
         pub tokenId: Option<TID>,
     }
@@ -139,23 +155,33 @@ pub mod tables {
                 "Symbol may only contain 3 to 7 lowercase alphabetic characters",
             );
             let length_record = length_record.unwrap();
+            let recipient = get_sender();
+            let billing_token = Config::get_assert().billing_token;
+
+            let on_created = |quantity: Quantity| {
+                crate::Wrapper::emit().history().symCreated(
+                    symbol,
+                    recipient,
+                    Decimal::new(quantity, Tokens::call().getToken(billing_token).precision)
+                        .to_string(),
+                );
+            };
 
             if billable {
                 let price = psibase::services::diff_adjust::Wrapper::call()
                     .increment(length_record.nftId, 1)
                     .into();
 
-                let owner = get_sender();
-                psibase::services::tokens::Wrapper::call().debit(
-                    SYSTEM_TOKEN,
-                    owner,
+                Tokens::call().debit(
+                    billing_token,
+                    recipient,
                     price,
                     "symbol purchase".to_string().try_into().unwrap(),
                 );
 
-                crate::Wrapper::emit()
-                    .history()
-                    .symCreated(symbol, owner, price);
+                on_created(price);
+            } else {
+                on_created(0.into());
             }
 
             let new_instance = Self::new(symbol, Nft::call().mint());
@@ -163,7 +189,7 @@ pub mod tables {
 
             Nft::call().credit(
                 new_instance.ownerNft,
-                get_sender(),
+                recipient,
                 format!("This NFT conveys ownership of symbol: {}", symbol).into(),
             );
 
@@ -171,9 +197,7 @@ pub mod tables {
         }
 
         pub fn map_symbol(&mut self, token_id: TID) {
-            let token_owner_nft = psibase::services::tokens::Wrapper::call()
-                .getToken(token_id)
-                .nft_id;
+            let token_owner_nft = Tokens::call().getToken(token_id).nft_id;
             check(
                 Nft::call().getNft(token_owner_nft).owner == get_sender(),
                 "Missing required authority",
@@ -190,12 +214,18 @@ pub mod tables {
             SymbolTable::read_write().put(&self).unwrap();
         }
     }
+
+    #[ComplexObject]
+    impl Symbol {
+        pub async fn owner_nft(&self) -> NftRecord {
+            psibase::services::nft::Wrapper::call().getNft(self.ownerNft)
+        }
+    }
 }
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
     use crate::tables::{Config, Symbol, SymbolLength};
-    use crate::SYSTEM_TOKEN;
     use psibase::services::symbol::SID;
     use psibase::services::tokens::{Quantity, TID};
     use psibase::*;
@@ -270,17 +300,11 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        check(
-            Tokens::call_from(Wrapper::SERVICE)
-                .getToken(SYSTEM_TOKEN)
-                .nft_id
-                != 0,
-            "service not initialized",
-        );
+        check_some(Config::get(), "service not initialized");
     }
 
     #[event(history)]
-    fn symCreated(symbol: AccountNumber, owner: AccountNumber, cost: Quantity) {}
+    fn symCreated(symbol: AccountNumber, owner: AccountNumber, cost: String) {}
 }
 
 #[cfg(test)]

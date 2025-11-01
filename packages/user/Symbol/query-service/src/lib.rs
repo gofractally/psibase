@@ -4,32 +4,35 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::Deserialize;
+    use symbol::tables::{Symbol, SymbolLength};
 
     #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
+    struct SymbolCreated {
+        symbol: AccountNumber,
+        new_thing: AccountNumber,
+        cost: String,
     }
 
     struct Query;
 
     #[Object]
     impl Query {
-        /// This query gets the current value of the Example Thing.
-        async fn example_thing(&self) -> String {
-            // symbol::Wrapper::call().getExampleThing()
-            "a new thing".to_string()
+        async fn symbol_length(&self, length: u8) -> Option<SymbolLength> {
+            SymbolLength::get(length)
         }
 
-        /// This query gets paginated historical updates of the Example Thing.
-        async fn historical_updates(
+        async fn symbol(&self, symbol: String) -> Option<Symbol> {
+            Symbol::get(symbol.as_str().into())
+        }
+
+        async fn symbol_created(
             &self,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
-            EventQuery::new("history.symbol.updated")
+        ) -> async_graphql::Result<Connection<u64, SymbolCreated>> {
+            EventQuery::new("history.symbol.symCreated")
                 .first(first)
                 .last(last)
                 .before(before)
