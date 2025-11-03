@@ -9,7 +9,37 @@ use psibase::AccountNumber;
 use psibase::services::accounts as AccountsService;
 use psibase::fracpack::Pack;
 use serde::Deserialize;
+use trust::*;
 
+psibase::define_trust! {
+    descriptions {
+        None => "
+            - Check if user is logged in
+            - get account details
+            - get current user
+            - decode connection token
+        ",
+        Low => "",
+        Medium => "",
+        High => "
+        High trust grants the abilities of all lower trust levels, plus these abilities:
+            - set auth service on an account
+            - get list of apps an account is connected to
+        ",
+        Max => "
+        Max trust grants the abilities of all lower trust levels, plus these abilities:
+            - login user to an app
+            - import (keys for) an account
+            - get list of all accounts
+        ",
+    }
+    functions {
+        None => [is_logged_in, get_account, get_current_user],
+        Low => [],
+        High => [set_auth_service, get_connected_apps],
+        Max => [login, import_account, get_all_accounts],
+    }
+}
 
 #[derive(Deserialize, Debug)]
 struct ResponseRoot {
@@ -54,11 +84,8 @@ impl API for AccountsPlugin {
     }
 
     fn set_auth_service(service_name: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::set_auth_service, vec!["homepage".into()])?;
         // Restrict to "homepage" app for now
-        if Client::get_sender() != "homepage" {
-            return Err(Unauthorized("set_auth_service can only be called by the homepage app").into());
-        }
-
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
             .map_err(|_| InvalidAccountName(service_name))?;
         Transact::add_action_to_transaction(
