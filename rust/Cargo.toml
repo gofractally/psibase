@@ -46,7 +46,7 @@ publish = false
 anyhow = "1.0"
 async-graphql = "=7.0.17"
 clap = { version = "4.5", features = ["derive"] }
-fracpack = { version = "0.21.0", path = "./fracpack" }
+fracpack = { version = "0.22.0", path = "./fracpack" }
 indexmap = { version = "2.2.6", features = ["std", "serde"] }
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }
@@ -55,7 +55,7 @@ serde-aux = "4.5"
 psibase = { path = "./psibase" }
 psibase_names = { path = "./psibase_names" }
 psibase_macros = { path = "./psibase_macros" }
-psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive", version = "0.21.0" }
+psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive", version = "0.22.0" }
 url = "2.5.4"
 psibase-rust-workspace-hack = "0.2.0"
 
