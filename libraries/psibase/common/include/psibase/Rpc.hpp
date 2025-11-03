@@ -118,6 +118,7 @@ namespace psibase
       notAcceptable        = 406,
       unsupportedMediaType = 415,
       internalServerError  = 500,
+      badGateway           = 502,
       serviceUnavailable   = 503,
    };
 

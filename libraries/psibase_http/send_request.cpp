@@ -3,6 +3,7 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
+#include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -60,6 +61,7 @@ namespace
                                if (ec)
                                {
                                   PSIBASE_LOG(self->logger, warning) << "Failed to send request";
+                                  get_lowest_layer(self->stream).cancel();
                                }
                             });
       }
@@ -78,6 +80,7 @@ namespace
                 {
                    PSIBASE_LOG(self->logger, warning)
                        << "Failed to read HTTP response: " << ec.message();
+                   self->do_error(server, ec);
                 }
                 else
                 {
@@ -94,7 +97,6 @@ namespace
 
                    auto breply = self->parser.get();
 
-                   // TODO: fill in reply
                    HttpReply reply{
                        .status      = static_cast<HttpStatus>(breply.result_int()),
                        .contentType = breply[bhttp::field::content_type],
@@ -128,6 +130,35 @@ namespace
                    }
                 }
              });
+      }
+      void do_error(server_state& server, const std::error_code& ec)
+      {
+         auto system = server.sharedState->getSystemContext();
+
+         psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+         BlockContext  bc{*system, system->sharedDatabase.getHead(),
+                         system->sharedDatabase.createWriter(), true};
+         bc.start();
+
+         TransactionTrace trace;
+
+         Action action{
+             .sender  = AccountNumber(),
+             .service = proxyServiceNum,
+             .rawData = psio::convert_to_frac(std::tuple(this->id)),
+         };
+         try
+         {
+            bc.execAsyncExport("close", std::move(action), trace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::close succeeded";
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, warning)
+                << action.service.str() << "::close failed: " << e.what();
+         }
       }
       virtual void send(std::span<const char>) override
       {
@@ -200,6 +231,7 @@ namespace
    void dispatch_tls(boost::asio::io_context& context,
                      server_state&            state,
                      E&&                      endpoint,
+                     std::string_view         hostport,
                      std::optional<TLSInfo>&& tls,
                      const auto&              add,
                      F&&                      next)
@@ -210,6 +242,12 @@ namespace
          auto result      = std::make_shared<HttpClientSocket<tls_stream>>(
              context, *state.http_config->tls_context);
          add(result);
+         auto [host, _] = split_port(hostport);
+         result->stream.set_verify_mode(boost::asio::ssl::verify_peer);
+         result->stream.set_verify_callback(
+             boost::asio::ssl::host_name_verification(std::string(host)));
+         auto ssl_conn = result->stream.native_handle();
+         SSL_set_tlsext_host_name(ssl_conn, std::string(host).c_str());
          do_connect(std::move(result), std::forward<E>(endpoint),
                     [next = std::forward<F>(next)](const std::error_code& ec, auto&& socket) mutable
                     {
@@ -239,6 +277,7 @@ namespace
    void dispatch_endpoint(boost::asio::io_context& context,
                           server_state&            state,
                           const IPV4Endpoint&      endpoint,
+                          std::string_view         host,
                           std::optional<TLSInfo>&& tls,
                           const auto&              add,
                           F&&                      next)
@@ -246,13 +285,14 @@ namespace
       return dispatch_tls(context, state,
                           boost::asio::ip::tcp::endpoint(
                               boost::asio::ip::address_v4{endpoint.address.bytes}, endpoint.port),
-                          std::move(tls), add, std::forward<F>(next));
+                          host, std::move(tls), add, std::forward<F>(next));
    }
 
    template <typename F>
    void dispatch_endpoint(boost::asio::io_context& context,
                           server_state&            state,
                           const IPV6Endpoint&      endpoint,
+                          std::string_view         host,
                           std::optional<TLSInfo>&& tls,
                           const auto&              add,
                           F&&                      next)
@@ -261,13 +301,14 @@ namespace
                    boost::asio::ip::tcp::endpoint(
                        boost::asio::ip::address_v6{endpoint.address.bytes, endpoint.address.zone},
                        endpoint.port),
-                   std::move(tls), add, std::forward<F>(next));
+                   host, std::move(tls), add, std::forward<F>(next));
    }
 
    template <typename F>
    void dispatch_endpoint(boost::asio::io_context& context,
                           server_state&            state,
                           const LocalEndpoint&     endpoint,
+                          std::string_view         host,
                           std::optional<TLSInfo>&& tls,
                           const auto&              add,
                           F&&                      next)
@@ -294,6 +335,7 @@ void psibase::http::send_request(boost::asio::io_context&        context,
       if (ec)
       {
          PSIBASE_LOG(socket->logger, warning) << "Connection failed: " << ec.message();
+         socket->do_error(state, ec);
       }
       else
       {
@@ -306,14 +348,14 @@ void psibase::http::send_request(boost::asio::io_context&        context,
       return dispatch_tls(context, state,
                           StringEndpoint{std::move(host),
                                          std::make_shared<boost::asio::ip::tcp::resolver>(context)},
-                          std::move(tls), add, std::move(next));
+                          host, std::move(tls), add, std::move(next));
    }
    else
    {
       return std::visit(
           [&](const auto& endpoint)
           {
-             return dispatch_endpoint(context, state, endpoint, std::move(tls), add,
+             return dispatch_endpoint(context, state, endpoint, host, std::move(tls), add,
                                       std::move(next));
           },
           *endpoint);

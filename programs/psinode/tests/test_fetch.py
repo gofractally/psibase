@@ -86,7 +86,7 @@ class TestFetch(unittest.TestCase):
                 reply.raise_for_status()
                 result = reply.text
 
-                self.assertEqual(result, expected)
+            self.assertEqual(result, expected)
         finally:
             server.shutdown()
             t.join()
@@ -94,12 +94,12 @@ class TestFetch(unittest.TestCase):
 
     @testutil.psinode_test
     def test_https(self, cluster):
-        (a,) = cluster.complete(*testutil.generate_names(1))
-
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
-
         certfile = os.path.join(cluster.dir, "cert.pem")
         make_certificate(certfile)
+
+        (a,) = cluster.complete(*testutil.generate_names(1), trustfile=certfile)
+
+        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
 
         server = HTTPSServer(certfile)
 
@@ -113,7 +113,33 @@ class TestFetch(unittest.TestCase):
                 reply.raise_for_status()
                 result = reply.text
 
-                self.assertEqual(result, expected)
+            self.assertEqual(result, expected)
+        finally:
+            server.shutdown()
+            t.join()
+            server.server_close()
+
+    @testutil.psinode_test
+    def test_https_fail_cert(self, cluster):
+        certfile = os.path.join(cluster.dir, "cert.pem")
+        make_certificate(certfile)
+
+        (a,) = cluster.complete(*testutil.generate_names(1))
+
+        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+
+        server = HTTPSServer(certfile)
+
+        t = threading.Thread(target=server.serve_forever)
+        t.start()
+        try:
+            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
+                reply.raise_for_status()
+
+            with a.get('/', service='x-proxy', timeout=4) as reply:
+                status = reply.status_code
+
+            self.assertEqual(status, 502)
         finally:
             server.shutdown()
             t.join()

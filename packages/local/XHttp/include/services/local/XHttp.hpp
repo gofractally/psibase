@@ -15,7 +15,8 @@ namespace LocalService
       std::int32_t           socket;
       psibase::AccountNumber service;
       psibase::MethodNumber  method;
-      PSIO_REFLECT(ResponseHandlerRow, socket, service, method)
+      psibase::MethodNumber  err;
+      PSIO_REFLECT(ResponseHandlerRow, socket, service, method, err)
    };
    using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
    PSIO_REFLECT_TYPENAME(ResponseHandlerTable)
@@ -51,6 +52,7 @@ namespace LocalService
       /// TODO: decide how to report connection errors
       std::int32_t sendRequest(psibase::HttpRequest                   request,
                                psibase::MethodNumber                  callback,
+                               psibase::MethodNumber                  err,
                                std::optional<psibase::TLSInfo>        tls,
                                std::optional<psibase::SocketEndpoint> endpoint);
 

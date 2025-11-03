@@ -423,7 +423,7 @@ def _write_config(dir, log_filter, log_format, softhsm, trustfile):
     if softhsm:
         extra += 'pkcs11-module = %s\n' % softhsm
     if trustfile:
-        extra += 'tls-trustfile = %s\n' & trustfile
+        extra += 'tls-trustfile = %s\n' % trustfile
     if not os.path.exists(logfile):
         if log_filter is None:
             log_filter = _default_log_filter

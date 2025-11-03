@@ -33,8 +33,12 @@ struct XProxy : psibase::Service
 
    std::optional<HttpReply> serveSys(HttpRequest req, std::optional<std::int32_t> socket);
    void                     onReply(std::int32_t socket, psibase::HttpReply reply);
+   void                     onError(std::int32_t socket);
 };
-PSIO_REFLECT(XProxy, method(serveSys, request, socket), method(onReply, socket, reply))
+PSIO_REFLECT(XProxy,
+             method(serveSys, request, socket),
+             method(onReply, socket, reply),
+             method(onError, socket))
 PSIBASE_REFLECT_TABLES(XProxy, XProxy::Subjective, XProxy::Session)
 
 std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
@@ -74,9 +78,10 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
       }
       if (originServer)
       {
-         req.host      = originServer->host;
-         auto upstream = to<XHttp>().sendRequest(req, MethodNumber{"onReply"}, originServer->tls,
-                                                 originServer->endpoint);
+         req.host = originServer->host;
+         auto upstream =
+             to<XHttp>().sendRequest(req, MethodNumber{"onReply"}, MethodNumber{"onError"},
+                                     originServer->tls, originServer->endpoint);
          auto requests = open<ProxyTable>();
          PSIBASE_SUBJECTIVE_TX
          {
@@ -98,6 +103,25 @@ void XProxy::onReply(std::int32_t socket, psibase::HttpReply reply)
       {
          to<XHttp>().autoClose(row->socket2, true);
          to<XHttp>().sendReply(row->socket2, std::move(reply));
+         table.remove(*row);
+      }
+   }
+}
+
+void XProxy::onError(std::int32_t socket)
+{
+   auto             table = open<ProxyTable>();
+   std::string_view msg{"Bad Gateway"};
+   HttpReply        reply{.status      = HttpStatus::badGateway,
+                          .contentType = "text/html",
+                          .body        = std::vector(msg.begin(), msg.end())};
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (auto row = table.get(socket))
+      {
+         to<XHttp>().autoClose(row->socket2, true);
+         to<XHttp>().sendReply(row->socket2, std::move(reply));
+         table.remove(*row);
       }
    }
 }
