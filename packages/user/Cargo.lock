@@ -2352,10 +2352,21 @@ name = "psibase-user-workspace-hack"
 version = "0.1.0"
 dependencies = [
  "generic-array",
+ "getrandom 0.3.4",
+ "indexmap",
+ "libc",
  "libsecp256k1-core",
+ "memchr",
+ "num-traits",
  "once_cell",
  "portable-atomic",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_core",
+ "serde_json",
  "subtle",
+ "syn 2.0.108",
  "zeroize",
 ]
 

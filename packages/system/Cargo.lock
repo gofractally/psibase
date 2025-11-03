@@ -1872,6 +1872,16 @@ checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
 [[package]]
 name = "psibase-system-workspace-hack"
 version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "memchr",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_core",
+ "serde_json",
+ "syn 2.0.108",
+]
 
 [[package]]
 name = "psibase_macros"
