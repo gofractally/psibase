@@ -20,4 +20,4 @@ psibase-user-workspace-hack.workspace = true
 
 
 [dev-dependencies]
-symbol-pkg = { path = "..", version = "0.21.0" }
+symbol-pkg = { path = "..", version = "0.22.0" }

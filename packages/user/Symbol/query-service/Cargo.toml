@@ -10,6 +10,6 @@ publish.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-symbol = { path = "../service", version = "0.21.0" }
+symbol = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true
