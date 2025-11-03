@@ -10,6 +10,9 @@ members = [
     "Chainmail",
     "Chainmail/service",
     "Chainmail/plugin",
+    "DiffAdjust",
+    "DiffAdjust/service",
+    "DiffAdjust/query-service",
     "Evaluations",
     "Evaluations/service",
     "Evaluations/plugin",
@@ -45,10 +48,30 @@ members = [
     "Tokens/query-service",
 ]
 
-exclude = ["CommonApi/common/packages/component-parser"]
+exclude = [
+    "CommonApi/common/packages/component-parser", 
+    "Aes/plugin",
+    "Base64/plugin",
+    "ClientData/plugin",
+    "Host/plugin/auth",
+    "Host/plugin/crypto",
+    "Host/plugin/common",
+    "Host/plugin/prompt",
+    "Host/plugin/types",
+    "Invite/plugin",
+    "Invite/plugin_AuthInvite",
+    "Kdf/plugin",
+    "Sites/plugin",
+    "Packages/plugin",
+    "Permissions/plugin",
+    "WebCrypto/plugin",
+    "FractalCore/plugin",
+    "Workshop/plugin",
+    "Config/plugin",
+]
 
 [workspace.package]
-version = "0.21.0"
+version = "0.22.0"
 rust-version = "1.64"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
@@ -57,8 +80,8 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
-psibase = { path = "../../rust/psibase", version = "0.21.0" }
-psibase_macros = { path = "../../rust/psibase_macros", version = "0.21.0" }
+psibase = { path = "../../rust/psibase", version = "0.22.0" }
+psibase_macros = { path = "../../rust/psibase_macros", version = "0.22.0" }
 async-graphql = "=7.0.17"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.120"
