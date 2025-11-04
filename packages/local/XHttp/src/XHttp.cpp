@@ -218,14 +218,19 @@ std::int32_t XHttp::sendRequest(HttpRequest                   request,
                                 std::optional<TLSInfo>        tls,
                                 std::optional<SocketEndpoint> endpoint)
 {
-   // TODO: set Origin
-   // TODO: ban forbidden request headers
+   auto sender    = getSender();
+   auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (!codeTable.get(sender))
+         abortMessage("Only local services can use sendRequest");
+   }
    auto requests = Session{}.open<ResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
    PSIBASE_SUBJECTIVE_TX
    {
-      requests.put({sock, getSender(), callback, err});
+      requests.put({sock, sender, callback, err});
       socketAutoClose(sock, false);
    }
    return sock;
