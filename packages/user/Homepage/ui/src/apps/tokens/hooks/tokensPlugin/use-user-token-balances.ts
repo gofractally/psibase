@@ -1,13 +1,12 @@
-import { queryClient } from "@/main";
-import { useQuery } from "@tanstack/react-query";
-import { useRef } from "react";
-import { z } from "zod";
-
 import {
     fetchTokenMeta,
     fetchUserTokenBalances,
 } from "@/apps/tokens/lib/graphql/ui";
 import { Quantity } from "@/apps/tokens/lib/quantity";
+import { queryClient } from "@/main";
+import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
+import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
@@ -18,8 +17,6 @@ import { toast } from "@shared/shadcn/ui/sonner";
 export interface Token {
     id: number;
     balance?: Quantity;
-    owner: string;
-    isAdmin: boolean;
     symbol: string;
     label: string;
     precision: number;
@@ -54,8 +51,6 @@ export const useUserTokenBalances = (
 
                 return {
                     id: balance.tokenId,
-                    owner: "", // unused
-                    isAdmin: false, // unused
                     symbol: balance.symbol,
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
