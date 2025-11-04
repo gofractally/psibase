@@ -9,6 +9,7 @@ use exports::auth_delegate::plugin::api::{Error, Guest as Api};
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
 use transact::plugin::intf::add_action_to_transaction;
 
+use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::*;
 
@@ -55,10 +56,7 @@ impl Api for AuthDelegate {
     fn set_owner(owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::setOwner as set_owner_action;
 
-        trust::assert_authorized_with_whitelist(
-            trust::FunctionName::set_owner,
-            vec!["workshop".into()],
-        )?;
+        assert_authorized_with_whitelist(FunctionName::set_owner, vec!["workshop".into()])?;
 
         let set_owner = set_owner_action {
             owner: get_account_number(owner.as_str())?,
@@ -72,10 +70,7 @@ impl Api for AuthDelegate {
     fn new_account(name: String, owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::newAccount as new_account_action;
 
-        trust::assert_authorized_with_whitelist(
-            trust::FunctionName::new_account,
-            vec!["workshop".into()],
-        )?;
+        assert_authorized_with_whitelist(FunctionName::new_account, vec!["workshop".into()])?;
 
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
