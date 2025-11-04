@@ -44,12 +44,9 @@ namespace LocalService
       /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
       void send(std::int32_t socket, psio::view<const std::vector<char>> data);
 
-      /// Sends an HTTP request. When the response is available, it
-      /// will be passed to `sender::callback(socket, reply)`
-      ///
-      /// Returns the new socket
-      ///
-      /// TODO: decide how to report connection errors
+      /// Sends an HTTP request and returns the new socket. When the response
+      /// is available, it will be passed to `sender::callback(socket, reply)`.
+      /// If the the request fails without a response, calls `sender::err(socket)`
       std::int32_t sendRequest(psibase::HttpRequest                   request,
                                psibase::MethodNumber                  callback,
                                psibase::MethodNumber                  err,

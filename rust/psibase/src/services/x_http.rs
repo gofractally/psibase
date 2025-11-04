@@ -1,11 +1,25 @@
 #[crate::service(name = "x-http", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::HttpReply;
+    use crate::{HttpReply, HttpRequest, MethodNumber, SocketEndpoint, TLSInfo};
 
     /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
     #[action]
     fn send(socket: i32, data: Vec<u8>) {
+        unimplemented!()
+    }
+
+    /// Sends an HTTP request and returns the new socket. When the response
+    /// is available, it will be passed to `sender::callback(socket, reply)`.
+    /// If the the request fails without a response, calls `sender::err(socket)`
+    #[action]
+    fn sendRequest(
+        request: HttpRequest,
+        callback: MethodNumber,
+        err: MethodNumber,
+        tls: Option<TLSInfo>,
+        endpoint: Option<SocketEndpoint>,
+    ) -> i32 {
         unimplemented!()
     }
 

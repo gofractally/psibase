@@ -269,18 +269,74 @@ impl LogTruncateRow {
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV4Address {
+    bytes: [u8; 4],
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV6Address {
+    bytes: [u8; 16],
+    zone: u32,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV4Endpoint {
+    address: IPV4Address,
+    port: u16,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV6Endpoint {
+    address: IPV6Address,
+    port: u16,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct LocalEndpoint {
+    path: String,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub enum SocketEndpoint {
+    IPV4Endpoint(IPV4Endpoint),
+    IPV6Endpoint(IPV6Endpoint),
+    LocalEndpoint(LocalEndpoint),
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct TLSInfo {}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ProducerMultiCastSocketInfo {}
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct HttpSocketInfo {}
+pub struct HttpSocketInfo {
+    endpoint: Option<SocketEndpoint>,
+    tls: Option<TLSInfo>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct HttpClientSocketInfo {
+    endpoint: Option<SocketEndpoint>,
+    tls: Option<TLSInfo>,
+}
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum SocketInfo {
     ProducerMultiCastSocketInfo(ProducerMultiCastSocketInfo),
     HttpSocketInfo(HttpSocketInfo),
+    HttpClientSocketInfo(HttpClientSocketInfo),
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
