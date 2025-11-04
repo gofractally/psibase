@@ -1,13 +1,13 @@
 import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
 
 import {
-    useCreateConnectionToken,
     useCurrentAccounts,
     useLoggedInUser,
     useLogout,
     useSelectAccount,
 } from "@/hooks";
 
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Avatar, AvatarFallback } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -23,9 +23,14 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export function AccountSwitcher() {
-    const { mutateAsync: onLogin } = useCreateConnectionToken();
+    const { mutateAsync: onLogin } = useConnectAccount({
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
 
     const { data: loggedInUser } = useLoggedInUser();
     const isLoggedIn = !!loggedInUser;
