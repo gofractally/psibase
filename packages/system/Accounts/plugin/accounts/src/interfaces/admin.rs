@@ -22,7 +22,7 @@ fn assert_valid_account(account: &str) {
 
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
-        assert_authorized(FunctionName::login_direct)?;
+        assert_authorized(FunctionName::login_direct).unwrap();
 
         assert_valid_account(&user);
 
@@ -61,16 +61,14 @@ impl Admin for AccountsPlugin {
     }
 
     fn import_account(account: String) {
-        assert_authorized(FunctionName::import_account)?;
+        assert_authorized(FunctionName::import_account).unwrap();
         assert_valid_account(&account);
         AppsTable::new(&Client::get_receiver()).connect(&account);
     }
 
     fn get_all_accounts() -> Vec<String> {
-        assert_authorized_with_whitelist(
-            FunctionName::get_all_accounts,
-            vec!["supervisor".into()],
-        )?;
+        assert_authorized_with_whitelist(FunctionName::get_all_accounts, vec!["supervisor".into()])
+            .unwrap();
         AppsTable::new(&Client::get_receiver()).get_connected_accounts()
     }
 
