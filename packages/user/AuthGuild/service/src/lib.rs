@@ -29,6 +29,38 @@ pub mod service {
         _allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) {
+        // check authsys runs when john proposes a tx on behalf of a guild on johns auth service
+        // but this does not run at all for the guild account itself - validate this by aboring
+        //
+        //
+
+        // No additional checks needed beyond isAuthSys?
+        // add abort message here
+
+        // 1. Either the guild is the sender, then we check if the guild is authed to do it
+        // or
+        // 2. Fractal is the sender, john is proposer, we take the sender
+        // lookup the fractal, find the legislative guid council and representative
+        // check if john is in either group sufficently or other authorizers are in the list
+
+        // James
+        // The sender of the propose action is john
+        // the sender of the internal action is the fractal
+        // so there will be a hop to get to the guild auth
+        // the fractal will use auth-delegate, delegated to legislative account.
+        // that account uses guild auth.
+        //
+        // there are certain actions that are defined on the fractals service
+        // that are not auth by legilative
+
+        // 3 roles
+        // Legislative - Create a new law, the same thing, change the name
+        // Judicial - Exile a member
+        // Fractal -  auth-delegate for everything else,
+
+        // the proposer is john
+        // sender is the guild
+        //
     }
 
     fn is_sufficient_actors(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {

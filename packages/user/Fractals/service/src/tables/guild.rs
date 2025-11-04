@@ -27,6 +27,8 @@ impl Guild {
     }
 
     fn configure_new_guild_account(account: AccountNumber) {
+        // try make this auth-guild 
+        
         accounts::Wrapper::call().newAccount(account, AccountNumber::from("auth-any"), true);
 
         let set_auth_serv = Action {

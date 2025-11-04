@@ -24,6 +24,7 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
+        // legislative
     }
 
     impl Fractal {
