@@ -13,34 +13,7 @@ use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::*;
-use trust::*;
-
-psibase::define_trust! {
-    descriptions {
-        None => "
-            - decode connection token
-        ",
-        Low => "",
-        Medium => "",
-        High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
-            - get list of apps a user is connected to
-        ",
-        Max => "
-        Max trust grants the abilities of all lower trust levels, plus these abilities:
-            - login a user to an app
-            - import (keys for) an account
-            - get list of all accounts
-            - get list of auth services
-        ",
-    }
-    functions {
-        None => [decode_connection_token],
-        Low => [],
-        High => [get_connected_apps],
-        Max => [login_direct, import_account, get_all_accounts, get_auth_services],
-    }
-}
+use crate::trust::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn get_assert_caller_admin(context: &str) -> String {
@@ -65,7 +38,8 @@ fn assert_valid_account(account: &str) {
 
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
-        assert_authorized_with_whitelist(FunctionName::login_direct, "accounts");
+        assert_authorized_with_whitelist(FunctionName::login_direct, vec!["accounts".into()])
+            .unwrap();
 
         assert_valid_account(&user);
 
@@ -98,12 +72,14 @@ impl Admin for AccountsPlugin {
     }
 
     fn get_connected_apps(user: String) -> Vec<String> {
-        assert_authorized_with_whitelist(FunctionName::get_connected_apps, "homepage");
+        assert_authorized_with_whitelist(FunctionName::get_connected_apps, vec!["homepage".into()])
+            .unwrap();
         UserTable::new(&user).get_connected_apps()
     }
 
     fn import_account(account: String) {
-        assert_authorized_with_whitelist(FunctionName::import_account, "accounts");
+        assert_authorized_with_whitelist(FunctionName::import_account, vec!["accounts".into()])
+            .unwrap();
         assert_valid_account(&account);
         AppsTable::new(&Client::get_receiver()).connect(&account);
     }
@@ -111,13 +87,18 @@ impl Admin for AccountsPlugin {
     fn get_all_accounts() -> Vec<String> {
         assert_authorized_with_whitelist(
             FunctionName::get_all_accounts,
-            ["accounts", "supervisor"],
-        );
+            vec!["accounts".into(), "supervisor".into()],
+        )
+        .unwrap();
         AppsTable::new(&Client::get_receiver()).get_connected_accounts()
     }
 
     fn get_auth_services() -> Result<Vec<String>, Error> {
-        assert_authorized_with_whitelist(FunctionName::get_auth_services, ["supervisor"]);
+        assert_authorized_with_whitelist(
+            FunctionName::get_auth_services,
+            vec!["supervisor".into()],
+        )
+        .unwrap();
 
         let connected_accounts = Self::get_connected_accounts();
         let accounts = connected_accounts?
