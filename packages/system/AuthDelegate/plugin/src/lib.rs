@@ -7,22 +7,32 @@ mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
-use host::common::client as Client;
 use transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 use psibase::*;
 
-struct AuthDelegate;
-
-// TODO: User oauth when available
-fn assert_caller(allowed_callers: &[&str], context: &str) {
-    assert!(
-        allowed_callers.contains(&Client::get_sender().as_str()),
-        "[AuthDelegate] Unauthorized call to '{}'",
-        context
-    );
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "
+        Medium trust grants these abilities:
+            - Create new accounts owned by you
+        ",
+        High => "
+        High trust grants the abilities of all lower trust levels, plus these abilities:
+            - Set the owner of your account
+        ",
+    }
+    functions {
+        None => [],
+        Low => [],
+        Medium => [new_account],
+        High => [set_owner],
+    }
 }
+
+struct AuthDelegate;
 
 fn get_account_number(name: &str) -> Result<AccountNumber, Error> {
     AccountNumber::from_str(name).map_err(|_| Error::from(InvalidAccountName))
@@ -45,7 +55,10 @@ impl Api for AuthDelegate {
     fn set_owner(owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::setOwner as set_owner_action;
 
-        assert_caller(&[Client::get_receiver().as_str()], "set_owner");
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::set_owner,
+            vec!["workshop".into()],
+        )?;
 
         let set_owner = set_owner_action {
             owner: get_account_number(owner.as_str())?,
@@ -59,10 +72,10 @@ impl Api for AuthDelegate {
     fn new_account(name: String, owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::newAccount as new_account_action;
 
-        assert_caller(
-            &[Client::get_receiver().as_str(), "workshop"],
-            "new_account",
-        );
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::new_account,
+            vec!["workshop".into()],
+        )?;
 
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
