@@ -9,7 +9,6 @@ wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-indoc.workspace = true
 psibase-plugin-workspace-hack.workspace = true
 
 [lib]

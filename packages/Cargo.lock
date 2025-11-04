@@ -26,7 +26,6 @@ dependencies = [
 name = "accounts"
 version = "0.22.0"
 dependencies = [
- "indoc",
  "psibase",
  "psibase-plugin-workspace-hack",
  "serde",
@@ -354,7 +353,6 @@ dependencies = [
 name = "auth-sig"
 version = "0.22.0"
 dependencies = [
- "indoc",
  "lazy_static",
  "pem",
  "psibase",

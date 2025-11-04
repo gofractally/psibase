@@ -12,23 +12,7 @@ use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
-use crate::helpers::*;
 use crate::trust::*;
-
-// Asserts that the caller is the active app, and that it's the `accounts` app.
-fn get_assert_caller_admin(context: &str) -> String {
-    let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
-    assert!(
-        caller == Client::get_receiver() || caller == "x-admin",
-        "{} only callable by `accounts` or `x-admin`",
-        context
-    );
-    caller
-}
-
-fn assert_caller_admin(context: &str) {
-    let _ = get_assert_caller_admin(context);
-}
 
 fn assert_valid_account(account: &str) {
     let account_details =
@@ -38,8 +22,7 @@ fn assert_valid_account(account: &str) {
 
 impl Admin for AccountsPlugin {
     fn login_direct(app: String, user: String) {
-        assert_authorized_with_whitelist(FunctionName::login_direct, vec!["accounts".into()])
-            .unwrap();
+        assert_authorized(FunctionName::login_direct)?;
 
         assert_valid_account(&user);
 
@@ -78,8 +61,7 @@ impl Admin for AccountsPlugin {
     }
 
     fn import_account(account: String) {
-        assert_authorized_with_whitelist(FunctionName::import_account, vec!["accounts".into()])
-            .unwrap();
+        assert_authorized(FunctionName::import_account)?;
         assert_valid_account(&account);
         AppsTable::new(&Client::get_receiver()).connect(&account);
     }
@@ -87,9 +69,8 @@ impl Admin for AccountsPlugin {
     fn get_all_accounts() -> Vec<String> {
         assert_authorized_with_whitelist(
             FunctionName::get_all_accounts,
-            vec!["accounts".into(), "supervisor".into()],
-        )
-        .unwrap();
+            vec!["supervisor".into()],
+        )?;
         AppsTable::new(&Client::get_receiver()).get_connected_accounts()
     }
 
