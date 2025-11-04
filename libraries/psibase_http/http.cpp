@@ -429,15 +429,18 @@ namespace psibase::http
    }
 
    server_service::server_service(boost::asio::execution_context& ctx) : service(ctx) {}
+
    server_service::server_service(net::execution_context&                   ctx,
                                   const std::shared_ptr<const http_config>& http_config,
                                   const std::shared_ptr<SharedState>&       sharedState)
-       : service(ctx)
+       : service(ctx), impl(std::make_shared<server_impl>(http_config, sharedState))
    {
-      check(http_config->num_threads > 0, "too few threads");
-      auto server = std::make_shared<server_impl>(http_config, sharedState);
-      if (server->start())
-         impl = std::move(server);
+   }
+
+   void server_service::start()
+   {
+      check(impl->http_config->num_threads > 0, "too few threads");
+      impl->start();
    }
 
    HttpConnector server_service::get_connector()

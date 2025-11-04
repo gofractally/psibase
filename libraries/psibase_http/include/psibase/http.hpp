@@ -282,6 +282,7 @@ namespace psibase::http
       server_service(boost::asio::execution_context&           ctx,
                      const std::shared_ptr<const http_config>& http_config,
                      const std::shared_ptr<SharedState>&       sharedState);
+      void start();
       void async_close(bool restart, std::function<void()>);
 
       // The result must not be used after the server_service is

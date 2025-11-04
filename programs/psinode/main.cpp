@@ -2155,6 +2155,10 @@ void run(const std::string&              db_path,
       auto& service =
           boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
       node.chain().onSocketOpen(service.get_connector());
+
+      // This starts threads that can run wasm, so it isn't safe to run
+      // until after all the node.chain().onXXX callbacks are set up.
+      service.start();
    }
    else
    {
