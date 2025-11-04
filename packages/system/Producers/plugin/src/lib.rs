@@ -2,6 +2,8 @@
 mod bindings;
 use bindings::*;
 
+use crate::bindings::host::common::client as Client;
+
 use psibase::services::auth_sig::SubjectPublicKeyInfo;
 
 use host::common::server::post_graphql_get_json;
@@ -117,18 +119,21 @@ impl ProducersPlugin {
 
 impl Api for ProducersPlugin {
     fn set_cft_consensus(prods: Vec<String>) -> Result<(), Error> {
+        assert!(Client::get_sender() == "config");
         Self::set_consensus_internal(psibase::ConsensusData::CFT(psibase::CftConsensus {
             producers: Self::lookup_candidates(&prods)?,
         }))
     }
 
     fn set_bft_consensus(prods: Vec<String>) -> Result<(), Error> {
+        assert!(Client::get_sender() == "config");
         Self::set_consensus_internal(psibase::ConsensusData::BFT(psibase::BftConsensus {
             producers: Self::lookup_candidates(&prods)?,
         }))
     }
 
     fn set_producers(prods: Vec<String>) -> Result<(), Error> {
+        assert!(Client::get_sender() == "config");
         add_action_to_transaction(
             Actions::setProducers::ACTION_NAME,
             &Actions::setProducers {
@@ -139,6 +144,7 @@ impl Api for ProducersPlugin {
     }
 
     fn register_candidate(endpoint: String, claim: ClaimType) -> Result<(), Error> {
+        assert!(Client::get_sender() == "config");
         let claim = match claim {
             ClaimType::PubkeyPem(pem) => {
                 let spki: SubjectPublicKeyInfo =
@@ -163,6 +169,7 @@ impl Api for ProducersPlugin {
     }
 
     fn unregister_candidate() {
+        assert!(Client::get_sender() == "config");
         add_action_to_transaction(
             Actions::unregCand::ACTION_NAME,
             &Actions::unregCand {}.packed(),
