@@ -33,7 +33,7 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Given a token id, return a record that represents token 
+        /// Given a token id, return a record that represents token
         /// configuration, ownership, and supply details.
         async fn token(&self, token_id: String) -> Option<Token> {
             TokenTable::with_service(tokens::SERVICE)
@@ -41,7 +41,7 @@ mod service {
                 .get(&token_id_to_number(token_id))
         }
 
-        /// Given a user account, return a record that represents the user's 
+        /// Given a user account, return a record that represents the user's
         /// configuration within the token service.
         async fn user_settings(&self, user: AccountNumber) -> UserConfig {
             UserConfigTable::with_service(tokens::SERVICE)
@@ -77,7 +77,7 @@ mod service {
         }
 
         /// Given a user account, return a list of records that represent the
-        /// user's current pending incoming debits. These are tokens that were 
+        /// user's current pending incoming debits. These are tokens that were
         /// credited to the user but have yet to be debited (claimed).
         async fn user_debits(
             &self,
@@ -152,7 +152,7 @@ mod service {
         }
 
         /// Returns a paginated subset of all historical events (that haven't yet been pruned
-        /// from this node) related to changes to the configuration of the specified token. 
+        /// from this node) related to changes to the configuration of the specified token.
         async fn configurations(
             &self,
             token_id: TID,
@@ -191,9 +191,9 @@ mod service {
         }
 
         /// Returns a paginated subset of all historical events (that haven't yet been pruned
-        /// from this node) related to changes to the balances of the specified token for the 
+        /// from this node) related to changes to the balances of the specified token for the
         /// specified user.
-        /// Changes in the balance of at least one user happen when tokens are recalled, burned, 
+        /// Changes in the balance of at least one user happen when tokens are recalled, burned,
         /// credited, debited, uncredited, rejected.
         async fn balChanges(
             &self,
