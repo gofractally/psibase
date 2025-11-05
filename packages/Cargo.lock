@@ -353,6 +353,7 @@ dependencies = [
 name = "auth-sig"
 version = "0.22.0"
 dependencies = [
+ "indoc",
  "lazy_static",
  "pem",
  "psibase",

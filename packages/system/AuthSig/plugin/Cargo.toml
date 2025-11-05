@@ -10,6 +10,7 @@ pem = "3"
 seahash = "4.1"
 serde.workspace = true
 serde_json.workspace = true
+indoc = "2.0.6"
 lazy_static = "1.4"
 psibase-plugin-workspace-hack.workspace = true
 
