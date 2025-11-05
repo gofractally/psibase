@@ -121,7 +121,11 @@ mod service {
         }
 
         /// Returns the specified user's current balance for the specified token.
-        async fn user_balance(&self, user: AccountNumber, token_id: String) -> async_graphql::Result<Balance> {
+        async fn user_balance(
+            &self,
+            user: AccountNumber,
+            token_id: String,
+        ) -> async_graphql::Result<Balance> {
             let token_id = token_id_to_number(token_id);
 
             Ok(BalanceTable::with_service(tokens::SERVICE)
@@ -131,8 +135,7 @@ mod service {
                     account: user,
                     balance: 0.into(),
                     token_id,
-                })
-            )
+                }))
         }
 
         /// Returns a list of all tokens for which the specified user is the owner/issuer.
