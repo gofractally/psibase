@@ -96,7 +96,7 @@ interface UserTokenBalance {
 export interface UserTokenBalanceNode {
     tokenId: number;
     balance: string;
-    symbol: string;
+    symbol: string | null;
     precision: number;
     account: string;
 }

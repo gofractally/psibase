@@ -2,7 +2,6 @@ import {
     fetchTokenMeta,
     fetchUserTokenBalances,
 } from "@/apps/tokens/lib/graphql/ui";
-import { Quantity } from "@/apps/tokens/lib/quantity";
 import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
@@ -12,12 +11,13 @@ import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
 import { Account } from "@/lib/zod/Account";
 
+import { Quantity } from "@shared/lib/quantity";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export interface Token {
     id: number;
     balance?: Quantity;
-    symbol: string;
+    symbol: string | null;
     label: string;
     precision: number;
     isTransferable: boolean;
@@ -87,12 +87,7 @@ export const updateUserTokenBalancesCache = (
     queryClient.setQueryData(
         QueryKey.userTokenBalances(username),
         (balances: Token[] | undefined) => {
-            if (
-                operation !== Operation.Enum.Add &&
-                operation !== Operation.Enum.Subtract
-            ) {
-                throw new Error(`Unsupported operation`);
-            }
+            Operation.parse(operation);
             if (balances) {
                 return updateArray(
                     balances,

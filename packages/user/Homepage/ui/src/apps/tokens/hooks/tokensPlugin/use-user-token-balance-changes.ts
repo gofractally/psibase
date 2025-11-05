@@ -1,13 +1,13 @@
 import type { Token } from "./use-user-token-balances";
 
+import { fetchUserTokenBalanceChanges } from "@/apps/tokens/lib/graphql/ui";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { fetchUserTokenBalanceChanges } from "@/apps/tokens/lib/graphql/ui";
-import { Quantity } from "@/apps/tokens/lib/quantity";
-
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
+
+import { Quantity } from "@shared/lib/quantity";
 
 export const zActionType = z.enum([
     "credited",

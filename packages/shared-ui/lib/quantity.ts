@@ -34,7 +34,7 @@ export class Quantity {
     /**
      * The token symbol (optional)
      */
-    public readonly tokenSymbol?: string;
+    public readonly tokenSymbol?: string | null;
 
     /**
      * Creates a new Quantity instance
@@ -48,7 +48,7 @@ export class Quantity {
         amount: QuantityInput,
         precision: number,
         tokenNumber: number,
-        tokenSymbol?: string,
+        tokenSymbol?: string | null,
     ) {
         if (precision < 0 || !Number.isInteger(precision)) {
             throw new Error("Precision must be a non-negative integer");
@@ -131,7 +131,7 @@ export class Quantity {
      * Get the display label for the token
      */
     public getDisplayLabel(): string {
-        return this.tokenSymbol?.toUpperCase() || `#${this.tokenNumber}`;
+        return this.tokenSymbol?.toUpperCase() || `ID:${this.tokenNumber}`;
     }
 
     /**

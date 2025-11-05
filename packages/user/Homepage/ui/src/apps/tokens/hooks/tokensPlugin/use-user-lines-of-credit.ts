@@ -1,14 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
-
 import {
     LineOfCreditNode,
     fetchOpenLinesOfCredit,
 } from "@/apps/tokens/lib/graphql/ui";
-import { Quantity } from "@/apps/tokens/lib/quantity";
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
+
+import { Quantity } from "@shared/lib/quantity";
 
 export interface LineOfCredit {
     balance: Quantity;
