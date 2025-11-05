@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 interface Error {
     message: string;
@@ -19,10 +19,10 @@ interface GraphqlResponse<T> {
 
 export const graphql = async <T>(
     query: string,
-    service: z.infer<typeof Account>,
+    service: z.infer<typeof zAccount>,
 ): Promise<T> => {
     const response = (await fetch(
-        siblingUrl(null, Account.parse(service), "graphql", false),
+        siblingUrl(null, zAccount.parse(service), "graphql", false),
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },

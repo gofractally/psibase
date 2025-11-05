@@ -3,14 +3,15 @@ import type {
     Transaction,
 } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 
-import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
-
 import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
+import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
 
 import { GlowingCard } from "@/components/glowing-card";
+import { Loading } from "@/components/loading";
 
 import { Avatar } from "@shared/components/avatar";
+import { ErrorCard } from "@shared/components/error-card";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -34,17 +35,28 @@ interface Props {
 }
 
 export function CreditTable({ user, token }: Props) {
-    const { data: transactions, isPending } = useUserTokenBalanceChanges(
-        user,
-        token,
-    );
+    const {
+        data: transactions,
+        isPending,
+        isError,
+        error,
+    } = useUserTokenBalanceChanges(user, token);
 
     if (isPending) {
         return (
             <GlowingCard>
-                <CardContent className="text-muted-foreground py-8 text-center">
-                    Loading recent transactions...
-                </CardContent>
+                <Loading />
+            </GlowingCard>
+        );
+    }
+
+    if (isError) {
+        console.error("ERROR:", error);
+        const errorMessage =
+            "Failed to load recent transactions. See logs for more details.";
+        return (
+            <GlowingCard>
+                <ErrorCard error={new Error(errorMessage)} />
             </GlowingCard>
         );
     }

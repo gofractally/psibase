@@ -1,4 +1,4 @@
-import type { Quantity } from "../lib/quantity";
+import type { Quantity } from "@shared/lib/quantity";
 
 import { Icon as SelectIcon } from "@radix-ui/react-select";
 import { ChevronDown } from "lucide-react";

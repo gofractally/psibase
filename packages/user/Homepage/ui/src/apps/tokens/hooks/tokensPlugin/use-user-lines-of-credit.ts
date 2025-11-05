@@ -1,37 +1,35 @@
-import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
-
 import {
     LineOfCreditNode,
     fetchOpenLinesOfCredit,
 } from "@/apps/tokens/lib/graphql/ui";
-import { Quantity } from "@/apps/tokens/lib/quantity";
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
+
+import { Quantity } from "@shared/lib/quantity";
 
 export interface LineOfCredit {
     balance: Quantity;
-    creditor: z.infer<typeof Account>;
-    debitor: z.infer<typeof Account>;
+    creditor: z.infer<typeof zAccount>;
+    debitor: z.infer<typeof zAccount>;
 }
 
 interface Output {
-    counterParty: z.infer<typeof Account>;
+    counterParty: z.infer<typeof zAccount>;
     credit: LineOfCredit | undefined;
     debit: LineOfCredit | undefined;
 }
 
 export const useUserLinesOfCredit = (
-    username: z.infer<typeof Account> | undefined | null,
+    username: z.infer<typeof zAccount> | undefined | null,
 ) => {
     return useQuery<Output[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,
         queryFn: async () => {
-            console.log("USERNAME:", username);
-            const res = await fetchOpenLinesOfCredit(Account.parse(username));
-
+            const res = await fetchOpenLinesOfCredit(zAccount.parse(username));
             const transformLOC = (loc: LineOfCreditNode): LineOfCredit => {
                 const quan = new Quantity(
                     loc.balance,

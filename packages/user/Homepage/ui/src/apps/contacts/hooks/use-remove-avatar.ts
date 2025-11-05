@@ -5,7 +5,7 @@ import { supervisor } from "@/supervisor";
 
 import { useCacheBust } from "@/hooks/use-cache-bust";
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -22,7 +22,7 @@ export const useRemoveAvatar = () => {
         onSuccess: async () => {
             toast.success("Avatar removed");
 
-            const currentUser = Account.parse(
+            const currentUser = zAccount.parse(
                 await queryClient.getQueryData(QueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");

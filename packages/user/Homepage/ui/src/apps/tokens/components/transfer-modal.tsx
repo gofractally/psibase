@@ -1,17 +1,16 @@
 import type { Token } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 
+import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
 import { useMemo, useState } from "react";
-
-import { useContacts } from "@/apps/contacts/hooks/use-contacts";
-import { Quantity } from "@/apps/tokens/lib/quantity";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
 import { Avatar } from "@shared/components/avatar";
 import { withForm } from "@shared/components/form/app-form";
+import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 import {
     AlertDialog,
