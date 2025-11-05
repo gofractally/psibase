@@ -34,6 +34,24 @@ use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
 use serde::Deserialize;
 use serde_json::from_str;
+use crate::trust::*;
+
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "",
+        High => "
+        High trust grants these abilities:
+            - Hook actions sender
+        ",
+    }
+    functions {
+        None => [hook_action_auth, unhook_actions_sender, add_action_to_transaction],
+        Low => [],
+        High => [hook_actions_sender],
+        Max => [hook_tx_transform_label, set_snapshot_time, start_tx, finish_tx, get_query_token],
+    }
+}
 
 // The transaction construction cycle, including hooks, is as follows:
 //
@@ -61,17 +79,18 @@ impl Hooks for TransactPlugin {
     }
 
     fn hook_actions_sender() {
+        assert_authorized_with_whitelist(
+            FunctionName::hook_actions_sender,
+            vec!["staged-tx".into(), "invite".into()],
+        )
+        .unwrap();
+
         let sender_app = Host::client::get_sender();
 
         if let Some(hooked) = ActionSenderHook::get() {
             if hooked != sender_app {
                 panic!("Action sender hook already set");
             }
-        }
-
-        // Temporary whitelist until we have oauth
-        if sender_app != "staged-tx" && sender_app != "invite" {
-            panic!("hook_actions_sender: {} is not whitelisted", sender_app);
         }
 
         ActionSenderHook::set(sender_app);
@@ -86,20 +105,18 @@ impl Hooks for TransactPlugin {
     }
 
     fn hook_tx_transform_label(label: Option<String>) {
+        assert_authorized_with_whitelist(
+            FunctionName::hook_tx_transform_label,
+            vec!["staged-tx".into()],
+        )
+        .unwrap();
+
         let transformer = Host::client::get_sender();
 
         if let Some(existing) = TxTransformLabel::get_transformer_plugin() {
             if existing != transformer {
                 panic!("Error: Only one plugin can transform the transaction");
             }
-        }
-
-        // TODO: Use `permissions` oauth instead of hardcoded whitelist
-        if transformer != "staged-tx" {
-            panic!(
-                "hook_tx_transform_label: {} is not whitelisted",
-                transformer
-            );
         }
 
         TxTransformLabel::set(transformer, label);
@@ -144,6 +161,8 @@ impl Intf for TransactPlugin {
 
 impl Network for TransactPlugin {
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::set_snapshot_time, vec!["config".into()])?;
+
         let packed_args = setSnapTime { seconds }.packed();
 
         schedule_action(
@@ -156,8 +175,10 @@ impl Network for TransactPlugin {
 
 impl Admin for TransactPlugin {
     fn start_tx() {
+        assert_authorized_with_whitelist(FunctionName::start_tx, vec!["supervisor".into()])
+            .unwrap();
+
         Store::clear_buffers();
-        assert_from_supervisor();
         if CurrentActions::has_actions() {
             println!("[Warning] Transaction should already have been cleared.");
             CurrentActions::clear();
@@ -181,7 +202,8 @@ impl Admin for TransactPlugin {
     }
 
     fn finish_tx() -> Result<(), HostTypes::Error> {
-        assert_from_supervisor();
+        assert_authorized_with_whitelist(FunctionName::finish_tx, vec!["supervisor".into()])?;
+
         ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
@@ -238,7 +260,7 @@ struct LoginReply {
 
 impl Auth for TransactPlugin {
     fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
-        assert!(Host::client::get_sender() == "host");
+        assert_authorized_with_whitelist(FunctionName::get_query_token, vec!["host".into()])?;
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");
