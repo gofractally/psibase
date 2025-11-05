@@ -47,6 +47,7 @@
     }
 
     // Keeping the below example to show how to run service unit tests:
+    // Use `psitest -v -v` for more verbose output
     // {
     //     "label": "Test NFT",
     //     "type": "shell",

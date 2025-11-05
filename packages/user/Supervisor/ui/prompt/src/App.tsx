@@ -78,9 +78,10 @@ export const App = () => {
             }
 
             if (event.data === "finished") {
-                const rootDomain = new URL(
-                    siblingUrl(null, activeApp, returnPath, true),
-                );
+                const rootDomain =
+                    activeApp !== "homepage"
+                        ? new URL(siblingUrl(null, activeApp, returnPath, true))
+                        : new URL(siblingUrl(null, null, returnPath, true));
                 window.location.href = rootDomain.toString();
             }
         },
@@ -113,8 +114,8 @@ export const App = () => {
                 <iframe
                     src={iframeUrl}
                     style={{
-                        width: "50%",
-                        height: "50dvh",
+                        width: "100%",
+                        height: "100dvh",
                         border: "none",
                     }}
                 />

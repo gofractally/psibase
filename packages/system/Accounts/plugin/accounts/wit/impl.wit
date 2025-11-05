@@ -5,13 +5,6 @@ interface admin {
     use accounts:account-tokens/types.{connection-token};
     use host:types/types.{error};
 
-    /// Logs the specified user into the specified app without any user interaction.
-    /// This function is only callable by the accounts app itself.
-    login-direct: func(app: string, user: string);
-
-    /// Gets details of the connection token
-    decode-connection-token: func(token: string) -> option<connection-token>;
-
     /// Gets the names of all apps to which the user has connected
     get-connected-apps: func(user: string) -> list<string>;
 
@@ -23,18 +16,56 @@ interface admin {
 
     /// Get a list of auth accounts
     get-auth-services: func() -> result<list<string>, error>;
+
+    /// DEPRECATED
+    decode-connection-token: func(token: string) -> option<connection-token>;
+    login-direct: func(app: string, user: string);
+}
+
+interface prompt {
+    use host:types/types.{error};
+
+    /// Returns whether or not an account can currently be created.
+    ///
+    /// An account can be created if either of the following is true:
+    /// * The user is already logged into the top-level app with an account
+    /// * The user is responding to an invite that can be redeemed to create an account
+    can-create-account: func() -> bool;
+
+    /// Import a pre-existing account to this device
+    import-existing: func(account: string);
+
+    /// Creates a new account, returns the private key used to authorize it.
+    ///
+    /// The new account will also be imported onto this device.
+    ///
+    /// If there is already a user logged into the top-level app, then the account will be 
+    ///   created by that user. Otherwise, if there is currently an active invite that can 
+    ///   be redeemed to create an account, then the invite will be used. If neither condition 
+    ///   is met, then the attempt to create an account will fail.
+    create-account: func(account-name: string) -> result<string, error>;
+
+    /// Will connect the specified account with the active app, if not already 
+    ///   connected, and login.
+    /// If there is currently an active invite, calling this will automatically accept it.
+    connect-account: func(account: string);
 }
 
 world impl {
     include host:common/imports;
     include host:common/privileged;
     include host:auth/imports;
+    include host:prompt/imports;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
     include accounts:account-tokens/imports;
+    include auth-sig:plugin/imports;
+
+    import invite:plugin/redemption;
 
     export api;
     export active-app;
 
+    export prompt;
     export admin;
 }

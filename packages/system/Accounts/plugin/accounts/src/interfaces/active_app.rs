@@ -1,16 +1,18 @@
-use crate::bindings::host::auth::api as HostAuth;
-use crate::bindings::*;
-use crate::db::apps_table::*;
-use crate::db::user_table::*;
+use crate::bindings;
+
+use crate::db::{apps_table::*, user_table::*};
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
 use accounts::account_tokens::types::*;
+use bindings::*;
 use exports::accounts::plugin::{
     active_app::{Guest as ActiveApp, *},
     api::Guest as Api,
 };
-use host::common::client::get_app_url;
+use host::auth::api as HostAuth;
+use host::common::{client, client::get_app_url};
+use host::prompt::api as Prompt;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
@@ -54,6 +56,7 @@ impl ActiveApp for AccountsPlugin {
     }
 
     fn create_connection_token() -> Result<String, Error> {
+        eprintln!("[WARNING] create_connection_token is deprecated");
         let app = get_assert_top_level_app("create_connection_token", &vec![])?;
         let origin = get_app_url(&app);
         Ok(Token::new_connection_token(ConnectionToken {
@@ -61,5 +64,19 @@ impl ActiveApp for AccountsPlugin {
             origin,
         })
         .into())
+    }
+
+    fn connect_account() -> Result<(), Error> {
+        let sender = client::get_sender();
+
+        assert!(
+            sender == client::get_active_app()
+                || sender == psibase::services::invite::SERVICE.to_string(),
+            "Unauthorized",
+        );
+
+        Prompt::prompt("connect", None);
+
+        Ok(())
     }
 }
