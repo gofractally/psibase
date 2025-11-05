@@ -33,12 +33,16 @@ mod service {
 
     #[Object]
     impl Query {
+        /// Given a token id, return a record that represents token 
+        /// configuration, ownership, and supply details.
         async fn token(&self, token_id: String) -> Option<Token> {
             TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&token_id_to_number(token_id))
         }
 
+        /// Given a user account, return a record that represents the user's 
+        /// configuration within the token service.
         async fn user_settings(&self, user: AccountNumber) -> UserConfig {
             UserConfigTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -49,6 +53,9 @@ mod service {
                 })
         }
 
+        /// Given a user account, return a list of records that represent the
+        /// user's current pending outgoing credits. These are tokens that have
+        /// yet to be claimed (debited) by the receiver.
         async fn user_credits(
             &self,
             user: AccountNumber,
@@ -69,6 +76,9 @@ mod service {
             .await
         }
 
+        /// Given a user account, return a list of records that represent the
+        /// user's current pending incoming debits. These are tokens that were 
+        /// credited to the user but have yet to be debited (claimed).
         async fn user_debits(
             &self,
             user: AccountNumber,
@@ -89,6 +99,7 @@ mod service {
             .await
         }
 
+        /// Returns the specified user's current balances for all of their tokens.
         async fn user_balances(
             &self,
             user: AccountNumber,
@@ -109,6 +120,7 @@ mod service {
             .await
         }
 
+        /// Returns the specified user's current balance for the specified token.
         async fn user_balance(&self, user: AccountNumber, token_id: String) -> Balance {
             let token_id = token_id_to_number(token_id);
 
@@ -122,6 +134,7 @@ mod service {
                 })
         }
 
+        /// Returns a list of all tokens for which the specified user is the owner/issuer.
         async fn user_tokens(&self, user: AccountNumber) -> Vec<Token> {
             let tokens: Vec<Token> = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -137,6 +150,8 @@ mod service {
                 .collect()
         }
 
+        /// Returns a paginated subset of all historical events (that haven't yet been pruned
+        /// from this node) related to changes to the configuration of the specified token. 
         async fn configurations(
             &self,
             token_id: TID,
@@ -154,6 +169,9 @@ mod service {
                 .query()
         }
 
+        /// Returns a paginated subset of all historical events (that haven't yet been pruned
+        /// from this node) related to changes to the supply of the specified token.
+        /// Changes in supply happen when tokens are minted, burned, or recalled.
         async fn supplyChanges(
             &self,
             token_id: TID,
@@ -171,6 +189,11 @@ mod service {
                 .query()
         }
 
+        /// Returns a paginated subset of all historical events (that haven't yet been pruned
+        /// from this node) related to changes to the balances of the specified token for the 
+        /// specified user.
+        /// Changes in the balance of at least one user happen when tokens are recalled, burned, 
+        /// credited, debited, uncredited, rejected.
         async fn balChanges(
             &self,
             token_id: TID,
