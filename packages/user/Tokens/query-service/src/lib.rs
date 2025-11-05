@@ -9,7 +9,7 @@ mod service {
 
     use psibase::*;
     use tokens::{
-        helpers::{identify_token_type, TokenType},
+        helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
             Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
             UserConfig, UserConfigTable,
@@ -213,6 +213,19 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+            let precision = TokenTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&token_id)
+                .ok_or_else(|| {
+                    async_graphql::Error::new(format!("token '{}' not found", token_id))
+                })?
+                .precision
+                .value();
+
+            // Create fixed-precision string versions of the specified amount bounds
+            let min_fixed = amount_min.as_deref().map(|s| to_fixed(s, precision));
+            let max_fixed = amount_max.as_deref().map(|s| to_fixed(s, precision));
+
             let mut conditions = vec![
                 format!("token_id = {}", token_id),
                 format!("account = '{}'", account),
@@ -242,12 +255,16 @@ mod service {
                 conditions.push(format!("action = '{}'", act));
             }
 
-            if let Some(min) = &amount_min {
-                conditions.push(format!("amount >= '{}'", min));
+            if let Some(min) = &min_fixed {
+                conditions.push(format!(
+                    "(length(amount) > length('{min}') OR (length(amount) = length('{min}') AND amount >= '{min}'))"
+                ));
             }
 
-            if let Some(max) = &amount_max {
-                conditions.push(format!("amount <= '{}'", max));
+            if let Some(max) = &max_fixed {
+                conditions.push(format!(
+                    "(length(amount) < length('{max}') OR (length(amount) = length('{max}') AND amount <= '{max}'))"
+                ));
             }
 
             if let Some(m) = &memo {
