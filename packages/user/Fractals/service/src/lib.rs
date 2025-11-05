@@ -73,6 +73,7 @@ pub mod service {
     fn create_fractal(
         fractal_account: AccountNumber,
         guild_account: AccountNumber,
+        council_account: AccountNumber,
         name: String,
         mission: String,
     ) {
@@ -85,6 +86,7 @@ pub mod service {
         let genesis_guild = Guild::add(
             fractal_account,
             guild_account,
+            council_account,
             sender,
             "Genesis".to_string().try_into().unwrap(),
         );
@@ -95,13 +97,8 @@ pub mod service {
 
     #[action]
     fn get_g_counc(guild_account: AccountNumber) -> Option<Vec<AccountNumber>> {
-        Guild::get(guild_account).map(|guild| {
-            guild
-                .council_members()
-                .into_iter()
-                .map(|m| m.member)
-                .collect()
-        })
+        Guild::get(guild_account)
+            .map(|guild| guild.council_mems().into_iter().map(|m| m.member).collect())
     }
 
     #[action]
@@ -366,12 +363,57 @@ pub mod service {
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
     #[action]
-    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
+    fn create_guild(
+        fractal: AccountNumber,
+        guild_account: AccountNumber,
+        council_account: AccountNumber,
+        display_name: Memo,
+    ) {
         check(
             FractalMember::get_assert(fractal, get_sender()).is_citizen(),
             "must be a citizen to create a guild",
         );
-        Guild::add(fractal, guild_account, get_sender(), display_name);
+        Guild::add(
+            fractal,
+            guild_account,
+            council_account,
+            get_sender(),
+            display_name,
+        );
+    }
+
+    #[action]
+    fn get_guild_by_council(council_account: AccountNumber) -> Option<Guild> {
+        Guild::get_by_council(council_account)
+    }
+
+    /// Set a new representative of the Guild.
+    ///
+    /// Will throw if the new representative is already the current representative.
+    ///
+    /// # Arguments
+    /// * `new_representative` - The account number of the new representative.
+    #[action]
+    fn set_g_rep(new_representative: AccountNumber) {
+        Guild::get_assert(get_sender()).set_representative(new_representative);
+    }
+
+    /// Resign as representative of a guild.
+    ///
+    /// Will throw if there is no representative to remove.
+    #[action]
+    fn resign_g_rep() {
+        Guild::get_assert(get_sender()).remove_representative();
+    }
+
+    /// Forcibly remove the current representative of the guild.
+    ///
+    /// This is the only action where we assume the sender is not the guild itself but the council from the council account.
+    ///
+    /// Will throw if there is no representative to remove.
+    #[action]
+    fn remove_g_rep() {
+        Guild::get_assert_by_council(get_sender()).remove_representative();
     }
 
     #[event(history)]

@@ -29,67 +29,48 @@ pub mod service {
         )
         .rep;
 
-        let council = Fractals::call().get_g_counc(sender).unwrap_or_default();
-
-        let representative_included = guild_rep.is_some_and(|rep| signers.contains(&rep));
-        let council_member_included = council
-            .iter()
-            .any(|council_member| signers.contains(council_member));
-
-        let is_guild_consultation_required = council_member_included && !is_approval;
-
-        if representative_included && !is_guild_consultation_required {
-            return true;
-        }
-
-        let council_success = {
-            if council.is_empty() {
-                false
+        if let Some(rep) = guild_rep {
+            if signers.contains(&rep) {
+                return true;
             } else {
-                let council_members_signed = signers
-                    .iter()
-                    .filter(|&account| council.contains(account))
-                    .count() as u8;
+                let mut auth_set_next = auth_set.unwrap_or_default();
+                auth_set_next.push(sender);
 
-                let approval_min = council_approval_threshold(council.len());
+                let auth_service = psibase::services::accounts::Wrapper::call().getAuthOf(rep);
 
-                let threshold = if is_approval {
-                    approval_min
-                } else {
-                    (council.len() as u8).saturating_sub(approval_min) + 1
+                let is_auth_action = Action {
+                    service: auth_service,
+                    method: auth_delegate::action_structs::isAuthSys::ACTION_NAME.into(),
+                    sender: Wrapper::SERVICE,
+                    rawData: auth_delegate::action_structs::isAuthSys {
+                        sender: rep,
+                        authorizers: signers,
+                        auth_set: Some(auth_set_next),
+                    }
+                    .packed()
+                    .into(),
                 };
-                council_members_signed >= threshold
+
+                return bool::unpacked(&transact::Wrapper::call().runAs(is_auth_action, vec![]))
+                    .unwrap();
             }
-        };
+        } else {
+            let council = Fractals::call().get_g_counc(sender).unwrap_or_default();
 
-        if council_success {
-            return true;
-        }
-        if is_guild_consultation_required {
-            return false;
-        }
+            let council_members_signed = signers
+                .iter()
+                .filter(|&account| council.contains(account))
+                .count() as u8;
 
-        let mut auth_set_next = auth_set.unwrap_or_default();
-        auth_set_next.push(sender);
+            let approval_min = council_approval_threshold(council.len());
 
-        guild_rep.map_or(false, |rep| {
-            let auth_service = psibase::services::accounts::Wrapper::call().getAuthOf(rep);
-
-            let is_auth_action = Action {
-                service: auth_service,
-                method: auth_delegate::action_structs::isAuthSys::ACTION_NAME.into(),
-                sender: Wrapper::SERVICE,
-                rawData: auth_delegate::action_structs::isAuthSys {
-                    sender: rep,
-                    authorizers: signers,
-                    auth_set: Some(auth_set_next),
-                }
-                .packed()
-                .into(),
+            let threshold = if is_approval {
+                approval_min
+            } else {
+                (council.len() as u8).saturating_sub(approval_min) + 1
             };
-
-            bool::unpacked(&transact::Wrapper::call().runAs(is_auth_action, vec![])).unwrap()
-        })
+            return council_members_signed >= threshold;
+        }
     }
 
     #[action]
