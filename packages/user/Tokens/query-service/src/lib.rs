@@ -66,7 +66,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
-                &(user),
+                &user,
             )
             .first(first)
             .last(last)
@@ -121,10 +121,10 @@ mod service {
         }
 
         /// Returns the specified user's current balance for the specified token.
-        async fn user_balance(&self, user: AccountNumber, token_id: String) -> Balance {
+        async fn user_balance(&self, user: AccountNumber, token_id: String) -> async_graphql::Result<Balance> {
             let token_id = token_id_to_number(token_id);
 
-            BalanceTable::with_service(tokens::SERVICE)
+            Ok(BalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&(user, token_id))
                 .unwrap_or(Balance {
@@ -132,6 +132,7 @@ mod service {
                     balance: 0.into(),
                     token_id,
                 })
+            )
         }
 
         /// Returns a list of all tokens for which the specified user is the owner/issuer.
