@@ -1,104 +1,213 @@
-import { SharedBalance } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { useDebit } from "@/apps/tokens/hooks/tokensPlugin/useDebit";
-import { useUncredit } from "@/apps/tokens/hooks/tokensPlugin/useUncredit";
-import { z } from "zod";
+import type {
+    ActionType,
+    Transaction,
+} from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 
-import { Button } from "@shared/shadcn/ui/button";
+import { useContacts } from "@/apps/contacts/hooks/use-contacts";
+import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
+import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
+
+import { GlowingCard } from "@/components/glowing-card";
+import { Loading } from "@/components/loading";
+
+import { Avatar } from "@shared/components/avatar";
+import { ErrorCard } from "@shared/components/error-card";
+import { cn } from "@shared/lib/utils";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
     TableCaption,
     TableCell,
-    TableHead,
-    TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@shared/shadcn/ui/tooltip";
 
-import { AnimateNumber } from "./AnimateNumber";
+import { Token } from "../hooks/tokensPlugin/use-user-token-balances";
 
 interface Props {
-    balances: SharedBalance[];
-    user: string | undefined | null;
-    isLoading: boolean;
+    user: string;
+    token: Token;
 }
 
-const ActionType = z.enum(["Uncredit", "Debit"]);
+export function CreditTable({ user, token }: Props) {
+    const {
+        data: transactions,
+        isPending,
+        isError,
+        error,
+    } = useUserTokenBalanceChanges(user, token);
 
-export function CreditTable({ balances, user }: Props) {
-    const { mutate: uncredit } = useUncredit();
-    const { mutate: debit } = useDebit();
-
-    const handle = (id: string, action: z.infer<typeof ActionType>) => {
-        const parsedAction = ActionType.parse(action);
-        const balance = balances.find((bal) => bal.id == id);
-        if (!balance) throw new Error(`Failed to find balance`);
-        if (parsedAction == ActionType.Enum.Uncredit) {
-            uncredit({
-                amount: balance.amount.toDecimal().toString(),
-                tokenId: balance.tokenId.toString(),
-                memo: "",
-                debitor: balance.debitor,
-            });
-        } else if (parsedAction == ActionType.Enum.Debit) {
-            debit({
-                tokenId: balance.tokenId.toString(),
-                sender: balance.debitor,
-                amount: balance.amount.toDecimal().toString(),
-                memo: "",
-            });
-        } else throw new Error(`Unhandled action`);
-    };
-
-    if (balances.length == 0) {
-        return null;
+    if (isPending) {
+        return (
+            <GlowingCard>
+                <Loading />
+            </GlowingCard>
+        );
     }
-    return (
-        <Table>
-            <TableCaption>A list of your credit and debits.</TableCaption>
-            <TableHeader>
-                <TableRow>
-                    <TableHead className="w-[100px]">
-                        Creditor / Debitor
-                    </TableHead>
-                    <TableHead>Token</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {balances.map((balance) => {
-                    const type: z.infer<typeof ActionType> =
-                        balance.creditor === user
-                            ? ActionType.Enum.Uncredit
-                            : ActionType.Enum.Debit;
 
-                    return (
-                        <TableRow key={balance.id}>
-                            <TableCell className="font-medium">
-                                {balance.creditor == user
-                                    ? balance.debitor
-                                    : balance.creditor}
-                            </TableCell>
-                            <TableCell>
-                                {" "}
-                                <AnimateNumber
-                                    n={balance.amount.toDecimal()}
-                                    precision={balance.amount.getPrecision()}
-                                />
-                                {" " +
-                                    balance.amount.format(true).split(" ")[1]}
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => handle(balance.id, type)}
+    if (isError) {
+        console.error("ERROR:", error);
+        const errorMessage =
+            "Failed to load recent transactions. See logs for more details.";
+        return (
+            <GlowingCard>
+                <ErrorCard error={new Error(errorMessage)} />
+            </GlowingCard>
+        );
+    }
+
+    if (transactions?.length === 0) {
+        return (
+            <GlowingCard>
+                <CardContent className="text-muted-foreground py-8 text-center">
+                    No transactions to display
+                </CardContent>
+            </GlowingCard>
+        );
+    }
+
+    return (
+        <GlowingCard>
+            <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+            </CardHeader>
+            <CardContent className="@container">
+                <Table>
+                    <TableCaption>
+                        A list of your credit and debits.
+                    </TableCaption>
+                    <TableBody>
+                        {transactions?.map((transaction, index) => {
+                            return (
+                                <TableRow
+                                    key={`${transaction.counterParty}-${transaction.action}-${index}`}
                                 >
-                                    {type}
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    );
-                })}
-            </TableBody>
-        </Table>
+                                    <TableCell
+                                        className="w-6 text-center"
+                                        title={transaction.action}
+                                    >
+                                        <CellAction
+                                            action={transaction.action}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <CellCounterparty
+                                            counterParty={
+                                                transaction.counterParty
+                                            }
+                                            user={user}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <CellAmount transaction={transaction} />
+                                    </TableCell>
+                                    <TableCell className="h-full w-6 text-center">
+                                        <CellMemo memo={transaction.memo} />
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </GlowingCard>
     );
 }
+
+const CellAction = ({ action }: { action: ActionType }) => {
+    return (
+        <Tooltip>
+            <TooltipContent>
+                {action.charAt(0).toUpperCase() + action.slice(1)}
+            </TooltipContent>
+            {action === "credited" ? (
+                <TooltipTrigger className="block">
+                    <ArrowUp className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : action === "debited" ? (
+                <TooltipTrigger className="block">
+                    <ArrowDown className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : action === "uncredited" ? (
+                <TooltipTrigger className="block">
+                    <Undo2 className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : action === "rejected" ? (
+                <TooltipTrigger className="block">
+                    <X className="h-4 w-4" />
+                </TooltipTrigger>
+            ) : null}
+        </Tooltip>
+    );
+};
+
+const CellCounterparty = ({
+    counterParty,
+    user,
+}: {
+    counterParty: string;
+    user: string;
+}) => {
+    const { data: contacts } = useContacts(user);
+    const contact = contacts?.find(
+        (contact) => contact.account === counterParty,
+    );
+    return (
+        <div className="@lg:h-auto flex h-10 items-center gap-2">
+            <Avatar
+                account={counterParty}
+                className="@lg:h-5 @lg:w-5 h-8 w-8"
+                alt="Counterparty avatar"
+            />
+            {contact?.nickname ? (
+                <div className="@lg:flex-row @lg:gap-1 flex flex-col">
+                    <div className="font-medium">{contact.nickname}</div>
+                    <div className="text-muted-foreground italic">
+                        {counterParty}
+                    </div>
+                </div>
+            ) : (
+                <div className="italic">{counterParty}</div>
+            )}
+        </div>
+    );
+};
+
+const CellAmount = ({ transaction }: { transaction: Transaction }) => {
+    return (
+        <>
+            <span className="font-mono">
+                {transaction.direction === "outgoing" && "-"}
+                {transaction?.amount?.format({
+                    fullPrecision: true,
+                    includeLabel: false,
+                })}
+            </span>{" "}
+            <span
+                className={cn(
+                    "text-muted-foreground",
+                    !transaction?.amount?.hasTokenSymbol() && "italic",
+                )}
+            >
+                {transaction?.amount.getDisplayLabel()}
+            </span>
+        </>
+    );
+};
+
+const CellMemo = ({ memo }: { memo: string }) => {
+    if (!memo) return null;
+    return (
+        <Tooltip>
+            <TooltipContent>{memo}</TooltipContent>
+            <TooltipTrigger className="block">
+                <ReceiptText className="h-4 w-4" />
+            </TooltipTrigger>
+        </Tooltip>
+    );
+};

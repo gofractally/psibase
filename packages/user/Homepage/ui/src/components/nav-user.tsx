@@ -20,9 +20,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCanExportAccount } from "@/hooks/use-can-export-account";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -30,10 +28,10 @@ import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
 import { useProfile } from "@/hooks/use-profile";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
+import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -74,19 +72,17 @@ function AccountMenuItem({
     isConnectingToAccount,
     connectToAccount,
 }: {
-    account: z.infer<typeof Account>;
+    account: z.infer<typeof zAccount>;
     isConnectingToAccount: boolean;
     connectToAccount: (account: string) => void;
 }) {
-    const { avatarSrc } = useAvatar(account);
-
     return (
         <DropdownMenuItem
             disabled={isConnectingToAccount}
             key={account}
             onClick={() => connectToAccount(account)}
         >
-            <img className="mr-2 h-4 w-4 rounded-none" src={avatarSrc} />
+            <Avatar account={account} className="mr-2 h-4 w-4" />
             <span>{account}</span>
         </DropdownMenuItem>
     );
@@ -98,12 +94,10 @@ export function NavUser() {
     const { data: currentUser, isFetched: isFetchedLoggedInuser } =
         useCurrentUser();
 
-    const { isFetched: isFetchedChainId } = useChainId();
     const { mutateAsync: logout } = useLogout();
     const navigate = useNavigate();
 
     const { data: profile } = useProfile(currentUser);
-    const { avatarSrc } = useAvatar(currentUser);
 
     const onLogout = async () => {
         await logout();
@@ -148,11 +142,8 @@ export function NavUser() {
     const isUsingOnlyOption =
         connectedAccounts.length == 1 && connectedAccounts[0] === currentUser;
     const isLoading =
-        !(
-            isFetchedLoggedInuser &&
-            isFetchedConnectedAccounts &&
-            isFetchedChainId
-        ) || isConnectingToAccount;
+        !(isFetchedLoggedInuser && isFetchedConnectedAccounts) ||
+        isConnectingToAccount;
 
     return (
         <Dialog open={showModal} onOpenChange={setShowModal}>
@@ -174,16 +165,10 @@ export function NavUser() {
                                 size="lg"
                                 className="data-[state=open]:bg-sidebar-accent  data-[state=open]:text-sidebar-accent-foreground"
                             >
-                                <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage
-                                        className="object-cover"
-                                        src={avatarSrc}
-                                        alt={currentUser || ""}
-                                    />
-                                    <AvatarFallback className="rounded-lg">
-                                        ?
-                                    </AvatarFallback>
-                                </Avatar>
+                                <Avatar
+                                    account={currentUser || ""}
+                                    className="h-8 w-8"
+                                />
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate ">
                                         {profile?.profile?.displayName ||
@@ -202,15 +187,10 @@ export function NavUser() {
                         >
                             <DropdownMenuLabel className="p-0 font-normal">
                                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                    <Avatar className="h-8 w-8 rounded-lg">
-                                        <AvatarImage
-                                            src={avatarSrc}
-                                            className="object-cover"
-                                        />
-                                        <AvatarFallback className="rounded-lg">
-                                            ?
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <Avatar
+                                        account={currentUser || ""}
+                                        className="h-8 w-8"
+                                    />
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-semibold">
                                             {profile?.profile?.displayName ||
