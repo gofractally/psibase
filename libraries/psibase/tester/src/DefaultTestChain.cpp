@@ -17,10 +17,37 @@ using namespace UserService;
 
 namespace
 {
-   void pushGenesisTransaction(TestChain& chain, std::span<PackagedService> service_packages)
+   // These are the services that MUST be installed at genesis
+   // - Anything that is used in the genesis block
+   // - SetCode to install the remaining services at the beginning
+   //   of the next block.
+   constexpr AccountNumber essentialServices[] = {Transact::service, SetCode::service};
+
+   // Returns the number of leading packages up to and including
+   // the last one containing an essential service.
+   std::size_t countEssentialPackages(std::span<PackagedService> packages)
+   {
+      auto iter = packages.rbegin();
+      auto end  = packages.rend();
+      for (; iter != end; ++iter)
+      {
+         for (auto account : iter->accounts())
+         {
+            if (std::ranges::contains(essentialServices, account))
+            {
+               return end - iter;
+            }
+         }
+      }
+      return end - iter;
+   }
+
+   void pushGenesisTransaction(TestChain&                 chain,
+                               std::span<PackagedService> service_packages,
+                               std::size_t                priority_count)
    {
       std::vector<GenesisService> services;
-      for (auto& s : service_packages)
+      for (auto& s : service_packages.subspan(0, priority_count))
       {
          s.genesis(services);
       }
@@ -40,12 +67,18 @@ namespace
    }
 
    std::vector<Action> getInitialActions(std::span<PackagedService> service_packages,
+                                         std::size_t                priority_count,
                                          bool                       installUI)
    {
       transactor<Accounts> asys{Accounts::service, Accounts::service};
       transactor<Transact> tsys{Transact::service, Transact::service};
       std::vector<Action>  actions;
       bool                 has_packages = false;
+
+      for (auto& s : service_packages.subspan(priority_count))
+      {
+         s.installCode(actions);
+      }
 
       for (auto& s : service_packages)
       {
@@ -147,17 +180,21 @@ namespace
       static DefaultTestChain result{DefaultTestChain::defaultPackages(), false, {}, false};
       return result;
    }
+
 }  // namespace
 
 void TestChain::boot(const std::vector<std::string>& names, bool installUI)
 {
    auto packageRoot = std::getenv("PSIBASE_DATADIR");
    check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
-   auto packages = DirectoryRegistry(std::string(packageRoot) + "/packages").resolve(names);
+   auto packages =
+       DirectoryRegistry(std::string(packageRoot) + "/packages").resolve(names, essentialServices);
    setAutoBlockStart(false);
    startBlock();
-   pushGenesisTransaction(*this, packages);
-   auto transactions = makeTransactions(*this, getInitialActions(packages, installUI));
+   auto numEssential = countEssentialPackages(packages);
+   pushGenesisTransaction(*this, packages, numEssential);
+   auto transactions =
+       makeTransactions(*this, getInitialActions(packages, numEssential, installUI));
    std::vector<Checksum256> transactionIds;
    for (const auto& trx : transactions)
    {
