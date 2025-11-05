@@ -1,12 +1,12 @@
 [package]
 name = "tokens-plugin"
-version = "0.21.1"
+version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-tokens = { path = "../service/", version = "0.21.1" }
+tokens = { path = "../service/", version = "0.22.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
