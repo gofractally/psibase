@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -15,7 +15,7 @@ export const useUpdateContact = () => {
     return useMutation({
         mutationFn: async (updatedContact: LocalContact) => {
             void (await supervisor.functionCall({
-                service: Account.parse("profiles"),
+                service: zAccount.parse("profiles"),
                 method: "set",
                 params: [updatedContact],
                 intf: "contacts",
@@ -30,7 +30,7 @@ export const useUpdateContact = () => {
             );
             if (currentUser) {
                 queryClient.invalidateQueries({
-                    queryKey: QueryKey.contacts(Account.parse(currentUser)),
+                    queryKey: QueryKey.contacts(zAccount.parse(currentUser)),
                 });
             }
         },
