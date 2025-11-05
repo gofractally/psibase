@@ -1,6 +1,6 @@
 import z from "zod";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export const zTransferFormMemo = z.string().refine(
     (val) => {
@@ -16,7 +16,7 @@ export const zTransferFormMemo = z.string().refine(
 export const zTransferForm = (currentUser: string | null) =>
     z.object({
         to: z.object({
-            account: Account.refine((val) => val !== currentUser, {
+            account: zAccount.refine((val) => val !== currentUser, {
                 message: "Cannot send to yourself",
             }),
         }),

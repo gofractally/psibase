@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { updateUserTokenBalancesCache } from "./use-user-token-balances";
 
@@ -12,7 +12,7 @@ const Args = z.object({
     tokenId: z.string(),
     amount: z.string(),
     memo: z.string().default(""),
-    receiver: Account,
+    receiver: zAccount,
 });
 
 export const useCredit = (user: string | null) => {
@@ -23,7 +23,7 @@ export const useCredit = (user: string | null) => {
 
             // Optimistically update the balance
             updateUserTokenBalancesCache(
-                Account.parse(user),
+                zAccount.parse(user),
                 tokenId,
                 amount,
                 "Subtract",
@@ -38,7 +38,7 @@ export const useCredit = (user: string | null) => {
             });
         },
         onSuccess: (_data, vars, _result, context) => {
-            const parsedUser = Account.parse(user);
+            const parsedUser = zAccount.parse(user);
             // Invalidate queries to update the token balance
             context.client.invalidateQueries({
                 queryKey: QueryKey.userTokenBalances(parsedUser),
@@ -60,7 +60,7 @@ export const useCredit = (user: string | null) => {
         onError: (_error, vars) => {
             // Rollback optimistic update on error
             updateUserTokenBalancesCache(
-                Account.parse(user),
+                zAccount.parse(user),
                 vars.tokenId,
                 vars.amount,
                 "Add",

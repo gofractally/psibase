@@ -1,14 +1,14 @@
 import { AppConfigType } from "@/configuredApps";
 import { Coins } from "lucide-react";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { TokensLayout } from "./layout";
 import { PendingPage } from "./pending";
 import { TransferPage } from "./transfer";
 
 export const tokensConfig: AppConfigType = {
-    service: Account.parse("tokens"),
+    service: zAccount.parse("tokens"),
     name: "Wallet",
     description: "Send tokens and manage balances.",
     icon: <Coins className="h-6 w-6" />,

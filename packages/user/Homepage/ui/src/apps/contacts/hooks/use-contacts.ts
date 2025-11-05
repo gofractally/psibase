@@ -5,19 +5,19 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { LocalContact, zLocalContact } from "../types";
 
 export const useContacts = (
-    username?: z.infer<typeof Account> | null | undefined,
+    username?: z.infer<typeof zAccount> | null | undefined,
     enabled = true,
 ) =>
     useQuery({
         queryKey: QueryKey.contacts(username),
         queryFn: async () => {
             const res = await supervisor.functionCall({
-                service: Account.parse("profiles"),
+                service: zAccount.parse("profiles"),
                 method: "get",
                 params: [],
                 intf: "contacts",
@@ -29,7 +29,7 @@ export const useContacts = (
     });
 
 export const upsertUserToCache = (
-    username: z.infer<typeof Account>,
+    username: z.infer<typeof zAccount>,
     contact: LocalContact,
 ) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
@@ -50,8 +50,8 @@ export const upsertUserToCache = (
 };
 
 export const removeUserFromCache = (
-    username: z.infer<typeof Account>,
-    account: z.infer<typeof Account>,
+    username: z.infer<typeof zAccount>,
+    account: z.infer<typeof zAccount>,
 ) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
         if (data) {

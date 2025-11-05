@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { Quantity } from "@shared/lib/quantity";
 
@@ -28,7 +28,7 @@ export interface Transaction {
 }
 
 export const useUserTokenBalanceChanges = (
-    username: z.infer<typeof Account> | undefined | null,
+    username: z.infer<typeof zAccount> | undefined | null,
     token: Token,
 ) => {
     return useQuery<Transaction[]>({
@@ -37,7 +37,7 @@ export const useUserTokenBalanceChanges = (
         refetchInterval: 10000,
         queryFn: async () => {
             const res = await fetchUserTokenBalanceChanges(
-                Account.parse(username),
+                zAccount.parse(username),
                 token.id,
             );
 

@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { Quantity } from "@shared/lib/quantity";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -24,7 +24,7 @@ export interface Token {
 }
 
 export const useUserTokenBalances = (
-    username: z.infer<typeof Account> | undefined | null,
+    username: z.infer<typeof zAccount> | undefined | null,
 ) => {
     const toasted = useRef(false);
     return useQuery<Token[]>({
@@ -32,7 +32,7 @@ export const useUserTokenBalances = (
         enabled: !!username,
         queryFn: async () => {
             if (!toasted.current) toast("Fetching token balances...");
-            const res = await fetchUserTokenBalances(Account.parse(username));
+            const res = await fetchUserTokenBalances(zAccount.parse(username));
 
             // TODO: Remove this once token settings comes back from `fetchUserTokenBalances`
             const tokenMetaPromises = res.map(async (balance) => {

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export const AppSchema = z
     .object({
@@ -15,7 +15,7 @@ export const AppSchema = z
     })
     .and(
         z.union([
-            z.object({ service: Account }),
+            z.object({ service: zAccount }),
             z.object({ href: z.string().url() }),
         ]),
     );
@@ -27,13 +27,13 @@ const apps: App[] = [
         title: "Wallet",
         description: "Send tokens and manage balances.",
         icon: <Coins className="h-6 w-6" />,
-        service: Account.parse("tokens"),
+        service: zAccount.parse("tokens"),
     },
     {
         title: "Chain mail",
         description: "Send mail between accounts.",
         icon: <Mail className="h-6 w-6" />,
-        service: Account.parse("chainmail"),
+        service: zAccount.parse("chainmail"),
     },
     {
         title: "Doc",

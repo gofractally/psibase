@@ -5,19 +5,19 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { ProfileResponse } from "../../../hooks/use-profile";
 
-const Params = z.object({
+export const zParams = z.object({
     displayName: z.string(),
     bio: z.string(),
 });
 
 export const useSetProfile = () =>
-    useMutation<void, Error, z.infer<typeof Params>>({
+    useMutation<void, Error, z.infer<typeof zParams>>({
         mutationFn: async (params) =>
             supervisor.functionCall({
                 method: "setProfile",
@@ -28,7 +28,7 @@ export const useSetProfile = () =>
         onSuccess: async (_, params) => {
             toast.success("Profile updated");
 
-            const currentUser = Account.parse(
+            const currentUser = zAccount.parse(
                 await queryClient.getQueryData(QueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");

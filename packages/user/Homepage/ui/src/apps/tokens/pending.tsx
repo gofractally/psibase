@@ -1,8 +1,10 @@
 import { useOutletContext } from "react-router-dom";
 
 import { GlowingCard } from "@/components/glowing-card";
+import { Loading } from "@/components/loading";
 
 import { Avatar } from "@shared/components/avatar";
+import { ErrorCard } from "@shared/components/error-card";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -41,19 +43,30 @@ export const PendingPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
     const { currentUser, isLoading, selectedToken } = context;
 
-    const { data } = useUserLinesOfCredit(currentUser);
+    const { data, isError, error, isPending } =
+        useUserLinesOfCredit(currentUser);
+
     const pendingTransactions = data?.filter(
         (pt) =>
             pt.credit?.balance.tokenNumber === selectedToken.id ||
             pt.debit?.balance.tokenNumber === selectedToken.id,
     );
 
-    if (isLoading) {
+    if (isLoading || isPending) {
         return (
             <GlowingCard>
-                <CardContent className="text-muted-foreground py-8 text-center">
-                    Loading pending transactions...
-                </CardContent>
+                <Loading />
+            </GlowingCard>
+        );
+    }
+
+    if (isError) {
+        console.error("ERROR:", error);
+        const errorMessage =
+            "Failed to load pending transactions. See logs for more details.";
+        return (
+            <GlowingCard>
+                <ErrorCard error={new Error(errorMessage)} />
             </GlowingCard>
         );
     }

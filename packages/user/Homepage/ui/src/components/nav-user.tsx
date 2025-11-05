@@ -28,7 +28,7 @@ import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
 import { useProfile } from "@/hooks/use-profile";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
@@ -72,7 +72,7 @@ function AccountMenuItem({
     isConnectingToAccount,
     connectToAccount,
 }: {
-    account: z.infer<typeof Account>;
+    account: z.infer<typeof zAccount>;
     isConnectingToAccount: boolean;
     connectToAccount: (account: string) => void;
 }) {

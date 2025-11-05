@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { fetchUserSettings } from "../../lib/graphql/ui";
 
@@ -13,7 +13,7 @@ export const useUserManualDebit = (user: string | null) => {
         queryKey: QueryKey.userSettings(user),
         enabled: !!user,
         queryFn: async () => {
-            const res = await fetchUserSettings(Account.parse(user));
+            const res = await fetchUserSettings(zAccount.parse(user));
             return res.manualDebit;
         },
     });
@@ -38,7 +38,7 @@ export const useToggleUserManualDebit = (user: string | null) => {
             });
         },
         onSuccess: (_data, vars, _result, context) => {
-            const parsedUser = Account.parse(user);
+            const parsedUser = zAccount.parse(user);
             // Invalidate queries to update the token balance
             context.client.invalidateQueries({
                 queryKey: QueryKey.userSettings(parsedUser),

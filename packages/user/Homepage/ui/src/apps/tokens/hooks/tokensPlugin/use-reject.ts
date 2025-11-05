@@ -4,12 +4,12 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 import { TokenId } from "@/lib/zod/TokenId";
 
 const Args = z.object({
     tokenId: TokenId,
-    creditor: Account,
+    creditor: zAccount,
     memo: z.string().default(""),
 });
 
@@ -28,7 +28,7 @@ export const useReject = (user: string | null, counterParty: string) =>
             });
         },
         onSuccess: (_data, _vars, _result, context) => {
-            const parsedUser = Account.parse(user);
+            const parsedUser = zAccount.parse(user);
 
             // Invalidate queries to update the pending transactions table
             context.client.invalidateQueries({
