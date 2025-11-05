@@ -199,7 +199,8 @@ mod service {
             &self,
             token_id: TID,
             account: AccountNumber,
-            counter_party: Option<String>,
+            counter_parties: Option<Vec<String>>,
+            excluded_counter_parties: Option<Vec<String>>,
             action: Option<String>,
             amount_min: Option<String>,
             amount_max: Option<String>,
@@ -214,8 +215,24 @@ mod service {
                 format!("account = '{}'", account),
             ];
 
-            if let Some(cp) = &counter_party {
-                conditions.push(format!("counter_party LIKE '%{}%'", cp));
+            if let Some(cps) = &counter_parties {
+                if !cps.is_empty() {
+                    let cp_conditions: Vec<String> = cps
+                        .iter()
+                        .map(|cp| format!("counter_party LIKE '%{}%'", cp))
+                        .collect();
+                    conditions.push(format!("({})", cp_conditions.join(" OR ")));
+                }
+            }
+
+            if let Some(excluded_cps) = &excluded_counter_parties {
+                if !excluded_cps.is_empty() {
+                    let excluded_conditions: Vec<String> = excluded_cps
+                        .iter()
+                        .map(|cp| format!("counter_party NOT LIKE '%{}%'", cp))
+                        .collect();
+                    conditions.push(format!("({})", excluded_conditions.join(" AND ")));
+                }
             }
 
             if let Some(act) = &action {
