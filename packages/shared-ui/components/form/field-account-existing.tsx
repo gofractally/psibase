@@ -1,3 +1,4 @@
+// import { useStore } from "@tanstack/react-form";
 import { User, UserX } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
@@ -71,6 +72,9 @@ export const FieldAccountExisting = withFieldGroup({
         supervisor,
     }) {
         const [isValidating, setIsValidating] = useState(false);
+        // TODO: can we just use...
+        // const isValidating = useStore(group.form.store, (state) => state.isValidating);
+        // ?
         const [userNotFound, setUserNotFound] = useState(false);
         return (
             <group.AppField
