@@ -10,9 +10,9 @@ publish.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde-aux.workspace = true
-registry = { path = "../service", version = "0.21.0" }
+registry = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-registry-pkg = { path = "..", version = "0.21.0" }
+registry-pkg = { path = "..", version = "0.22.0" }

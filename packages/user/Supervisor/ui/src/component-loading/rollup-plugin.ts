@@ -57,7 +57,9 @@ export const plugin = (
             if (!fileContent) return;
 
             const wasmBlobUrl = URL.createObjectURL(
-                new Blob([fileContent], { type: "application/wasm" }),
+                new Blob([fileContent as BlobPart], {
+                    type: "application/wasm",
+                }),
             );
 
             if (!wasmBlobUrl) return;

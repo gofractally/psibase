@@ -1,6 +1,6 @@
 [package]
 name = "chainmail-plugin"
-version = "0.21.1"
+version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
-chainmail = { path = "../service", version = "0.21.1" }
+chainmail = { path = "../service", version = "0.22.0" }
 serde_json.workspace = true
 serde.workspace = true
 serde-aux.workspace = true
@@ -18,7 +18,7 @@ chrono = "0.4"
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.21.0" }
+chainmail_package = { path = "..", version = "0.22.0" }
 
 [lib]
 crate-type = ["cdylib"]

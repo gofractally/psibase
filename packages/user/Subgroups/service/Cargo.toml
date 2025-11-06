@@ -12,4 +12,4 @@ serde = { version = "1.0.208", features = ["derive"] }
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-subgroups-pkg = { path = "..", version = "0.21.0" }
+subgroups-pkg = { path = "..", version = "0.22.0" }

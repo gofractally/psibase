@@ -54,6 +54,7 @@ namespace psibase
 
       void genesis(std::vector<GenesisService>& out);
       bool hasService(AccountNumber service) const;
+      void installCode(std::vector<Action>& actions);
       void setSchema(std::vector<Action>& actions);
       void storeData(std::vector<Action>& actions);
       void regServer(std::vector<Action>& actions);
@@ -72,9 +73,13 @@ namespace psibase
    {
      public:
       DirectoryRegistry(std::string_view path);
-      PackagedService              get(std::string_view name) const;
-      PackagedService              get(const PackageInfo& info) const;
-      std::vector<PackagedService> resolve(std::span<const std::string> packages);
+      PackagedService get(std::string_view name) const;
+      PackagedService get(const PackageInfo& info) const;
+      // Packages will be returned in the order that they should be
+      // installed. Packages containing services in priorityServices
+      // will be as close to the front as possible.
+      std::vector<PackagedService> resolve(std::span<const std::string>   packages,
+                                           std::span<const AccountNumber> priorityServices = {});
 
      private:
       std::string path;

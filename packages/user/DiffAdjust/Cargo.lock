@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "diff-adjust"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-graphql",
  "diff-adjust-pkg",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "diff-adjust-pkg"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "diff-adjust",
  "r-diff-adjust",
@@ -848,7 +848,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1816,7 +1816,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1830,7 +1830,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1842,14 +1842,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "seahash",
 ]
@@ -1865,7 +1865,7 @@ dependencies = [
 
 [[package]]
 name = "r-diff-adjust"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "async-graphql",
  "diff-adjust",

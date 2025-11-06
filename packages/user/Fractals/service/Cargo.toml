@@ -16,11 +16,11 @@ postinstall = [
 [dependencies]
 psibase.workspace = true
 psibase_macros.workspace = true
-evaluations = { path = "../../Evaluations/service", version = "0.21.0" }
+evaluations = { path = "../../Evaluations/service", version = "0.22.0" }
 async-graphql.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-fractals-pkg = { path = "..", version = "0.21.0" }
+fractals-pkg = { path = "..", version = "0.22.0" }

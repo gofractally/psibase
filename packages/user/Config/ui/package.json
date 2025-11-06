@@ -12,7 +12,7 @@
         "@dicebear/collection": "^9.2.2",
         "@dicebear/core": "^9.2.2",
         "@psibase/common-lib": "workspace:*",
-        "@tanstack/react-form": "^1.11.1",
+        "@tanstack/react-form": "^1.19.3",
         "@tanstack/react-query": "^5.75.7",
         "humanize-duration": "^3.32.2",
         "lucide-react": "^0.475.0",
