@@ -20,7 +20,29 @@ use db::*;
 use serde::{Deserialize, Serialize};
 
 mod errors;
+use crate::trust::*;
 use errors::ErrorType;
+
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "",
+        High => "
+        🚨 WARNING 🚨 
+        This approval will grant the caller the ability to accept/reject transactions on your behalf! Make sure you completely trust the caller's legitimacy.
+
+        High trust grants these abilities:
+            - Accept staged transactions
+            - Reject staged transactions
+        ",
+    }
+    functions {
+        None => [remove, execute],
+        Low => [],
+        High => [accept, reject],
+        Max => [set_propose_latch, propose],
+    }
+}
 
 fn validate_account(account: &str) -> Result<(), Error> {
     match get_account(account) {
@@ -127,8 +149,7 @@ impl Proposer for StagedTxPlugin {
     }
 
     fn propose(actions: Vec<Action>, auto_exec: bool) -> Result<(), Error> {
-        let packages = psibase::services::packages::SERVICE.to_string();
-        get_assert_caller("propose", &[&packages])?;
+        assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
 
         add_action_to_transaction(
             propose::ACTION_NAME,
@@ -154,6 +175,11 @@ impl Proposer for StagedTxPlugin {
 
 impl Respondent for StagedTxPlugin {
     fn accept(id: u32) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::accept,
+            vec!["config".into(), "workshop".into()],
+        )?;
+
         add_action_to_transaction(
             accept::ACTION_NAME,
             &accept {
@@ -165,6 +191,11 @@ impl Respondent for StagedTxPlugin {
     }
 
     fn reject(id: u32) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::reject,
+            vec!["config".into(), "workshop".into()],
+        )?;
+
         add_action_to_transaction(
             reject::ACTION_NAME,
             &reject {
