@@ -1,9 +1,9 @@
 import { LogIn, LogOut, Moon, Settings, Sun, UserPlus } from "lucide-react";
 
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLogout } from "@/hooks/useLogout";
 
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -26,7 +26,7 @@ export const SettingsDropdown = () => {
 
     const { mutate: logout } = useLogout();
     const { data: currentUser } = useCurrentUser();
-    const { mutateAsync: login } = useCreateConnectionToken();
+    const { mutateAsync: login } = useConnectAccount();
 
     const isLoggedIn = !!currentUser;
 
@@ -75,20 +75,12 @@ export const SettingsDropdown = () => {
                     <DropdownMenuSeparator />
 
                     {isLoggedIn ? (
-                        <DropdownMenuItem
-                            onClick={() => {
-                                logout();
-                            }}
-                        >
+                        <DropdownMenuItem onClick={() => logout()}>
                             <LogOut className="mr-2 h-4 w-4" />
                             <span>Log out</span>
                         </DropdownMenuItem>
                     ) : (
-                        <DropdownMenuItem
-                            onClick={() => {
-                                login();
-                            }}
-                        >
+                        <DropdownMenuItem onClick={() => login()}>
                             <LogIn className="mr-2 h-4 w-4" />
                             <span>Log in</span>
                         </DropdownMenuItem>

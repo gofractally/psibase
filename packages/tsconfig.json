@@ -7,6 +7,9 @@
             "@shared/*": ["shared-ui/*"],
             "@psibase/common-lib": [
                 "./user/CommonApi/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "./user/CommonApi/common/packages/common-lib/src/*"
             ]
         }
     }

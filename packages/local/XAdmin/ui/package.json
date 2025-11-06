@@ -14,7 +14,7 @@
         "@hookform/resolvers": "^5.1.1",
         "@psibase/common-lib": "workspace:*",
         "@radix-ui/react-toast": "^1.2.1",
-        "@tanstack/react-query": "^5.52.0",
+        "@tanstack/react-query": "^5.90.6",
         "@tanstack/react-table": "^8.20.4",
         "class-variance-authority": "^0.7.0",
         "framer-motion": "^11.2.11",
