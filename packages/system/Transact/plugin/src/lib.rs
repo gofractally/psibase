@@ -45,7 +45,7 @@ psibase::define_trust! {
         This approval will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
 
         High trust grants these abilities:
-            - alter which account takes the actions in a transaction
+            - alter which of your accounts is being used
         ",
     }
     functions {
