@@ -11,10 +11,10 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
+import { Avatar } from "@shared/components/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -70,8 +70,6 @@ export function ContactDetails({
 
     const isSelf = contact.account === currentUser;
     const { data: profile } = useProfile(contact.account);
-
-    const { avatarSrc } = useAvatar(contact.account);
 
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,
@@ -214,10 +212,10 @@ export function ContactDetails({
             </Dialog>
             <div className="mx-auto flex w-full max-w-screen-md flex-col items-center justify-center gap-4 p-4">
                 <div className="flex w-full justify-center">
-                    <img
-                        src={avatarSrc}
+                    <Avatar
+                        account={contact.account}
+                        className="h-56 border-4"
                         alt="Contact avatar"
-                        className="h-56 w-full rounded-none object-contain"
                     />
                 </div>
                 <div className="flex flex-col gap-2 text-center">

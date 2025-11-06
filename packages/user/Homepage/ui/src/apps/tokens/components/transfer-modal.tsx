@@ -1,112 +1,292 @@
-import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { Quantity } from "@/apps/tokens/lib/quantity";
+import type { Token } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 
-import { useAvatar } from "@/hooks/use-avatar";
+import { useContacts } from "@/apps/contacts/hooks/use-contacts";
+import { useStore } from "@tanstack/react-form";
+import { ArrowDown } from "lucide-react";
+import { useMemo, useState } from "react";
+
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useProfile } from "@/hooks/use-profile";
 
+import { Avatar } from "@shared/components/avatar";
+import { withForm } from "@shared/components/form/app-form";
+import { Quantity } from "@shared/lib/quantity";
+import { cn } from "@shared/lib/utils";
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    // AlertDialogDescription,
+    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
+import { Button } from "@shared/shadcn/ui/button";
 
-interface Props {
-    open: boolean;
-    onContinue: () => void;
-    onClose: () => void;
-    isPending: boolean;
-    title?: string;
-    from?: string | null;
-    amount?: string;
-    tokenId?: number;
-    to?: string;
-}
+import { defaultTransferValues } from "../lib/transfer-form-schema";
 
-export const TransferModal = ({
-    open,
-    onContinue,
-    onClose,
-    from,
-    to,
-    isPending,
-    tokenId,
-    amount,
-}: Props) => {
-    const { data: currentUserData } = useCurrentUser();
+export const TransferModal = withForm({
+    defaultValues: defaultTransferValues,
+    props: {
+        open: false,
+        onClose: () => {},
+        selectedToken: undefined as Token | undefined,
+        onSubmit: ({
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            addToContacts,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            closeConfirmationModal,
+        }: {
+            addToContacts: boolean;
+            closeConfirmationModal: () => void;
+        }) => {},
+    },
+    render: function TransferModal({
+        form,
+        open,
+        onClose,
+        selectedToken,
+        onSubmit,
+    }) {
+        const { data: currentUser } = useCurrentUser();
+        const { data: profile } = useProfile(currentUser);
+        const { data: contacts } = useContacts(currentUser);
 
-    const { data: balances } = useBalances(currentUserData);
-    const token = balances?.tokens.find((token) => token.id == tokenId);
+        const [to, amount, isSubmitting] = useStore(form.store, (state) => [
+            state.values.to.account,
+            state.values.amount,
+            state.isSubmitting,
+        ]);
 
-    const convertedToInteger = Math.floor(
-        Number(amount) * Math.pow(10, token?.precision || 0),
-    );
+        // Helper function to get contact info for display
+        const getContactDisplay = (account: string) => {
+            const contact = contacts?.find((c) => c.account === account);
+            if (contact?.nickname) {
+                return {
+                    primary: contact.nickname,
+                    secondary: account,
+                };
+            }
+            return {
+                primary: account,
+                secondary: undefined,
+            };
+        };
 
-    const quantity = token
-        ? new Quantity(convertedToInteger.toString(), token.precision, token.id)
-        : undefined;
+        // For the current user (from), use profile displayName if available
+        const fromContact = (() => {
+            if (profile?.profile?.displayName) {
+                return {
+                    primary: profile.profile.displayName,
+                    secondary: currentUser || "",
+                };
+            }
+            return {
+                primary: currentUser || "",
+                secondary: undefined,
+            };
+        })();
 
-    const numSymbol = quantity ? quantity.format(true).split(" ") : ["", ""];
-    const [amountFormatted, symbol] = numSymbol;
+        const toContact = getContactDisplay(to);
 
-    const { avatarSrc: fromAvatar } = useAvatar(from);
-    const { avatarSrc: toAvatar } = useAvatar(to);
+        // Check if recipient is in contacts
+        const isRecipientInContacts = contacts?.some((c) => c.account === to);
+        const [addToContacts, setAddToContacts] = useState(false);
 
-    return (
-        <AlertDialog open={open}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Token transfer</AlertDialogTitle>
-                    <div className="grid w-full grid-cols-2 gap-2">
-                        {[
-                            { label: "From", address: from },
-                            { label: "To", address: to },
-                        ].map(({ label, address }) => (
-                            <div
-                                key={label}
-                                className="flex flex-col items-center gap-1 "
-                            >
-                                <div className="text-muted-foreground text-center">
-                                    {label}
-                                </div>
-                                <div>
-                                    <img
-                                        className="h-20 w-20 border object-cover"
-                                        src={
-                                            label == "From"
-                                                ? fromAvatar
-                                                : toAvatar
-                                        }
-                                    />
-                                </div>
-                                <div className="truncate text-center text-lg">
-                                    {address}
+        const quantity = useMemo(() => {
+            if (!selectedToken) return null;
+            const { precision, id, symbol } = selectedToken;
+            try {
+                return new Quantity(amount.amount, precision, id, symbol);
+            } catch (error) {
+                console.log(error);
+                return null;
+            }
+        }, [amount.amount, selectedToken]);
+
+        const handleClose = () => {
+            setAddToContacts(false);
+            onClose();
+        };
+
+        if (!quantity) return <></>;
+
+        return (
+            <AlertDialog open={open}>
+                <AlertDialogContent className="max-w-md">
+                    <AlertDialogHeader className="text-center">
+                        <AlertDialogTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                            Confirm Transfer
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
+                            Please review the details before confirming your
+                            transfer
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="mt-3 space-y-4">
+                        {/* From Account */}
+                        <div className="flex items-center gap-4 rounded-xl border border-gray-300 bg-gray-100/70 p-4 dark:border-gray-800 dark:bg-gray-900/50">
+                            <div className="flex-shrink-0">
+                                <Avatar
+                                    account={currentUser || ""}
+                                    className="h-12 w-12"
+                                    alt="From account"
+                                />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                    From
+                                </p>
+                                <div className="break-words text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    {fromContact.secondary ? (
+                                        <>
+                                            <span className="font-medium">
+                                                {fromContact.primary}
+                                            </span>{" "}
+                                            <span className="font-normal text-slate-600 dark:text-slate-400">
+                                                ({fromContact.secondary})
+                                            </span>
+                                        </>
+                                    ) : (
+                                        fromContact.primary
+                                    )}
                                 </div>
                             </div>
-                        ))}
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="flex justify-center">
+                            <ArrowDown className="text-slate-600 dark:text-slate-400" />
+                        </div>
+
+                        {/* To Account */}
+                        <div className="flex items-center gap-4 rounded-xl border border-gray-300 bg-gray-100/70 p-4 dark:border-gray-800 dark:bg-gray-900/50">
+                            <div className="flex-shrink-0">
+                                <Avatar
+                                    account={to}
+                                    className="h-12 w-12"
+                                    alt="To account"
+                                />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                    To
+                                </p>
+                                <div className="break-words text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    {toContact.secondary ? (
+                                        <>
+                                            <span className="font-medium">
+                                                {toContact.primary}
+                                            </span>{" "}
+                                            <span className="font-normal text-slate-600 dark:text-slate-400">
+                                                ({toContact.secondary})
+                                            </span>
+                                        </>
+                                    ) : (
+                                        toContact.primary
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex w-full justify-center gap-2 text-center text-xl font-semibold">
-                        <span>Sending </span>
-                        <span>{amountFormatted}</span>
-                        <span className="text-muted-foreground">{symbol}</span>
+
+                    {/* Add to contacts section - only show if recipient is not in contacts */}
+                    {!isRecipientInContacts && (
+                        <div
+                            className="cursor-pointer rounded-xl border border-yellow-200 bg-yellow-50 p-4 transition-colors hover:bg-yellow-100 dark:border-yellow-700/30 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30"
+                            onClick={() => setAddToContacts(!addToContacts)}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-800/30">
+                                        <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">
+                                            !
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                        This recipient is not in your contacts.
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="add-to-contacts"
+                                            checked={addToContacts}
+                                            onChange={(e) => {
+                                                e.stopPropagation();
+                                                setAddToContacts(
+                                                    e.target.checked,
+                                                );
+                                            }}
+                                            className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 dark:border-yellow-600/50 dark:bg-yellow-800/20 dark:ring-yellow-500/50"
+                                        />
+                                        <label
+                                            htmlFor="add-to-contacts"
+                                            className="cursor-pointer text-sm text-yellow-800 dark:text-yellow-200"
+                                        >
+                                            Add this account to my contacts
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Amount Display */}
+                    <div className="mt-3 rounded-xl border border-gray-300 bg-gray-100/70 p-6 text-center dark:border-gray-800 dark:bg-gray-900/50">
+                        <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                            Transfer Amount
+                        </p>
+                        <p className="text-2xl">
+                            <span className="font-mono">
+                                {quantity.format({
+                                    fullPrecision: true,
+                                    includeLabel: false,
+                                })}
+                            </span>{" "}
+                            <span
+                                className={cn(
+                                    "text-muted-foreground",
+                                    !quantity?.hasTokenSymbol() && "italic",
+                                )}
+                            >
+                                {quantity.getDisplayLabel()}
+                            </span>
+                        </p>
                     </div>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => onClose()}>
-                        Cancel
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                        disabled={isPending}
-                        onClick={() => onContinue()}
-                    >
-                        {isPending ? "Sending" : "Send"}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-};
+
+                    <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
+                        <AlertDialogCancel
+                            onClick={handleClose}
+                            className="order-2 w-full sm:order-1 sm:w-auto"
+                        >
+                            Cancel
+                        </AlertDialogCancel>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                onSubmit({
+                                    addToContacts,
+                                    closeConfirmationModal: handleClose,
+                                });
+                            }}
+                            disabled={isSubmitting}
+                            className="order-1 sm:order-2"
+                        >
+                            {isSubmitting ? (
+                                <div className="flex items-center gap-2">
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent"></div>
+                                    Sending...
+                                </div>
+                            ) : (
+                                "Confirm Transfer"
+                            )}
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        );
+    },
+});
