@@ -1091,7 +1091,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor TestFractal TokenUsers Tokens TokenStream Symbol Transact Homepage WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XRun XSites XTransact)
 
 install(
@@ -1109,6 +1109,7 @@ install(
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Credentials.psi
           ${SERVICE_DIR}/DevDefault.psi
+          ${SERVICE_DIR}/DiffAdjust.psi
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
@@ -1137,11 +1138,10 @@ install(
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
+          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
-          ${SERVICE_DIR}/DiffAdjust.psi
-          ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi

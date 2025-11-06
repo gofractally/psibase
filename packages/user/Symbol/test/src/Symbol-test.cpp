@@ -160,7 +160,6 @@ SCENARIO("Buying a symbol")
       }
    }
 }
-// derp
 
 SCENARIO("Measuring price increases")
 {
