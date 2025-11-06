@@ -30,17 +30,20 @@ use exports::transact::plugin::{
 use psibase::services::transact::action_structs::setSnapTime;
 
 // Third-party crates
+use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
 use serde::Deserialize;
 use serde_json::from_str;
-use crate::trust::*;
 
 psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "",
         High => "
+        🚨 WARNING 🚨 
+        This approval will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
+
         High trust grants these abilities:
             - Hook actions sender
         ",
