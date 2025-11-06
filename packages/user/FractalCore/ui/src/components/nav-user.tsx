@@ -9,13 +9,13 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useLogout } from "@/hooks/use-logout";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";

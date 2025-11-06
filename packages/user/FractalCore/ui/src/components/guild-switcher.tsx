@@ -3,12 +3,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import {
     DropdownMenu,
     DropdownMenuContent,

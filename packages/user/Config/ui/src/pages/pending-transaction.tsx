@@ -5,7 +5,6 @@ import { ErrorCard } from "@/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useAcceptStaged } from "@/hooks/use-accept-staged";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useExecuteStaged } from "@/hooks/use-execute-staged";
 import { useRejectStaged } from "@/hooks/use-reject-staged";
 import { useRemoveStaged } from "@/hooks/use-remove-staged";
@@ -14,6 +13,7 @@ import { useTxHistory } from "@/hooks/use-tx-history";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { generateAvatar } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {

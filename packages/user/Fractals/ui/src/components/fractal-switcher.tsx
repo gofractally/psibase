@@ -5,13 +5,13 @@ import { useNavigate } from "react-router-dom";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { zFractal } from "@/lib/graphql/fractals/getFractal";
 import QueryKey from "@/lib/queryKeys";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import {
     DropdownMenu,
     DropdownMenuContent,

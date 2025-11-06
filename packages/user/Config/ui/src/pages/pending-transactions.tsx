@@ -4,10 +4,10 @@ import { EmptyBlock } from "@/components/EmptyBlock";
 import { ErrorCard } from "@/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useStagedTransactions } from "@/hooks/use-staged-transactions";
 import { generateAvatar } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 

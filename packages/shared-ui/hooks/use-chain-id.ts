@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@shared/lib/query-keys";
 
 export const useChainId = () =>
     useQuery({
