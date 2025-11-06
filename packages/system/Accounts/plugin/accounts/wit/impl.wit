@@ -32,6 +32,7 @@ world impl {
     include clientdata:plugin/imports;
     include transact:plugin/imports;
     include accounts:account-tokens/imports;
+    include permissions:plugin/imports;
 
     export api;
     export active-app;
