@@ -129,6 +129,14 @@ impl From<psibase::PackageOp> for types::PackageOpInfo {
 
 struct PackagesPlugin;
 
+fn assert_caller_config(context: &str) {
+    assert!(
+        Client::get_sender() == "config",
+        "{} can only be called by config",
+        context
+    );
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct QueryRoot<T> {
     data: T,
@@ -370,6 +378,8 @@ impl PrivateApi for PackagesPlugin {
         request_pref: types::PackagePreference,
         non_request_pref: types::PackagePreference,
     ) -> Result<Vec<types::PackageOpInfo>, HostTypes::Error> {
+        assert_caller_config("resolve");
+
         let index = index.into_iter().map(|p| p.into()).collect();
         let essential = get_essential_packages(&index, &EssentialServices::new());
         Ok(solve_dependencies(
@@ -391,6 +401,7 @@ impl PrivateApi for PackagesPlugin {
         packages: Vec<types::PackageOpFull>,
         compression_level: u8,
     ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), HostTypes::Error> {
+        assert_caller_config("build_transactions");
         let id = getrandom::u64().unwrap();
 
         let index_cell = Cell::new(0);
@@ -457,7 +468,7 @@ impl PrivateApi for PackagesPlugin {
     }
     // Only callable by the UI
     fn push_data(tx: Vec<u8>) {
-        assert!(Client::get_sender() == "config".to_string());
+        assert_caller_config("push_data");
 
         let tx = Transaction::unpacked(&tx).unwrap();
         for action in tx.actions {
@@ -486,7 +497,7 @@ impl PrivateApi for PackagesPlugin {
         }
     }
     fn propose_install(tx: Vec<u8>) -> Result<(), HostTypes::Error> {
-        assert!(Client::get_sender() == "config".to_string());
+        assert_caller_config("propose_install");
 
         let tx = Transaction::unpacked(&tx).unwrap();
         StagedTx::propose(
@@ -496,6 +507,8 @@ impl PrivateApi for PackagesPlugin {
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {
+        assert_caller_config("set_account_sources");
+
         let packed_args = psibase::services::packages::action_structs::setSources {
             sources: accounts
                 .into_iter()
