@@ -103,6 +103,7 @@ namespace psibase
       movedPermanently     = 301,
       found                = 302,
       notModified          = 304,
+      badRequest           = 400,
       unauthorized         = 401,
       forbidden            = 403,
       notFound             = 404,

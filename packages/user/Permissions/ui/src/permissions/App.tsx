@@ -81,7 +81,7 @@ export const App = () => {
     }
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-lg rounded border border-gray-200 p-6">
+        <div className="mx-auto h-screen w-screen max-w-screen-lg rounded p-6">
             <h3 className="text-4xl">Authorize application</h3>
             <p>
                 <b>{permissionRequest.caller}</b> app wants to use the{" "}
