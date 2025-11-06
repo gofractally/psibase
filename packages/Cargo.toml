@@ -54,7 +54,6 @@ publish = false
 [workspace.dependencies]
 # Common dependencies for plugins
 async-graphql = "=7.0.17"
-indoc = "2.0.6"
 psibase = { path = "../rust/psibase", version = "0.22.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
