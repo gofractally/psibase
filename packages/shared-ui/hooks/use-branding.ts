@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const useBranding = () =>
     useQuery({
