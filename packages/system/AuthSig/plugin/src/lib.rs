@@ -26,19 +26,21 @@ psibase::define_trust! {
     descriptions {
         Low => "
         Low trust grants these abilities:
-            - Create new keypairs
             - Import existing keypairs
         ",
         Medium => "",
         High => "
+        🚨 WARNING 🚨 
+        This approval will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
+
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Set the public key for your account
             - Sign transactions on your behalf
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der],
-        Low => [import_key, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit],
+        Low => [import_key],
         High => [set_key, sign],
     }
 }
@@ -91,7 +93,7 @@ impl KeyVault for AuthSig {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::sign_explicit, vec!["auth-invite".into()])?;
+        assert_authorized(FunctionName::sign_explicit)?;
         HostCrypto::sign_explicit(&hashed_message, &private_key)
     }
 
