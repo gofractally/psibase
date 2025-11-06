@@ -11,7 +11,31 @@ use psibase::services::sites::action_structs as Actions;
 use psibase::Hex;
 
 mod errors;
+use crate::trust::*;
 use errors::ErrorType;
+
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "
+        Medium trust grants these abilities:
+            - Set cache mode
+        ",
+        High => "
+        High trust grants the abilities of all lower trust levels, plus these abilities:
+            - Upload files
+            - Remove files
+            - Configure site settings (SPA, CSP, proxy)
+        ",
+    }
+    functions {
+        None => [],
+        Low => [],
+        Medium => [set_cache_mode],
+        High => [upload, upload_encoded, upload_tree, remove, enable_spa, set_csp, delete_csp, set_proxy, clear_proxy],
+    }
+}
+
 struct SitesPlugin;
 
 // Add a leading slash if missing and remove trailing slashes.
@@ -38,6 +62,8 @@ fn validate_compression_quality(quality: u8) -> Result<(), Error> {
 
 impl Sites for SitesPlugin {
     fn upload(file: File, compression_quality: u8) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::upload, vec!["workshop".into()])?;
+
         validate_compression_quality(compression_quality)?;
 
         let (content, content_encoding) = if compression_quality > 0 {
@@ -66,6 +92,8 @@ impl Sites for SitesPlugin {
     }
 
     fn upload_encoded(file: File, content_encoding: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::upload_encoded, vec!["workshop".into()])?;
+
         let packed = Actions::storeSys {
             path: file.path.clone(),
             contentType: file.content_type,
@@ -82,6 +110,8 @@ impl Sites for SitesPlugin {
     }
 
     fn upload_tree(files: Vec<File>, compression_quality: u8) -> Result<u16, Error> {
+        assert_authorized_with_whitelist(FunctionName::upload_tree, vec!["workshop".into()])?;
+
         validate_compression_quality(compression_quality)?;
 
         let mut accumulated_size = 0;
@@ -120,18 +150,26 @@ impl Sites for SitesPlugin {
     }
 
     fn remove(path: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::remove, vec!["workshop".into()])?;
+
         Transact::add_action_to_transaction("remove", &Actions::remove { path }.packed())
     }
 
     fn enable_spa(enable: bool) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::enable_spa, vec!["workshop".into()])?;
+
         Transact::add_action_to_transaction("enableSpa", &Actions::enableSpa { enable }.packed())
     }
 
     fn set_csp(path: String, csp: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::set_csp, vec!["workshop".into()])?;
+
         Transact::add_action_to_transaction("setCsp", &Actions::setCsp { path, csp }.packed())
     }
 
     fn set_cache_mode(enable: bool) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::set_cache_mode, vec!["workshop".into()])?;
+
         Transact::add_action_to_transaction(
             "enableCache",
             &Actions::enableCache { enable }.packed(),
@@ -139,16 +177,23 @@ impl Sites for SitesPlugin {
     }
 
     fn delete_csp(path: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::delete_csp, vec!["workshop".into()])?;
+
         Transact::add_action_to_transaction("deleteCsp", &Actions::deleteCsp { path }.packed())
     }
 
     fn set_proxy(proxy: String) {
+        assert_authorized_with_whitelist(FunctionName::set_proxy, vec!["workshop".into()]).unwrap();
+
         let proxy = psibase::AccountNumber::from(proxy.as_str());
         Transact::add_action_to_transaction("setProxy", &Actions::setProxy { proxy }.packed())
             .unwrap();
     }
 
     fn clear_proxy() {
+        assert_authorized_with_whitelist(FunctionName::clear_proxy, vec!["workshop".into()])
+            .unwrap();
+
         Transact::add_action_to_transaction("clearProxy", &Actions::clearProxy {}.packed())
             .unwrap();
     }
