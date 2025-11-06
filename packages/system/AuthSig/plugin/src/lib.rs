@@ -35,6 +35,9 @@ psibase::define_trust! {
             - Create new accounts
         ",
         High => "
+        🚨 WARNING 🚨 
+        This approval will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
+
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Set the public key for your account
             - Sign transactions on your behalf
