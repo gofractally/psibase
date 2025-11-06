@@ -8,17 +8,17 @@ use errors::ErrorType;
 use bindings::exports::tokens::plugin as Exports;
 use Exports::types::Decimal;
 use Exports::{
-    helpers::Guest as Helpers, issuer::Guest as Issuer, user::Guest as User,
-    user_config::Guest as UserConfig,
+    authorized::Guest as Authorized, helpers::Guest as Helpers, issuer::Guest as Issuer,
+    user::Guest as User, user_config::Guest as UserConfig,
 };
 
+use bindings::host::common::{client, server};
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
-use psibase::AccountNumber;
-use psibase::{fracpack::Pack, services::tokens, FlagsType};
+use psibase::{fracpack::Pack, services::tokens, AccountNumber, FlagsType};
 pub mod query {
     pub mod fetch_token;
 }
@@ -222,6 +222,16 @@ impl UserConfig for TokensPlugin {
         let packed_args = Actions::delBalConf { token_id }.packed();
 
         add_action_to_transaction(Actions::delBalConf::ACTION_NAME, &packed_args)
+    }
+}
+
+impl Authorized for TokensPlugin {
+    fn graphql(query: String) -> String {
+        // TODO: Delete the below check and replace with a permissions check.
+        // Should be trust = high, with whitelist = "homepage"
+        assert!(client::get_sender() == "homepage", "Unauthorized");
+
+        server::post_graphql_get_json(&query).expect("Failed to post graphql")
     }
 }
 

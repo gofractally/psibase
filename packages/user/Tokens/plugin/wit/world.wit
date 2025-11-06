@@ -158,10 +158,24 @@ interface helpers {
     u64-to-decimal: func(token-id: u32, amount: u64) -> result<decimal, error>;
 }
 
+/// Interface that makes authorized queries to this app's http server. 
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> string;
+}
+
 world imports {
     import types;
     import issuer;
     import user;
     import user-config;
     import helpers;
+    import authorized;
 }
