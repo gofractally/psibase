@@ -61,7 +61,8 @@ impl Admin for AccountsPlugin {
     }
 
     fn import_account(account: String) {
-        assert_authorized(FunctionName::import_account).unwrap();
+        assert_authorized_with_whitelist(FunctionName::import_account, vec!["x-admin".into()])
+            .unwrap();
         assert_valid_account(&account);
         AppsTable::new(&Client::get_receiver()).connect(&account);
     }
