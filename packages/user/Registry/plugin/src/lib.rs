@@ -6,9 +6,9 @@ mod types;
 
 use crate::trust::*;
 use bindings::registry::plugin::types::AppMetadata;
+use ::registry::action_structs::*;
 use exports::registry::plugin::developer::Guest as Developer;
 use psibase::fracpack::Pack;
-use registry::action_structs::*;
 use transact::plugin::intf as Transact;
 
 psibase::define_trust! {
