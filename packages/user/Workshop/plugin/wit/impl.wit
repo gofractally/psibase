@@ -10,6 +10,7 @@ world impl {
     include registry:plugin/imports;
     include auth-delegate:plugin/imports;
     include accounts:plugin/imports;
+    include permissions:plugin/imports;
 
     export app;
     export mail;
