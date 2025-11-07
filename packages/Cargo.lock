@@ -2173,6 +2173,7 @@ dependencies = [
  "quote",
  "rand_core 0.6.4",
  "serde",
+ "serde_core",
  "serde_json",
  "subtle",
  "syn 2.0.109",

@@ -14,6 +14,7 @@ psibase_macros.workspace = true
 async-graphql.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 diff-adjust-pkg = { path = "..", version = "0.22.0" }
