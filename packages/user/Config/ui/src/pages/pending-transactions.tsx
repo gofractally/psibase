@@ -4,12 +4,13 @@ import { EmptyBlock } from "@/components/EmptyBlock";
 import { ErrorCard } from "@/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useStagedTransactions } from "@/hooks/use-staged-transactions";
 import { generateAvatar } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const shorten = (id: string, length: number) =>
     id.slice(0, length) + "...." + id.slice(-length);
@@ -40,14 +41,18 @@ export const PendingTransactions = () => {
                     >
                         <div className="flex gap-2">
                             <div className="flex items-center gap-2 text-sm">
-                                <Avatar className="h-6 w-6 rounded-sm">
-                                    <AvatarImage
-                                        src={generateAvatar(
-                                            chainId,
-                                            transaction.proposer,
-                                        )}
-                                    />
-                                </Avatar>
+                                {chainId && transaction.proposer ? (
+                                    <Avatar className="h-6 w-6 rounded-sm">
+                                        <AvatarImage
+                                            src={generateAvatar(
+                                                chainId,
+                                                transaction.proposer,
+                                            )}
+                                        />
+                                    </Avatar>
+                                ) : (
+                                    <Skeleton className="h-6 w-6 rounded-sm" />
+                                )}
                                 {transaction.proposer}
                             </div>
                             <div className="flex flex-col gap-2">

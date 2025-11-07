@@ -5,6 +5,7 @@
 #include <psibase/semver.hpp>
 #include <psio/schema.hpp>
 #include <services/system/HttpServer.hpp>
+#include <services/system/SetCode.hpp>
 #include <services/user/Packages.hpp>
 #include <services/user/Sites.hpp>
 
@@ -242,6 +243,25 @@ namespace psibase
       }
       return false;
    }
+   void PackagedService::installCode(std::vector<Action>& actions)
+   {
+      for (const auto& [account, index, info] : services)
+      {
+         if (account.value == 0)
+         {
+            std::string filename = std::string(archive.getEntry(index).filename());
+            abortMessage("Service with filename: " + filename + " has invalid account name");
+         }
+
+         actions.push_back(transactor<SetCode>(account, SetCode::service)
+                               .setCode(account, 0, 0, archive.getEntry(index).read()));
+         if (auto flags = info.parseFlags())
+         {
+            actions.push_back(
+                transactor<SetCode>(SetCode::service, SetCode::service).setFlags(account, flags));
+         }
+      }
+   }
    void PackagedService::setSchema(std::vector<Action>& actions)
    {
       for (const auto& [account, index, info] : services)
@@ -433,7 +453,9 @@ namespace psibase
       return PackagedService(readWholeFile(filepath));
    }
 
-   std::vector<PackagedService> DirectoryRegistry::resolve(std::span<const std::string> packages)
+   std::vector<PackagedService> DirectoryRegistry::resolve(
+       std::span<const std::string>   packages,
+       std::span<const AccountNumber> priorityServices)
    {
       std::vector<PackageInfo> index;
       {
@@ -454,8 +476,41 @@ namespace psibase
          std::map<std::string_view, bool> found;
          dfs(index, in, found, selected);
       }
+
+      // Make sure that packages containing the priority services are first
+      std::vector<const PackageInfo*> ordered;
+      {
+         std::map<std::string_view, bool> found;
+         for (const PackageInfo* package : selected)
+         {
+            for (auto account : package->accounts)
+            {
+               if (std::ranges::find(priorityServices, account) != priorityServices.end())
+               {
+                  if (auto [pos, inserted] = found.try_emplace(package->name, false); !inserted)
+                  {
+                     check(pos->second, "Cycle in service dependencies");
+                  }
+                  else
+                  {
+                     dfs(index, package->depends, found, ordered);
+                     ordered.push_back(package);
+                     pos->second = true;
+                  }
+                  break;
+               }
+            }
+         }
+         // The remaining packages are already in the correct order
+         for (const PackageInfo* package : selected)
+         {
+            if (found.find(package->name) == found.end())
+               ordered.push_back(package);
+         }
+      }
+
       std::vector<PackagedService> result;
-      for (const auto* package : selected)
+      for (const auto* package : ordered)
       {
          result.push_back(get(*package));
       }

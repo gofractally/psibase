@@ -533,7 +533,10 @@ class Node(API):
             self.tempdir.cleanup()
     def shutdown(self, force=False):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/shutdown', service='x-admin', json={"force":force}):
+        try:
+            with self.post('/shutdown', service='x-admin', json={"force":force}):
+                pass
+        except requests.exceptions.ConnectionError:
             pass
         self.session.close()
         try:

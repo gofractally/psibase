@@ -14,7 +14,7 @@ interface types {
     /// - `high`: access to data or functionality that can affect the user outside of your app
     ///    or involves other users (e.g., sending messages, updating keys, reading private user-data).
     ///    Using this level prompts the user if the caller lacks sufficient trust level.
-    /// - `max`: Too much risk to be called by anyone other than you're own app. Using this
+    /// - `max`: Too much risk to be called by anyone other than your own app. Using this
     ///    level will result in any caller except your own app being automatically denied.
     enum trust-level {
         none,
@@ -34,23 +34,22 @@ interface api {
     use host:types/types.{error};
     use types.{trust-level, descriptions};
 
-    /// When an app 'A' calls into an app 'B', and B calls into the permissions plugin to authorize the call,
-    ///   app A is known as the "caller" app. This plugin restricts callers so that they are either:
-    ///     * The currently active application, or
-    ///     * An explicitly set "allowed caller"
-    /// This function allows the active app to set the list of allowed callers.
-    /// It can only be called by the active app.
-    /// The list is stored permanently until deleted by the active app.
-    ///   To delete, the active app can call this function with an empty list.
-    ///
-    /// The intention behind this restriction is so that the user is only presented for requests to authorize
-    ///   apps with which they are familiar. That is why the active app is always whitelisted (the user is using
-    ///   the active app, and is therefore familiar with it). 
-    set-allowed-callers: func(callers: list<string>);
-
-    /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller`
-    ///     a sufficient permission level to use callee's plugin on the user's behalf. If the caller has insufficient 
-    ///     permission, this function will cause the user to be prompted to consider the request.
+    /// # Summary
+    /// 
+    /// Check if the user has granted the caller a sufficient trust level to access the callee's data/functionality.
+    /// 
+    /// # Terminology
+    /// 
+    /// - "user":   The currently logged in user of the active app.
+    /// - "caller": An app or plugin that makes a call to another app's plugin.
+    /// - "callee": An app that gets called into and uses this `is-authorized` function to check authorization.
+    /// - "trust level": How strongly the user should trust the caller, as defined by the callee.
+    /// 
+    /// # Details
+    /// 
+    /// The caller of this function (the "callee") wants to check if the user has granted the specified `caller` app
+    ///     a sufficient permission level to use callee's plugin. If the caller has insufficient permissions, this 
+    ///     function will attempt to prompt the user to consider the request.
     /// 
     /// On successful execution, the return value represents whether the user is authorized or not.
     /// 
@@ -63,9 +62,44 @@ interface api {
     ///   message to help track down the root cause.
     /// - `descriptions`: A list of descriptions that help the user know what capabilities they will be
     ///   granting the requesting application should they approve the request.
-    /// - `whitelist`: A list of accounts who are pre-authorized to perform this action.
+    /// - `whitelist`: A list of accounts that are pre-authorized to perform this action.
     ///   These accounts are not generally authorized at the specified `trust` level but will pass this check.
+    /// 
+    /// # Final Notes
+    /// 
+    /// Plugins not meant for white-labeling or embedding should simply assert that the caller is the expected 
+    /// sender (typically `host:common/client::get_sender()` == `host:common/client::get_receiver()`).
+    /// 
+    /// Plugins intended for embedding, however, often need to request user authorization (similar to OAuth) to permit 
+    /// interactions. This plugin provides a convenient way to handle such "OAuth-like" permission flows.
+    /// 
+    /// This plugin is not privileged or special; it only manages simple hierarchical user authorizations. For more 
+    /// complex or dynamic approval scenarios, a different or custom authorization plugin may be required.
     is-authorized: func(caller: string, level: trust-level, descriptions: descriptions, debug-label: string, whitelist: list<string>) -> result<bool, error>;
+
+    /// # Summary
+    /// 
+    /// This function allows the active app to set the list of allowed caller apps that may attempt to perform 
+    /// actions that result in user prompts for permission.
+    /// 
+    /// # Details
+    /// 
+    /// By using this plugin, the user may be tasked with defining how much they trust the caller app in a particular 
+    /// context. The user should only be given such a task when they are familiar with the caller app and are therefore
+    /// able to make an informed decision.
+    /// 
+    /// Therefore, by default this plugin restricts the caller app to:
+    /// - The currently active app, or
+    /// - The currently active app's defined list of "allowed caller" apps
+    /// 
+    /// This function allows the active app to manage such a set of apps that may attempt to perform actions that 
+    /// result in user prompts for permission.
+    /// 
+    /// # Lifetime
+    /// 
+    /// The list of allowed callers for a particular active app is stored permanently until deleted. The active
+    /// app can delete the list by calling this function with an empty list.
+    set-allowed-callers: func(callers: list<string>);
 }
 
 world imports {

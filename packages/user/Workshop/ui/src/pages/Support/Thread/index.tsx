@@ -5,7 +5,6 @@ import React from "react";
 
 import { LoadingBlock } from "@/components/LoadingBlock";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useCurrentThreadId } from "@/hooks/useCurrentThreadId";
 import { useMail } from "@/hooks/useMail";
@@ -14,6 +13,7 @@ import { createIdenticon } from "@/lib/createIdenticon";
 import { getThreadIdentifier } from "@/lib/createThreadIdentifier";
 import { Account } from "@/lib/zodTypes";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
