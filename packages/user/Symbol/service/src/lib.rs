@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};

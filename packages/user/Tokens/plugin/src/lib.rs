@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::str::FromStr;
 mod errors;
 use errors::ErrorType;
 
@@ -17,7 +16,6 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
-use psibase::AccountNumber;
 use psibase::{fracpack::Pack, services::tokens, FlagsType};
 pub mod query {
     pub mod fetch_token;
