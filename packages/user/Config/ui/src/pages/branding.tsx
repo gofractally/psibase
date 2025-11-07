@@ -11,8 +11,8 @@ import { useDraftLogo } from "@/hooks/use-draft-logo";
 import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
 import { useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
-import { useBranding } from "@/hooks/useBranding";
 
+import { useBranding } from "@shared/hooks/use-branding";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";

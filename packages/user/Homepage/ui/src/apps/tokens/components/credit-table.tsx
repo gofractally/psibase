@@ -7,11 +7,11 @@ import { useContacts } from "@/apps/contacts/hooks/use-contacts";
 import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
 
-import { GlowingCard } from "@/components/glowing-card";
 import { Loading } from "@/components/loading";
 
 import { Avatar } from "@shared/components/avatar";
 import { ErrorCard } from "@shared/components/error-card";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
