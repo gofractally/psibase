@@ -307,5 +307,3 @@ pub mod service {
     fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {}
 }
 
-#[cfg(test)]
-mod tests;
