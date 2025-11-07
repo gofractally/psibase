@@ -1,5 +1,5 @@
 [package]
-name = "profiles"
+name = "profiles"             # Crate name
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -7,14 +7,15 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-profiles"
-plugin = "plugin"
+plugin = "profiles-plugin"
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-psibase_macros = { version = "0.21.0", path = "../../../../rust/psibase_macros" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.120"
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.21.1" }
+profiles-pkg = { path = "..", version = "0.22.0" }

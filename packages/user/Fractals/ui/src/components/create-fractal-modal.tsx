@@ -9,14 +9,13 @@ import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { isAccountAvailable } from "@/hooks/use-account-status";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { useAppForm } from "./form/app-form";
 
 export const CreateFractalModal = ({
     show,

@@ -1,8 +1,6 @@
+use crate::bindings::*;
 use crate::errors::ErrorType::*;
-use crate::{bindings::*, InviteToken};
 
-use accounts::account_tokens::api::deserialize_token;
-use accounts::account_tokens::types::*;
 use host::types::types as CommonTypes;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Deserialize;
@@ -17,48 +15,56 @@ pub trait TryParseGqlResponse: Sized {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InviteRecordSubset {
-    pub invite_id: u32,
-    pub pubkey: String,
-    pub inviter: psibase::AccountNumber,
-    pub app: Option<psibase::AccountNumber>,
-    pub app_domain: Option<String>,
-    pub actor: psibase::AccountNumber,
-    pub expiry: String,
-    pub state: u8,
-    pub secret: Option<String>,
+pub struct FixedDetailsResponse {
+    pub secret: String,
+    pub expiryDate: String,
+}
+
+#[derive(Pack, Unpack)]
+pub struct FixedDetails {
+    pub expiry_date: String,
+    pub private_key: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Deserialize, Pack, Unpack)]
+pub struct CurrentDetailsResponse {
+    pub numAccounts: u16,
+}
+
+#[derive(Default, Pack, Unpack)]
+pub struct DeviceDetails {
+    // Whether this device created an account with this invite
+    pub account_created: bool,
+
+    // Whether the invite was accepted on this device
+    pub accepted: bool,
 }
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
-pub struct GetInviteResponse {
-    pub inviteById2: Option<InviteRecordSubset>,
+pub struct GetInviteResponse<T> {
+    pub inviteById: Option<T>,
 }
 
-impl TryParseGqlResponse for InviteRecordSubset {
+impl TryParseGqlResponse for FixedDetailsResponse {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
-        let response_root: ResponseRoot<GetInviteResponse> =
+        let response_root: ResponseRoot<GetInviteResponse<FixedDetailsResponse>> =
             serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
-        Ok(response_root.data.inviteById2.ok_or_else(|| {
-            QueryError("Unable to extract InviteRecordSubset from query response".to_string())
+        Ok(response_root.data.inviteById.ok_or_else(|| {
+            QueryError("Unable to extract SecretResponse from query response".to_string())
         })?)
     }
 }
 
-impl InviteToken {
-    pub fn from_encoded(token: &str) -> Result<Self, CommonTypes::Error> {
-        let invite_params =
-            deserialize_token(token).ok_or(DecodeInviteError("maybe incorrect token?"))?;
-
-        let invite_token = match invite_params {
-            Token::InviteToken(params) => params,
-            _ => {
-                return Err(DecodeInviteError("maybe incorrect token?").into());
-            }
-        };
-
-        Ok(invite_token)
+impl TryParseGqlResponse for CurrentDetailsResponse {
+    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+        let response_root: ResponseRoot<GetInviteResponse<CurrentDetailsResponse>> =
+            serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
+        Ok(response_root.data.inviteById.ok_or_else(|| {
+            QueryError("Unable to extract InviteValidResponse from query response".to_string())
+        })?)
     }
 }

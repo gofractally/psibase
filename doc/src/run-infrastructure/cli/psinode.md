@@ -6,13 +6,13 @@ psinode - The psibase blockchain server
 
 ## SYNOPSIS
 
-`psinode` [`-l` *port*] [`-p` *name*] [`-o` *host*] [*options*]\.\.\. *database*
+`psinode` *database* [`-l` *port*] [`-p` *name*] [`-o` *host*] [*options*]\.\.\.
 
 ## DESCRIPTION
 
 `psinode` runs a chain. It can optionally be a producer or a non-producer node on a chain. It also optionally hosts an http interface which provides RPC services, GraphQL services, and hosts web UIs. On-chain services define most of the http interface.
 
-*database* is a directory which will contain the chain database. `psinode` creates it if it does not already exist.
+*database* is a directory which will contain the chain database. `psinode` creates it if it does not already exist. The database directory must come before any other options.
 
 ## OPTIONS
 

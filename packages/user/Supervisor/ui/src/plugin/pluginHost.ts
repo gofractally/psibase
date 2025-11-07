@@ -101,7 +101,16 @@ export class PluginHost implements HostInterface {
                     xhr.setRequestHeader(name, value);
                 }
             }
-            xhr.send(req.body && req.body.val.length > 0 ? req.body.val : null);
+            xhr.send(
+                req.body && req.body.val.length > 0
+                    ? (req.body.val as string)
+                    : null,
+            );
+            if (xhr.status >= 400) {
+                if (xhr.response) {
+                    console.error(xhr.response);
+                }
+            }
             if (xhr.status === 500) {
                 throw this.recoverableError(
                     `Http request error: ${xhr.response}`,

@@ -8,8 +8,9 @@ world impl {
     include staged-tx:plugin/imports;
 
 
-    export user-guild;
     export admin-guild;
+    export admin-fractal;
+    export user-guild;
     export user-fractal;
     export user-eval;
 }

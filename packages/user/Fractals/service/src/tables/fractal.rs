@@ -6,7 +6,12 @@ use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalT
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl Fractal {
-    fn new(account: AccountNumber, name: String, mission: String) -> Self {
+    fn new(
+        account: AccountNumber,
+        name: String,
+        mission: String,
+        genesis_guild: AccountNumber,
+    ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
@@ -14,11 +19,18 @@ impl Fractal {
             created_at: now,
             mission,
             name,
+            judiciary: genesis_guild,
+            legislature: genesis_guild,
         }
     }
 
-    pub fn add(account: AccountNumber, name: String, mission: String) {
-        Self::new(account, name, mission).save();
+    pub fn add(
+        account: AccountNumber,
+        name: String,
+        mission: String,
+        genesis_guild: AccountNumber,
+    ) {
+        Self::new(account, name, mission, genesis_guild).save();
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {

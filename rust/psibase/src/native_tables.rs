@@ -24,6 +24,7 @@ pub const SCHEDULED_SNAPSHOT_TABLE: NativeTable = 12;
 pub const LOG_TRUNCATE_TABLE: NativeTable = 13;
 pub const SOCKET_TABLE: NativeTable = 14;
 pub const RUN_TABLE: NativeTable = 15;
+pub const HOST_CONFIG_TABLE: NativeTable = 17;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -301,6 +302,7 @@ impl SocketRow {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[repr(transparent)]
 pub struct RunMode(u8);
 
 impl RunMode {
@@ -333,5 +335,19 @@ impl RunRow {
     pub const DB: DbId = DbId::NativeSubjective;
     pub fn key(&self) -> (NativeTable, NativeIndex, u64) {
         (RUN_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.id)
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct HostConfigRow {
+    pub hostVersion: String,
+    pub config: String,
+}
+
+impl HostConfigRow {
+    pub const DB: DbId = DbId::NativeSession;
+    pub fn key(&self) -> (NativeTable, NativeIndex) {
+        (HOST_CONFIG_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }

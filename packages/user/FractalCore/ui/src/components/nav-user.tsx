@@ -11,12 +11,12 @@ import { useNavigate } from "react-router-dom";
 
 import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useLogout } from "@/hooks/use-logout";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import {
@@ -63,7 +63,7 @@ export function NavUser() {
     const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
         useConnectedAccounts();
 
-    const { mutateAsync: login } = useCreateConnectionToken();
+    const { mutateAsync: login } = useConnectAccount();
     const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
         useSelectAccount();
 

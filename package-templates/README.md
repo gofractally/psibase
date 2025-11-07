@@ -10,14 +10,14 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 # Install
 
-`cargo install cargo-generate@0.22.0`
+`cargo install cargo-generate`
 
 # Usage
 
 ## Instantiating the template
 
 From the root of the workspace, run:
-`cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v`
+`cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --allow-commands`
 
 This will run a CLI wizard to set up the new app in the `./packages/user/` directory.
 

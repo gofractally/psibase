@@ -42,7 +42,8 @@ void SocketAutoCloseSet::close(Writer&                           writer,
       for (const auto& socket : sockets)
       {
          socket->closed = true;
-         parent.sockets[static_cast<std::size_t>(socket->id)].reset();
+         if (!parent.stopped)
+            parent.sockets[static_cast<std::size_t>(socket->id)].reset();
       }
    }
    sockets.clear();

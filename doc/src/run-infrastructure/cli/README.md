@@ -12,7 +12,7 @@ A chain doesn't exist until it's booted. This procedure boots a chain suitable f
 ### Start psinode
 
 ```
-psinode -p prod my_psinode_db
+psinode my_psinode_db -p prod
 ```
 
 This will:
@@ -47,11 +47,10 @@ You may now interact with the chain using:
 ## Connecting to an existing chain
 
 ```
-psinode \
+psinode my_psinode_db             \
     --peer some_domain_or_ip:8080 \
     --listen 8080                 \
-    --host psibase.localhost      \
-    my_psinode_db
+    --host psibase.localhost
 ```
 
 This will:

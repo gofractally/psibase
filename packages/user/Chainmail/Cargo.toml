@@ -1,15 +1,3 @@
-[workspace]
-resolver = "2"
-members = ["service", "plugin"]
-
-[workspace.package]
-version = "0.21.1"
-rust-version = "1.64"
-edition = "2021"
-repository = "https://github.com/gofractally/psibase"
-homepage = "https://psibase.io"
-publish = false
-
 [package]
 name = "chainmail_package"
 description = "Message-sending application"
@@ -25,24 +13,18 @@ package-name = "Chainmail"
 services = ["chainmail"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.21.0"
-Supervisor = "0.21.0"
-Events = "0.21.0"
-SetCode = "0.21.0"
-Accounts = "0.21.0"
-CommonApi = "0.21.0"
-Sites = "0.21.0"
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
+HttpServer = "0.22.0"
+Supervisor = "0.22.0"
+Events = "0.22.0"
+SetCode = "0.22.0"
+Accounts = "0.22.0"
+CommonApi = "0.22.0"
+Sites = "0.22.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-chainmail = { path = "service", version = "0.21.1" }
-plugin = { path = "plugin", version = "0.21.1" }
+chainmail = { path = "service", version = "0.22.0" }
+chainmail-plugin = { path = "plugin", version = "0.22.0" }
+psibase-user-workspace-hack.workspace = true

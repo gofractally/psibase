@@ -425,7 +425,7 @@ pub mod service {
     #[action]
     fn credit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
         let creditor = get_sender();
-        SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount);
+        SharedBalance::get_or_new(creditor, debitor, token_id).credit(amount, memo.clone());
 
         Wrapper::emit().history().balChanged(
             token_id,

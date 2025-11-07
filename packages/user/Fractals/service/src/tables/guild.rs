@@ -56,7 +56,13 @@ impl Guild {
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
-        FractalMember::get_assert(fractal, rep).check_has_visa_or_citizenship();
+        // TODO: replace with auth-guild when available
+        AuthDelegate::call().newAccount(guild, get_sender());
+
+        check_some(
+            FractalMember::get(fractal, rep),
+            "rep must be a member of the fractal",
+        );
 
         let new_guild_instance = Self::new(fractal, guild, council, rep, display_name);
         new_guild_instance.save();

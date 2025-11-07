@@ -1,0 +1,19 @@
+[package]
+name = "diff-adjust"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-diff-adjust"
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+diff-adjust-pkg = { path = "..", version = "0.22.0" }

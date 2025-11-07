@@ -184,4 +184,13 @@ namespace psibase
    {
       return hostConfigKey();
    }
+
+   auto pendingShutdownKey() -> KeyPrefixType
+   {
+      return std::tuple{pendingShutdownTable, nativeTablePrimaryIndex};
+   }
+   auto PendingShutdownRow::key() const -> KeyPrefixType
+   {
+      return pendingShutdownKey();
+   }
 }  // namespace psibase

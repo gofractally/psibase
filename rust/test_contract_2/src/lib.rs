@@ -217,7 +217,6 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
                     "headers": [{"name": "", "value": ""}],
                     "host": "",
                     "method": "",
-                    "rootHost": "",
                     "target": ""
                 }
             }

@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -17,7 +17,7 @@ export const useCreateContact = () => {
         mutationFn: async (newContact: LocalContact) => {
             const parsed = zLocalContact.parse(newContact);
             void (await supervisor.functionCall({
-                service: Account.parse("profiles"),
+                service: zAccount.parse("profiles"),
                 method: "set",
                 intf: "contacts",
                 params: [parsed, false],
@@ -26,7 +26,7 @@ export const useCreateContact = () => {
         onMutate: () => ({ toastId: toast.loading("Creating contact...") }),
         onSuccess: (_, newContact, context) => {
             toast.success("Contact created", { id: context.toastId });
-            const username = Account.parse(
+            const username = zAccount.parse(
                 queryClient.getQueryData(QueryKey.currentUser()),
             );
             upsertUserToCache(username, newContact);

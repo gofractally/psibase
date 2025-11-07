@@ -9,6 +9,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 hex = "0.4"
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

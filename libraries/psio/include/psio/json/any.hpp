@@ -41,6 +41,12 @@ namespace psio
          }
 
          template <typename T>
+         T* get_if()
+         {
+            return std::get_if<T>(&_value);
+         }
+
+         template <typename T>
          const T& as() const
          {
             if (auto p = std::get_if<T>(&_value))

@@ -193,13 +193,13 @@ class Chain {
     }
 
     public async restart(): Promise<void> {
-        await postJson("/native/admin/shutdown", {
+        await postJson("/shutdown", {
             restart: true,
         });
     }
 
     public async shutdown(): Promise<void> {
-        await postJson("/native/admin/shutdown", {});
+        await postJson("/shutdown", {});
     }
 
     public async connect(config: { url: string }): Promise<any> {

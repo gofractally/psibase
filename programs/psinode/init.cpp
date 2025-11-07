@@ -68,7 +68,7 @@ void load_local_packages(TransactionContext& tc, const std::vector<PackagedServi
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
       }
 
-      std::string rootHost = "psibase";
+      std::string rootHost("", 1);
 
       for (auto [account, header] : package.data)
       {
@@ -77,7 +77,6 @@ void load_local_packages(TransactionContext& tc, const std::vector<PackagedServi
 
          requests.push_back(HttpRequest{
              .host        = account.str() + "." + rootHost,
-             .rootHost    = rootHost,
              .method      = "PUT",
              .target      = std::string(path),
              .contentType = std::string(mimeType),

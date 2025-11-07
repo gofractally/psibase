@@ -296,6 +296,19 @@ namespace psibase
          context.blockContext.db.setCallbackFlags(DatabaseCallbacks::hostConfigFlag);
       }
 
+      void verifyPendingShutdownRow(TransactionContext& context,
+                                    psio::input_stream  key,
+                                    psio::input_stream  value)
+      {
+         check(psio::fracpack_validate<PendingShutdownRow>({value.pos, value.end}),
+               "PendingShutdownRow has invalid format");
+         auto expected_key = psio::convert_to_key(pendingShutdownKey());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "PendingShutdownRow has incorrect key");
+         context.blockContext.db.setCallbackFlags(DatabaseCallbacks::shutdownFlag);
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -355,6 +368,8 @@ namespace psibase
             verifyEnvRow(key, value);
          else if (table == hostConfigTable)
             verifyHostConfigRow(context, key, value);
+         else if (table == pendingShutdownTable)
+            verifyPendingShutdownRow(context, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSubjective");
       }

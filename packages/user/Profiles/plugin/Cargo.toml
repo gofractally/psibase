@@ -1,16 +1,17 @@
 [package]
-name = "plugin"
+name = "profiles-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-profiles = { path = "../service/", version = "0.21.1" }
-psibase = { path = "../../../../rust/psibase/", version = "0.21.0" }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = { version = "1.0.125" }
-wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+profiles = { path = "../service/", version = "0.22.0" }
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wit-bindgen-rt.workspace = true
+psibase-user-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -30,4 +31,4 @@ world = "impl"
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.21.1" }
+profiles-pkg = { path = "..", version = "0.22.0" }

@@ -15,6 +15,7 @@ namespace psibase
       // If this returns true, double quotes, escape sequences,
       // comments, and env variables in the value will be processed.
       std::function<bool(std::string_view key)> expandValue = [](std::string_view) { return true; };
+      bool                                      allowUnregistered = false;
    };
 
    // Config file editor that attempts to preserve ordering and comments.

@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-evaluations"
-plugin = "plugin"
+plugin = "evaluations-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     # { sender = "evaluations", service = "evaluations", method = "init", rawData = "0000" },
@@ -15,12 +15,14 @@ postinstall = [
 ]
 
 [dependencies]
-psibase = { version = "0.21.0", path = "../../../../rust/psibase" }
-async-graphql = "=7.0.17"
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.120"
+psibase.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 rand = "0.9.1"
 ecies = { version = "0.2", default-features = false, features = ["pure"] }
 average = "0.16.0"
+serde-aux.workspace = true
+psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]

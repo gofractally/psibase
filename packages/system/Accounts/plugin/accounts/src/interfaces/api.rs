@@ -9,7 +9,7 @@ use psibase::AccountNumber;
 use psibase::services::accounts as AccountsService;
 use psibase::fracpack::Pack;
 use serde::Deserialize;
-
+use crate::trust::*;
 
 #[derive(Deserialize, Debug)]
 struct ResponseRoot {
@@ -54,10 +54,7 @@ impl API for AccountsPlugin {
     }
 
     fn set_auth_service(service_name: String) -> Result<(), Error> {
-        // Restrict to "homepage" app for now
-        if Client::get_sender() != "homepage" {
-            return Err(Unauthorized("set_auth_service can only be called by the homepage app").into());
-        }
+        assert_authorized_with_whitelist(FunctionName::set_auth_service, vec!["homepage".into()])?;
 
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
             .map_err(|_| InvalidAccountName(service_name))?;

@@ -602,15 +602,9 @@ struct HttpSocket : psibase::AutoCloseSocket
    {
       auto reply  = psio::view<const psibase::HttpReply>{data};
       auto status = reply.status().unpack();
-      switch (status)
-      {
-         case psibase::HttpStatus::ok:
-         case psibase::HttpStatus::notFound:
-            break;
-         default:
-            psibase::check(false, "HTTP response code not allowed: " +
-                                      std::to_string(static_cast<std::uint16_t>(status)));
-      }
+      auto code   = static_cast<std::uint16_t>(status);
+      psibase::check(code >= 100 && code <= 599,
+                     "HTTP response code not allowed: " + std::to_string(code));
       sendImpl(std::vector(data.begin(), data.end()));
    }
    void sendImpl(std::vector<char>&& reply)
@@ -1526,6 +1520,8 @@ struct callbacks
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
          case uint32_t(psibase::DbId::nativeSubjective):
+         case uint32_t(psibase::DbId::session):
+         case uint32_t(psibase::DbId::nativeSession):
             return {chain, (psibase::DbId)db};
          default:
             throw std::runtime_error("may not read this db, or must use another intrinsic");
@@ -1543,6 +1539,8 @@ struct callbacks
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
          case uint32_t(psibase::DbId::nativeSubjective):
+         case uint32_t(psibase::DbId::session):
+         case uint32_t(psibase::DbId::nativeSession):
             return {chain, (psibase::DbId)db};
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):

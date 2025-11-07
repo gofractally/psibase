@@ -28,17 +28,6 @@ export const useProducers = () => {
     });
 };
 
-export const useIsProducer = () => {
-    const { data } = useProducers();
-    const { data: config } = useConfig();
-
-    const producers = data?.map((producer) => producer.name);
-
-    if (!config || !producers) return undefined;
-
-    return producers.includes(config.producer);
-};
-
 /**
  * If the node is a producer, returns the producer object that represents itself. Otherwise, returns undefined.
  */

@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt.workspace = true
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

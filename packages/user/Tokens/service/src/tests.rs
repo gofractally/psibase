@@ -3,70 +3,19 @@
 #[cfg(test)]
 mod tests {
     use crate::Wrapper;
-    use psibase::services::tokens::Quantity;
+    use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
 
-    fn credit(
-        chain: &psibase::Chain,
-        token_id: u32,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-    ) -> ChainEmptyResult {
-        Wrapper::push_from(chain, creditor).credit(
-            token_id,
-            debitor,
-            amount,
-            "memo".to_string().try_into().unwrap(),
-        )
-    }
-
-    fn debit(
-        chain: &psibase::Chain,
-        token_id: u32,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: Quantity,
-    ) -> ChainEmptyResult {
-        Wrapper::push_from(chain, debitor).debit(
-            token_id,
-            creditor,
-            amount,
-            "debit".to_string().try_into().unwrap(),
-        )
-    }
+    const MANUAL_DEBIT: u8 = 0;
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
-        assert_eq!(result.trace.error.unwrap(), message);
-    }
-
-    fn get_balance(chain: &psibase::Chain, account: AccountNumber, token_id: u32) -> Quantity {
-        Wrapper::push(&chain)
-            .getBalance(token_id, account)
-            .get()
-            .unwrap()
-    }
-
-    fn assert_balance(
-        chain: &psibase::Chain,
-        account: AccountNumber,
-        token_id: u32,
-        balance: Quantity,
-    ) {
-        assert_eq!(get_balance(chain, account, token_id), balance)
-    }
-
-    fn assert_shared_balance(
-        chain: &psibase::Chain,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        token_id: u32,
-        balance: Quantity,
-    ) {
-        assert_eq!(
-            get_shared_balance(chain, token_id, creditor, debitor),
-            balance
-        )
+        let err = result.trace.error.unwrap();
+        let contains_error = err.contains(message);
+        assert!(
+            contains_error,
+            "Error \"{}\" does not contain: \"{}\"",
+            err, message
+        );
     }
 
     fn get_shared_balance(
@@ -87,63 +36,81 @@ mod tests {
 
         let alice = account!("alice");
         chain.new_account(alice).unwrap();
+        let a = Wrapper::push_from(&chain, alice);
 
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
+        let b = Wrapper::push_from(&chain, bob);
+        b.setUserConf(MANUAL_DEBIT, true);
 
         let malicious_mike = account!("mike");
         chain.new_account(malicious_mike).unwrap();
 
+        let memo = Memo::new("memo".to_string()).unwrap();
+
         // Alice cannot mint a token that does not yet exist.
-        assert_error(
-            Wrapper::push_from(&chain, alice).mint(
-                2,
-                12345.into(),
-                "memo".to_string().try_into().unwrap(),
-            ),
-            "service 'tokens' aborted with message: failed to find token",
-        );
+        assert_error(a.mint(2, 12345.into(), memo.clone()), "Token DNE");
 
         // Alice can create a new token
-        let token_id = Wrapper::push_from(&chain, alice)
-            .create(4.try_into().unwrap(), 80000.into())
-            .get()?;
+        let tid = a.create(4.try_into().unwrap(), 80000.into()).get()?;
 
         // Alice can mint a portion of the token supply;
-        assert_balance(&chain, alice, token_id, 0.into());
-        Wrapper::push_from(&chain, alice)
-            .mint(token_id, 12345.into(), format!("").try_into().unwrap())
-            .get()?;
-        assert_balance(&chain, alice, token_id, 12345.into());
-
-        chain.finish_block();
+        assert_eq!(0, a.getBalance(tid, alice).get().unwrap().value);
+        a.mint(tid, 12345.into(), memo.clone());
+        assert_eq!(12345, a.getBalance(tid, alice).get().unwrap().value);
 
         // Alice credits her entire balance to bob, with the entire amount in their shared balance.
-        credit(&chain, token_id, alice, bob, 12345.into()).get()?;
-        assert_balance(&chain, alice, token_id, 0.into());
-        assert_shared_balance(&chain, alice, bob, token_id, 12345.into());
+        a.credit(tid, bob, 12345.into(), memo.clone());
+        assert_eq!(0, a.getBalance(tid, alice).get().unwrap().value);
+        assert_eq!(12345, get_shared_balance(&chain, tid, alice, bob).value);
 
         // Bob can debit most of the balance, leaving 5 left.
-        debit(&chain, token_id, alice, bob, 12340.into()).get()?;
-        assert_balance(&chain, bob, token_id, 12340.into());
-        assert_shared_balance(&chain, alice, bob, token_id, 5.into());
+        b.debit(tid, alice, 12340.into(), memo.clone());
+        assert_eq!(12340, b.getBalance(tid, bob).get().unwrap().value);
+        assert_eq!(5, get_shared_balance(&chain, tid, alice, bob).value);
+
         // Bob cannot debit more than whats in the shared balance
         assert_error(
-            debit(&chain, token_id, alice, bob, 6.into()),
-            "unreachable: unreachable",
+            b.debit(tid, alice, 6.into(), memo.clone()),
+            "Insufficient token balance",
         );
-
-        debit(&chain, token_id, alice, bob, 5.into()).get()?;
-        assert_shared_balance(&chain, alice, bob, token_id, 0.into());
+        b.debit(tid, alice, 5.into(), memo.clone());
+        assert_eq!(0, get_shared_balance(&chain, tid, alice, bob).value);
 
         assert_error(
-            Wrapper::push_from(&chain, alice).mint(
-                token_id,
-                67656.into(),
-                "memo".to_string().try_into().unwrap(),
-            ),
-            "service 'tokens' aborted with message: over max issued supply",
+            a.mint(tid, 67656.into(), memo.clone()),
+            "Max issued supply exceeded",
         );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Tokens"))]
+    fn test_reject(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let memo = Memo::new("".to_string()).unwrap();
+
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+        let a = Wrapper::push_from(&chain, alice);
+
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+        let b = Wrapper::push_from(&chain, bob);
+
+        b.setUserConf(MANUAL_DEBIT, true);
+
+        let tid = a
+            .create(Precision::new(4).unwrap(), 100_0000.into())
+            .get()?;
+        a.mint(tid, 100.into(), memo.clone());
+
+        assert_eq!(100, a.getBalance(tid, alice).get()?.value);
+        a.credit(tid, bob, 100.into(), memo.clone()).get()?;
+        assert_eq!(0, a.getBalance(tid, alice).get()?.value);
+        assert_eq!(0, b.getBalance(tid, bob).get()?.value);
+        b.reject(tid, alice, memo.clone());
+        assert_eq!(100, a.getBalance(tid, alice).get()?.value);
+        assert_eq!(0, b.getBalance(tid, bob).get()?.value);
 
         Ok(())
     }
