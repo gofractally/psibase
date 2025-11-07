@@ -42,6 +42,10 @@ members = [
     "Tokens/service",
     "Tokens/plugin",
     "Tokens/query-service",
+    "AuthDyn",
+    "AuthDyn/service",
+    "AuthDyn/query-service",
+    "AuthDyn/plugin",
 ]
 
 exclude = [

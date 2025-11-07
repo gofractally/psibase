@@ -1,0 +1,15 @@
+[package]
+name = "r-auth-dyn"
+description = "RPC service for auth-dyn"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+auth-dyn = { path = "../service", version = "0.22.0" }
+async-graphql.workspace = true
+psibase-user-workspace-hack.workspace = true

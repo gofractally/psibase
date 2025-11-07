@@ -13,6 +13,7 @@
             "system/Accounts/ui",
             "system/AuthSig/ui",
             "system/Producers/ui",
+            "user/AuthDyn/ui",
             "user/Supervisor/ui",
             "user/Branding/ui",
             "user/Explorer/ui",
