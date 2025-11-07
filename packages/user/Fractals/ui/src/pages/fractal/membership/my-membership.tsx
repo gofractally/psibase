@@ -72,7 +72,7 @@ export const MyMembership = () => {
                 <h1 className="text-lg font-semibold">My membership</h1>
             </div>
             <div className="mt-3 space-y-6">
-                {isLoading ? (
+                {isLoading || !chainId ? (
                     <>
                         <Skeleton className="h-44 w-full rounded-xl" />
                         <Skeleton className="h-44 w-full rounded-xl" />

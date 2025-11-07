@@ -24,6 +24,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { CreateGuildModal } from "./modals/create-guild-modal";
 
@@ -59,12 +60,16 @@ export function GuildSwitcher() {
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                <img
-                                    className="size-4"
-                                    src={createIdenticon(
-                                        chainId + guildAccount,
-                                    )}
-                                />
+                                {chainId && guildAccount ? (
+                                    <img
+                                        className="size-4"
+                                        src={createIdenticon(
+                                            chainId + guildAccount,
+                                        )}
+                                    />
+                                ) : (
+                                    <Skeleton className="size-4 rounded-lg" />
+                                )}
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">

@@ -16,6 +16,7 @@ import { generateAvatar } from "@/lib/createIdenticon";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import {
     Table,
     TableBody,
@@ -97,14 +98,18 @@ export const PendingTransaction = () => {
                     <div className="flex justify-between pt-5">
                         <div>
                             <div className="flex items-center gap-2 py-1 text-sm">
-                                <Avatar className="h-6 w-6 rounded-sm">
-                                    <AvatarImage
-                                        src={generateAvatar(
-                                            chainId,
-                                            data.details.proposer,
-                                        )}
-                                    />
-                                </Avatar>
+                                {chainId && data.details.proposer ? (
+                                    <Avatar className="h-6 w-6 rounded-sm">
+                                        <AvatarImage
+                                            src={generateAvatar(
+                                                chainId,
+                                                data.details.proposer,
+                                            )}
+                                        />
+                                    </Avatar>
+                                ) : (
+                                    <Skeleton className="h-6 w-6 rounded-sm" />
+                                )}
                                 {data.details.proposer}
                             </div>
                             <div className="text-muted-foreground rounded-sm border px-1 font-mono text-sm italic">

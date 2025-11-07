@@ -76,11 +76,15 @@ const GuildOverviewCard = () => {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        <img
-                            src={createIdenticon(chainId + guild?.account)}
-                            alt={guild?.displayName || "Guild"}
-                            className="size-5"
-                        />
+                        {chainId && guild?.account ? (
+                            <img
+                                src={createIdenticon(chainId + guild?.account)}
+                                alt={guild?.displayName || "Guild"}
+                                className="size-5"
+                            />
+                        ) : (
+                            <Skeleton className="size-5 rounded-lg" />
+                        )}
                     </div>
                     <div>
                         <div className="text-xl font-semibold">
