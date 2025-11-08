@@ -249,7 +249,7 @@ mod service {
                     let excluded_conditions: Vec<String> = (0..excluded_cps.len())
                         .map(|_| "counter_party NOT LIKE ?".to_string())
                         .collect();
-                    conditions.push(format!("({})", excluded_conditions.join(" AND ")));
+                    conditions.push(format!("{}", excluded_conditions.join(" AND ")));
                     for cp in excluded_cps {
                         params.push(format!("%{}%", cp));
                     }
