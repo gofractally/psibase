@@ -1,5 +1,9 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{
+    check_some,
+    services::auth_dyn::interfaces::{DynamicAuthPolicy, SingleAuth},
+    AccountNumber, Table,
+};
 
 use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
@@ -55,6 +59,12 @@ impl Fractal {
                     ..=(self.account, AccountNumber::new(u64::MAX)),
             )
             .collect()
+    }
+
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
+        DynamicAuthPolicy::Single(SingleAuth {
+            authorizer: self.legislature,
+        })
     }
 }
 

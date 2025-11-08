@@ -117,51 +117,18 @@ pub mod service {
         GuildApplication::add(guild.account, get_sender(), extra_info);
     }
 
-    /// Set guild display name
+    /// Get policy action used by AuthDyn service.
     ///
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
     fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
-        if let Some(fractal) = Fractal::get(account) {
-            return Single(SingleAuth {
-                authorizer: fractal.legislature,
-            });
-        }
-        if let Some(guild) = Guild::get(account) {
-            if guild.rep.is_some() {
-                return Single(SingleAuth {
-                    authorizer: guild.rep_role,
-                });
-            } else {
-                return Single(SingleAuth {
-                    authorizer: guild.council_role,
-                });
-            }
-        }
-        if let Some(guild) = Guild::get_by_rep_role(account) {
-            // In the event that the role account shouldn't be used because the guild is in council mode
-            // Should this throw? Or should this return a policy that he couldnt use anyway?
-            return Single(SingleAuth {
-                authorizer: check_some(guild.rep, "guild does not allow representative use"),
-            });
-        }
-        if let Some(guild) = Guild::get_by_council_role(account) {
-            let authorizers: Vec<WeightedAuthorizer> = guild
-                .council_members()
-                .into_iter()
-                .map(|auth| WeightedAuthorizer {
-                    account: auth.member,
-                    weight: 1,
-                })
-                .collect();
-
-            return Multi(MultiAuth {
-                threshold: (authorizers.len() as u8 * 2 + 2) / 3,
-                authorizers,
-            });
-        }
-        abort_message("account not supported");
+        Fractal::get(account)
+            .map(|fractal| fractal.auth_policy())
+            .or(Guild::get(account).map(|guild| guild.guild_auth_policy()))
+            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_auth_policy()))
+            .or(Guild::get_by_council_role(account).map(|guild| guild.council_auth_policy()))
+            .unwrap_or_else(|| abort_message("account not supported"))
     }
 
     /// Set guild display name
