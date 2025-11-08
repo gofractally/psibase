@@ -11,12 +11,16 @@ pub mod Service {
     /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
         guild_account: AccountNumber,
         name: String,
         mission: String,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
     ) {
         unimplemented!()
     }
@@ -191,8 +195,16 @@ pub mod Service {
     /// * `fractal` - The account number of the fractal.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
+    fn create_guild(
+        fractal: AccountNumber,
+        guild_account: AccountNumber,
+        display_name: Memo,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
+    ) {
         unimplemented!()
     }
 

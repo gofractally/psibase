@@ -21,19 +21,13 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
+        #[primary_key]
         pub account: AccountNumber,
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
         pub legislature: AccountNumber,
         pub judiciary: AccountNumber,
-    }
-
-    impl Fractal {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
     }
 
     #[table(name = "FractalMemberTable", index = 1)]

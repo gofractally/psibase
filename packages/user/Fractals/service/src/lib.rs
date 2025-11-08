@@ -14,13 +14,10 @@ pub mod service {
     };
 
     use psibase::services::{
-        accounts, auth_delegate,
-        auth_dyn::interfaces::{DynamicAuthPolicy, MultiAuth, SingleAuth, WeightedAuthorizer},
-        sites, transact,
+        accounts, auth_delegate, auth_dyn::interfaces::DynamicAuthPolicy, sites, transact,
     };
     use psibase::*;
-    use psibase::{fracpack::Pack, services::accounts::Account, AccountNumber};
-    use DynamicAuthPolicy::{Multi, Single};
+    use psibase::{fracpack::Pack, AccountNumber};
 
     fn configure_new_fractal_account(fractal_account: AccountNumber) {
         accounts::Wrapper::call().newAccount(
@@ -74,6 +71,8 @@ pub mod service {
     /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
@@ -235,9 +234,15 @@ pub mod service {
             FractalMember::get(fractal, sender),
             "you are already a member",
         );
+        check_none(Fractal::get(sender), "a fractal cannot join a fractal");
+        check_none(Guild::get(sender), "a guild cannot join a fractal");
         check_none(
-            Fractal::get(sender),
-            "a fractal cannot join another fractal",
+            Guild::get_by_rep_role(sender),
+            "rep role account cannot join a fractal",
+        );
+        check_none(
+            Guild::get_by_council_role(sender),
+            "council role account cannot join a fractal",
         );
 
         FractalMember::add(fractal, sender, MemberStatus::Visa);
@@ -366,8 +371,8 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
-    /// * `display_name` - The display name of the guild.
-    /// * `display_name` - The display name of the guild.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
     fn create_guild(
         fractal: AccountNumber,
