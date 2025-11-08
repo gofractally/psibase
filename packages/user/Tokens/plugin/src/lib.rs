@@ -226,12 +226,16 @@ impl UserConfig for TokensPlugin {
 }
 
 impl Authorized for TokensPlugin {
-    fn graphql(query: String) -> String {
+    fn graphql(query: String) -> Result<String, Error> {
         // TODO: Delete the below check and replace with a permissions check.
         // Should be trust = high, with whitelist = "homepage"
-        assert!(client::get_sender() == "homepage", "Unauthorized");
+        let sender = client::get_sender();
+        assert!(
+            sender == client::get_receiver() || sender == "homepage",
+            "Unauthorized"
+        );
 
-        server::post_graphql_get_json(&query).expect("Failed to post graphql")
+        server::post_graphql_get_json(&query)
     }
 }
 

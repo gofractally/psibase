@@ -168,7 +168,7 @@ interface authorized {
     /// * `query` - GraphQL query to execute
     ///
     /// Returns the result of the query as a string.
-    graphql: func(query: string) -> string;
+    graphql: func(query: string) -> result<string, error>;
 }
 
 world imports {
