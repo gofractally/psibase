@@ -15,10 +15,10 @@ use Exports::{
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
 use psibase::AccountNumber;
 use psibase::{fracpack::Pack, services::tokens, FlagsType};
+use tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 pub mod query {
     pub mod fetch_token;
 }
@@ -31,12 +31,11 @@ psibase::define_trust! {
         Medium => "
         Medium trust grants these abilities:
             - Create new tokens
-            - Configure your balance preferences
+            - Configure balance and transfer preferences
         ",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Issue and manage token supply
-            - Manage token transfer settings
+            - Issue, configure, and manage token and token supply
             - Transfer tokens on your behalf
         ",
     }
