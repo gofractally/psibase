@@ -1,6 +1,9 @@
 use async_graphql::ComplexObject;
+use psibase::services::accounts::Wrapper as Accounts;
 use psibase::services::auth_delegate::Wrapper as AuthDelegate;
-use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table};
+use psibase::services::auth_dyn::Wrapper as AuthDyn;
+
+use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table, ToServiceSchema};
 
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
@@ -12,6 +15,8 @@ impl Guild {
         guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
     ) -> Self {
         Self {
             account: guild,
@@ -20,6 +25,8 @@ impl Guild {
             display_name,
             rep: Some(rep),
             description: "".to_string(),
+            council_role,
+            rep_role,
         }
     }
 
@@ -28,18 +35,35 @@ impl Guild {
         guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
         // TODO: replace with auth-guild when available
+
+        // Hang on, what about an Policy account setting a policy for accounts that don't want it?
+        // because at the moment, a policy
+
+        AuthDyn::call().set_policy(council_role, crate::Wrapper::SERVICE);
+        AuthDyn::call().set_policy(rep_role, crate::Wrapper::SERVICE);
+
         AuthDelegate::call().newAccount(guild, get_sender());
+        Accounts::call().newAccount(fractal_account, "auth-any".into(), true);
+
+        // First it goes to whales
+        // isAuthSys - uses get_policy which returns the representative role
+        // finds that Jake is in authorizers but not multi-auth authorizors.
+        // Loops through the multi-auth, which is the rep_role account
+        // Loops up the rep_role account, get_policy which returns jakes account
 
         check_some(
             FractalMember::get(fractal, rep),
             "rep must be a member of the fractal",
         );
 
-        let new_guild_instance = Self::new(fractal, guild, rep, display_name);
+        let new_guild_instance =
+            Self::new(fractal, guild, rep, display_name, council_role, rep_role);
         new_guild_instance.save();
 
         GuildMember::add(new_guild_instance.account, rep);
