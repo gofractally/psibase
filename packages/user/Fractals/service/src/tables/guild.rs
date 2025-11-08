@@ -40,13 +40,10 @@ impl Guild {
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
-        // TODO: replace with auth-guild when available
-
-        AuthDyn::call().createAccount(council_role);
-        AuthDyn::call().createAccount(rep_role);
-
-        AuthDyn::call().createAccount(guild);
-        // Accounts::call().newAccount(fractal_account, "auth-any".into(), true);
+        AuthDyn::call().newAccount(fractal);
+        AuthDyn::call().newAccount(council_role);
+        AuthDyn::call().newAccount(rep_role);
+        AuthDyn::call().newAccount(guild);
 
         // First it goes to whales
         // isAuthSys - uses get_policy which returns the representative role
@@ -69,6 +66,14 @@ impl Guild {
 
     pub fn get(account: AccountNumber) -> Option<Self> {
         GuildTable::read().get_index_pk().get(&account)
+    }
+
+    pub fn get_by_council_role(council: AccountNumber) -> Option<Self> {
+        GuildTable::read().get_index_by_council().get(&council)
+    }
+
+    pub fn get_by_rep_role(rep: AccountNumber) -> Option<Self> {
+        GuildTable::read().get_index_by_rep().get(&rep)
     }
 
     pub fn get_assert(account: AccountNumber) -> Self {

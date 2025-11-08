@@ -13,9 +13,14 @@ pub mod service {
         },
     };
 
-    use psibase::services::{accounts, auth_delegate, sites, transact};
+    use psibase::services::{
+        accounts, auth_delegate,
+        auth_dyn::interfaces::{DynamicAuthPolicy, MultiAuth, SingleAuth, WeightedAuthorizer},
+        sites, transact,
+    };
     use psibase::*;
     use psibase::{fracpack::Pack, services::accounts::Account, AccountNumber};
+    use DynamicAuthPolicy::{Multi, Single};
 
     fn configure_new_fractal_account(fractal_account: AccountNumber) {
         accounts::Wrapper::call().newAccount(
@@ -110,6 +115,53 @@ pub mod service {
             "must be a member of a fractal to apply for its guild",
         );
         GuildApplication::add(guild.account, get_sender(), extra_info);
+    }
+
+    /// Set guild display name
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+        if let Some(fractal) = Fractal::get(account) {
+            return Single(SingleAuth {
+                authorizer: fractal.legislature,
+            });
+        }
+        if let Some(guild) = Guild::get(account) {
+            if guild.rep.is_some() {
+                return Single(SingleAuth {
+                    authorizer: guild.rep_role,
+                });
+            } else {
+                return Single(SingleAuth {
+                    authorizer: guild.council_role,
+                });
+            }
+        }
+        if let Some(guild) = Guild::get_by_rep_role(account) {
+            // In the event that the role account shouldn't be used because the guild is in council mode
+            // Should this throw? Or should this return a policy that he couldnt use anyway?
+            return Single(SingleAuth {
+                authorizer: check_some(guild.rep, "guild does not allow representative use"),
+            });
+        }
+        if let Some(guild) = Guild::get_by_council_role(account) {
+            let authorizers: Vec<WeightedAuthorizer> = guild
+                .council_members()
+                .into_iter()
+                .map(|auth| WeightedAuthorizer {
+                    account: auth.member,
+                    weight: 1,
+                })
+                .collect();
+
+            return Multi(MultiAuth {
+                threshold: (authorizers.len() as u8 * 2 + 2) / 3,
+                authorizers,
+            });
+        }
+        abort_message("account not supported");
     }
 
     /// Set guild display name
