@@ -92,6 +92,8 @@ impl AdminFractal for FractallyPlugin {
             guild_account: guild_account.parse().unwrap(),
             name,
             mission,
+            council_role: "derp".into(),
+            rep_role: "derp2".into(),
         }
         .packed();
         add_action_to_transaction(
@@ -124,6 +126,8 @@ impl AdminGuild for FractallyPlugin {
             fractal: guild.fractal,
             display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
+            council_role: "x".into(),
+            rep_role: "dd".into(),
         }
         .packed();
 

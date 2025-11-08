@@ -42,14 +42,11 @@ impl Guild {
 
         // TODO: replace with auth-guild when available
 
-        // Hang on, what about an Policy account setting a policy for accounts that don't want it?
-        // because at the moment, a policy
+        AuthDyn::call().createAccount(council_role);
+        AuthDyn::call().createAccount(rep_role);
 
-        AuthDyn::call().set_policy(council_role, crate::Wrapper::SERVICE);
-        AuthDyn::call().set_policy(rep_role, crate::Wrapper::SERVICE);
-
-        AuthDelegate::call().newAccount(guild, get_sender());
-        Accounts::call().newAccount(fractal_account, "auth-any".into(), true);
+        AuthDyn::call().createAccount(guild);
+        // Accounts::call().newAccount(fractal_account, "auth-any".into(), true);
 
         // First it goes to whales
         // isAuthSys - uses get_policy which returns the representative role
