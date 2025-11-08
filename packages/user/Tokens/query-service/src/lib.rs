@@ -29,7 +29,9 @@ mod service {
         }
     }
 
-    struct Query;
+    struct Query {
+        user: Option<AccountNumber>,
+    }
 
     #[Object]
     impl Query {
@@ -64,6 +66,13 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
+
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
                 &user,
@@ -87,6 +96,13 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
+
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_debitor(),
                 &(user),
@@ -108,6 +124,13 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Balance>> {
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
+
             TableQuery::subindex::<u32>(
                 BalanceTable::with_service(tokens::SERVICE).get_index_pk(),
                 &(user),
@@ -127,6 +150,13 @@ mod service {
             token_id: String,
         ) -> async_graphql::Result<Balance> {
             let token_id = token_id_to_number(token_id);
+
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
 
             Ok(BalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -213,6 +243,13 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+            if self.user != Some(account) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    account
+                )));
+            }
+
             let precision = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&token_id)
@@ -283,9 +320,24 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
+        if get_sender() != AccountNumber::from("http-server") {
+            return Some(HttpReply {
+                status: HttpStatus::Unauthorized as u16,
+                contentType: "text/html".into(),
+                body: b"permission denied: tokens::serveSys only callable by 'http-server'"
+                    .to_vec()
+                    .into(),
+                headers: allow_cors_for_subdomains(&request, true),
+            });
+        }
+
         // Services graphql queries
-        None.or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_graphql(&request, Query { user }))
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
     }
