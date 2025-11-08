@@ -55,7 +55,6 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
             }
         } catch (e) {
             console.error("Error logging out or in: ", e);
-            alert("Error logging out or in: " + e);
         }
     };
 
