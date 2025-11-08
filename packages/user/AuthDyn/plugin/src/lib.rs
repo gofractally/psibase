@@ -17,7 +17,6 @@ define_trust! {
         High => "Set the policy service for an account",
     }
     functions {
-        Low => [],
         High => [set_policy],
     }
 }
