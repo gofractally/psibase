@@ -1065,7 +1065,8 @@ void load_tables(sqlite3* db, std::string_view sql)
    }
 }
 
-std::vector<char> REvents::sqlQuery(const std::string& squery)
+std::vector<char> REvents::sqlQuery(const std::string&              squery,
+                                    const std::vector<std::string>& params)
 {
    std::string_view query{squery};
    sqlite3*         db;
@@ -1096,6 +1097,14 @@ std::vector<char> REvents::sqlQuery(const std::string& squery)
          if (int err = sqlite3_prepare_v2(db, ptr, static_cast<int>(end - ptr), &stmt, &ptr))
          {
             abortMessage(std::string("sqlite3_prepare_v2: ") + sqlite3_errmsg(db));
+         }
+         for (std::size_t i = 0; i < params.size(); ++i)
+         {
+            if (int err = sqlite3_bind_text(stmt, static_cast<int>(i + 1), params[i].c_str(),
+                                            static_cast<int>(params[i].size()), SQLITE_TRANSIENT))
+            {
+               abortMessage(std::string("sqlite3_bind_text: ") + sqlite3_errmsg(db));
+            }
          }
          while (true)
          {
@@ -1142,7 +1151,7 @@ std::optional<HttpReply> REvents::serveSys(const HttpRequest& request)
       return {};
 
    return HttpReply{.contentType = "application/json",
-                    .body        = sqlQuery({request.body.begin(), request.body.end()})};
+                    .body        = sqlQuery({request.body.begin(), request.body.end()}, {})};
 }
 
 PSIBASE_DISPATCH(UserService::REvents)

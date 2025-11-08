@@ -226,33 +226,39 @@ mod service {
             let min_fixed = amount_min.as_deref().map(|s| to_fixed(s, precision));
             let max_fixed = amount_max.as_deref().map(|s| to_fixed(s, precision));
 
-            let mut conditions = vec![
-                format!("token_id = {}", token_id),
-                format!("account = '{}'", account),
-            ];
+            let mut conditions = vec![format!("token_id = {}", token_id)];
+            let mut params = Vec::new();
+
+            conditions.push("account = ?".to_string());
+            params.push(account.to_string());
 
             if let Some(cps) = &counter_parties {
                 if !cps.is_empty() {
-                    let cp_conditions: Vec<String> = cps
-                        .iter()
-                        .map(|cp| format!("counter_party LIKE '%{}%'", cp))
+                    let cp_conditions: Vec<String> = (0..cps.len())
+                        .map(|_| "counter_party LIKE ?".to_string())
                         .collect();
                     conditions.push(format!("({})", cp_conditions.join(" OR ")));
+                    for cp in cps {
+                        params.push(format!("%{}%", cp));
+                    }
                 }
             }
 
             if let Some(excluded_cps) = &excluded_counter_parties {
                 if !excluded_cps.is_empty() {
-                    let excluded_conditions: Vec<String> = excluded_cps
-                        .iter()
-                        .map(|cp| format!("counter_party NOT LIKE '%{}%'", cp))
+                    let excluded_conditions: Vec<String> = (0..excluded_cps.len())
+                        .map(|_| "counter_party NOT LIKE ?".to_string())
                         .collect();
                     conditions.push(format!("({})", excluded_conditions.join(" AND ")));
+                    for cp in excluded_cps {
+                        params.push(format!("%{}%", cp));
+                    }
                 }
             }
 
             if let Some(act) = &action {
-                conditions.push(format!("action = '{}'", act));
+                conditions.push("action = ?".to_string());
+                params.push(act.clone());
             }
 
             if let Some(min) = &min_fixed {
@@ -268,11 +274,12 @@ mod service {
             }
 
             if let Some(m) = &memo {
-                conditions.push(format!("memo LIKE '%{}%'", m));
+                conditions.push("memo LIKE ?".to_string());
+                params.push(format!("%{}%", m));
             }
 
             EventQuery::new("history.tokens.balChanged")
-                .condition(conditions.join(" AND "))
+                .condition_with_params(conditions.join(" AND "), params)
                 .first(first)
                 .last(last)
                 .before(before)

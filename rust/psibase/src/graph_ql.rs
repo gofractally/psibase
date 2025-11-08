@@ -431,6 +431,7 @@ impl<'de> Deserialize<'de> for SqlRow {
 pub struct EventQuery<T: DeserializeOwned + OutputType> {
     table_name: String,
     condition: Option<String>,
+    params: Vec<String>,
     first: Option<i32>,
     last: Option<i32>,
     before: Option<String>,
@@ -445,6 +446,7 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
         Self {
             table_name: format!("\"{}\"", table_name.into()),
             condition: None,
+            params: Vec::new(),
             first: None,
             last: None,
             before: None,
@@ -465,6 +467,20 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
     /// This replaces the current condition if one exists.
     pub fn condition(mut self, condition: impl Into<String>) -> Self {
         self.condition = Some(condition.into());
+        self.params.clear();
+        self
+    }
+
+    /// Add a SQL WHERE clause condition with parameters to filter results
+    ///
+    /// This replaces the current condition and parameters if they exist.
+    pub fn condition_with_params(
+        mut self,
+        condition: impl Into<String>,
+        params: Vec<String>,
+    ) -> Self {
+        self.condition = Some(condition.into());
+        self.params = params;
         self
     }
 
@@ -561,12 +577,13 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
         query
     }
 
-    fn sql_query(&self, query: String) -> String {
+    fn sql_query(&self, query: String, params: Vec<String>) -> String {
         if self.debug {
             println!("[EventQuery] SQL query str: {}", query);
+            println!("[EventQuery] SQL params: {:?}", params);
         }
 
-        let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query);
+        let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query, params);
 
         if self.debug {
             println!("[EventQuery] Raw JSON response: {}", json_str);
@@ -593,7 +610,7 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
             self.after.clone(),
         );
 
-        let json_str = self.sql_query(query);
+        let json_str = self.sql_query(query, self.params.clone());
         let mut rows: Vec<SqlRow> = serde_json::from_str(&json_str).unwrap_or_else(|e| {
             if self.debug {
                 println!("[EventQuery] Failed to deserialize rows: {}", e);

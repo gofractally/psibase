@@ -878,9 +878,9 @@ namespace psibase
 
    struct EventQueryInterface
    {
-      std::string sqlQuery(const std::string& squery);
+      std::string sqlQuery(const std::string& squery, const std::vector<std::string>& params);
    };
-   PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query))
+   PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query, params))
 
    template <typename T>
    struct SqlRow
@@ -922,6 +922,17 @@ namespace psibase
       EventQuery& condition(std::string cond)
       {
          _condition = std::move(cond);
+         _params.clear();
+         return *this;
+      }
+
+      /// Add a SQL WHERE clause condition with parameters to filter results
+      ///
+      /// This replaces the current condition and parameters if they exist.
+      EventQuery& condition_with_params(std::string cond, std::vector<std::string> params)
+      {
+         _condition = std::move(cond);
+         _params    = std::move(params);
          return *this;
       }
 
@@ -1037,7 +1048,7 @@ namespace psibase
          }
 
          auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
-         auto json_str  = sql_query(query_str, _debug);
+         auto json_str  = sql_query(query_str, _params, _debug);
          auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
 
          if (_debug)
@@ -1135,14 +1146,24 @@ namespace psibase
          return query;
       }
 
-      static std::string sql_query(const std::string& query, bool debug)
+      static std::string sql_query(const std::string&              query,
+                                   const std::vector<std::string>& params,
+                                   bool                            debug)
       {
          if (debug)
          {
             printf("[EventQuery] SQL query str: %s\n", query.c_str());
+            printf("[EventQuery] SQL params: [");
+            for (size_t i = 0; i < params.size(); ++i)
+            {
+               if (i > 0)
+                  printf(", ");
+               printf("\"%s\"", params[i].c_str());
+            }
+            printf("]\n");
          }
 
-         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query);
+         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
 
          if (debug)
          {
@@ -1154,6 +1175,7 @@ namespace psibase
 
       std::string                _table_name;
       std::optional<std::string> _condition;
+      std::vector<std::string>   _params;
       std::optional<int32_t>     _first;
       std::optional<int32_t>     _last;
       std::optional<std::string> _before;

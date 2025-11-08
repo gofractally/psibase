@@ -4,7 +4,7 @@ mod service {
     use crate::HttpRequest;
 
     #[action]
-    fn sqlQuery(query: String) -> String {
+    fn sqlQuery(query: String, params: Vec<String>) -> String {
         unimplemented!()
     }
 
