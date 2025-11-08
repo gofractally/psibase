@@ -1,6 +1,7 @@
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
+    use crate::services::auth_dyn::interfaces::DynamicAuthPolicy;
     use crate::AccountNumber;
     use crate::Memo;
 
@@ -205,6 +206,15 @@ pub mod Service {
         council_role: AccountNumber,
         rep_role: AccountNumber,
     ) {
+        unimplemented!()
+    }
+
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
         unimplemented!()
     }
 
