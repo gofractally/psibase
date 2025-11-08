@@ -16,10 +16,6 @@ interface admin {
 
     /// Get a list of auth accounts
     get-auth-services: func() -> result<list<string>, error>;
-
-    /// DEPRECATED
-    decode-connection-token: func(token: string) -> option<connection-token>;
-    login-direct: func(app: string, user: string);
 }
 
 interface prompt {
