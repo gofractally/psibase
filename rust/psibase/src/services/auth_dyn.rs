@@ -32,7 +32,7 @@ pub mod interfaces {
     }
 }
 
-#[crate::service(name = "auth-delegate", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "auth-dyn", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{
@@ -54,11 +54,6 @@ mod service {
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn getOwner(account: AccountNumber) -> AccountNumber {
         unimplemented!()
     }
 
