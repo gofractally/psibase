@@ -59,6 +59,16 @@ namespace
       return to<Transact>().checkFirstAuth(id, *trx.transaction);
    }
 
+   auto getChainId()
+   {
+      static const auto status =
+          psibase::Native::tables(psibase::KvMode::read).open<psibase::StatusTable>().get({});
+      check(status.has_value(), "Missing status record");
+      auto chainId = psio::to_hex(std::span<const char>(
+          reinterpret_cast<const char*>((status->chainId).data()), (status->chainId).size()));
+      return chainId;
+   }
+
 }  // namespace
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
@@ -1222,11 +1232,17 @@ namespace
 
    struct LoginTokenData
    {
+      std::string   iss;
       AccountNumber sub;
       std::string   aud;
       std::int64_t  exp;
    };
-   PSIO_REFLECT(LoginTokenData, sub, aud, exp)
+   PSIO_REFLECT(LoginTokenData, iss, sub, aud, exp)
+
+   bool didIssueJwt(const LoginTokenData& decoded)
+   {
+      return decoded.iss == getChainId();
+   }
 
    struct LoginReply
    {
@@ -1351,7 +1367,9 @@ std::string RTransact::login(std::string rootHost)
    auto sender = getSender();
    auto exp = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now() +
                                                                  std::chrono::days(30));
-   return encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
+   return encodeJWT(getJWTKey(), LoginTokenData{//
+                                                .iss = getChainId(),
+                                                .sub = sender,
                                                 .aud = std::move(rootHost),
                                                 .exp = exp.time_since_epoch().count()});
 }
@@ -1373,10 +1391,11 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
                         if (value.starts_with(prefix))
                         {
                            auto token   = value.substr(prefix.size());
-                           auto decoded = decodeJWT<LoginTokenData>(key, token);
-                           if (decoded.aud == rootHost && checkExp(decoded.exp))
+                           auto decoded = decodeJWT<LoginTokenData>(key, token, didIssueJwt);
+
+                           if (decoded && decoded->aud == rootHost && checkExp(decoded->exp))
                            {
-                              result = decoded.sub;
+                              result = decoded->sub;
                            }
                         }
                      });
@@ -1390,9 +1409,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    auto tokens = request.getCookie(cookieName);
    for (const auto& token : tokens)
    {
-      auto decoded = decodeJWT<LoginTokenData>(key, token);
-      if (decoded.aud == rootHost && checkExp(decoded.exp))
-         return decoded.sub;
+      auto decoded = decodeJWT<LoginTokenData>(key, token, didIssueJwt);
+      if (decoded && decoded->aud == rootHost && checkExp(decoded->exp))
+         return decoded->sub;
    }
    return {};
 }
@@ -1536,7 +1555,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          // Construct token
          auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
              std::chrono::system_clock::now() + std::chrono::days(30));
-         auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
+         auto                token = encodeJWT(getJWTKey(), LoginTokenData{//
+                                                                           .iss = getChainId(),
+                                                                           .sub = sender,
                                                                            .aud = std::string(rootHost(request)),
                                                                            .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json",
