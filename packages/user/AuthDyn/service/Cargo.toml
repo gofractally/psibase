@@ -9,9 +9,6 @@ publish.workspace = true
 server = "r-auth-dyn"
 plugin = "auth-dyn-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
-postinstall = [
-    { sender = "auth-dyn", service = "auth-dyn", method = "init", data = {} },
-]
 
 [dependencies]
 psibase.workspace = true
