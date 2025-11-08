@@ -32,13 +32,13 @@ fn do_post_internal(
     with_credentials: bool,
 ) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
-    let query_auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
-    let headers = if query_auth_token.is_none() {
+    let auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
+    let headers = if auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
         make_headers(&[
             ("Content-Type", &ty),
-            ("Authorization", &query_auth_token.unwrap()),
+            ("Authorization", &format!("Bearer {}", auth_token.unwrap())),
         ])
     };
     let request = HttpRequest {
@@ -67,13 +67,13 @@ fn do_post_with_credentials(
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
-    let query_auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
-    let headers = if query_auth_token.is_none() {
+    let auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
+    let headers = if auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {
         make_headers(&[
             ("Accept", "application/json"),
-            ("Authorization", &query_auth_token.unwrap()),
+            ("Authorization", &format!("Bearer {}", auth_token.unwrap())),
         ])
     };
     Ok(HttpRequest {
@@ -108,13 +108,7 @@ impl Admin for HostCommon {
 
 impl Server for HostCommon {
     fn post_graphql_get_json(graphql: String) -> Result<String, Error> {
-        let res = HttpRequest {
-            uri: format!("{}/{}", HostCommon::get_app_url(caller()), "graphql"),
-            method: "POST".to_string(),
-            headers: make_headers(&[("Content-Type", "application/graphql")]),
-            body: Some(BridgeTypes::BodyTypes::Text(graphql)),
-        }
-        .send()?;
+        let res = do_post(caller(), "graphql".to_string(), BodyTypes::Graphql(graphql))?;
 
         if let Some(BridgeTypes::BodyTypes::Json(body)) = res.body {
             let json: serde_json::Value =

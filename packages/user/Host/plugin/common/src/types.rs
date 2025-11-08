@@ -27,6 +27,7 @@ impl From<BridgeTypes::BodyTypes> for BodyTypes {
             BridgeTypes::BodyTypes::Text(t) => BodyTypes::Text(t),
             BridgeTypes::BodyTypes::Bytes(b) => BodyTypes::Bytes(b),
             BridgeTypes::BodyTypes::Json(j) => BodyTypes::Json(j),
+            BridgeTypes::BodyTypes::Graphql(g) => BodyTypes::Graphql(g),
         }
     }
 }
@@ -37,6 +38,7 @@ impl From<BodyTypes> for BridgeTypes::BodyTypes {
             BodyTypes::Text(t) => BridgeTypes::BodyTypes::Text(t),
             BodyTypes::Bytes(b) => BridgeTypes::BodyTypes::Bytes(b),
             BodyTypes::Json(j) => BridgeTypes::BodyTypes::Json(j),
+            BodyTypes::Graphql(g) => BridgeTypes::BodyTypes::Graphql(g),
         }
     }
 }
@@ -47,6 +49,7 @@ impl BodyTypes {
             BodyTypes::Bytes(_) => ("application/octet-stream".to_string(), self.clone().into()),
             BodyTypes::Json(_) => ("application/json".to_string(), self.clone().into()),
             BodyTypes::Text(_) => ("text/plain".to_string(), self.clone().into()),
+            BodyTypes::Graphql(_) => ("application/graphql".to_string(), self.clone().into()),
         }
     }
 }

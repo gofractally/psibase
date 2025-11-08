@@ -16,6 +16,7 @@ interface types {
         bytes(list<u8>),
         json(string),
         text(string),
+        graphql(string),
     }
 
     record header {
