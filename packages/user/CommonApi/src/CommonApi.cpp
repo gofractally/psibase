@@ -101,25 +101,13 @@ namespace SystemService
       {
          if (request.target == "/common/thisservice")
          {
-            psibase::writeConsole("[CommonApi] thisservice: entry, host=" + request.host + "\n");
-            auto rootHost = to<HttpServer>().rootHost(request.host);
-            psibase::writeConsole("[CommonApi] thisservice: rootHost=" + rootHost + "\n");
+            auto        rootHost = to<HttpServer>().rootHost(request.host);
             std::string serviceName;
             if (request.host.size() > rootHost.size() + 1 && request.host.ends_with(rootHost) &&
                 request.host[request.host.size() - rootHost.size() - 1] == '.')
-            {
                serviceName.assign(request.host.begin(), request.host.end() - rootHost.size() - 1);
-               psibase::writeConsole(
-                   "[CommonApi] thisservice: extracted serviceName=" + serviceName + "\n");
-            }
             else
-            {
                serviceName = HttpServer::homepageService.str();
-               psibase::writeConsole(
-                   "[CommonApi] thisservice: using homepageService=" + serviceName + "\n");
-            }
-            psibase::writeConsole("[CommonApi] thisservice: returning serviceName=" + serviceName +
-                                  "\n");
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
