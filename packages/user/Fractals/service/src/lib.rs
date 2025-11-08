@@ -123,12 +123,14 @@ pub mod service {
     /// * `account` - Account being checked.
     #[action]
     fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
-        Fractal::get(account)
-            .map(|fractal| fractal.auth_policy())
-            .or(Guild::get(account).map(|guild| guild.guild_auth_policy()))
-            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_auth_policy()))
-            .or(Guild::get_by_council_role(account).map(|guild| guild.council_auth_policy()))
-            .unwrap_or_else(|| abort_message("account not supported"))
+        check_some(
+            Fractal::get(account)
+                .map(|fractal| fractal.auth_policy())
+                .or(Guild::get(account).map(|guild| guild.guild_auth()))
+                .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
+                .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth())),
+            "account not supported",
+        )
     }
 
     /// Set guild display name

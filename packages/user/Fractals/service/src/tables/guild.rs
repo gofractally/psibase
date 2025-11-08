@@ -1,12 +1,11 @@
 use async_graphql::ComplexObject;
-use psibase::services::accounts::Wrapper as Accounts;
-use psibase::services::auth_delegate::Wrapper as AuthDelegate;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
 
 use psibase::services::auth_dyn::interfaces::{
-    DynamicAuthPolicy, MultiAuth, SingleAuth, WeightedAuthorizer,
+    DynamicAuthPolicy::{self, Multi, Single},
+    MultiAuth, SingleAuth, WeightedAuthorizer,
 };
-use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table, ToServiceSchema};
+use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
@@ -123,21 +122,21 @@ impl Guild {
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
 
-    pub fn guild_auth_policy(&self) -> DynamicAuthPolicy {
-        DynamicAuthPolicy::Single(SingleAuth {
+    pub fn guild_auth(&self) -> DynamicAuthPolicy {
+        Single(SingleAuth {
             authorizer: self.rep.map(|_| self.rep_role).unwrap_or(self.council_role),
         })
     }
 
-    pub fn rep_auth_policy(&self) -> DynamicAuthPolicy {
+    pub fn rep_role_auth(&self) -> DynamicAuthPolicy {
         // In the event that the role account shouldn't be used because the guild is in council mode
         // Should this throw? Or should this return a policy that he couldnt use anyway?
-        DynamicAuthPolicy::Single(SingleAuth {
+        Single(SingleAuth {
             authorizer: check_some(self.rep, "guild does not allow representative use"),
         })
     }
 
-    pub fn council_auth_policy(&self) -> DynamicAuthPolicy {
+    pub fn council_role_auth(&self) -> DynamicAuthPolicy {
         let authorizers: Vec<WeightedAuthorizer> = self
             .council_members()
             .into_iter()
@@ -147,7 +146,7 @@ impl Guild {
             })
             .collect();
 
-        DynamicAuthPolicy::Multi(MultiAuth {
+        Multi(MultiAuth {
             threshold: (authorizers.len() as u8 * 2 + 2) / 3,
             authorizers,
         })
