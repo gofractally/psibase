@@ -33,11 +33,37 @@ impl GuildApplication {
             .get(&(guild, member))
     }
 
+    pub fn applications_by_member(member: AccountNumber) -> Vec<Self> {
+        GuildApplicationTable::read()
+            .get_index_by_member()
+            .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
+            .collect()
+    }
+
+    pub fn remove_all_by_member(member: AccountNumber) {
+        let table = GuildApplicationTable::read_write();
+        for application in GuildApplication::applications_by_member(member) {
+            table.remove(&application);
+        }
+    }
+
     pub fn get_assert(guild: AccountNumber, member: AccountNumber) -> Self {
         check_some(Self::get(guild, member), "guild application does not exist")
     }
 
     pub fn conclude(&self, accepted: bool) {
+        if accepted {
+            GuildMember::add(self.guild, self.member);
+        }
+
+        self.remove()
+    }
+
+    pub fn cancel(&self) {
+        self.remove()
+    }
+
+    fn remove(&self) {
         let table = GuildAttestTable::read_write();
 
         table
@@ -50,14 +76,6 @@ impl GuildApplication {
                 table.remove(&attest);
             });
 
-        if accepted {
-            GuildMember::add(self.guild, self.member);
-        }
-
-        self.remove()
-    }
-
-    fn remove(&self) {
         GuildApplicationTable::read_write().remove(&self);
     }
 

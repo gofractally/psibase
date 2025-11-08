@@ -8,6 +8,7 @@ mod errors;
 mod queries;
 mod serde_structs;
 
+use crate::trust::*;
 use bindings::accounts::plugin as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
@@ -22,6 +23,27 @@ use psibase::AccountNumber;
 use queries::{get_msg_by_id, query_messages_endpoint};
 use serde_structs::TempMessageForDeserGqlResponse;
 
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "
+        Medium trust grants these abilities:
+            - Archive chainmail messages
+            - Save chainmail messages
+        ",
+        High => "
+        High trust grants the abilities of all lower trust levels, plus these abilities:
+            - Send chainmail messages
+        ",
+    }
+    functions {
+        None => [get_msgs, get_archived_msgs, get_saved_msgs],
+        Low => [],
+        Medium => [archive, save],
+        High => [send],
+    }
+}
+
 struct ChainmailPlugin;
 
 fn get_unix_time_from_iso8601_str(dt_str: String) -> Result<i64, Error> {
@@ -32,6 +54,8 @@ fn get_unix_time_from_iso8601_str(dt_str: String) -> Result<i64, Error> {
 
 impl Api for ChainmailPlugin {
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::send, vec![receiver.clone()])?;
+
         Transact::add_action_to_transaction(
             "send",
             &chainmail::action_structs::send {
@@ -45,6 +69,8 @@ impl Api for ChainmailPlugin {
     }
 
     fn archive(msg_id: u64) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::archive, vec!["workshop".into()])?;
+
         Transact::add_action_to_transaction(
             "archive",
             &chainmail::action_structs::archive { msg_id }.packed(),
@@ -53,6 +79,8 @@ impl Api for ChainmailPlugin {
     }
 
     fn save(msg_id: u64) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::save, vec!["workshop".into()])?;
+
         let msg = get_msg_by_id(msg_id)?;
 
         Transact::add_action_to_transaction(

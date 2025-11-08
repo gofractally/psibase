@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -30,14 +31,13 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { useAccountLookup } from "./hooks/useAccountLookup";
 import { useAccountSelector } from "./hooks/useAccountSelector";
 import { useConnectedAccounts } from "./hooks/useConnectedAccounts";
-import { useCreateConnectionToken } from "./hooks/useCreateConnectionToken";
 import { usePublicToPrivate } from "./hooks/usePrivateFromPublicKey";
 import { modifyUrlParams } from "./lib/modifyUrlParams";
 
 const ModalState = z.enum(["Off", "Warn", "Show"]);
 
 export const AccountSelection = () => {
-    const { data: connectionToken } = useCreateConnectionToken();
+    const { mutate: login } = useConnectAccount();
 
     const onReveal = () => {
         setModalState(warnUser ? "Warn" : "Show");
@@ -48,14 +48,7 @@ export const AccountSelection = () => {
 
     const { selectedAccount, setSelectedAccount } = useAccountSelector(
         availableAccounts,
-        () => {
-            window.location.href = modifyUrlParams(
-                siblingUrl(undefined, "accounts"),
-                {
-                    token: connectionToken!,
-                },
-            );
-        },
+        login,
     );
 
     const { data: account } = useAccountLookup(selectedAccount);

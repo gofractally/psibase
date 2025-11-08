@@ -865,6 +865,7 @@ dependencies = [
  "async-graphql",
  "diff-adjust-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
@@ -2390,6 +2391,7 @@ dependencies = [
  "async-graphql",
  "diff-adjust",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
 ]

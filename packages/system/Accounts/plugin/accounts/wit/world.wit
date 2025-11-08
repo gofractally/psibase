@@ -24,6 +24,11 @@ interface active-app {
     /// The user may only log in to accounts that have been connected.
     get-connected-accounts: func() -> result<list<string>, error>;
 
+    /// Called to connect an account to the active app
+    connect-account: func() -> result<_, error>;
+
+
+    /// DEPRECATED!
     /// Create a connection token. This is passed to the `accounts` login page to allow it to link 
     /// a new account to your app.
     create-connection-token: func() -> result<string, error>;

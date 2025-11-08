@@ -2,74 +2,57 @@ package invite:plugin;
 
 interface types {
 
-    enum invite-state {
-        pending,
-        accepted,
-        rejected
-    }
-
     /// This is the information tracked about an invite.
     /// 
     /// Fields:
     /// * `inviter` - The account responsible for generating the invite
-    /// * `app` - The app responsible for generating the invite
-    /// * `app_domain` - The domain of the app responsible for generating the invite
-    /// * `state` - The state of the invite
-    /// * `actor` - The name of the account to most recently accept or reject the invite
     /// * `expiry` - The UTC timestamp of the invite's expiration
-    /// 
-    /// Other notes:
-    /// `actor` is useful primarily for displaying information about an invite that has already been
-    ///    used.
     record invite {
         inviter: string,
-        app: option<string>,
-        app-domain: string,
-        state: invite-state,
-        actor: string,
         expiry: string,
     }
 
     type url = string;
+
+    record new-invite-details {
+        invite-id: u32,
+        invite-key: list<u8>,
+        encrypted-secret: string,
+    }
+    type invite-token = string;
+    type pubkey-der = list<u8>;
 }
 
-// interface admin {
-//     use host:types/types.{error};
-
-//     // Restricts the accounts that are able to create invites to those 
-//     // that exist in the whitelist.
-//     // 
-//     // This method may only be called by the service account on which the 
-//     // invite service is deployed.
-//     set-whitelist: func(accounts: list<string>) -> result<_, error>;
-
-//     // Prevents accounts that are in the blacklist from creating accounts.
-//     // 
-//     // This method may only be called by the service account on which the 
-//     // invite service is deployed.
-//     set-blacklist: func(accounts: list<string>) -> result<_, error>;
-// }
 
 /// Functionality exposed for the inviter
 interface inviter {
     use host:types/types.{error};
+    use types.{invite-token, new-invite-details};
 
     /// Allows a user to generate an invite token that can be used to 
     /// invite someone (with or without a preexisting account) to an 
     /// application.
     /// 
     /// Successful return value:
-    ///  * The invite token that was created. This token can
-    ///    be sent to a user to invite them to the app.
-    generate-invite: func() -> result<string, error>;
+    ///  * `invite-token` - This token can be imported on another device to redeem the invite.
+    generate-invite: func() -> result<invite-token, error>;
+
+    /// Will prepare the information necessary to generate a new invite, but will 
+    /// not actually generate it. This is used when an app wants to control the invite 
+    /// creation in more detail, for example by creating the invite server-side and 
+    /// registering the creator service to receive hooks when the invite gets updated.
+    ///
+    /// Returns:
+    /// * `invite-token` - should be kept private, can be used to accept the invite
+    /// * `new-invite-details` - Contains values that should be used when calling `create-invite`
+    ///   on the invite service in order to correctly correspond to the `invite-token`.
+    prepare-new-invite: func() -> result<tuple<invite-token, new-invite-details>, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
-    /// from the database. An invite can be deleted regardless of whether it has been
-    /// accepted, rejected, or is still pending.
+    /// from the database.
     /// 
     /// Parameters
-    /// * `token`: The token that was generated during the creation of the 
-    /// invite.
+    /// * `token`: The token that was generated during the creation of the invite.
     delete-invite: func(token: string) -> result<_, error>;
 }
 
@@ -80,53 +63,25 @@ interface invitee {
 
     use types.{invite};
 
-    /// Retrieves details about the invite from the invite token.
+    /// Imports the invite token
     /// 
-    /// Parameters: 
-    /// * `token`: The token that was generated during the creation of the 
-    /// invite.
-    decode-invite: func(token: string) -> result<invite, error>;
+    /// This will make the invite available for the active application.
+    /// When an invite is available, the next account connected to the
+    ///   active application will "accept" the invite.
+    /// Invites also usually allow the accepter to create a new account if 
+    ///   they don't yet have one.
+    import-invite-token: func(token: string) -> result<u32, error>;
 
-    /// Creates a new account and accepts the specified invite with it.
-    /// 
-    /// Parameters
-    /// * `account`: The name of the new account being created
-    /// * `token`: The token of the invite being accepted
-    accept-with-new-account: func(account: string, token: string) -> result<_, error>;
+    /// Returns whether or not an invite is available for the active application
+    is-active-invite: func() -> bool;
 
-    /// Accepts an invite with an existing account (the currently logged-in account).
-    /// 
-    /// Parameters
-    /// * `token`: The token of the invite being accepted
-    accept: func(token: string) -> result<_, error>;
-
-    /// Rejects an invite. Once an invite is rejected, it cannot be accepted or used to
-    /// create a new account.
-    /// 
-    /// Parameters
-    /// * `token`: The token of the invite being rejected
-    reject: func(token: string) -> result<_, error>;
-}
-
-interface adv-types {
-    // DER encoded
-    record inv-keys {
-        pub-key: list<u8>,
-        priv-key: list<u8>,
-    }
-}
-
-interface advanced {
-    use types.{invite};
-    use host:types/types.{error};
-    use adv-types.{inv-keys};
-
-    /// Deserializes an invite token into just the creator app + private key
-    deserialize: func(token: string) -> result<inv-keys, error>;
+    /// If there is an invite available for the active application, reject it.
+    /// This will make it unavailable on this device unless and until it 
+    ///   is re-imported.
+    reject-active-invite: func();
 }
 
 world imports {
-    import advanced;
     import inviter;
     import invitee;
 }

@@ -5,6 +5,7 @@
 #include <psibase/time.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/Transact.hpp>
+#include "psibase/MethodNumber.hpp"
 
 namespace SystemService
 {
@@ -29,6 +30,7 @@ namespace SystemService
       /// Parameters:
       /// - `pubkey`: The credential public key
       /// - `expires`: The number of seconds until the credential expires
+      /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
       ///
       /// This action is meant to be called inline by another service.
       /// The caller service is the credential issuer.
@@ -36,7 +38,8 @@ namespace SystemService
       /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
       /// that matches the specified public key.
       uint32_t create(SystemService::AuthSig::SubjectPublicKeyInfo pubkey,
-                      std::optional<uint32_t>                      expires);
+                      std::optional<uint32_t>                      expires,
+                      const std::vector<psibase::MethodNumber>&    allowed_actions);
 
       /// Looks up the credential used to sign the active transaction, and consumes it.
       /// Can only be called by the credential's issuer.
@@ -61,7 +64,7 @@ namespace SystemService
       method(init),
       method(canAuthUserSys, user),
       method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-      method(create, pubkey, expires),
+      method(create, pubkey, expires, allowed_actions),
       method(consume_active),
       method(get_active),
       method(get_pubkey, id),

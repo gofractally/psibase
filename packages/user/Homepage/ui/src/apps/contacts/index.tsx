@@ -1,12 +1,12 @@
 import { AppConfigType } from "@/configuredApps";
 import { BookUser } from "lucide-react";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import { ContactsPage } from "./page";
 
 export const contactsConfig: AppConfigType = {
-    service: Account.parse("contacts"),
+    service: zAccount.parse("contacts"),
     name: "Contacts",
     description: "Manage your contacts.",
     icon: <BookUser className="h-6 w-6" />,

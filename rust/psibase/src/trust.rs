@@ -11,6 +11,9 @@
 ///
 /// Valid trust levels are: [None, Low, Medium, High, Max]
 ///
+/// Descriptions can only be provided for Low, Medium, and High trust levels, since these are the only levels
+/// that trigger user prompts.
+///
 /// Example usage:
 /// ```rust,ignore
 /// psibase::define_trust! {

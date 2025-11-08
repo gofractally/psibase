@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 #[allow(warnings)]
 mod bindings;
 use bindings::*;
@@ -6,271 +8,245 @@ mod errors;
 use errors::ErrorType::*;
 
 mod types;
+use chrono::{DateTime, Utc};
 use types::*;
 
 mod db;
 use db::*;
 
-use accounts::{
-    account_tokens::{api::serialize_token, types::*},
-    plugin as Accounts,
-};
-
 use aes::plugin as aes;
-use auth_invite::plugin::intf as AuthInvite;
 use base64::plugin as base64;
-use bindings::invite::plugin::types::{Invite, InviteState};
-use chrono::{DateTime, SecondsFormat};
+use bindings::invite::plugin::types::NewInviteDetails;
+use credentials::plugin::api as Credentials;
 use exports::{
-    invite::{
-        self,
-        plugin::advanced::{Guest as Advanced, InvKeys as InviteKeys},
-    },
+    invite::{self},
     transact_hook_actions_sender::Guest as HookActionsSender,
 };
-use hex;
 use host::common::{client as Client, server as Server};
 use host::crypto::keyvault;
 use host::types::types as HostTypes;
-use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
+use invite::plugin::{
+    invitee::Guest as Invitee, inviter::Guest as Inviter, redemption::Guest as Redemption,
+};
+use psibase::define_trust;
 use psibase::{
     fracpack::Pack,
+    services::credentials::CREDENTIAL_SENDER,
     services::invite::{self as InviteService, action_structs::*},
 };
-use rand::Rng;
+use rand::{rngs::OsRng, Rng, TryRngCore};
 use transact::plugin::{hooks::*, intf as Transact};
 
-/* TODO:
-    /// This doesn't need to be exposed, it can just be jammed into various plugin functions
-    /// when the user is submitting another action anyways.
-    /// Used by anyone to garbage collect expired invites. Up to 'maxDeleted' invites
-    /// can be deleted by calling this action
-    void delExpired(uint32_t maxDeleted);
-*/
+use crate::{
+    bindings::credentials::plugin::types::Credential,
+    trust::{
+        assert_authorized, assert_authorized_with_whitelist, is_authorized,
+        is_authorized_with_whitelist,
+    },
+};
 
-fn rand_bytes(nr_bytes: u32) -> Vec<u8> {
-    let mut result = vec![0u8; nr_bytes as usize];
-    let mut rng = rand::rng();
-    rng.fill(&mut result[..]);
-    result
+define_trust! {
+    descriptions {
+        Low => "
+        Low trust grants these abilities:
+            - Delete previously created invites
+            - Reject active invites
+        ",
+        Medium => "Medium trust grants all the abilities of low trust, plus these abilities:
+            - Generate new invites
+        ",
+        High => "",
+    }
+    functions {
+        None => [import_invite_token, prepare_new_invite, is_active_invite],
+        Low => [delete_invite, reject_active_invite],
+        Medium => [generate_invite],
+        High => [],
+    }
 }
 
 struct InvitePlugin;
 
-fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, HostTypes::Error> {
-    let id = token.id;
-
-    if let Some(invite) = InvitesTable::get_invite(id) {
-        return Ok(invite);
-    }
-
-    let query = format!(
-        r#"query {{
-            inviteById2(secondaryId: "{id}") {{
-                inviteId,
-                pubkey,
-                inviter,
-                app,
-                appDomain,
-                actor,
-                expiry,
-                state,
-                secret,
-            }}
-        }}"#,
-        id = id
+fn create_secret(private_data: &[u8]) -> (Vec<u8>, String) {
+    let mut key = [0u8; 16];
+    OsRng.try_fill_bytes(&mut key).unwrap();
+    let encrypted = aes::with_key::encrypt(
+        &aes::types::Key {
+            strength: aes::types::Strength::Aes128,
+            key_data: key.to_vec(),
+        },
+        private_data,
     );
-    let invite = InviteRecordSubset::from_gql(Server::post_graphql_get_json(&query)?)?;
-    InvitesTable::add_invite(id, &invite);
-    Ok(invite)
+
+    (key.to_vec(), base64::standard::encode(&encrypted))
+}
+
+fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
+    let mut data = invite_id.to_le_bytes().to_vec();
+    data.extend_from_slice(&symmetric_key);
+    assert!(data.len() == 20, "encryption key must be 16 bytes");
+    base64::url::encode(data.as_slice())
 }
 
 impl Invitee for InvitePlugin {
-    fn accept_with_new_account(account: String, token: String) -> Result<(), HostTypes::Error> {
-        let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
-            return Err(InvalidAccount(&account));
-        })?;
+    fn import_invite_token(token: String) -> Result<u32, HostTypes::Error> {
+        if !is_authorized(trust::FunctionName::import_invite_token)? {
+            return Err(Unauthorized().into());
+        }
+        let imported = InviteTokensTable::import(token);
+        if imported.is_none() {
+            return Err(InviteNotValid().into());
+        }
+        Ok(imported.unwrap())
+    }
 
-        if Accounts::api::get_account(&account)?.is_some() {
-            return Err(AccountExists("accept_with_new_account").into());
+    /// Returns whether or not an invite from someone is active for the caller
+    /// application
+    fn is_active_invite() -> bool {
+        assert_authorized(trust::FunctionName::is_active_invite).unwrap();
+        InviteTokensTable::active_invite_id().is_some()
+    }
+
+    /// If there is an active invite, reject it
+    fn reject_active_invite() {
+        assert_authorized_with_whitelist(
+            trust::FunctionName::reject_active_invite,
+            vec![Client::get_active_app()],
+        )
+        .unwrap();
+
+        InviteTokensTable::reject_active();
+    }
+}
+
+fn use_active_invite() {
+    hook_actions_sender();
+
+    let cred_private_key = InviteTokensTable::active_credential_key().unwrap();
+    let cred_public_key = keyvault::pub_from_priv(&cred_private_key).unwrap();
+
+    Credentials::sign_latch(&Credential {
+        p256_pub: keyvault::to_der(&cred_public_key).unwrap(),
+        p256_priv: keyvault::to_der(&cred_private_key).unwrap(),
+    });
+}
+
+impl Redemption for InvitePlugin {
+    fn get_active_invite() -> Option<bool> {
+        assert!(Client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+
+        let token = InviteTokensTable::active_invite_id();
+        if token.is_none() {
+            return None;
         }
 
-        hook_actions_sender();
-
-        AuthInvite::notify(&token)?;
-
-        let invite_token = InviteToken::from_encoded(&token)?;
-        let invite = fetch_and_decode(&invite_token)?;
-
-        let account_keypair = keyvault::generate_unmanaged_keypair()?;
-        // TODO: add UI to save private key to password manager
-        keyvault::import_key(&account_keypair.private_key)?;
-
-        Transact::add_action_to_transaction(
-            acceptCreate::ACTION_NAME,
-            &acceptCreate {
-                inviteId: invite.invite_id,
-                acceptedBy: accepted_by,
-                newAccountKey: keyvault::to_der(&account_keypair.public_key)?.into(),
-            }
-            .packed(),
-        )?;
-
-        InvitesTable::delete_invite(invite_token.id);
-
-        Ok(())
+        Some(InviteTokensTable::active_can_create_account())
     }
 
-    fn accept(token: String) -> Result<(), HostTypes::Error> {
-        let invite_token = InviteToken::from_encoded(&token)?;
-        let invite = fetch_and_decode(&invite_token)?;
+    fn create_new_account(account: String) -> String {
+        assert!(Client::get_sender() == psibase::services::accounts::SERVICE.to_string());
 
-        AuthInvite::notify(&token)?;
+        assert!(
+            InviteTokensTable::active_can_create_account(),
+            "Active invite token cannot be used to create an account"
+        );
 
-        Transact::add_action_to_transaction(
-            accept::ACTION_NAME,
-            &accept {
-                inviteId: invite.invite_id,
-            }
-            .packed(),
-        )?;
+        use_active_invite();
 
-        InvitesTable::delete_invite(invite_token.id);
-
-        Ok(())
-    }
-
-    fn reject(token: String) -> Result<(), HostTypes::Error> {
-        let invite_token = InviteToken::from_encoded(&token)?;
-        let invite = fetch_and_decode(&invite_token)?;
-
-        hook_actions_sender();
-
-        AuthInvite::notify(&token)?;
+        let new_account_keys = keyvault::generate_unmanaged_keypair().unwrap();
+        let new_acc_pubkey = keyvault::import_key(&new_account_keys.private_key).unwrap();
 
         Transact::add_action_to_transaction(
-            reject::ACTION_NAME,
-            &reject {
-                inviteId: invite.invite_id,
+            createAccount::ACTION_NAME,
+            &createAccount {
+                account: psibase::AccountNumber::from_exact(&account).unwrap(),
+                accountKey: keyvault::to_der(&new_acc_pubkey).unwrap().into(),
             }
             .packed(),
-        )?;
+        )
+        .unwrap();
 
-        InvitesTable::delete_invite(invite_token.id);
+        InviteTokensTable::account_created();
 
-        Ok(())
+        new_account_keys.private_key
     }
 
-    fn decode_invite(token: String) -> Result<Invite, HostTypes::Error> {
-        let invite_token = InviteToken::from_encoded(&token)?;
-        let invite = fetch_and_decode(&invite_token)?;
+    fn accept() {
+        assert!(Client::get_sender() == psibase::services::accounts::SERVICE.to_string());
 
-        let expiry = DateTime::parse_from_rfc3339(&invite.expiry)
-            .map_err(|_| DatetimeError("decode_invite"))?
-            .to_rfc3339_opts(SecondsFormat::Millis, true);
-        let state = match invite.state {
-            0 => InviteState::Pending,
-            1 => InviteState::Accepted,
-            2 => InviteState::Rejected,
-            _ => {
-                return Err(InvalidInviteState("decode_invite").into());
-            }
+        use_active_invite();
+
+        let Some(inviteId) = InviteTokensTable::active_invite_id() else {
+            println!("No active invite token");
+            return;
         };
 
-        let app = invite.app.map(|app| app.to_string());
+        Transact::add_action_to_transaction(accept::ACTION_NAME, &accept { inviteId }.packed())
+            .unwrap();
 
-        let app_domain = if invite.app_domain.is_none() {
-            if app.is_none() {
-                return Err(InvalidInvite("decode_invite").into());
-            } else {
-                Client::get_app_url(&app.clone().unwrap())
-            }
-        } else {
-            invite.app_domain.unwrap().to_string()
-        };
-
-        Ok(Invite {
-            inviter: invite.inviter.to_string(),
-            app,
-            app_domain,
-            state: state,
-            actor: invite.actor.to_string(),
-            expiry,
-        })
+        InviteTokensTable::accepted();
     }
 }
 
 impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, HostTypes::Error> {
-        let keypair = keyvault::generate_unmanaged_keypair()?;
+        if !is_authorized_with_whitelist(
+            trust::FunctionName::generate_invite,
+            vec!["homepage".into()],
+        )? {
+            return Err(Unauthorized().into());
+        }
+        let (invite_token, details) = Self::prepare_new_invite()?;
 
-        let seed = rand_bytes(8);
-        let pub_b64 = base64::standard::encode(&keyvault::to_der(&keypair.public_key)?);
-        let encrypted_private_key =
-            aes::with_password::encrypt(&seed, keypair.private_key.as_bytes(), &pub_b64);
-        let encrypted_private_key_hex = hex::encode(&encrypted_private_key);
-
-        let sender = Client::get_sender();
-        let app =
-            psibase::AccountNumber::from_exact(&sender).map_err(|_| InvalidAccount(&sender))?;
-
-        let id: u32 = rand::rng().random();
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
             &createInvite {
-                inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
-                secondaryId: Some(id),
-                secret: Some(encrypted_private_key_hex),
-                app: Some(app),
-                appDomain: Some(Client::get_app_url(&sender)),
+                id: details.invite_id,
+                inviteKey: details.invite_key.into(),
+                numAccounts: 1,
+                useHooks: false,
+                secret: details.encrypted_secret,
             }
             .packed(),
         )?;
 
-        let seed_u64 = u64::from_le_bytes(seed.as_slice().try_into().unwrap());
-        let invite_token = InviteToken { pk: seed_u64, id };
+        Ok(invite_token)
+    }
 
-        Ok(serialize_token(&Token::InviteToken(invite_token)))
+    fn prepare_new_invite() -> Result<(String, NewInviteDetails), HostTypes::Error> {
+        if !is_authorized(trust::FunctionName::prepare_new_invite)? {
+            return Err(Unauthorized().into());
+        }
+        let keypair = keyvault::generate_unmanaged_keypair()?;
+        let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
+
+        let invite_id: u32 = rand::rng().random();
+        let invite_token = encode_invite_token(invite_id, symmetric_key);
+
+        Ok((
+            invite_token,
+            NewInviteDetails {
+                invite_id,
+                invite_key: keyvault::to_der(&keypair.public_key)?,
+                encrypted_secret: secret,
+            },
+        ))
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {
-        let invite_token = InviteToken::from_encoded(&token)?;
-        let invite = fetch_and_decode(&invite_token)?;
+        if !is_authorized(trust::FunctionName::delete_invite)? {
+            return Err(Unauthorized().into());
+        }
+        let decoded = InviteTokensTable::decode_invite_token(token)?;
         Transact::add_action_to_transaction(
             delInvite::ACTION_NAME,
             &delInvite {
-                inviteId: invite.invite_id,
+                inviteId: decoded.0,
             }
             .packed(),
         )?;
 
         Ok(())
-    }
-}
-
-impl Advanced for InvitePlugin {
-    fn deserialize(token: String) -> Result<InviteKeys, HostTypes::Error> {
-        let invite_token = InviteToken::from_encoded(&token)?;
-        let invite = fetch_and_decode(&invite_token)?;
-
-        let encrypted_private_key_hex = invite
-            .secret
-            .ok_or_else(|| DecodeInviteError("No secret in invite record"))?;
-        let encrypted_private_key = hex::decode(&encrypted_private_key_hex).unwrap();
-
-        let pub_b64 = base64::standard::encode(&keyvault::to_der(&invite.pubkey)?);
-        let private_key_pem_bytes = aes::with_password::decrypt(
-            &invite_token.pk.to_le_bytes(),
-            &encrypted_private_key,
-            &pub_b64,
-        )?;
-        let private_key_pem = String::from_utf8(private_key_pem_bytes)
-            .map_err(|_| DecodeInviteError("Failed to decode encrypted private key"))?;
-
-        Ok(InviteKeys {
-            pub_key: keyvault::to_der(&keyvault::pub_from_priv(&private_key_pem)?)?,
-            priv_key: keyvault::to_der(&private_key_pem)?,
-        })
     }
 }
 
@@ -279,10 +255,8 @@ impl HookActionsSender for InvitePlugin {
         service: String,
         method: String,
     ) -> Result<Option<String>, HostTypes::Error> {
-        if service == InviteService::SERVICE.to_string()
-            && (method == acceptCreate::ACTION_NAME || method == reject::ACTION_NAME)
-        {
-            return Ok(Some(InviteService::PAYER_ACCOUNT.to_string()));
+        if service == InviteService::SERVICE.to_string() && method == createAccount::ACTION_NAME {
+            return Ok(Some(CREDENTIAL_SENDER.to_string()));
         }
 
         Ok(None)

@@ -1,13 +1,13 @@
 import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
 
 import {
-    useCreateConnectionToken,
     useCurrentAccounts,
     useCurrentUser,
     useLogout,
     useSelectAccount,
 } from "@/hooks";
 
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Avatar, AvatarFallback } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -23,9 +23,14 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export function AccountSwitcher() {
-    const { mutateAsync: onLogin } = useCreateConnectionToken();
+    const { mutateAsync: onLogin } = useConnectAccount({
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
 
     const { data: loggedInUser } = useCurrentUser();
     const isLoggedIn = !!loggedInUser;
@@ -87,11 +92,7 @@ export function AccountSwitcher() {
                     </DropdownMenuItem>
                 )}
                 {!isNoOptions && !otherConnectedAccounts.length ? (
-                    <DropdownMenuItem
-                        onClick={() => {
-                            onLogin();
-                        }}
-                    >
+                    <DropdownMenuItem onClick={() => onLogin()}>
                         <UserPlus className="mr-2 h-4 w-4" />
                         <span>Switch account</span>
                     </DropdownMenuItem>
@@ -112,9 +113,9 @@ export function AccountSwitcher() {
                                     {otherConnectedAccounts.map((account) => (
                                         <DropdownMenuItem
                                             key={account}
-                                            onClick={() => {
-                                                selectAccount(account);
-                                            }}
+                                            onClick={() =>
+                                                selectAccount(account)
+                                            }
                                         >
                                             <User className="mr-2 h-4 w-4" />
                                             <span>{account}</span>
@@ -123,11 +124,7 @@ export function AccountSwitcher() {
                                     {otherConnectedAccounts.length ? (
                                         <DropdownMenuSeparator />
                                     ) : null}
-                                    <DropdownMenuItem
-                                        onClick={() => {
-                                            onLogin();
-                                        }}
-                                    >
+                                    <DropdownMenuItem onClick={() => onLogin()}>
                                         <PlusCircle className="mr-2 h-4 w-4" />
                                         <span>More...</span>
                                     </DropdownMenuItem>

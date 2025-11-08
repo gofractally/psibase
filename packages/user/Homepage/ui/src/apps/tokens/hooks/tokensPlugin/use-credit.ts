@@ -1,0 +1,70 @@
+import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
+
+import QueryKey from "@/lib/queryKeys";
+import { zAccount } from "@/lib/zod/Account";
+
+import { updateUserTokenBalancesCache } from "./use-user-token-balances";
+
+const Args = z.object({
+    tokenId: z.string(),
+    amount: z.string(),
+    memo: z.string().default(""),
+    receiver: zAccount,
+});
+
+export const useCredit = (user: string | null) => {
+    return useMutation<void, Error, z.infer<typeof Args>>({
+        mutationKey: ["credit"],
+        mutationFn: (vars) => {
+            const { receiver, amount, memo, tokenId } = Args.parse(vars);
+
+            // Optimistically update the balance
+            updateUserTokenBalancesCache(
+                zAccount.parse(user),
+                tokenId,
+                amount,
+                "Subtract",
+            );
+
+            return supervisor.functionCall({
+                service: "tokens",
+                plugin: "plugin",
+                intf: "user",
+                method: "credit",
+                params: [tokenId, receiver, amount, memo],
+            });
+        },
+        onSuccess: (_data, vars, _result, context) => {
+            const parsedUser = zAccount.parse(user);
+            // Invalidate queries to update the token balance
+            context.client.invalidateQueries({
+                queryKey: QueryKey.userTokenBalances(parsedUser),
+            });
+
+            // Invalidate queries to update the recent transactions table
+            context.client.invalidateQueries({
+                queryKey: QueryKey.userTokenBalanceChanges(
+                    parsedUser,
+                    Number(vars.tokenId),
+                ),
+            });
+
+            // Invalidate queries to update the pending transactions table
+            context.client.invalidateQueries({
+                queryKey: QueryKey.userLinesOfCredit(parsedUser),
+            });
+        },
+        onError: (_error, vars) => {
+            // Rollback optimistic update on error
+            updateUserTokenBalancesCache(
+                zAccount.parse(user),
+                vars.tokenId,
+                vars.amount,
+                "Add",
+            );
+        },
+    });
+};

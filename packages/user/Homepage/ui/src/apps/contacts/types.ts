@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export const zLocalContact = z.object({
-    account: Account,
+    account: zAccount,
     nickname: z.string().optional(),
     email: z.string().optional(),
     phone: z.string().optional(),

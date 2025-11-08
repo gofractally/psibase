@@ -4,4 +4,4 @@ export * from "./messaging";
 export * from "./utils";
 export * from "./prompts";
 
-export { getSupervisor, type Supervisor } from "./supervisor";
+export { getSupervisor, type Supervisor, type AutoRedirectConfig } from "./supervisor";

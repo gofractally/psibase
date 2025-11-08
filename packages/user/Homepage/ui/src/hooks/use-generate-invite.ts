@@ -19,7 +19,7 @@ export const useGenerateInvite = () =>
             );
 
             const res = modifyUrlParams(
-                siblingUrl(undefined, "accounts", null, false),
+                siblingUrl(undefined, null, "invite", false),
                 {
                     token,
                 },

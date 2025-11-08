@@ -8,4 +8,5 @@ plugin_error! {
     QueryError(msg: String) => "Graphql query error: {msg}",
     DeserializationError(msg: String) => "Deserialization error: {msg}",
     NotConnected(user: String) => "User {user} is not connected to this app",
+    CannotCreateAccount() => "Cannot create account",
 }

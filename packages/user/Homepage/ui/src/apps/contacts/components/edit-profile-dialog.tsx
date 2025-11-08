@@ -2,11 +2,12 @@ import { Trash, Upload } from "lucide-react";
 
 import { FormProfile } from "@/components/form-profile";
 
-import { useAvatar } from "@/hooks/use-avatar";
 import { useCacheBust } from "@/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
+import { Avatar } from "@shared/components/avatar";
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogDescription } from "@shared/shadcn/ui/dialog";
 import { DialogTitle } from "@shared/shadcn/ui/dialog";
@@ -64,7 +65,7 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
         }
     };
 
-    const { avatarSrc, type } = useAvatar(currentUser);
+    const { avatarSrc, type } = useAvatar({ account: currentUser });
     const removeImage = async () => {
         await removeAvatar();
     };
@@ -74,10 +75,11 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
             <DialogTitle>Edit profile</DialogTitle>
             <DialogDescription>All information is public.</DialogDescription>
             <div className="flex items-center justify-between space-x-4">
-                <img
+                <Avatar
+                    account={currentUser || ""}
                     src={avatarSrc}
+                    className="h-24 w-24 transition-opacity duration-200"
                     alt={`Avatar of ${currentUser}`}
-                    className={`h-24 w-24 rounded-lg object-cover transition-opacity duration-200 ${isUploadingAvatar || isRemovingAvatar ? "opacity-50" : ""}`}
                 />
                 <div className="flex flex-1 flex-col justify-center gap-2">
                     <div>

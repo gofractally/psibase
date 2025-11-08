@@ -1,5 +1,3 @@
-"use client"
-
 import * as React from "react"
 import {
   ChevronDownIcon,
@@ -9,7 +7,7 @@ import {
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "@shared/lib/utils"
-import { Button, buttonVariants } from "shared-ui/shadcn/ui/button"
+import { Button, buttonVariants } from "@shared/shadcn/ui/button"
 
 function Calendar({
   className,

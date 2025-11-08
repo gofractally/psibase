@@ -13,7 +13,7 @@
         "@dicebear/core": "^9.2.2",
         "@hookform/resolvers": "^5.1.1",
         "@psibase/common-lib": "workspace:*",
-        "@tanstack/react-query": "^5.52.0",
+        "@tanstack/react-query": "^5.90.6",
         "@uidotdev/usehooks": "^2.4.1",
         "dayjs": "^1.11.13",
         "humanize-duration": "^3.32.1",

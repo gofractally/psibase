@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export const useCanExportAccount = (account?: string | null) =>
     useQuery({
@@ -15,13 +15,13 @@ export const useCanExportAccount = (account?: string | null) =>
                 plugin: "plugin",
                 intf: "api",
                 method: "getAccount",
-                params: [Account.parse(account)],
+                params: [zAccount.parse(account)],
             });
 
             const accountInfo = z
                 .object({
                     accountNum: z.string(),
-                    authService: Account,
+                    authService: zAccount,
                     resourceBalance: z.bigint(),
                 })
                 .parse(response);

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export type GetCurrentUserRes = string | null;
 
@@ -16,7 +16,7 @@ export const queryFn = async () => {
         service: "accounts",
         intf: "api",
     });
-    return res ? Account.parse(res) : null;
+    return res ? zAccount.parse(res) : null;
 };
 
 export const useCurrentUser = () =>
@@ -26,8 +26,10 @@ export const useCurrentUser = () =>
         staleTime: 60000,
     });
 
-export const setCurrentUser = (accountName: z.infer<typeof Account> | null) => {
+export const setCurrentUser = (
+    accountName: z.infer<typeof zAccount> | null,
+) => {
     queryClient.setQueryData(QueryKey.currentUser(), () =>
-        accountName === null ? null : Account.parse(accountName),
+        accountName === null ? null : zAccount.parse(accountName),
     );
 };

@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 import { createIdenticon } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -37,7 +37,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { data: connectedAccounts } = useConnectedAccounts();
 
     const isNoOptions = connectedAccounts.length == 0;
-    const { mutate: login, isPending } = useCreateConnectionToken();
+    const { mutate: login, isPending } = useConnectAccount();
     const { mutateAsync: selectAccount, isPending: isConnectingToAccount } =
         useSelectAccount();
 
@@ -100,9 +100,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
                         {isNoOptions ? (
                             <Button
                                 disabled={isPending}
-                                onClick={() => {
-                                    login();
-                                }}
+                                onClick={() => login()}
                             >
                                 Login
                             </Button>

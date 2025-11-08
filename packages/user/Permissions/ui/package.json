@@ -10,7 +10,7 @@
     },
     "dependencies": {
         "@psibase/common-lib": "workspace:*",
-        "@tanstack/react-query": "^5.62.8",
+        "@tanstack/react-query": "^5.90.6",
         "lucide-react": "^0.475.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",

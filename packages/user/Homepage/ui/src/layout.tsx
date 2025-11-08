@@ -26,7 +26,7 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
-import { LoadingBox } from "./apps/chainmail/components/empty-states";
+import { Loading } from "./components/loading";
 import { useCurrentUser } from "./hooks/use-current-user";
 import { LoginButton } from "./login-button";
 
@@ -122,7 +122,7 @@ export const Layout = () => {
                 ) : isPendingCurrentUser &&
                   currentApp?.showLoginLoadingSpinner ? (
                     <div className="flex-1">
-                        <LoadingBox />
+                        <Loading />
                     </div>
                 ) : (
                     <Outlet />

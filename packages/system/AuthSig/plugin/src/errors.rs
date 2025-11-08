@@ -7,5 +7,6 @@ plugin_error! {
     Unauthorized(msg: String) => "Unauthorized: {msg}",
     JsonDecodeError(msg: String) => "JSON decode error: {msg}",
     KeyNotFound(msg: &'a str) => "Key not found: {msg}",
-    InsufficientPermissions(privileged_action: String) => "Insufficient access for {privileged_action}"
+    InsufficientPermissions(privileged_action: String) => "Insufficient access for {privileged_action}",
+    InvalidAccountName(msg: &'a str) => "Invalid account name: {msg}",
 }

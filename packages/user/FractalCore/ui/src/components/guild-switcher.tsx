@@ -3,12 +3,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -24,6 +24,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { CreateGuildModal } from "./modals/create-guild-modal";
 
@@ -59,12 +60,16 @@ export function GuildSwitcher() {
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                <img
-                                    className="size-4"
-                                    src={createIdenticon(
-                                        chainId + guildAccount,
-                                    )}
-                                />
+                                {chainId && guildAccount ? (
+                                    <img
+                                        className="size-4"
+                                        src={createIdenticon(
+                                            chainId + guildAccount,
+                                        )}
+                                    />
+                                ) : (
+                                    <Skeleton className="size-4 rounded-lg" />
+                                )}
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">

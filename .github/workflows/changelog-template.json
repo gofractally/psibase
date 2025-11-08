@@ -86,5 +86,6 @@
                 }
             ]
         }
-    ]
+    ],
+    "max_pull_requests": 300,
 }

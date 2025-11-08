@@ -9,7 +9,7 @@ import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 import {
     AlertDialog,
@@ -61,7 +61,7 @@ interface SupervisorError {
 }
 
 export const zSendMessageSchema = z.object({
-    to: Account,
+    to: zAccount,
     subject: z.string().min(1),
     message: z.string().min(1),
 });

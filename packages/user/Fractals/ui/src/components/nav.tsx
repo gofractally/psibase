@@ -1,8 +1,7 @@
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useBranding } from "@/hooks/use-branding";
-
 import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
+import { useBranding } from "@shared/hooks/use-branding";
 
 import { SettingsDropdown } from "./settings-dropdown";
 

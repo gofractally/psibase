@@ -5,12 +5,12 @@ import { ErrorCard } from "@/components/error-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -76,11 +76,15 @@ const GuildOverviewCard = () => {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        <img
-                            src={createIdenticon(chainId + guild?.account)}
-                            alt={guild?.displayName || "Guild"}
-                            className="size-5"
-                        />
+                        {chainId && guild?.account ? (
+                            <img
+                                src={createIdenticon(chainId + guild?.account)}
+                                alt={guild?.displayName || "Guild"}
+                                className="size-5"
+                            />
+                        ) : (
+                            <Skeleton className="size-5 rounded-lg" />
+                        )}
                     </div>
                     <div>
                         <div className="text-xl font-semibold">

@@ -12,3 +12,4 @@ serde.workspace = true
 serde_json.workspace = true
 diff-adjust = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
+psibase-user-workspace-hack.workspace = true

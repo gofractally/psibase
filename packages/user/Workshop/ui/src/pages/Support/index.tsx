@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { EmptyBlock } from "@/components/EmptyBlock";
 import { LoadingBlock } from "@/components/LoadingBlock";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useMessages } from "@/hooks/useMessages";
 import { createIdenticon } from "@/lib/createIdenticon";
@@ -14,6 +13,7 @@ import {
     removeReplyPrefix,
 } from "@/lib/createThreadIdentifier";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
 dayjs.extend(relative);

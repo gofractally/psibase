@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export const ProfileResponse = z.object({
     profile: z
         .object({
-            account: Account,
+            account: zAccount,
             displayName: z.string(),
             bio: z.string(),
         })

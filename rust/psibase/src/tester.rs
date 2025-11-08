@@ -110,6 +110,8 @@ impl Chain {
             self.push(&trx).ok()?;
         }
 
+        self.start_block();
+
         for (_, group, _) in subsequent_tx {
             for trx in group {
                 self.push(&trx).ok()?;

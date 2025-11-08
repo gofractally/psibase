@@ -7,13 +7,11 @@ import {
     TicketCheck,
     TriangleAlert,
 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
-import { siblingUrl } from "@psibase/common-lib";
-
-import { modifyUrlParams } from "@/lib/modifyUrlParams";
+import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -27,29 +25,49 @@ import {
 
 dayjs.extend(relativeTime);
 
-const inviteObject = z.object({
-    actor: z.string(),
-    app: z.string().optional(),
-    appDomain: z.string(),
-    expiry: z.string(),
-    inviter: z.string(),
-    state: z.enum(["pending", "accepted", "rejected"]),
+const inviteDetailsResponse = z.object({
+    data: z.object({
+        inviteById: z.object({
+            inviter: z.string(),
+            numAccounts: z.number(),
+            expiryDate: z.string(),
+        }),
+    }),
 });
 
 const fetchInvite = async (token: string) => {
-    const tokenRes = await supervisor.functionCall({
+    const inviteId = await supervisor.functionCall({
         service: "invite",
         intf: "invitee",
-        method: "decodeInvite",
+        method: "importInviteToken",
         params: [token],
     });
 
-    const parsedToken = inviteObject.parse(tokenRes);
+    const response = await postGraphQLGetJson(
+        siblingUrl(undefined, "invite", "graphql", false),
+        `
+            query InviteById {
+                inviteById(inviteId: ${inviteId}) {
+                    inviter
+                    numAccounts
+                    expiryDate
+                }
+            }
+        `,
+    );
+    const inviteDetails = inviteDetailsResponse.parse(response).data.inviteById;
+
+    const networkName = await supervisor.functionCall({
+        service: "branding",
+        intf: "queries",
+        method: "getNetworkName",
+        params: [],
+    });
 
     return {
-        chainName: "psibase",
-        inviter: parsedToken.inviter,
-        expiry: new Date(parsedToken.expiry),
+        chainName: networkName,
+        inviter: inviteDetails.inviter,
+        expiry: new Date(inviteDetails.expiryDate),
     };
 };
 
@@ -122,19 +140,6 @@ export const Invite = () => {
             : `${inviter} has invited you to create an account
         on the ${chainName} platform.`;
 
-        const accountsUrl = siblingUrl(undefined, "accounts", undefined, false);
-        const redirect = siblingUrl(
-            undefined,
-            undefined,
-            "invite-response",
-            false,
-        );
-
-        const link = modifyUrlParams(accountsUrl, {
-            token,
-            redirect,
-        });
-
         if (isExpired) {
             return (
                 <Card className="mx-auto mt-4 w-[350px]">
@@ -164,9 +169,24 @@ export const Invite = () => {
                     </CardHeader>
                     <CardContent></CardContent>
                     <CardFooter className="flex justify-between">
-                        <Link to={link}>
-                            <Button>Continue</Button>
-                        </Link>
+                        <Button
+                            onClick={async () => {
+                                await supervisor.functionCall(
+                                    {
+                                        service: "accounts",
+                                        intf: "activeApp",
+                                        method: "connectAccount",
+                                        params: [],
+                                    },
+                                    {
+                                        enabled: true,
+                                        returnPath: "/invite-response",
+                                    },
+                                );
+                            }}
+                        >
+                            Continue
+                        </Button>
                     </CardFooter>
                 </Card>
             );

@@ -3,10 +3,10 @@ import { z } from "zod";
 import { chainMailConfig } from "./apps/chainmail";
 import { contactsConfig } from "./apps/contacts";
 import { tokensConfig } from "./apps/tokens";
-import { Account } from "./lib/zod/Account";
+import { zAccount } from "./lib/zod/Account";
 
 export const AppConfig = z.object({
-    service: Account,
+    service: zAccount,
     name: z.string(),
     isMore: z.boolean(),
     element: z.any().optional(),

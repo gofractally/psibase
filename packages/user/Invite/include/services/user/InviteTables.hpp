@@ -9,104 +9,41 @@ namespace UserService
    {
       using Spki = SystemService::AuthSig::SubjectPublicKeyInfo;
 
-      enum InviteStates : uint8_t
-      {
-         pending = 0,
-         accepted,
-         rejected
-      };
-
       struct InviteEventType
       {
          static constexpr std::string_view created        = "created";
          static constexpr std::string_view accepted       = "accepted";
-         static constexpr std::string_view rejected       = "rejected";
+         static constexpr std::string_view accountRedeemed = "accountRedeemed";
          static constexpr std::string_view deleted        = "deleted";
-         static constexpr std::string_view deletedExpired = "deletedExpired";
       };
-
-      struct NextInviteId
-      {
-         uint32_t nextInviteId;
-      };
-      PSIO_REFLECT(NextInviteId, nextInviteId);
-      using NextInviteIdTable = psibase::Table<NextInviteId, psibase::SingletonKey{}>;
-      PSIO_REFLECT_TYPENAME(NextInviteIdTable)
 
       /// An invite object
       struct InviteRecord
       {
-         /// Monotonically increasing ID of the invite
-         uint32_t inviteId;
+         /// The id of the invite (not sequential)
+         uint32_t id;
 
-         /// The public key of the invite. This uniquely identifies an invite and
-         ///   may also used to authenticate the transaction accepting the invite.
-         Spki pubkey;
-
-         /// An optional secondary identifier for the invite
-         std::optional<uint32_t> secondaryId;
+         /// The id of the credential associated with the invite
+         uint32_t cid;
 
          /// The creator of the invite object
          psibase::AccountNumber inviter;
 
-         /// The app responsible for creating the invite
-         std::optional<psibase::AccountNumber> app;
+         /// Represents the number of accounts this invite can be used to create
+         uint16_t numAccounts;
 
-         /// The domain of the app responsible for creating the invite
-         std::optional<std::string> appDomain;
+         /// A flag that represents whether to use hooks to notify the inviter when the invite is updated
+         bool useHooks;
 
-         /// The last account to accept or reject the invite
-         psibase::AccountNumber actor;
+         /// The encrypted secret used to redeem the invite
+         std::string secret;
 
-         /// The time in seconds at which this invite expires
-         psibase::TimePointSec expiry;
-
-         /// A flag that represents whether a new account may still be created by
-         ///   redeeming this invite
-         bool newAccountToken = false;
-
-         /// An integer representing whether the invite is:
-         ///  - pending (0)
-         ///  - accepted (1)
-         ///  - rejected (2)
-         uint8_t state;
-
-         /// Encrypted invite secret
-         std::optional<std::string> secret;
-
-         using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::inviteId>;
-         using ById2 = psibase::CompositeKey<&InviteRecord::secondaryId, &InviteRecord::inviteId>;
-         using ByPubkey =
-             psibase::CompositeKey<psibase::NestedKey<&InviteRecord::pubkey, &Spki::fingerprint>{},
-                                   &InviteRecord::inviteId>;
+         using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::id>;
       };
-      PSIO_REFLECT(InviteRecord,
-                   inviteId,
-                   pubkey,
-                   secondaryId,
-                   inviter,
-                   app,
-                   appDomain,
-                   actor,
-                   expiry,
-                   newAccountToken,
-                   state,
-                   secret);
-      using InviteTable = psibase::Table<InviteRecord,
-                                         &InviteRecord::inviteId,
-                                         InviteRecord::ByInviter{},
-                                         InviteRecord::ById2{},
-                                         InviteRecord::ByPubkey{}>;
+      PSIO_REFLECT(InviteRecord, id, cid, inviter, numAccounts, useHooks, secret);
+      using InviteTable = psibase::
+          Table<InviteRecord, &InviteRecord::id, InviteRecord::ByInviter{}, &InviteRecord::cid>;
       PSIO_REFLECT_TYPENAME(InviteTable)
-
-      struct NewAccountRecord
-      {
-         psibase::AccountNumber name;
-         psibase::AccountNumber inviter;
-      };
-      PSIO_REFLECT(NewAccountRecord, name, inviter);
-      using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
-      PSIO_REFLECT_TYPENAME(NewAccTable)
 
    }  // namespace InviteNs
 }  // namespace UserService

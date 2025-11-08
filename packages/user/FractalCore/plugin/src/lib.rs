@@ -1,7 +1,9 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::exports::fractal_core::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractal_core::plugin::admin_guild::Guest as AdminGuild;
+
 use bindings::exports::fractal_core::plugin::user_eval::Guest as UserEval;
 use bindings::exports::fractal_core::plugin::user_fractal::Guest as UserFractal;
 use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
@@ -35,6 +37,7 @@ define_trust! {
             High => "
             High trust grants the abilities of all lower trust levels, plus these abilities:
             - Proposing a vote in evaluation cycle
+            - Exiling a member from a fractal
             - Setting the guild evaluation schedule
             - Setting the guild display name
             - Setting the guild bio
@@ -47,11 +50,20 @@ define_trust! {
         None => [get_group_users],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
+        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
     }
 }
 
 struct FractalCorePlugin;
+
+impl AdminFractal for FractalCorePlugin {
+    fn exile_member(fractal_account: String, member_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::exile_member)?;
+        set_propose_latch(Some(&fractal_account))?;
+
+        FractalsPlugin::admin_fractal::exile_member(&member_account)
+    }
+}
 
 impl AdminGuild for FractalCorePlugin {
     fn set_schedule(
