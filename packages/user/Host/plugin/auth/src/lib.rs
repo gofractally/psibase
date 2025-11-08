@@ -31,7 +31,7 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
         endpoint: String::from("/common/set-auth-cookie"),
         body: BodyTypes::Json(format!("{{\"accessToken\": \"{}\"}}", query_token)),
     };
-    HostAdmin::post(app, &req).unwrap();
+    HostAdmin::post_with_credentials(app, &req).unwrap();
 
     let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(user));
 
@@ -43,7 +43,7 @@ fn remove_active_query_token(app: &str, user: &str) {
         endpoint: String::from("/common/remove-auth-cookie"),
         body: BodyTypes::Json(format!("{{}}")),
     };
-    HostAdmin::post(app, &req).unwrap();
+    HostAdmin::post_with_credentials(app, &req).unwrap();
 
     let bucket = KvStore::Bucket::new(DB, &get_query_token_bucket_name(&user));
     bucket.delete(&&app);

@@ -25,7 +25,12 @@ use url::Url;
 
 struct HostCommon;
 
-fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
+fn do_post_internal(
+    app: String,
+    endpoint: String,
+    content: BodyTypes,
+    with_credentials: bool,
+) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
     let query_auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
     let headers = if query_auth_token.is_none() {
@@ -36,13 +41,29 @@ fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResp
             ("Authorization", &query_auth_token.unwrap()),
         ])
     };
-    Ok(HttpRequest {
+    let request = HttpRequest {
         uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
         method: "POST".to_string(),
         headers,
         body: Some(content),
+    };
+    if with_credentials {
+        Ok(request.send_with_credentials()?)
+    } else {
+        Ok(request.send()?)
     }
-    .send()?)
+}
+
+fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<HttpResponse, Error> {
+    do_post_internal(app, endpoint, content, false)
+}
+
+fn do_post_with_credentials(
+    app: String,
+    endpoint: String,
+    content: BodyTypes,
+) -> Result<HttpResponse, Error> {
+    do_post_internal(app, endpoint, content, true)
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
@@ -70,6 +91,17 @@ impl Admin for HostCommon {
 
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(app, endpoint, request.body)?;
+        Ok(res.body.map(Into::into))
+    }
+
+    fn post_with_credentials(
+        app: String,
+        request: PostRequest,
+    ) -> Result<Option<BodyTypes>, Error> {
+        check_caller(&["host"], "post-with-credentials@host:common/admin");
+
+        let endpoint = normalize_endpoint(request.endpoint);
+        let res = do_post_with_credentials(app, endpoint, request.body)?;
         Ok(res.body.map(Into::into))
     }
 }
