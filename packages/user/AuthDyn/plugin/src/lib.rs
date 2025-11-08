@@ -2,8 +2,6 @@
 mod bindings;
 
 use bindings::exports::auth_dyn::plugin::api::Guest as Api;
-use bindings::exports::auth_dyn::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -11,62 +9,33 @@ use psibase::define_trust;
 use psibase::fracpack::Pack;
 
 mod errors;
-use errors::ErrorType;
 
 define_trust! {
     descriptions {
-        Low => "
-        Low trust grants these abilities:
-            - Reading the value of the example-thing
-        ",
+        Low => "",
         Medium => "",
-        High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Setting the example thing
-        ",
+        High => "Set the policy service for an account",
     }
     functions {
-        Low => [get_example_thing],
-        High => [set_example_thing],
+        Low => [],
+        High => [set_policy],
     }
 }
 
 struct AuthDynPlugin;
 
 impl Api for AuthDynPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = auth_dyn::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
-        Ok(())
-    }
-}
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
-
-impl Queries for AuthDynPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
-
-        let graphql_str = "query { exampleThing }";
-
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let examplething_val = 
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(examplething_val.data.example_thing)
+    fn set_policy(account: String, policy: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_policy)?;
+        let packed_example_thing_args = auth_dyn::action_structs::set_policy {
+            account: account.as_str().into(),
+            policy: policy.as_str().into(),
+        }
+        .packed();
+        add_action_to_transaction(
+            auth_dyn::action_structs::set_policy::ACTION_NAME,
+            &packed_example_thing_args,
+        )
     }
 }
 

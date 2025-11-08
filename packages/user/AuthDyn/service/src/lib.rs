@@ -79,7 +79,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::Policy;
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::auth_dyn::interfaces::{DynamicAuthPolicy, WeightedAuthorizer};
+    use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
     use psibase::services::transact::ServiceMethod;
     use psibase::ServiceCaller;
     use psibase::*;
@@ -108,6 +108,17 @@ pub mod service {
     }
 
     #[action]
+    #[allow(non_snake_case)]
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        auth_set: Option<Vec<AccountNumber>>,
+    ) -> bool {
+        is_auth(sender, authorizers, auth_set, true)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn isRejectSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
@@ -121,22 +132,35 @@ pub mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         auth_set: Vec<AccountNumber>,
+        is_approval: bool,
     ) -> bool {
-        use psibase::services::auth_delegate::action_structs::isAuthSys;
+        use psibase::services::auth_delegate::action_structs;
 
-        ServiceCaller {
+        let service_caller = ServiceCaller {
             sender: Wrapper::SERVICE,
             service: auth_service,
             flags: 0,
+        };
+
+        if is_approval {
+            service_caller.call(
+                action_structs::isAuthSys::ACTION_NAME.into(),
+                action_structs::isAuthSys {
+                    sender,
+                    authorizers,
+                    auth_set: Some(auth_set),
+                },
+            )
+        } else {
+            service_caller.call(
+                action_structs::isRejectSys::ACTION_NAME.into(),
+                action_structs::isRejectSys {
+                    sender,
+                    authorizers,
+                    auth_set: Some(auth_set),
+                },
+            )
         }
-        .call(
-            isAuthSys::ACTION_NAME.into(),
-            isAuthSys {
-                sender,
-                authorizers,
-                auth_set: Some(auth_set),
-            },
-        )
     }
 
     fn is_auth(
@@ -156,8 +180,6 @@ pub mod service {
 
         match dynamic_auth_policy {
             DynamicAuthPolicy::Single(single_auth) => {
-                // Here we learn 1 account is specified as an approver, if they have approved in a stagedtx, we personally approve.
-                // otherwise, we query their auth service to see if they have approved
                 if authorizers.contains(&single_auth.authorizer) {
                     return true;
                 } else {
@@ -168,6 +190,7 @@ pub mod service {
                         single_auth.authorizer,
                         authorizers,
                         auth_set,
+                        is_approval,
                     );
                 }
             }
@@ -181,7 +204,17 @@ pub mod service {
                     .authorizers
                     .iter()
                     .fold(0, |acc, authorizer| acc + authorizer.weight);
-                if total_possible_weight < multi_auth.threshold {
+
+                let required_weight = if is_approval {
+                    multi_auth.threshold
+                } else {
+                    // Anti-threshold: total - threshold + 1
+                    total_possible_weight
+                        .saturating_sub(multi_auth.threshold)
+                        .saturating_add(1)
+                };
+
+                if total_possible_weight < required_weight {
                     return false;
                 }
 
@@ -199,10 +232,11 @@ pub mod service {
                             weight_authorizer.account,
                             authorizers.clone(),
                             auth_set.clone(),
+                            is_approval,
                         );
                     if is_auth {
                         total_weight_approved += weight_authorizer.weight;
-                        if total_weight_approved >= multi_auth.threshold {
+                        if total_weight_approved >= required_weight {
                             return true;
                         }
                     }
@@ -215,23 +249,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
-        is_auth(sender, authorizers, auth_set, true)
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
         check_some(Policy::get(user), "no policy set for user");
     }
-
-    #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
 }
-
-#[cfg(test)]
-mod tests;
