@@ -13,9 +13,9 @@ pub mod service {
         },
     };
 
-    use psibase::fracpack::Pack;
     use psibase::services::{accounts, auth_delegate, sites, transact};
     use psibase::*;
+    use psibase::{fracpack::Pack, services::accounts::Account, AccountNumber};
 
     fn configure_new_fractal_account(fractal_account: AccountNumber) {
         accounts::Wrapper::call().newAccount(
@@ -75,6 +75,8 @@ pub mod service {
         guild_account: AccountNumber,
         name: String,
         mission: String,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
     ) {
         let sender = get_sender();
 
@@ -87,6 +89,8 @@ pub mod service {
             guild_account,
             sender,
             "Genesis".to_string().try_into().unwrap(),
+            council_role,
+            rep_role,
         );
         GuildMember::add(genesis_guild.account, sender);
 
@@ -341,13 +345,28 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
+    /// * `display_name` - The display name of the guild.
+    /// * `display_name` - The display name of the guild.
     #[action]
-    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
+    fn create_guild(
+        fractal: AccountNumber,
+        guild_account: AccountNumber,
+        display_name: Memo,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
+    ) {
         check(
             FractalMember::get_assert(fractal, get_sender()).is_citizen(),
             "must be a citizen to create a guild",
         );
-        Guild::add(fractal, guild_account, get_sender(), display_name);
+        Guild::add(
+            fractal,
+            guild_account,
+            get_sender(),
+            display_name,
+            council_role,
+            rep_role,
+        );
     }
 
     /// Exile a fractal member.
