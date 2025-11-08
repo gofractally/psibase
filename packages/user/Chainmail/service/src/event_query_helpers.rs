@@ -106,7 +106,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let sql_query_str = format!("{} ORDER BY {}", sql_query_str?, order_by_clause);
 
-        let query_response = REventsSvc::call().sqlQuery(sql_query_str);
+        let query_response = REventsSvc::call().sqlQuery(sql_query_str, Vec::new());
 
         return Some(HttpReply {
             status: 200,
