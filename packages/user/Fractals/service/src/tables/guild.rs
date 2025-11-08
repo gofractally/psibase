@@ -3,6 +3,9 @@ use psibase::services::accounts::Wrapper as Accounts;
 use psibase::services::auth_delegate::Wrapper as AuthDelegate;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
 
+use psibase::services::auth_dyn::interfaces::{
+    DynamicAuthPolicy, MultiAuth, SingleAuth, WeightedAuthorizer,
+};
 use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table, ToServiceSchema};
 
 use crate::tables::tables::{
@@ -118,6 +121,36 @@ impl Guild {
     pub fn representative(&self) -> Option<GuildMember> {
         self.rep
             .map(|rep| GuildMember::get_assert(self.account, rep))
+    }
+
+    pub fn guild_auth_policy(&self) -> DynamicAuthPolicy {
+        DynamicAuthPolicy::Single(SingleAuth {
+            authorizer: self.rep.map(|_| self.rep_role).unwrap_or(self.council_role),
+        })
+    }
+
+    pub fn rep_auth_policy(&self) -> DynamicAuthPolicy {
+        // In the event that the role account shouldn't be used because the guild is in council mode
+        // Should this throw? Or should this return a policy that he couldnt use anyway?
+        DynamicAuthPolicy::Single(SingleAuth {
+            authorizer: check_some(self.rep, "guild does not allow representative use"),
+        })
+    }
+
+    pub fn council_auth_policy(&self) -> DynamicAuthPolicy {
+        let authorizers: Vec<WeightedAuthorizer> = self
+            .council_members()
+            .into_iter()
+            .map(|auth| WeightedAuthorizer {
+                account: auth.member,
+                weight: 1,
+            })
+            .collect();
+
+        DynamicAuthPolicy::Multi(MultiAuth {
+            threshold: (authorizers.len() as u8 * 2 + 2) / 3,
+            authorizers,
+        })
     }
 
     pub fn set_display_name(&mut self, display_name: Memo) {
