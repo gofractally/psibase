@@ -2,11 +2,11 @@ import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useBranding } from "@/hooks/useBranding";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 
+import { useBranding } from "@shared/hooks/use-branding";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,

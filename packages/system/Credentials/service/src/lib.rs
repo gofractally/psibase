@@ -3,7 +3,7 @@ pub const CREDENTIAL_SENDER: psibase::AccountNumber = psibase::account!("cred-sy
 #[psibase::service_tables]
 pub mod tables {
     use psibase::fracpack::{Pack, Unpack};
-    use psibase::{AccountNumber, ToSchema};
+    use psibase::{AccountNumber, MethodNumber, ToSchema};
     use psibase::{Table, TimePointSec};
     use serde::{Deserialize, Serialize};
 
@@ -45,6 +45,7 @@ pub mod tables {
         pub pubkey: Vec<u8>,
         pub issuance_date: TimePointSec,
         pub expiry_date: Option<TimePointSec>,
+        pub allowed_actions: Vec<MethodNumber>,
     }
 
     impl Credential {
@@ -155,6 +156,11 @@ pub mod service {
         );
 
         check(
+            credential.allowed_actions.contains(&action.method),
+            &format!("Action {} not allowed using this credential", action.method),
+        );
+
+        check(
             credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now(),
             "Credential expired",
         );
@@ -165,6 +171,7 @@ pub mod service {
     /// Parameters:
     /// - `pubkey`: The credential public key
     /// - `expires`: The number of seconds until the credential expires
+    /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
     ///
     /// This action is meant to be called inline by another service.
     /// The caller service is the credential issuer.
@@ -172,7 +179,11 @@ pub mod service {
     /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
     /// that matches the specified public key.
     #[action]
-    fn create(pubkey: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
+    fn create(
+        pubkey: SubjectPublicKeyInfo,
+        expires: Option<u32>,
+        allowed_actions: Vec<MethodNumber>,
+    ) -> u32 {
         let table = CredentialTable::new();
 
         let existing = table.get_index_by_pubkey().get(&pubkey.0);
@@ -186,6 +197,7 @@ pub mod service {
                 pubkey: pubkey.0.clone(),
                 issuance_date: now,
                 expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),
+                allowed_actions,
             })
             .unwrap();
 

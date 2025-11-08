@@ -5,7 +5,7 @@ pub const CREDENTIAL_SENDER: &str = "cred-sys";
 pub mod service {
     use crate::{
         services::auth_sig::SubjectPublicKeyInfo, services::transact::ServiceMethod, AccountNumber,
-        Claim, TimePointSec,
+        Claim, MethodNumber, TimePointSec,
     };
 
     #[action]
@@ -37,6 +37,7 @@ pub mod service {
     /// Parameters:
     /// - `pubkey`: The credential public key
     /// - `expires`: The number of seconds until the credential expires
+    /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
     ///
     /// This action is meant to be called inline by another service.
     /// The caller service is the credential issuer.
@@ -44,7 +45,11 @@ pub mod service {
     /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
     /// that matches the specified public key.
     #[action]
-    fn create(pubkey: SubjectPublicKeyInfo, expires: Option<u32>) -> u32 {
+    fn create(
+        pubkey: SubjectPublicKeyInfo,
+        expires: Option<u32>,
+        allowed_actions: Vec<MethodNumber>,
+    ) -> u32 {
         unimplemented!()
     }
 

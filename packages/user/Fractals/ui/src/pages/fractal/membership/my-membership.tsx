@@ -9,12 +9,12 @@ import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
-import { useChainId } from "@/hooks/use-chain-id";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -72,7 +72,7 @@ export const MyMembership = () => {
                 <h1 className="text-lg font-semibold">My membership</h1>
             </div>
             <div className="mt-3 space-y-6">
-                {isLoading ? (
+                {isLoading || !chainId ? (
                     <>
                         <Skeleton className="h-44 w-full rounded-xl" />
                         <Skeleton className="h-44 w-full rounded-xl" />

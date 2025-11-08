@@ -13,102 +13,79 @@ namespace UserService
 {
    namespace InviteNs
    {
+
+      /// This interface should be implemented by a service that wants to handle hooks from the invite service
+      /// to be notified when an event occurs related to an invite.
+      struct InviteHooks
+      {
+         /// Called on the invite creator when the invite is accepted
+         void onInvAccept(uint32_t inviteId, psibase::AccountNumber accepter);
+
+         /// Called on the invite creator when the invite is deleted, unless it is
+         /// deleted by the invite creator manually.
+         void onInvDelete(uint32_t inviteId);
+      };
+      PSIO_REFLECT(InviteHooks,
+                   method(onInvAccept, inviteId, accepter),
+                   method(onInvDelete, inviteId))
+
       /// This service facilitates the creation and redemption of invites
       ///
       /// Invites are generic and their acceptance can, but does not always, result
-      /// in the creation of a new Psibase account. This service can be used
+      /// in the creation of a new account. This service can be used
       /// by third party applications to streamline their user onboarding.
-      ///
-      /// Only this system service and Accounts are permitted to create new accounts.
       class Invite : public psibase::Service
       {
         public:
-         using Tables =
-             psibase::ServiceTables<InviteTable, InitTable, NewAccTable, NextInviteIdTable>;
-         /// "invite"
-         static constexpr auto service = SystemService::Accounts::inviteService;
-         /// "invited-sys"
-         static constexpr auto payerAccount = psibase::AccountNumber("invited-sys");
+         using Tables = psibase::ServiceTables<InviteTable, InitTable>;
 
-         /// Constructor prevents actions from being called until after init() has
-         /// been called
+         static constexpr auto service = SystemService::Accounts::inviteService;
+
          Invite(psio::shared_view_ptr<psibase::Action> action);
 
-         /// Called once during chain initialization
-         ///
-         /// 1. Registers this service as an RPC/gql query handler
-         /// 2. Configures itself for manual debiting
-         /// 3. Creates the "invites-sys" system account used to create new accounts
          void init();
 
          /// Creates and stores a new invite object that can be used to create a new account
          /// Returns the ID of the newly created invite
          ///
          /// Parameters:
-         /// - `inviteKey` is the public key of the invite.
-         /// - `id` is an optional secondary identifier for the invite.
-         /// - `secret` is an optional secret for the invite.
-         /// - `app` is the account responsible for creating the invite. It is optional because it may
-         ///   not be able to be determined.
-         /// - `appDomain` is the domain of the app that created the invite.
-         uint32_t createInvite(Spki                                  inviteKey,
-                               std::optional<uint32_t>               secondaryId,
-                               std::optional<std::string>            secret,
-                               std::optional<psibase::AccountNumber> app,
-                               std::optional<std::string>            appDomain);
+         /// - `inviteId` is the id of the invite (could be randomly generated)
+         /// - `inviteKey` is the public key of the invite
+         /// - `numAccounts` is the number of accounts this invite can be used to create
+         /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
+         ///    the invite is updated
+         /// - `secret` is an encrypted secret used to redeem the invite
+         ///
+         /// If `useHooks` is true, the caller must be an account with a service deployed on it
+         /// that implements the InviteHooks interface.
+         uint32_t createInvite(uint32_t    inviteId,
+                               Spki        inviteKey,
+                               uint16_t    numAccounts,
+                               bool        useHooks,
+                               std::string secret);
 
-         /// Called by existing Psibase accounts to accept an invite without creating
-         /// a new Psibase account
+         /// Called by an invite credential (not a user account) to create the specified
+         /// account. The new account is authorized by the specified public key.
+         void createAccount(psibase::AccountNumber account, Spki accountKey);
+
+         /// The sender accepts an invite.
+         /// Calling this action also requires that the sender authorizes the transaction with the
+         /// proof for the credential associated with the invite.
          void accept(uint32_t inviteId);
 
-         /// Called by the system account "invited-sys" to accept an invite and
-         /// simultaneously create the new account 'acceptedBy', which is
-         /// authenticated by the provided 'newAccountKey' public key
-         ///
-         /// Each invite may be used to redeem a maximum of one new account.
-         void acceptCreate(uint32_t               inviteId,
-                           psibase::AccountNumber acceptedBy,
-                           Spki                   newAccountKey);
-
-         /// Called by existing accounts or the system account "invited-sys" to reject
-         /// an invite. Once an invite is rejected, it cannot be accepted or used to
-         /// create a new account
-         void reject(uint32_t inviteId);
-
-         /// Used by the creator of an invite to delete it. Deleted invites are removed
-         /// from the database. An invite can be deleted regardless of whether it has been
-         /// accepted, rejected, or is still pending
+         /// Delete the invite and its secret (if applicable).
+         /// Can only be called by the invite creator.
          void delInvite(uint32_t inviteId);
 
-         /// Used by anyone to garbage collect expired invites. Up to 'maxDeleted' invites
-         /// can be deleted by calling this action
-         void delExpired(uint32_t maxDeleted);
-
-         /// Called synchronously by other services to retrieve the invite
-         /// record corresponding to the provided 'pubkey' public key
+         /// Called synchronously by other services to retrieve the specified invite record
          std::optional<InviteRecord> getInvite(uint32_t inviteId);
-
-         /// Called synchronously by other services to query whether the invite
-         /// record corresponding to the provided `pubkey` public key is expired
-         bool isExpired(uint32_t inviteId);
-
-         /// Called synchronously by other services to query whether the specified
-         /// actor should be allowed to claim the invite specified by the `pubkey`
-         /// public key.
-         ///
-         /// To be considered a valid interaction, the following criteria must be met:
-         /// * The invite must exist
-         /// * The invite must be in the accepted state
-         /// * The invite actor must be the same as the specified `actor` parameter
-         /// * The invite must not be expired
-         void checkClaim(psibase::AccountNumber actor, uint32_t inviteId);
 
          // clang-format off
          struct Events
          {
             struct History
             {
-               void updated(uint32_t inviteId, psibase::AccountNumber actor, psibase::TimePointUSec datetime, std::string_view event);
+               void updated(uint32_t inviteId, psibase::AccountNumber actor, std::string_view event);
             };
             struct Ui {};
             struct Merkle {};
@@ -119,19 +96,15 @@ namespace UserService
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
-         method(createInvite, inviteKey, secondaryId, secret, app, appDomain),
+         method(createInvite, inviteId, inviteKey, numAccounts, useHooks, secret),
+         method(createAccount, account, accountKey),
          method(accept, inviteId),
-         method(acceptCreate, inviteId, acceptedBy, newAccountKey),
-         method(reject, inviteId),
          method(delInvite, inviteId),
-         method(delExpired, maxDeleted),
          method(getInvite, inviteId),
-         method(isExpired, inviteId),
-         method(checkClaim, actor, inviteId),
       );
       PSIBASE_REFLECT_EVENTS(Invite);
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
-         method(updated, inviteId, actor, datetime, event),
+         method(updated, inviteId, actor, event),
       );
       PSIBASE_REFLECT_UI_EVENTS(Invite);
       PSIBASE_REFLECT_MERKLE_EVENTS(Invite);

@@ -1,16 +1,14 @@
 import type { TokensOutletContext } from "./layout";
 
+import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { useCallback, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { supervisor } from "@/supervisor";
 
-import { TransferModal } from "@/apps/tokens/components/transfer-modal";
-
-import { GlowingCard } from "@/components/glowing-card";
-
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
