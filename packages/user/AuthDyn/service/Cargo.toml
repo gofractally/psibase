@@ -8,7 +8,6 @@ publish.workspace = true
 [package.metadata.psibase]
 server = "r-auth-dyn"
 plugin = "auth-dyn-plugin"
-data = [{ src = "../ui/dist", dst = "/" }]
 
 [dependencies]
 psibase.workspace = true
