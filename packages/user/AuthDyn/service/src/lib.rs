@@ -2,10 +2,9 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::auth_dyn::action_structs::get_policy;
-    use psibase::{check, get_sender, Caller};
     use psibase::{
-        check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber, Fracpack,
-        ServiceCaller, Table, ToSchema,
+        check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber, Caller,
+        Fracpack, ServiceCaller, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -51,19 +50,6 @@ pub mod tables {
         }
 
         pub fn set(account: AccountNumber, policy: AccountNumber) -> Self {
-            let sender = get_sender();
-            let existing_policy = Self::get(account);
-            if let Some(existing_policy) = existing_policy {
-                check(
-                    sender == existing_policy.policy,
-                    "existing policies can only be updated by policy account",
-                )
-            } else {
-                check(
-                    sender == policy || sender == account,
-                    "new policies can only be created by the policy account or user",
-                );
-            }
             let instance = Self::new(account, policy);
             instance.save();
             instance
@@ -86,11 +72,33 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn createAccount(account: AccountNumber) {
+        Policy::set(account, get_sender());
+        Accounts::call().newAccount(account, Wrapper::SERVICE, true);
+    }
+
+    #[action]
     fn set_policy(account: AccountNumber, policy: AccountNumber) {
         check(
-            psibase::services::accounts::Wrapper::call().exists(policy),
+            Accounts::call().exists(policy),
             "policy account does not exist",
         );
+        check(Accounts::call().exists(account), "account does not exist");
+
+        let sender = get_sender();
+        let existing_policy = Policy::get(account);
+        if let Some(existing_policy) = existing_policy {
+            check(
+                sender == existing_policy.policy,
+                "existing policies must be updated by policy account",
+            )
+        } else {
+            check(
+                sender == account,
+                "new policies must be created by user account",
+            );
+        }
+
         Policy::set(account, policy);
     }
 

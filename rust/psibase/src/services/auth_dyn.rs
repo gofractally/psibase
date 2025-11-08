@@ -41,6 +41,11 @@ mod service {
     };
 
     #[action]
+    fn createAccount(account: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
     fn checkAuthSys(
         flags: u32,
         requester: AccountNumber,
@@ -86,7 +91,7 @@ mod service {
     }
 
     #[action]
-    fn set_policy(policy: AccountNumber) {
+    fn set_policy(account: AccountNumber, policy: AccountNumber) {
         unimplemented!()
     }
 }
