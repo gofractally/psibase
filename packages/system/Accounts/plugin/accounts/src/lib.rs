@@ -5,7 +5,6 @@ mod errors;
 mod helpers;
 mod interfaces;
 mod plugin;
-mod tokens;
 
 use plugin::AccountsPlugin;
 

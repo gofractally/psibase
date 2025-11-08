@@ -2,7 +2,6 @@ package accounts:plugin;
 
 /// This interface is only callable by the accounts app itself.
 interface admin {
-    use accounts:account-tokens/types.{connection-token};
     use host:types/types.{error};
 
     /// Gets the names of all apps to which the user has connected
@@ -54,7 +53,6 @@ world impl {
     include host:prompt/imports;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
-    include accounts:account-tokens/imports;
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
 
