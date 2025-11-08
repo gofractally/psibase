@@ -2,22 +2,14 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::auth_dyn::action_structs::get_policy;
-    use psibase::Caller;
+    use psibase::{check, get_sender, Caller};
     use psibase::{
-        check_none, check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber,
-        Fracpack, ServiceCaller, Table, ToSchema,
+        check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber, Fracpack,
+        ServiceCaller, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "PolicyTable", index = 1)]
+    #[table(name = "PolicyTable", index = 0)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Policy {
         #[primary_key]
@@ -58,8 +50,20 @@ pub mod tables {
             )
         }
 
-        pub fn add(account: AccountNumber, policy: AccountNumber) -> Self {
-            check_none(Self::get(account), "policy already exists for account");
+        pub fn set(account: AccountNumber, policy: AccountNumber) -> Self {
+            let sender = get_sender();
+            let existing_policy = Self::get(account);
+            if let Some(existing_policy) = existing_policy {
+                check(
+                    sender == existing_policy.policy,
+                    "existing policies can only be updated by policy account",
+                )
+            } else {
+                check(
+                    sender == policy || sender == account,
+                    "new policies can only be created by the policy account or user",
+                );
+            }
             let instance = Self::new(account, policy);
             instance.save();
             instance
@@ -73,36 +77,21 @@ pub mod tables {
 
 #[psibase::service(name = "auth-dyn", tables = "tables")]
 pub mod service {
-    use crate::tables::{InitRow, InitTable, Policy};
-    use psibase::services::auth_dyn::action_structs::get_policy;
+    use crate::tables::Policy;
+    use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::auth_dyn::interfaces::{DynamicAuthPolicy, WeightedAuthorizer};
     use psibase::services::transact::ServiceMethod;
     use psibase::ServiceCaller;
     use psibase::*;
 
     #[action]
-    fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
-    }
-
-    #[action]
     #[allow(non_snake_case)]
-    fn set_policy(policy: AccountNumber) {
+    fn set_policy(account: AccountNumber, policy: AccountNumber) {
         check(
             psibase::services::accounts::Wrapper::call().exists(policy),
             "policy account does not exist",
         );
-        Policy::add(get_sender(), policy);
+        Policy::set(account, policy);
     }
 
     #[action]
@@ -124,7 +113,7 @@ pub mod service {
         authorizers: Vec<AccountNumber>,
         auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
-        unimplemented!()
+        is_auth(sender, authorizers, auth_set, false)
     }
 
     fn is_auth_other(
@@ -150,12 +139,11 @@ pub mod service {
         )
     }
 
-    #[action]
-    #[allow(non_snake_case)]
-    fn isAuthSys(
+    fn is_auth(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         auth_set: Option<Vec<AccountNumber>>,
+        is_approval: bool,
     ) -> bool {
         // Make sure we're not in a loop
         let mut auth_set = auth_set.unwrap_or_default();
@@ -164,20 +152,16 @@ pub mod service {
         }
         auth_set.push(sender);
 
-        // If we don't have a policy for the sender, we don't have an interest in authorizing anything
-
         let dynamic_auth_policy = Policy::get_assert(sender).dynamic_policy();
 
         match dynamic_auth_policy {
             DynamicAuthPolicy::Single(single_auth) => {
                 // Here we learn 1 account is specified as an approver, if they have approved in a stagedtx, we personally approve.
                 // otherwise, we query their auth service to see if they have approved
-                let is_authed = authorizers.contains(&single_auth.authorizer);
-                if is_authed {
+                if authorizers.contains(&single_auth.authorizer) {
                     return true;
                 } else {
-                    let auth_service = psibase::services::accounts::Wrapper::call()
-                        .getAuthOf(single_auth.authorizer);
+                    let auth_service = Accounts::call().getAuthOf(single_auth.authorizer);
 
                     return is_auth_other(
                         auth_service,
@@ -187,51 +171,38 @@ pub mod service {
                     );
                 }
             }
-            DynamicAuthPolicy::Multi(multi_auth) => {
-                let threshold = multi_auth.threshold;
+            DynamicAuthPolicy::Multi(mut multi_auth) => {
+                check(
+                    multi_auth.threshold != 0,
+                    "multi auth threshold cannot be 0",
+                );
+
                 let total_possible_weight = multi_auth
                     .authorizers
                     .iter()
                     .fold(0, |acc, authorizer| acc + authorizer.weight);
-                if total_possible_weight < threshold {
+                if total_possible_weight < multi_auth.threshold {
                     return false;
                 }
 
-                // Quickly see if we can return true based purely from the authorizors and their weights
-                let (immediately_approved, not_approved_locally): (
-                    Vec<WeightedAuthorizer>,
-                    Vec<WeightedAuthorizer>,
-                ) = multi_auth
+                // Move any multi_auth.authorizers to the front if found in authorizers
+                multi_auth
                     .authorizers
-                    .into_iter()
-                    .partition(|weight_authorizer| {
-                        authorizers.contains(&weight_authorizer.account)
-                    });
+                    .sort_by_key(|wa| !authorizers.contains(&wa.account));
 
-                let immediately_approved_weight = immediately_approved
-                    .iter()
-                    .fold(0, |acc, vote| acc + vote.weight);
+                let mut total_weight_approved = 0;
 
-                if immediately_approved_weight >= threshold {
-                    return true;
-                }
-
-                // here we will do a full check, by checking each authorizer recursively if they haven't already approved
-                let mut total_weight_approved = immediately_approved_weight;
-
-                for weight_authorizer in not_approved_locally {
-                    let auth_service = psibase::services::accounts::Wrapper::call()
-                        .getAuthOf(weight_authorizer.account);
-
-                    let is_auth = is_auth_other(
-                        auth_service,
-                        weight_authorizer.account,
-                        authorizers.clone(),
-                        auth_set.clone(),
-                    );
+                for weight_authorizer in multi_auth.authorizers {
+                    let is_auth = authorizers.contains(&weight_authorizer.account)
+                        || is_auth_other(
+                            Accounts::call().getAuthOf(weight_authorizer.account),
+                            weight_authorizer.account,
+                            authorizers.clone(),
+                            auth_set.clone(),
+                        );
                     if is_auth {
                         total_weight_approved += weight_authorizer.weight;
-                        if total_weight_approved >= threshold {
+                        if total_weight_approved >= multi_auth.threshold {
                             return true;
                         }
                     }
@@ -240,6 +211,16 @@ pub mod service {
                 false
             }
         }
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        auth_set: Option<Vec<AccountNumber>>,
+    ) -> bool {
+        is_auth(sender, authorizers, auth_set, true)
     }
 
     #[action]
