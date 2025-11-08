@@ -86,6 +86,8 @@ pub mod tables {
         pub display_name: Memo,
         #[graphql(skip)]
         pub rep: Option<AccountNumber>,
+        pub council_role: AccountNumber,
+        pub rep_role: AccountNumber,
         pub bio: Memo,
         pub description: String,
     }
@@ -94,6 +96,16 @@ pub mod tables {
         #[secondary_key(1)]
         pub fn by_fractal(&self) -> (AccountNumber, AccountNumber) {
             (self.fractal, self.account)
+        }
+
+        #[secondary_key(2)]
+        pub fn by_council(&self) -> AccountNumber {
+            self.council_role
+        }
+
+        #[secondary_key(3)]
+        pub fn by_rep(&self) -> AccountNumber {
+            self.rep_role
         }
     }
 
