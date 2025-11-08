@@ -51,6 +51,7 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
                         "activeApp",
                         "connectAccount",
                     ),
+                    { enabled: true, returnPath: "/common/plugin-tester" },
                 );
             }
         } catch (e) {
