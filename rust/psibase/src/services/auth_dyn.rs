@@ -41,7 +41,7 @@ mod service {
     };
 
     #[action]
-    fn createAccount(account: AccountNumber) {
+    fn newAccount(account: AccountNumber) {
         unimplemented!()
     }
 
