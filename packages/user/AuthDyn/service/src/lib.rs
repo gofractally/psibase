@@ -72,7 +72,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn createAccount(account: AccountNumber) {
+    fn newAccount(account: AccountNumber) {
         Policy::set(account, get_sender());
         Accounts::call().newAccount(account, Wrapper::SERVICE, true);
     }
