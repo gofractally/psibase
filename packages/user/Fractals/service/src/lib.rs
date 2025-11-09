@@ -194,7 +194,7 @@ pub mod service {
         );
         GuildAttest::add(guild.account, member, sender, comment, endorses);
 
-        if guild_account == sender || guild.rep.is_some_and(|rep| rep == sender) {
+        if guild_account == sender {
             application.conclude(endorses)
         }
     }
