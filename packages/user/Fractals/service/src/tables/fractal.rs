@@ -5,7 +5,7 @@ use psibase::{
     AccountNumber, Table,
 };
 
-use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
+use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable, Guild};
 
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -72,5 +72,13 @@ impl Fractal {
 impl Fractal {
     async fn memberships(&self) -> Vec<FractalMember> {
         self.members()
+    }
+
+    async fn legislature(&self) -> Guild {
+        Guild::get_assert(self.legislature)
+    }
+
+    async fn judiciary(&self) -> Guild {
+        Guild::get_assert(self.judiciary)
     }
 }

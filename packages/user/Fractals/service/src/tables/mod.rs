@@ -26,7 +26,9 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
+        #[graphql(skip)]
         pub legislature: AccountNumber,
+        #[graphql(skip)]
         pub judiciary: AccountNumber,
     }
 
