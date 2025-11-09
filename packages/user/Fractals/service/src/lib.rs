@@ -13,18 +13,12 @@ pub mod service {
         },
     };
 
-    use psibase::services::{
-        accounts, auth_delegate, auth_dyn::interfaces::DynamicAuthPolicy, sites, transact,
-    };
+    use psibase::services::{accounts, auth_dyn, sites, transact};
     use psibase::*;
     use psibase::{fracpack::Pack, AccountNumber};
 
     fn configure_new_fractal_account(fractal_account: AccountNumber) {
-        accounts::Wrapper::call().newAccount(
-            fractal_account,
-            AccountNumber::from("auth-any"),
-            true,
-        );
+        accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
         let set_proxy = Action {
             sender: fractal_account,
             service: sites::SERVICE,
@@ -36,12 +30,13 @@ pub mod service {
             .into(),
         };
 
-        let set_owner = Action {
+        let set_policy = Action {
             sender: fractal_account,
-            service: auth_delegate::SERVICE,
-            method: auth_delegate::action_structs::setOwner::ACTION_NAME.into(),
-            rawData: auth_delegate::action_structs::setOwner {
-                owner: get_sender(),
+            service: auth_dyn::SERVICE,
+            method: auth_dyn::action_structs::set_policy::ACTION_NAME.into(),
+            rawData: auth_dyn::action_structs::set_policy {
+                account: fractal_account,
+                policy: Wrapper::SERVICE,
             }
             .packed()
             .into(),
@@ -52,7 +47,7 @@ pub mod service {
             service: accounts::SERVICE,
             method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
             rawData: accounts::action_structs::setAuthServ {
-                authService: auth_delegate::SERVICE,
+                authService: auth_dyn::Wrapper::SERVICE,
             }
             .packed()
             .into(),
@@ -60,7 +55,7 @@ pub mod service {
 
         // Create the fractal account, proxy it to fractal-core for a default UI
         transact::Wrapper::call().runAs(set_proxy, vec![]);
-        transact::Wrapper::call().runAs(set_owner, vec![]);
+        transact::Wrapper::call().runAs(set_policy, vec![]);
         transact::Wrapper::call().runAs(set_auth_serv, vec![]);
     }
 
@@ -84,9 +79,9 @@ pub mod service {
     ) {
         let sender = get_sender();
 
+        Fractal::add(fractal_account, name, mission, guild_account);
         configure_new_fractal_account(fractal_account);
 
-        Fractal::add(fractal_account, name, mission, guild_account);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
         let genesis_guild = Guild::add(
             fractal_account,
@@ -121,7 +116,7 @@ pub mod service {
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
-    fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+    fn get_policy(account: AccountNumber) -> auth_dyn::interfaces::DynamicAuthPolicy {
         check_some(
             Fractal::get(account)
                 .map(|fractal| fractal.auth_policy())

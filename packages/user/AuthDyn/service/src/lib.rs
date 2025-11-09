@@ -61,7 +61,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "auth-dyn", tables = "tables")]
+#[psibase::service(name = "auth-dyn", tables = "tables", recursive = true)]
 pub mod service {
     use crate::tables::Policy;
     use psibase::services::accounts::Wrapper as Accounts;
