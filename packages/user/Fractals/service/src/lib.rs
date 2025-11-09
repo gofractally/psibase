@@ -5,11 +5,14 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
 
-    use crate::tables::{
-        fractal_member::MemberStatus,
+    use crate::{
+        helpers::is_user_account,
         tables::{
-            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
-            GuildMember,
+            fractal_member::MemberStatus,
+            tables::{
+                EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
+                GuildMember,
+            },
         },
     };
 
@@ -224,21 +227,7 @@ pub mod service {
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
-        check(sender != fractal, "a fractal cannot join itself");
-        check_none(
-            FractalMember::get(fractal, sender),
-            "you are already a member",
-        );
-        check_none(Fractal::get(sender), "a fractal cannot join a fractal");
-        check_none(Guild::get(sender), "a guild cannot join a fractal");
-        check_none(
-            Guild::get_by_rep_role(sender),
-            "rep role account cannot join a fractal",
-        );
-        check_none(
-            Guild::get_by_council_role(sender),
-            "council role account cannot join a fractal",
-        );
+        check(is_user_account(sender), "only user accounts can join");
 
         FractalMember::add(fractal, sender, MemberStatus::Visa);
 

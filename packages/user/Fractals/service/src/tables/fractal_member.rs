@@ -49,6 +49,10 @@ impl FractalMember {
 
     pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
         check_none(
+            Self::get(fractal, account),
+            "account is already a fractal member",
+        );
+        check_none(
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
         );

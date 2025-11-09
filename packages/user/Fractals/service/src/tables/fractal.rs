@@ -1,6 +1,6 @@
 use async_graphql::ComplexObject;
 use psibase::{
-    check_some,
+    check_none, check_some,
     services::auth_dyn::interfaces::{DynamicAuthPolicy, SingleAuth},
     AccountNumber, Table,
 };
@@ -34,6 +34,7 @@ impl Fractal {
         mission: String,
         genesis_guild: AccountNumber,
     ) {
+        check_none(Self::get(account), "fractal already exists");
         Self::new(account, name, mission, genesis_guild).save();
     }
 
