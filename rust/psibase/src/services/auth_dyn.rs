@@ -32,13 +32,29 @@ pub mod interfaces {
     }
 }
 
-#[crate::service(name = "auth-delegate", dispatch = false, psibase_mod = "crate")]
+#[crate::service(
+    name = "auth-dyn-it",
+    actions = "int_actions",
+    wrapper = "int_wrapper",
+    structs = "int_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod Int {
+    use crate::{services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber};
+
+    #[action]
+    pub fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+        unimplemented!()
+    }
+}
+
+#[crate::service(name = "auth-dyn", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{
-        services::{auth_dyn::interfaces::DynamicAuthPolicy, transact::ServiceMethod},
-        AccountNumber, Claim,
-    };
+    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
 
     #[action]
     fn newAccount(account: AccountNumber) {
@@ -58,11 +74,6 @@ mod service {
     }
 
     #[action]
-    fn getOwner(account: AccountNumber) -> AccountNumber {
-        unimplemented!()
-    }
-
-    #[action]
     fn canAuthUserSys(user: AccountNumber) {
         unimplemented!()
     }
@@ -73,11 +84,6 @@ mod service {
         authorizers: Vec<AccountNumber>,
         auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
-        unimplemented!()
-    }
-
-    #[action]
-    fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
         unimplemented!()
     }
 

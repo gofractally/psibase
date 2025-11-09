@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::services::auth_dyn::action_structs::get_policy;
+    use psibase::services::auth_dyn::int_structs::get_policy;
     use psibase::{
         check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber, Caller,
         Fracpack, ServiceCaller, Table, ToSchema,
