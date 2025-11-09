@@ -393,6 +393,39 @@ pub mod service {
         FractalMember::get_assert(fractal, member).exile();
     }
 
+    /// Set a new representative of the Guild.
+    ///
+    /// # Arguments
+    /// * `new_representative` - The account number of the new representative.
+    #[action]
+    fn set_g_rep(new_representative: AccountNumber) {
+        Guild::get_assert(get_sender()).set_representative(new_representative);
+    }
+
+    /// Resign as representative of a guild.
+    ///
+    /// Called by current representative of guild.
+    #[action]
+    fn resign_g_rep() {
+        check_some(
+            Guild::get_by_rep_role(get_sender()),
+            "sender must be representative role account of guild",
+        )
+        .remove_representative();
+    }
+
+    /// Forcibly remove the current representative of the guild.
+    ///
+    /// Called by council role account of the guild.
+    #[action]
+    fn remove_g_rep() {
+        check_some(
+            Guild::get_by_council_role(get_sender()),
+            "sender must be council role account of guild",
+        )
+        .remove_representative();
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 

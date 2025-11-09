@@ -209,6 +209,31 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set a new representative of the Guild.
+    ///
+    /// # Arguments
+    /// * `new_representative` - The account number of the new representative.
+    #[action]
+    fn set_g_rep(new_representative: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Resign as representative of a guild.
+    ///
+    /// Called by current representative of guild.
+    #[action]
+    fn resign_g_rep() {
+        unimplemented!()
+    }
+
+    /// Forcibly remove the current representative of the guild.
+    ///
+    /// Called by council role account of the guild.
+    #[action]
+    fn remove_g_rep() {
+        unimplemented!()
+    }
+
     /// Get policy action used by AuthDyn service.
     ///
     /// # Arguments
