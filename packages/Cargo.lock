@@ -28,6 +28,7 @@ version = "0.22.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
+ "rand",
  "serde",
  "serde_json",
  "url",
