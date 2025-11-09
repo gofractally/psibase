@@ -1,8 +1,7 @@
 import { CircleCheck, LoaderCircle } from "lucide-react";
 import ConfettiExplosion from "react-confetti-explosion";
 
-import { useBranding } from "@/hooks/use-branding";
-
+import { useBranding } from "@shared/hooks/use-branding";
 import {
     Card,
     CardDescription,

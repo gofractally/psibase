@@ -1,10 +1,10 @@
 import { useOutletContext } from "react-router-dom";
 
-import { GlowingCard } from "@/components/glowing-card";
 import { Loading } from "@/components/loading";
 
 import { Avatar } from "@shared/components/avatar";
 import { ErrorCard } from "@shared/components/error-card";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {

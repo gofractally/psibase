@@ -5,8 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { NavApps } from "@/components/nav-apps";
 import { NavUser } from "@/components/nav-user";
 
-import { useBranding } from "@/hooks/use-branding";
-
+import { useBranding } from "@shared/hooks/use-branding";
 import {
     Sidebar,
     SidebarContent,

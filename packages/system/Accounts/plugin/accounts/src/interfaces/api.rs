@@ -2,6 +2,7 @@ use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType::*;
+use crate::helpers::generate_account;
 use crate::plugin::AccountsPlugin;
 use crate::db::apps_table::*;
 
@@ -70,5 +71,10 @@ impl API for AccountsPlugin {
 
     fn get_current_user() -> Option<String> {
         AppsTable::new(&Client::get_active_app()).get_logged_in_user()
+    }
+
+    fn gen_rand_account() -> Result<String, Error> {
+        let account_number = generate_account()?;
+        Ok(account_number.to_string())
     }
 }

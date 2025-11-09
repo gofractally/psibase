@@ -3,7 +3,6 @@ import { ChevronsUpDown, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import {
     MetadataResponse,
     appMetadataQueryKey,
@@ -13,6 +12,7 @@ import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 import { createIdenticon } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,

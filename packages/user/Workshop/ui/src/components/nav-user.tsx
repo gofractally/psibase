@@ -9,13 +9,13 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { useChainId } from "@/hooks/use-chain-id";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLogout } from "@/hooks/useLogout";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 
+import { useChainId } from "@shared/hooks/use-chain-id";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
@@ -120,14 +120,18 @@ export function NavUser() {
                     >
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage
-                                        src={generateAvatar(
-                                            chainId,
-                                            currentUser || "",
-                                        )}
-                                    />
-                                </Avatar>
+                                {chainId && currentUser ? (
+                                    <Avatar className="h-8 w-8 rounded-lg">
+                                        <AvatarImage
+                                            src={generateAvatar(
+                                                chainId,
+                                                currentUser,
+                                            )}
+                                        />
+                                    </Avatar>
+                                ) : (
+                                    <Skeleton className="h-8 w-8 rounded-lg" />
+                                )}
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
                                         {currentUser || ""}
