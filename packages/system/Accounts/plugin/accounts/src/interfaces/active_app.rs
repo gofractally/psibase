@@ -50,6 +50,25 @@ impl ActiveApp for AccountsPlugin {
         Ok(())
     }
 
+    fn disconnect(account: String) -> Result<(), Error> {
+        let app = get_assert_top_level_app("disconnect", &vec![client::get_receiver().as_str()])?;
+        let apps_table = AppsTable::new(&app);
+
+        if !apps_table.get_connected_accounts().contains(&account) {
+            return Ok(());
+        }
+
+        if let Some(user) = apps_table.get_logged_in_user() {
+            if user == account {
+                HostAuth::log_out_user(&user, &app);
+                apps_table.logout();
+            }
+        }
+
+        apps_table.disconnect(&account);
+        Ok(())
+    }
+
     fn get_connected_accounts() -> Result<Vec<String>, Error> {
         let app = get_assert_top_level_app("get_connected_accounts", &vec!["supervisor"])?;
         Ok(AppsTable::new(&app).get_connected_accounts())
