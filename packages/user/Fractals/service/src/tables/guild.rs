@@ -42,7 +42,6 @@ impl Guild {
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
-        AuthDyn::call().newAccount(fractal);
         AuthDyn::call().newAccount(council_role);
         AuthDyn::call().newAccount(rep_role);
         AuthDyn::call().newAccount(guild);
