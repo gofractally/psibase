@@ -5,7 +5,7 @@ use psibase::services::auth_dyn::interfaces::{
     DynamicAuthPolicy::{self, Multi, Single},
     MultiAuth, SingleAuth, WeightedAuthorizer,
 };
-use psibase::{check_none, check_some, AccountNumber, Memo, Table};
+use psibase::{check, check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
@@ -103,8 +103,8 @@ impl Guild {
         )
     }
 
-    pub fn council_members(&self) -> Vec<GuildMember> {
-        GuildMemberTable::read()
+    pub fn council_members(&self) -> Option<Vec<GuildMember>> {
+        let council: Vec<GuildMember> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
                 (self.account, 0, AccountNumber::new(0))
@@ -113,7 +113,12 @@ impl Guild {
             .rev()
             .take(6)
             .filter(|member| member.score != 0)
-            .collect()
+            .collect();
+        if council.len() > 0 {
+            return Some(council);
+        } else {
+            return None;
+        }
     }
 
     pub fn representative(&self) -> Option<GuildMember> {
@@ -136,19 +141,40 @@ impl Guild {
     }
 
     pub fn council_role_auth(&self) -> DynamicAuthPolicy {
-        let authorizers: Vec<WeightedAuthorizer> = self
-            .council_members()
-            .into_iter()
-            .map(|auth| WeightedAuthorizer {
-                account: auth.member,
-                weight: 1,
-            })
-            .collect();
+        let council = self.council_members().map_or(
+            MultiAuth {
+                authorizers: vec![],
+                threshold: 1,
+            },
+            |guild_members| MultiAuth {
+                threshold: (guild_members.len() as u8 * 2 + 2) / 3,
+                authorizers: guild_members
+                    .into_iter()
+                    .map(|auth| WeightedAuthorizer {
+                        account: auth.member,
+                        weight: 1,
+                    })
+                    .collect(),
+            },
+        );
 
-        Multi(MultiAuth {
-            threshold: (authorizers.len() as u8 * 2 + 2) / 3,
-            authorizers,
-        })
+        Multi(council)
+    }
+
+    pub fn set_representative(&mut self, new_representative: AccountNumber) {
+        FractalMember::get_assert(self.fractal, new_representative);
+
+        self.rep = Some(new_representative);
+        self.save();
+    }
+
+    pub fn remove_representative(&mut self) {
+        check_some(
+            self.council_members(),
+            "cannot remove representative without council in place",
+        );
+        self.rep = None;
+        self.save();
     }
 
     pub fn set_display_name(&mut self, display_name: Memo) {
@@ -181,11 +207,9 @@ impl Guild {
         Fractal::get_assert(self.fractal)
     }
 
-    pub async fn council(&self) -> Vec<AccountNumber> {
+    pub async fn council(&self) -> Option<Vec<AccountNumber>> {
         self.council_members()
-            .into_iter()
-            .map(|member| member.member)
-            .collect()
+            .map(|members| members.into_iter().map(|member| member.member).collect())
     }
 
     pub async fn rep(&self) -> Option<GuildMember> {
