@@ -188,19 +188,14 @@ pub mod service {
 
         match dynamic_auth_policy {
             DynamicAuthPolicy::Single(single_auth) => {
-                if authorizers.contains(&single_auth.authorizer) {
-                    return true;
-                } else {
-                    let auth_service = Accounts::call().getAuthOf(single_auth.authorizer);
-
-                    return is_auth_other(
-                        auth_service,
+                authorizers.contains(&single_auth.authorizer)
+                    || is_auth_other(
+                        Accounts::call().getAuthOf(single_auth.authorizer),
                         single_auth.authorizer,
                         authorizers,
                         auth_set,
                         is_approval,
-                    );
-                }
+                    )
             }
             DynamicAuthPolicy::Multi(mut multi_auth) => {
                 check(
