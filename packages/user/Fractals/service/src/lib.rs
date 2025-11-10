@@ -86,7 +86,7 @@ pub mod service {
         configure_new_fractal_account(fractal_account);
 
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
-        let genesis_guild = Guild::add(
+        Guild::add(
             fractal_account,
             guild_account,
             sender,
@@ -94,7 +94,6 @@ pub mod service {
             council_role,
             rep_role,
         );
-        GuildMember::add(genesis_guild.account, sender);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
