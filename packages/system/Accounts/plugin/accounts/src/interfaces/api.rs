@@ -73,8 +73,7 @@ impl API for AccountsPlugin {
         AppsTable::new(&Client::get_active_app()).get_logged_in_user()
     }
 
-    fn gen_rand_account() -> Result<String, Error> {
-        let account_number = generate_account()?;
-        Ok(account_number.to_string())
+    fn gen_rand_account(prefix: Option<String>) -> Result<String, Error> {
+        generate_account(prefix)
     }
 }

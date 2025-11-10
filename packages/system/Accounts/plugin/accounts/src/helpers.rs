@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
@@ -37,43 +39,54 @@ pub fn assert_valid_account(account: &str) {
     assert!(account_details.is_some(), "Invalid account name");
 }
 
-use psibase::AccountNumber;
 use rand::prelude::*;
 
-pub fn generate_account() -> Result<AccountNumber, CommonTypes::Error> {
+pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::Error> {
     let mut rng = rand::rng();
 
-    let max_tries = 1000;
-    let mut tries = 0;
+    const MAX_TRIES: u16 = 1000;
+    const LENGTH: u8 = 10;
 
-    loop {
-        if tries >= max_tries {
-            return Err(MaxGenerationAttemptsExceeded().into());
+    let first_chars: &[char] = &(b'a'..=b'z').map(|b| b as char).collect::<Vec<_>>();
+    let allowed_chars: &[char] = &(b'a'..=b'z')
+        .chain(b'0'..=b'9')
+        .map(|b| b as char)
+        .collect::<Vec<_>>();
+
+    let starting_string = prefix.unwrap_or_default();
+
+    let is_too_many_dashes = starting_string
+        .chars()
+        .into_iter()
+        .filter(|char| *char == '-')
+        .count()
+        > 1;
+    let is_invalid_length = starting_string.len() > 9;
+    let is_valid_chars = starting_string.chars().enumerate().all(|(index, char)| {
+        if index == 0 {
+            first_chars.contains(&char)
+        } else {
+            allowed_chars.contains(&char) || char == '-'
         }
-        tries += 1;
+    });
+    if is_invalid_length || !is_valid_chars || is_too_many_dashes {
+        return Err(InvalidPrefix().into());
+    }
 
-        let mut account = String::new();
+    for _ in 0..MAX_TRIES {
+        let mut account = starting_string.clone();
+        if account.len() == 0 {
+            account.push(*first_chars.choose(&mut rng).unwrap());
+        }
+        let remaining_chars = LENGTH - account.len() as u8;
 
-        // First character: lowercase a-z
-        let first_chars: &[char] = &(b'a'..=b'z').map(|b| b as char).collect::<Vec<_>>();
-        account.push(*first_chars.choose(&mut rng).unwrap());
-
-        // Remaining 9 characters: a-z, 0-9 (no -)
-        let allowed_chars: &[char] = &(b'a'..=b'z')
-            .chain(b'0'..=b'9')
-            .map(|b| b as char)
-            .collect::<Vec<_>>();
-
-        for _ in 0..9 {
+        for _ in 0..remaining_chars {
             account.push(*allowed_chars.choose(&mut rng).unwrap());
         }
 
-        let account_number = AccountNumber::from(account.as_str());
-        if account_number.to_string() == account {
-            let is_available = AccountsPlugin::get_account(account_number.to_string())?.is_none();
-            if is_available {
-                return Ok(account_number);
-            }
+        if let Ok(None) = AccountsPlugin::get_account(account.clone()) {
+            return Ok(account);
         }
     }
+    Err(MaxGenerationAttemptsExceeded().into())
 }
