@@ -1101,7 +1101,7 @@ std::vector<char> REvents::sqlQuery(const std::string&              squery,
          for (std::size_t i = 0; i < params.size(); ++i)
          {
             if (int err = sqlite3_bind_text(stmt, static_cast<int>(i + 1), params[i].c_str(),
-                                            static_cast<int>(params[i].size()), SQLITE_TRANSIENT))
+                                            static_cast<int>(params[i].size()), SQLITE_STATIC))
             {
                abortMessage(std::string("sqlite3_bind_text: ") + sqlite3_errmsg(db));
             }
