@@ -128,7 +128,7 @@ impl Guild {
 
     pub fn guild_auth(&self) -> DynamicAuthPolicy {
         Single(SingleAuth {
-            authorizer: self.rep.map(|_| self.rep_role).unwrap_or(self.council_role),
+            authorizer: self.rep.map_or(self.council_role, |_| self.rep_role),
         })
     }
 
