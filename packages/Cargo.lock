@@ -13,16 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "account-tokens"
-version = "0.22.0"
-dependencies = [
- "psibase-plugin-workspace-hack",
- "serde",
- "serde_json",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "accounts"
 version = "0.22.0"
 dependencies = [
@@ -329,7 +319,6 @@ dependencies = [
 name = "auth-sig"
 version = "0.22.0"
 dependencies = [
- "indoc",
  "lazy_static",
  "pem",
  "psibase",

@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "system/Accounts/plugin/accounts/",
-    "system/Accounts/plugin/account_tokens/",
     "system/AuthAny/plugin/",
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",

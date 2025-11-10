@@ -270,7 +270,6 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
-    account-tokens
     aes
     auth-any
     auth-delegate
@@ -354,7 +353,6 @@ psibase_package(
         SERVER r-accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
-        DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
