@@ -329,7 +329,6 @@ dependencies = [
 name = "auth-sig"
 version = "0.22.0"
 dependencies = [
- "indoc",
  "lazy_static",
  "pem",
  "psibase",
@@ -2173,6 +2172,7 @@ dependencies = [
  "quote",
  "rand_core 0.6.4",
  "serde",
+ "serde_core",
  "serde_json",
  "subtle",
  "syn 2.0.109",

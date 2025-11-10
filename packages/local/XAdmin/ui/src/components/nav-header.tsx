@@ -3,9 +3,9 @@ import { NavLink } from "react-router-dom";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
+import { useBranding } from "@shared/hooks/use-branding";
 import { Tabs, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 
-import { useBranding } from "../hooks/useBranding";
 import { useKeyDevices } from "../hooks/useKeyDevices";
 import { useStatuses } from "../hooks/useStatuses";
 import { MenuContent } from "./menu-content";
