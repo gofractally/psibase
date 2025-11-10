@@ -74,7 +74,6 @@ impl API for AccountsPlugin {
     }
 
     fn gen_rand_account() -> Result<String, Error> {
-        let account_number = generate_account()?;
-        Ok(account_number.to_string())
+        generate_account()
     }
 }

@@ -37,43 +37,29 @@ pub fn assert_valid_account(account: &str) {
     assert!(account_details.is_some(), "Invalid account name");
 }
 
-use psibase::AccountNumber;
 use rand::prelude::*;
 
-pub fn generate_account() -> Result<AccountNumber, CommonTypes::Error> {
+pub fn generate_account() -> Result<String, CommonTypes::Error> {
     let mut rng = rand::rng();
 
-    let max_tries = 1000;
-    let mut tries = 0;
+    const MAX_TRIES: u16 = 1000;
 
-    loop {
-        if tries >= max_tries {
-            return Err(MaxGenerationAttemptsExceeded().into());
-        }
-        tries += 1;
+    let first_chars: &[char] = &(b'a'..=b'z').map(|b| b as char).collect::<Vec<_>>();
+    let allowed_chars: &[char] = &(b'a'..=b'z')
+        .chain(b'0'..=b'9')
+        .map(|b| b as char)
+        .collect::<Vec<_>>();
 
+    for _ in 0..MAX_TRIES {
         let mut account = String::new();
-
-        // First character: lowercase a-z
-        let first_chars: &[char] = &(b'a'..=b'z').map(|b| b as char).collect::<Vec<_>>();
         account.push(*first_chars.choose(&mut rng).unwrap());
-
-        // Remaining 9 characters: a-z, 0-9 (no -)
-        let allowed_chars: &[char] = &(b'a'..=b'z')
-            .chain(b'0'..=b'9')
-            .map(|b| b as char)
-            .collect::<Vec<_>>();
-
         for _ in 0..9 {
             account.push(*allowed_chars.choose(&mut rng).unwrap());
         }
 
-        let account_number = AccountNumber::from(account.as_str());
-        if account_number.to_string() == account {
-            let is_available = AccountsPlugin::get_account(account_number.to_string())?.is_none();
-            if is_available {
-                return Ok(account_number);
-            }
+        if let Ok(None) = AccountsPlugin::get_account(account.clone()) {
+            return Ok(account);
         }
     }
+    Err(MaxGenerationAttemptsExceeded().into())
 }
