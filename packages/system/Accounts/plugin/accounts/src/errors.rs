@@ -9,5 +9,6 @@ plugin_error! {
     DeserializationError(msg: String) => "Deserialization error: {msg}",
     NotConnected(user: String) => "User {user} is not connected to this app",
     CannotCreateAccount() => "Cannot create account",
-    MaxGenerationAttemptsExceeded() => "Max generation attempts exceeded"
+    MaxGenerationAttemptsExceeded() => "Max generation attempts exceeded",
+    InvalidPrefix() => "Prefix must be a-z, 1 - 6 chars in length"
 }

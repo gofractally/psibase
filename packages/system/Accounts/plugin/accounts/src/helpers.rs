@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
@@ -39,10 +41,11 @@ pub fn assert_valid_account(account: &str) {
 
 use rand::prelude::*;
 
-pub fn generate_account() -> Result<String, CommonTypes::Error> {
+pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::Error> {
     let mut rng = rand::rng();
 
     const MAX_TRIES: u16 = 1000;
+    const LENGTH: u8 = 10;
 
     let first_chars: &[char] = &(b'a'..=b'z').map(|b| b as char).collect::<Vec<_>>();
     let allowed_chars: &[char] = &(b'a'..=b'z')
@@ -50,10 +53,34 @@ pub fn generate_account() -> Result<String, CommonTypes::Error> {
         .map(|b| b as char)
         .collect::<Vec<_>>();
 
+    let starting_string = prefix.unwrap_or_default();
+
+    let is_too_many_dashes = starting_string
+        .chars()
+        .into_iter()
+        .filter(|char| *char == '-')
+        .count()
+        > 1;
+    let is_invalid_length = starting_string.len() > 6;
+    let is_valid_chars = starting_string.chars().enumerate().all(|(index, char)| {
+        if index == 0 {
+            first_chars.contains(&char)
+        } else {
+            allowed_chars.contains(&char) || char == '-'
+        }
+    });
+    if is_invalid_length || !is_valid_chars || is_too_many_dashes {
+        return Err(InvalidPrefix().into());
+    }
+
     for _ in 0..MAX_TRIES {
-        let mut account = String::new();
-        account.push(*first_chars.choose(&mut rng).unwrap());
-        for _ in 0..9 {
+        let mut account = starting_string.clone();
+        if account.len() == 0 {
+            account.push(*first_chars.choose(&mut rng).unwrap());
+        }
+        let remaining_chars = LENGTH - account.len() as u8;
+
+        for _ in 0..remaining_chars {
             account.push(*allowed_chars.choose(&mut rng).unwrap());
         }
 

@@ -58,7 +58,7 @@ interface api {
     get-current-user: func() -> option<string>;
 
     /// Generates a random account number not in use on the network
-    gen-rand-account: func() -> result<string, error>;
+    gen-rand-account: func(prefix: option<string>) -> result<string, error>;
 }
 
 world imports {
