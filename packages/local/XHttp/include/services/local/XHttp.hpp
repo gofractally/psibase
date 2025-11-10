@@ -70,7 +70,7 @@ namespace LocalService
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
-                method(sendRequest, request, callback, tls, endpoint),
+                method(sendRequest, request, callback, err, tls, endpoint),
                 method(autoClose, socket, value),
                 method(sendReply, socket, response),
                 method(rootHost, host),
