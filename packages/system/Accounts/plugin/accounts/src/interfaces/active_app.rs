@@ -4,14 +4,13 @@ use crate::db::{apps_table::*, user_table::*};
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
-use accounts::account_tokens::types::*;
 use bindings::*;
 use exports::accounts::plugin::{
     active_app::{Guest as ActiveApp, *},
     api::Guest as Api,
 };
 use host::auth::api as HostAuth;
-use host::common::{client, client::get_app_url};
+use host::common::client;
 use host::prompt::api as Prompt;
 
 impl ActiveApp for AccountsPlugin {
@@ -72,17 +71,6 @@ impl ActiveApp for AccountsPlugin {
     fn get_connected_accounts() -> Result<Vec<String>, Error> {
         let app = get_assert_top_level_app("get_connected_accounts", &vec!["supervisor"])?;
         Ok(AppsTable::new(&app).get_connected_accounts())
-    }
-
-    fn create_connection_token() -> Result<String, Error> {
-        eprintln!("[WARNING] create_connection_token is deprecated");
-        let app = get_assert_top_level_app("create_connection_token", &vec![])?;
-        let origin = get_app_url(&app);
-        Ok(Token::new_connection_token(ConnectionToken {
-            app: Some(app),
-            origin,
-        })
-        .into())
     }
 
     fn connect_account() -> Result<(), Error> {
