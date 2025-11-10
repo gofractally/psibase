@@ -918,16 +918,6 @@ namespace psibase
 
       /// Add a SQL WHERE clause condition to filter results
       ///
-      /// This replaces the current condition if one exists.
-      EventQuery& condition(std::string cond)
-      {
-         _condition = std::move(cond);
-         _params.clear();
-         return *this;
-      }
-
-      /// Add a SQL WHERE clause condition with parameters to filter results
-      ///
       /// This replaces the current condition and parameters if they exist.
       ///
       /// Parameters are bound using `sqlite3_bind_text` and are safe from SQL injection.
@@ -935,7 +925,7 @@ namespace psibase
       /// values in the `params` vector. Parameters are bound in order.
       ///
       /// For LIKE patterns, include wildcards (e.g., `%`) in the parameter values, not in the SQL.
-      EventQuery& condition_with_params(std::string cond, std::vector<std::string> params)
+      EventQuery& condition(std::string cond, std::vector<std::string> params = {})
       {
          _condition = std::move(cond);
          _params    = std::move(params);
