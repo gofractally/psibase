@@ -61,7 +61,7 @@ pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::E
         .filter(|char| *char == '-')
         .count()
         > 1;
-    let is_invalid_length = starting_string.len() > 6;
+    let is_invalid_length = starting_string.len() > 9;
     let is_valid_chars = starting_string.chars().enumerate().all(|(index, char)| {
         if index == 0 {
             first_chars.contains(&char)
