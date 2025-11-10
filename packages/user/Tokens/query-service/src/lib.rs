@@ -299,15 +299,23 @@ mod service {
             }
 
             if let Some(min) = &min_fixed {
-                conditions.push(format!(
-                    "(length(amount) > length('{min}') OR (length(amount) = length('{min}') AND amount >= '{min}'))"
-                ));
+                conditions.push(
+                    "(length(amount) > length(?) OR (length(amount) = length(?) AND amount >= ?))"
+                        .to_string(),
+                );
+                params.push(min.clone());
+                params.push(min.clone());
+                params.push(min.clone());
             }
 
             if let Some(max) = &max_fixed {
-                conditions.push(format!(
-                    "(length(amount) < length('{max}') OR (length(amount) = length('{max}') AND amount <= '{max}'))"
-                ));
+                conditions.push(
+                    "(length(amount) < length(?) OR (length(amount) = length(?) AND amount <= ?))"
+                        .to_string(),
+                );
+                params.push(max.clone());
+                params.push(max.clone());
+                params.push(max.clone());
             }
 
             if let Some(m) = &memo {
