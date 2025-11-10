@@ -19,7 +19,7 @@ psibase::define_trust! {
         Low => "",
         Medium => "
         Medium trust grants these abilities:
-            - Create new workshop apps
+            - Create new apps
             - Configure app cache behavior
         ",
         High => "
