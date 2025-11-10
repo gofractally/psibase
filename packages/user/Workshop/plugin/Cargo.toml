@@ -33,3 +33,4 @@ world = "impl"
 "registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "auth-delegate:plugin" = { path = "../../../system/AuthDelegate/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
