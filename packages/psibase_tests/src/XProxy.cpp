@@ -1,6 +1,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/dispatch.hpp>
+#include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 
 using namespace psibase;
@@ -48,6 +49,8 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
 
    if (target == "/set_origin_server")
    {
+      if (auto reply = to<XAdmin>().checkAuth(req, socket))
+         return reply;
       if (req.method != "POST")
          return HttpReply::methodNotAllowed(req);
       if (req.contentType != "application/json")
@@ -96,6 +99,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
 
 void XProxy::onReply(std::int32_t socket, psibase::HttpReply reply)
 {
+   check(getSender() == XHttp::service, "Wrong sender");
    auto table = open<ProxyTable>();
    PSIBASE_SUBJECTIVE_TX
    {
@@ -110,6 +114,7 @@ void XProxy::onReply(std::int32_t socket, psibase::HttpReply reply)
 
 void XProxy::onError(std::int32_t socket)
 {
+   check(getSender() == XHttp::service, "Wrong sender");
    auto             table = open<ProxyTable>();
    std::string_view msg{"Bad Gateway"};
    HttpReply        reply{.status      = HttpStatus::badGateway,
