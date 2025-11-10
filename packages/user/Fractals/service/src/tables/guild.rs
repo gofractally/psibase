@@ -135,9 +135,13 @@ impl Guild {
     pub fn rep_role_auth(&self) -> DynamicAuthPolicy {
         // In the event that the role account shouldn't be used because the guild is in council mode
         // Should this throw? Or should this return a policy that he couldnt use anyway?
-        Single(SingleAuth {
-            authorizer: check_some(self.rep, "guild does not allow representative use"),
-        })
+        self.rep.map_or(
+            Multi(MultiAuth {
+                threshold: 1,
+                authorizers: vec![],
+            }),
+            |rep| Single(SingleAuth { authorizer: rep }),
+        )
     }
 
     pub fn council_role_auth(&self) -> DynamicAuthPolicy {
