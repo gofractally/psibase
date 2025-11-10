@@ -37,13 +37,14 @@ psibase::define_trust! {
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Issue, configure, and manage token and token supply
             - Transfer tokens on your behalf
+            - Enable automatic debit of balances
         ",
     }
     functions {
         None => [decimal_to_u64, u64_to_decimal],
         Low => [],
-        Medium => [create, enable_user_manual_debit, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
-        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn],
+        Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
+        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
     }
 }
 
