@@ -5,7 +5,7 @@ use psibase::services::auth_dyn::interfaces::{
     DynamicAuthPolicy::{self, Multi, Single},
     MultiAuth, SingleAuth, WeightedAuthorizer,
 };
-use psibase::{check, check_none, check_some, AccountNumber, Memo, Table};
+use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
