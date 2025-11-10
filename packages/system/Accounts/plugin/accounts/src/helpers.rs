@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
