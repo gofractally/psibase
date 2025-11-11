@@ -1,5 +1,6 @@
 #include "services/system/CommonApi.hpp"
 
+#include <chrono>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
@@ -20,11 +21,8 @@ namespace SystemService
 
    namespace
    {
-      int getCookieMaxAge()
-      {
-         static constexpr int EXPIRATION_IN_DAYS = 30;
-         return EXPIRATION_IN_DAYS * 24 * 60 * 60;
-      }
+      constexpr auto cookieMaxAge =
+          std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(30)).count();
 
       template <typename T>
       T extractData(HttpRequest& request)
@@ -34,16 +32,8 @@ namespace SystemService
          return psio::from_json<T>(jstream);
       }
 
-      std::vector<HttpHeader> getAuthCookieHeaders(const HttpRequest& req,
-                                                   const std::string& accessToken,
-                                                   int                maxAge)
+      HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
       {
-         bool hostIsSubdomain = to<HttpServer>().rootHost(req.host) != req.host;
-         auto headers         = allowCors(req, "supervisor"_a, hostIsSubdomain);
-
-         // Needed for browsers to allow cross-domain calls that set cookies (along with non-* CORS headers)
-         headers.push_back({"Access-Control-Allow-Credentials", "true"});
-
          bool        isLocalhost = psibase::isLocalhost(req);
          std::string cookieName  = isLocalhost ? "SESSION" : "__Host-SESSION";
 
@@ -58,15 +48,16 @@ namespace SystemService
          }
 
          std::string cookieValue = cookieName + "=" + accessToken + "; " + cookieAttribs;
-         headers.push_back({"Set-Cookie", cookieValue});
-         return headers;
+         return HttpHeader{"Set-Cookie", cookieValue};
       }
 
-      std::vector<HttpHeader> getAuthPreflightHeaders(const HttpRequest& req)
+      HttpHeader allowCredentials()
       {
-         bool hostIsSubdomain = to<HttpServer>().rootHost(req.host) != req.host;
-         auto headers         = allowCors(req, "supervisor"_a, hostIsSubdomain);
+         return HttpHeader{"Access-Control-Allow-Credentials", "true"};
+      }
 
+      void reflectRequestedHeaders(std::vector<HttpHeader>& headers, const HttpRequest& req)
+      {
          if (auto requested = req.getHeader("access-control-request-headers"); requested)
          {
             for (auto& h : headers)
@@ -78,11 +69,13 @@ namespace SystemService
                }
             }
          }
-
-         headers.push_back({"Access-Control-Allow-Credentials", "true"});
-         return headers;
       }
 
+      std::vector<HttpHeader> allowCorsFrom(const HttpRequest& req, AccountNumber subdomain)
+      {
+         bool hostIsSubdomain = to<HttpServer>().rootHost(req.host) != req.host;
+         return allowCors(req, subdomain, hostIsSubdomain);
+      }
    }  // namespace
 
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
@@ -134,7 +127,11 @@ namespace SystemService
          if (request.target == "/common/set-auth-cookie" ||
              request.target == "/common/remove-auth-cookie")
          {
-            return HttpReply{.headers = getAuthPreflightHeaders(request)};
+            auto headers = allowCorsFrom(request, "supervisor"_a);
+            headers.push_back(allowCredentials());
+            reflectRequestedHeaders(headers, request);
+
+            return HttpReply{.headers = headers};
          }
       }
 
@@ -158,8 +155,11 @@ namespace SystemService
          }
          if (request.target == "/common/set-auth-cookie")
          {
-            auto token_data = extractData<TokenData>(request);
-            auto headers = getAuthCookieHeaders(request, token_data.accessToken, getCookieMaxAge());
+            auto data = extractData<TokenData>(request);
+
+            auto headers = allowCorsFrom(request, "supervisor"_a);
+            headers.push_back(allowCredentials());
+            headers.push_back(authCookie(request, data.accessToken, cookieMaxAge));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",
@@ -168,10 +168,14 @@ namespace SystemService
          }
          if (request.target == "/common/remove-auth-cookie")
          {
+            auto headers = allowCorsFrom(request, "supervisor"_a);
+            headers.push_back(allowCredentials());
+            headers.push_back(authCookie(request, "", 0));
+
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",
                              .body        = {},
-                             .headers     = getAuthCookieHeaders(request, "", 0)};
+                             .headers     = headers};
          }
       }
       return std::nullopt;
