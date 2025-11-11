@@ -34,7 +34,7 @@ pub mod tables {
             check_some(Self::get(account), "failed to find policy")
         }
 
-        pub fn dynamic_policy(&self) -> DynamicAuthPolicy {
+        pub fn dynamic_policy(&self) -> Option<DynamicAuthPolicy> {
             let service_caller = ServiceCaller {
                 flags: 0,
                 sender: crate::Wrapper::SERVICE,
@@ -184,10 +184,9 @@ pub mod service {
         }
         auth_set.push(sender);
 
-        let dynamic_auth_policy = Policy::get_assert(sender).dynamic_policy();
-
-        match dynamic_auth_policy {
-            DynamicAuthPolicy::Single(single_auth) => {
+        match Management::get_assert(sender).dynamic_policy() {
+            None => false,
+            Some(DynamicAuthPolicy::Single(single_auth)) => {
                 authorizers.contains(&single_auth.authorizer)
                     || is_auth_other(
                         Accounts::call().getAuthOf(single_auth.authorizer),
@@ -197,7 +196,7 @@ pub mod service {
                         is_approval,
                     )
             }
-            DynamicAuthPolicy::Multi(mut multi_auth) => {
+            Some(DynamicAuthPolicy::Multi(mut multi_auth)) => {
                 check(
                     multi_auth.threshold != 0,
                     "multi auth threshold cannot be 0",
