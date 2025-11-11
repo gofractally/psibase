@@ -132,9 +132,10 @@ struct StagedTxPlugin;
 
 impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
-        if Client::get_sender() != Client::get_active_app() {
-            return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
-        }
+        assert_authorized_with_whitelist(
+            FunctionName::set_propose_latch,
+            vec![Client::get_active_app()],
+        )?;
 
         if let Some(acc) = &account {
             validate_account(acc)?;
