@@ -36,8 +36,9 @@ psibase::define_trust! {
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Issue, configure, and manage token and token supply
-            - Transfer tokens on your behalf
-            - Enable automatic debit of balances
+            - Transfer tokens
+            - Configure automatic balance debiting
+            - Read your token balances and transaction history
         ",
     }
     functions {
