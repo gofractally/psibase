@@ -309,26 +309,15 @@ pub mod tables {
         }
     }
 
-    #[table(name = "SharedBalanceTable", index = 3)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
-    #[graphql(complex)]
-    pub struct SharedBalance {
-        pub creditor: AccountNumber,
-        pub debitor: AccountNumber,
-        pub token_id: TID,
-        #[graphql(skip)]
-        pub balance: Quantity,
-    }
-
     // Each transfer is represented as a row in the PendingTransferTable.
     #[table(name = "PendingTransferTable", index = 3)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct PendingTransfer {
-        pub transfer_id: ID,
+        pub transfer_id: XferID,
         pub token_id: TID,
         #[graphql(skip)]
-        pub balance: Quantity,
+        pub amount: Quantity,
     }
 
     // For each transfer, there are two rows in the TransferPartyTable,
@@ -340,7 +329,7 @@ pub mod tables {
     pub struct TransferParty {
         pub party: AccountNumber,
         pub isCreditor: bool,
-        pub transfer_id: ID,
+        pub transfer_id: XferID,
     }
 
     #[ComplexObject]
