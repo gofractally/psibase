@@ -320,6 +320,29 @@ pub mod tables {
         pub balance: Quantity,
     }
 
+    // Each transfer is represented as a row in the PendingTransferTable.
+    #[table(name = "PendingTransferTable", index = 3)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
+    pub struct PendingTransfer {
+        pub transfer_id: ID,
+        pub token_id: TID,
+        #[graphql(skip)]
+        pub balance: Quantity,
+    }
+
+    // For each transfer, there are two rows in the TransferPartyTable,
+    // one for the creditor (isCreditor = true) and one for the debitor (isCreditor = false).
+    // Enables query for all pending transfers involving a user (party == user)
+    #[table(name = "TransferPartyTable", index = 4)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
+    pub struct TransferParty {
+        pub party: AccountNumber,
+        pub isCreditor: bool,
+        pub transfer_id: ID,
+    }
+
     #[ComplexObject]
     impl SharedBalance {
         pub async fn token(&self) -> Token {
