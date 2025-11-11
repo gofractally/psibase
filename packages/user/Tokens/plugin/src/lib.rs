@@ -23,6 +23,31 @@ pub mod query {
     pub mod fetch_token;
 }
 
+use crate::trust::*;
+
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "
+        Medium trust grants these abilities:
+            - Create new tokens
+            - Configure balance and transfer preferences
+        ",
+        High => "
+        High trust grants the abilities of all lower trust levels, plus these abilities:
+            - Issue, configure, and manage token and token supply
+            - Transfer tokens on your behalf
+            - Enable automatic debit of balances
+        ",
+    }
+    functions {
+        None => [decimal_to_u64, u64_to_decimal],
+        Low => [],
+        Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
+        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
+    }
+}
+
 struct TokensPlugin;
 
 impl TokensPlugin {
@@ -70,6 +95,8 @@ impl TokensPlugin {
 
 impl Issuer for TokensPlugin {
     fn create(precision: u8, max_supply: Decimal) -> Result<(), Error> {
+        assert_authorized(FunctionName::create)?;
+
         let max_issued_supply =
             Quantity::from_str(&max_supply, precision.try_into().unwrap()).unwrap();
 
@@ -83,6 +110,8 @@ impl Issuer for TokensPlugin {
     }
 
     fn recall(token_id: u32, amount: Decimal, memo: String, account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::recall)?;
+
         let packed_args = Actions::recall {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),
             from: account.as_str().into(),
@@ -94,6 +123,8 @@ impl Issuer for TokensPlugin {
     }
 
     fn mint(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::mint)?;
+
         let packed_args = Actions::mint {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
@@ -104,6 +135,8 @@ impl Issuer for TokensPlugin {
     }
 
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::map_symbol)?;
+
         let packed_args = Actions::mapSymbol {
             token_id,
             symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
@@ -113,10 +146,12 @@ impl Issuer for TokensPlugin {
     }
 
     fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {
+        assert_authorized(FunctionName::enable_token_untransferable)?;
         Self::set_token_flag(token_id, TokenFlags::UNTRANSFERABLE, enable)
     }
 
     fn enable_token_unrecallable(token_id: u32, enable: bool) -> Result<(), Error> {
+        assert_authorized(FunctionName::enable_token_unrecallable)?;
         Self::set_token_flag(token_id, TokenFlags::UNRECALLABLE, enable)
     }
 }
@@ -139,6 +174,8 @@ impl Helpers for TokensPlugin {
 
 impl User for TokensPlugin {
     fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
+
         let packed_args = Actions::credit {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
@@ -156,6 +193,8 @@ impl User for TokensPlugin {
         amount: Decimal,
         memo: String,
     ) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::uncredit, vec!["homepage".into()])?;
+
         let packed_args = Actions::uncredit {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
@@ -168,6 +207,8 @@ impl User for TokensPlugin {
     }
 
     fn debit(token_id: u32, creditor: String, amount: Decimal, memo: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::debit, vec!["homepage".into()])?;
+
         let packed_args = Actions::debit {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),
             creditor: creditor.as_str().into(),
@@ -180,6 +221,8 @@ impl User for TokensPlugin {
     }
 
     fn reject(token_id: u32, creditor: String, memo: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::reject, vec!["homepage".into()])?;
+
         let packed_args = Actions::reject {
             creditor: creditor.as_str().into(),
             token_id,
@@ -191,6 +234,8 @@ impl User for TokensPlugin {
     }
 
     fn burn(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::burn, vec!["homepage".into()])?;
+
         let packed_args = Actions::burn {
             amount: Self::decimal_to_u64(token_id, amount)?.into(),
             memo: memo.try_into().unwrap(),
@@ -203,22 +248,42 @@ impl User for TokensPlugin {
 
 impl UserConfig for TokensPlugin {
     fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::enable_user_manual_debit,
+            vec!["homepage".into()],
+        )?;
         Self::set_user_flag(BalanceFlags::MANUAL_DEBIT, enable)
     }
 
     fn enable_user_keep_zero_balances(enable: bool) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::enable_user_keep_zero_balances,
+            vec!["homepage".into()],
+        )?;
         Self::set_user_flag(BalanceFlags::KEEP_ZERO_BALANCES, enable)
     }
 
     fn enable_balance_manual_debit(token_id: u32, enable: bool) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::enable_balance_manual_debit,
+            vec!["homepage".into()],
+        )?;
         Self::set_balance_flag(token_id, BalanceFlags::MANUAL_DEBIT, enable)
     }
 
     fn enable_balance_keep_zero_balances(token_id: u32, enable: bool) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::enable_balance_keep_zero_balances,
+            vec!["homepage".into()],
+        )?;
         Self::set_balance_flag(token_id, BalanceFlags::KEEP_ZERO_BALANCES, enable)
     }
 
     fn del_balance_config(token_id: u32) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::del_balance_config,
+            vec!["homepage".into()],
+        )?;
         let packed_args = Actions::delBalConf { token_id }.packed();
 
         add_action_to_transaction(Actions::delBalConf::ACTION_NAME, &packed_args)

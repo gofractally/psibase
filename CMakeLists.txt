@@ -139,7 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XSocketListService)
+        XProxy XSocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1237,6 +1237,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XProxy.psi
+    NAME XProxy
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Simple reverse proxy"
+    SERVICE x-proxy
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
+        SERVER x-proxy
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XSocketList.psi
     NAME XSocketList
     VERSION ${PSIBASE_VERSION}.0
@@ -1249,7 +1261,7 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList)
 
 ExternalProject_Add(
     rust
