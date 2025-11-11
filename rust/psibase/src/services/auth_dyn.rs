@@ -46,7 +46,7 @@ pub mod Int {
     use crate::{services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber};
 
     #[action]
-    pub fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+    pub fn get_policy(account: AccountNumber) -> Option<DynamicAuthPolicy> {
         unimplemented!()
     }
 
