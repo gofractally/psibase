@@ -6,9 +6,9 @@ mod types;
 
 use crate::trust::*;
 use bindings::registry::plugin::types::AppMetadata;
-use ::registry::action_structs::*;
 use exports::registry::plugin::developer::Guest as Developer;
 use psibase::fracpack::Pack;
+use registry::action_structs::*;
 use transact::plugin::intf as Transact;
 
 psibase::define_trust! {
@@ -36,7 +36,8 @@ struct RegistryPlugin;
 
 impl Developer for RegistryPlugin {
     fn set_metadata(metadata: AppMetadata) {
-        assert_authorized(FunctionName::set_metadata).unwrap();
+        assert_authorized_with_whitelist(FunctionName::set_metadata, vec!["workshop".to_string()])
+            .unwrap();
 
         Transact::add_action_to_transaction(
             setMetadata::ACTION_NAME,
@@ -46,13 +47,15 @@ impl Developer for RegistryPlugin {
     }
 
     fn publish() {
-        assert_authorized(FunctionName::publish).unwrap();
+        assert_authorized_with_whitelist(FunctionName::publish, vec!["workshop".to_string()])
+            .unwrap();
 
         Transact::add_action_to_transaction(publish::ACTION_NAME, &publish {}.packed()).unwrap();
     }
 
     fn unpublish() {
-        assert_authorized(FunctionName::unpublish).unwrap();
+        assert_authorized_with_whitelist(FunctionName::unpublish, vec!["workshop".to_string()])
+            .unwrap();
 
         Transact::add_action_to_transaction(unpublish::ACTION_NAME, &unpublish {}.packed())
             .unwrap();
