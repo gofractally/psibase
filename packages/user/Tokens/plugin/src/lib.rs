@@ -12,7 +12,7 @@ use Exports::{
     user::Guest as User, user_config::Guest as UserConfig,
 };
 
-use bindings::host::common::{client, server};
+use bindings::host::common::server;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -44,7 +44,7 @@ psibase::define_trust! {
         None => [decimal_to_u64, u64_to_decimal],
         Low => [],
         Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
-        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
+        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit, graphql],
     }
 }
 
@@ -292,13 +292,7 @@ impl UserConfig for TokensPlugin {
 
 impl Authorized for TokensPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        // TODO: Delete the below check and replace with a permissions check.
-        // Should be trust = high, with whitelist = "homepage"
-        let sender = client::get_sender();
-        assert!(
-            sender == client::get_receiver() || sender == "homepage",
-            "Unauthorized"
-        );
+        assert_authorized_with_whitelist(FunctionName::graphql, vec!["homepage".into()])?;
 
         server::post_graphql_get_json(&query)
     }
