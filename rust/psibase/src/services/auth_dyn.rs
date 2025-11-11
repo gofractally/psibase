@@ -49,6 +49,11 @@ pub mod Int {
     pub fn get_policy(account: AccountNumber) -> Option<DynamicAuthPolicy> {
         unimplemented!()
     }
+
+    #[action]
+    pub fn has_policy(account: AccountNumber) -> bool {
+        unimplemented!()
+    }
 }
 
 #[crate::service(name = "auth-dyn", dispatch = false, psibase_mod = "crate")]

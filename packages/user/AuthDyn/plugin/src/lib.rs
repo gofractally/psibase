@@ -14,27 +14,27 @@ define_trust! {
     descriptions {
         Low => "",
         Medium => "",
-        High => "Set the policy service for an account",
+        High => "Set the manager service for an account",
     }
     functions {
-        High => [set_policy],
+        High => [set_management],
     }
 }
 
 struct AuthDynPlugin;
 
 impl Api for AuthDynPlugin {
-    fn set_policy(account: String, policy: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_policy)?;
+    fn set_management(account: String, manager: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_management)?;
 
-        let packed_args = auth_dyn::action_structs::set_policy {
+        let packed_args = auth_dyn::action_structs::set_mgmt {
             account: account.as_str().into(),
-            policy: policy.as_str().into(),
+            manager: manager.as_str().into(),
         }
         .packed();
 
         add_action_to_transaction(
-            auth_dyn::action_structs::set_policy::ACTION_NAME,
+            auth_dyn::action_structs::set_mgmt::ACTION_NAME,
             &packed_args,
         )
     }
