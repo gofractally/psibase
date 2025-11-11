@@ -71,6 +71,7 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_block_signing)
     set_tests_properties(psinode_test_block_signing PROPERTIES PROCESSORS 4)
     add_psinode_test(test_config)
+    add_psinode_test(test_fetch)
 endif()
 
 include(GNUInstallDirs)
