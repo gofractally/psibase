@@ -429,16 +429,38 @@ namespace psibase
       }
 
       template <typename R = HttpReply, typename T>
-      R post(AccountNumber account, std::string_view target, const T& data)
+      R post(AccountNumber                   account,
+             std::string_view                target,
+             const T&                        data,
+             std::optional<std::string_view> token = std::nullopt)
       {
-         return http<R>(makePost(account, target, data));
+         auto req = makePost(account, target, data);
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
+         return http<R>(req);
       }
 
       template <typename R = HttpReply>
-      R get(AccountNumber account, std::string_view target)
+      R get(AccountNumber                   account,
+            std::string_view                target,
+            std::optional<std::string_view> token = std::nullopt)
       {
-         return http<R>(makeGet(account, target));
+         auto req = makeGet(account, target);
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
+         return http<R>(req);
       }
+
+      /**
+       * Login to a service with an account that uses auth-any (no proofs needed to login)
+       */
+      std::string login(AccountNumber user, AccountNumber service);
 
       AsyncHttpReply asyncHttp(const HttpRequest& request);
       template <typename T>
