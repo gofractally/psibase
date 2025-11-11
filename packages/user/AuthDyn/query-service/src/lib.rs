@@ -2,28 +2,28 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use auth_dyn::tables::{Policy, PolicyTable};
+    use auth_dyn::tables::{Management, ManagementTable};
     use psibase::*;
 
     struct Query;
 
     #[Object]
     impl Query {
-        async fn policy(&self, account: AccountNumber) -> Option<Policy> {
-            Policy::get(account)
+        async fn management(&self, account: AccountNumber) -> Option<Management> {
+            Management::get(account)
         }
 
-        async fn policies(
+        async fn managements(
             &self,
-            policy: AccountNumber,
+            manager: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, Policy>> {
+        ) -> async_graphql::Result<Connection<RawKey, Management>> {
             TableQuery::subindex::<AccountNumber>(
-                PolicyTable::with_service(auth_dyn::SERVICE).get_index_by_policy(),
-                &(policy),
+                ManagementTable::with_service(auth_dyn::SERVICE).get_index_by_manager(),
+                &(manager),
             )
             .first(first)
             .last(last)

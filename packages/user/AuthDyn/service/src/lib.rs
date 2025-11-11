@@ -3,42 +3,46 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::auth_dyn::int_structs::get_policy;
     use psibase::{
-        check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber, Caller,
-        Fracpack, ServiceCaller, Table, ToSchema,
+        check, check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber,
+        Caller, Fracpack, ServiceCaller, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "PolicyTable", index = 0)]
+    #[table(name = "ManagementTable", index = 0)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Policy {
+    pub struct Management {
         #[primary_key]
         pub account: AccountNumber,
-        pub policy: AccountNumber,
+        pub manager: AccountNumber,
     }
 
-    impl Policy {
+    impl Management {
         #[secondary_key(1)]
-        fn by_policy(&self) -> (AccountNumber, AccountNumber) {
-            (self.policy, self.account)
+        fn by_manager(&self) -> (AccountNumber, AccountNumber) {
+            (self.manager, self.account)
         }
 
-        fn new(account: AccountNumber, policy: AccountNumber) -> Self {
-            Self { account, policy }
+        fn new(account: AccountNumber, manager: AccountNumber) -> Self {
+            Self { account, manager }
         }
 
         pub fn get(account: AccountNumber) -> Option<Self> {
-            PolicyTable::read().get_index_pk().get(&account)
+            ManagementTable::read().get_index_pk().get(&account)
         }
 
         pub fn get_assert(account: AccountNumber) -> Self {
-            check_some(Self::get(account), "failed to find policy")
+            check_some(Self::get(account), "failed to find management")
+        }
+
+        pub fn has_policy(&self) -> bool {
+            psibase::services::auth_dyn::int_wrapper::call_to(self.manager).has_policy(self.account)
         }
 
         pub fn dynamic_policy(&self) -> DynamicAuthPolicy {
             let service_caller = ServiceCaller {
                 flags: 0,
                 sender: crate::Wrapper::SERVICE,
-                service: self.policy,
+                service: self.manager,
             };
 
             service_caller.call(
@@ -55,15 +59,22 @@ pub mod tables {
             instance
         }
 
+        pub fn assert_has_policy(&self) {
+            check(
+                self.has_policy(),
+                "management service does not support user",
+            )
+        }
+
         fn save(&self) {
-            PolicyTable::read_write().put(self).unwrap();
+            ManagementTable::read_write().put(self).unwrap();
         }
     }
 }
 
 #[psibase::service(name = "auth-dyn", tables = "tables", recursive = true)]
 pub mod service {
-    use crate::tables::Policy;
+    use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
     use psibase::services::transact::ServiceMethod;
@@ -73,24 +84,24 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn newAccount(account: AccountNumber) {
-        Policy::set(account, get_sender());
+        Management::set(account, get_sender());
         Accounts::call().newAccount(account, Wrapper::SERVICE, true);
     }
 
     #[action]
-    fn set_policy(account: AccountNumber, policy: AccountNumber) {
+    fn set_mgmt(account: AccountNumber, manager: AccountNumber) {
         check(
-            Accounts::call().exists(policy),
-            "policy account does not exist",
+            Accounts::call().exists(manager),
+            "manager account does not exist",
         );
         check(Accounts::call().exists(account), "account does not exist");
 
         let sender = get_sender();
-        let existing_policy = Policy::get(account);
-        if let Some(existing_policy) = existing_policy {
+        let existing_management = Management::get(account);
+        if let Some(existing_management) = existing_management {
             check(
-                sender == existing_policy.policy,
-                "existing policies must be updated by policy account",
+                sender == existing_management.manager,
+                "existing managements must be updated by management account",
             )
         } else {
             check(
@@ -99,7 +110,8 @@ pub mod service {
             );
         }
 
-        Policy::set(account, policy);
+        let management = Management::set(account, manager);
+        management.assert_has_policy();
     }
 
     #[action]
@@ -184,7 +196,7 @@ pub mod service {
         }
         auth_set.push(sender);
 
-        let dynamic_auth_policy = Policy::get_assert(sender).dynamic_policy();
+        let dynamic_auth_policy = Management::get_assert(sender).dynamic_policy();
 
         match dynamic_auth_policy {
             DynamicAuthPolicy::Single(single_auth) => {
@@ -253,6 +265,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
-        check_some(Policy::get(user), "no policy set for user");
+        let management = check_some(Management::get(user), "no manager set for user");
+        management.assert_has_policy();
     }
 }
