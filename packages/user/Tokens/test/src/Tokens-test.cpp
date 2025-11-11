@@ -2,7 +2,6 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
-#include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/RTokens.hpp>
 #include <services/user/Tokens.hpp>
@@ -795,10 +794,9 @@ TEST_CASE("Testing custom tokens")
       }
    }
 }
+
 TEST_CASE("GraphQL Queries")
 {
-   using SystemService::Transact;
-
    DefaultTestChain t;
 
    auto alice = t.from(t.addAccount("alice"_a));
