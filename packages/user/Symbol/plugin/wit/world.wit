@@ -13,7 +13,6 @@ interface api {
 interface admin {
     use host:types/types.{error};
 
-
     /// Initialize the symbol service and specify which token to bill in
     init: func(token-id: u32) -> result<_, error>;
 
