@@ -26,13 +26,21 @@ struct SymbolLength {
 pub struct SymbolRecord {
     pub symbolId: SID,
     pub ownerNft: NID,
-    pub tokenId: Option<TID>,
+}
+
+#[derive(
+    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct Mapping {
+    pub tokenId: TID,
+    pub symbolId: AccountNumber,
 }
 
 #[crate::service(name = "symbol", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod Service {
-    use crate::services::symbol::{SymbolLength, SymbolRecord, SID};
+    use crate::services::symbol::{Mapping, SymbolLength, SymbolRecord, SID};
     use crate::services::tokens::TID;
     use crate::{services::tokens::Quantity, AccountNumber};
 
@@ -57,7 +65,12 @@ pub mod Service {
     }
 
     #[action]
-    fn getByToken(token_id: TID) -> Option<SymbolRecord> {
+    fn getByToken(token_id: TID) -> Option<Mapping> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getMapBySym(symbol: AccountNumber) -> Option<Mapping> {
         unimplemented!()
     }
 

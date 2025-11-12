@@ -52,8 +52,8 @@ pub mod tables {
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
-            let token = psibase::services::symbol::Wrapper::call().getSymbol(symbol);
-            Self::get(token.tokenId?)
+            let mapping = psibase::services::symbol::Wrapper::call().getMapBySym(symbol)?;
+            Self::get(mapping.tokenId)
         }
 
         fn check_is_owner(&self, account: AccountNumber) {

@@ -213,13 +213,13 @@ pub mod tables {
         #[primary_key]
         pub tokenId: TID,
         #[graphql(skip)]
-        pub symbol: AccountNumber,
+        pub symbolId: AccountNumber,
     }
 
     impl Mapping {
         #[secondary_key(1)]
         fn by_symbol(&self) -> AccountNumber {
-            self.symbol
+            self.symbolId
         }
 
         pub fn get(tokenId: TID) -> Option<Self> {
@@ -234,8 +234,8 @@ pub mod tables {
             MappingTable::read().get_index_by_symbol().get(&symbol)
         }
 
-        fn new(tokenId: TID, symbol: AccountNumber) -> Self {
-            Self { tokenId, symbol }
+        fn new(tokenId: TID, symbolId: AccountNumber) -> Self {
+            Self { tokenId, symbolId }
         }
 
         pub fn add(tokenId: TID, symbol: AccountNumber) {
@@ -254,7 +254,7 @@ pub mod tables {
     #[ComplexObject]
     impl Mapping {
         pub async fn symbol(&self) -> Symbol {
-            Symbol::get_assert(self.symbol)
+            Symbol::get_assert(self.symbolId)
         }
 
         pub async fn token(&self) -> TokenRecord {
@@ -279,7 +279,7 @@ pub mod service {
         check_none(Config::get(), "service already initialized");
         check(
             get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
-            "only root account can call init",
+            "only root or symbol account can call init",
         );
 
         Config::set(billing_token);
@@ -294,7 +294,7 @@ pub mod service {
 
     #[action]
     fn create(symbol: AccountNumber) {
-        Symbol::add(symbol, true);
+        Symbol::add(symbol, get_sender() != Wrapper::SERVICE);
     }
 
     #[action]
@@ -318,13 +318,18 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getTokenSym(token_id: TID) -> SID {
-        Mapping::get_assert(token_id).symbol
+        Mapping::get_assert(token_id).symbolId
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn getByToken(token_id: TID) -> Option<Mapping> {
         Mapping::get(token_id)
+    }
+
+    #[action]
+    fn getMapBySym(symbol: AccountNumber) -> Option<Mapping> {
+        Mapping::get_by_symbol(symbol)
     }
 
     #[action]
