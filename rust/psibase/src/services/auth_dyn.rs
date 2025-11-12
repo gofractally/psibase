@@ -102,7 +102,7 @@ mod service {
     }
 
     #[action]
-    fn set_policy(account: AccountNumber, policy: AccountNumber) {
+    fn set_mgmt(account: AccountNumber, manager: AccountNumber) {
         unimplemented!()
     }
 }
