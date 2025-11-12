@@ -9,7 +9,7 @@ mod service {
 
     use psibase::*;
     use tokens::{
-        helpers::{identify_token_type, TokenType},
+        helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
             Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
             UserConfig, UserConfigTable,
@@ -33,12 +33,16 @@ mod service {
 
     #[Object]
     impl Query {
+        /// Given a token id, return a record that represents token
+        /// configuration, ownership, and supply details.
         async fn token(&self, token_id: String) -> Option<Token> {
             TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&token_id_to_number(token_id))
         }
 
+        /// Given a user account, return a record that represents the user's
+        /// configuration within the token service.
         async fn user_settings(&self, user: AccountNumber) -> UserConfig {
             UserConfigTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -49,6 +53,9 @@ mod service {
                 })
         }
 
+        /// Given a user account, return a list of records that represent the
+        /// user's current pending outgoing credits. These are tokens that have
+        /// yet to be claimed (debited) by the receiver.
         async fn user_credits(
             &self,
             user: AccountNumber,
@@ -59,7 +66,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
-                &(user),
+                &user,
             )
             .first(first)
             .last(last)
@@ -69,6 +76,9 @@ mod service {
             .await
         }
 
+        /// Given a user account, return a list of records that represent the
+        /// user's current pending incoming debits. These are tokens that were
+        /// credited to the user but have yet to be debited (claimed).
         async fn user_debits(
             &self,
             user: AccountNumber,
@@ -89,6 +99,7 @@ mod service {
             .await
         }
 
+        /// Returns the specified user's current balances for all of their tokens.
         async fn user_balances(
             &self,
             user: AccountNumber,
@@ -109,19 +120,25 @@ mod service {
             .await
         }
 
-        async fn user_balance(&self, user: AccountNumber, token_id: String) -> Balance {
+        /// Returns the specified user's current balance for the specified token.
+        async fn user_balance(
+            &self,
+            user: AccountNumber,
+            token_id: String,
+        ) -> async_graphql::Result<Balance> {
             let token_id = token_id_to_number(token_id);
 
-            BalanceTable::with_service(tokens::SERVICE)
+            Ok(BalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&(user, token_id))
                 .unwrap_or(Balance {
                     account: user,
                     balance: 0.into(),
                     token_id,
-                })
+                }))
         }
 
+        /// Returns a list of all tokens for which the specified user is the owner/issuer.
         async fn user_tokens(&self, user: AccountNumber) -> Vec<Token> {
             let tokens: Vec<Token> = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -137,6 +154,8 @@ mod service {
                 .collect()
         }
 
+        /// Returns a paginated subset of all historical events (that haven't yet been pruned
+        /// from this node) related to changes to the configuration of the specified token.
         async fn configurations(
             &self,
             token_id: TID,
@@ -154,6 +173,9 @@ mod service {
                 .query()
         }
 
+        /// Returns a paginated subset of all historical events (that haven't yet been pruned
+        /// from this node) related to changes to the supply of the specified token.
+        /// Changes in supply happen when tokens are minted, burned, or recalled.
         async fn supplyChanges(
             &self,
             token_id: TID,
@@ -171,20 +193,101 @@ mod service {
                 .query()
         }
 
+        /// Returns a paginated subset of all historical events (that haven't yet been pruned
+        /// from this node) related to changes to the balances of the specified token for the
+        /// specified user.
+        /// Changes in the balance of at least one user happen when tokens are recalled, burned,
+        /// credited, debited, uncredited, rejected.
         async fn balChanges(
             &self,
             token_id: TID,
             account: AccountNumber,
+            counter_parties: Option<Vec<String>>,
+            excluded_counter_parties: Option<Vec<String>>,
+            action: Option<String>,
+            amount_min: Option<String>,
+            amount_max: Option<String>,
+            memo: Option<String>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+            let precision = TokenTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&token_id)
+                .ok_or_else(|| {
+                    async_graphql::Error::new(format!("token '{}' not found", token_id))
+                })?
+                .precision
+                .value();
+
+            // Create fixed-precision string versions of the specified amount bounds
+            let min_fixed = amount_min.as_deref().map(|s| to_fixed(s, precision));
+            let max_fixed = amount_max.as_deref().map(|s| to_fixed(s, precision));
+
+            let mut conditions = vec![format!("token_id = {}", token_id)];
+            let mut params = Vec::new();
+
+            conditions.push("account = ?".to_string());
+            params.push(account.to_string());
+
+            if let Some(cps) = &counter_parties {
+                if !cps.is_empty() {
+                    let cp_conditions: Vec<String> = (0..cps.len())
+                        .map(|_| "counter_party LIKE ?".to_string())
+                        .collect();
+                    conditions.push(format!("({})", cp_conditions.join(" OR ")));
+                    for cp in cps {
+                        params.push(format!("%{}%", cp));
+                    }
+                }
+            }
+
+            if let Some(excluded_cps) = &excluded_counter_parties {
+                if !excluded_cps.is_empty() {
+                    let excluded_conditions: Vec<String> = (0..excluded_cps.len())
+                        .map(|_| "counter_party NOT LIKE ?".to_string())
+                        .collect();
+                    conditions.push(format!("{}", excluded_conditions.join(" AND ")));
+                    for cp in excluded_cps {
+                        params.push(format!("%{}%", cp));
+                    }
+                }
+            }
+
+            if let Some(act) = &action {
+                conditions.push("action = ?".to_string());
+                params.push(act.clone());
+            }
+
+            if let Some(min) = &min_fixed {
+                conditions.push(
+                    "(length(amount) > length(?) OR (length(amount) = length(?) AND amount >= ?))"
+                        .to_string(),
+                );
+                params.push(min.clone());
+                params.push(min.clone());
+                params.push(min.clone());
+            }
+
+            if let Some(max) = &max_fixed {
+                conditions.push(
+                    "(length(amount) < length(?) OR (length(amount) = length(?) AND amount <= ?))"
+                        .to_string(),
+                );
+                params.push(max.clone());
+                params.push(max.clone());
+                params.push(max.clone());
+            }
+
+            if let Some(m) = &memo {
+                conditions.push("memo LIKE ?".to_string());
+                params.push(format!("%{}%", m));
+            }
+
             EventQuery::new("history.tokens.balChanged")
-                .condition(format!(
-                    "token_id = {} AND account = '{}'",
-                    token_id, account
-                ))
+                .condition_with_params(conditions.join(" AND "), params)
                 .first(first)
                 .last(last)
                 .before(before)

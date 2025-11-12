@@ -14,15 +14,29 @@ use psibase::fracpack::Pack;
 mod errors;
 use errors::ErrorType;
 
+fn assert_caller(allowed: &[&str], context: &str) {
+    let sender = host::common::client::get_sender();
+    assert!(
+        allowed.contains(&sender.as_str()),
+        "{} can only be called by {:?}",
+        context,
+        allowed
+    );
+}
+
 struct BrandingPlugin;
 
 impl Api for BrandingPlugin {
     fn set_network_name(name: String) {
+        assert_caller(&["config"], "set_network_name");
+
         let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
 
     fn set_logo(logo: Vec<u8>) {
+        assert_caller(&["config"], "set_logo");
+
         upload(
             &File {
                 path: "/network_logo.svg".to_string(),

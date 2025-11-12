@@ -7,10 +7,10 @@
             "@/*": ["./src/*"],
             "@shared/*": ["../../../shared-ui/*"],
             "@psibase/common-lib": [
-                "../../CommonApi/common/packages/common-lib/src"
+                "../../../user/CommonApi/common/packages/common-lib/src"
             ],
             "@psibase/common-lib/*": [
-                "../../CommonApi/common/packages/common-lib/src/*"
+                "../../../user/CommonApi/common/packages/common-lib/src/*"
             ],
             "wasm-transpiled": ["./wasm-transpiled/x_admin.d.ts"]
         }

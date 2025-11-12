@@ -22,7 +22,6 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import { useCanExportAccount } from "@/hooks/use-can-export-account";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
@@ -31,6 +30,7 @@ import { useSelectAccount } from "@/hooks/use-select-account";
 import { zAccount } from "@/lib/zod/Account";
 
 import { Avatar } from "@shared/components/avatar";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -125,7 +125,11 @@ export function NavUser() {
         (account) => account.toLowerCase() !== currentUser?.toLowerCase(),
     );
 
-    const { mutateAsync: login } = useCreateConnectionToken();
+    const { mutateAsync: login } = useConnectAccount({
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
     const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
         useSelectAccount();
 

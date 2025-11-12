@@ -1,6 +1,5 @@
-import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
-
 import { Avatar } from "@shared/components/avatar";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -8,12 +7,17 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useConnectedAccounts } from "./hooks/use-connected-accounts";
 import { useSelectAccount } from "./hooks/use-select-account";
 
 export const LoginButton = () => {
-    const { mutate: login, isPending } = useCreateConnectionToken();
+    const { mutate: login, isPending } = useConnectAccount({
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
     const { data: connectedAccounts } = useConnectedAccounts();
 
     const isNoOptions = connectedAccounts && connectedAccounts.length == 0;
