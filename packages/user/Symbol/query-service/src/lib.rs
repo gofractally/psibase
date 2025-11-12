@@ -17,14 +17,19 @@ mod service {
 
     #[Object]
     impl Query {
+
+        /// Fetch price information according to symbol length
         async fn symbol_length(&self, length: u8) -> Option<SymbolLength> {
             SymbolLength::get(length)
         }
 
+
+        /// Fetch symbol information, returns null if it does not exist 
         async fn symbol(&self, symbol: String) -> Option<Symbol> {
             Symbol::get(symbol.as_str().into())
         }
 
+        // Symbol created events
         async fn symbol_created(
             &self,
             first: Option<i32>,
