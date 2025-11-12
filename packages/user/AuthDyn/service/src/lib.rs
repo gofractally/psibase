@@ -71,7 +71,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn newAccount(account: AccountNumber, require_new: bool) {
+    fn newAccount(account: AccountNumber) {
         let existing_management = Management::get(account);
         if let Some(management) = existing_management {
             check(
@@ -80,8 +80,8 @@ pub mod service {
             );
         } else {
             Management::set(account, get_sender());
+            Accounts::call().newAccount(account, Wrapper::SERVICE, true);
         }
-        Accounts::call().newAccount(account, Wrapper::SERVICE, require_new);
     }
 
     #[action]
@@ -200,6 +200,9 @@ pub mod service {
                 } else {
                     total_possible_weight - multi_auth.threshold + 1
                 };
+
+                // TODO: add partition
+                let (already_approved, to_check) = multi_auth.;
 
                 let mut total_weight_approved = 0;
 
