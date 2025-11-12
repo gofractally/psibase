@@ -305,13 +305,16 @@ class API:
         return self.push_action('producers', 'producers', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
 
     # Queries
-    def graphql(self, service, query):
+    def graphql(self, service, query, token=None):
         '''
         Sends a GraphQL query to a service and returns the result as json
 
         Raise GraphQLError if the query fails
         '''
-        with self.post('/graphql', service=service, json={'query': query}) as result:
+        kwargs = {'json': {'query': query}}
+        if token is not None:
+            kwargs['headers'] = {'Authorization': 'Bearer ' + token}
+        with self.post('/graphql', service=service, **kwargs) as result:
             result.raise_for_status()
             json = result.json()
             if 'errors' in json:
@@ -403,13 +406,13 @@ class Service(object):
         Raise TransactionError if the transaction fails
         '''
         return self.api.push_action(sender, self.service, method, data, keys)
-    def graphql(self, query):
+    def graphql(self, query, token=None):
         '''
         Sends a GraphQL query to a service and returns the result as json
 
         Raise GraphQLError if the query fails
         '''
-        return self.api.graphql(self.service, query)
+        return self.api.graphql(self.service, query, token)
 
 _default_config = '''# psinode config
 service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
