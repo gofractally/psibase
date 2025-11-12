@@ -9,11 +9,11 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn management(&self, account: AccountNumber) -> Option<Management> {
+        async fn get_management(&self, account: AccountNumber) -> Option<Management> {
             Management::get(account)
         }
 
-        async fn managements(
+        async fn get_managed(
             &self,
             manager: AccountNumber,
             first: Option<i32>,
