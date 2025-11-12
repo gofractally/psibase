@@ -222,6 +222,10 @@ pub mod tables {
             self.symbolId
         }
 
+        fn new(tokenId: TID, symbolId: AccountNumber) -> Self {
+            Self { tokenId, symbolId }
+        }
+
         pub fn get(tokenId: TID) -> Option<Self> {
             MappingTable::read().get_index_pk().get(&tokenId)
         }
@@ -232,10 +236,6 @@ pub mod tables {
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
             MappingTable::read().get_index_by_symbol().get(&symbol)
-        }
-
-        fn new(tokenId: TID, symbolId: AccountNumber) -> Self {
-            Self { tokenId, symbolId }
         }
 
         pub fn add(tokenId: TID, symbol: AccountNumber) {
