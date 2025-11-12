@@ -4,7 +4,7 @@ interface api {
     use host:types/types.{error};
 
     /// Create / purchase a new symbol
-    create: func(symbol: string, amount: string) -> result<_, error>;
+    create: func(symbol: string, token-id: u32, amount: string) -> result<_, error>;
 
     /// Maps a symbol to a token ID
     map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;

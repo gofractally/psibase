@@ -12,22 +12,39 @@ use psibase::{define_trust, AccountNumber};
 
 define_trust! {
     descriptions {
-        Low => "",
-        Medium => "",
+        Medium => "
+        Medium trust grants the abilities
+            - Purchase new symbols",
         High => "
-        Creates new symbols and map them to tokens.
-        ",
+        High trust grants the abilities of the Medium trust level, plus these abilities:
+            - Map symbols to tokens.",
+        Max => "
+        🚨 WARNING 🚨 
+        Max trust grants the abilities of all lower trust levels, plus these abilities:
+            Intialize and set the billing token for the symbol service.",
     }
     functions {
-        High => [create, init, map_symbol],
+        Medium => [create],
+        High => [map_symbol],
+        Max => [init],
     }
 }
 
 struct SymbolPlugin;
 
 impl Api for SymbolPlugin {
-    fn create(symbol: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::create)?;
+    fn create(symbol: String, token_id: u32, amount: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::create,
+            vec!["config".to_string()],
+        )?;
+
+        bindings::tokens::plugin::user::credit(
+            token_id,
+            &symbol::Wrapper::SERVICE.to_string(),
+            &amount,
+            "".into(),
+        )?;
 
         let packed_args = symbol::action_structs::create {
             symbol: AccountNumber::from(symbol.as_str()),
@@ -37,7 +54,10 @@ impl Api for SymbolPlugin {
     }
 
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::map_symbol)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::map_symbol,
+            vec!["config".to_string()],
+        )?;
 
         let packed_args = symbol::action_structs::mapSymbol {
             token_id,
@@ -50,7 +70,10 @@ impl Api for SymbolPlugin {
 
 impl Admin for SymbolPlugin {
     fn init(token_id: u32) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::init)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::init,
+            vec!["config".to_string()],
+        )?;
 
         let packed_args = symbol::action_structs::init {
             billing_token: token_id,
