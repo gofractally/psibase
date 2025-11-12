@@ -77,8 +77,7 @@ pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
-    use psibase::services::transact::ServiceMethod;
-    use psibase::ServiceCaller;
+    use psibase::services::transact::{AuthWrapper, ServiceMethod};
     use psibase::*;
 
     #[action]
@@ -153,33 +152,14 @@ pub mod service {
         auth_set: Vec<AccountNumber>,
         is_approval: bool,
     ) -> bool {
-        use psibase::services::transact::auth_interface::auth_action_structs;
+        use psibase::services::transact::auth_interface::AuthWrapper;
 
-        let auth_service = Accounts::call().getAuthOf(sender);
-        let service_caller = ServiceCaller {
-            sender: Wrapper::SERVICE,
-            service: auth_service,
-            flags: 0,
-        };
+        let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
 
         if is_approval {
-            service_caller.call(
-                auth_action_structs::isAuthSys::ACTION_NAME.into(),
-                auth_action_structs::isAuthSys {
-                    sender,
-                    authorizers,
-                    authSet: Some(auth_set),
-                },
-            )
+            auth_service.isAuthSys(sender, authorizers, Some(auth_set))
         } else {
-            service_caller.call(
-                auth_action_structs::isRejectSys::ACTION_NAME.into(),
-                auth_action_structs::isRejectSys {
-                    sender,
-                    rejecters: authorizers,
-                    authSet: Some(auth_set),
-                },
-            )
+            auth_service.isRejectSys(sender, authorizers, Some(auth_set))
         }
     }
 
@@ -202,7 +182,7 @@ pub mod service {
                 authorizers.contains(&single_auth.authorizer)
                     || is_auth_other(single_auth.authorizer, authorizers, auth_set, is_approval)
             }
-            Some(DynamicAuthPolicy::Multi(mut multi_auth)) => {
+            Some(DynamicAuthPolicy::Multi(multi_auth)) => {
                 check(
                     multi_auth.threshold != 0,
                     "multi auth threshold cannot be 0",
