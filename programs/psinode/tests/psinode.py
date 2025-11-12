@@ -151,7 +151,14 @@ class TransactionError(Exception):
 
 class GraphQLError(Exception):
     def __init__(self, json):
-        super().__init__(json['errors']['message'])
+        errors = json.get('errors', [])
+        if errors and isinstance(errors, list):
+            message = errors[0].get('message', str(errors[0]))
+        elif isinstance(errors, dict):
+            message = errors.get('message', str(errors))
+        else:
+            message = str(errors)
+        super().__init__(message)
         self.json = json
 
 class PrivateKey:
