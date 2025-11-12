@@ -1,10 +1,10 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::services::auth_dyn::int_structs::get_policy;
+    use psibase::services::auth_dyn::int_wrapper;
     use psibase::{
         check, check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber,
-        Caller, Fracpack, ServiceCaller, Table, ToSchema,
+        Fracpack, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -35,22 +35,11 @@ pub mod tables {
         }
 
         pub fn has_policy(&self) -> bool {
-            psibase::services::auth_dyn::int_wrapper::call_to(self.manager).has_policy(self.account)
+            int_wrapper::call_to(self.manager).has_policy(self.account)
         }
 
         pub fn dynamic_policy(&self) -> Option<DynamicAuthPolicy> {
-            let service_caller = ServiceCaller {
-                flags: 0,
-                sender: crate::Wrapper::SERVICE,
-                service: self.manager,
-            };
-
-            service_caller.call(
-                get_policy::ACTION_NAME.into(),
-                get_policy {
-                    account: self.account,
-                },
-            )
+            int_wrapper::call_to(self.manager).get_policy(self.account)
         }
 
         pub fn set(account: AccountNumber, policy: AccountNumber) -> Self {
@@ -78,7 +67,6 @@ pub mod service {
     use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
     use psibase::services::transact::ServiceMethod;
-    use psibase::ServiceCaller;
     use psibase::*;
 
     #[action]
@@ -132,54 +120,35 @@ pub mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        auth_set: Option<Vec<AccountNumber>>,
+        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, auth_set, true)
+        is_auth(sender, authorizers, authSet, true)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn isRejectSys(
         sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        auth_set: Option<Vec<AccountNumber>>,
+        rejecters: Vec<AccountNumber>,
+        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, auth_set, false)
+        is_auth(sender, rejecters, authSet, false)
     }
 
     fn is_auth_other(
-        auth_service: AccountNumber,
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         auth_set: Vec<AccountNumber>,
         is_approval: bool,
     ) -> bool {
-        use psibase::services::auth_delegate::action_structs;
+        use psibase::services::transact::auth_interface::AuthWrapper;
 
-        let service_caller = ServiceCaller {
-            sender: Wrapper::SERVICE,
-            service: auth_service,
-            flags: 0,
-        };
+        let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
 
         if is_approval {
-            service_caller.call(
-                action_structs::isAuthSys::ACTION_NAME.into(),
-                action_structs::isAuthSys {
-                    sender,
-                    authorizers,
-                    auth_set: Some(auth_set),
-                },
-            )
+            auth_service.isAuthSys(sender, authorizers, Some(auth_set))
         } else {
-            service_caller.call(
-                action_structs::isRejectSys::ACTION_NAME.into(),
-                action_structs::isRejectSys {
-                    sender,
-                    authorizers,
-                    auth_set: Some(auth_set),
-                },
-            )
+            auth_service.isRejectSys(sender, authorizers, Some(auth_set))
         }
     }
 
@@ -200,15 +169,9 @@ pub mod service {
             None => false,
             Some(DynamicAuthPolicy::Single(single_auth)) => {
                 authorizers.contains(&single_auth.authorizer)
-                    || is_auth_other(
-                        Accounts::call().getAuthOf(single_auth.authorizer),
-                        single_auth.authorizer,
-                        authorizers,
-                        auth_set,
-                        is_approval,
-                    )
+                    || is_auth_other(single_auth.authorizer, authorizers, auth_set, is_approval)
             }
-            Some(DynamicAuthPolicy::Multi(mut multi_auth)) => {
+            Some(DynamicAuthPolicy::Multi(multi_auth)) => {
                 check(
                     multi_auth.threshold != 0,
                     "multi auth threshold cannot be 0",
@@ -219,30 +182,22 @@ pub mod service {
                     .iter()
                     .fold(0, |acc, authorizer| acc + authorizer.weight);
 
+                check(
+                    multi_auth.threshold <= total_possible_weight,
+                    "threshold exceeds total possible weight",
+                );
+
                 let required_weight = if is_approval {
                     multi_auth.threshold
                 } else {
-                    // Anti-threshold: total - threshold + 1
-                    total_possible_weight
-                        .saturating_sub(multi_auth.threshold)
-                        .saturating_add(1)
+                    total_possible_weight - multi_auth.threshold + 1
                 };
-
-                if total_possible_weight < required_weight {
-                    return false;
-                }
-
-                // Move any multi_auth.authorizers to the front if found in authorizers
-                multi_auth
-                    .authorizers
-                    .sort_by_key(|wa| !authorizers.contains(&wa.account));
 
                 let mut total_weight_approved = 0;
 
                 for weight_authorizer in multi_auth.authorizers {
                     let is_auth = authorizers.contains(&weight_authorizer.account)
                         || is_auth_other(
-                            Accounts::call().getAuthOf(weight_authorizer.account),
                             weight_authorizer.account,
                             authorizers.clone(),
                             auth_set.clone(),
