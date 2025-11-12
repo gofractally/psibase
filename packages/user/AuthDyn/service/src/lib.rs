@@ -226,11 +226,6 @@ pub mod service {
                     return false;
                 }
 
-                // Move any multi_auth.authorizers to the front if found in authorizers
-                multi_auth
-                    .authorizers
-                    .sort_by_key(|wa| !authorizers.contains(&wa.account));
-
                 let mut total_weight_approved = 0;
 
                 for weight_authorizer in multi_auth.authorizers {
