@@ -71,9 +71,17 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn newAccount(account: AccountNumber) {
-        Management::set(account, get_sender());
-        Accounts::call().newAccount(account, Wrapper::SERVICE, true);
+    fn newAccount(account: AccountNumber, require_new: bool) {
+        let existing_management = Management::get(account);
+        if let Some(management) = existing_management {
+            check(
+                management.manager == get_sender(),
+                "new manager conflicts with pre-existing manager",
+            );
+        } else {
+            Management::set(account, get_sender());
+        }
+        Accounts::call().newAccount(account, Wrapper::SERVICE, require_new);
     }
 
     #[action]

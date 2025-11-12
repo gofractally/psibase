@@ -42,7 +42,7 @@ pub mod interfaces {
     psibase_mod = "crate"
 )]
 #[allow(non_snake_case, unused_variables)]
-pub mod Int {
+pub mod AuthDynIntf {
     use crate::{services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber};
 
     #[action]
