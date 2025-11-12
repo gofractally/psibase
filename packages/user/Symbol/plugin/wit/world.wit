@@ -4,10 +4,17 @@ interface api {
     use host:types/types.{error};
 
     create: func(symbol: string) -> result<_, error>;
-    init: func(token-id: u32) -> result<_, error>;
     map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
+}
+
+interface admin {
+    use host:types/types.{error};
+
+    init: func(token-id: u32) -> result<_, error>;
+
 }
 
 world imports {
     import api;
+    import admin;
 }

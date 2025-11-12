@@ -1,14 +1,14 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::exports::symbol::plugin::admin::Guest as Admin;
 use bindings::exports::symbol::plugin::api::Guest as Api;
+
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 use psibase::{define_trust, AccountNumber};
-
-mod errors;
 
 define_trust! {
     descriptions {
@@ -36,16 +36,6 @@ impl Api for SymbolPlugin {
         add_action_to_transaction(symbol::action_structs::create::ACTION_NAME, &packed_args)
     }
 
-    fn init(token_id: u32) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::init)?;
-
-        let packed_args = symbol::action_structs::init {
-            billing_token: token_id,
-        }
-        .packed();
-        add_action_to_transaction(symbol::action_structs::init::ACTION_NAME, &packed_args)
-    }
-
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::map_symbol)?;
 
@@ -55,6 +45,18 @@ impl Api for SymbolPlugin {
         }
         .packed();
         add_action_to_transaction(symbol::action_structs::mapSymbol::ACTION_NAME, &packed_args)
+    }
+}
+
+impl Admin for SymbolPlugin {
+    fn init(token_id: u32) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::init)?;
+
+        let packed_args = symbol::action_structs::init {
+            billing_token: token_id,
+        }
+        .packed();
+        add_action_to_transaction(symbol::action_structs::init::ACTION_NAME, &packed_args)
     }
 }
 

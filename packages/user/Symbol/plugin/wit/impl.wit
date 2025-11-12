@@ -6,4 +6,5 @@ world impl {
     include permissions:plugin/imports;
 
     export api;
+    export admin;
 }
