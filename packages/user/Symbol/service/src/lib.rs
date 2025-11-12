@@ -259,7 +259,7 @@ pub mod service {
 
     #[action]
     fn create(symbol: AccountNumber) {
-        Symbol::add(symbol, true);
+        Symbol::add(symbol, get_sender() != Wrapper::SERVICE);
     }
 
     #[action]
