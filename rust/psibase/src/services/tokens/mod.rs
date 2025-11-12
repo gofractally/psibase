@@ -66,6 +66,11 @@ pub struct Balance {
     pub balance: Quantity,
 }
 
+crate::define_flags!(BalanceFlags, u8, {
+    manual_debit,
+    keep_zero_balance,
+});
+
 #[crate::service(name = "tokens", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {

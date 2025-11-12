@@ -232,7 +232,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::{Config, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
-    use psibase::services::tokens::{Quantity, TID};
+    use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
 
     use psibase::services::nft::Wrapper as Nft;
@@ -248,7 +248,7 @@ pub mod service {
         );
 
         Config::set(billing_token);
-        Tokens::call_from(Wrapper::SERVICE).setUserConf(0, true);
+        Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
 
         // Populate default settings for each token symbol length
