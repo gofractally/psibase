@@ -182,19 +182,16 @@ pub mod service {
                     .iter()
                     .fold(0, |acc, authorizer| acc + authorizer.weight);
 
+                check(
+                    multi_auth.threshold <= total_possible_weight,
+                    "threshold exceeds total possible weight",
+                );
+
                 let required_weight = if is_approval {
                     multi_auth.threshold
                 } else {
-                    // Anti-threshold: total - threshold + 1
-                    total_possible_weight
-                        .saturating_sub(multi_auth.threshold)
-                        .saturating_add(1)
+                    total_possible_weight - multi_auth.threshold + 1
                 };
-
-                check(
-                    total_possible_weight >= required_weight,
-                    "multi auth returned insufficient weight",
-                );
 
                 let mut total_weight_approved = 0;
 
