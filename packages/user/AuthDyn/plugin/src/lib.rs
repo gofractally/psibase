@@ -12,7 +12,8 @@ define_trust! {
     descriptions {
         Low => "",
         Medium => "",
-        High => "Set the manager service for an account",
+        High => "🚨 WARNING 🚨
+This approval allows the caller to change your account's policy service, which could be abused to control your account! Make sure you completely trust the caller's legitimacy.",
     }
     functions {
         High => [set_management],
