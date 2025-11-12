@@ -1,10 +1,10 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::services::auth_dyn::int_structs::get_policy;
+    use psibase::services::auth_dyn::int_wrapper;
     use psibase::{
         check, check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber,
-        Caller, Fracpack, ServiceCaller, Table, ToSchema,
+        Fracpack, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -35,22 +35,11 @@ pub mod tables {
         }
 
         pub fn has_policy(&self) -> bool {
-            psibase::services::auth_dyn::int_wrapper::call_to(self.manager).has_policy(self.account)
+            int_wrapper::call_to(self.manager).has_policy(self.account)
         }
 
         pub fn dynamic_policy(&self) -> Option<DynamicAuthPolicy> {
-            let service_caller = ServiceCaller {
-                flags: 0,
-                sender: crate::Wrapper::SERVICE,
-                service: self.manager,
-            };
-
-            service_caller.call(
-                get_policy::ACTION_NAME.into(),
-                get_policy {
-                    account: self.account,
-                },
-            )
+            int_wrapper::call_to(self.manager).get_policy(self.account)
         }
 
         pub fn set(account: AccountNumber, policy: AccountNumber) -> Self {
@@ -77,7 +66,7 @@ pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
-    use psibase::services::transact::{AuthWrapper, ServiceMethod};
+    use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
     #[action]
