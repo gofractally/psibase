@@ -27,7 +27,7 @@ pub mod tables {
             Self { billing_token }
         }
 
-        pub fn add(billing_token: TID) -> Self {
+        pub fn set(billing_token: TID) -> Self {
             let new_instance = Self::new(billing_token);
             new_instance.save();
             new_instance
@@ -247,7 +247,7 @@ pub mod service {
             "only root account can call init",
         );
 
-        Config::add(billing_token);
+        Config::set(billing_token);
         Tokens::call_from(Wrapper::SERVICE).setUserConf(0, true);
         Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
 
