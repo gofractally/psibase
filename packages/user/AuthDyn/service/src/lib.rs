@@ -222,9 +222,10 @@ pub mod service {
                         .saturating_add(1)
                 };
 
-                if total_possible_weight < required_weight {
-                    return false;
-                }
+                check(
+                    total_possible_weight >= required_weight,
+                    "multi auth returned insufficient weight",
+                );
 
                 let mut total_weight_approved = 0;
 
