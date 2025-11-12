@@ -72,7 +72,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "auth-dyn", tables = "tables")]
+#[psibase::service(name = "auth-dyn", tables = "tables", recursive = true)]
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
@@ -132,30 +132,30 @@ pub mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        auth_set: Option<Vec<AccountNumber>>,
+        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, auth_set, true)
+        is_auth(sender, authorizers, authSet, true)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn isRejectSys(
         sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        auth_set: Option<Vec<AccountNumber>>,
+        rejecters: Vec<AccountNumber>,
+        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, auth_set, false)
+        is_auth(sender, rejecters, authSet, false)
     }
 
     fn is_auth_other(
-        auth_service: AccountNumber,
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         auth_set: Vec<AccountNumber>,
         is_approval: bool,
     ) -> bool {
-        use psibase::services::auth_delegate::action_structs;
+        use psibase::services::transact::auth_interface::auth_action_structs;
 
+        let auth_service = Accounts::call().getAuthOf(sender);
         let service_caller = ServiceCaller {
             sender: Wrapper::SERVICE,
             service: auth_service,
@@ -164,20 +164,20 @@ pub mod service {
 
         if is_approval {
             service_caller.call(
-                action_structs::isAuthSys::ACTION_NAME.into(),
-                action_structs::isAuthSys {
+                auth_action_structs::isAuthSys::ACTION_NAME.into(),
+                auth_action_structs::isAuthSys {
                     sender,
                     authorizers,
-                    auth_set: Some(auth_set),
+                    authSet: Some(auth_set),
                 },
             )
         } else {
             service_caller.call(
-                action_structs::isRejectSys::ACTION_NAME.into(),
-                action_structs::isRejectSys {
+                auth_action_structs::isRejectSys::ACTION_NAME.into(),
+                auth_action_structs::isRejectSys {
                     sender,
-                    authorizers,
-                    auth_set: Some(auth_set),
+                    rejecters: authorizers,
+                    authSet: Some(auth_set),
                 },
             )
         }
@@ -200,13 +200,7 @@ pub mod service {
             None => false,
             Some(DynamicAuthPolicy::Single(single_auth)) => {
                 authorizers.contains(&single_auth.authorizer)
-                    || is_auth_other(
-                        Accounts::call().getAuthOf(single_auth.authorizer),
-                        single_auth.authorizer,
-                        authorizers,
-                        auth_set,
-                        is_approval,
-                    )
+                    || is_auth_other(single_auth.authorizer, authorizers, auth_set, is_approval)
             }
             Some(DynamicAuthPolicy::Multi(mut multi_auth)) => {
                 check(
@@ -242,7 +236,6 @@ pub mod service {
                 for weight_authorizer in multi_auth.authorizers {
                     let is_auth = authorizers.contains(&weight_authorizer.account)
                         || is_auth_other(
-                            Accounts::call().getAuthOf(weight_authorizer.account),
                             weight_authorizer.account,
                             authorizers.clone(),
                             auth_set.clone(),
