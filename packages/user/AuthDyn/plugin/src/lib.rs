@@ -8,8 +8,6 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::define_trust;
 use psibase::fracpack::Pack;
 
-mod errors;
-
 define_trust! {
     descriptions {
         Low => "",
