@@ -4,8 +4,8 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
     use psibase::services::nft::{NftRecord, Wrapper as Nft};
-    use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity};
+    use psibase::services::tokens::{TokenRecord, Wrapper as Tokens};
     use psibase::{
         check, check_some, get_sender,
         services::{nft::NID, tokens::TID},
@@ -99,6 +99,10 @@ pub mod tables {
                     .getToken(Config::get_assert().billing_token)
                     .precision,
             )
+        }
+
+        pub async fn billing_token(&self) -> TokenRecord {
+            Tokens::call().getToken(Config::get_assert().billing_token)
         }
     }
 
@@ -307,4 +311,3 @@ pub mod service {
     #[event(history)]
     fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {}
 }
-
