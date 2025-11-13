@@ -163,6 +163,7 @@ impl Proposer for StagedTxPlugin {
     }
 
     fn remove(id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::remove)?;
         add_action_to_transaction(
             remove::ACTION_NAME,
             &remove {
@@ -208,6 +209,7 @@ impl Respondent for StagedTxPlugin {
     }
 
     fn execute(id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::execute)?;
         add_action_to_transaction(
             execute::ACTION_NAME,
             &execute {

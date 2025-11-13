@@ -25,10 +25,12 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
+        assert_authorized(FunctionName::is_logged_in)?;
         Self::get_current_user().is_some()
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {
+        assert_authorized(FunctionName::get_account)?;
         let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
@@ -70,10 +72,12 @@ impl API for AccountsPlugin {
     }
 
     fn get_current_user() -> Option<String> {
+        assert_authorized(FunctionName::get_current_user)?;
         AppsTable::new(&Client::get_active_app()).get_logged_in_user()
     }
 
     fn gen_rand_account(prefix: Option<String>) -> Result<String, Error> {
+        assert_authorized(FunctionName::gen_rand_account)?;
         generate_account(prefix)
     }
 }

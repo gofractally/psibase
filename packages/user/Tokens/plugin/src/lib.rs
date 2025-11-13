@@ -15,10 +15,10 @@ use Exports::{
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
 use psibase::AccountNumber;
 use psibase::{fracpack::Pack, services::tokens, FlagsType};
+use tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 pub mod query {
     pub mod fetch_token;
 }
@@ -158,6 +158,7 @@ impl Issuer for TokensPlugin {
 
 impl Helpers for TokensPlugin {
     fn decimal_to_u64(token_id: u32, amount: String) -> Result<u64, Error> {
+        assert_authorized(FunctionName::decimal_to_u64)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Quantity::from_str(&amount, token.precision)
@@ -166,6 +167,7 @@ impl Helpers for TokensPlugin {
     }
 
     fn u64_to_decimal(token_id: u32, amount: u64) -> Result<String, Error> {
+        assert_authorized(FunctionName::u64_to_decimal)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Ok(tokens::Decimal::new(amount.into(), token.precision).to_string())
