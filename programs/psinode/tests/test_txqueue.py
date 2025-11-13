@@ -18,7 +18,7 @@ class TestTransactionQueue(unittest.TestCase):
 
         tokens = Tokens(a)
         txqueue = Transact(a)
-        auth = txqueue.login('alice', 'tokens')
+        auth = txqueue.login('alice')
         old_balance = tokens.balance('alice', token=1, token_auth=auth)
 
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
@@ -65,7 +65,7 @@ class TestTransactionQueue(unittest.TestCase):
 
         tokens = Tokens(a)
         transact = Transact(a)
-        auth = transact.login('alice', 'tokens')
+        auth = transact.login('alice')
         old_balance = tokens.balance('alice', token=1, token_auth=auth)
 
         txqueue = Transact(prods[2])
@@ -81,10 +81,10 @@ class TestTransactionQueue(unittest.TestCase):
         testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'AuthSig', 'TokenUsers'])
         (a, b, c, d) = prods
 
-        auth_a = Transact(a).login('alice', 'tokens')
-        auth_b = Transact(b).login('alice', 'tokens')
-        auth_c = Transact(c).login('alice', 'tokens')
-        auth_d = Transact(d).login('alice', 'tokens')
+        auth_a = Transact(a).login('alice')
+        auth_b = Transact(b).login('alice')
+        auth_c = Transact(c).login('alice')
+        auth_d = Transact(d).login('alice')
 
         tokens = Tokens(a)
         old_balance = tokens.balance('alice', token=1, token_auth=auth_a)
