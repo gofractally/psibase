@@ -13,6 +13,7 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct InitRow {
         pub last_used_id: TID,
+        pub last_used_shared_bal_id: u64,
     }
     impl InitRow {
         #[primary_key]
@@ -313,6 +314,7 @@ pub mod tables {
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct SharedBalance {
+        pub shared_bal_id: u64,
         pub creditor: AccountNumber,
         pub debitor: AccountNumber,
         pub token_id: TID,
@@ -356,13 +358,29 @@ pub mod tables {
 
     impl SharedBalance {
         #[primary_key]
+        fn by_shared_bal_id(&self) -> u64 {
+            self.shared_bal_id
+        }
+
+        #[secondary_key(1)]
         fn by_creditor(&self) -> (AccountNumber, AccountNumber, TID) {
             (self.creditor, self.debitor, self.token_id)
         }
 
-        #[secondary_key(1)]
+        #[secondary_key(2)]
         fn by_debitor(&self) -> (AccountNumber, AccountNumber, TID) {
             (self.debitor, self.creditor, self.token_id)
+        }
+
+        fn next_id() -> u64 {
+            let init_table = InitTable::new();
+            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
+            let new_shared_bal_id = init_row.last_used_shared_bal_id.checked_add(1).unwrap();
+
+            init_row.last_used_shared_bal_id = new_shared_bal_id;
+            init_table.put(&init_row).unwrap();
+
+            new_shared_bal_id
         }
 
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
@@ -371,7 +389,9 @@ pub mod tables {
                 creditor != debitor,
                 format!("Sender cannot be receiver").as_str(),
             );
+
             Self {
+                shared_bal_id: Self::next_id(),
                 token_id,
                 creditor,
                 debitor,
@@ -381,7 +401,7 @@ pub mod tables {
 
         fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
             SharedBalanceTable::read()
-                .get_index_pk()
+                .get_index_by_creditor()
                 .get(&(creditor, debitor, token_id))
         }
 
@@ -490,7 +510,7 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            SharedBalanceTable::new().erase(&(self.by_creditor()));
+            SharedBalanceTable::new().erase(&(self.by_shared_bal_id()));
         }
 
         fn save(&mut self) {
@@ -644,6 +664,37 @@ pub mod tables {
     impl ConfigRow {
         pub async fn token(&self) -> Token {
             Token::get_assert(self.sys_tid)
+        }
+    }
+    
+    #[table(name = "UserPendingTable", index = 6)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
+    pub struct UserPending {
+        pub user: String,
+        pub token_id: TID,
+        #[graphql(skip)]
+        pub shared_bal_id: u64,
+    }
+
+    #[ComplexObject]
+    impl UserPending {
+        // pub async fn user(&self) -> AccountNumber {
+        //     AccountNumber::from_str(self.user).unwrap()
+        // }
+
+        pub async fn shared_bal_id(&self) -> SharedBalance {
+            SharedBalanceTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.shared_bal_id)
+                .unwrap()
+        }
+    }
+
+    impl UserPending {
+        #[primary_key]
+        fn by_shared_bal_id(&self) -> u64 {
+            self.shared_bal_id
         }
     }
 }
