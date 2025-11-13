@@ -4,12 +4,10 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
     use psibase::services::nft::{NftRecord, Wrapper as Nft};
-    use psibase::services::tokens::{Decimal, Quantity};
-    use psibase::services::tokens::{TokenRecord, Wrapper as Tokens};
+    use psibase::services::tokens::Wrapper as Tokens;
+    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
     use psibase::{
-        check, check_some, get_sender,
-        services::{nft::NID, tokens::TID},
-        AccountNumber, Fracpack, Table, ToSchema,
+        check, check_some, get_sender, services::nft::NID, AccountNumber, Fracpack, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -115,21 +113,11 @@ pub mod tables {
         pub symbolId: AccountNumber,
         #[graphql(skip)]
         pub ownerNft: NID,
-        pub tokenId: Option<TID>,
     }
 
     impl Symbol {
-        #[secondary_key(1)]
-        fn by_token(&self) -> (Option<TID>, AccountNumber) {
-            (self.tokenId, self.symbolId)
-        }
-
         fn new(symbolId: AccountNumber, ownerNft: NID) -> Self {
-            Self {
-                symbolId,
-                ownerNft,
-                tokenId: None,
-            }
+            Self { symbolId, ownerNft }
         }
 
         pub fn get(symbol: AccountNumber) -> Option<Self> {
@@ -138,18 +126,6 @@ pub mod tables {
 
         pub fn get_assert(symbol: AccountNumber) -> Self {
             check_some(Self::get(symbol), "Symbol does not exist")
-        }
-
-        pub fn get_by_token(token_id: TID) -> Option<Self> {
-            let mut symbols: Vec<Symbol> = SymbolTable::read()
-                .get_index_by_token()
-                .range(
-                    (Some(token_id), AccountNumber::new(0))
-                        ..=(Some(token_id), AccountNumber::new(u64::MAX)),
-                )
-                .collect();
-
-            symbols.pop()
         }
 
         pub fn add(symbol: AccountNumber, billable: bool) -> Self {
@@ -212,8 +188,7 @@ pub mod tables {
             let symbol_owner_nft = self.ownerNft;
             Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
             Nft::call().burn(symbol_owner_nft);
-            self.tokenId = Some(token_id);
-            self.save();
+            Mapping::add(token_id, self.symbolId);
         }
 
         fn save(&self) {
@@ -226,12 +201,72 @@ pub mod tables {
         pub async fn owner_nft(&self) -> NftRecord {
             psibase::services::nft::Wrapper::call().getNft(self.ownerNft)
         }
+
+        pub async fn mapping(&self) -> Option<Mapping> {
+            Mapping::get_by_symbol(self.symbolId)
+        }
+    }
+
+    #[table(name = "MappingTable", index = 3)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct Mapping {
+        #[primary_key]
+        pub tokenId: TID,
+        #[graphql(skip)]
+        pub symbolId: AccountNumber,
+    }
+
+    impl Mapping {
+        #[secondary_key(1)]
+        fn by_symbol(&self) -> AccountNumber {
+            self.symbolId
+        }
+
+        fn new(tokenId: TID, symbolId: AccountNumber) -> Self {
+            Self { tokenId, symbolId }
+        }
+
+        pub fn get(tokenId: TID) -> Option<Self> {
+            MappingTable::read().get_index_pk().get(&tokenId)
+        }
+
+        pub fn get_assert(tokenId: TID) -> Self {
+            check_some(Self::get(tokenId), "mapping does not exist")
+        }
+
+        pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
+            MappingTable::read().get_index_by_symbol().get(&symbol)
+        }
+
+        pub fn add(tokenId: TID, symbol: AccountNumber) {
+            check_none(
+                Self::get_by_symbol(symbol),
+                "Symbol is already mapped to a token",
+            );
+            Self::new(tokenId, symbol).save();
+        }
+
+        fn save(&self) {
+            MappingTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[ComplexObject]
+    impl Mapping {
+        pub async fn symbol(&self) -> Symbol {
+            Symbol::get_assert(self.symbolId)
+        }
+
+        pub async fn token(&self) -> TokenRecord {
+            Tokens::call().getToken(self.tokenId)
+        }
     }
 }
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{Config, Symbol, SymbolLength};
+    use crate::tables::{Config, Mapping, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
     use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
@@ -245,7 +280,7 @@ pub mod service {
         check_none(Config::get(), "service already initialized");
         check(
             get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
-            "only root account can call init",
+            "only root or symbol account can call init",
         );
 
         Config::set(billing_token);
@@ -284,13 +319,18 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getTokenSym(token_id: TID) -> SID {
-        Symbol::get_by_token(token_id).unwrap().symbolId
+        Mapping::get_assert(token_id).symbolId
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn getByToken(token_id: TID) -> Option<Symbol> {
-        Symbol::get_by_token(token_id)
+    fn getByToken(token_id: TID) -> Option<Mapping> {
+        Mapping::get(token_id)
+    }
+
+    #[action]
+    fn getMapBySym(symbol: AccountNumber) -> Option<Mapping> {
+        Mapping::get_by_symbol(symbol)
     }
 
     #[action]

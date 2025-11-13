@@ -2,9 +2,9 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use psibase::*;
+    use psibase::{services::tokens::TID, *};
     use serde::Deserialize;
-    use symbol::tables::{Symbol, SymbolLength};
+    use symbol::tables::{Mapping, Symbol, SymbolLength};
 
     #[derive(Deserialize, SimpleObject)]
     struct SymbolCreated {
@@ -17,16 +17,19 @@ mod service {
 
     #[Object]
     impl Query {
-
         /// Fetch price information according to symbol length
         async fn symbol_length(&self, length: u8) -> Option<SymbolLength> {
             SymbolLength::get(length)
         }
 
-
-        /// Fetch symbol information, returns null if it does not exist 
+        /// Fetch symbol information, returns null if it does not exist
         async fn symbol(&self, symbol: String) -> Option<Symbol> {
             Symbol::get(symbol.as_str().into())
+        }
+
+        /// Fetch a mapping of a symbol by token ID
+        async fn mapping(&self, token_id: TID) -> Option<Mapping> {
+            Mapping::get(token_id)
         }
 
         // Symbol created events
