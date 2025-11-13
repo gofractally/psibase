@@ -1239,6 +1239,11 @@ namespace
    };
    PSIO_REFLECT(LoginTokenData, iss, sub, aud, exp)
 
+   bool didIssueJwt(const LoginTokenData& decoded)
+   {
+      return decoded.iss == getChainId();
+   }
+
    struct LoginReply
    {
       std::string access_token;
@@ -1375,10 +1380,6 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    std::optional<AccountNumber> result;
    bool                         isLocalhost = psibase::isLocalhost(request);
    auto                         rootHost    = to<HttpServer>().rootHost(request.host);
-
-   auto isValidJwt = [&](const LoginTokenData& decoded)
-   { return decoded.iss == getChainId() && decoded.aud == rootHost && checkExp(decoded.exp); };
-
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
@@ -1390,9 +1391,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
                         if (value.starts_with(prefix))
                         {
                            auto token   = value.substr(prefix.size());
-                           auto decoded = decodeJWT<LoginTokenData>(key, token, isValidJwt);
+                           auto decoded = decodeJWT<LoginTokenData>(key, token, didIssueJwt);
 
-                           if (decoded)
+                           if (decoded && decoded->aud == rootHost && checkExp(decoded->exp))
                            {
                               result = decoded->sub;
                            }
@@ -1408,11 +1409,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    auto tokens = request.getCookie(cookieName);
    for (const auto& token : tokens)
    {
-      auto decoded = decodeJWT<LoginTokenData>(key, token, isValidJwt);
-      if (decoded)
-      {
+      auto decoded = decodeJWT<LoginTokenData>(key, token, didIssueJwt);
+      if (decoded && decoded->aud == rootHost && checkExp(decoded->exp))
          return decoded->sub;
-      }
    }
    return {};
 }
