@@ -1,0 +1,13 @@
+package auth-dyn:plugin;
+
+interface api {
+    use host:types/types.{error};
+
+    /// Set a manager service for an account
+    set-management: func(account: string, manager: string) -> result<_, error>;
+}
+
+
+world imports {
+    import api;
+}
