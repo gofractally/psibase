@@ -33,6 +33,18 @@ mod service {
         user: Option<AccountNumber>,
     }
 
+    impl Query {
+        fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
+            Ok(())
+        }
+    }
+
     #[Object]
     impl Query {
         /// Given a token id, return a record that represents token
@@ -66,12 +78,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
-            if self.user != Some(user) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
-                    user
-                )));
-            }
+            self.check_user_auth(user)?;
 
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
@@ -96,12 +103,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
-            if self.user != Some(user) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
-                    user
-                )));
-            }
+            self.check_user_auth(user)?;
 
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_debitor(),
@@ -124,12 +126,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Balance>> {
-            if self.user != Some(user) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
-                    user
-                )));
-            }
+            self.check_user_auth(user)?;
 
             TableQuery::subindex::<u32>(
                 BalanceTable::with_service(tokens::SERVICE).get_index_pk(),
@@ -151,12 +148,7 @@ mod service {
         ) -> async_graphql::Result<Balance> {
             let token_id = token_id_to_number(token_id);
 
-            if self.user != Some(user) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
-                    user
-                )));
-            }
+            self.check_user_auth(user)?;
 
             Ok(BalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -243,12 +235,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
-            if self.user != Some(account) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
-                    account
-                )));
-            }
+            self.check_user_auth(account)?;
 
             let precision = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
