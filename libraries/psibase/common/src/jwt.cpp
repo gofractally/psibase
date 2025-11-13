@@ -119,25 +119,14 @@ namespace psibase
       friend bool operator==(const token_header&, const token_header&) = default;
    };
    PSIO_REFLECT(token_header, typ, alg);
-
-   std::string decodeJWTPayloadUnsafe(std::string_view token)
+   std::string decodeJWT(const JWTKey& key, std::string_view token)
    {
       auto end_header = token.find('.');
       psibase::check(end_header != std::string_view::npos, "Invalid JWT");
       auto end_payload = token.find('.', end_header + 1);
       psibase::check(end_payload != std::string_view::npos, "Invalid JWT");
-
+      std::string_view encoded_header  = token.substr(0, end_header);
       std::string_view encoded_payload = token.substr(end_header + 1, end_payload - end_header - 1);
-      return from_base64url(encoded_payload);
-   }
-   void validateJWT(const JWTKey& key, std::string_view token)
-   {
-      auto end_header = token.find('.');
-      psibase::check(end_header != std::string_view::npos, "Invalid JWT");
-      auto end_payload = token.find('.', end_header + 1);
-      psibase::check(end_payload != std::string_view::npos, "Invalid JWT");
-
-      std::string_view encoded_header    = token.substr(0, end_header);
       std::string_view encoded_signature = token.substr(end_payload + 1, std::string::npos);
       std::string_view signing_input     = token.substr(0, end_payload);
 
@@ -149,8 +138,9 @@ namespace psibase
 
       auto header = psio::convert_from_json<token_header>(from_base64url(encoded_header));
       psibase::check(header == token_header{}, "Wrong header");
-   }
 
+      return from_base64url(encoded_payload);
+   }
    std::string encodeJWT(const JWTKey& key, std::string_view token)
    {
       std::string result =
