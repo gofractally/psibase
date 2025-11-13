@@ -382,12 +382,20 @@ namespace psibase
        * Creates a POST request with a JSON body
        */
       template <typename T>
-      HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
+      HttpRequest makePost(AccountNumber                   account,
+                           std::string_view                target,
+                           const T&                        data,
+                           std::optional<std::string_view> token = std::nullopt) const
       {
-         HttpRequest         req{.host   = account.str() + ".psibase.io",
-                                 .method = "POST",
-                                 .target{target},
-                                 .contentType = "application/json"};
+         HttpRequest req{.host   = account.str() + ".psibase.io",
+                         .method = "POST",
+                         .target{target},
+                         .contentType = "application/json"};
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
          psio::vector_stream stream{req.body};
          using psio::to_json;
          to_json(data, stream);
@@ -398,21 +406,38 @@ namespace psibase
        * Creates a POST request
        */
       template <HttpRequestBody T>
-      HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
+      HttpRequest makePost(AccountNumber                   account,
+                           std::string_view                target,
+                           const T&                        data,
+                           std::optional<std::string_view> token = std::nullopt) const
       {
-         return {.host   = account.str() + ".psibase.io",
-                 .method = "POST",
-                 .target{target},
-                 .contentType = data.contentType(),
-                 .body        = data.body()};
+         HttpRequest req{.host   = account.str() + ".psibase.io",
+                         .method = "POST",
+                         .target{target},
+                         .contentType = data.contentType(),
+                         .body        = data.body()};
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
+         return req;
       }
 
       /**
        * Creates a GET request
        */
-      HttpRequest makeGet(AccountNumber account, std::string_view target) const
+      HttpRequest makeGet(AccountNumber                   account,
+                          std::string_view                target,
+                          std::optional<std::string_view> token = std::nullopt) const
       {
-         return {.host = account.str() + ".psibase.io", .method = "GET", .target{target}};
+         HttpRequest req{.host = account.str() + ".psibase.io", .method = "GET", .target{target}};
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
+         return req;
       }
 
       /**
@@ -434,13 +459,7 @@ namespace psibase
              const T&                        data,
              std::optional<std::string_view> token = std::nullopt)
       {
-         auto req = makePost(account, target, data);
-         if (token)
-         {
-            req.headers.push_back(
-                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
-         }
-         return http<R>(req);
+         return http<R>(makePost(account, target, data, token));
       }
 
       template <typename R = HttpReply>
@@ -448,13 +467,7 @@ namespace psibase
             std::string_view                target,
             std::optional<std::string_view> token = std::nullopt)
       {
-         auto req = makeGet(account, target);
-         if (token)
-         {
-            req.headers.push_back(
-                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
-         }
-         return http<R>(req);
+         return http<R>(makeGet(account, target, token));
       }
 
       /**
