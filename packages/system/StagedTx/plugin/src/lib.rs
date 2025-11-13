@@ -37,9 +37,9 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [remove, execute],
+        None => [execute],
         Low => [],
-        High => [accept, reject],
+        High => [accept, reject, remove],
         Max => [set_propose_latch, propose],
     }
 }
