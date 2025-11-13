@@ -28,6 +28,7 @@ pub mod tables {
         }
 
         pub fn set(billing_token: TID) -> Self {
+            check_none(Self::get(), "config is already set");
             let new_instance = Self::new(billing_token);
             new_instance.save();
             new_instance

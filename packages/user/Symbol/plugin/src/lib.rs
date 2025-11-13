@@ -12,16 +12,13 @@ use psibase::{define_trust, AccountNumber};
 
 define_trust! {
     descriptions {
+        Low => "",
         Medium => "
         Medium trust grants the abilities
             - Purchase new symbols",
         High => "
         High trust grants the abilities of the Medium trust level, plus these abilities:
             - Map symbols to tokens.",
-        Max => "
-        🚨 WARNING 🚨 
-        Max trust grants the abilities of all lower trust levels, plus these abilities:
-            Intialize and set the billing token for the symbol service.",
     }
     functions {
         Medium => [create],
