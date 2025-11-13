@@ -327,16 +327,10 @@ mod service {
         _socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
-        if get_sender() != AccountNumber::from("http-server") {
-            return Some(HttpReply {
-                status: HttpStatus::Unauthorized as u16,
-                contentType: "text/html".into(),
-                body: b"permission denied: tokens::serveSys only callable by 'http-server'"
-                    .to_vec()
-                    .into(),
-                headers: allow_cors_for_subdomains(&request, true),
-            });
-        }
+        check(
+            get_sender() == AccountNumber::from("http-server"),
+            "permission denied: tokens::serveSys only callable by 'http-server'",
+        );
 
         // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query { user }))
