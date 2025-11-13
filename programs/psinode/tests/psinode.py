@@ -150,16 +150,10 @@ class TransactionError(Exception):
         self.trace = trace
 
 class GraphQLError(Exception):
-    def __init__(self, json):
-        errors = json.get('errors', [])
-        if errors and isinstance(errors, list):
-            message = errors[0].get('message', str(errors[0]))
-        elif isinstance(errors, dict):
-            message = errors.get('message', str(errors))
-        else:
-            message = str(errors)
-        super().__init__(message)
-        self.json = json
+    def __init__(self, payload):
+        msg = payload["errors"][0].get("message", "GraphQL error")
+        super().__init__(msg)
+        self.json = payload
 
 class PrivateKey:
     def __init__(self, data=None):
