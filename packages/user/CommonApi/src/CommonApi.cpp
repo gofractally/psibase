@@ -29,7 +29,9 @@ namespace SystemService
       {
          request.body.push_back(0);
          psio::json_token_stream jstream{request.body.data()};
-         return psio::from_json<T>(jstream);
+         auto                    result = psio::from_json<T>(jstream);
+         request.body.pop_back();
+         return result;
       }
 
       HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
