@@ -29,6 +29,10 @@ const DB: Database = Database {
     duration: StorageDuration::Persistent,
 };
 
+fn bucket_id(user: &str) -> String {
+    format!("query_tokens-{}", user)
+}
+
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     let req: PostRequest = PostRequest {
         endpoint: String::from("/common/set-auth-cookie"),
@@ -36,7 +40,7 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     };
     HostAdmin::post_with_credentials(app, &req).unwrap();
 
-    Bucket::new(DB, user).set(&app, &query_token.to_string().packed());
+    Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
@@ -46,14 +50,14 @@ fn remove_active_query_token(app: &str, user: &str) {
     };
     HostAdmin::post_with_credentials(app, &req).unwrap();
 
-    Bucket::new(DB, user).delete(&&app);
+    Bucket::new(DB, &bucket_id(user)).delete(&&app);
 }
 
 impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
         check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
-        let query_token = Bucket::new(DB, &user)
+        let query_token = Bucket::new(DB, &bucket_id(&user))
             .get(&app)
             .map(|t| String::unpacked(&t).unwrap())
             .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
@@ -74,7 +78,7 @@ impl Api for HostAuth {
             "get-active-query-token@host:auth/api",
         );
 
-        Bucket::new(DB, &Accounts::get_current_user()?)
+        Bucket::new(DB, &bucket_id(&Accounts::get_current_user()?))
             .get(&app)
             .map(|t| String::unpacked(&t).unwrap())
     }
