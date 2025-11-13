@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/jwt.hpp>
@@ -119,12 +120,14 @@ namespace psibase
       friend bool operator==(const token_header&, const token_header&) = default;
    };
    PSIO_REFLECT(token_header, typ, alg);
-   std::string decodeJWT(const JWTKey& key, std::string_view token)
+   std::optional<std::string> decodeJWT(const JWTKey& key, std::string_view token)
    {
       auto end_header = token.find('.');
-      psibase::check(end_header != std::string_view::npos, "Invalid JWT");
+      if (end_header == std::string_view::npos)
+         return std::nullopt;
       auto end_payload = token.find('.', end_header + 1);
-      psibase::check(end_payload != std::string_view::npos, "Invalid JWT");
+      if (end_payload == std::string_view::npos)
+         return std::nullopt;
       std::string_view encoded_header  = token.substr(0, end_header);
       std::string_view encoded_payload = token.substr(end_header + 1, end_payload - end_header - 1);
       std::string_view encoded_signature = token.substr(end_payload + 1, std::string::npos);
@@ -132,12 +135,13 @@ namespace psibase
 
       Checksum256 mac       = hmacSha256(key, signing_input);
       auto        signature = from_base64url(encoded_signature);
-      psibase::check(signature.size() == mac.size() &&
-                         std::memcmp(signature.data(), mac.data(), mac.size()) == 0,
-                     "Bad signature");
+      if (signature.size() != mac.size() ||
+          std::memcmp(signature.data(), mac.data(), mac.size()) != 0)
+         return std::nullopt;
 
       auto header = psio::convert_from_json<token_header>(from_base64url(encoded_header));
-      psibase::check(header == token_header{}, "Wrong header");
+      if (header != token_header{})
+         return std::nullopt;
 
       return from_base64url(encoded_payload);
    }
