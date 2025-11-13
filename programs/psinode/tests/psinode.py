@@ -311,10 +311,10 @@ class API:
 
         Raise GraphQLError if the query fails
         '''
-        kwargs = {'json': {'query': query}}
+        headers = {}
         if token is not None:
-            kwargs['headers'] = {'Authorization': 'Bearer ' + token}
-        with self.post('/graphql', service=service, **kwargs) as result:
+            headers['Authorization'] = 'Bearer ' + token
+        with self.post('/graphql', service=service, json={'query': query}, headers=headers) as result:
             result.raise_for_status()
             json = result.json()
             if 'errors' in json:
