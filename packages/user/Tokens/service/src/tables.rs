@@ -435,6 +435,20 @@ pub mod tables {
                     UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::MANUAL_DEBIT),
                 );
 
+            let upt = UserPendingTable::new();
+            upt.put(&UserPending::new(
+                self.creditor,
+                self.token_id,
+                self.shared_bal_id,
+            ))
+            .unwrap();
+            upt.put(&UserPending::new(
+                self.debitor,
+                self.token_id,
+                self.shared_bal_id,
+            ))
+            .unwrap();
+
             if !is_manual_debit {
                 self.debit(quantity, memo);
             }
@@ -448,6 +462,12 @@ pub mod tables {
             let quantity = quantity.min(self.balance);
             self.sub_balance(quantity);
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
+
+            if self.balance == 0.into() {
+                let upt = UserPendingTable::new();
+                upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
+                upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
+            }
         }
 
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
@@ -464,6 +484,13 @@ pub mod tables {
 
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
+
+            if self.balance == 0.into() {
+                // TODO: remove shared balance (if shared_bal == 0)
+                let upt = UserPendingTable::new();
+                upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
+                upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
+            }
         }
 
         pub fn reject(&mut self, memo: Memo) {
@@ -479,6 +506,12 @@ pub mod tables {
                 );
                 self.sub_balance(balance);
                 Balance::get_or_new(self.creditor, self.token_id).add_balance(balance);
+
+                if self.balance == 0.into() {
+                    let upt = UserPendingTable::new();
+                    upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
+                    upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
+                }
             }
         }
 
@@ -652,7 +685,7 @@ pub mod tables {
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct UserPending {
-        pub user: String,
+        pub user: AccountNumber,
         pub token_id: TID,
         #[graphql(skip)]
         pub shared_bal_id: u64,
@@ -674,8 +707,15 @@ pub mod tables {
 
     impl UserPending {
         #[primary_key]
-        fn by_shared_bal_id(&self) -> u64 {
-            self.shared_bal_id
+        fn by_pk(&self) -> (AccountNumber, TID, u64) {
+            (self.user, self.token_id, self.shared_bal_id)
+        }
+        fn new(user: AccountNumber, token_id: TID, shared_bal_id: u64) -> Self {
+            Self {
+                shared_bal_id,
+                token_id,
+                user,
+            }
         }
     }
 }
