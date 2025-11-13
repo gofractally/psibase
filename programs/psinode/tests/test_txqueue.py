@@ -17,13 +17,14 @@ class TestTransactionQueue(unittest.TestCase):
         a.wait(new_block())
 
         tokens = Tokens(a)
-        old_balance = tokens.balance('alice', token=1)
-
         txqueue = Transact(a)
+        auth = txqueue.login('alice')
+        old_balance = tokens.balance('alice', token=1, token_auth=auth)
+
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())
-        new_balance = tokens.balance('alice', token=1)
+        new_balance = tokens.balance('alice', token=1, token_auth=auth)
         self.assertEqual(old_balance - 10000, new_balance)
 
         with txqueue.get('/foo') as response:
@@ -63,13 +64,15 @@ class TestTransactionQueue(unittest.TestCase):
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'TokenUsers'])
 
         tokens = Tokens(a)
-        old_balance = tokens.balance('alice', token=1)
+        transact = Transact(a)
+        auth = transact.login('alice')
+        old_balance = tokens.balance('alice', token=1, token_auth=auth)
 
         txqueue = Transact(prods[2])
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())
-        new_balance = tokens.balance('alice', token=1)
+        new_balance = tokens.balance('alice', token=1, token_auth=auth)
         self.assertEqual(old_balance - 10000, new_balance)
 
     @testutil.psinode_test
@@ -78,8 +81,13 @@ class TestTransactionQueue(unittest.TestCase):
         testutil.boot_with_producers(prods[:3], packages=['Minimal', 'Explorer', 'AuthSig', 'TokenUsers'])
         (a, b, c, d) = prods
 
+        auth_a = Transact(a).login('alice')
+        auth_b = Transact(b).login('alice')
+        auth_c = Transact(c).login('alice')
+        auth_d = Transact(d).login('alice')
+
         tokens = Tokens(a)
-        old_balance = tokens.balance('alice', token=1)
+        old_balance = tokens.balance('alice', token=1, token_auth=auth_a)
 
         key = PrivateKey()
         AuthSig(a).set_key('alice', key)
@@ -89,13 +97,13 @@ class TestTransactionQueue(unittest.TestCase):
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"}, keys=[key])
         pred = new_block()
         a.wait(pred)
-        a_balance = Tokens(a).balance('alice', token=1)
+        a_balance = Tokens(a).balance('alice', token=1, token_auth=auth_a)
         b.wait(pred)
-        b_balance = Tokens(b).balance('alice', token=1)
+        b_balance = Tokens(b).balance('alice', token=1, token_auth=auth_b)
         c.wait(pred)
-        c_balance = Tokens(c).balance('alice', token=1)
+        c_balance = Tokens(c).balance('alice', token=1, token_auth=auth_c)
         d.wait(pred)
-        d_balance = Tokens(d).balance('alice', token=1)
+        d_balance = Tokens(d).balance('alice', token=1, token_auth=auth_d)
         expected_balance = old_balance - 10000
         self.assertEqual(a_balance, expected_balance)
         self.assertEqual(b_balance, expected_balance)

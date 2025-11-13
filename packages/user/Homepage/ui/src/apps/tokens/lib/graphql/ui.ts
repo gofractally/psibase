@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
+import { supervisor } from "@/supervisor";
 import { zAccount } from "@/lib/zod/Account";
 
 const qs = {
@@ -73,6 +74,21 @@ const qs = {
     `,
 };
 
+const graphqlViaPlugin = async <T>(query: string): Promise<T> => {
+    const result = await supervisor.functionCall({
+        service: "tokens",
+        plugin: "plugin",
+        intf: "authorized",
+        method: "graphql",
+        params: [query],
+    });
+    const response = JSON.parse(result) as { data: T; errors?: Array<{ message: string }> };
+    if (response.errors) {
+        throw new Error(response.errors[0].message);
+    }
+    return response.data;
+};
+
 const zUserSettingsSchema = z.object({
     userSettings: z.object({
         settings: z.object({
@@ -110,9 +126,8 @@ export type UserTokenBalanceNode = z.infer<typeof zUserTokenBalanceNodeSchema>;
 
 export const fetchUserTokenBalances = async (username: string) => {
     const query = `{${qs.userTokenBalances(username)}}`;
-    const res = await graphql<z.infer<typeof zUserTokenBalanceSchema>>(
+    const res = await graphqlViaPlugin<z.infer<typeof zUserTokenBalanceSchema>>(
         query,
-        "tokens",
     );
     const parsed = zUserTokenBalanceSchema.parse(res);
     return parsed.userBalances.nodes;
@@ -168,9 +183,8 @@ export const fetchUserTokenBalanceChanges = async (
     tokenId: number,
 ) => {
     const query = `{${qs.userTokenBalanceChanges(username, tokenId)}}`;
-    const res = await graphql<z.infer<typeof zBalChangeResSchema>>(
+    const res = await graphqlViaPlugin<z.infer<typeof zBalChangeResSchema>>(
         query,
-        "tokens",
     );
     const parsed = zBalChangeResSchema.parse(res);
     return parsed.balChanges.nodes;
@@ -205,9 +219,8 @@ export const fetchOpenLinesOfCredit = async (username: string) => {
         ${qs.userDebits(username)}
     }`;
 
-    const res = await graphql<z.infer<typeof zOpenLinesOfCreditResSchema>>(
+    const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
         query,
-        "tokens",
     );
     const parsed = zOpenLinesOfCreditResSchema.parse(res);
     return {

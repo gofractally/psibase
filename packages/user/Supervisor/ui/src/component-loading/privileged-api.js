@@ -1,6 +1,6 @@
 export const intf = {
-    sendRequest(req) {
-        return host.sendRequest(req);
+    sendRequest(...args) {
+        return host.sendRequest(...args);
     },
 
     serviceStack() {

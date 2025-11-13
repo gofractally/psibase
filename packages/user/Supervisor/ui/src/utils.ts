@@ -6,8 +6,8 @@ import { DownloadFailed } from "./errors";
 export const wasmFromUrl = async (url: string) => {
     let headers: [string, string][] = [];
     if (queryToken) {
-        headers = [["Authorization", queryToken]];
-    }
+        headers = [["Authorization", `Bearer ${queryToken}`]];
+    } 
     return fetch(url, {
         headers,
     })

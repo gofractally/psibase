@@ -150,7 +150,7 @@ namespace psibase
 
    void HttpRequest::removeCookie(std::string_view name)
    {
-      for (auto iter = headers.begin(), end = headers.end(); iter != end;)
+      for (auto iter = headers.begin(); iter != headers.end();)
       {
          auto& header = *iter;
          if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
@@ -162,11 +162,8 @@ namespace psibase
                std::string_view kv  = split2sv(kvrange);
                auto             pos = kv.find('=');
                check(pos != std::string_view::npos, "Invalid cookie");
-               bool matched = false;
                auto leading = kv.find_first_not_of(" \t");
                auto key     = kv.substr(leading, pos - leading);
-               auto value   = kv.substr(pos + 1);
-               matched      = key == name;
                if (key != name)
                {
                   if (first)
@@ -178,7 +175,7 @@ namespace psibase
             }
             if (newValue.empty())
             {
-               headers.erase(iter);
+               iter = headers.erase(iter);
                continue;
             }
             header.value = std::move(newValue);

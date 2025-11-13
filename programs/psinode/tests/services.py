@@ -5,8 +5,8 @@ class Tokens(Service):
     service = 'tokens'
     def credit(self, sender, debitor, token, amount, memo):
         self.push_action(sender, 'credit', {"tokenId":token,"debitor":debitor,"amount":{"value":amount}, "memo":memo})
-    def balance(self, account, token):
-        balances = self.graphql('query { userBalances(user: "%s") { edges { node { tokenId balance } } } }' % account)
+    def balance(self, account, token, token_auth=None):
+        balances = self.graphql('query { userBalances(user: "%s") { edges { node { tokenId balance } } } }' % account, token=token_auth)
         for edge in balances['userBalances']['edges']:
             node = edge['node']
             if node['tokenId'] == token:
@@ -32,8 +32,8 @@ class Transact(Service):
             rootHost: String
         tapos = self.api.get_tapos(timeout=timeout, flags=1)
         rootHost = urllib3.util.parse_url(self.api.url).host
-        packed = self.api.pack_signed_transaction(Transaction(tapos, actions=[Action(account, 'transact', 'loginSys', LoginData(rootHost))], claims=[]), keys)
-        with self.post('/login', headers={'Content-Type': 'application/octet-stream'}, data=packed) as reply:
+        packed = self.api.pack_signed_transaction(Transaction(tapos, actions=[Action(account, self.service, 'loginSys', LoginData(rootHost))], claims=[]), keys)
+        with self.post('/login', headers={'Content-Type': 'application/octet-stream', 'Accept': 'application/json'}, data=packed) as reply:
             reply.raise_for_status()
             return reply.json()['access_token']
     def get_jwt_key(self, token):

@@ -812,12 +812,17 @@ TEST_CASE("GraphQL Queries")
    REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
    t.finishBlock();
 
-   auto userBalaces = t.post(
+   auto token_a = t.login(alice, Tokens::service);
+   auto token_b = t.login(bob, Tokens::service);
+
+   auto userBalances = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"});
+           R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"},
+       token_a);
+
    CHECK(
-       std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
+       std::string(userBalances.body.begin(), userBalances.body.end()) ==
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
@@ -825,7 +830,8 @@ TEST_CASE("GraphQL Queries")
    auto userCredits = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userCredits(user: "alice") { edges { node { symbol tokenId precision balance debitor } } } } )"});
+           R"( query { userCredits(user: "alice") { edges { node { symbol tokenId precision balance debitor } } } } )"},
+       token_a);
    CHECK(
        std::string(userCredits.body.begin(), userCredits.body.end()) ==
        R"({"data":{"userCredits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","debitor":"bob"}}]}}})");
@@ -833,7 +839,8 @@ TEST_CASE("GraphQL Queries")
    auto userDebits = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userDebits(user: "bob") { edges { node { symbol tokenId precision balance creditor } } } } )"});
+           R"( query { userDebits(user: "bob") { edges { node { symbol tokenId precision balance creditor } } } } )"},
+       token_b);
    CHECK(
        std::string(userDebits.body.begin(), userDebits.body.end()) ==
        R"({"data":{"userDebits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice"}}]}}})");

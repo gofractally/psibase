@@ -41,6 +41,7 @@ interface types {
         bytes(list<u8>),
         json(string),
         text(string),
+        graphql(string),
     }
 
     /// The object needed to specify a post request

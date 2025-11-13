@@ -54,6 +54,9 @@ interface admin {
 
     /// Make a post request
     post: func(app: string, request: post-request) -> result<option<body-types>, error>;
+
+    /// Make a post request with credentials enabled
+    post-with-credentials: func(app: string, request: post-request) -> result<option<body-types>, error>;
 }
 
 /// A keyvalue interface that provides key-value operations.

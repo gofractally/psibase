@@ -6,9 +6,6 @@
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
-#include "services/system/Accounts.hpp"
-
-#include <algorithm>
 
 static constexpr bool enable_print = false;
 
@@ -93,13 +90,14 @@ namespace SystemService
 
    namespace
    {
-      constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Headers",  //
-                                                     "Access-Control-Allow-Methods",  //
-                                                     "Access-Control-Allow-Origin",   //
-                                                     "Allow",                         //
-                                                     "Cache-Control",                 //
-                                                     "Content-Encoding",              //
-                                                     "Content-Security-Policy",       //
+      constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Credentials",  //
+                                                     "Access-Control-Allow-Headers",
+                                                     "Access-Control-Allow-Methods",
+                                                     "Access-Control-Allow-Origin",
+                                                     "Allow",
+                                                     "Cache-Control",
+                                                     "Content-Encoding",
+                                                     "Content-Security-Policy",
                                                      "ETag",
                                                      "Set-Cookie"};
 
@@ -109,6 +107,7 @@ namespace SystemService
          {
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
+               // TODO: Convert to 500 error response (with cors on subdomains) instead of aborting.
                abortMessage("service " + service.str() + " attempted to set http header " +
                             header.name);
             }
@@ -205,6 +204,7 @@ namespace SystemService
 
       // Remove sensitive headers
       req.removeCookie("__HOST-SESSION");
+      req.removeCookie("SESSION");
       std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
 
       // First we check the registered server

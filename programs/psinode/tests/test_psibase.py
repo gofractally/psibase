@@ -134,7 +134,7 @@ class TestPsibase(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer'])
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        a.graphql('tokens', '''query { token(tokenId: "0") { id precision } }''')
         # Installing packages that are already installed should do nothing
         a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
 
@@ -370,18 +370,19 @@ class TestPsibase(unittest.TestCase):
         auth_sig.set_key('aaaaaaa123', key)
         a.wait(new_block())
 
-        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', 'bbbbbbb123'])
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', '--proposer', 'bbbbbbb123'])
         a.wait(new_block())
 
-        # This should fail because the transaction was only proposed
-        with self.assertRaises(requests.HTTPError):
-            a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        # This should be None because the transaction was only proposed
+        result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService resourceBalance { value } } }''')
+        self.assertEqual(result, {'getAccount': None})
 
         for tx in staged_tx.get_staged(proposer='bbbbbbb123'):
             staged_tx.accept('aaaaaaa123', tx, keys=[key])
 
         a.wait(new_block())
-        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbol tokenId balance precision } } } }''')
+        result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService resourceBalance { value } } }''')
+        self.assertIsNotNone(result['getAccount'])
 
     def assertResponse(self, response, expected):
         response.raise_for_status()

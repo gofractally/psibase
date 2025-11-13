@@ -1,13 +1,18 @@
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 
+#include <psibase/Actor.hpp>
+#include <psibase/block.hpp>
 #include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
+
+#include <chrono>
 
 #include <fcntl.h>
 
@@ -682,6 +687,29 @@ std::optional<psibase::HttpReply> psibase::AsyncHttpReply::poll()
 psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
 {
    return asyncHttp(request).get();
+}
+
+namespace
+{
+   struct LoginInterface
+   {
+      void loginSys(std::string rootHost) {}
+   };
+   PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
+}  // namespace
+
+std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
+{
+   transactor<LoginInterface> loginTransactor{user, service};
+   Tapos             tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
+                                 std::chrono::system_clock::now()) +
+                             std::chrono::seconds(10),
+                           .flags = Tapos::do_not_broadcast_flag};
+   Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
+   SignedTransaction strx{trx};
+   auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",
+                                                FracPackBody{std::move(strx)});
+   return reply.access_token;
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,

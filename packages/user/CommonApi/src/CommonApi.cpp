@@ -1,5 +1,6 @@
 #include "services/system/CommonApi.hpp"
 
+#include <chrono>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
@@ -12,17 +13,73 @@ using namespace psibase;
 
 namespace SystemService
 {
-   struct cookie_data
+   struct TokenData
    {
       std::string accessToken;
    };
-   PSIO_REFLECT(cookie_data, accessToken);
+   PSIO_REFLECT(TokenData, accessToken);
 
-   int getCookieMaxAge()
+   namespace
    {
-      static constexpr int EXPIRATION_IN_DAYS = 30;
-      return EXPIRATION_IN_DAYS * 24 * 60 * 60;
-   }
+      constexpr auto cookieMaxAge =
+          std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(30)).count();
+
+      template <typename T>
+      T extractData(HttpRequest& request)
+      {
+         request.body.push_back(0);
+         psio::json_token_stream jstream{request.body.data()};
+         auto                    result = psio::from_json<T>(jstream);
+         request.body.pop_back();
+         return result;
+      }
+
+      HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
+      {
+         bool        isLocalhost = psibase::isLocalhost(req);
+         std::string cookieName  = isLocalhost ? "SESSION" : "__Host-SESSION";
+
+         std::string cookieAttribs;
+         cookieAttribs += "Path=/; ";
+         cookieAttribs += "HttpOnly; ";
+         cookieAttribs += "SameSite=Strict; ";
+         cookieAttribs += "Max-Age=" + std::to_string(maxAge);
+         if (!isLocalhost)
+         {
+            cookieAttribs += "; Secure; ";
+         }
+
+         std::string cookieValue = cookieName + "=" + accessToken + "; " + cookieAttribs;
+         return HttpHeader{"Set-Cookie", cookieValue};
+      }
+
+      HttpHeader allowCredentials()
+      {
+         return HttpHeader{"Access-Control-Allow-Credentials", "true"};
+      }
+
+      void reflectRequestedHeaders(std::vector<HttpHeader>& headers, const HttpRequest& req)
+      {
+         if (auto requested = req.getHeader("access-control-request-headers"); requested)
+         {
+            for (auto& h : headers)
+            {
+               if (h.name == "Access-Control-Allow-Headers")
+               {
+                  h.value = *requested;
+                  break;
+               }
+            }
+         }
+      }
+
+      std::vector<HttpHeader> allowCorsFrom(const HttpRequest& req, AccountNumber subdomain)
+      {
+         bool hostIsSubdomain = to<HttpServer>().rootHost(req.host) != req.host;
+         return allowCors(req, subdomain, hostIsSubdomain);
+      }
+   }  // namespace
+
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
    {
       auto to_json = [](const auto& obj)
@@ -67,51 +124,44 @@ namespace SystemService
          }
       }
 
+      if (request.method == "OPTIONS")
+      {
+         if (request.target == "/common/set-auth-cookie" ||
+             request.target == "/common/remove-auth-cookie")
+         {
+            auto headers = allowCorsFrom(request, "supervisor"_a);
+            headers.push_back(allowCredentials());
+            reflectRequestedHeaders(headers, request);
+
+            return HttpReply{.headers = headers};
+         }
+      }
+
       if (request.method == "POST")
       {
          if (request.target == "/common/pack/Transaction")
          {
-            request.body.push_back(0);
-            psio::json_token_stream jstream{request.body.data()};
-            Transaction             trx;
-            psio::from_json(trx, jstream);
             return HttpReply{
                 .contentType = "application/octet-stream",
-                .body        = psio::convert_to_frac(trx),
+                .body        = psio::convert_to_frac(extractData<Transaction>(request)),
                 .headers     = allowCors(),
             };
          }
          if (request.target == "/common/pack/SignedTransaction")
          {
-            request.body.push_back(0);
-            psio::json_token_stream jstream{request.body.data()};
-            SignedTransaction       trx;
-            psio::from_json(trx, jstream);
             return HttpReply{
                 .contentType = "application/octet-stream",
-                .body        = psio::convert_to_frac(trx),
+                .body        = psio::convert_to_frac(extractData<SignedTransaction>(request)),
                 .headers     = allowCors(),
             };
          }
          if (request.target == "/common/set-auth-cookie")
          {
-            request.body.push_back(0);
-            psio::json_token_stream jstream{request.body.data()};
-            auto                    params = psio::from_json<cookie_data>(jstream);
+            auto data = extractData<TokenData>(request);
 
-            std::vector<HttpHeader> headers =
-                allowCors(request, AccountNumber{"supervisor"},
-                          to<HttpServer>().rootHost(request.host) != request.host);
-            bool        isLocalhost = psibase::isLocalhost(request);
-            std::string cookieName  = "__Host-SESSION";
-
-            std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" +
-                                        std::to_string(getCookieMaxAge());
-            if (isLocalhost)
-               cookieName = "SESSION";
-
-            std::string cookieValue = cookieName + "=" + params.accessToken + "; " + cookieAttribs;
-            headers.push_back({"Set-Cookie", cookieValue});
+            auto headers = allowCorsFrom(request, "supervisor"_a);
+            headers.push_back(allowCredentials());
+            headers.push_back(authCookie(request, data.accessToken, cookieMaxAge));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",
@@ -120,18 +170,9 @@ namespace SystemService
          }
          if (request.target == "/common/remove-auth-cookie")
          {
-            std::vector<HttpHeader> headers =
-                allowCors(request, AccountNumber{"supervisor"},
-                          to<HttpServer>().rootHost(request.host) != request.host);
-            bool        isLocalhost = psibase::isLocalhost(request);
-            std::string cookieName  = "__Host-SESSION";
-
-            std::string cookieAttribs = "Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
-            if (isLocalhost)
-               cookieName = "SESSION";
-
-            std::string cookieValue = cookieName + "=; " + cookieAttribs;
-            headers.push_back({"Set-Cookie", cookieValue});
+            auto headers = allowCorsFrom(request, "supervisor"_a);
+            headers.push_back(allowCredentials());
+            headers.push_back(authCookie(request, "", 0));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",
