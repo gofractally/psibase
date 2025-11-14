@@ -44,6 +44,12 @@ impl FromStr for Memo {
     }
 }
 
+impl From<&str> for Memo {
+    fn from(s: &str) -> Self {
+        Memo::from_str(s).unwrap()
+    }
+}
+
 impl<'a> Unpack<'a> for Memo {
     const FIXED_SIZE: u32 = 4;
     const VARIABLE_SIZE: bool = true;
