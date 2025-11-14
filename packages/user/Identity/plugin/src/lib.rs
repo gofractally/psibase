@@ -14,8 +14,8 @@ use psibase::AccountNumber;
 use serde::{Deserialize, Serialize};
 
 mod errors;
-use errors::ErrorType::{self, *};
 use crate::trust::*;
+use errors::ErrorType::{self, *};
 
 psibase::define_trust! {
     descriptions {
@@ -86,6 +86,7 @@ impl QueriesApi for IdentityPlugin {
     fn summary(
         subject: String,
     ) -> Result<Option<IdentityTypes::IdentitySummary>, HostTypes::Error> {
+        assert_authorized(FunctionName::summary)?;
         let graphql_str = format!(
             "query {{ subjectStats(subject:\"{}\") {{ numHighConfAttestations, uniqueAttesters }} }}",
             subject
