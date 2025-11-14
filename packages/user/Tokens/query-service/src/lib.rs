@@ -53,8 +53,6 @@ mod service {
                 })
         }
 
-        // TODO: replace these 2 queries with user_pending()
-
         /// Given a user account, return a list of records that represent the
         /// user's current pending outgoing credits. These are tokens that have
         /// yet to be claimed (debited) by the receiver.
@@ -77,29 +75,6 @@ mod service {
             .query()
             .await
         }
-
-        /// Given a user account, return a list of records that represent the
-        /// user's current pending incoming debits. These are tokens that were
-        /// credited to the user but have yet to be debited (claimed).
-        // async fn user_debits(
-        //     &self,
-        //     user: AccountNumber,
-        //     first: Option<i32>,
-        //     last: Option<i32>,
-        //     before: Option<String>,
-        //     after: Option<String>,
-        // ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
-        //     TableQuery::subindex::<(AccountNumber, u32)>(
-        //         SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_debitor(),
-        //         &(user),
-        //     )
-        //     .first(first)
-        //     .last(last)
-        //     .before(before)
-        //     .after(after)
-        //     .query()
-        //     .await
-        // }
 
         /// Returns the specified user's current balances for all of their tokens.
         async fn user_balances(
