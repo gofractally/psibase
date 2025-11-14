@@ -632,7 +632,7 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct ConfigRow {
-        pub tid: TID,
+        pub sys_tid: TID,
     }
 
     impl ConfigRow {
@@ -643,7 +643,7 @@ pub mod tables {
     #[ComplexObject]
     impl ConfigRow {
         pub async fn token(&self) -> Token {
-            Token::get_assert(self.tid)
+            Token::get_assert(self.sys_tid)
         }
     }
 }

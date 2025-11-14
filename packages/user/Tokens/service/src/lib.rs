@@ -532,7 +532,7 @@ pub mod service {
             config_table.get_index_pk().get(&()).is_none(),
             "Changing system token is not supported",
         );
-        config_table.put(&ConfigRow { tid: tokenId }).unwrap();
+        config_table.put(&ConfigRow { sys_tid: tokenId }).unwrap();
     }
 
     #[event(history)]
