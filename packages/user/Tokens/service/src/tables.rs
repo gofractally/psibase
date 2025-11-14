@@ -13,6 +13,7 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct InitRow {
         pub last_used_id: TID,
+        pub last_used_shared_bal_id: u64,
     }
     impl InitRow {
         #[primary_key]
@@ -313,6 +314,7 @@ pub mod tables {
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct SharedBalance {
+        pub shared_bal_id: u64,
         pub creditor: AccountNumber,
         pub debitor: AccountNumber,
         pub token_id: TID,
@@ -356,13 +358,19 @@ pub mod tables {
 
     impl SharedBalance {
         #[primary_key]
-        fn by_creditor(&self) -> (AccountNumber, AccountNumber, TID) {
-            (self.creditor, self.debitor, self.token_id)
+        fn by_pk(&self) -> u64 {
+            self.shared_bal_id
         }
 
-        #[secondary_key(1)]
-        fn by_debitor(&self) -> (AccountNumber, AccountNumber, TID) {
-            (self.debitor, self.creditor, self.token_id)
+        fn next_id() -> u64 {
+            let init_table = InitTable::new();
+            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
+            let new_shared_bal_id = init_row.last_used_shared_bal_id.checked_add(1).unwrap();
+
+            init_row.last_used_shared_bal_id = new_shared_bal_id;
+            init_table.put(&init_row).unwrap();
+
+            new_shared_bal_id
         }
 
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
@@ -371,7 +379,9 @@ pub mod tables {
                 creditor != debitor,
                 format!("Sender cannot be receiver").as_str(),
             );
+
             Self {
+                shared_bal_id: Self::next_id(),
                 token_id,
                 creditor,
                 debitor,
@@ -380,9 +390,32 @@ pub mod tables {
         }
 
         fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
+            let shared_creditor_bals = UserPendingTable::new()
+                .get_index_pk()
+                .range((creditor, token_id, 0 as u64)..(creditor, token_id, u64::MAX))
+                .collect::<Vec<_>>();
+            if shared_creditor_bals.is_empty() {
+                return None;
+            }
+
+            let shared_debitor_bals = UserPendingTable::new()
+                .get_index_pk()
+                .range((debitor, token_id, 0 as u64)..(debitor, token_id, u64::MAX))
+                .collect::<Vec<_>>();
+            if shared_debitor_bals.is_empty() {
+                return None;
+            }
+
+            let shared_bal_id = shared_creditor_bals.iter().find_map(|creditor_bal| {
+                shared_debitor_bals
+                    .iter()
+                    .find(|debitor_bal| debitor_bal.shared_bal_id == creditor_bal.shared_bal_id)
+                    .map(|_| creditor_bal.shared_bal_id)
+            })?;
+
             SharedBalanceTable::read()
                 .get_index_pk()
-                .get(&(creditor, debitor, token_id))
+                .get(&shared_bal_id)
         }
 
         pub fn get_assert(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
@@ -415,6 +448,20 @@ pub mod tables {
                     UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::MANUAL_DEBIT),
                 );
 
+            let upt = UserPendingTable::new();
+            upt.put(&UserPendingRecord::new(
+                self.creditor,
+                self.token_id,
+                self.shared_bal_id,
+            ))
+            .unwrap();
+            upt.put(&UserPendingRecord::new(
+                self.debitor,
+                self.token_id,
+                self.shared_bal_id,
+            ))
+            .unwrap();
+
             if !is_manual_debit {
                 self.debit(quantity, memo);
             }
@@ -428,6 +475,12 @@ pub mod tables {
             let quantity = quantity.min(self.balance);
             self.sub_balance(quantity);
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
+
+            if self.balance == 0.into() {
+                let upt = UserPendingTable::new();
+                upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
+                upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
+            }
         }
 
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
@@ -444,6 +497,12 @@ pub mod tables {
 
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
+
+            if self.balance == 0.into() {
+                let upt = UserPendingTable::new();
+                upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
+                upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
+            }
         }
 
         pub fn reject(&mut self, memo: Memo) {
@@ -459,6 +518,12 @@ pub mod tables {
                 );
                 self.sub_balance(balance);
                 Balance::get_or_new(self.creditor, self.token_id).add_balance(balance);
+
+                if self.balance == 0.into() {
+                    let upt = UserPendingTable::new();
+                    upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
+                    upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
+                }
             }
         }
 
@@ -490,7 +555,7 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            SharedBalanceTable::new().erase(&(self.by_creditor()));
+            SharedBalanceTable::new().erase(&(self.by_pk()));
         }
 
         fn save(&mut self) {
@@ -625,6 +690,45 @@ pub mod tables {
     impl UserConfig {
         pub async fn settings(&self) -> BalanceFlagsJson {
             BalanceFlagsJson::from(Flags::new(self.flags))
+        }
+    }
+
+    #[table(name = "UserPendingTable", index = 6)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
+    pub struct UserPendingRecord {
+        pub user: AccountNumber,
+        pub token_id: TID,
+        #[graphql(skip)]
+        pub shared_bal_id: u64,
+    }
+
+    #[ComplexObject]
+    impl UserPendingRecord {
+        // pub async fn user(&self) -> AccountNumber {
+        //     AccountNumber::from_str(self.user).unwrap()
+        // }
+
+        pub async fn shared_bal_id(&self) -> SharedBalance {
+            SharedBalanceTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.shared_bal_id)
+                .unwrap()
+        }
+    }
+
+    impl UserPendingRecord {
+        #[primary_key]
+        fn by_pk(&self) -> (AccountNumber, TID, u64) {
+            (self.user, self.token_id, self.shared_bal_id)
+        }
+
+        fn new(user: AccountNumber, token_id: TID, shared_bal_id: u64) -> Self {
+            Self {
+                shared_bal_id,
+                token_id,
+                user,
+            }
         }
     }
 }
