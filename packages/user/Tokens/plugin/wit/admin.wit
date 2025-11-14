@@ -1,0 +1,5 @@
+package tokens:plugin;
+
+interface admin {
+    set-sys-token: func(token-id: u32);
+}

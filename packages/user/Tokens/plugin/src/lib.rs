@@ -8,7 +8,7 @@ use errors::ErrorType;
 use bindings::exports::tokens::plugin as Exports;
 use Exports::types::Decimal;
 use Exports::{
-    helpers::Guest as Helpers, issuer::Guest as Issuer, user::Guest as User,
+    admin::Guest as Admin, helpers::Guest as Helpers, issuer::Guest as Issuer, user::Guest as User,
     user_config::Guest as UserConfig,
 };
 
@@ -45,6 +45,7 @@ psibase::define_trust! {
         Low => [],
         Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
         High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
+        Max => [set_sys_token],
     }
 }
 
@@ -287,6 +288,19 @@ impl UserConfig for TokensPlugin {
         let packed_args = Actions::delBalConf { token_id }.packed();
 
         add_action_to_transaction(Actions::delBalConf::ACTION_NAME, &packed_args)
+    }
+}
+
+impl Admin for TokensPlugin {
+    fn set_sys_token(token_id: u32) {
+        assert_authorized_with_whitelist(FunctionName::set_sys_token, vec!["config".into()])
+            .unwrap();
+
+        add_action_to_transaction(
+            Actions::setSysToken::ACTION_NAME,
+            &Actions::setSysToken { tokenId: token_id }.packed(),
+        )
+        .unwrap();
     }
 }
 
