@@ -15,4 +15,5 @@ world impl {
     export app;
     export mail;
     export registry;
+    export development;
 }
