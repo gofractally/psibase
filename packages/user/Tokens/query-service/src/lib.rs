@@ -11,8 +11,8 @@ mod service {
     use tokens::{
         helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
-            Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
-            UserConfig, UserConfigTable,
+            Balance, BalanceTable, ConfigTable, SharedBalance, SharedBalanceTable, Token,
+            TokenTable, UserConfig, UserConfigTable,
         },
     };
 
@@ -33,6 +33,14 @@ mod service {
 
     #[Object]
     impl Query {
+        /// Returns the current system token details
+        async fn get_sys_token(&self) -> Option<TID> {
+            ConfigTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&())
+                .map(|row| row.tid)
+        }
+
         /// Given a token id, return a record that represents token
         /// configuration, ownership, and supply details.
         async fn token(&self, token_id: String) -> Option<Token> {

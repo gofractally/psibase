@@ -363,6 +363,20 @@ mod service {
         unimplemented!()
     }
 
+    /// Sets the system token
+    ///
+    /// # Arguments
+    /// * `tokenId` - Identifier of a previously created token
+    ///
+    /// # Notes
+    /// * Only the service account can set the system token
+    /// * The system token can only be set once (changing system token is not yet supported)
+    #[action]
+    #[allow(non_snake_case)]
+    fn setSysToken(tokenId: TID) {
+        unimplemented!()
+    }
+
     /// Set token configuration. Only the token owner can set the configuration.
     ///
     /// # Arguments
