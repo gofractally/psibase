@@ -18,7 +18,7 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::services::tokens::Quantity;
 use psibase::AccountNumber;
 use psibase::{fracpack::Pack, services::tokens, FlagsType};
-use tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
+use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 pub mod query {
     pub mod fetch_token;
 }

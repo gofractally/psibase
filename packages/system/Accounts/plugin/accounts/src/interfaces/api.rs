@@ -25,7 +25,7 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
-        assert_authorized(FunctionName::is_logged_in)?;
+        assert_authorized(FunctionName::is_logged_in).unwrap();
         Self::get_current_user().is_some()
     }
 
@@ -72,7 +72,7 @@ impl API for AccountsPlugin {
     }
 
     fn get_current_user() -> Option<String> {
-        assert_authorized(FunctionName::get_current_user)?;
+        assert_authorized(FunctionName::get_current_user).unwrap();
         AppsTable::new(&Client::get_active_app()).get_logged_in_user()
     }
 
