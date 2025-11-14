@@ -27,3 +27,4 @@ world = "impl"
 "producers:plugin" = { path = "../../../system/Producers/plugin/wit/world.wit" }
 "branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
 "packages:plugin" = { path = "../../Packages/plugin/wit/world.wit" }
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/admin.wit" }
