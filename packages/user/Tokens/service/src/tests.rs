@@ -154,4 +154,35 @@ mod tests {
         assert_eq!(to_fixed("123.4", 8), "123.40000000");
         assert_eq!(to_fixed("0", 5), "0.00000");
     }
+
+    #[psibase::test_case(packages("Tokens"))]
+    fn test_user_pending(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init();
+
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+        let a = Wrapper::push_from(&chain, alice);
+
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+        let b = Wrapper::push_from(&chain, bob);
+
+        let memo = Memo::new("memo".to_string()).unwrap();
+
+        b.setUserConf(MANUAL_DEBIT, true);
+
+        let tid = a
+            .create(Precision::new(4).unwrap(), 100_0000.into())
+            .get()?;
+        a.mint(tid, 100.into(), memo.clone());
+
+        a.credit(tid, bob, 100.into(), memo.clone()).get()?;
+        let aliceBobCred = a.getSharedBal(tid, alice, bob).get()?;
+        let bobAliceCred = b.getSharedBal(tid, bob, alice).get()?;
+        b.reject(tid, alice, memo.clone()).get()?;
+        let aliceBobCred2 = a.getSharedBal(tid, alice, bob).get()?;
+        let bobAliceCred2 = b.getSharedBal(tid, bob, alice).get()?;
+
+        Ok(())
+    }
 }
