@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::str::FromStr;
 mod errors;
 use errors::ErrorType;
 
@@ -17,7 +16,6 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
-use psibase::AccountNumber;
 use psibase::{fracpack::Pack, services::tokens, FlagsType};
 pub mod query {
     pub mod fetch_token;
@@ -44,7 +42,7 @@ psibase::define_trust! {
         None => [decimal_to_u64, u64_to_decimal],
         Low => [],
         Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
-        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
+        High => [recall, mint, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
     }
 }
 
@@ -132,17 +130,6 @@ impl Issuer for TokensPlugin {
         }
         .packed();
         add_action_to_transaction(Actions::mint::ACTION_NAME, &packed_args)
-    }
-
-    fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::map_symbol)?;
-
-        let packed_args = Actions::mapSymbol {
-            token_id,
-            symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(Actions::mapSymbol::ACTION_NAME, &packed_args)
     }
 
     fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {

@@ -33,14 +33,6 @@ interface issuer {
     /// * `memo`     - Memo describing the mint
     mint: func(token-id: u32, amount: decimal, memo: string) -> result<_, error>;
 
-    /// Map a symbol to a token.
-    ///
-    /// Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `symbol`   - Symbol to map, e.g. "BTC"
-    ///
-    /// This will burn the symbol NFT ensuring the symbol cannot be mapped to any other tokens.
-    map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
 
     /// Configures whether a token should be transferable.
     ///
@@ -80,7 +72,7 @@ interface user {
     /// * `amount`   - Amount to uncredit
     /// * `memo`     - Memo describing the uncredit
     uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
-    
+
     /// Move tokens from shared balance into the debitor's account balance.
     ///
     /// Arguments
@@ -97,7 +89,7 @@ interface user {
     /// * `creditor` - Account that initiated the credit
     /// * `memo`     - Memo describing the rejection
     reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
-    
+
     /// Burn tokens from the caller's balance.
     ///
     /// Arguments
@@ -115,27 +107,27 @@ interface user-config {
     /// Arguments
     /// * `enable` - `true` to require manual debit, `false` for automatic debit
     enable-user-manual-debit: func(enable: bool) -> result<_, error>;
-    
+
     /// Keep zero balances globally for the caller.
     ///
     /// Arguments
     /// * `enable` - `true` to retain zero-balance rows, `false` to prune them
     enable-user-keep-zero-balances: func(enable: bool) -> result<_, error>;
-    
+
     /// Enable manual debit for a specific token balance.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to require manual debit, `false` for automatic debit
     enable-balance-manual-debit: func(token-id: u32, enable: bool) -> result<_, error>;
-    
+
     /// Keep zero balances for a specific token balance.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to retain zero-balance rows, `false` to prune them
     enable-balance-keep-zero-balances: func(token-id: u32, enable: bool) -> result<_, error>;
-    
+
     /// Delete the caller's balance configuration for a token.
     ///
     /// Arguments
@@ -147,8 +139,8 @@ interface helpers {
     use host:types/types.{error};
     use types.{decimal};
 
-    /// Uses the precision of the specified token to convert from a token 
-    ///   decimal (string) to its u64 representation 
+    /// Uses the precision of the specified token to convert from a token
+    ///   decimal (string) to its u64 representation
     ///   (e.g. "100.0000" -> 1000000)
     decimal-to-u64: func(token-id: u32, amount: decimal) -> result<u64, error>;
 
