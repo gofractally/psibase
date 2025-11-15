@@ -1,7 +1,11 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{
+    check_none, check_some,
+    services::auth_dyn::interfaces::{DynamicAuthPolicy, SingleAuth},
+    AccountNumber, Table,
+};
 
-use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
+use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable, Guild};
 
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -30,6 +34,7 @@ impl Fractal {
         mission: String,
         genesis_guild: AccountNumber,
     ) {
+        check_none(Self::get(account), "fractal already exists");
         Self::new(account, name, mission, genesis_guild).save();
     }
 
@@ -56,11 +61,25 @@ impl Fractal {
             )
             .collect()
     }
+
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
+        DynamicAuthPolicy::Single(SingleAuth {
+            authorizer: self.legislature,
+        })
+    }
 }
 
 #[ComplexObject]
 impl Fractal {
     async fn memberships(&self) -> Vec<FractalMember> {
         self.members()
+    }
+
+    async fn legislature(&self) -> Guild {
+        Guild::get_assert(self.legislature)
+    }
+
+    async fn judiciary(&self) -> Guild {
+        Guild::get_assert(self.judiciary)
     }
 }
