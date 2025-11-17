@@ -299,6 +299,12 @@ namespace UserService
       /// * The system token can only be set once (changing system token is not yet supported)
       void setSysToken(TID tokenId);
 
+      /// Gets the system token
+      ///
+      /// # Returns
+      /// * `Option<TID>` - `Some(sys_tid)` if it has been set, otherwise `None`
+      std::optional<TID> getSysToken();
+
      private:
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
@@ -341,6 +347,8 @@ namespace UserService
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
+      method(setSysToken, tokenId),
+      method(getSysToken),
       method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
