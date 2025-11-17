@@ -1970,6 +1970,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "nft-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nft-pkg"
+version = "0.22.0"
+dependencies = [
+ "nft",
+ "nft-plugin",
+ "r-nft",
+]
+
+[[package]]
+name = "nft-plugin"
+version = "0.22.0"
+dependencies = [
+ "nft",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2473,6 +2507,18 @@ dependencies = [
  "psibase-user-workspace-hack",
  "serde",
  "serde-aux",
+ "serde_json",
+]
+
+[[package]]
+name = "r-nft"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "nft",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
  "serde_json",
 ]
 
