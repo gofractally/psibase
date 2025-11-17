@@ -7,17 +7,17 @@ use errors::ErrorType;
 use bindings::exports::tokens::plugin as Exports;
 use Exports::types::Decimal;
 use Exports::{
-    admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers,
-    issuer::Guest as Issuer, user::Guest as User, user_config::Guest as UserConfig,
+    admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers, issuer::Guest as Issuer,
+    user::Guest as User, user_config::Guest as UserConfig,
 };
 
 use bindings::host::common::server;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
+use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
-use psibase::{fracpack::Pack, services::tokens, AccountNumber, FlagsType};
-use tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
+use psibase::{fracpack::Pack, services::tokens, FlagsType};
 pub mod query {
     pub mod fetch_token;
 }
