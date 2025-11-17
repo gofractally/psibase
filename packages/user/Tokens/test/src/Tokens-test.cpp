@@ -839,7 +839,7 @@ TEST_CASE("GraphQL Queries")
        token_a);
 
    CHECK(
-       std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
+       std::string(userBalances.body.begin(), userBalances.body.end()) ==
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
