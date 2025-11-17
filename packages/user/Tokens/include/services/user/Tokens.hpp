@@ -289,6 +289,16 @@ namespace UserService
       /// Returns a `bool` indicating whether the specified configuration flag is enabled
       bool getTokenConf(TID tokenId, uint8_t index);
 
+      /// Sets the system token
+      ///
+      /// # Arguments
+      /// * `tokenId` - Identifier of a previously created token
+      ///
+      /// # Notes
+      /// * Only the service account can set the system token
+      /// * The system token can only be set once (changing system token is not yet supported)
+      void setSysToken(TID tokenId);
+
      private:
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);

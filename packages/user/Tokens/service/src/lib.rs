@@ -4,8 +4,8 @@ pub use tables::tables::{BalanceFlags, TokenFlags};
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::*;
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
+    use crate::tables::tables::{ConfigRow, *};
     use psibase::services::events;
     use psibase::services::nft::{NamedBit, Wrapper as Nfts};
     use psibase::services::symbol::Service::Wrapper as Symbol;
@@ -511,6 +511,28 @@ pub mod service {
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
         SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
+    }
+
+    /// Sets the system token
+    ///
+    /// # Arguments
+    /// * `token_id` - Identifier of a previously created token
+    ///
+    /// # Notes
+    /// * Only the service account can set the system token
+    /// * The system token can only be set once (changing system token is not yet supported)
+    #[action]
+    #[allow(non_snake_case)]
+    fn setSysToken(tokenId: TID) {
+        check(get_sender() == get_service(), "Unauthorized");
+        check(Token::get(tokenId).is_some(), "Token DNE");
+
+        let config_table = ConfigTable::new();
+        check(
+            config_table.get_index_pk().get(&()).is_none(),
+            "Changing system token is not supported",
+        );
+        config_table.put(&ConfigRow { sys_tid: tokenId }).unwrap();
     }
 
     #[event(history)]

@@ -627,4 +627,23 @@ pub mod tables {
             BalanceFlagsJson::from(Flags::new(self.flags))
         }
     }
+
+    #[table(name = "ConfigTable", index = 6)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct ConfigRow {
+        pub sys_tid: TID,
+    }
+
+    impl ConfigRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[ComplexObject]
+    impl ConfigRow {
+        pub async fn token(&self) -> Token {
+            Token::get_assert(self.sys_tid)
+        }
+    }
 }
