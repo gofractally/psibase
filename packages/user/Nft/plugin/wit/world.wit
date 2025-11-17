@@ -2,15 +2,13 @@ package nft:plugin;
 
 interface api {
     use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
+    credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
+    mint: func() -> result<_, error>;
+    burn: func(nft-id: u32) -> result<_, error>;
 }
 
-interface queries {
-    use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
-}
+
 
 world imports {
     import api;
-    import queries;
 }
