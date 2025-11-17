@@ -16,6 +16,7 @@ interface types {
         bytes(list<u8>),
         json(string),
         text(string),
+        graphql(string),
     }
 
     record header {
@@ -40,7 +41,7 @@ interface types {
 interface intf {
     use types.{http-request, http-response, error, plugin-id};
 
-    send-request: func(req: http-request) -> result<http-response, error>;
+    send-request: func(req: http-request, with-credentials: bool) -> result<http-response, error>;
 
     // The last items in the list are the most recent services in the callstack
     service-stack: func() -> list<string>;

@@ -57,7 +57,7 @@ export interface HostInterface {
     syncCallDyn: (args: QualifiedDynCallArgs) => any;
 
     // Send an HTTP request and get the response (synchronously)
-    sendRequest: (req: HttpRequest) => HttpResponse;
+    sendRequest: (req: HttpRequest, withCredentials?: boolean) => HttpResponse;
 
     // Get the service name from each level of the callstack
     getServiceStack(): string[];
