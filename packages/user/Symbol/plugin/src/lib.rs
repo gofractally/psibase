@@ -12,6 +12,8 @@ use psibase::fracpack::Pack;
 use psibase::services::nft;
 use psibase::{define_trust, AccountNumber};
 
+use crate::graphql::fetch_symbol_owner_nft;
+
 mod errors;
 mod graphql;
 
@@ -61,11 +63,10 @@ impl Api for SymbolPlugin {
             vec!["config".to_string()],
         )?;
 
-        // look up the nft id of the symbol
-        // credit the nft to the symbol service
+        let nft_id = fetch_symbol_owner_nft(symbol.as_str().into())?;
         let credit_args = nft::action_structs::credit {
-            nftId: 2,
-            memo: "".into(),
+            nftId: nft_id,
+            memo: "symbol mapping".into(),
             receiver: symbol::SERVICE,
         }
         .packed();
