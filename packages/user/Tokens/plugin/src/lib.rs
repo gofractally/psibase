@@ -159,6 +159,7 @@ impl Issuer for TokensPlugin {
 
 impl Helpers for TokensPlugin {
     fn decimal_to_u64(token_id: u32, amount: String) -> Result<u64, Error> {
+        assert_authorized(FunctionName::decimal_to_u64)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Quantity::from_str(&amount, token.precision)
@@ -167,6 +168,7 @@ impl Helpers for TokensPlugin {
     }
 
     fn u64_to_decimal(token_id: u32, amount: u64) -> Result<String, Error> {
+        assert_authorized(FunctionName::u64_to_decimal)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Ok(tokens::Decimal::new(amount.into(), token.precision).to_string())
