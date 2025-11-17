@@ -285,7 +285,7 @@ pub mod service {
 
         Config::set(billing_token);
         Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-        Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
+        Nft::call_from(Wrapper::SERVICE).setUserConf(0, true);
 
         // Populate default settings for each token symbol length
         for length in 3u8..7 {
