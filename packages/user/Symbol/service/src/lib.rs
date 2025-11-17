@@ -1,0 +1,354 @@
+#![allow(non_snake_case)]
+#[psibase::service_tables]
+pub mod tables {
+    use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::check_none;
+    use psibase::services::nft::{NftRecord, Wrapper as Nft};
+    use psibase::services::tokens::Wrapper as Tokens;
+    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
+    use psibase::{
+        check, check_some, get_sender, services::nft::NID, AccountNumber, Fracpack, Table, ToSchema,
+    };
+    use serde::{Deserialize, Serialize};
+
+    #[table(name = "ConfigTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    pub struct Config {
+        pub billing_token: TID,
+    }
+
+    impl Config {
+        #[primary_key]
+        fn pk(&self) {}
+
+        fn new(billing_token: TID) -> Self {
+            Self { billing_token }
+        }
+
+        pub fn set(billing_token: TID) -> Self {
+            check_none(Self::get(), "config is already set");
+            let new_instance = Self::new(billing_token);
+            new_instance.save();
+            new_instance
+        }
+
+        pub fn get() -> Option<Self> {
+            ConfigTable::read().get_index_pk().get(&())
+        }
+
+        pub fn get_assert() -> Self {
+            check_some(Self::get(), "Config not found")
+        }
+
+        pub fn save(&self) {
+            ConfigTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[table(name = "SymbolLengthTable", index = 1)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct SymbolLength {
+        #[primary_key]
+        pub symbolLength: u8,
+        pub nftId: NID,
+    }
+
+    impl SymbolLength {
+        fn new(symbolLength: u8, nftId: NID) -> Self {
+            Self {
+                symbolLength,
+                nftId,
+            }
+        }
+
+        pub fn get(symbol_length: u8) -> Option<Self> {
+            SymbolLengthTable::read().get_index_pk().get(&symbol_length)
+        }
+
+        pub fn get_assert(symbol_length: u8) -> Self {
+            check_some(Self::get(symbol_length), "symbol length not supported")
+        }
+
+        pub fn add(symbol_length: u8) -> Self {
+            let nft_id = psibase::services::diff_adjust::Wrapper::call()
+                .create(10000000, 86400, 24, 24, 0, 50000);
+            let new_instance = Self::new(symbol_length, nft_id);
+            new_instance.save();
+            new_instance
+        }
+
+        pub fn price(&self) -> Quantity {
+            psibase::services::diff_adjust::Wrapper::call()
+                .get_diff(self.nftId)
+                .into()
+        }
+
+        fn save(&self) {
+            SymbolLengthTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[ComplexObject]
+    impl SymbolLength {
+        pub async fn current_price(&self) -> Decimal {
+            Decimal::new(
+                self.price(),
+                Tokens::call()
+                    .getToken(Config::get_assert().billing_token)
+                    .precision,
+            )
+        }
+
+        pub async fn billing_token(&self) -> TokenRecord {
+            Tokens::call().getToken(Config::get_assert().billing_token)
+        }
+    }
+
+    #[table(name = "SymbolTable", index = 2)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct Symbol {
+        #[primary_key]
+        pub symbolId: AccountNumber,
+        #[graphql(skip)]
+        pub ownerNft: NID,
+    }
+
+    impl Symbol {
+        fn new(symbolId: AccountNumber, ownerNft: NID) -> Self {
+            Self { symbolId, ownerNft }
+        }
+
+        pub fn get(symbol: AccountNumber) -> Option<Self> {
+            SymbolTable::read().get_index_pk().get(&symbol)
+        }
+
+        pub fn get_assert(symbol: AccountNumber) -> Self {
+            check_some(Self::get(symbol), "Symbol does not exist")
+        }
+
+        pub fn add(symbol: AccountNumber, billable: bool) -> Self {
+            check_none(Symbol::get(symbol), "Symbol already exists");
+            let length_record = SymbolLength::get(symbol.to_string().len() as u8);
+            check(
+                length_record.is_some()
+                    && symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
+                "Symbol may only contain 3 to 7 lowercase alphabetic characters",
+            );
+            let length_record = length_record.unwrap();
+            let recipient = get_sender();
+            let billing_token = Config::get_assert().billing_token;
+
+            let on_created = |quantity: Quantity| {
+                crate::Wrapper::emit().history().symCreated(
+                    symbol,
+                    recipient,
+                    Decimal::new(quantity, Tokens::call().getToken(billing_token).precision)
+                        .to_string(),
+                );
+            };
+
+            if billable {
+                let price = psibase::services::diff_adjust::Wrapper::call()
+                    .increment(length_record.nftId, 1)
+                    .into();
+
+                Tokens::call().debit(
+                    billing_token,
+                    recipient,
+                    price,
+                    "symbol purchase".to_string().try_into().unwrap(),
+                );
+
+                on_created(price);
+            } else {
+                on_created(0.into());
+            }
+
+            let new_instance = Self::new(symbol, Nft::call().mint());
+            new_instance.save();
+
+            Nft::call().credit(
+                new_instance.ownerNft,
+                recipient,
+                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+            );
+
+            new_instance
+        }
+
+        pub fn map_symbol(&mut self, token_id: TID) {
+            let token_owner_nft = Tokens::call().getToken(token_id).nft_id;
+            check(
+                Nft::call().getNft(token_owner_nft).owner == get_sender(),
+                "Missing required authority",
+            );
+
+            let symbol_owner_nft = self.ownerNft;
+            Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
+            Nft::call().burn(symbol_owner_nft);
+            Mapping::add(token_id, self.symbolId);
+        }
+
+        fn save(&self) {
+            SymbolTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[ComplexObject]
+    impl Symbol {
+        pub async fn owner_nft(&self) -> NftRecord {
+            psibase::services::nft::Wrapper::call().getNft(self.ownerNft)
+        }
+
+        pub async fn mapping(&self) -> Option<Mapping> {
+            Mapping::get_by_symbol(self.symbolId)
+        }
+    }
+
+    #[table(name = "MappingTable", index = 3)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct Mapping {
+        #[primary_key]
+        pub tokenId: TID,
+        #[graphql(skip)]
+        pub symbolId: AccountNumber,
+    }
+
+    impl Mapping {
+        #[secondary_key(1)]
+        fn by_symbol(&self) -> AccountNumber {
+            self.symbolId
+        }
+
+        fn new(tokenId: TID, symbolId: AccountNumber) -> Self {
+            Self { tokenId, symbolId }
+        }
+
+        pub fn get(tokenId: TID) -> Option<Self> {
+            MappingTable::read().get_index_pk().get(&tokenId)
+        }
+
+        pub fn get_assert(tokenId: TID) -> Self {
+            check_some(Self::get(tokenId), "mapping does not exist")
+        }
+
+        pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
+            MappingTable::read().get_index_by_symbol().get(&symbol)
+        }
+
+        pub fn add(tokenId: TID, symbol: AccountNumber) {
+            check_none(
+                Self::get_by_symbol(symbol),
+                "Symbol is already mapped to a token",
+            );
+            Self::new(tokenId, symbol).save();
+        }
+
+        fn save(&self) {
+            MappingTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[ComplexObject]
+    impl Mapping {
+        pub async fn symbol(&self) -> Symbol {
+            Symbol::get_assert(self.symbolId)
+        }
+
+        pub async fn token(&self) -> TokenRecord {
+            Tokens::call().getToken(self.tokenId)
+        }
+    }
+}
+
+#[psibase::service(name = "symbol", tables = "tables")]
+pub mod service {
+    use crate::tables::{Config, Mapping, Symbol, SymbolLength};
+    use psibase::services::symbol::SID;
+    use psibase::services::tokens::{BalanceFlags, Quantity, TID};
+    use psibase::*;
+
+    use psibase::services::nft::Wrapper as Nft;
+    use psibase::services::tokens::Wrapper as Tokens;
+
+    #[action]
+    fn init(billing_token: TID) {
+        Tokens::call().getToken(billing_token); // Validate token exists
+        check_none(Config::get(), "service already initialized");
+        check(
+            get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
+            "only root or symbol account can call init",
+        );
+
+        Config::set(billing_token);
+        Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+        Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
+
+        // Populate default settings for each token symbol length
+        for length in 3u8..7 {
+            SymbolLength::add(length);
+        }
+    }
+
+    #[action]
+    fn create(symbol: AccountNumber) {
+        Symbol::add(symbol, get_sender() != Wrapper::SERVICE);
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getPrice(length: u8) -> Quantity {
+        SymbolLength::get_assert(length).price()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSymbolType(length: u8) -> SymbolLength {
+        SymbolLength::get_assert(length)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSymbol(symbol: AccountNumber) -> Symbol {
+        Symbol::get_assert(symbol)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getTokenSym(token_id: TID) -> SID {
+        Mapping::get_assert(token_id).symbolId
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getByToken(token_id: TID) -> Option<Mapping> {
+        Mapping::get(token_id)
+    }
+
+    #[action]
+    fn getMapBySym(symbol: AccountNumber) -> Option<Mapping> {
+        Mapping::get_by_symbol(symbol)
+    }
+
+    #[action]
+    fn exists(symbol: AccountNumber) -> bool {
+        Symbol::get(symbol).is_some()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
+        Symbol::get_assert(symbol).map_symbol(token_id);
+    }
+
+    #[pre_action(exclude(init, getByToken))]
+    fn check_init() {
+        check_some(Config::get(), "service not initialized");
+    }
+
+    #[event(history)]
+    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {}
+}

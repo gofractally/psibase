@@ -1,0 +1,25 @@
+package symbol:plugin;
+
+interface api {
+    use host:types/types.{error};
+
+    /// Create / purchase a new symbol
+    /// Requires symbol to purchase and deposit amount of billable token
+    create: func(symbol: string, deposit: string) -> result<_, error>;
+
+    /// Maps a symbol to a token ID
+    map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
+}
+
+interface admin {
+    use host:types/types.{error};
+
+    /// Initialize the symbol service and specify which token to bill in
+    init: func(token-id: u32) -> result<_, error>;
+
+}
+
+world imports {
+    import api;
+    import admin;
+}

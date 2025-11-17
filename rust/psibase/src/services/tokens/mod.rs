@@ -34,7 +34,6 @@ pub struct TokenRecord {
     pub issued_supply: Quantity,
     pub burned_supply: Quantity,
     pub max_issued_supply: Quantity,
-    pub symbol: Option<AccountNumber>,
 }
 
 #[derive(
@@ -66,6 +65,11 @@ pub struct Balance {
     pub token_id: TID,
     pub balance: Quantity,
 }
+
+crate::define_flags!(BalanceFlags, u8, {
+    manual_debit,
+    keep_zero_balance,
+});
 
 #[crate::service(name = "tokens", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
@@ -205,33 +209,6 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> TokenRecord {
-        unimplemented!()
-    }
-
-    /// Lookup token symbol
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    ///
-    /// Returns token symbol
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        unimplemented!()
-    }
-
-    /// Map a symbol to a token
-    ///
-    /// By default, tokens are only identifiable by their TID.
-    /// Symbols may be mapped to improve usability. Once a symbol
-    /// is mapped, it is permanent.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
         unimplemented!()
     }
 
