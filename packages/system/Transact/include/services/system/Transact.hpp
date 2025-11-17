@@ -15,6 +15,13 @@ namespace SystemService
    };
    PSIO_REFLECT(ServiceMethod, service, method)
 
+   /// Resource metering interface
+   struct MeteringInterface
+   {
+      void useNet(psibase::AccountNumber user, uint64_t amount_bytes);
+   };
+   PSIO_REFLECT(MeteringInterface, method(useNet, user, amount_bytes))
+
    /// Authenticate actions
    ///
    /// [Transact] calls into auth services using this interface
@@ -243,6 +250,14 @@ namespace SystemService
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(SnapshotInfoTable)
 
+   struct MeteringService
+   {
+      psibase::AccountNumber meteringService;
+   };
+   PSIO_REFLECT(MeteringService, meteringService)
+   using MeteringServiceTable = psibase::Table<MeteringService, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(MeteringServiceTable)
+
    /// All transactions enter the chain through this service
    ///
    /// This privileged service dispatches top-level actions to other
@@ -264,7 +279,8 @@ namespace SystemService
                                             BlockSummaryTable,
                                             IncludedTrxTable,
                                             CallbacksTable,
-                                            SnapshotInfoTable>;
+                                            SnapshotInfoTable,
+                                            MeteringServiceTable>;
 
       /// This action enables the boot procedure to be split across multiple blocks
       ///
@@ -364,6 +380,11 @@ namespace SystemService
       /// This is *not* the currently executing block time.
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
+
+      /// Set the metering service
+      ///
+      /// The metering service is the service to which all resource consumption metrics are reported.
+      void setMeterServ(psibase::AccountNumber meteringService);
    };
    PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),
@@ -379,7 +400,10 @@ namespace SystemService
                 method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
-                method(headBlockTime))
+                method(headBlockTime),
+                method(setMeterServ, meteringService),
+                //
+   )
 
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
 
