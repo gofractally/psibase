@@ -27,6 +27,7 @@ world = "impl"
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
+"permissions:plugin" = { path = "../../../user/Permissions/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Serialize", "serde::Deserialize"]

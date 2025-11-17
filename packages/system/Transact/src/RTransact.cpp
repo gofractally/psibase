@@ -1362,6 +1362,10 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    std::optional<AccountNumber> result;
    bool                         isLocalhost = psibase::isLocalhost(request);
    auto                         rootHost    = to<HttpServer>().rootHost(request.host);
+
+   auto isValidJwt = [&](const LoginTokenData& decoded)
+   { return decoded.aud == rootHost && checkExp(decoded.exp); };
+
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
@@ -1374,9 +1378,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
                         {
                            auto token   = value.substr(prefix.size());
                            auto decoded = decodeJWT<LoginTokenData>(key, token);
-                           if (decoded.aud == rootHost && checkExp(decoded.exp))
+                           if (decoded && isValidJwt(*decoded))
                            {
-                              result = decoded.sub;
+                              result = decoded->sub;
                            }
                         }
                      });
@@ -1391,8 +1395,8 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    for (const auto& token : tokens)
    {
       auto decoded = decodeJWT<LoginTokenData>(key, token);
-      if (decoded.aud == rootHost && checkExp(decoded.exp))
-         return decoded.sub;
+      if (decoded && isValidJwt(*decoded))
+         return decoded->sub;
    }
    return {};
 }

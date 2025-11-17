@@ -50,11 +50,15 @@ pub struct CreditRecord {
     creditor: AccountNumber,
 }
 
+pub type NamedBit = crate::MethodNumber;
+pub const MANUAL_DEBIT: u64 = crate::method_raw!("manualDebit");
+
 #[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
+    use super::NamedBit;
     use super::NID;
-    use crate::{AccountNumber, HttpReply, HttpRequest, MethodNumber, NamedBit};
+    use crate::{AccountNumber, HttpReply, HttpRequest, MethodNumber};
 
     #[action]
     fn init() {

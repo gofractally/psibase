@@ -150,9 +150,10 @@ class TransactionError(Exception):
         self.trace = trace
 
 class GraphQLError(Exception):
-    def __init__(self, json):
-        super().__init__(json['errors']['message'])
-        self.json = json
+    def __init__(self, payload):
+        msg = payload["errors"][0].get("message", "GraphQL error")
+        super().__init__(msg)
+        self.json = payload
 
 class PrivateKey:
     def __init__(self, data=None):
@@ -298,13 +299,16 @@ class API:
         return self.push_action('producers', 'producers', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
 
     # Queries
-    def graphql(self, service, query):
+    def graphql(self, service, query, token=None):
         '''
         Sends a GraphQL query to a service and returns the result as json
 
         Raise GraphQLError if the query fails
         '''
-        with self.post('/graphql', service=service, json={'query': query}) as result:
+        headers = {}
+        if token is not None:
+            headers['Authorization'] = 'Bearer ' + token
+        with self.post('/graphql', service=service, json={'query': query}, headers=headers) as result:
             result.raise_for_status()
             json = result.json()
             if 'errors' in json:
@@ -396,13 +400,13 @@ class Service(object):
         Raise TransactionError if the transaction fails
         '''
         return self.api.push_action(sender, self.service, method, data, keys)
-    def graphql(self, query):
+    def graphql(self, query, token=None):
         '''
         Sends a GraphQL query to a service and returns the result as json
 
         Raise GraphQLError if the query fails
         '''
-        return self.api.graphql(self.service, query)
+        return self.api.graphql(self.service, query, token)
 
 _default_config = '''# psinode config
 service  = x-admin.:$PSIBASE_DATADIR/services/x-admin

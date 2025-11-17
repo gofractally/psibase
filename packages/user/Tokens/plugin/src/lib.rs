@@ -7,16 +7,17 @@ use errors::ErrorType;
 use bindings::exports::tokens::plugin as Exports;
 use Exports::types::Decimal;
 use Exports::{
-    helpers::Guest as Helpers, issuer::Guest as Issuer, user::Guest as User,
-    user_config::Guest as UserConfig,
+    admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers,
+    issuer::Guest as Issuer, user::Guest as User, user_config::Guest as UserConfig,
 };
 
+use bindings::host::common::server;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
-use psibase::{fracpack::Pack, services::tokens, FlagsType};
+use psibase::{fracpack::Pack, services::tokens, AccountNumber, FlagsType};
+use tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 pub mod query {
     pub mod fetch_token;
 }
@@ -34,15 +35,17 @@ psibase::define_trust! {
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
             - Issue, configure, and manage token and token supply
-            - Transfer tokens on your behalf
-            - Enable automatic debit of balances
+            - Transfer tokens
+            - Configure automatic balance debiting
+            - Read your token balances and transaction history
         ",
     }
     functions {
         None => [decimal_to_u64, u64_to_decimal],
         Low => [],
         Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
-        High => [recall, mint, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit],
+        High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit, graphql],
+        Max => [set_sys_token],
     }
 }
 
@@ -145,6 +148,7 @@ impl Issuer for TokensPlugin {
 
 impl Helpers for TokensPlugin {
     fn decimal_to_u64(token_id: u32, amount: String) -> Result<u64, Error> {
+        assert_authorized(FunctionName::decimal_to_u64)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Quantity::from_str(&amount, token.precision)
@@ -153,6 +157,7 @@ impl Helpers for TokensPlugin {
     }
 
     fn u64_to_decimal(token_id: u32, amount: u64) -> Result<String, Error> {
+        assert_authorized(FunctionName::u64_to_decimal)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
         Ok(tokens::Decimal::new(amount.into(), token.precision).to_string())
@@ -274,6 +279,27 @@ impl UserConfig for TokensPlugin {
         let packed_args = Actions::delBalConf { token_id }.packed();
 
         add_action_to_transaction(Actions::delBalConf::ACTION_NAME, &packed_args)
+    }
+}
+
+impl Admin for TokensPlugin {
+    fn set_sys_token(token_id: u32) {
+        assert_authorized_with_whitelist(FunctionName::set_sys_token, vec!["config".into()])
+            .unwrap();
+
+        add_action_to_transaction(
+            Actions::setSysToken::ACTION_NAME,
+            &Actions::setSysToken { tokenId: token_id }.packed(),
+        )
+        .unwrap();
+    }
+}
+
+impl Authorized for TokensPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_authorized_with_whitelist(FunctionName::graphql, vec!["homepage".into()])?;
+
+        server::post_graphql_get_json(&query)
     }
 }
 
