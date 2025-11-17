@@ -7,8 +7,13 @@ use bindings::exports::symbol::plugin::api::Guest as Api;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
+use bindings::staged_tx::plugin::proposer::set_propose_latch;
 use psibase::fracpack::Pack;
+use psibase::services::nft;
 use psibase::{define_trust, AccountNumber};
+
+mod errors;
+mod graphql;
 
 define_trust! {
     descriptions {
@@ -30,16 +35,16 @@ define_trust! {
 struct SymbolPlugin;
 
 impl Api for SymbolPlugin {
-    fn create(symbol: String, token_id: u32, amount: String) -> Result<(), Error> {
+    fn create(symbol: String, deposit: String) -> Result<(), Error> {
         trust::assert_authorized_with_whitelist(
             trust::FunctionName::create,
             vec!["config".to_string()],
         )?;
 
         bindings::tokens::plugin::user::credit(
-            token_id,
+            graphql::fetch_config()?.billing_token,
             &symbol::Wrapper::SERVICE.to_string(),
-            &amount,
+            &deposit,
             "".into(),
         )?;
 
@@ -56,12 +61,23 @@ impl Api for SymbolPlugin {
             vec!["config".to_string()],
         )?;
 
-        let packed_args = symbol::action_structs::mapSymbol {
+        // look up the nft id of the symbol
+        // credit the nft to the symbol service
+        let credit_args = nft::action_structs::credit {
+            nftId: 2,
+            memo: "".into(),
+            receiver: symbol::SERVICE,
+        }
+        .packed();
+
+        add_action_to_transaction(nft::action_structs::credit::ACTION_NAME, &credit_args)?;
+
+        let map_args = symbol::action_structs::mapSymbol {
             token_id,
             symbol: AccountNumber::from(symbol.as_str()),
         }
         .packed();
-        add_action_to_transaction(symbol::action_structs::mapSymbol::ACTION_NAME, &packed_args)
+        add_action_to_transaction(symbol::action_structs::mapSymbol::ACTION_NAME, &map_args)
     }
 }
 
@@ -71,6 +87,7 @@ impl Admin for SymbolPlugin {
             trust::FunctionName::init,
             vec!["config".to_string()],
         )?;
+        set_propose_latch(Some(&symbol::SERVICE.to_string()))?;
 
         let packed_args = symbol::action_structs::init {
             billing_token: token_id,

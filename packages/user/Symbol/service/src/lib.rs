@@ -12,7 +12,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
     pub struct Config {
         pub billing_token: TID,
     }
@@ -344,7 +344,7 @@ pub mod service {
         Symbol::get_assert(symbol).map_symbol(token_id);
     }
 
-    #[pre_action(exclude(init))]
+    #[pre_action(exclude(init, getByToken))]
     fn check_init() {
         check_some(Config::get(), "service not initialized");
     }

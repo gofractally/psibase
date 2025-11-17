@@ -4,7 +4,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::{services::tokens::TID, *};
     use serde::Deserialize;
-    use symbol::tables::{Mapping, Symbol, SymbolLength};
+    use symbol::tables::{Config, Mapping, Symbol, SymbolLength};
 
     #[derive(Deserialize, SimpleObject)]
     struct SymbolCreated {
@@ -30,6 +30,10 @@ mod service {
         /// Fetch a mapping of a symbol by token ID
         async fn mapping(&self, token_id: TID) -> Option<Mapping> {
             Mapping::get(token_id)
+        }
+
+        async fn config(&self) -> Option<Config> {
+            Config::get()
         }
 
         // Symbol created events
