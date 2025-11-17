@@ -57,7 +57,7 @@ void Symbol::init()
    initTable.put(InitializedRecord{});
 
    // Configure manualDebit for self on Token and NFT
-   to<Nft>().setUserConf("manualDebit"_m, true);
+   to<Nft>().setUserConf(0, true);
    to<Tokens>().setUserConf(Tokens::manualDebit, true);
 
    // Create system token

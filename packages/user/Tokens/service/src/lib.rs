@@ -28,7 +28,7 @@ pub mod service {
             let init_instance = InitRow { last_used_id: 0 };
             table.put(&init_instance).unwrap();
 
-            Nfts::call().setUserConf(psibase::NamedBit::from("manualDebit"), true);
+            Nfts::call().setUserConf(0, true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

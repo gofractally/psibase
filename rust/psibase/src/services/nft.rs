@@ -87,7 +87,7 @@ mod service {
     }
 
     #[action]
-    fn setUserConf(flag: NamedBit, enable: bool) {
+    fn setUserConf(flag: u8, enable: bool) {
         unimplemented!()
     }
 
