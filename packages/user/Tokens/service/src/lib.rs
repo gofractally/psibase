@@ -7,7 +7,7 @@ pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use crate::tables::tables::{ConfigRow, *};
     use psibase::services::events;
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::nft::{NamedBit, Wrapper as Nfts};
     use psibase::services::symbol::Service::Wrapper as Symbol;
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{get_sender, AccountNumber, Memo};
@@ -28,7 +28,7 @@ pub mod service {
             let init_instance = InitRow { last_used_id: 0 };
             table.put(&init_instance).unwrap();
 
-            Nfts::call().setUserConf(psibase::NamedBit::from("manualDebit"), true);
+            Nfts::call().setUserConf(NamedBit::from("manualDebit"), true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

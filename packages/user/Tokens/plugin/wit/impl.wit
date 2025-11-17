@@ -11,4 +11,5 @@ world impl {
     export user-config;
     export helpers;
     export admin;
+    export authorized;
 }
