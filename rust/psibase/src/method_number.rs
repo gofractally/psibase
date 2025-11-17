@@ -36,8 +36,6 @@ pub struct MethodNumber {
 
 serialize_as_str!(MethodNumber, "method number");
 
-pub type NamedBit = MethodNumber;
-
 impl MethodNumber {
     pub fn new(value: u64) -> Self {
         MethodNumber { value }
