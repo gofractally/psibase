@@ -183,7 +183,7 @@ pub mod service {
         _authorizers: Vec<AccountNumber>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
-        false
+        true
     }
 
     /// Creates a credential
