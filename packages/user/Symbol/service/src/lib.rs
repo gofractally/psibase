@@ -3,6 +3,7 @@
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
+    use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::nft::{NftRecord, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
@@ -33,7 +34,10 @@ pub mod tables {
         }
 
         pub fn get_assert(symbol_length: u8) -> Self {
-            check_some(Self::get(symbol_length), format!("symbol length of {} not supported", symbol_length).as_str())
+            check_some(
+                Self::get(symbol_length),
+                format!("symbol length of {} not supported", symbol_length).as_str(),
+            )
         }
 
         pub fn add(
@@ -43,7 +47,12 @@ pub mod tables {
             target_max: u32,
             floor_price: u64,
         ) -> Self {
-            let nft_id = psibase::services::diff_adjust::Wrapper::call().create(
+            check_none(
+                Self::get(symbol_length),
+                "sale of symbol length already exists",
+            );
+
+            let nft_id = DiffAdjust::call().create(
                 initial_price,
                 86400,
                 target_min,
@@ -57,9 +66,7 @@ pub mod tables {
         }
 
         pub fn price(&self) -> Quantity {
-            psibase::services::diff_adjust::Wrapper::call()
-                .get_diff(self.nftId)
-                .into()
+            DiffAdjust::call().get_diff(self.nftId).into()
         }
 
         fn save(&self) {
@@ -122,10 +129,8 @@ pub mod tables {
             );
             let length_record = length_record.unwrap();
             let recipient = get_sender();
-            let billing_token = check_some(
-                psibase::services::tokens::Wrapper::call().getSysToken(),
-                "system token must be defined",
-            );
+            let billing_token =
+                check_some(Tokens::call().getSysToken(), "system token must be defined");
 
             let on_created = |quantity: Quantity| {
                 crate::Wrapper::emit().history().symCreated(
@@ -137,9 +142,7 @@ pub mod tables {
             };
 
             if billable {
-                let price = psibase::services::diff_adjust::Wrapper::call()
-                    .increment(length_record.nftId, 1)
-                    .into();
+                let price = DiffAdjust::call().increment(length_record.nftId, 1).into();
 
                 Tokens::call().debit(
                     billing_token,
@@ -186,7 +189,7 @@ pub mod tables {
     #[ComplexObject]
     impl Symbol {
         pub async fn owner_nft(&self) -> NftRecord {
-            psibase::services::nft::Wrapper::call().getNft(self.ownerNft)
+            Nft::call().getNft(self.ownerNft)
         }
 
         pub async fn mapping(&self) -> Option<Mapping> {
