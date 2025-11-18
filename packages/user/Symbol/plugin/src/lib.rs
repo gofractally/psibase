@@ -9,7 +9,6 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 use psibase::fracpack::Pack;
-use psibase::services::nft;
 use psibase::{define_trust, AccountNumber};
 
 use crate::graphql::fetch_symbol_owner_nft;
@@ -64,14 +63,11 @@ impl Api for SymbolPlugin {
         )?;
 
         let nft_id = fetch_symbol_owner_nft(symbol.as_str().into())?;
-        let credit_args = nft::action_structs::credit {
-            nftId: nft_id,
-            memo: "symbol mapping".into(),
-            receiver: symbol::SERVICE,
-        }
-        .packed();
-
-        add_action_to_transaction(nft::action_structs::credit::ACTION_NAME, &credit_args)?;
+        bindings::nft::plugin::api::credit(
+            nft_id,
+            &symbol::SERVICE.to_string(),
+            "symbol mapping".into(),
+        )?;
 
         let map_args = symbol::action_structs::mapSymbol {
             token_id,
