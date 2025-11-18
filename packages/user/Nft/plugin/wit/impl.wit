@@ -5,5 +5,8 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
 
-    export api;
+    export issuer;
+    export user;
+    export user-config;
+
 }
