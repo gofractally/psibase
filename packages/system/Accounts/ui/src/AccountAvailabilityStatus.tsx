@@ -6,7 +6,7 @@ export const AccountAvailabilityStatus = ({
     isCreatingAccount,
 }: {
     accountStatus?: string;
-    isLoading: boolean;
+    isLoading?: boolean;
     isCreatingAccount: boolean;
 }) => (
     <div className="text-muted-foreground">
