@@ -710,7 +710,7 @@ pub mod tables {
         }
     }
     
-    #[table(name = "UserPendingTable", index = 6)]
+    #[table(name = "UserPendingTable", index = 7)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct UserPendingRecord {
