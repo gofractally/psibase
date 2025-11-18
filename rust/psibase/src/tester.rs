@@ -69,26 +69,6 @@ impl Chain {
     pub fn start_block(&self) {
         unimplemented!();
     }
-    pub fn graphql<T: DeserializeOwned>(
-        &self,
-        _account: AccountNumber,
-        _query: &str,
-    ) -> Result<T, anyhow::Error> {
-        unimplemented!();
-    }
-    pub fn default_registry() -> DirectoryRegistry {
-        unimplemented!();
-    }
-    pub fn boot_with<R: PackageRegistry>(
-        &self,
-        _reg: &R,
-        _services: &[String],
-    ) -> Result<(), Error> {
-        unimplemented!();
-    }
-    pub fn new_account(&self, _account: AccountNumber) -> Result<(), anyhow::Error> {
-        unimplemented!();
-    }
 }
 
 #[cfg(target_family = "wasm")]
