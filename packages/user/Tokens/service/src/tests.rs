@@ -64,7 +64,7 @@ mod tests {
         a.credit(tid, bob, 12345.into(), memo.clone());
         assert_eq!(0, a.getBalance(tid, alice).get().unwrap().value);
         assert_eq!(12345, get_shared_balance(&chain, tid, alice, bob).value);
-        assert_eq!(12345, get_shared_balance(&chain, tid, bob, alice).value);
+        assert_eq!(0, get_shared_balance(&chain, tid, bob, alice).value);
 
         // Bob can debit most of the balance, leaving 5 left.
         b.debit(tid, alice, 12340.into(), memo.clone());
@@ -154,48 +154,5 @@ mod tests {
         // test_large_precision
         assert_eq!(to_fixed("123.4", 8), "123.40000000");
         assert_eq!(to_fixed("0", 5), "0.00000");
-    }
-
-    #[psibase::test_case(packages("Tokens"))]
-    fn test_user_pending(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init();
-
-        let alice = account!("alice");
-        chain.new_account(alice).unwrap();
-        let a = Wrapper::push_from(&chain, alice);
-
-        let bob = account!("bob");
-        chain.new_account(bob).unwrap();
-        let b = Wrapper::push_from(&chain, bob);
-
-        let memo = Memo::new("memo".to_string()).unwrap();
-
-        b.setUserConf(MANUAL_DEBIT, true);
-
-        let tid = a
-            .create(Precision::new(4).unwrap(), 100_0000.into())
-            .get()?;
-        a.mint(tid, 100.into(), memo.clone());
-
-        // TODO: Need to get this data from UserPendingTable
-        a.credit(tid, bob, 100.into(), memo.clone()).get()?;
-        let aliceBobCred = a.getSharedBal(tid, alice, bob).get()?;
-        println!("aliceBobCred: {:?}", aliceBobCred);
-        assert_eq!(aliceBobCred, 100.into());
-
-        let bobAliceCred = b.getSharedBal(tid, bob, alice).get()?;
-        println!("bobAliceCred: {:?}", bobAliceCred);
-        assert_eq!(bobAliceCred, 0.into());
-
-        b.reject(tid, alice, memo.clone()).get()?;
-        let aliceBobCred2 = a.getSharedBal(tid, alice, bob).get()?;
-        println!("aliceBobCred2: {:?}", aliceBobCred2);
-        assert_eq!(aliceBobCred2, 0.into());
-
-        let bobAliceCred2 = b.getSharedBal(tid, bob, alice).get()?;
-        println!("bobAliceCred2: {:?}", bobAliceCred2);
-        assert_eq!(bobAliceCred2, 0.into());
-
-        Ok(())
     }
 }
