@@ -542,11 +542,10 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getSysToken() -> Option<TID> {
-        let config_table = ConfigTable::new();
-        if config_table.get_index_pk().get(&()).is_none() {
-            return None;
-        }
-        Some(config_table.get_index_pk().get(&()).unwrap().sys_tid)
+        ConfigTable::read()
+            .get_index_pk()
+            .get(&())
+            .map(|row| row.sys_tid)
     }
 
     #[event(history)]
