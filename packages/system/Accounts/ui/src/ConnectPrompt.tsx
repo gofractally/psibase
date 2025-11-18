@@ -5,32 +5,24 @@ import { useSearchParams } from "react-router-dom";
 import { getSupervisor, prompt } from "@psibase/common-lib";
 
 import { Avatar } from "@shared/components/avatar";
-import { NetworkLogo } from "@shared/components/network-logo";
 import { useBranding } from "@shared/hooks/use-branding";
 import { Button } from "@shared/shadcn/ui/button";
 import {
-    Card,
     CardAction,
     CardContent,
     CardFooter,
-    CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import {
     Dialog,
+    DialogClose,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@shared/shadcn/ui/select";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { BrandedGlowingCard } from "./components/branded-glowing-card";
@@ -62,21 +54,20 @@ export const ConnectPrompt = () => {
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [accounts, setAccounts] = useState<string[]>([]);
-    const [selectedAccount, setSelectedAccount] = useState("");
     const [canCreate, setCanCreate] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    console.log("error", error);
+
     const [showImport, setShowImport] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
+    const [showCannotCreate, setShowCannotCreate] = useState(false);
     const [importName, setImportName] = useState("");
     const [createName, setCreateName] = useState("");
     const [busy, setBusy] = useState<Busy>("idle");
 
     const { data: networkName } = useBranding();
-
-    const selectDefault = (list: string[], current: string) =>
-        list.includes(current) ? current : (list[0] ?? "");
 
     const load = async () => {
         setError(null);
@@ -87,7 +78,6 @@ export const ConnectPrompt = () => {
             ]);
             const list = Array.isArray(acctList) ? (acctList as string[]) : [];
             setAccounts(list);
-            setSelectedAccount((prev) => selectDefault(list, prev));
             setCanCreate(Boolean(canCreateFlag));
         } catch {
             setError("Failed to initialize");
@@ -109,7 +99,6 @@ export const ConnectPrompt = () => {
         try {
             await api.importExisting(name);
             await load();
-            setSelectedAccount(name);
             setShowImport(false);
             setImportName("");
         } catch {
@@ -125,9 +114,9 @@ export const ConnectPrompt = () => {
         setBusy("creating");
         setError(null);
         try {
-            /* const privateKey = */ await api.createAccount(name);
+            const privateKey = await api.createAccount(name);
+            console.log("privateKey", privateKey);
             await load();
-            setSelectedAccount(name);
             setShowCreate(false);
             setCreateName("");
         } catch {
@@ -217,7 +206,13 @@ export const ConnectPrompt = () => {
                                 <Button
                                     type="button"
                                     variant="link"
-                                    onClick={() => setShowCreate(true)}
+                                    onClick={async () => {
+                                        if (canCreate) {
+                                            setShowCreate(true);
+                                        } else {
+                                            setShowCannotCreate(true);
+                                        }
+                                    }}
                                     disabled={isLoggingIn}
                                     className="px-0 focus-visible:underline focus-visible:underline-offset-4 focus-visible:ring-0"
                                 >
@@ -263,6 +258,26 @@ export const ConnectPrompt = () => {
                         </div>
                     </DialogContent>
                 </Dialog>
+
+                <Dialog
+                    open={showCannotCreate}
+                    onOpenChange={(open) => !open && setShowCannotCreate(false)}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Cannot create account</DialogTitle>
+                        </DialogHeader>
+                        <DialogDescription>
+                            To create an account, you must either be logged in
+                            as an existing account or have an active invite.
+                        </DialogDescription>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button>Okay</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </>
         );
     }
@@ -305,173 +320,38 @@ export const ConnectPrompt = () => {
                             <div>Use another account</div>
                         </li>
                     </ul>
-
-                    {/* <div className="flex gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowImport(true)}
-                                disabled={isLoggingIn}
-                            >
-                                Import existing
-                            </Button>
-                            {canCreate && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setShowCreate(true)}
-                                    disabled={isLoggingIn}
-                                >
-                                    Create account
-                                </Button>
-                            )}
-                        </div> */}
-
-                    {/* <div className="mt-3">
-                            <Button
-                                onClick={handleLogin}
-                                disabled={!selectedAccount || isLoggingIn}
-                            >
-                                {isLoggingIn ? "Logging in…" : "Login"}
-                            </Button>
-                        </div> */}
                 </div>
             </CardContent>
         </BrandedGlowingCard>
     );
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-md p-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-3xl">
-                        <NetworkLogo /> Connect an account
-                    </CardTitle>
-                    {error && (
-                        <div className="border-destructive/40 bg-destructive/10 text-destructive rounded border p-2">
-                            {error}
-                        </div>
-                    )}
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {loading ? (
-                        <div className="text-muted-foreground">Loading…</div>
-                    ) : (
-                        <div className="space-y-3">
-                            <Label className="mb-2 block">
-                                Available accounts
-                            </Label>
-                            {accounts.length > 0 ? (
-                                <Select
-                                    value={selectedAccount}
-                                    onValueChange={setSelectedAccount}
-                                >
-                                    <SelectTrigger className="text-foreground">
-                                        <SelectValue placeholder="Choose an account" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {accounts.map((name) => (
-                                            <SelectItem key={name} value={name}>
-                                                {name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="text-muted-foreground text-sm">
-                                    No accounts yet.
-                                </div>
-                            )}
-
-                            <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setShowImport(true)}
-                                    disabled={isLoggingIn}
-                                >
-                                    Import existing
-                                </Button>
-                                {canCreate && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setShowCreate(true)}
-                                        disabled={isLoggingIn}
-                                    >
-                                        Create account
-                                    </Button>
-                                )}
-                            </div>
-
-                            <div className="mt-3">
-                                <Button
-                                    onClick={() => handleLogin(selectedAccount)}
-                                    disabled={!selectedAccount || isLoggingIn}
-                                >
-                                    {isLoggingIn ? "Logging in…" : "Login"}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Dialog
-                open={showImport}
-                onOpenChange={(open) => !open && setShowImport(false)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Import existing account</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex items-center gap-2">
-                        <Input
-                            className="text-foreground placeholder:text-muted-foreground flex-1"
-                            placeholder="Enter account name"
-                            value={importName}
-                            onChange={(e) => setImportName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") handleImport();
-                            }}
-                        />
-                        <Button
-                            onClick={handleImport}
-                            disabled={!importName.trim() || isImporting}
-                        >
-                            {isImporting ? "Importing…" : "Import"}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog
-                open={showCreate}
-                onOpenChange={(open) => !open && setShowCreate(false)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create new account</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex items-center gap-2">
-                        <Input
-                            className="text-foreground placeholder:text-muted-foreground flex-1"
-                            placeholder="Enter account name"
-                            value={createName}
-                            onChange={(e) => setCreateName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") handleCreate();
-                            }}
-                        />
-                        <Button
-                            onClick={handleCreate}
-                            disabled={!createName.trim() || isCreating}
-                        >
-                            {isCreating ? "Creating…" : "Create"}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </div>
+        <Dialog
+            open={showImport}
+            onOpenChange={(open) => !open && setShowImport(false)}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Import existing account</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center gap-2">
+                    <Input
+                        className="text-foreground placeholder:text-muted-foreground flex-1"
+                        placeholder="Enter account name"
+                        value={importName}
+                        onChange={(e) => setImportName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") handleImport();
+                        }}
+                    />
+                    <Button
+                        onClick={handleImport}
+                        disabled={!importName.trim() || isImporting}
+                    >
+                        {isImporting ? "Importing…" : "Import"}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 };
