@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "AuthDyn",
+    "AuthDyn/service",
+    "AuthDyn/query-service",
+    "AuthDyn/plugin",
     "Credentials",
     "Credentials/service",
     "Credentials/plugin",
@@ -18,7 +22,7 @@ exclude = [
     "AuthSig/plugin/",
     "Transact/plugin/",
     "SetCode/plugin/",
-    "Producers/plugin/"
+    "Producers/plugin/",
 ]
 
 [workspace.package]

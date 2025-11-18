@@ -293,40 +293,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "auth-dyn"
-version = "0.22.0"
-dependencies = [
- "async-graphql",
- "auth-dyn-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_macros",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "auth-dyn-pkg"
-version = "0.22.0"
-dependencies = [
- "auth-dyn",
- "auth-dyn-plugin",
- "r-auth-dyn",
-]
-
-[[package]]
-name = "auth-dyn-plugin"
-version = "0.22.0"
-dependencies = [
- "auth-dyn",
- "psibase",
- "psibase-user-workspace-hack",
- "serde",
- "serde_json",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2461,18 +2427,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "r-auth-dyn"
-version = "0.22.0"
-dependencies = [
- "async-graphql",
- "auth-dyn",
- "psibase",
- "psibase-user-workspace-hack",
- "serde",
- "serde_json",
 ]
 
 [[package]]

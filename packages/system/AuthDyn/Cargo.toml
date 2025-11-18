@@ -1,5 +1,5 @@
 [package]
-name = "auth-dyn-pkg"                      # Crate name
+name = "auth-dyn-pkg"                # Crate name
 description = "Dynamic auth service"
 version.workspace = true
 rust-version.workspace = true

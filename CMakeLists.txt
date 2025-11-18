@@ -437,8 +437,8 @@ psibase_package(
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthDyn.psi
-    PATH packages/user/AuthDyn
-    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    PATH packages/system/AuthDyn
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
 
