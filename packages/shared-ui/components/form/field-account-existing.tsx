@@ -88,7 +88,10 @@ export const FieldAccountExisting = withFieldGroup({
                             description={description}
                             startContent={
                                 <UserStartContent
-                                    userNotFound={userNotFound}
+                                    userNotFound={
+                                        Boolean(field.state.value) &&
+                                        userNotFound
+                                    }
                                     value={field.state.value}
                                     isValid={field.state.meta.isValid}
                                     isValidating={isValidating}

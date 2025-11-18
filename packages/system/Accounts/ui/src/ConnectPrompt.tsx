@@ -1,11 +1,15 @@
 import { CircleUserRound } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { z } from "zod";
 
-import { prompt } from "@psibase/common-lib";
+import { getSupervisor, prompt } from "@psibase/common-lib";
 
 import { Avatar } from "@shared/components/avatar";
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
+import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     CardAction,
@@ -33,6 +37,8 @@ import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 import { useImportExisting } from "./hooks/use-import-existing";
 
 type Busy = "idle" | "importing" | "creating" | "loggingIn";
+
+const supervisor = getSupervisor();
 
 export const ConnectPrompt = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -112,17 +118,13 @@ export const ConnectPrompt = () => {
         }
     };
 
-    const handleImportAndLogin = async (
-        e: React.FormEvent<HTMLFormElement>,
-    ) => {
-        e.preventDefault();
-        const name = importName.trim();
-        if (!name || busy !== "idle") return;
+    const handleImportAndLogin = async (account: string) => {
+        if (!account || busy !== "idle") return;
         setBusy("importing");
         setError(null);
         try {
-            await importExistingMutation.mutateAsync(name);
-            await connectAccountMutation.mutateAsync(name);
+            await importExistingMutation.mutateAsync(account);
+            await connectAccountMutation.mutateAsync(account);
             prompt.finished();
         } catch {
             setError("Import and login failed");
@@ -133,6 +135,24 @@ export const ConnectPrompt = () => {
     const isImporting = busy === "importing";
     const isCreating = busy === "creating";
     const isLoggingIn = busy === "loggingIn";
+
+    const form = useAppForm({
+        defaultValues: {
+            account: {
+                account: "",
+            },
+        },
+        validators: {
+            onChange: z.object({
+                account: z.object({
+                    account: zAccount.or(z.literal("")),
+                }),
+            }),
+        },
+        onSubmit: async (data) => {
+            await handleImportAndLogin(data.value.account.account);
+        },
+    });
 
     if (loading) {
         return (
@@ -154,57 +174,71 @@ export const ConnectPrompt = () => {
     ) {
         return (
             <>
-                <form onSubmit={handleImportAndLogin}>
-                    <BrandedGlowingCard>
-                        <CardContent className="flex flex-col">
-                            <div className="mb-6 flex-1 space-y-2">
-                                <CardTitle className="text-3xl font-normal">
-                                    Sign in
-                                </CardTitle>
-                                <div className="text-muted-foreground">
-                                    Use your {networkName} account
+                <form.AppForm>
+                    <form
+                        id="import-account-form"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            form.handleSubmit();
+                        }}
+                    >
+                        <BrandedGlowingCard>
+                            <CardContent className="flex flex-col">
+                                <div className="mb-6 flex-1 space-y-2">
+                                    <CardTitle className="text-3xl font-normal">
+                                        Sign in
+                                    </CardTitle>
+                                    <div className="text-muted-foreground">
+                                        Use your {networkName} account
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex-1">
-                                <Input
+                                <div className="flex-1">
+                                    <FieldAccountExisting
+                                        form={form}
+                                        fields="account"
+                                        label="Account name"
+                                        description={undefined}
+                                        placeholder="Account name"
+                                        disabled={isImporting}
+                                        supervisor={supervisor}
+                                    />
+                                    {/* <Input
                                     className="text-foreground placeholder:text-muted-foreground flex-1"
                                     placeholder="Account name"
                                     value={importName}
                                     onChange={(e) =>
                                         setImportName(e.target.value)
                                     }
-                                />
-                            </div>
-                        </CardContent>
-                        <CardFooter className="mt-4 flex flex-1 justify-between">
-                            <CardAction>
-                                <Button
-                                    type="button"
-                                    variant="link"
-                                    onClick={async () => {
-                                        if (canCreate) {
-                                            setShowCreate(true);
-                                        } else {
-                                            setShowCannotCreate(true);
-                                        }
-                                    }}
-                                    disabled={isLoggingIn}
-                                    className="px-0 focus-visible:underline focus-visible:underline-offset-4 focus-visible:ring-0"
-                                >
-                                    Create account
-                                </Button>
-                            </CardAction>
-                            <CardAction>
-                                <Button
-                                    type="submit"
-                                    disabled={!importName.trim() || isImporting}
-                                >
-                                    {isImporting ? "Importing…" : "Import"}
-                                </Button>
-                            </CardAction>
-                        </CardFooter>
-                    </BrandedGlowingCard>
-                </form>
+                                /> */}
+                                </div>
+                            </CardContent>
+                            <CardFooter className="mt-4 flex flex-1 justify-between">
+                                <CardAction>
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={async () => {
+                                            if (canCreate) {
+                                                setShowCreate(true);
+                                            } else {
+                                                setShowCannotCreate(true);
+                                            }
+                                        }}
+                                        disabled={isLoggingIn}
+                                        className="px-0 focus-visible:underline focus-visible:underline-offset-4 focus-visible:ring-0"
+                                    >
+                                        Create account
+                                    </Button>
+                                </CardAction>
+                                <CardAction>
+                                    <form.SubmitButton
+                                        labels={["Import", "Importing..."]}
+                                    />
+                                </CardAction>
+                            </CardFooter>
+                        </BrandedGlowingCard>
+                    </form>
+                </form.AppForm>
 
                 <Dialog
                     open={showCreate}
