@@ -47,8 +47,8 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Returns the token service configuration
-        async fn get_config(&self) -> Option<ConfigRow> {
+        /// Returns the token service global configuration
+        async fn config(&self) -> Option<ConfigRow> {
             ConfigTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&())

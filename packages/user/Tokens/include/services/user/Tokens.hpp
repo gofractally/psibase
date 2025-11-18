@@ -125,7 +125,7 @@ namespace UserService
       /// * `debitor`  - Debitor / recipient
       /// * `amount`   - Amount to credit
       /// * `memo`     - Memo
-      void credit(TID tokenId, psibase::AccountNumber receiver, Quantity amount, Memo memo);
+      void credit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
 
       /// Uncredit tokens that were credited into a shared balance
       ///
@@ -144,7 +144,7 @@ namespace UserService
       /// * `debitor`  - Debitor / recipient
       /// * `amount`   - Amount to uncredit
       /// * `memo`     - Memo
-      void uncredit(TID tokenId, psibase::AccountNumber receiver, Quantity maxAmount, Memo memo);
+      void uncredit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
 
       /// Rejects the shared balance between a creditor and a debitor
       ///
@@ -162,7 +162,7 @@ namespace UserService
       /// * `token_id` - Unique token identifier
       /// * `creditor`  - User who credited the tokens
       /// * `memo`     - Memo
-      void reject(TID tokenId, psibase::AccountNumber receiver, Memo memo);
+      void reject(TID tokenId, psibase::AccountNumber creditor, Memo memo);
 
       /// Debit tokens that were credited into a shared balance
       ///
@@ -181,7 +181,7 @@ namespace UserService
       /// * `creditor` - User who credited the tokens
       /// * `amount`   - Amount to debit
       /// * `memo`     - Memo
-      void debit(TID tokenId, psibase::AccountNumber sender, Quantity amount, Memo memo);
+      void debit(TID tokenId, psibase::AccountNumber creditor, Quantity amount, Memo memo);
 
       /// Recalls an amount of tokens from a user's balance and burns them
       ///
@@ -287,6 +287,12 @@ namespace UserService
       /// * The system token can only be set once (changing system token is not yet supported)
       void setSysToken(TID tokenId);
 
+      /// Gets the system token
+      ///
+      /// # Returns
+      /// * `Option<TID>` - `Some(sys_tid)` if it has been set, otherwise `None`
+      std::optional<TID> getSysToken();
+
      private:
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
@@ -322,13 +328,16 @@ namespace UserService
       method(delBalConf, tokenId),
       method(setUserConf, index, enable),
       method(setTokenConf, tokenId, index, enable),
-      method(credit, tokenId, receiver, amount, memo),
-      method(uncredit, tokenId, receiver, maxAmount, memo),
-      method(reject, tokenId, receiver, memo),
-      method(debit, tokenId, sender, amount, memo),
+      method(credit, tokenId, debitor, amount, memo),
+      method(uncredit, tokenId, debitor, amount, memo),
+      method(reject, tokenId, creditor, memo),
+      method(debit, tokenId, creditor, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
+      method(setSysToken, tokenId),
+      method(getSysToken),
+      method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),
