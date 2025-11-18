@@ -1,8 +1,8 @@
 import { CircleUserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { getSupervisor, prompt } from "@psibase/common-lib";
+import { prompt } from "@psibase/common-lib";
 
 import { Avatar } from "@shared/components/avatar";
 import { useBranding } from "@shared/hooks/use-branding";
@@ -26,36 +26,17 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { BrandedGlowingCard } from "./components/branded-glowing-card";
-
-const supervisor = getSupervisor();
-const fc = (
-    service: string,
-    plugin: string,
-    intf: string,
-    method: string,
-    params: unknown[] = [],
-) => supervisor.functionCall({ service, plugin, intf, method, params });
-
-const api = {
-    getAllAccounts: () => fc("accounts", "plugin", "admin", "getAllAccounts"),
-    canCreateAccount: () =>
-        fc("accounts", "plugin", "prompt", "canCreateAccount"),
-    importExisting: (accountName: string) =>
-        fc("accounts", "plugin", "prompt", "importExisting", [accountName]),
-    createAccount: (accountName: string) =>
-        fc("accounts", "plugin", "prompt", "createAccount", [accountName]),
-    connectAccount: (accountName: string) =>
-        fc("accounts", "plugin", "prompt", "connectAccount", [accountName]),
-};
+import { useCanCreateAccount } from "./hooks/use-can-create-account";
+import { useConnectAccount } from "./hooks/use-connect-account";
+import { useCreateAccount } from "./hooks/use-create-account";
+import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
+import { useImportExisting } from "./hooks/use-import-existing";
 
 type Busy = "idle" | "importing" | "creating" | "loggingIn";
 
 export const ConnectPrompt = () => {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [accounts, setAccounts] = useState<string[]>([]);
-    const [canCreate, setCanCreate] = useState(false);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     console.log("error", error);
@@ -68,28 +49,19 @@ export const ConnectPrompt = () => {
     const [busy, setBusy] = useState<Busy>("idle");
 
     const { data: networkName } = useBranding();
+    const {
+        data: accounts = [],
+        isLoading: loadingAccounts,
+        refetch: refetchAccounts,
+    } = useGetAllAccounts();
+    const { data: canCreate = false, isLoading: loadingCanCreate } =
+        useCanCreateAccount();
+    const importExistingMutation = useImportExisting();
+    const createAccountMutation = useCreateAccount();
+    const connectAccountMutation = useConnectAccount();
 
-    const load = async () => {
-        setError(null);
-        try {
-            const [acctList, canCreateFlag] = await Promise.all([
-                api.getAllAccounts(),
-                api.canCreateAccount(),
-            ]);
-            const list = Array.isArray(acctList) ? (acctList as string[]) : [];
-            setAccounts(list);
-            setCanCreate(Boolean(canCreateFlag));
-        } catch {
-            setError("Failed to initialize");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const loading = loadingAccounts || loadingCanCreate;
+    const accountsList = Array.isArray(accounts) ? accounts : [];
 
     const handleImport = async () => {
         const name = importName.trim();
@@ -97,8 +69,8 @@ export const ConnectPrompt = () => {
         setBusy("importing");
         setError(null);
         try {
-            await api.importExisting(name);
-            await load();
+            await importExistingMutation.mutateAsync(name);
+            await refetchAccounts();
             setShowImport(false);
             setImportName("");
         } catch {
@@ -114,9 +86,9 @@ export const ConnectPrompt = () => {
         setBusy("creating");
         setError(null);
         try {
-            const privateKey = await api.createAccount(name);
+            const privateKey = await createAccountMutation.mutateAsync(name);
             console.log("privateKey", privateKey);
-            await load();
+            await refetchAccounts();
             setShowCreate(false);
             setCreateName("");
         } catch {
@@ -132,7 +104,7 @@ export const ConnectPrompt = () => {
         setBusy("loggingIn");
         setError(null);
         try {
-            await api.connectAccount(accountName);
+            await connectAccountMutation.mutateAsync(accountName);
             prompt.finished();
         } catch {
             setError("Login failed");
@@ -149,8 +121,8 @@ export const ConnectPrompt = () => {
         setBusy("importing");
         setError(null);
         try {
-            await api.importExisting(name);
-            await api.connectAccount(name);
+            await importExistingMutation.mutateAsync(name);
+            await connectAccountMutation.mutateAsync(name);
             prompt.finished();
         } catch {
             setError("Import and login failed");
@@ -176,7 +148,10 @@ export const ConnectPrompt = () => {
         );
     }
 
-    if (accounts.length === 0 || searchParams.get("step") === "ADD_ACCOUNT") {
+    if (
+        accountsList.length === 0 ||
+        searchParams.get("step") === "ADD_ACCOUNT"
+    ) {
         return (
             <>
                 <form onSubmit={handleImportAndLogin}>
@@ -290,7 +265,7 @@ export const ConnectPrompt = () => {
                 </CardTitle>
                 <div className="space-y-3">
                     <ul>
-                        {accounts.map((name) => {
+                        {accountsList.map((name) => {
                             return (
                                 <div key={`account-${name}`}>
                                     <li
