@@ -535,17 +535,14 @@ pub mod service {
         config_table.put(&ConfigRow { sys_tid: tokenId }).unwrap();
     }
 
-    /// Gets the system token
-    ///
-    /// # Returns
-    /// * `Option<TID>` - `Some(sys_tid)` if it has been set, otherwise `None`
+    /// Gets the system token details (if set), otherwise returns `None`
     #[action]
     #[allow(non_snake_case)]
-    fn getSysToken() -> Option<TID> {
+    fn getSysToken() -> Option<Token> {
         ConfigTable::read()
             .get_index_pk()
             .get(&())
-            .map(|row| row.sys_tid)
+            .map(|row| Token::get_assert(row.sys_tid))
     }
 
     #[event(history)]
