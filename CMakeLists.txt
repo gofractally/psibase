@@ -290,6 +290,7 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
+    nft
     fractal-core
     config
     producers
@@ -808,12 +809,14 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Nft.psi
     NAME Nft
     VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     SERVICE nft
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
         INIT
+        DATA ${Plugins_OUTPUT_FILE_nft} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${Plugins_DEP}
 )
 
 psibase_package(

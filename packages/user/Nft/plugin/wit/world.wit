@@ -1,0 +1,14 @@
+package nft:plugin;
+
+interface api {
+    use host:types/types.{error};
+    credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
+    mint: func() -> result<_, error>;
+    burn: func(nft-id: u32) -> result<_, error>;
+}
+
+
+
+world imports {
+    import api;
+}

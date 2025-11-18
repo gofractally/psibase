@@ -49,7 +49,7 @@ members = [
 ]
 
 exclude = [
-    "CommonApi/common/packages/component-parser", 
+    "CommonApi/common/packages/component-parser",
     "Aes/plugin",
     "Base64/plugin",
     "ClientData/plugin",
@@ -66,6 +66,7 @@ exclude = [
     "Permissions/plugin",
     "WebCrypto/plugin",
     "FractalCore/plugin",
+    "Nft/plugin",
     "Workshop/plugin",
     "Config/plugin",
 ]
