@@ -63,7 +63,7 @@ impl Api for SymbolPlugin {
         )?;
 
         let nft_id = fetch_symbol_owner_nft(symbol.as_str().into())?;
-        bindings::nft::plugin::api::credit(
+        bindings::nft::plugin::user::credit(
             nft_id,
             &symbol::SERVICE.to_string(),
             "symbol mapping".into(),
