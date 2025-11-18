@@ -91,17 +91,28 @@ export class PluginHost implements HostInterface {
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
     //    from BytecodeAlliance's JCO project.
-    public sendRequest(req: HttpRequest): HttpResponse {
+    public sendRequest(req: HttpRequest, withCredentials: boolean = false): HttpResponse {
         try {
             const xhr = new XMLHttpRequest();
             xhr.open(req.method.toString(), req.uri, false);
+            xhr.withCredentials = withCredentials;
+
             const requestHeaders = new Headers(convert(req.headers));
             for (const [name, value] of requestHeaders.entries()) {
                 if (name !== "user-agent" && name !== "host") {
                     xhr.setRequestHeader(name, value);
                 }
             }
-            xhr.send(req.body && req.body.val.length > 0 ? req.body.val : null);
+            xhr.send(
+                req.body && req.body.val.length > 0
+                    ? (req.body.val as string)
+                    : null,
+            );
+            if (xhr.status >= 400) {
+                if (xhr.response) {
+                    console.error(xhr.response);
+                }
+            }
             if (xhr.status === 500) {
                 throw this.recoverableError(
                     `Http request error: ${xhr.response}`,

@@ -11,7 +11,7 @@ serde.workspace = true
 serde_json.workspace = true
 chrono = "0.4.38"
 sha2 = "0.10.6"
-plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -27,6 +27,7 @@ world = "impl"
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
+"permissions:plugin" = { path = "../../../user/Permissions/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Serialize", "serde::Deserialize"]

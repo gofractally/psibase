@@ -41,14 +41,14 @@ namespace SystemService
          return tokens;
       }
 
-      bool isSubdomain(const psibase::HttpRequest& req)
+      bool isSubdomain(const psibase::HttpRequest& req, std::string_view rootHost)
       {
-         return req.host.size() > req.rootHost.size() + 1  //
-                && req.host.ends_with(req.rootHost)        //
-                && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
+         return req.host.size() > rootHost.size() + 1  //
+                && req.host.ends_with(rootHost)        //
+                && req.host[req.host.size() - rootHost.size() - 1] == '.';
       }
 
-      AccountNumber getTargetService(const HttpRequest& req)
+      AccountNumber getTargetService(const HttpRequest& req, std::string_view rootHost)
       {
          std::string serviceName;
 
@@ -57,8 +57,8 @@ namespace SystemService
             serviceName = HttpServer::commonApiService.str();
 
          // subdomain
-         else if (isSubdomain(req))
-            serviceName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
+         else if (isSubdomain(req, rootHost))
+            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
 
          // root domain
          else
@@ -393,12 +393,13 @@ namespace SystemService
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
    {
-      if (request.host.size() < request.rootHost.size())
+      auto rootHost = to<HttpServer>().rootHost(request.host);
+      if (request.host.size() < rootHost.size())
       {
          check(false, "request host invalid: \"" + request.host + "\"");
       }
 
-      auto account = getTargetService(request);
+      auto account = getTargetService(request, rootHost);
 
       if (request.method == "GET" || request.method == "HEAD")
       {

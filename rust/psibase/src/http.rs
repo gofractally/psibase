@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{Hex, Pack, ToKey, ToSchema, Unpack};
+use crate::{AccountNumber, Hex, Pack, ToKey, ToSchema, Unpack};
 use anyhow::anyhow;
 use percent_encoding::percent_decode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -31,13 +31,27 @@ impl HttpHeader {
             value: value.to_string(),
         }
     }
-    pub fn allow_cors() -> Vec<HttpHeader> {
-        vec![
-            HttpHeader::new("Access-Control-Allow-Origin", "*"),
-            HttpHeader::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"),
-            HttpHeader::new("Access-Control-Allow-Headers", "*"),
-        ]
+    pub fn matches(&self, name: &str) -> bool {
+        self.name.eq_ignore_ascii_case(name)
     }
+}
+
+/// HTTP Status codes
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[repr(u16)]
+pub enum HttpStatus {
+    Ok = 200,
+    MovedPermanently = 301,
+    Found = 302,
+    NotModified = 304,
+    Unauthorized = 401,
+    Forbidden = 403,
+    NotFound = 404,
+    MethodNotAllowed = 405,
+    NotAcceptable = 406,
+    UnsupportedMediaType = 415,
+    InternalServerError = 500,
+    ServiceUnavailable = 503,
 }
 
 /// An HTTP Request
@@ -53,9 +67,6 @@ impl HttpHeader {
 pub struct HttpRequest {
     /// Fully-qualified domain name
     pub host: String,
-
-    /// host name, but without service subdomain
-    pub rootHost: String,
 
     /// "GET" or "POST"
     pub method: String,
@@ -86,6 +97,12 @@ impl HttpRequest {
         return form_urlencoded::parse(encoded.as_bytes())
             .into_owned()
             .collect();
+    }
+    pub fn get_header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|h| h.matches(name))
+            .map(|h| h.value.as_str())
     }
 }
 
@@ -146,4 +163,84 @@ impl HttpReply {
         }
         Ok(serde_json::de::from_str(&self.text()?)?)
     }
+}
+
+struct Origin {
+    scheme: String,
+    host: String,
+}
+
+impl Origin {
+    fn new(url: &str) -> Self {
+        let mut scheme = String::new();
+        let mut host = String::new();
+        if let Some(pos) = url.find("://") {
+            scheme = url[..pos].to_string();
+            let after_scheme = &url[pos + 3..];
+            if let Some(colon_pos) = after_scheme.rfind(':') {
+                if !after_scheme[..colon_pos].contains(']') {
+                    host = after_scheme[..colon_pos].to_string();
+                } else {
+                    host = after_scheme.to_string();
+                }
+            } else {
+                host = after_scheme.to_string();
+            }
+        }
+        Origin { scheme, host }
+    }
+
+    fn is_secure(&self) -> bool {
+        self.scheme == "https" || self.host == "localhost" || self.host.ends_with(".localhost")
+    }
+
+    fn is_service(&self, root_host: &str, account: AccountNumber) -> bool {
+        self.is_secure() && self.host == format!("{}.{}", account, root_host)
+    }
+
+    fn is_subdomain(&self, root_host: &str) -> bool {
+        self.is_secure()
+            && (self.host == root_host || self.host.ends_with(&format!(".{}", root_host)))
+    }
+}
+
+pub fn root_host(req: &HttpRequest, host_is_subdomain: bool) -> &str {
+    if host_is_subdomain {
+        let pos = req.host.find('.').expect("Subdomain expected");
+        &req.host[pos + 1..]
+    } else {
+        &req.host
+    }
+}
+
+pub fn allow_cors_for_account(
+    req: &HttpRequest,
+    account: AccountNumber,
+    host_is_subdomain: bool,
+) -> Vec<HttpHeader> {
+    if let Some(o) = req.get_header("origin") {
+        let origin = Origin::new(o);
+        if origin.is_service(root_host(req, host_is_subdomain), account) {
+            return allow_cors_with_origin(o);
+        }
+    }
+    Vec::new()
+}
+
+pub fn allow_cors_for_subdomains(req: &HttpRequest, host_is_subdomain: bool) -> Vec<HttpHeader> {
+    if let Some(origin) = req.get_header("origin") {
+        let origin_obj = Origin::new(origin);
+        if origin_obj.is_subdomain(root_host(req, host_is_subdomain)) {
+            return allow_cors_with_origin(origin);
+        }
+    }
+    Vec::new()
+}
+
+pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {
+    vec![
+        HttpHeader::new("Access-Control-Allow-Origin", origin),
+        HttpHeader::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"),
+        HttpHeader::new("Access-Control-Allow-Headers", "*"),
+    ]
 }

@@ -46,6 +46,9 @@ impl UserTable {
         let mut connected_apps = connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
             .unwrap_or_default();
+        if connected_apps.apps.contains(&app.to_string()) {
+            return;
+        }
         connected_apps.add(app);
         Keyvalue::set(
             &self.prefixed_key(DbKeys::CONNECTED_APPS),

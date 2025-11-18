@@ -14,7 +14,24 @@ use psibase::AccountNumber;
 use serde::{Deserialize, Serialize};
 
 mod errors;
+use crate::trust::*;
 use errors::ErrorType::{self, *};
+
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "
+        Medium trust grants these abilities:
+            - Attest to other accounts' identities
+        ",
+        High => "",
+    }
+    functions {
+        None => [summary],
+        Low => [],
+        Medium => [attest_identity_claim],
+    }
+}
 
 struct IdentityPlugin;
 
@@ -27,6 +44,8 @@ struct Attestation {
 
 impl Api for IdentityPlugin {
     fn attest_identity_claim(subject: String, score: f32) -> Result<(), HostTypes::Error> {
+        assert_authorized(FunctionName::attest_identity_claim)?;
+
         if !(score >= 0.0 && score <= 1.0) {
             return Err(InvalidClaim(score).into());
         }
@@ -67,6 +86,7 @@ impl QueriesApi for IdentityPlugin {
     fn summary(
         subject: String,
     ) -> Result<Option<IdentityTypes::IdentitySummary>, HostTypes::Error> {
+        assert_authorized(FunctionName::summary)?;
         let graphql_str = format!(
             "query {{ subjectStats(subject:\"{}\") {{ numHighConfAttestations, uniqueAttesters }} }}",
             subject

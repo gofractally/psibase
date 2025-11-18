@@ -131,7 +131,7 @@ if(DEFINED WASI_SDK_PREFIX)
     )
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
-    set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthInvite CommonApi
+    set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
         CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
@@ -139,7 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XSocketListService)
+        XProxy XSocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -270,11 +270,9 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
-    account-tokens
     aes
     auth-any
     auth-delegate
-    auth-invite
     auth-sig
     base64
     kdf
@@ -321,7 +319,7 @@ set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
-set(PSIBASE_VERSION 0.21)
+set(PSIBASE_VERSION 0.22)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -355,7 +353,6 @@ psibase_package(
         SERVER r-accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
-        DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
@@ -458,6 +455,7 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/DiffAdjust.psi
     PATH packages/user/DiffAdjust
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -792,10 +790,6 @@ psibase_package(
         SERVER r-invite
         INIT
         DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
-    SERVICE auth-invite
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite-schema.json
-        DATA ${Plugins_OUTPUT_FILE_auth_invite} /plugin.wasm
     SERVICE r-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RInvite-schema.json
@@ -1243,6 +1237,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XProxy.psi
+    NAME XProxy
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Simple reverse proxy"
+    SERVICE x-proxy
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
+        SERVER x-proxy
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XSocketList.psi
     NAME XSocketList
     VERSION ${PSIBASE_VERSION}.0
@@ -1255,7 +1261,7 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList)
 
 ExternalProject_Add(
     rust

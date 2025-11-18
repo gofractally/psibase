@@ -9,7 +9,7 @@ publish.workspace = true
 wit-bindgen-rt.workspace = true
 pbkdf2 = "0.12.2"
 sha2 = "0.10.8"
-plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

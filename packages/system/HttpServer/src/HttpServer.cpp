@@ -6,9 +6,6 @@
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
-#include "services/system/Accounts.hpp"
-
-#include <algorithm>
 
 static constexpr bool enable_print = false;
 
@@ -19,11 +16,11 @@ namespace SystemService
 {
    namespace
    {
-      bool isSubdomain(const psibase::HttpRequest& req)
+      bool isSubdomain(const psibase::HttpRequest& req, std::string_view rootHost)
       {
-         return req.host.size() > req.rootHost.size() + 1  //
-                && req.host.ends_with(req.rootHost)        //
-                && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
+         return req.host.size() > rootHost.size() + 1  //
+                && req.host.ends_with(rootHost)        //
+                && req.host[req.host.size() - rootHost.size() - 1] == '.';
       }
 
       std::optional<RegisteredServiceRow> getServer(const AccountNumber& server)
@@ -33,7 +30,7 @@ namespace SystemService
              .get(server);
       }
 
-      AccountNumber getTargetService(const HttpRequest& req)
+      AccountNumber getTargetService(const HttpRequest& req, std::string_view rootHost)
       {
          std::string serviceName;
 
@@ -42,8 +39,8 @@ namespace SystemService
             serviceName = HttpServer::commonApiService.str();
 
          // subdomain
-         else if (isSubdomain(req))
-            serviceName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
+         else if (isSubdomain(req, rootHost))
+            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
 
          // root domain
          else
@@ -93,13 +90,14 @@ namespace SystemService
 
    namespace
    {
-      constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Headers",  //
-                                                     "Access-Control-Allow-Methods",  //
-                                                     "Access-Control-Allow-Origin",   //
-                                                     "Allow",                         //
-                                                     "Cache-Control",                 //
-                                                     "Content-Encoding",              //
-                                                     "Content-Security-Policy",       //
+      constexpr std::string_view allowedHeaders[] = {"Access-Control-Allow-Credentials",  //
+                                                     "Access-Control-Allow-Headers",
+                                                     "Access-Control-Allow-Methods",
+                                                     "Access-Control-Allow-Origin",
+                                                     "Allow",
+                                                     "Cache-Control",
+                                                     "Content-Encoding",
+                                                     "Content-Security-Policy",
                                                      "ETag",
                                                      "Set-Cookie"};
 
@@ -109,6 +107,7 @@ namespace SystemService
          {
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
+               // TODO: Convert to 500 error response (with cors on subdomains) instead of aborting.
                abortMessage("service " + service.str() + " attempted to set http header " +
                             header.name);
             }
@@ -201,14 +200,15 @@ namespace SystemService
    {
       check(getSender() == XHttp::service, "Wrong sender");
 
-      auto user = to<RTransact>().getUser(req);
+      auto user = recurse().to<RTransact>().getUser(req);
 
       // Remove sensitive headers
       req.removeCookie("__HOST-SESSION");
+      req.removeCookie("SESSION");
       std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
 
       // First we check the registered server
-      auto                     service    = getTargetService(req);
+      auto                     service    = getTargetService(req, to<XHttp>().rootHost(req.host));
       auto                     registered = getServer(service);
       std::optional<HttpReply> result;
       psibase::AccountNumber   server;
@@ -254,6 +254,10 @@ namespace SystemService
       }
    }  // serve()
 
+   std::string HttpServer::rootHost(psio::view<const std::string> host)
+   {
+      return to<XHttp>().rootHost(host);
+   }
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::HttpServer)

@@ -21,6 +21,9 @@ interface settings {
 
     /// Set snapshot interval period network wide
     set-snapshot-time: func(seconds: u32) -> result<_, error>;
+
+    /// Set system token
+    set-system-token: func(token-id: u32) -> result<_, error>;
 }
 
 interface producers {

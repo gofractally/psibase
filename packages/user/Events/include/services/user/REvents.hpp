@@ -13,12 +13,12 @@ namespace UserService
       static constexpr psibase::AccountNumber service{"r-events"};
 
       // Synchronous calls between other services
-      std::vector<char> sqlQuery(const std::string& query);
+      std::vector<char> sqlQuery(const std::string& query, const std::vector<std::string>& params);
 
       // Standard HTTP API
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&);
    };
-   PSIO_REFLECT(REvents, method(sqlQuery, query), method(serveSys, request))
+   PSIO_REFLECT(REvents, method(sqlQuery, query, params), method(serveSys, request))
    PSIBASE_REFLECT_TABLES(REvents)
 
 }  // namespace UserService

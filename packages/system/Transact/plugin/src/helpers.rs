@@ -9,7 +9,7 @@ use crate::{ActionAuthPlugins, ActionClaims, ActionMetadata, ActionSenderHook, T
 use psibase::fracpack::Pack;
 use psibase::{AccountNumber, Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
-use Host::{client as Client, server as Server};
+use Host::server as Server;
 
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -20,11 +20,6 @@ pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
         return Ok(());
     }
     Err(InvalidActionName(action_name).into())
-}
-
-pub fn assert_from_supervisor() {
-    let sender = Client::get_sender();
-    assert!(sender == "supervisor", "Unauthorized: {}", sender);
 }
 
 pub fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {

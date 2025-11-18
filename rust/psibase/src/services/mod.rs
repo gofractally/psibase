@@ -2,7 +2,6 @@
 
 pub mod accounts;
 pub mod auth_delegate;
-pub mod auth_invite;
 pub mod auth_sig;
 pub mod brotli_codec;
 pub mod chainmail;
@@ -34,3 +33,4 @@ pub mod transact;
 pub mod verify_sig;
 pub mod x_admin;
 pub mod x_db;
+pub mod x_http;

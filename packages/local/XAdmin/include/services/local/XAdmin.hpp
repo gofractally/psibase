@@ -19,8 +19,9 @@ namespace LocalService
 
    struct AdminOptionsRow
    {
-      bool p2p = false;
-      PSIO_REFLECT(AdminOptionsRow, p2p)
+      bool                     p2p = false;
+      std::vector<std::string> hosts;
+      PSIO_REFLECT(AdminOptionsRow, p2p, hosts)
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)

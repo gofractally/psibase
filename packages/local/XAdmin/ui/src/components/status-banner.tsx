@@ -28,22 +28,26 @@ export const StatusBanner = () => {
                 );
             case "needgenesis":
                 return (
-                    <>
-                        No chain running.{" "}
-                        <a
-                            className="text-primary font-medium underline underline-offset-4"
-                            href="#Boot"
-                        >
-                            Create a new chain
-                        </a>{" "}
-                        or{" "}
-                        <a
-                            className="text-primary font-medium underline underline-offset-4"
-                            href="#Peers"
-                        >
-                            connect to an existing chain
-                        </a>
-                    </>
+                    <div>
+                        <div>
+                            No chain running.
+                        </div>
+                        <div className="flex gap-1">
+                            <a
+                                className="text-primary font-medium underline underline-offset-4"
+                                href="#Boot"
+                            >
+                                Create a new chain
+                            </a>{" "}
+                            or{" "}
+                            <a
+                                className="text-primary font-medium underline underline-offset-4"
+                                href="#Peers"
+                            >
+                                connect to an existing chain
+                            </a>
+                        </div>
+                    </div>
                 );
             default:
                 return <>{s}</>;

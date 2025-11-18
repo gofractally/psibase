@@ -19,8 +19,40 @@ namespace
       return std::ranges::equal(std::string_view{header.name()}, h, {}, ::tolower, ::tolower);
    }
 
+   std::string_view getRootHost(std::string_view host)
+   {
+      static std::vector<std::string> hosts = to<XAdmin>().options().hosts;
+      std::string_view                result;
+
+      // Find the most specific host name that matches the request
+      for (const auto& name : hosts)
+      {
+         if (host.ends_with(name) &&
+             (host.size() == name.size() || host[host.size() - name.size() - 1] == '.'))
+         {
+            if (name.size() > result.size())
+            {
+               result = name;
+            }
+         }
+      }
+      using namespace std::literals::string_view_literals;
+      // Special hostname that is not valid HTTP syntax, used by psinode
+      // and psitest for internally generated requests that should
+      // work even when there is no host name configured.
+      if (result.empty() && host == "\0"sv || host.ends_with(".\0"sv))
+         result = "\0"sv;
+      // If there isn't a matching host, default to the first host
+      if (result.empty() && !hosts.empty())
+      {
+         result = hosts.front();
+      }
+      return result;
+   }
+
    std::string getUrl(psio::view<const HttpRequest> req,
                       std::int32_t                  socket,
+                      std::string_view              rootHost,
                       std::optional<AccountNumber>  subdomain = {})
    {
       std::string              location;
@@ -38,7 +70,7 @@ namespace
          location += subdomain->str();
          location += '.';
       }
-      location += req.rootHost();
+      location += rootHost;
       for (auto header : req.headers())
       {
          if (matches(header, "host"))
@@ -99,20 +131,109 @@ namespace
    }
 }  // namespace
 
+#ifndef PSIBASE_GENERATE_SCHEMA
+
 extern "C" [[clang::export_name("recv")]] void recv()
 {
-   auto act       = getCurrentActionView();
+   psibase::internal::receiver = XHttp::service;
+   auto act                    = getCurrentActionView();
+
+   auto [socket, data] =
+       psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
+   // if this is a response to an HTTP request, send it to the owner
+   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+   std::optional<ResponseHandlerRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = requests.get(socket.unpack());
+      if (row)
+      {
+         requests.remove(*row);
+      }
+      socketAutoClose(socket, true);
+   }
+
+   if (row)
+   {
+      call(Action{.sender  = XHttp::service,
+                  .service = row->service,
+                  .method  = row->method,
+                  .rawData = psio::to_frac(
+                      std::tuple(socket, psio::view<const psibase::HttpReply>(data)))});
+      return;
+   }
+
    act->sender()  = XHttp::service;
    act->service() = HttpServer::service;
    act->method()  = MethodNumber{"recv"};
    psibase::call(act.data(), act.size());
 }
 
+extern "C" [[clang::export_name("close")]] void closeSocket()
+{
+   psibase::internal::receiver = XHttp::service;
+   auto act                    = getCurrentActionView();
+
+   auto [socket] = psio::view<const std::tuple<std::int32_t>>(act->rawData());
+   // if this is a response to an HTTP request, send it to the owner
+   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+   std::optional<ResponseHandlerRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = requests.get(socket.unpack());
+      if (row)
+      {
+         requests.remove(*row);
+      }
+      socketAutoClose(socket, true);
+   }
+
+   if (row)
+   {
+      call(Action{.sender  = XHttp::service,
+                  .service = row->service,
+                  .method  = row->err,
+                  .rawData = psio::to_frac(std::tuple(socket))});
+      return;
+   }
+
+   act->sender()  = XHttp::service;
+   act->service() = HttpServer::service;
+   act->method()  = MethodNumber{"close"};
+   psibase::call(act.data(), act.size());
+}
+
+#endif
+
 void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket == producer_multicast, "Cannot call send on this socket");
    psibase::socketSend(socket, data);
+}
+
+std::int32_t XHttp::sendRequest(HttpRequest                   request,
+                                MethodNumber                  callback,
+                                MethodNumber                  err,
+                                std::optional<TLSInfo>        tls,
+                                std::optional<SocketEndpoint> endpoint)
+{
+   auto sender    = getSender();
+   auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (!codeTable.get(sender))
+         abortMessage("Only local services can use sendRequest");
+   }
+   auto requests = Session{}.open<ResponseHandlerTable>();
+   auto sock     = socketOpen(request, tls, endpoint);
+   check(sock >= 0, "Failed to open socket");
+   PSIBASE_SUBJECTIVE_TX
+   {
+      requests.put({sock, sender, callback, err});
+      socketAutoClose(sock, false);
+   }
+   return sock;
 }
 
 void XHttp::autoClose(std::int32_t socket, bool value)
@@ -160,13 +281,18 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    socketSend(socket, psio::to_frac(result));
 }
 
-#ifndef PSIBASE_GENERATE_SCHEMA
-
-extern "C" [[clang::export_name("startSession")]] void startSession()
+std::string XHttp::rootHost(psio::view<const std::string> host)
 {
-   psibase::internal::receiver = XHttp::service;
+   return std::string(getRootHost(host));
+}
+
+void XHttp::startSession()
+{
+   check(getSender() == AccountNumber{}, "Wrong sender");
    to<XAdmin>().startSession();
 }
+
+#ifndef PSIBASE_GENERATE_SCHEMA
 
 extern "C" [[clang::export_name("serve")]] void serve()
 {
@@ -176,9 +302,16 @@ extern "C" [[clang::export_name("serve")]] void serve()
    auto [sockview, req] = psio::view<const std::tuple<std::int32_t, HttpRequest>>(act->rawData());
    auto sock            = sockview.unpack();
 
-   auto owned = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
+   auto owned    = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
+   auto rootHost = getRootHost(req.host());
 
-   if (auto service = XHttp::getService(req); service != AccountNumber{})
+   if (rootHost.empty())
+   {
+      sendNotFound(sock, req);
+      return;
+   }
+
+   if (auto service = XHttp::getService(req.host(), rootHost); service != AccountNumber{})
    {
       // Handle local service subdomains
       auto                   codeTable = Native::subjective(KvMode::read).open<CodeTable>();
@@ -225,11 +358,11 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (req.rootHost() != req.host() && std::string_view{req.target()} != "/native/p2p")
+   else if (rootHost != req.host() && std::string_view{req.target()} != "/native/p2p")
    {
-      if (!req.rootHost().empty())
+      if (!rootHost.empty())
       {
-         std::string location = getUrl(req, sock);
+         std::string location = getUrl(req, sock, rootHost);
          auto        reply    = redirect(HttpStatus::found,
                                          R"(<html><body>This psibase server is hosted at {}.</body></html>)",
                                          location);
@@ -259,7 +392,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    {
       if (req.method() == "GET" || req.method() == "HEAD")
       {
-         std::string location = getUrl(req, sock, XAdmin::service);
+         std::string location = getUrl(req, sock, rootHost, XAdmin::service);
          auto        reply    = redirect(
              HttpStatus::found,
              R"(<html><body>Node is not connected to any psibase network.  Visit {} for node setup.</body></html>)",

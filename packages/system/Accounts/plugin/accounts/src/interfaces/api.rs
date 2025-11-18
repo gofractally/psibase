@@ -2,6 +2,7 @@ use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType::*;
+use crate::helpers::generate_account;
 use crate::plugin::AccountsPlugin;
 use crate::db::apps_table::*;
 
@@ -9,7 +10,7 @@ use psibase::AccountNumber;
 use psibase::services::accounts as AccountsService;
 use psibase::fracpack::Pack;
 use serde::Deserialize;
-
+use crate::trust::*;
 
 #[derive(Deserialize, Debug)]
 struct ResponseRoot {
@@ -24,10 +25,12 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
+        assert_authorized(FunctionName::is_logged_in).unwrap();
         Self::get_current_user().is_some()
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {
+        assert_authorized(FunctionName::get_account)?;
         let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
@@ -54,10 +57,7 @@ impl API for AccountsPlugin {
     }
 
     fn set_auth_service(service_name: String) -> Result<(), Error> {
-        // Restrict to "homepage" app for now
-        if Client::get_sender() != "homepage" {
-            return Err(Unauthorized("set_auth_service can only be called by the homepage app").into());
-        }
+        assert_authorized_with_whitelist(FunctionName::set_auth_service, vec!["homepage".into()])?;
 
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
             .map_err(|_| InvalidAccountName(service_name))?;
@@ -72,6 +72,12 @@ impl API for AccountsPlugin {
     }
 
     fn get_current_user() -> Option<String> {
+        assert_authorized(FunctionName::get_current_user).unwrap();
         AppsTable::new(&Client::get_active_app()).get_logged_in_user()
+    }
+
+    fn gen_rand_account(prefix: Option<String>) -> Result<String, Error> {
+        assert_authorized(FunctionName::gen_rand_account)?;
+        generate_account(prefix)
     }
 }

@@ -24,6 +24,7 @@ pub const SCHEDULED_SNAPSHOT_TABLE: NativeTable = 12;
 pub const LOG_TRUNCATE_TABLE: NativeTable = 13;
 pub const SOCKET_TABLE: NativeTable = 14;
 pub const RUN_TABLE: NativeTable = 15;
+pub const HOST_CONFIG_TABLE: NativeTable = 17;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -268,18 +269,74 @@ impl LogTruncateRow {
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV4Address {
+    bytes: [u8; 4],
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV6Address {
+    bytes: [u8; 16],
+    zone: u32,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV4Endpoint {
+    address: IPV4Address,
+    port: u16,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct IPV6Endpoint {
+    address: IPV6Address,
+    port: u16,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+pub struct LocalEndpoint {
+    path: String,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub enum SocketEndpoint {
+    IPV4Endpoint(IPV4Endpoint),
+    IPV6Endpoint(IPV6Endpoint),
+    LocalEndpoint(LocalEndpoint),
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct TLSInfo {}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ProducerMultiCastSocketInfo {}
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct HttpSocketInfo {}
+pub struct HttpSocketInfo {
+    endpoint: Option<SocketEndpoint>,
+    tls: Option<TLSInfo>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct HttpClientSocketInfo {
+    endpoint: Option<SocketEndpoint>,
+    tls: Option<TLSInfo>,
+}
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum SocketInfo {
     ProducerMultiCastSocketInfo(ProducerMultiCastSocketInfo),
     HttpSocketInfo(HttpSocketInfo),
+    HttpClientSocketInfo(HttpClientSocketInfo),
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
@@ -301,6 +358,7 @@ impl SocketRow {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[repr(transparent)]
 pub struct RunMode(u8);
 
 impl RunMode {
@@ -333,5 +391,19 @@ impl RunRow {
     pub const DB: DbId = DbId::NativeSubjective;
     pub fn key(&self) -> (NativeTable, NativeIndex, u64) {
         (RUN_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.id)
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct HostConfigRow {
+    pub hostVersion: String,
+    pub config: String,
+}
+
+impl HostConfigRow {
+    pub const DB: DbId = DbId::NativeSession;
+    pub fn key(&self) -> (NativeTable, NativeIndex) {
+        (HOST_CONFIG_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }

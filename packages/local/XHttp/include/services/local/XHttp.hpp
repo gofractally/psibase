@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/Service.hpp>
+#include <psibase/SocketInfo.hpp>
 #include <psibase/Table.hpp>
 #include <services/system/HttpServer.hpp>
 
@@ -9,11 +10,22 @@ namespace LocalService
    using SystemService::PendingRequestRow;
    using SystemService::PendingRequestTable;
 
+   struct ResponseHandlerRow
+   {
+      std::int32_t           socket;
+      psibase::AccountNumber service;
+      psibase::MethodNumber  method;
+      psibase::MethodNumber  err;
+      PSIO_REFLECT(ResponseHandlerRow, socket, service, method, err)
+   };
+   using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
+   PSIO_REFLECT_TYPENAME(ResponseHandlerTable)
+
    struct XHttp : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-http"};
 
-      using Session = psibase::SessionTables<PendingRequestTable>;
+      using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
 
       static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)
       {
@@ -26,17 +38,20 @@ namespace LocalService
          }
          return {};
       }
-      static psibase::AccountNumber getService(const psibase::HttpRequest& req)
-      {
-         return getService(req.host, req.rootHost);
-      }
-      static psibase::AccountNumber getService(psio::view<const psibase::HttpRequest> req)
-      {
-         return getService(req.host(), req.rootHost());
-      }
+      static psibase::AccountNumber getService(const psibase::HttpRequest& req);
+      static psibase::AccountNumber getService(psio::view<const psibase::HttpRequest> req);
 
       /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
       void send(std::int32_t socket, psio::view<const std::vector<char>> data);
+
+      /// Sends an HTTP request and returns the new socket. When the response
+      /// is available, it will be passed to `sender::callback(socket, reply)`.
+      /// If the the request fails without a response, calls `sender::err(socket)`
+      std::int32_t sendRequest(psibase::HttpRequest                   request,
+                               psibase::MethodNumber                  callback,
+                               psibase::MethodNumber                  err,
+                               std::optional<psibase::TLSInfo>        tls,
+                               std::optional<psibase::SocketEndpoint> endpoint);
 
       /// Enables or disables automatic closing of the socket
       /// when the transaction context exits.
@@ -46,11 +61,30 @@ namespace LocalService
 
       /// Sends an HTTP response. The socket must have autoClose enabled.
       void sendReply(std::int32_t socket, const psibase::HttpReply& response);
+
+      /// Returns the root host for a given host
+      std::string rootHost(psio::view<const std::string> host);
+
+      /// Called by the host at the beginning of a session
+      void startSession();
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
+                method(sendRequest, request, callback, err, tls, endpoint),
                 method(autoClose, socket, value),
-                method(sendReply, socket, response))
+                method(sendReply, socket, response),
+                method(rootHost, host),
+                method(startSession))
 
    PSIBASE_REFLECT_TABLES(XHttp, XHttp::Session)
+
+   inline psibase::AccountNumber XHttp::getService(const psibase::HttpRequest& req)
+   {
+      return getService(req.host, psibase::to<XHttp>().rootHost(req.host));
+   }
+   inline psibase::AccountNumber XHttp::getService(psio::view<const psibase::HttpRequest> req)
+   {
+      return getService(req.host(), psibase::to<XHttp>().rootHost(req.host()));
+   }
+
 }  // namespace LocalService

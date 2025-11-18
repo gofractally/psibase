@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::helpers::validate_user;
 
 use psibase::services::r_events::Wrapper as REventsSvc;
-use psibase::{Hex, HttpHeader, HttpReply, HttpRequest};
+use psibase::{allow_cors_with_origin, Hex, HttpReply, HttpRequest};
 
 fn build_query_by_id(params: HashMap<String, String>) -> Option<String> {
     if params.get("id").is_none() {
@@ -106,12 +106,12 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let sql_query_str = format!("{} ORDER BY {}", sql_query_str?, order_by_clause);
 
-        let query_response = REventsSvc::call().sqlQuery(sql_query_str);
+        let query_response = REventsSvc::call().sqlQuery(sql_query_str, Vec::new());
 
         return Some(HttpReply {
             status: 200,
             contentType: String::from("application/json"),
-            headers: HttpHeader::allow_cors(),
+            headers: allow_cors_with_origin("*"),
             body: Hex(query_response.as_bytes().to_vec()),
         });
     }

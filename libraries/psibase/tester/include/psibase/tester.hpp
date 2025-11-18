@@ -238,7 +238,11 @@ namespace psibase
       bool                              isAutoRun        = true;
       bool                              isPublicChain;
 
-      explicit TestChain(uint32_t chain_id, bool clone, bool pub = true, bool init = true);
+      explicit TestChain(uint32_t chain_id,
+                         bool     clone,
+                         bool     pub       = true,
+                         bool     init      = true,
+                         bool     writeable = true);
       void setSignature(BlockNum blockNum, std::vector<char> sig);
 
      public:
@@ -378,13 +382,20 @@ namespace psibase
        * Creates a POST request with a JSON body
        */
       template <typename T>
-      HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
+      HttpRequest makePost(AccountNumber                   account,
+                           std::string_view                target,
+                           const T&                        data,
+                           std::optional<std::string_view> token = std::nullopt) const
       {
-         HttpRequest         req{.host     = account.str() + ".psibase.io",
-                                 .rootHost = "psibase.io",
-                                 .method   = "POST",
-                                 .target{target},
-                                 .contentType = "application/json"};
+         HttpRequest req{.host   = account.str() + ".psibase.io",
+                         .method = "POST",
+                         .target{target},
+                         .contentType = "application/json"};
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
          psio::vector_stream stream{req.body};
          using psio::to_json;
          to_json(data, stream);
@@ -395,25 +406,38 @@ namespace psibase
        * Creates a POST request
        */
       template <HttpRequestBody T>
-      HttpRequest makePost(AccountNumber account, std::string_view target, const T& data) const
+      HttpRequest makePost(AccountNumber                   account,
+                           std::string_view                target,
+                           const T&                        data,
+                           std::optional<std::string_view> token = std::nullopt) const
       {
-         return {.host     = account.str() + ".psibase.io",
-                 .rootHost = "psibase.io",
-                 .method   = "POST",
-                 .target{target},
-                 .contentType = data.contentType(),
-                 .body        = data.body()};
+         HttpRequest req{.host   = account.str() + ".psibase.io",
+                         .method = "POST",
+                         .target{target},
+                         .contentType = data.contentType(),
+                         .body        = data.body()};
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
+         return req;
       }
 
       /**
        * Creates a GET request
        */
-      HttpRequest makeGet(AccountNumber account, std::string_view target) const
+      HttpRequest makeGet(AccountNumber                   account,
+                          std::string_view                target,
+                          std::optional<std::string_view> token = std::nullopt) const
       {
-         return {.host     = account.str() + ".psibase.io",
-                 .rootHost = "psibase.io",
-                 .method   = "GET",
-                 .target{target}};
+         HttpRequest req{.host = account.str() + ".psibase.io", .method = "GET", .target{target}};
+         if (token)
+         {
+            req.headers.push_back(
+                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
+         }
+         return req;
       }
 
       /**
@@ -430,16 +454,26 @@ namespace psibase
       }
 
       template <typename R = HttpReply, typename T>
-      R post(AccountNumber account, std::string_view target, const T& data)
+      R post(AccountNumber                   account,
+             std::string_view                target,
+             const T&                        data,
+             std::optional<std::string_view> token = std::nullopt)
       {
-         return http<R>(makePost(account, target, data));
+         return http<R>(makePost(account, target, data, token));
       }
 
       template <typename R = HttpReply>
-      R get(AccountNumber account, std::string_view target)
+      R get(AccountNumber                   account,
+            std::string_view                target,
+            std::optional<std::string_view> token = std::nullopt)
       {
-         return http<R>(makeGet(account, target));
+         return http<R>(makeGet(account, target, token));
       }
+
+      /**
+       * Login to a service with an account that uses auth-any (no proofs needed to login)
+       */
+      std::string login(AccountNumber user, AccountNumber service);
 
       AsyncHttpReply asyncHttp(const HttpRequest& request);
       template <typename T>

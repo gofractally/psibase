@@ -10,7 +10,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
-plugin-workspace-hack = { version = "0.1", path = "../../../plugin-workspace-hack" }
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -33,3 +33,4 @@ world = "impl"
 "registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "auth-delegate:plugin" = { path = "../../../system/AuthDelegate/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }

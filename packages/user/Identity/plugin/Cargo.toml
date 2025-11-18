@@ -10,8 +10,8 @@ wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-identity = { path = "../service/", version = "0.21.0" }
-user-workspace-hack = { version = "0.1", path = "../../user-workspace-hack" }
+identity = { path = "../service/", version = "0.22.0" }
+psibase-user-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -30,6 +30,7 @@ world = "impl"
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.21.0" }
+identity-pkg = { path = "..", version = "0.22.0" }

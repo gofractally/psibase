@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 
-import {
-    FunctionCallArgs,
-    type Supervisor,
-    siblingUrl,
-} from "@psibase/common-lib";
+import { FunctionCallArgs, type Supervisor } from "@psibase/common-lib";
 
 function withArgs(
     service: string,
@@ -48,24 +44,18 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
                 );
                 setCurrentUser(null);
             } else {
-                const token = await supervisor.functionCall(
+                await supervisor.functionCall(
                     withArgs(
                         "accounts",
                         "plugin",
                         "activeApp",
-                        "createConnectionToken",
+                        "connectAccount",
                     ),
-                );
-
-                window.location.href = siblingUrl(
-                    null,
-                    "accounts",
-                    `/?token=${encodeURIComponent(token)}`,
+                    { enabled: true, returnPath: "/common/plugin-tester" },
                 );
             }
         } catch (e) {
             console.error("Error logging out or in: ", e);
-            alert("Error logging out or in: " + e);
         }
     };
 

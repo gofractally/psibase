@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Account } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 
 export const zMailbox = z.enum([
     "inbox",
@@ -13,8 +13,8 @@ export const zMailbox = z.enum([
 export const zMessage = z.object({
     id: z.string(),
     msgId: z.bigint(),
-    from: Account,
-    to: Account,
+    from: zAccount,
+    to: zAccount,
     datetime: z.number(),
     isDraft: z.boolean(),
     type: z.enum(["incoming", "outgoing"]),
@@ -32,8 +32,8 @@ export const zRawMessage = z.object({
     datetime: z.string(),
     isSavedMsg: z.boolean(),
     msgId: z.bigint(),
-    receiver: Account,
-    sender: Account,
+    receiver: zAccount,
+    sender: zAccount,
     subject: z.string(),
 });
 

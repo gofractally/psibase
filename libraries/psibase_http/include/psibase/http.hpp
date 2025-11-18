@@ -262,6 +262,18 @@ namespace psibase::http
    };
 
    struct server_impl;
+
+   class HttpConnector
+   {
+     public:
+      explicit HttpConnector(server_impl* state);
+      using AddSocketFn = std::function<void(const std::shared_ptr<Socket>&)>;
+      void operator()(std::span<const char> data, const AddSocketFn& add);
+
+     private:
+      server_impl* state;
+   };
+
    class server_service : public boost::asio::execution_context::service
    {
      public:
@@ -270,7 +282,12 @@ namespace psibase::http
       server_service(boost::asio::execution_context&           ctx,
                      const std::shared_ptr<const http_config>& http_config,
                      const std::shared_ptr<SharedState>&       sharedState);
+      void start();
       void async_close(bool restart, std::function<void()>);
+
+      // The result must not be used after the server_service is
+      // destroyed
+      HttpConnector get_connector();
 
      private:
       void                         shutdown() noexcept override;

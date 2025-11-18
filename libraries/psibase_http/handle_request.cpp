@@ -750,25 +750,6 @@ namespace psibase::http
                }
             }
 
-            // Find the most specific host name that matches the request
-            std::string_view root_host;
-            for (const auto& name : server.http_config->hosts)
-            {
-               if (host.ends_with(name) &&
-                   (host.size() == name.size() || host[host.size() - name.size() - 1] == '.'))
-               {
-                  if (name.size() > root_host.size())
-                  {
-                     root_host = name;
-                  }
-               }
-            }
-            // If there isn't a matching host, default to the first host
-            if (root_host.empty() && !server.http_config->hosts.empty())
-            {
-               root_host = server.http_config->hosts.front();
-            }
-
             auto        startTime = steady_clock::now();
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
@@ -798,7 +779,6 @@ namespace psibase::http
                return send(builder.methodNotAllowed(req.target(), req.method_string(),
                                                     "GET, POST, OPTIONS", true));
             data.host        = {host.begin(), host.size()};
-            data.rootHost    = root_host;
             data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = req.body();

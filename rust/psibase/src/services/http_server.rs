@@ -51,6 +51,12 @@ mod service {
     fn serve(socket: i32, req: HttpRequest) {
         unimplemented!()
     }
+
+    /// Returns the root host for a given host
+    #[action]
+    fn rootHost(host: String) -> String {
+        unimplemented!()
+    }
 }
 
 #[test]

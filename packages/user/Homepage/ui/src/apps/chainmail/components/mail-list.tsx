@@ -2,10 +2,12 @@ import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
 import { formatDistanceToNow } from "@/apps/chainmail/utils";
 
+import { Loading } from "@/components/loading";
+
 import { Avatar } from "@shared/shadcn/ui/avatar";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
-import { EmptyBox, LoadingBox } from "./empty-states";
+import { EmptyBox } from "./empty-states";
 
 interface SharedProps {
     mailbox: Mailbox;
@@ -26,7 +28,7 @@ export function MailList({
     isLoading,
 }: MailListProps) {
     if (isLoading) {
-        return <LoadingBox />;
+        return <Loading />;
     }
 
     if (messages.length === 0) {

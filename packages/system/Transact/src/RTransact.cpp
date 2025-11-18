@@ -8,6 +8,7 @@
 #include <services/system/Transact.hpp>
 
 #include <functional>
+#include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -317,8 +318,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
-       -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id,
+                         const ClientFilter&         clientFilter) -> ClaimedSockets
    {
       {
          auto                      clients = RTransact{}.open<TraceClientTable>();
@@ -1360,6 +1361,11 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
    bool                         isLocalhost = psibase::isLocalhost(request);
+   auto                         rootHost    = to<HttpServer>().rootHost(request.host);
+
+   auto isValidJwt = [&](const LoginTokenData& decoded)
+   { return decoded.aud == rootHost && checkExp(decoded.exp); };
+
    for (const auto& header : request.headers)
    {
       if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
@@ -1372,9 +1378,9 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
                         {
                            auto token   = value.substr(prefix.size());
                            auto decoded = decodeJWT<LoginTokenData>(key, token);
-                           if (decoded.aud == request.rootHost && checkExp(decoded.exp))
+                           if (decoded && isValidJwt(*decoded))
                            {
-                              result = decoded.sub;
+                              result = decoded->sub;
                            }
                         }
                      });
@@ -1389,8 +1395,8 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    for (const auto& token : tokens)
    {
       auto decoded = decodeJWT<LoginTokenData>(key, token);
-      if (decoded.aud == request.rootHost && checkExp(decoded.exp))
-         return decoded.sub;
+      if (decoded && isValidJwt(*decoded))
+         return decoded->sub;
    }
    return {};
 }
@@ -1426,6 +1432,34 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
                                              std::optional<std::int32_t>  socket,
                                              std::optional<AccountNumber> user)
 {
+   auto make400 = [&](std::string_view message)
+   {
+      return HttpReply{
+          .status      = HttpStatus::badRequest,
+          .contentType = "text/html",
+          .body{message.begin(), message.end()},
+          .headers = allowCors(request, AccountNumber{"supervisor"}),
+      };
+   };
+   auto make404 = [&](std::string_view message)
+   {
+      return HttpReply{
+          .status      = HttpStatus::notFound,
+          .contentType = "text/html",
+          .body{message.begin(), message.end()},
+          .headers = allowCors(request, AccountNumber{"supervisor"}),
+      };
+   };
+   auto make415 = [&](std::string_view message)
+   {
+      return HttpReply{
+          .status      = HttpStatus::unsupportedMediaType,
+          .contentType = "text/html",
+          .body{message.begin(), message.end()},
+          .headers = allowCors(request, AccountNumber{"supervisor"}),
+      };
+   };
+
    check(getSender() == HttpServer::service, "Wrong sender");
    check(socket.has_value(), "Missing socket");
    auto target = request.path();
@@ -1447,7 +1481,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          };
       }
       if (request.contentType != "application/octet-stream")
-         abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
+         return make415("Expected fracpack encoded signed transaction (application/octet-stream)");
 
       auto query       = request.query<WaitFor>();
       auto trx         = psio::from_frac<SignedTransaction>(request.body);
@@ -1468,21 +1502,23 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    else if (request.method == "POST" && target == "/login")
    {
       auto trx = parseBody<SignedTransaction>(request);
-      check(trx.transaction->actions().size() == 1 &&
-                trx.transaction->actions()[0].method() == MethodNumber{"loginSys"},
-            "Expected a login transaction");
-      check(trx.transaction->tapos().flags() & Tapos::do_not_broadcast_flag,
-            "Login transaction must be do_not_broadcast");
+      if (trx.transaction->actions().size() != 1 ||
+          trx.transaction->actions()[0].method() != MethodNumber{"loginSys"})
+         return make400("Expected a login transaction");
+      if (!(trx.transaction->tapos().flags() & Tapos::do_not_broadcast_flag))
+         return make400("Login transaction must be do_not_broadcast");
       auto loginAct = trx.transaction->actions()[0];
       auto sender   = loginAct.sender().unpack();
       auto app      = loginAct.service().unpack();
       auto data     = psio::from_frac<LoginData>(loginAct.rawData());
-      if (checkExp(trx.transaction->tapos().expiration()) && data.rootHost == request.rootHost)
+      if (!checkExp(trx.transaction->tapos().expiration()))
+         return make400("Login expired");
+      if (data.rootHost == rootHost(request))
       {
          // verify signatures
          auto claims = trx.transaction->claims();
          if (claims.size() != trx.proofs.size())
-            abortMessage("Proofs and claims must have the same size");
+            return make400("Proofs and claims must have the same size");
          for (std::size_t i = 0; i < trx.proofs.size(); ++i)
          {
             Actor<VerifyInterface> verify(RTransact::service, claims[i].service());
@@ -1494,7 +1530,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          auto accountTable   = accountsTables.open<AccountTable>();
          auto accountIndex   = accountTable.getIndex<0>();
          auto account        = accountIndex.get(sender);
-         check(!!account, "Account not found");
+         if (!account)
+            return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
          auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
          auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
@@ -1504,13 +1541,17 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
              std::chrono::system_clock::now() + std::chrono::days(30));
          auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
-                                                                           .aud = request.rootHost,
+                                                                           .aud = std::string(rootHost(request)),
                                                                            .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json",
                                    .headers     = allowCors(request, AccountNumber{"supervisor"})};
          psio::vector_stream stream{reply.body};
          to_json(LoginReply{token}, stream);
          return reply;
+      }
+      else
+      {
+         return make400("Login data contians invalid root host");
       }
    }
    else if (target == "/jwt_key" && request.method == "GET")

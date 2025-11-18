@@ -1,5 +1,6 @@
 mod evaluation_instance;
 mod fractal;
+mod fractal_exile;
 pub mod fractal_member;
 mod guild;
 mod guild_application;
@@ -24,6 +25,8 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
+        pub legislature: AccountNumber,
+        pub judiciary: AccountNumber,
     }
 
     impl Fractal {
@@ -139,6 +142,11 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.guild, self.member)
         }
+
+        #[secondary_key(1)]
+        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+            (self.member, self.guild)
+        }
     }
 
     #[table(name = "GuildAttestTable", index = 6)]
@@ -160,8 +168,34 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_attestee(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+        fn by_guild(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
             (self.guild, self.attestee, self.member)
+        }
+
+        #[secondary_key(2)]
+        fn by_attestee(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.attestee, self.guild, self.member)
+        }
+    }
+
+    #[table(name = "FractalExileTable", index = 7)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct FractalExile {
+        #[graphql(skip)]
+        pub fractal: AccountNumber,
+        pub member: AccountNumber,
+    }
+
+    impl FractalExile {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.member)
+        }
+
+        #[secondary_key(1)]
+        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+            (self.member, self.fractal)
         }
     }
 }

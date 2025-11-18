@@ -1,0 +1,170 @@
+{
+  "folders": [
+    {
+      "name": "Workspace settings",
+      "path": "../../.vscode/workspaces/",
+    },
+    {
+      "name": "Supervisor",
+      "path": "../../packages/user/Supervisor/ui",
+    },
+    {
+      "name": "Registry",
+      "path": "../../packages/user/Registry/",
+    },
+    {
+      "name": "Sites",
+      "path": "../../packages/user/Sites/",
+    },
+    {
+      "name": "Common lib",
+      "path": "../../packages/user/CommonApi/common/packages/common-lib",
+    },
+    {
+      "name": "[Plugin] host:common",
+      "path": "../../packages/user/Host/plugin/common",
+    },
+    {
+      "name": "[Plugin] host:prompt",
+      "path": "../../packages/user/Host/plugin/prompt",
+    },
+    {
+      "name": "[Plugin] host:auth",
+      "path": "../../packages/user/Host/plugin/auth",
+    },
+    {
+      "name": "StagedTx",
+      "path": "../../packages/system/StagedTx/",
+    },
+    {
+      "name": "Rust",
+      "path": "../../rust/",
+    },
+  ],
+  "settings": {
+    // The following setting would allow terminals to open in the regular root directory by default,
+    //   but there's an open vscode bug related to it: https://github.com/microsoft/vscode/issues/189166
+    //"terminal.integrated.cwd": "/root/psibase",
+    "search.exclude": {
+      "**/target": true,
+      "**/.yarn": true,
+      "**/.pnp.*": true,
+    },
+    "eslint.nodePath": "/root/psibase/packages/.yarn/sdks",
+    "prettier.prettierPath": "/root/psibase/packages/.yarn/sdks/prettier/index.cjs",
+    "typescript.tsdk": "/root/psibase/packages/.yarn/sdks/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "[markdown]": {
+      "files.trimTrailingWhitespace": false,
+    },
+    "[cpp]": {
+      "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+      "editor.tabSize": 3,
+      "editor.formatOnSave": true,
+      "editor.formatOnSaveMode": "file",
+    },
+    "[javascript, typescript, typescriptreact]": {
+      "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+      "editor.formatOnPaste": false,
+      "editor.formatOnType": false,
+      "editor.formatOnSave": true,
+      "editor.formatOnSaveMode": "file",
+    },
+    "eslint.validate": [
+      "javascript",
+      "javascriptreact",
+      "typescript",
+      "typescriptreact",
+    ],
+    "[rust]": {
+      "editor.defaultFormatter": "rust-lang.rust-analyzer",
+      "editor.formatOnSave": true,
+    },
+    "rust-analyzer.check.overrideCommand": [
+      "cargo",
+      "component",
+      "check",
+      "--workspace",
+      "--all-targets",
+      "--message-format=json",
+    ],
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build",
+        "type": "shell",
+        "command": "../scripts/build.sh 1",
+        "group": {
+          "kind": "build",
+          "isDefault": true,
+        },
+        "options": {
+          "statusbar": {
+            "label": "$(tools) Build",
+          },
+        },
+      },
+      {
+        "label": "Launch",
+        "type": "shell",
+        "command": "../scripts/launch.sh $HOST_IP myprod 8080",
+        "options": {
+          "statusbar": {
+            "label": "$(play) Launch",
+          },
+        },
+      },
+      {
+        "label": "Launch Secure",
+        "type": "shell",
+        "command": "../scripts/launch_secure.sh $HOST_IP myprod 8080 /usr/lib/softhsm/libsofthsm2.so",
+        "options": {
+          "statusbar": {
+            "label": "$(play)$(lock) Launch Secure",
+          },
+        },
+      },
+      {
+        "label": "Redeploy",
+        "type": "shell",
+        "command": "cd /root/psibase/packages/user/Supervisor/ui && yarn build && psibase upload -a dev -r -S supervisor ./dist/ /",
+        "group": {
+          "kind": "none",
+        },
+        "options": {
+          "statusbar": {
+            "label": "$(tools) Redeploy supervisor",
+          },
+        },
+      },
+      {
+        "label": "Redeploy component parser",
+        "type": "shell",
+        "command": "cd /root/psibase/packages/user/CommonApi/common/packages/component-parser && cargo component build -r --target wasm32-unknown-unknown && psibase upload -a dev -r -S common-api ./target/wasm32-unknown-unknown/release/component_parser.wasm /common/component_parser.wasm",
+        "group": {
+          "kind": "none",
+        },
+        "options": {
+          "statusbar": {
+            "label": "$(tools) Redeploy component parser",
+          },
+        },
+      },
+      {
+        "label": "Redeploy common-lib",
+        "type": "shell",
+        "command": "cd /root/psibase/packages/user/CommonApi/common/packages/common-lib/ && yarn build && psibase upload -a dev -r -S common-api ./dist/ /",
+        "group": {
+          "kind": "none",
+        },
+        "options": {
+          "statusbar": {
+            "label": "$(tools) Redeploy common-lib",
+          },
+        },
+      },
+    ],
+  },
+}

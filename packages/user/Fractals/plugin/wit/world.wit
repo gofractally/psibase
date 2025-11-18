@@ -4,6 +4,7 @@ interface admin-fractal {
     use host:types/types.{error};
 
     create-fractal: func(fractal-account: string, guild-account: string, name: string, mission: string) -> result<_, error>;
+    exile-member: func(member: string) -> result<_, error>;
 }
 
 interface admin-guild {

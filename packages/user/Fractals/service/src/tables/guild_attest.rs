@@ -55,18 +55,35 @@ impl GuildAttest {
         GuildAttestTable::read_write().remove(&self);
     }
 
-    pub fn drop_user_attestations(guild: AccountNumber, guild_member: AccountNumber) {
-        let table = GuildAttestTable::read_write();
-
-        table
-            .get_index_by_attestee()
+    pub fn attestations_by_guild_member(guild: AccountNumber, member: AccountNumber) -> Vec<Self> {
+        GuildAttestTable::read()
+            .get_index_by_guild()
             .range(
-                (guild, guild_member, AccountNumber::new(0))
-                    ..=(guild, guild_member, AccountNumber::new(u64::MAX)),
+                (guild, member, AccountNumber::new(0))
+                    ..=(guild, member, AccountNumber::new(u64::MAX)),
             )
-            .for_each(|attest| {
-                table.remove(&attest);
-            });
+            .collect()
+    }
+
+    pub fn attestations_by_member(member: AccountNumber) -> Vec<Self> {
+        GuildAttestTable::read()
+            .get_index_by_guild()
+            .range(
+                (member, AccountNumber::new(0), AccountNumber::new(0))
+                    ..=(
+                        member,
+                        AccountNumber::new(u64::MAX),
+                        AccountNumber::new(u64::MAX),
+                    ),
+            )
+            .collect()
+    }
+
+    pub fn remove_all_by_member(member: AccountNumber) {
+        let table = GuildAttestTable::read_write();
+        for attestation in GuildAttest::attestations_by_member(member) {
+            table.remove(&attestation);
+        }
     }
 
     fn save(&self) {

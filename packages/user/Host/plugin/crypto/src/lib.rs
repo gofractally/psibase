@@ -24,7 +24,6 @@ psibase::define_trust! {
         Low => "
         Low trust grants these abilities:
             - Import existing keypairs
-            - Sign transaction with explicit private key provided
         ",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
@@ -32,8 +31,8 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der],
-        Low => [import_key, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit],
+        Low => [import_key],
         High => [sign],
     }
 }
@@ -86,10 +85,7 @@ impl KeyVault for HostCrypto {
         hashed_message: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized_with_whitelist(
-            FunctionName::sign_explicit,
-            vec!["auth-sig".into(), "auth-invite".into()],
-        )?;
+        assert_authorized(FunctionName::sign_explicit)?;
 
         Supervisor::sign_explicit(&hashed_message, &private_key)
     }

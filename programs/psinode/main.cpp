@@ -1470,13 +1470,14 @@ void run(const std::string&              db_path,
    // If this is a new database, initialize subjective services
    initialize_database(*system, db_template);
    {
-      Action act{.service = proxyServiceNum, .rawData = psio::to_frac(std::tuple())};
+      Action act{.service = proxyServiceNum,
+                 .method  = MethodNumber{"startSession"},
+                 .rawData = psio::to_frac(std::tuple())};
 
       BlockContext bc{*system, system->sharedDatabase.getHead(),
                       system->sharedDatabase.createWriter(), true};
 
-      TransactionTrace trace;
-      bc.execAsyncExport("startSession", std::move(act), trace);
+      bc.execAsyncAction(std::move(act));
    }
 
    // Manages the session and and unlinks all keys from prover on destruction
@@ -1784,8 +1785,6 @@ void run(const std::string&              db_path,
                  node.peers().disconnect_all(runResult.args->restart.has_value());
               });
        });
-
-   tpool.setNumThreads(service_threads);
 
    if (!listen.empty())
    {
@@ -2153,7 +2152,13 @@ void run(const std::string&              db_path,
                            });
       };
 
-      boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
+      auto& service =
+          boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
+      node.chain().onSocketOpen(service.get_connector());
+
+      // This starts threads that can run wasm, so it isn't safe to run
+      // until after all the node.chain().onXXX callbacks are set up.
+      service.start();
    }
    else
    {
@@ -2162,6 +2167,8 @@ void run(const std::string&              db_path,
              "<port> to add a listener.";
       boost::asio::post(chainContext, [&server_work] { server_work.reset(); });
    }
+
+   tpool.setNumThreads(service_threads);
 
    auto remove_http_handlers = psio::finally{[&http_config, &system]
                                              {

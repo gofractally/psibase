@@ -1,11 +1,18 @@
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 
+#include <psibase/Actor.hpp>
+#include <psibase/block.hpp>
 #include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/version.hpp>
+#include <services/local/XHttp.hpp>
+#include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
+
+#include <chrono>
 
 #include <fcntl.h>
 
@@ -172,7 +179,7 @@ namespace
             self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
          }
 
-         std::string rootHost = "psibase";
+         std::string rootHost("", 1);
 
          for (const auto& [account, header] : package.data)
          {
@@ -181,7 +188,6 @@ namespace
 
             requests.push_back(HttpRequest{
                 .host        = account.str() + "." + rootHost,
-                .rootHost    = rootHost,
                 .method      = "PUT",
                 .target      = std::string(path),
                 .contentType = std::string(mimeType),
@@ -209,15 +215,36 @@ namespace
       }
    }
 
+   void startSession(psibase::TestChain& self)
+   {
+      using namespace psibase;
+      HostConfigRow row{std::format("psitest-{}.{}.{}", PSIBASE_VERSION_MAJOR,
+                                    PSIBASE_VERSION_MINOR, PSIBASE_VERSION_PATCH),
+                        R"({"host":{"hosts":["psibase.io"]}})"};
+
+      tester::raw::checkoutSubjective(self.nativeHandle());
+      self.kvPut(row.db, row.key(), row);
+      psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
+                     "Failed to commit changes");
+      transactor<LocalService::XHttp> xhttp{AccountNumber{}, LocalService::XHttp::service};
+      expect(tester::runAction(self.nativeHandle(), RunMode::rpc, true, xhttp.startSession()));
+   }
+
 }  // namespace
 
-psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init)
+psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init, bool writable)
     : id{clone ? tester::raw::cloneChain(chain_id) : chain_id}, isPublicChain(pub)
 {
    if (pub && numPublicChains++ == 0)
       psibase::tester::raw::selectedChain = id;
    if (init)
+   {
       loadLocalServices(*this);
+   }
+   if (writable)
+   {
+      startSession(*this);
+   }
 }
 
 psibase::TestChain::TestChain(const TestChain& other, bool pub)
@@ -251,7 +278,8 @@ psibase::TestChain::TestChain(std::string_view path, int flags, const DatabaseCo
                                        &cfg),
                 false,
                 pub,
-                (flags & (O_CREAT | O_TRUNC)) != 0)
+                (flags & (O_CREAT | O_TRUNC)) != 0,
+                (get_wasi_rights(flags) & __WASI_RIGHTS_FD_WRITE) != 0)
 {
 }
 
@@ -659,6 +687,29 @@ std::optional<psibase::HttpReply> psibase::AsyncHttpReply::poll()
 psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
 {
    return asyncHttp(request).get();
+}
+
+namespace
+{
+   struct LoginInterface
+   {
+      void loginSys(std::string rootHost) {}
+   };
+   PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
+}  // namespace
+
+std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
+{
+   transactor<LoginInterface> loginTransactor{user, service};
+   Tapos             tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
+                                 std::chrono::system_clock::now()) +
+                             std::chrono::seconds(10),
+                           .flags = Tapos::do_not_broadcast_flag};
+   Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
+   SignedTransaction strx{trx};
+   auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",
+                                                FracPackBody{std::move(strx)});
+   return reply.access_token;
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
