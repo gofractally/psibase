@@ -166,6 +166,26 @@ pub mod service {
         );
     }
 
+    #[action]
+    #[allow(non_snake_case)]
+    fn isAuthSys(
+        _sender: AccountNumber,
+        _authorizers: Vec<AccountNumber>,
+        _auth_set: Option<Vec<AccountNumber>>,
+    ) -> bool {
+        false
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isRejectSys(
+        _sender: AccountNumber,
+        _authorizers: Vec<AccountNumber>,
+        _auth_set: Option<Vec<AccountNumber>>,
+    ) -> bool {
+        false
+    }
+
     /// Creates a credential
     ///
     /// Parameters:
