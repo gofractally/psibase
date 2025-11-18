@@ -140,7 +140,7 @@ struct InstallCommand {
 
 #[derive(Parser, Debug)]
 struct TestCommand {
-    /// Test name filter (matches any test containing this string)
+    /// Matches any test containing this string
     #[clap(value_name = "TEST_NAME")]
     test_filter: Option<String>,
 }
@@ -704,7 +704,6 @@ async fn test(
         let mut command = std::process::Command::new(&args.psitest);
         command.arg(test);
         command.arg("--nocapture");
-        // Pass test filter to Rust's test harness if provided
         if let Some(ref filter) = opts.test_filter {
             command.arg(filter);
         }
