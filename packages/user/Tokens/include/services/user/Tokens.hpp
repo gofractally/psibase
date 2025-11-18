@@ -320,7 +320,7 @@ namespace UserService
 
    // clang-format off
    PSIO_REFLECT(Tokens,
-      method(init, billing_token),
+      method(init),
       method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),
       method(burn, tokenId, amount, memo),
@@ -337,7 +337,6 @@ namespace UserService
       method(getUserConf, account, index),
       method(setSysToken, tokenId),
       method(getSysToken),
-      method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),

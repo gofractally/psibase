@@ -11,41 +11,7 @@ pub mod tables {
     };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
-    pub struct Config {
-        pub billing_token: TID,
-    }
-
-    impl Config {
-        #[primary_key]
-        fn pk(&self) {}
-
-        fn new(billing_token: TID) -> Self {
-            Self { billing_token }
-        }
-
-        pub fn set(billing_token: TID) -> Self {
-            check_none(Self::get(), "config is already set");
-            let new_instance = Self::new(billing_token);
-            new_instance.save();
-            new_instance
-        }
-
-        pub fn get() -> Option<Self> {
-            ConfigTable::read().get_index_pk().get(&())
-        }
-
-        pub fn get_assert() -> Self {
-            check_some(Self::get(), "Config not found")
-        }
-
-        pub fn save(&self) {
-            ConfigTable::read_write().put(&self).unwrap();
-        }
-    }
-
-    #[table(name = "SymbolLengthTable", index = 1)]
+    #[table(name = "SymbolLengthTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct SymbolLength {
@@ -95,17 +61,23 @@ pub mod tables {
             Decimal::new(
                 self.price(),
                 Tokens::call()
-                    .getToken(Config::get_assert().billing_token)
+                    .getToken(check_some(
+                        Tokens::call().getSysToken(),
+                        "system token must be defined",
+                    ))
                     .precision,
             )
         }
 
         pub async fn billing_token(&self) -> TokenRecord {
-            Tokens::call().getToken(Config::get_assert().billing_token)
+            Tokens::call().getToken(check_some(
+                Tokens::call().getSysToken(),
+                "system token must be defined",
+            ))
         }
     }
 
-    #[table(name = "SymbolTable", index = 2)]
+    #[table(name = "SymbolTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Symbol {
@@ -138,7 +110,10 @@ pub mod tables {
             );
             let length_record = length_record.unwrap();
             let recipient = get_sender();
-            let billing_token = Config::get_assert().billing_token;
+            let billing_token = check_some(
+                psibase::services::tokens::Wrapper::call().getSysToken(),
+                "system token must be defined",
+            );
 
             let on_created = |quantity: Quantity| {
                 crate::Wrapper::emit().history().symCreated(
@@ -207,7 +182,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "MappingTable", index = 3)]
+    #[table(name = "MappingTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Mapping {
@@ -266,7 +241,7 @@ pub mod tables {
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{Config, Mapping, Symbol, SymbolLength};
+    use crate::tables::{Mapping, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
     use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
@@ -275,15 +250,17 @@ pub mod service {
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
-    fn init(billing_token: TID) {
-        Tokens::call().getToken(billing_token); // Validate token exists
-        check_none(Config::get(), "service already initialized");
+    fn init() {
+        check_some(
+            psibase::services::tokens::Wrapper::call().getSysToken(),
+            "system token must be defined",
+        );
+
         check(
             get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
             "only root or symbol account can call init",
         );
 
-        Config::set(billing_token);
         Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
 
@@ -346,7 +323,11 @@ pub mod service {
 
     #[pre_action(exclude(init, getByToken))]
     fn check_init() {
-        check_some(Config::get(), "service not initialized");
+        check(
+            Tokens::call_from(Wrapper::SERVICE)
+                .getUserConf(Wrapper::SERVICE, BalanceFlags::MANUAL_DEBIT.index()),
+            "service not initialized",
+        )
     }
 
     #[event(history)]

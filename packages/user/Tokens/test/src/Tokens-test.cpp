@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <cstdint>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
@@ -40,6 +41,7 @@ SCENARIO("Using system token")
       Quantity userBalance{1'000'000'00e4};
 
       uint32_t sysToken = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
       CHECK(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, true);
@@ -690,9 +692,11 @@ SCENARIO("Mapping a symbol to a token")
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      auto sysToken    = Tokens::sysToken;
+      auto sysToken    = sysIssuer.create(Precision{4}, userBalance).returnVal();
+
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, userBalance, memo);
+      REQUIRE(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
+      REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
@@ -701,7 +705,7 @@ SCENARIO("Mapping a symbol to a token")
 
       auto symbolCtx = t.from("symbol"_a);
 
-      CHECK(symbolCtx.to<Symbol>().init(sysToken).succeeded());
+      CHECK(symbolCtx.to<Symbol>().init().succeeded());
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.to<Symbol>().getPrice(3).returnVal();
@@ -816,10 +820,10 @@ TEST_CASE("GraphQL Queries")
    auto bob   = t.from(t.addAccount("bob"_a));
 
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
-   sysIssuer.create(Precision{4}, 1'000'000'000e4);
+   auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+   t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
 
-   auto sysToken = Tokens::sysToken;
-   CHECK(symbolCtx.to<Symbol>().init(sysToken).succeeded());
+   CHECK(symbolCtx.to<Symbol>().init().succeeded());
 
    auto userBalance = 1'000'000e4;
 

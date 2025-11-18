@@ -79,17 +79,14 @@ impl Api for SymbolPlugin {
 }
 
 impl Admin for SymbolPlugin {
-    fn init(token_id: u32) -> Result<(), Error> {
+    fn init() -> Result<(), Error> {
         trust::assert_authorized_with_whitelist(
             trust::FunctionName::init,
             vec!["config".to_string()],
         )?;
         set_propose_latch(Some(&symbol::SERVICE.to_string()))?;
 
-        let packed_args = symbol::action_structs::init {
-            billing_token: token_id,
-        }
-        .packed();
+        let packed_args = symbol::action_structs::init {}.packed();
         add_action_to_transaction(symbol::action_structs::init::ACTION_NAME, &packed_args)
     }
 }

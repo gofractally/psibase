@@ -9,6 +9,13 @@
         }
     },
     {
+        "sender": "tokens",
+        "service": "tokens",
+        "method": "setSysToken",
+        "data": { "tokenId": 1 }
+    },
+    
+    {
         "sender": "symbol",
         "service": "tokens",
         "method": "settokenconf",
@@ -36,6 +43,6 @@
         "sender": "symbol",
         "service": "symbol",
         "method": "init",
-        "data": { "billing_token": 1 }
+        "data": {}
     }
 ]

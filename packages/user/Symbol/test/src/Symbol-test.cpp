@@ -46,7 +46,8 @@ SCENARIO("Buying a symbol")
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
-      t.from(Symbol::service).to<Symbol>().init(sysToken);
+      t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
+      t.from(Symbol::service).to<Symbol>().init();
 
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
@@ -172,7 +173,8 @@ SCENARIO("Measuring price increases")
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
-      REQUIRE(t.from(Symbol::service).to<Symbol>().init(sysToken).succeeded());
+      REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
+      REQUIRE(t.from(Symbol::service).to<Symbol>().init().succeeded());
 
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
@@ -256,7 +258,8 @@ SCENARIO("Using symbol ownership NFT")
       // Mint token used for purchasing symbols
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
-      REQUIRE(t.from(Symbol::service).to<Symbol>().init(sysToken).succeeded());
+      REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
+      REQUIRE(t.from(Symbol::service).to<Symbol>().init().succeeded());
       auto precision    = sysIssuer.getToken(sysToken).returnVal().precision;
       auto aliceBalance = q(1'000'000, precision);
 

@@ -45,7 +45,7 @@ pub mod Service {
     use crate::{services::tokens::Quantity, AccountNumber};
 
     #[action]
-    fn init(billing_token: TID) {
+    fn init() {
         unimplemented!()
     }
 

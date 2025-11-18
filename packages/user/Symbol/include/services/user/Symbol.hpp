@@ -19,7 +19,7 @@ namespace UserService
 
       Symbol(psio::shared_view_ptr<psibase::Action> action);
 
-      void init(TID billing_token);
+      void init();
 
       void create(SID newSymbol);
 
