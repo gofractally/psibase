@@ -1,3 +1,4 @@
+import { useStore } from "@tanstack/react-form";
 import { CircleUserRound } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -36,61 +37,38 @@ import { useCreateAccount } from "./hooks/use-create-account";
 import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 import { useImportExisting } from "./hooks/use-import-existing";
 
-type Busy = "idle" | "importing" | "creating" | "loggingIn";
-
 const supervisor = getSupervisor();
 
 export const ConnectPrompt = () => {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [error, setError] = useState<string | null>(null);
-
-    console.log("error", error);
-
-    const [showImport, setShowImport] = useState(false);
+    // modal state
     const [showCreate, setShowCreate] = useState(false);
     const [showCannotCreate, setShowCannotCreate] = useState(false);
-    const [importName, setImportName] = useState("");
-    const [createName, setCreateName] = useState("");
-    const [busy, setBusy] = useState<Busy>("idle");
 
+    const [createName, setCreateName] = useState("");
+
+    // queries
     const { data: networkName } = useBranding();
     const {
         data: accounts = [],
-        isLoading: loadingAccounts,
+        isPending: isPendingAccounts,
         refetch: refetchAccounts,
     } = useGetAllAccounts();
-    const { data: canCreate = false, isLoading: loadingCanCreate } =
+    const { data: canCreate = false, isPending: isPendingCanCreate } =
         useCanCreateAccount();
+
+    // mutations
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
     const connectAccountMutation = useConnectAccount();
 
-    const loading = loadingAccounts || loadingCanCreate;
+    const loading = isPendingAccounts || isPendingCanCreate;
     const accountsList = Array.isArray(accounts) ? accounts : [];
-
-    const handleImport = async () => {
-        const name = importName.trim();
-        if (!name || busy !== "idle") return;
-        setBusy("importing");
-        setError(null);
-        try {
-            await importExistingMutation.mutateAsync(name);
-            await refetchAccounts();
-            setShowImport(false);
-            setImportName("");
-        } catch {
-            setError("Import failed");
-        } finally {
-            setBusy("idle");
-        }
-    };
 
     const handleCreate = async () => {
         const name = createName.trim();
-        if (!name || busy !== "idle") return;
-        setBusy("creating");
-        setError(null);
+        if (!name) return;
         try {
             const privateKey = await createAccountMutation.mutateAsync(name);
             console.log("privateKey", privateKey);
@@ -98,43 +76,28 @@ export const ConnectPrompt = () => {
             setShowCreate(false);
             setCreateName("");
         } catch {
-            setError("Account creation failed");
-        } finally {
-            setBusy("idle");
+            console.error("Create account failed");
         }
     };
 
     const handleLogin = async (accountName: string) => {
-        console.log("handleLogin", accountName, busy);
-        if (busy !== "idle") return;
-        setBusy("loggingIn");
-        setError(null);
         try {
             await connectAccountMutation.mutateAsync(accountName);
             prompt.finished();
         } catch {
-            setError("Login failed");
-            setBusy("idle");
+            console.error("Login failed");
         }
     };
 
     const handleImportAndLogin = async (account: string) => {
-        if (!account || busy !== "idle") return;
-        setBusy("importing");
-        setError(null);
         try {
             await importExistingMutation.mutateAsync(account);
             await connectAccountMutation.mutateAsync(account);
             prompt.finished();
         } catch {
-            setError("Import and login failed");
+            console.error("Import and login failed");
         }
-        setBusy("idle");
     };
-
-    const isImporting = busy === "importing";
-    const isCreating = busy === "creating";
-    const isLoggingIn = busy === "loggingIn";
 
     const form = useAppForm({
         defaultValues: {
@@ -153,6 +116,8 @@ export const ConnectPrompt = () => {
             await handleImportAndLogin(data.value.account.account);
         },
     });
+
+    const isSubmitting = useStore(form.store, (state) => state.isSubmitting);
 
     if (loading) {
         return (
@@ -199,17 +164,9 @@ export const ConnectPrompt = () => {
                                         label="Account name"
                                         description={undefined}
                                         placeholder="Account name"
-                                        disabled={isImporting}
+                                        disabled={isSubmitting}
                                         supervisor={supervisor}
                                     />
-                                    {/* <Input
-                                    className="text-foreground placeholder:text-muted-foreground flex-1"
-                                    placeholder="Account name"
-                                    value={importName}
-                                    onChange={(e) =>
-                                        setImportName(e.target.value)
-                                    }
-                                /> */}
                                 </div>
                             </CardContent>
                             <CardFooter className="mt-4 flex flex-1 justify-between">
@@ -224,7 +181,7 @@ export const ConnectPrompt = () => {
                                                 setShowCannotCreate(true);
                                             }
                                         }}
-                                        disabled={isLoggingIn}
+                                        disabled={isSubmitting}
                                         className="px-0 focus-visible:underline focus-visible:underline-offset-4 focus-visible:ring-0"
                                     >
                                         Create account
@@ -258,12 +215,7 @@ export const ConnectPrompt = () => {
                                     if (e.key === "Enter") handleCreate();
                                 }}
                             />
-                            <Button
-                                onClick={handleCreate}
-                                disabled={!createName.trim() || isCreating}
-                            >
-                                {isCreating ? "Creating…" : "Create"}
-                            </Button>
+                            <Button onClick={handleCreate}>Create</Button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -332,35 +284,5 @@ export const ConnectPrompt = () => {
                 </div>
             </CardContent>
         </BrandedGlowingCard>
-    );
-
-    return (
-        <Dialog
-            open={showImport}
-            onOpenChange={(open) => !open && setShowImport(false)}
-        >
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Import existing account</DialogTitle>
-                </DialogHeader>
-                <div className="flex items-center gap-2">
-                    <Input
-                        className="text-foreground placeholder:text-muted-foreground flex-1"
-                        placeholder="Enter account name"
-                        value={importName}
-                        onChange={(e) => setImportName(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") handleImport();
-                        }}
-                    />
-                    <Button
-                        onClick={handleImport}
-                        disabled={!importName.trim() || isImporting}
-                    >
-                        {isImporting ? "Importing…" : "Import"}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
     );
 };

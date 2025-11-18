@@ -1797,6 +1797,7 @@ __metadata:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@tailwindcss/vite": "npm:^4.1.8"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
