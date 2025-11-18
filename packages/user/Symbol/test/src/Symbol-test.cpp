@@ -46,13 +46,24 @@ SCENARIO("Buying a symbol")
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+
       t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
-      t.from(Symbol::service).to<Symbol>().init();
+      REQUIRE(
+          t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 24, 5000).succeeded());
 
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      auto issuance = sysIssuer.mint(sysToken, q(20'000, precision), memo);
+      auto amount   = q(20'000, precision);
+      auto issuance = sysIssuer.mint(sysToken, amount, memo);
+
+      REQUIRE(
+          t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 24, 5000).succeeded());
+
       CHECK(issuance.succeeded());
 
       sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
@@ -172,16 +183,22 @@ SCENARIO("Measuring price increases")
       auto a     = alice.to<Symbol>();
 
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
-      auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+
+      auto sysToken = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
       REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
-      REQUIRE(t.from(Symbol::service).to<Symbol>().init().succeeded());
+      REQUIRE(
+          t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 24, 5000).succeeded());
 
       auto precision = sysIssuer.getToken(sysToken).returnVal().precision;
 
       auto aliceBalance = q(1'000'000, precision);
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, aliceBalance, memo);
+      REQUIRE(sysIssuer.mint(sysToken, aliceBalance, memo).succeeded());
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
@@ -258,13 +275,20 @@ SCENARIO("Using symbol ownership NFT")
       // Mint token used for purchasing symbols
       auto sysIssuer = t.from(Symbol::service).to<Tokens>();
       auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+
       REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
-      REQUIRE(t.from(Symbol::service).to<Symbol>().init().succeeded());
+      REQUIRE(
+          t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 24, 5000).succeeded());
+
       auto precision    = sysIssuer.getToken(sysToken).returnVal().precision;
       auto aliceBalance = q(1'000'000, precision);
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, aliceBalance, memo);
+      REQUIRE(sysIssuer.mint(sysToken, aliceBalance, memo).succeeded());
       REQUIRE(sysIssuer.credit(sysToken, alice, aliceBalance, memo).succeeded());
 
       // Create the symbol and claim the owner NFT

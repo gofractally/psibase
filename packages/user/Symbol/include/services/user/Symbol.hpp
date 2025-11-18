@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <psibase/psibase.hpp>
 
 #include <services/system/CommonTables.hpp>
@@ -30,6 +31,11 @@ namespace UserService
       Quantity           getPrice(uint8_t numChars);
       SymbolLengthRecord getSymbolType(uint8_t numChars);
       void               mapSymbol(TID tokenId, SID symbol);
+      void               sellLength(uint8_t  length,
+                                    Quantity initial_price,
+                                    uint32_t target_min,
+                                    uint32_t target_max,
+                                    Quantity floor_price);
       SID                getTokenSym(TID tokenId);
 
       // clang-format off
@@ -52,7 +58,7 @@ namespace UserService
       method(create, newSymbol),
       method(serveSys, request),
       method(mapSymbol, tokenId, symbol),
-
+      method(sellLength, length, initial_price, target_min, target_max, floor_price),
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),

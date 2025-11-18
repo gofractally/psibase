@@ -60,6 +60,17 @@ pub mod Service {
     }
 
     #[action]
+    fn sellLength(
+        length: u8,
+        initial_price: Quantity,
+        target_min: u32,
+        target_max: u32,
+        floor_price: Quantity,
+    ) {
+        unimplemented!()
+    }
+
+    #[action]
     fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
         unimplemented!()
     }

@@ -40,6 +40,10 @@ SCENARIO("Using system token")
       Quantity userBalance{1'000'000'00e4};
 
       uint32_t sysToken = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
       t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
       CHECK(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
 
@@ -693,9 +697,16 @@ SCENARIO("Mapping a symbol to a token")
       auto userBalance = 1'000'000e4;
       auto sysToken    = sysIssuer.create(Precision{4}, userBalance).returnVal();
 
-      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+
+      REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
       REQUIRE(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
       REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
+      REQUIRE(
+          t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 24, 5000).succeeded());
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
@@ -703,8 +714,6 @@ SCENARIO("Mapping a symbol to a token")
       aliceTokens.mint(newToken, userBalance, memo);
 
       auto symbolCtx = t.from("symbol"_a);
-
-      CHECK(symbolCtx.to<Symbol>().init().succeeded());
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.to<Symbol>().getPrice(3).returnVal();
@@ -820,9 +829,8 @@ TEST_CASE("GraphQL Queries")
 
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
    auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+   t.from(Symbol::service).to<Nft>().debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "");
    t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
-
-   CHECK(symbolCtx.to<Symbol>().init().succeeded());
 
    auto userBalance = 1'000'000e4;
 

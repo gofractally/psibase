@@ -33,12 +33,24 @@ pub mod tables {
         }
 
         pub fn get_assert(symbol_length: u8) -> Self {
-            check_some(Self::get(symbol_length), "symbol length not supported")
+            check_some(Self::get(symbol_length), format!("symbol length of {} not supported", symbol_length).as_str())
         }
 
-        pub fn add(symbol_length: u8) -> Self {
-            let nft_id = psibase::services::diff_adjust::Wrapper::call()
-                .create(10000000, 86400, 24, 24, 0, 50000);
+        pub fn add(
+            symbol_length: u8,
+            initial_price: u64,
+            target_min: u32,
+            target_max: u32,
+            floor_price: u64,
+        ) -> Self {
+            let nft_id = psibase::services::diff_adjust::Wrapper::call().create(
+                initial_price,
+                86400,
+                target_min,
+                target_max,
+                floor_price,
+                50000,
+            );
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();
             new_instance
@@ -251,23 +263,30 @@ pub mod service {
 
     #[action]
     fn init() {
-        check_some(
-            psibase::services::tokens::Wrapper::call().getSysToken(),
-            "system token must be defined",
-        );
-
-        check(
-            get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
-            "only root or symbol account can call init",
-        );
-
         Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
+    }
 
-        // Populate default settings for each token symbol length
-        for length in 3u8..7 {
-            SymbolLength::add(length);
-        }
+    #[action]
+    fn sellLength(
+        length: u8,
+        initial_price: Quantity,
+        target_min: u32,
+        target_max: u32,
+        floor_price: Quantity,
+    ) {
+        check_some(Tokens::call().getSysToken(), "system token must be defined");
+        check(
+            get_sender() == get_service(),
+            "only symbols account can sell lengths",
+        );
+        SymbolLength::add(
+            length,
+            initial_price.value,
+            target_min,
+            target_max,
+            floor_price.value,
+        );
     }
 
     #[action]

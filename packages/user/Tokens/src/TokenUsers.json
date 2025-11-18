@@ -9,6 +9,15 @@
         }
     },
     {
+        "sender": "symbol",
+        "service": "nft",
+        "method": "debit",
+        "data": {
+            "nftId": 1,
+            "memo": ""
+        }
+    },
+    {
         "sender": "tokens",
         "service": "tokens",
         "method": "setSysToken",
