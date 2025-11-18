@@ -65,15 +65,14 @@ pub mod tables {
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
+    use psibase::services::auth_dyn::interfaces::{DynamicAuthPolicy, WeightedAuthorizer};
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
     #[action]
     #[allow(non_snake_case)]
     fn newAccount(account: AccountNumber) {
-        let existing_management = Management::get(account);
-        if let Some(management) = existing_management {
+        if let Some(management) = Management::get(account) {
             check(
                 management.manager == get_sender(),
                 "new manager conflicts with pre-existing manager",
@@ -86,10 +85,6 @@ pub mod service {
 
     #[action]
     fn set_mgmt(account: AccountNumber, manager: AccountNumber) {
-        check(
-            Accounts::call().exists(manager),
-            "manager account does not exist",
-        );
         check(Accounts::call().exists(account), "account does not exist");
 
         let sender = get_sender();
@@ -100,6 +95,10 @@ pub mod service {
                 "existing managements must be updated by management account",
             )
         } else {
+            check(
+                Accounts::call().exists(manager),
+                "manager account does not exist",
+            );
             check(
                 sender == account,
                 "new policies must be created by user account",
@@ -201,19 +200,29 @@ pub mod service {
                     total_possible_weight - multi_auth.threshold + 1
                 };
 
-                // TODO: add partition
-                let (already_approved, to_check) = multi_auth.;
+                let (already_approved, to_check): (
+                    Vec<WeightedAuthorizer>,
+                    Vec<WeightedAuthorizer>,
+                ) = multi_auth
+                    .authorizers
+                    .into_iter()
+                    .partition(|authorizer| authorizers.contains(&authorizer.account));
 
-                let mut total_weight_approved = 0;
+                let mut total_weight_approved = already_approved
+                    .into_iter()
+                    .fold(0, |acc, authorizer| authorizer.weight + acc);
 
-                for weight_authorizer in multi_auth.authorizers {
-                    let is_auth = authorizers.contains(&weight_authorizer.account)
-                        || is_auth_other(
-                            weight_authorizer.account,
-                            authorizers.clone(),
-                            auth_set.clone(),
-                            is_approval,
-                        );
+                if total_weight_approved >= required_weight {
+                    return true;
+                }
+
+                for weight_authorizer in to_check {
+                    let is_auth = is_auth_other(
+                        weight_authorizer.account,
+                        authorizers.clone(),
+                        auth_set.clone(),
+                        is_approval,
+                    );
                     if is_auth {
                         total_weight_approved += weight_authorizer.weight;
                         if total_weight_approved >= required_weight {
