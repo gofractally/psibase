@@ -33,6 +33,8 @@ namespace psibase
          return false;
       if (action.service == AccountNumber{"cpu-limit"})
          return false;
+      if (action.sender == AccountNumber{"transact"} && action.method == MethodNumber{"useNetSys"})
+         return false;
       if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})
          return false;
       if (action.service == AccountNumber{"events"} && action.method == MethodNumber{"sync"})

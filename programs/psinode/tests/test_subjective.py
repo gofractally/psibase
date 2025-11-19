@@ -14,7 +14,7 @@ def is_user_action(action):
         return False
     if action['service'] == 'cpu-limit':
         return False
-    if action['method'] == 'useNetSys':
+    if action['sender'] == 'transact' and action['method'] == 'useNetSys':
         return False
     if action['service'] == 'accounts' and action['method'] == 'billCpu':
         return False
