@@ -135,11 +135,11 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTransact SetCode Symbol
+        RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XSocketListService)
+        XProxy XSocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -270,7 +270,6 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
-    account-tokens
     aes
     auth-any
     auth-delegate
@@ -291,6 +290,7 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
+    nft
     fractal-core
     config
     producers
@@ -354,7 +354,6 @@ psibase_package(
         SERVER r-accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
-        DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
@@ -449,6 +448,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    PATH packages/user/Symbol
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
@@ -485,6 +490,7 @@ cargo_psibase_package(
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
@@ -810,12 +816,14 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Nft.psi
     NAME Nft
     VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     SERVICE nft
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
         INIT
+        DATA ${Plugins_OUTPUT_FILE_nft} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${Plugins_DEP}
 )
 
 psibase_package(
@@ -842,18 +850,6 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    NAME Symbol
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
-    SERVICE symbol
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
-        INIT
-    DEPENDS wasm
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
@@ -937,8 +933,7 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Initial token users"
-    ACCOUNTS alice bob
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
@@ -1247,6 +1242,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XProxy.psi
+    NAME XProxy
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Simple reverse proxy"
+    SERVICE x-proxy
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
+        SERVER x-proxy
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XSocketList.psi
     NAME XSocketList
     VERSION ${PSIBASE_VERSION}.0
@@ -1259,7 +1266,7 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList)
 
 ExternalProject_Add(
     rust

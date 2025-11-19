@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord};
+    use psibase::{check, check_some, get_sender, AccountNumber, Memo, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -35,7 +35,6 @@ pub mod tables {
         pub burned_supply: Quantity,
         #[graphql(skip)]
         pub max_issued_supply: Quantity,
-        pub symbol: Option<AccountNumber>,
     }
 
     define_flags!(TokenFlags, u8, {
@@ -44,11 +43,6 @@ pub mod tables {
     });
 
     impl Token {
-        #[secondary_key(1)]
-        fn by_symbol(&self) -> (Option<AccountNumber>, TID) {
-            (self.symbol, self.id)
-        }
-
         pub fn get(id: TID) -> Option<Self> {
             TokenTable::read().get_index_pk().get(&id)
         }
@@ -58,26 +52,14 @@ pub mod tables {
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
-            let mut tokens: Vec<Token> = TokenTable::read()
-                .get_index_by_symbol()
-                .range((Some(symbol), 0 as u32)..=(Some(symbol), u32::MAX))
-                .collect();
-
-            tokens.pop()
+            let mapping = psibase::services::symbol::Wrapper::call().getMapBySym(symbol)?;
+            Self::get(mapping.tokenId)
         }
 
         fn check_is_owner(&self, account: AccountNumber) {
             let holder = self.nft_holder();
 
             check(account == holder, "Missing required authority");
-        }
-
-        pub fn map_symbol(&mut self, symbol: AccountNumber) {
-            check_none(self.symbol, "Token already has a symbol");
-            let sender = get_sender();
-            self.check_is_owner(sender);
-            self.symbol = Some(symbol);
-            self.save();
         }
 
         pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
@@ -96,7 +78,6 @@ pub mod tables {
                 max_issued_supply,
                 precision,
                 settings_value: 0,
-                symbol: None,
             };
 
             new_instance.save();
@@ -203,6 +184,12 @@ pub mod tables {
         pub async fn burned_supply(&self) -> Decimal {
             Decimal::new(self.burned_supply, self.precision.try_into().unwrap())
         }
+
+        pub async fn symbol(&self) -> Option<AccountNumber> {
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.id)
+                .map(|s| s.symbolId)
+        }
     }
 
     #[table(name = "BalanceTable", index = 2)]
@@ -298,7 +285,9 @@ pub mod tables {
         }
 
         pub async fn symbol(&self) -> Option<AccountNumber> {
-            Token::get_assert(self.token_id).symbol
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.token_id)
+                .map(|s| s.symbolId)
         }
 
         pub async fn precision(&self) -> Precision {
@@ -343,7 +332,9 @@ pub mod tables {
         }
 
         pub async fn symbol(&self) -> Option<AccountNumber> {
-            Token::get_assert(self.token_id).symbol
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.token_id)
+                .map(|s| s.symbolId)
         }
 
         pub async fn precision(&self) -> Precision {
@@ -625,6 +616,25 @@ pub mod tables {
     impl UserConfig {
         pub async fn settings(&self) -> BalanceFlagsJson {
             BalanceFlagsJson::from(Flags::new(self.flags))
+        }
+    }
+
+    #[table(name = "ConfigTable", index = 6)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct ConfigRow {
+        pub sys_tid: TID,
+    }
+
+    impl ConfigRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[ComplexObject]
+    impl ConfigRow {
+        pub async fn token(&self) -> Token {
+            Token::get_assert(self.sys_tid)
         }
     }
 }

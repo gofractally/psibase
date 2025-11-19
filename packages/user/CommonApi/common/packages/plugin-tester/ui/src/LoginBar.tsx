@@ -51,11 +51,11 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
                         "activeApp",
                         "connectAccount",
                     ),
+                    { enabled: true, returnPath: "/common/plugin-tester" },
                 );
             }
         } catch (e) {
             console.error("Error logging out or in: ", e);
-            alert("Error logging out or in: " + e);
         }
     };
 

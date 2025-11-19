@@ -3,10 +3,13 @@ package tokens:plugin;
 world impl {
     include host:common/imports;
     include transact:plugin/imports;
+    include permissions:plugin/imports;
 
     export types;
     export issuer;
     export user;
     export user-config;
     export helpers;
+    export admin;
+    export authorized;
 }

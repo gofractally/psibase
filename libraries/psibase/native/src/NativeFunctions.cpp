@@ -1,6 +1,7 @@
 #include <psibase/NativeFunctions.hpp>
 
 #include <psibase/ActionContext.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
 #include <psio/to_hex.hpp>
@@ -12,6 +13,7 @@ namespace psibase
    namespace
    {
       inline constexpr uint16_t wasi_errno_inval = 28;
+      inline constexpr uint16_t wasi_errno_nosys = 52;
 
       template <typename F>
       auto timeDb(NativeFunctions& self, F f)
@@ -928,6 +930,37 @@ namespace psibase
    void NativeFunctions::abortSubjective()
    {
       database.abortSubjective();
+   }
+
+   int32_t NativeFunctions::socketOpen(eosio::vm::span<const char> args)
+   {
+      check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
+      check(code.flags & CodeRow::isPrivileged, "Service is not allowed to open sockets");
+      check(code.flags & ExecutionContext::isLocal, "Service is not allowed to open sockets");
+
+      using Args = std::tuple<HttpRequest, std::optional<TLSInfo>, std::optional<SocketEndpoint>>;
+      check(psio::fracpack_validate<Args>(args), "Malformed arguments to socketOpen");
+
+      if (auto* callbacks =
+              transactionContext.blockContext.systemContext.sharedDatabase.getCallbacks())
+      {
+         if (callbacks->socketOpen)
+         {
+            std::int32_t result = -1;
+            callbacks->socketOpen(args,
+                                  [&](const std::shared_ptr<Socket>& socket)
+                                  {
+                                     check(result == -1, "socket already added");
+                                     transactionContext.blockContext.systemContext.sockets->add(
+                                         *transactionContext.blockContext.writer, socket,
+                                         &transactionContext.ownedSockets);
+                                     result = socket->id;
+                                  });
+            check(result != -1, "socketOpen failed to add a socket");
+            return result;
+         }
+      }
+      return -static_cast<std::int32_t>(wasi_errno_nosys);
    }
 
    int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)

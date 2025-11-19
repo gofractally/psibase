@@ -34,7 +34,6 @@ pub struct TokenRecord {
     pub issued_supply: Quantity,
     pub burned_supply: Quantity,
     pub max_issued_supply: Quantity,
-    pub symbol: Option<AccountNumber>,
 }
 
 #[derive(
@@ -66,6 +65,11 @@ pub struct Balance {
     pub token_id: TID,
     pub balance: Quantity,
 }
+
+crate::define_flags!(BalanceFlags, u8, {
+    manual_debit,
+    keep_zero_balance,
+});
 
 #[crate::service(name = "tokens", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
@@ -208,33 +212,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Lookup token symbol
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    ///
-    /// Returns token symbol
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        unimplemented!()
-    }
-
-    /// Map a symbol to a token
-    ///
-    /// By default, tokens are only identifiable by their TID.
-    /// Symbols may be mapped to improve usability. Once a symbol
-    /// is mapped, it is permanent.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        unimplemented!()
-    }
-
     /// Get user's global configuration.
     ///
     /// Settings apply to all tokens without a specific balance configuration.
@@ -360,6 +337,27 @@ mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
+        unimplemented!()
+    }
+
+    /// Sets the system token
+    ///
+    /// # Arguments
+    /// * `tokenId` - Identifier of a previously created token
+    ///
+    /// # Notes
+    /// * Only the service account can set the system token
+    /// * The system token can only be set once (changing system token is not yet supported)
+    #[action]
+    #[allow(non_snake_case)]
+    fn setSysToken(tokenId: TID) {
+        unimplemented!()
+    }
+
+    /// Gets the system token details (if set), otherwise returns `None`
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSysToken() -> Option<TokenRecord> {
         unimplemented!()
     }
 

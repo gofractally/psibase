@@ -20,18 +20,15 @@ interface active-app {
     /// Logs out the currently logged-in user.
     logout: func() -> result<_, error>;
 
+    /// Disconnects a previously connected account from the active app
+    disconnect: func(account: string) -> result<_, error>;
+
     /// Retrieves a list of accounts that the user has connected to this app.
     /// The user may only log in to accounts that have been connected.
     get-connected-accounts: func() -> result<list<string>, error>;
 
     /// Called to connect an account to the active app
     connect-account: func() -> result<_, error>;
-
-
-    /// DEPRECATED!
-    /// Create a connection token. This is passed to the `accounts` login page to allow it to link 
-    /// a new account to your app.
-    create-connection-token: func() -> result<string, error>;
 }
 
 /// This is the typical API intended to be used by third-party plugins or UIs.
@@ -58,6 +55,7 @@ interface api {
     get-current-user: func() -> option<string>;
 
     /// Generates a random account number not in use on the network
+    /// Supports optional prefix of up to 9 chars, must not start with "x-"
     gen-rand-account: func(prefix: option<string>) -> result<string, error>;
 }
 

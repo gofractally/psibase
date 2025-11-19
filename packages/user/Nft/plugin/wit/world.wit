@@ -1,0 +1,64 @@
+package nft:plugin;
+
+interface issuer {
+    use host:types/types.{error};
+
+
+    /// Mint new NFT into existence.
+    mint: func() -> result<_, error>;
+}
+
+
+interface user {
+
+    use host:types/types.{error};
+
+    /// Credit NFT to a recipient.
+    ///
+    /// Arguments
+    /// * `nft_id`   - Unique NFT identifier
+    /// * `receiver` - Recipient account
+    /// * `memo`     - Memo describing the credit
+    ///
+    /// Places NFT in shared table when the debitor has manual debit enabled
+    credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
+
+    /// Cancel a pending shared-balance credit.
+    ///
+    /// Arguments
+    /// * `nft_id` - Unique NFT identifier
+    /// * `memo`     - Memo describing the uncredit
+    uncredit: func(nft-id: u32, memo: string) -> result<_, error>;
+
+    /// Move tokens from shared balance into the debitor's account balance.
+    ///
+    /// Arguments
+    /// * `nft_id` - Unique NFT identifier
+    /// * `memo`     - Memo describing the debit
+    debit: func(nft-id: u32, memo: string) -> result<_, error>;
+
+    /// Burn NFT from the caller's posession.
+    ///
+    /// Arguments
+    /// * `nft_id`   - Unique NFT identifier
+    burn: func(nft-id: u32) -> result<_, error>;
+
+
+}
+
+interface user-config {
+    use host:types/types.{error};
+
+    /// Enable or disable manual debit globally for the caller.
+    ///
+    /// Arguments
+    /// * `enable` - `true` to require manual debit, `false` for automatic debit
+    enable-user-manual-debit: func(enable: bool) -> result<_, error>;
+}
+
+
+world imports {
+    import issuer;
+    import user;
+    import user-config;
+}

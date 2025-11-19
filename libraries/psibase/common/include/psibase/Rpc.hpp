@@ -92,6 +92,14 @@ namespace psibase
    /// local services).
    std::string_view rootHost(const HttpRequest& request, bool isSubdomain = true);
 
+   struct SplitURL
+   {
+      std::string_view scheme;
+      std::string_view host;
+      std::string_view path;
+   };
+   SplitURL splitURL(std::string_view url);
+
    struct URIPath
    {
       std::string path;
@@ -99,19 +107,48 @@ namespace psibase
 
    enum class HttpStatus : std::uint16_t
    {
-      ok                   = 200,
-      movedPermanently     = 301,
-      found                = 302,
-      notModified          = 304,
-      badRequest           = 400,
-      unauthorized         = 401,
-      forbidden            = 403,
-      notFound             = 404,
-      methodNotAllowed     = 405,
-      notAcceptable        = 406,
-      unsupportedMediaType = 415,
-      internalServerError  = 500,
-      serviceUnavailable   = 503,
+      continue_                   = 100,
+      switchingProtocols          = 101,
+      ok                          = 200,
+      created                     = 201,
+      accepted                    = 202,
+      nonAuthoritativeInformation = 203,
+      noContent                   = 204,
+      resetContent                = 205,
+      partialContent              = 206,
+      multipleChoices             = 300,
+      movedPermanently            = 301,
+      found                       = 302,
+      seeOther                    = 303,
+      notModified                 = 304,
+      temporaryRedirect           = 307,
+      permanentRedirecct          = 308,
+      badRequest                  = 400,
+      unauthorized                = 401,
+      forbidden                   = 403,
+      notFound                    = 404,
+      methodNotAllowed            = 405,
+      notAcceptable               = 406,
+      proxyAuthenticationRequired = 407,
+      requestTimeout              = 408,
+      conflict                    = 409,
+      gone                        = 410,
+      lengthRequired              = 411,
+      preconditionFailed          = 412,
+      contentTooLarge             = 413,
+      uriTooLong                  = 414,
+      unsupportedMediaType        = 415,
+      rangeNotSatisfiable         = 416,
+      expectationFailed           = 417,
+      misdirectedRequest          = 421,
+      unprocessableContent        = 422,
+      upgradeRequired             = 426,
+      internalServerError         = 500,
+      notImplemented              = 501,
+      badGateway                  = 502,
+      serviceUnavailable          = 503,
+      gatewayTimeout              = 504,
+      httpVersionNotSupported     = 505
    };
 
    void from_json(HttpStatus& status, auto& stream)

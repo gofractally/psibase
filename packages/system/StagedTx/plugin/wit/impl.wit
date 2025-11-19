@@ -8,6 +8,7 @@ world impl {
     include transact:plugin/hook-actions-sender;
     include transact:plugin/imports;
     include clientdata:plugin/imports;
+    include permissions:plugin/imports;
 
     export proposer;
     export respondent;

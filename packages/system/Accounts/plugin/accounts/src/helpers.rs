@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
@@ -55,12 +53,7 @@ pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::E
 
     let starting_string = prefix.unwrap_or_default();
 
-    let is_too_many_dashes = starting_string
-        .chars()
-        .into_iter()
-        .filter(|char| *char == '-')
-        .count()
-        > 1;
+    let starts_with_x = starting_string.starts_with("x-");
     let is_invalid_length = starting_string.len() > 9;
     let is_valid_chars = starting_string.chars().enumerate().all(|(index, char)| {
         if index == 0 {
@@ -69,7 +62,7 @@ pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::E
             allowed_chars.contains(&char) || char == '-'
         }
     });
-    if is_invalid_length || !is_valid_chars || is_too_many_dashes {
+    if is_invalid_length || !is_valid_chars || starts_with_x {
         return Err(InvalidPrefix().into());
     }
 

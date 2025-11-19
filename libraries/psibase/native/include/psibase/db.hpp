@@ -20,6 +20,7 @@ namespace triedent
 
 namespace psibase
 {
+   struct Socket;
    struct SocketAutoCloseSet;
    struct Sockets;
    struct SocketChange;
@@ -67,11 +68,18 @@ namespace psibase
       std::function<void(std::span<const char>)> validateHostConfig;
       std::function<void()>                      hostConfig;
       std::function<void()>                      shutdown;
-      static const unsigned                      nextTransactionFlag = 1;
-      static const unsigned                      runQueueFlag        = 2;
-      static const unsigned                      hostConfigFlag      = 4;
-      static const unsigned                      shutdownFlag        = 8;
-      using Flags                                                    = unsigned;
+      // This isn't actually part of the db. It's triggered
+      // by a separate host function, but there isn't a better
+      // place to put it.
+      std::function<void(std::span<const char>,
+                         const std::function<void(const std::shared_ptr<Socket>&)>&)>
+          socketOpen;
+
+      static const unsigned nextTransactionFlag = 1;
+      static const unsigned runQueueFlag        = 2;
+      static const unsigned hostConfigFlag      = 4;
+      static const unsigned shutdownFlag        = 8;
+      using Flags                               = unsigned;
       void run(Flags& flags)
       {
          if ((flags & nextTransactionFlag) != 0 && nextTransaction)
