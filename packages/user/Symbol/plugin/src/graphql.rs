@@ -54,7 +54,7 @@ impl TryFrom<String> for SymbolOwnerRes {
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: SymbolOwnerRes = serde_json::from_str(&response)
-            .map_err(|e: serde_json::Error| ErrorType::QueryResponseParseError(format!("{}", e)))?;
+            .map_err(|e: serde_json::Error| ErrorType::QueryResponseParseError(e.to_string()))?;
 
         Ok(response_root)
     }
