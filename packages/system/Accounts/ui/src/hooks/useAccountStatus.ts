@@ -1,8 +1,8 @@
-import { supervisor } from "@/main";
+import { queryClient, supervisor } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-const AccountNameStatus = z.enum(["Available", "Taken", "Invalid", "Loading"]);
+const zAccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
 const GetAccountReturn = z
     .object({
         accountNum: z.string(),
@@ -11,9 +11,11 @@ const GetAccountReturn = z
     })
     .optional();
 
-const isAccountAvailable = async (
+export type AccountNameStatus = z.infer<typeof zAccountNameStatus>;
+
+export const isAccountAvailable = async (
     accountName: string,
-): Promise<z.infer<typeof AccountNameStatus>> => {
+): Promise<AccountNameStatus> => {
     try {
         const res = GetAccountReturn.parse(
             await supervisor.functionCall({
@@ -24,17 +26,31 @@ const isAccountAvailable = async (
             }),
         );
 
-        return AccountNameStatus.parse(res ? "Taken" : "Available");
+        return zAccountNameStatus.parse(res ? "Taken" : "Available");
     } catch (e) {
         console.error(e);
-        return AccountNameStatus.parse("Invalid");
+        return zAccountNameStatus.parse("Invalid");
     }
 };
 
-export const useAccountStatus = (debouncedAccount: string | undefined) =>
-    useQuery<z.infer<typeof AccountNameStatus>>({
-        queryKey: ["userAccount", debouncedAccount],
-        queryFn: async () => isAccountAvailable(debouncedAccount!),
-        enabled: !!debouncedAccount,
-        initialData: "Loading",
+const getQueryKey = (account: string | undefined) => ["userAccount", account];
+
+export const useAccountStatus = (account: string | undefined) =>
+    useQuery<AccountNameStatus>({
+        queryKey: getQueryKey(account),
+        queryFn: async () => isAccountAvailable(account!),
+        enabled: !!account,
     });
+
+export const fetchAccountStatus = async (
+    account: string,
+): Promise<AccountNameStatus> => {
+    const cachedData = zAccountNameStatus
+        .optional()
+        .parse(queryClient.getQueryData(getQueryKey(account)));
+    if (cachedData) return cachedData;
+
+    const res = await isAccountAvailable(account);
+    queryClient.setQueryData(getQueryKey(account), () => res);
+    return res;
+};
