@@ -122,7 +122,7 @@ pub mod tables {
             check_some(Self::get(symbol), "Symbol does not exist")
         }
 
-        pub fn add(symbol: AccountNumber, billable: bool) -> Self {
+        pub fn add(symbol: AccountNumber) -> Self {
             check_none(Symbol::get(symbol), "Symbol already exists");
             let length_record = SymbolLength::get(symbol.to_string().len() as u8);
             check(
@@ -131,16 +131,16 @@ pub mod tables {
                 "Symbol may only contain 3 to 7 lowercase alphabetic characters",
             );
             let length_record = length_record.unwrap();
-            let recipient = get_sender();
+            let sender = get_sender();
             let billing_token =
                 check_some(Tokens::call().getSysToken(), "system token must be defined").id;
 
-            if billable {
+            if sender != crate::Wrapper::SERVICE {
                 let price = DiffAdjust::call().increment(length_record.nftId, 1).into();
 
                 Tokens::call().debit(
                     billing_token,
-                    recipient,
+                    sender,
                     price,
                     "symbol purchase".to_string().try_into().unwrap(),
                 );
@@ -148,14 +148,14 @@ pub mod tables {
 
             crate::Wrapper::emit()
                 .history()
-                .symEvent(symbol, recipient, CREATED);
+                .symEvent(symbol, sender, CREATED);
 
             let new_instance = Self::new(symbol, Nft::call().mint());
             new_instance.save();
 
             Nft::call().credit(
                 new_instance.ownerNft,
-                recipient,
+                sender,
                 format!("This NFT conveys ownership of symbol: {}", symbol).into(),
             );
 
@@ -299,7 +299,7 @@ pub mod service {
 
     #[action]
     fn create(symbol: AccountNumber) {
-        Symbol::add(symbol, get_sender() != Wrapper::SERVICE);
+        Symbol::add(symbol);
     }
 
     #[action]
