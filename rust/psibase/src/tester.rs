@@ -586,6 +586,7 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
+            || act.method == method!("useNetSys")
             || act.service == accounts::SERVICE && act.method == method!("billCpu")
             || act.service == events::SERVICE && act.method == method!("sync"))
     }
