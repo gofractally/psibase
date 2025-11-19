@@ -36,10 +36,7 @@ struct SymbolPlugin;
 
 impl Api for SymbolPlugin {
     fn create(symbol: String, deposit: String) -> Result<(), Error> {
-        trust::assert_authorized_with_whitelist(
-            trust::FunctionName::create,
-            vec!["config".to_string()],
-        )?;
+        trust::assert_authorized(trust::FunctionName::create)?;
 
         bindings::tokens::plugin::user::credit(
             graphql::fetch_config()?.billing_token,
@@ -56,10 +53,7 @@ impl Api for SymbolPlugin {
     }
 
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
-        trust::assert_authorized_with_whitelist(
-            trust::FunctionName::map_symbol,
-            vec!["config".to_string()],
-        )?;
+        trust::assert_authorized(trust::FunctionName::map_symbol)?;
 
         let nft_id = fetch_symbol_owner_nft(symbol.as_str().into())?;
         bindings::nft::plugin::user::credit(
