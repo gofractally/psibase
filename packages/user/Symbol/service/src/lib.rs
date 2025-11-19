@@ -73,20 +73,12 @@ pub mod tables {
         pub async fn current_price(&self) -> Decimal {
             Decimal::new(
                 self.price(),
-                Tokens::call()
-                    .getToken(check_some(
-                        Tokens::call().getSysToken(),
-                        "system token must be defined",
-                    ))
-                    .precision,
+                check_some(Tokens::call().getSysToken(), "system token must be defined").precision,
             )
         }
 
         pub async fn billing_token(&self) -> TokenRecord {
-            Tokens::call().getToken(check_some(
-                Tokens::call().getSysToken(),
-                "system token must be defined",
-            ))
+            check_some(Tokens::call().getSysToken(), "system token must be defined")
         }
     }
 
@@ -124,7 +116,7 @@ pub mod tables {
             let length_record = length_record.unwrap();
             let recipient = get_sender();
             let billing_token =
-                check_some(Tokens::call().getSysToken(), "system token must be defined");
+                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
 
             if billable {
                 let price = DiffAdjust::call().increment(length_record.nftId, 1).into();
