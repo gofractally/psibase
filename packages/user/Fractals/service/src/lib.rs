@@ -36,10 +36,10 @@ pub mod service {
         let set_policy = Action {
             sender: fractal_account,
             service: auth_dyn::SERVICE,
-            method: auth_dyn::action_structs::set_policy::ACTION_NAME.into(),
-            rawData: auth_dyn::action_structs::set_policy {
+            method: auth_dyn::action_structs::set_mgmt::ACTION_NAME.into(),
+            rawData: auth_dyn::action_structs::set_mgmt {
                 account: fractal_account,
-                policy: Wrapper::SERVICE,
+                manager: Wrapper::SERVICE,
             }
             .packed()
             .into(),

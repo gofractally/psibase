@@ -1,10 +1,6 @@
 use async_graphql::ComplexObject;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
 
-use psibase::services::auth_dyn::interfaces::{
-    DynamicAuthPolicy::{self, Multi, Single},
-    MultiAuth, SingleAuth, WeightedAuthorizer,
-};
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
@@ -142,19 +138,16 @@ impl Guild {
     }
 
     pub fn council_role_auth(&self) -> DynamicAuthPolicy {
-        let council =
-            self.council_members()
-                .map_or(DynamicAuthPolicy::impossible(), |council_members| {
-                    DynamicAuthPolicy::from_weighted_authorizers(
-                        council_members
-                            .into_iter()
-                            .map(|auth| (auth.member, 1))
-                            .collect(),
-                        (council_members.len() as u8 * 2 + 2) / 3,
-                    )
-                });
-
-        Multi(council)
+        self.council_members()
+            .map_or(DynamicAuthPolicy::impossible(), |council_members| {
+                DynamicAuthPolicy::from_weighted_authorizers(
+                    council_members
+                        .iter()
+                        .map(|auth| (auth.member, 1))
+                        .collect(),
+                    (council_members.len() as u8 * 2 + 2) / 3,
+                )
+            })
     }
 
     pub fn set_representative(&mut self, new_representative: AccountNumber) {
