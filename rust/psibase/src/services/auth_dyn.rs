@@ -11,11 +11,26 @@ pub mod policy {
         pub weight: u8,
     }
 
+    impl WeightedAuthorizer {
+        pub fn new(account: AccountNumber, weight: u8) -> Self {
+            Self { account, weight }
+        }
+    }
+
     #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct DynamicAuthPolicy {
         pub threshold: u8,
         pub authorizers: Vec<WeightedAuthorizer>,
+    }
+
+    impl DynamicAuthPolicy {
+        pub fn from_sole_authorizer(account: AccountNumber) -> Self {
+            Self {
+                authorizers: vec![WeightedAuthorizer::new(account, 1)],
+                threshold: 1,
+            }
+        }
     }
 }
 
