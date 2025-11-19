@@ -1,0 +1,26 @@
+[package]
+name = "auth-dyn-pkg"                # Crate name
+description = "Dynamic auth service"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "AuthDyn"
+services = ["auth-dyn"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.22.0"
+Sites = "0.22.0"
+Permissions = "0.22.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+auth-dyn = { path = "service", version = "0.22.0" }
+r-auth-dyn = { path = "query-service", version = "0.22.0" }
+auth-dyn-plugin = { path = "plugin", version = "0.22.0" }
