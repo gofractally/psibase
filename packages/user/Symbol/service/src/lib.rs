@@ -147,12 +147,16 @@ pub mod tables {
 
         pub fn map_symbol(&mut self, token_id: TID) {
             let token_owner_nft = Tokens::call().getToken(token_id).nft_id;
+            let symbol_owner_nft = self.ownerNft;
             check(
                 Nft::call().getNft(token_owner_nft).owner == get_sender(),
                 "Missing required authority",
             );
+            check(
+                Nft::call().getNft(symbol_owner_nft).owner == get_sender(),
+                "Missing required authority",
+            );
 
-            let symbol_owner_nft = self.ownerNft;
             Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
             Nft::call().burn(symbol_owner_nft);
             Mapping::add(token_id, self.symbolId);
