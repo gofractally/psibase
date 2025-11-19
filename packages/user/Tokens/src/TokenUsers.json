@@ -34,18 +34,32 @@
         "sender": "symbol",
         "service": "tokens",
         "method": "mint",
-        "rawData": "0C0001000000080000000E000000080000E40B54020000000900000054657374206D696E74"
+        "data": {
+            "token_id": 1,
+            "amount": { "value": 100000000000000000 },
+            "memo": "memo"
+        }    
     },
     {
         "sender": "symbol",
         "service": "tokens",
         "method": "credit",
-        "rawData": "1400010000000F31660000000000080000000E000000080080969800000000001500000054657374202D20696E697469616C20637265646974"
+        "data": {
+            "token_id": 1,
+            "amount": { "value": 10000000 },
+            "debitor": "alice",
+            "memo": "memo"
+        }
     },
     {
         "sender": "symbol",
         "service": "tokens",
         "method": "credit",
-        "rawData": "140001000000BE52800000000000080000000E000000080080969800000000001500000054657374202D20696E697469616C20637265646974"
+        "data": {
+            "token_id": 1,
+            "amount": { "value": 10000000 },
+            "debitor": "bob",
+            "memo": "memo"
+        }    
     }
 ]
