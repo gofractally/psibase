@@ -33,8 +33,7 @@ namespace UserService
       void               mapSymbol(TID tokenId, SID symbol);
       void               sellLength(uint8_t  length,
                                     Quantity initial_price,
-                                    uint32_t target_min,
-                                    uint32_t target_max,
+                                    uint32_t target,
                                     Quantity floor_price);
       SID                getTokenSym(TID tokenId);
 
@@ -58,7 +57,7 @@ namespace UserService
       method(create, newSymbol),
       method(serveSys, request),
       method(mapSymbol, tokenId, symbol),
-      method(sellLength, length, initial_price, target_min, target_max, floor_price),
+      method(sellLength, length, initial_price, target, floor_price),
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),

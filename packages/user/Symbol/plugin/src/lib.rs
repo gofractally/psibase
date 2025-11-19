@@ -7,7 +7,6 @@ use bindings::exports::symbol::plugin::api::Guest as Api;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use bindings::staged_tx::plugin::proposer::set_propose_latch;
 use psibase::fracpack::Pack;
 use psibase::{define_trust, AccountNumber};
 
@@ -29,7 +28,7 @@ define_trust! {
     functions {
         Medium => [create],
         High => [map_symbol],
-        Max => [init],
+        Max => [sell_length],
     }
 }
 
@@ -79,15 +78,29 @@ impl Api for SymbolPlugin {
 }
 
 impl Admin for SymbolPlugin {
-    fn init() -> Result<(), Error> {
+    fn sell_length(
+        length: u8,
+        initial_price: u64,
+        target: u32,
+        floor_price: u64,
+    ) -> Result<(), Error> {
         trust::assert_authorized_with_whitelist(
-            trust::FunctionName::init,
+            trust::FunctionName::map_symbol,
             vec!["config".to_string()],
         )?;
-        set_propose_latch(Some(&symbol::SERVICE.to_string()))?;
 
-        let packed_args = symbol::action_structs::init {}.packed();
-        add_action_to_transaction(symbol::action_structs::init::ACTION_NAME, &packed_args)
+        let packed_args = symbol::action_structs::sellLength {
+            length,
+            initial_price: initial_price.into(),
+            target,
+            floor_price: floor_price.into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            symbol::action_structs::sellLength::ACTION_NAME,
+            &packed_args,
+        )
     }
 }
 

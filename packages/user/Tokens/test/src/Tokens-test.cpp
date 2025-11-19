@@ -705,8 +705,7 @@ SCENARIO("Mapping a symbol to a token")
       REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
       REQUIRE(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
       REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
-      REQUIRE(
-          t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 24, 5000).succeeded());
+      REQUIRE(t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 5000).succeeded());
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token

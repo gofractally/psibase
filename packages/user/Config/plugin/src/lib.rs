@@ -4,7 +4,7 @@ use bindings::*;
 
 use exports::config::plugin::{
     branding::Guest as Branding, packaging::Guest as Packaging, producers::Guest as Producers,
-    settings::Guest as Settings,
+    settings::Guest as Settings, symbol::Guest as Symbol,
 };
 use host::types::types::Error;
 
@@ -69,6 +69,19 @@ impl Packaging for ConfigPlugin {
         let _ = packages::plugin::private_api::set_account_sources(&accounts);
 
         Ok(())
+    }
+}
+
+impl Symbol for ConfigPlugin {
+    fn sell_length(
+        length: u8,
+        initial_price: u64,
+        target: u32,
+        floor_price: u64,
+    ) -> Result<(), Error> {
+        set_propose_latch(Some("symbol"))?;
+
+        symbol::plugin::admin::sell_length(length, initial_price, target, floor_price)
     }
 }
 

@@ -60,13 +60,7 @@ pub mod Service {
     }
 
     #[action]
-    fn sellLength(
-        length: u8,
-        initial_price: Quantity,
-        target_min: u32,
-        target_max: u32,
-        floor_price: Quantity,
-    ) {
+    fn sellLength(length: u8, initial_price: Quantity, target: u32, floor_price: Quantity) {
         unimplemented!()
     }
 
@@ -106,7 +100,7 @@ pub mod Service {
     }
 
     #[event(history)]
-    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {
+    fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {
         unimplemented!()
     }
 }

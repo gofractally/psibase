@@ -43,9 +43,18 @@ interface producers {
     set-producers: func(prods: list<string>) -> result<_, error>;
 }
 
+interface symbol {
+    use host:types/types.{error};
+
+    /// Start selling symbols of a certain length
+    sell-length: func(length: u8, initial-price: u64, target: u32, floor-price: u64) -> result<_, error>;
+
+}
+
 world imports {
     import producers;
     import branding;
     import packaging;
     import settings;
+    import symbol;
 }

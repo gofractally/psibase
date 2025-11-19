@@ -12,6 +12,8 @@ pub mod tables {
     };
     use serde::{Deserialize, Serialize};
 
+    use crate::service::CREATED;
+
     #[table(name = "SymbolLengthTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
     #[graphql(complex)]
@@ -40,26 +42,18 @@ pub mod tables {
             )
         }
 
-        pub fn add(
-            symbol_length: u8,
-            initial_price: u64,
-            target_min: u32,
-            target_max: u32,
-            floor_price: u64,
-        ) -> Self {
+        pub fn add(symbol_length: u8, initial_price: u64, target: u32, floor_price: u64) -> Self {
             check_none(
                 Self::get(symbol_length),
                 "sale of symbol length already exists",
             );
-
-            let nft_id = DiffAdjust::call().create(
-                initial_price,
-                86400,
-                target_min,
-                target_max,
-                floor_price,
-                50000,
+            check(
+                symbol_length >= 3 && symbol_length <= 7,
+                "symbol length must be between 3 - 7 chars",
             );
+
+            let nft_id =
+                DiffAdjust::call().create(initial_price, 86400, target, target, floor_price, 50000);
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();
             new_instance
@@ -132,15 +126,6 @@ pub mod tables {
             let billing_token =
                 check_some(Tokens::call().getSysToken(), "system token must be defined");
 
-            let on_created = |quantity: Quantity| {
-                crate::Wrapper::emit().history().symCreated(
-                    symbol,
-                    recipient,
-                    Decimal::new(quantity, Tokens::call().getToken(billing_token).precision)
-                        .to_string(),
-                );
-            };
-
             if billable {
                 let price = DiffAdjust::call().increment(length_record.nftId, 1).into();
 
@@ -150,11 +135,11 @@ pub mod tables {
                     price,
                     "symbol purchase".to_string().try_into().unwrap(),
                 );
-
-                on_created(price);
-            } else {
-                on_created(0.into());
             }
+
+            crate::Wrapper::emit()
+                .history()
+                .symEvent(symbol, recipient, CREATED);
 
             let new_instance = Self::new(symbol, Nft::call().mint());
             new_instance.save();
@@ -261,6 +246,8 @@ pub mod service {
     use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
 
+    use psibase::services::events;
+
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
 
@@ -268,28 +255,27 @@ pub mod service {
     fn init() {
         Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
+
+        let add_index = |method: &str, column: u8| {
+            events::Wrapper::call().addIndex(
+                DbId::HistoryEvent,
+                Wrapper::SERVICE,
+                MethodNumber::from(method),
+                column,
+            );
+        };
+
+        add_index("symEvent", 0);
     }
 
     #[action]
-    fn sellLength(
-        length: u8,
-        initial_price: Quantity,
-        target_min: u32,
-        target_max: u32,
-        floor_price: Quantity,
-    ) {
+    fn sellLength(length: u8, initial_price: Quantity, target: u32, floor_price: Quantity) {
         check_some(Tokens::call().getSysToken(), "system token must be defined");
         check(
             get_sender() == get_service(),
             "only symbols account can sell lengths",
         );
-        SymbolLength::add(
-            length,
-            initial_price.value,
-            target_min,
-            target_max,
-            floor_price.value,
-        );
+        SymbolLength::add(length, initial_price.value, target, floor_price.value);
     }
 
     #[action]
@@ -352,6 +338,8 @@ pub mod service {
         )
     }
 
+    pub const CREATED: u8 = 0;
+    pub const MAPPED: u8 = 1;
     #[event(history)]
-    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {}
+    fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {}
 }
