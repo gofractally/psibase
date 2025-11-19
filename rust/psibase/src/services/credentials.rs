@@ -32,6 +32,26 @@ pub mod service {
         unimplemented!()
     }
 
+    #[action]
+    #[allow(non_snake_case)]
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        auth_set: Option<Vec<AccountNumber>>,
+    ) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isRejectSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        auth_set: Option<Vec<AccountNumber>>,
+    ) -> bool {
+        unimplemented!()
+    }
+
     /// Creates a credential
     ///
     /// Parameters:
