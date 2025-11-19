@@ -52,8 +52,17 @@ pub mod tables {
                 "symbol length must be between 3 - 7 chars",
             );
 
-            let nft_id =
-                DiffAdjust::call().create(initial_price, 86400, target, target, floor_price, 50000);
+            const TIME_WINDOW: u32 = 86_400; // 1 day (seconds)
+            const RATE_OF_CHANGE: u32 = 50_000; // 5 percent (ppm)
+
+            let nft_id = DiffAdjust::call().create(
+                initial_price,
+                TIME_WINDOW,
+                target,
+                target,
+                floor_price,
+                RATE_OF_CHANGE,
+            );
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();
             new_instance
