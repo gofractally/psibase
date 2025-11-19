@@ -124,8 +124,6 @@ impl Guild {
     }
 
     pub fn rep_role_auth(&self) -> DynamicAuthPolicy {
-        // In the event that the role account shouldn't be used because the guild is in council mode
-        // Should this throw? Or should this return impossible?
         self.rep.map_or(DynamicAuthPolicy::impossible(), |rep| {
             DynamicAuthPolicy::from_sole_authorizer(rep)
         })
