@@ -1,3 +1,4 @@
+#include <optional>
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
@@ -20,6 +21,35 @@ static constexpr auto maxTrxLifetime = psibase::Seconds{60 * 60};  // 1 hour
 
 namespace SystemService
 {
+
+   namespace
+   {
+
+      struct ResourceMetering
+      {
+         static std::optional<Actor<MeteringInterface>> getMeterServ()
+         {
+            auto row = Transact::Tables(Transact::service).open<MeteringServiceTable>().get({});
+            if (row)
+            {
+               return std::optional(
+                   Actor<MeteringInterface>(Transact::service, row->meteringService));
+            }
+            return std::nullopt;
+         }
+
+         static void useNet(psibase::AccountNumber user, uint64_t amount_bytes)
+         {
+            auto meterServ = getMeterServ();
+            if (!meterServ)
+               return;
+
+            meterServ->useNetSys(user, amount_bytes);
+         }
+      };
+
+   }  // namespace
+
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
       auto statusTable = open<TransactStatusTable>();
@@ -384,6 +414,14 @@ namespace SystemService
       return {};
    }
 
+   void Transact::setMeterServ(psibase::AccountNumber meteringService)
+   {
+      check(getSender() == getReceiver(), "Wrong sender");
+      auto tables = Transact::Tables(Transact::service);
+      auto table  = tables.open<MeteringServiceTable>();
+      table.put({meteringService});
+   }
+
    namespace
    {
       bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
@@ -504,6 +542,9 @@ namespace SystemService
       trxData  = t;
       auto trx = psio::view<const Transaction>(psio::prevalidated{t});
       auto id  = sha256(t.data(), t.size());
+
+      ResourceMetering::useNet(trx.actions()[0].sender(), t.size());
+
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
