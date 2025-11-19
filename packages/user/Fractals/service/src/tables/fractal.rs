@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{
     check_none, check_some,
-    services::auth_dyn::policy::{DynamicAuthPolicy, WeightedAuthorizer},
+    services::auth_dyn::policy::DynamicAuthPolicy,
     AccountNumber, Table,
 };
 
