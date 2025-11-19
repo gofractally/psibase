@@ -3,8 +3,8 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::{
-        check, check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber,
-        Fracpack, Table, ToSchema,
+        check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack,
+        Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -38,7 +38,7 @@ pub mod tables {
             int_wrapper::call_to(self.manager).has_policy(self.account)
         }
 
-        pub fn dynamic_policy(&self) -> Option<DynamicAuthPolicy> {
+        pub fn dynamic_policy(&self) -> DynamicAuthPolicy {
             int_wrapper::call_to(self.manager).get_policy(self.account)
         }
 
@@ -65,23 +65,29 @@ pub mod tables {
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::auth_dyn::interfaces::DynamicAuthPolicy;
+    use psibase::services::auth_dyn::policy::WeightedAuthorizer;
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
     #[action]
     #[allow(non_snake_case)]
     fn newAccount(account: AccountNumber) {
-        Management::set(account, get_sender());
-        Accounts::call().newAccount(account, Wrapper::SERVICE, true);
+        if let Some(management) = Management::get(account) {
+            /// Idempotency safety: if management already exists, only the current
+            /// manager may call this again — prevents other callers from being
+            /// misled into thinking they now manage the account.
+            check(
+                management.manager == get_sender(),
+                "new manager conflicts with pre-existing manager",
+            );
+        } else {
+            Management::set(account, get_sender());
+            Accounts::call().newAccount(account, Wrapper::SERVICE, true);
+        }
     }
 
     #[action]
     fn set_mgmt(account: AccountNumber, manager: AccountNumber) {
-        check(
-            Accounts::call().exists(manager),
-            "manager account does not exist",
-        );
         check(Accounts::call().exists(account), "account does not exist");
 
         let sender = get_sender();
@@ -92,6 +98,10 @@ pub mod service {
                 "existing managements must be updated by management account",
             )
         } else {
+            check(
+                Accounts::call().exists(manager),
+                "manager account does not exist",
+            );
             check(
                 sender == account,
                 "new policies must be created by user account",
@@ -165,55 +175,54 @@ pub mod service {
         }
         auth_set.push(sender);
 
-        match Management::get_assert(sender).dynamic_policy() {
-            None => false,
-            Some(DynamicAuthPolicy::Single(single_auth)) => {
-                authorizers.contains(&single_auth.authorizer)
-                    || is_auth_other(single_auth.authorizer, authorizers, auth_set, is_approval)
-            }
-            Some(DynamicAuthPolicy::Multi(multi_auth)) => {
-                check(
-                    multi_auth.threshold != 0,
-                    "multi auth threshold cannot be 0",
-                );
+        let policy = Management::get_assert(sender).dynamic_policy();
+        check(policy.threshold != 0, "multi auth threshold cannot be 0");
 
-                let total_possible_weight = multi_auth
-                    .authorizers
-                    .iter()
-                    .fold(0, |acc, authorizer| acc + authorizer.weight);
+        let total_possible_weight = policy
+            .authorizers
+            .iter()
+            .fold(0, |acc, authorizer| acc + authorizer.weight);
 
-                check(
-                    multi_auth.threshold <= total_possible_weight,
-                    "threshold exceeds total possible weight",
-                );
+        if policy.threshold > total_possible_weight {
+            return !is_approval;
+        }
 
-                let required_weight = if is_approval {
-                    multi_auth.threshold
-                } else {
-                    total_possible_weight - multi_auth.threshold + 1
-                };
+        let required_weight = if is_approval {
+            policy.threshold
+        } else {
+            total_possible_weight - policy.threshold + 1
+        };
 
-                let mut total_weight_approved = 0;
+        let (already_approved, to_check): (Vec<WeightedAuthorizer>, Vec<WeightedAuthorizer>) =
+            policy
+                .authorizers
+                .into_iter()
+                .partition(|authorizer| authorizers.contains(&authorizer.account));
 
-                for weight_authorizer in multi_auth.authorizers {
-                    let is_auth = authorizers.contains(&weight_authorizer.account)
-                        || is_auth_other(
-                            weight_authorizer.account,
-                            authorizers.clone(),
-                            auth_set.clone(),
-                            is_approval,
-                        );
-                    if is_auth {
-                        total_weight_approved += weight_authorizer.weight;
-                        if total_weight_approved >= required_weight {
-                            return true;
-                        }
-                    }
+        let mut total_weight_approved = already_approved
+            .into_iter()
+            .fold(0, |acc, authorizer| authorizer.weight + acc);
+
+        if total_weight_approved >= required_weight {
+            return true;
+        }
+
+        for weight_authorizer in to_check {
+            let is_auth = is_auth_other(
+                weight_authorizer.account,
+                authorizers.clone(),
+                auth_set.clone(),
+                is_approval,
+            );
+            if is_auth {
+                total_weight_approved += weight_authorizer.weight;
+                if total_weight_approved >= required_weight {
+                    return true;
                 }
-
-                false
             }
         }
+
+        false
     }
 
     #[action]

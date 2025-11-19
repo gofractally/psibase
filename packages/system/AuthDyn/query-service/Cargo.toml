@@ -12,4 +12,4 @@ serde.workspace = true
 serde_json.workspace = true
 auth-dyn = { path = "../service", version = "0.22.0" }
 async-graphql.workspace = true
-psibase-user-workspace-hack.workspace = true
+psibase-system-workspace-hack.workspace = true
