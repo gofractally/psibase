@@ -73,9 +73,9 @@ pub mod service {
     #[allow(non_snake_case)]
     fn newAccount(account: AccountNumber) {
         if let Some(management) = Management::get(account) {
-            /// Idempotency safety: if management already exists, only the current
-            /// manager may call this again — prevents other callers from being
-            /// misled into thinking they now manage the account.
+            // Idempotency safety: if management already exists, only the current
+            // manager may call this again — prevents other callers from being
+            // misled into thinking they now manage the account.
             check(
                 management.manager == get_sender(),
                 "new manager conflicts with pre-existing manager",
