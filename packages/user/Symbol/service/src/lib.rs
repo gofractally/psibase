@@ -14,7 +14,15 @@ pub mod tables {
 
     use crate::service::CREATED;
 
-    #[table(name = "SymbolLengthTable", index = 0)]
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[table(name = "SymbolLengthTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct SymbolLength {
@@ -91,7 +99,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "SymbolTable", index = 1)]
+    #[table(name = "SymbolTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Symbol {
@@ -187,7 +195,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "MappingTable", index = 2)]
+    #[table(name = "MappingTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Mapping {
@@ -246,7 +254,7 @@ pub mod tables {
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{Mapping, Symbol, SymbolLength};
+    use crate::tables::{InitRow, InitTable, Mapping, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
     use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
@@ -258,19 +266,25 @@ pub mod service {
 
     #[action]
     fn init() {
-        Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-        Nft::call_from(Wrapper::SERVICE).setUserConf("manualDebit".into(), true);
+        let table = InitTable::new();
 
-        let add_index = |method: &str, column: u8| {
-            events::Wrapper::call().addIndex(
-                DbId::HistoryEvent,
-                Wrapper::SERVICE,
-                MethodNumber::from(method),
-                column,
-            );
-        };
+        if InitTable::read().get_index_pk().get(&()).is_none() {
+            table.put(&InitRow {}).unwrap();
 
-        add_index("symEvent", 0);
+            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+            Nft::call().setUserConf("manualDebit".into(), true);
+
+            let add_index = |method: &str, column: u8| {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            };
+
+            add_index("symEvent", 0);
+        }
     }
 
     #[action]
@@ -336,11 +350,10 @@ pub mod service {
 
     #[pre_action(exclude(init, getByToken))]
     fn check_init() {
-        check(
-            Tokens::call_from(Wrapper::SERVICE)
-                .getUserConf(Wrapper::SERVICE, BalanceFlags::MANUAL_DEBIT.index()),
-            "service not initialized",
-        )
+        check_some(
+            InitTable::read().get_index_pk().get(&()),
+            "service not inited",
+        );
     }
 
     pub const CREATED: u8 = 0;
