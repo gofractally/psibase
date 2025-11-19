@@ -1,7 +1,7 @@
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
-    use crate::services::auth_dyn::interfaces::DynamicAuthPolicy;
+    use crate::services::auth_dyn::policy::DynamicAuthPolicy;
     use crate::AccountNumber;
     use crate::Memo;
 

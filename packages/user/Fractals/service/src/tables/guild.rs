@@ -135,33 +135,24 @@ impl Guild {
 
     pub fn rep_role_auth(&self) -> DynamicAuthPolicy {
         // In the event that the role account shouldn't be used because the guild is in council mode
-        // Should this throw? Or should this return a policy that he couldnt use anyway?
-        self.rep.map_or(
-            Multi(MultiAuth {
-                threshold: 1,
-                authorizers: vec![],
-            }),
-            |rep| Single(SingleAuth { authorizer: rep }),
-        )
+        // Should this throw? Or should this return impossible?
+        self.rep.map_or(DynamicAuthPolicy::impossible(), |rep| {
+            DynamicAuthPolicy::from_sole_authorizer(rep)
+        })
     }
 
     pub fn council_role_auth(&self) -> DynamicAuthPolicy {
-        let council = self.council_members().map_or(
-            MultiAuth {
-                authorizers: vec![],
-                threshold: 1,
-            },
-            |guild_members| MultiAuth {
-                threshold: (guild_members.len() as u8 * 2 + 2) / 3,
-                authorizers: guild_members
-                    .into_iter()
-                    .map(|auth| WeightedAuthorizer {
-                        account: auth.member,
-                        weight: 1,
-                    })
-                    .collect(),
-            },
-        );
+        let council =
+            self.council_members()
+                .map_or(DynamicAuthPolicy::impossible(), |council_members| {
+                    DynamicAuthPolicy::from_weighted_authorizers(
+                        council_members
+                            .into_iter()
+                            .map(|auth| (auth.member, 1))
+                            .collect(),
+                        (council_members.len() as u8 * 2 + 2) / 3,
+                    )
+                });
 
         Multi(council)
     }
