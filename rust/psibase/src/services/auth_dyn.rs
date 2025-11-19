@@ -31,6 +31,13 @@ pub mod policy {
                 threshold: 1,
             }
         }
+
+        pub fn impossible() -> Self {
+            Self {
+                authorizers: vec![],
+                threshold: 1,
+            }
+        }
     }
 }
 
