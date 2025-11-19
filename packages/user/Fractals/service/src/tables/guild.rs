@@ -5,6 +5,7 @@ use psibase::services::auth_dyn::interfaces::{
     DynamicAuthPolicy::{self, Multi, Single},
     MultiAuth, SingleAuth, WeightedAuthorizer,
 };
+use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::tables::tables::{
@@ -127,9 +128,9 @@ impl Guild {
     }
 
     pub fn guild_auth(&self) -> DynamicAuthPolicy {
-        Single(SingleAuth {
-            authorizer: self.rep.map_or(self.council_role, |_| self.rep_role),
-        })
+        DynamicAuthPolicy::from_sole_authorizer(
+            self.rep.map_or(self.council_role, |_| self.rep_role),
+        )
     }
 
     pub fn rep_role_auth(&self) -> DynamicAuthPolicy {

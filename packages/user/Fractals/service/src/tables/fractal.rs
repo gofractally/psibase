@@ -63,13 +63,7 @@ impl Fractal {
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
-        DynamicAuthPolicy {
-            authorizers: vec![WeightedAuthorizer {
-                account: self.legislature,
-                weight: 1,
-            }],
-            threshold: 1,
-        }
+        DynamicAuthPolicy::from_sole_authorizer(self.legislature)
     }
 }
 
