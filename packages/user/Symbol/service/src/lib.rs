@@ -6,13 +6,13 @@ pub mod tables {
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::nft::{NftRecord, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
+    use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord};
     use psibase::{
-        check, check_some, get_sender, services::nft::NID, AccountNumber, Fracpack, Table, ToSchema,
+        AccountNumber, Fracpack, Table, ToSchema, check, check_some, get_sender, services::nft::NID,
     };
     use serde::{Deserialize, Serialize};
 
-    use crate::service::CREATED;
+    use crate::service::{CREATED, MAPPED};
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
@@ -28,6 +28,9 @@ pub mod tables {
     pub struct SymbolLength {
         #[primary_key]
         pub symbolLength: u8,
+        
+        /// The owner of this NFT can change the price behavior for symbols of this length
+        #[graphql(name = "priceNftId")]
         pub nftId: NID,
     }
 
@@ -177,6 +180,10 @@ pub mod tables {
             Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
             Nft::call().burn(symbol_owner_nft);
             Mapping::add(token_id, self.symbolId);
+
+            crate::Wrapper::emit()
+                .history()
+                .symEvent(self.symbolId, get_sender(), MAPPED);
         }
 
         fn save(&self) {
@@ -284,6 +291,7 @@ pub mod service {
             };
 
             add_index("symEvent", 0);
+            add_index("symEvent", 1);
         }
     }
 
