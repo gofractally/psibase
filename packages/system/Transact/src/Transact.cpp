@@ -27,20 +27,24 @@ namespace SystemService
 
       struct ResourceMetering
       {
-         static std::optional<AccountNumber> getMeterServ()
+         static std::optional<Actor<MeteringInterface>> getMeterServ()
          {
             auto row = Transact::Tables(Transact::service).open<MeteringServiceTable>().get({});
-            return row ? std::optional<AccountNumber>(row->meteringService) : std::nullopt;
+            if (row)
+            {
+               return std::optional(
+                   Actor<MeteringInterface>(Transact::service, row->meteringService));
+            }
+            return std::nullopt;
          }
 
          static void useNet(psibase::AccountNumber user, uint64_t amount_bytes)
          {
             auto meterServ = getMeterServ();
-            if (meterServ)
-            {
-               Actor<MeteringInterface> metering(Transact::service, *meterServ);
-               metering.useNet(user, amount_bytes);
-            }
+            if (!meterServ)
+               return;
+
+            meterServ->useNetSys(user, amount_bytes);
          }
       };
 

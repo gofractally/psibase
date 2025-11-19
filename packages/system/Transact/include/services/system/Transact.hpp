@@ -18,9 +18,9 @@ namespace SystemService
    /// Resource metering interface
    struct MeteringInterface
    {
-      void useNet(psibase::AccountNumber user, uint64_t amount_bytes);
+      void useNetSys(psibase::AccountNumber user, uint64_t amount_bytes);
    };
-   PSIO_REFLECT(MeteringInterface, method(useNet, user, amount_bytes))
+   PSIO_REFLECT(MeteringInterface, method(useNetSys, user, amount_bytes))
 
    /// Authenticate actions
    ///
