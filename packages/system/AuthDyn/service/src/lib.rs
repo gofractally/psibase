@@ -3,8 +3,8 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::{
-        check, check_some, services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber,
-        Fracpack, Table, ToSchema,
+        check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack,
+        Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -65,7 +65,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::auth_dyn::interfaces::WeightedAuthorizer;
+    use psibase::services::auth_dyn::policy::WeightedAuthorizer;
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
@@ -73,6 +73,9 @@ pub mod service {
     #[allow(non_snake_case)]
     fn newAccount(account: AccountNumber) {
         if let Some(management) = Management::get(account) {
+            /// Idempotency safety: if management already exists, only the current
+            /// manager may call this again — prevents other callers from being
+            /// misled into thinking they now manage the account.
             check(
                 management.manager == get_sender(),
                 "new manager conflicts with pre-existing manager",

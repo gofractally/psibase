@@ -1,4 +1,4 @@
-pub mod interfaces {
+pub mod policy {
     use fracpack::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ pub mod interfaces {
 )]
 #[allow(non_snake_case, unused_variables)]
 pub mod AuthDynIntf {
-    use crate::{services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber};
+    use crate::{services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber};
 
     #[action]
     pub fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
