@@ -1,5 +1,25 @@
 [
     {
+        "sender": "accounts",
+        "service": "accounts",
+        "method": "newAccount",
+        "data": {
+            "name": "alice",
+            "authService": "auth-any",
+            "requireNew": true
+        }
+    },
+    {
+        "sender": "accounts",
+        "service": "accounts",
+        "method": "newAccount",
+        "data": {
+            "name": "bob",
+            "authService": "auth-any",
+            "requireNew": true
+        }
+    },
+    {
         "sender": "symbol",
         "service": "tokens",
         "method": "create",
