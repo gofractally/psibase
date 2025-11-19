@@ -2,7 +2,7 @@ pub mod helpers;
 mod scoring;
 pub mod tables;
 
-#[psibase::service(tables = "tables::tables")]
+#[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
     use crate::{
@@ -113,20 +113,30 @@ pub mod service {
         GuildApplication::add(guild.account, get_sender(), extra_info);
     }
 
+    fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
+        Fractal::get(account)
+            .map(|fractal| fractal.auth_policy())
+            .or(Guild::get(account).map(|guild| guild.guild_auth()))
+            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
+            .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth()))
+    }
+
     /// Get policy action used by AuthDyn service.
     ///
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
     fn get_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
-        check_some(
-            Fractal::get(account)
-                .map(|fractal| fractal.auth_policy())
-                .or(Guild::get(account).map(|guild| guild.guild_auth()))
-                .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
-                .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth())),
-            "account not supported",
-        )
+        check_some(account_policy(account), "account not supported")
+    }
+
+    /// Has policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn has_policy(account: AccountNumber) -> bool {
+        account_policy(account).is_some()
     }
 
     /// Set guild display name

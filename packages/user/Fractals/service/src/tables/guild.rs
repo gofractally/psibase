@@ -38,17 +38,6 @@ impl Guild {
         rep_role: AccountNumber,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
-
-        AuthDyn::call().newAccount(council_role);
-        AuthDyn::call().newAccount(rep_role);
-        AuthDyn::call().newAccount(guild);
-
-        // First it goes to whales
-        // isAuthSys - uses get_policy which returns the representative role
-        // finds that Jake is in authorizers but not multi-auth authorizors.
-        // Loops through the multi-auth, which is the rep_role account
-        // Loops up the rep_role account, get_policy which returns jakes account
-
         check_some(
             FractalMember::get(fractal, rep),
             "rep must be a member of the fractal",
@@ -59,6 +48,11 @@ impl Guild {
         new_guild_instance.save();
 
         GuildMember::add(new_guild_instance.account, rep);
+
+        AuthDyn::call().newAccount(council_role);
+        AuthDyn::call().newAccount(rep_role);
+        AuthDyn::call().newAccount(guild);
+
         new_guild_instance
     }
 
