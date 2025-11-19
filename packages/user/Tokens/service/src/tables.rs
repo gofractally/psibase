@@ -60,7 +60,7 @@ pub mod tables {
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
             let mut tokens: Vec<Token> = TokenTable::read()
                 .get_index_by_symbol()
-                .range((Some(symbol), 0 as u32)..=(Some(symbol), u32::MAX))
+                .range((Some(symbol), 0_u32)..=(Some(symbol), u32::MAX))
                 .collect();
 
             tokens.pop()

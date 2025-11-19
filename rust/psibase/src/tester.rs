@@ -56,6 +56,8 @@ impl Drop for Chain {
     }
 }
 
+// Following are stub functions for the linter (running in a non-wasm environment)
+// can see that these functions exist; otherwise, tests show linter errors for valid calls.
 #[cfg(not(target_family = "wasm"))]
 impl Chain {
     pub fn new() -> Chain {
