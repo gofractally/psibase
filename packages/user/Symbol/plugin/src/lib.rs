@@ -38,8 +38,9 @@ impl Api for SymbolPlugin {
     fn create(symbol: String, deposit: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::create)?;
 
+        let billing_token = bindings::tokens::plugin::helpers::fetch_network_token()?;
         bindings::tokens::plugin::user::credit(
-            graphql::fetch_config()?.billing_token,
+            billing_token,
             &symbol::Wrapper::SERVICE.to_string(),
             &deposit,
             "".into(),
