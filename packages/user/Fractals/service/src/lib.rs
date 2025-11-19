@@ -118,7 +118,7 @@ pub mod service {
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
-    fn get_policy(account: AccountNumber) -> auth_dyn::interfaces::DynamicAuthPolicy {
+    fn get_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
         check_some(
             Fractal::get(account)
                 .map(|fractal| fractal.auth_policy())

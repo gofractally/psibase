@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{
     check_none, check_some,
-    services::auth_dyn::interfaces::{DynamicAuthPolicy, SingleAuth},
+    services::auth_dyn::policy::{DynamicAuthPolicy, WeightedAuthorizer},
     AccountNumber, Table,
 };
 
@@ -63,9 +63,13 @@ impl Fractal {
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
-        DynamicAuthPolicy::Single(SingleAuth {
-            authorizer: self.legislature,
-        })
+        DynamicAuthPolicy {
+            authorizers: vec![WeightedAuthorizer {
+                account: self.legislature,
+                weight: 1,
+            }],
+            threshold: 1,
+        }
     }
 }
 
