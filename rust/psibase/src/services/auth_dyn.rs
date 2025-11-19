@@ -25,18 +25,31 @@ pub mod policy {
     }
 
     impl DynamicAuthPolicy {
-        pub fn from_sole_authorizer(account: AccountNumber) -> Self {
+        pub fn new(authorizers: Vec<WeightedAuthorizer>, threshold: u8) -> Self {
             Self {
-                authorizers: vec![WeightedAuthorizer::new(account, 1)],
-                threshold: 1,
+                authorizers,
+                threshold,
             }
         }
 
+        pub fn from_sole_authorizer(account: AccountNumber) -> Self {
+            Self::new(vec![WeightedAuthorizer::new(account, 1)], 1)
+        }
+
         pub fn impossible() -> Self {
-            Self {
-                authorizers: vec![],
-                threshold: 1,
-            }
+            Self::new(vec![], 1)
+        }
+
+        pub fn from_weighted_authorizers(
+            accounts: Vec<(AccountNumber, u8)>,
+            threshold: u8,
+        ) -> Self {
+            let authorizers = accounts
+                .into_iter()
+                .map(|(account, weight)| WeightedAuthorizer::new(account, weight))
+                .collect();
+
+            Self::new(authorizers, threshold)
         }
     }
 }
