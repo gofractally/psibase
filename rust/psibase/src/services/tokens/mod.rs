@@ -377,6 +377,13 @@ mod service {
         unimplemented!()
     }
 
+    /// Gets the system token details (if set), otherwise returns `None`
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSysToken() -> Option<TokenRecord> {
+        unimplemented!()
+    }
+
     /// Set token configuration. Only the token owner can set the configuration.
     ///
     /// # Arguments
