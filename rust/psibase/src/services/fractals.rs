@@ -243,6 +243,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Has policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn has_policy(account: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 
