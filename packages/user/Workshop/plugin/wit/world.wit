@@ -85,7 +85,15 @@ interface mail {
     save: func(app: string, msg-id: u64) -> result<_, error>;
 }
 
+interface development {
+    /// Check whether a string is a valid name for a service method 
+    /// and roundtrips the name compression algorithm
+    is-valid-method-name: func(name: string) -> bool;
+}
+
 world imports {
     import app;
     import mail;
+    import registry;
+    import development;
 }

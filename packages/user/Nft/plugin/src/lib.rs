@@ -15,22 +15,21 @@ use psibase::services::nft as Nft;
 
 define_trust! {
     descriptions {
-        Low => "
-        Low trust grants these abilities:
+        Low => "",
+        Medium => "
+        Medium trust grants these abilities:
             - Minting
-            - Basic NFT receipt actions (uncredit, debit)
-            - Manual debit toggle
         ",
-        Medium => "",
         High => "
         High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Crediting
+            - Credit, Debit and uncredit.
+            - Manual debit toggle
             - Burning
         ",
     }
     functions {
-        Low => [mint, uncredit, debit, enable_user_manual_debit],
-        High => [credit, burn],
+        Medium => [mint],
+        High => [uncredit, debit, enable_user_manual_debit, credit, burn],
     }
 }
 

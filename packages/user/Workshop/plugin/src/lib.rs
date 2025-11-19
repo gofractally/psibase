@@ -6,11 +6,14 @@ use accounts::plugin::api::get_current_user;
 use auth_delegate::plugin::api::new_account;
 use exports::workshop::plugin::{
     app::{File, Guest as App},
+    development::Guest as Development,
     mail::Guest as Mail,
     registry::{AppMetadata, Guest as Registry},
 };
 use host::types::types::Error;
+use psibase::MethodNumber;
 use staged_tx::plugin::proposer::set_propose_latch;
+use std::str::FromStr;
 
 use crate::trust::*;
 
@@ -135,6 +138,12 @@ impl Registry for WorkshopPlugin {
         assert_authorized(FunctionName::unpublish_app).unwrap();
         set_propose_latch(Some(&app)).unwrap();
         registry::plugin::developer::unpublish();
+    }
+}
+
+impl Development for WorkshopPlugin {
+    fn is_valid_method_name(name: String) -> bool {
+        MethodNumber::from_str(&name).unwrap().to_string() == name
     }
 }
 

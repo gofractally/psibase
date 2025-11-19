@@ -287,11 +287,8 @@ namespace UserService
       /// * The system token can only be set once (changing system token is not yet supported)
       void setSysToken(TID tokenId);
 
-      /// Gets the system token
-      ///
-      /// # Returns
-      /// * `Option<TID>` - `Some(sys_tid)` if it has been set, otherwise `None`
-      std::optional<TID> getSysToken();
+      /// Gets the system token details (if set), otherwise returns `None`
+      std::optional<TokenRecord> getSysToken();
 
      private:
       void checkAccountValid(psibase::AccountNumber account);

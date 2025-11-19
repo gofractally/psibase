@@ -354,13 +354,10 @@ mod service {
         unimplemented!()
     }
 
-    /// Gets the system token
-    ///
-    /// # Returns
-    /// * `Option<TID>` - `Some(sys_tid)` if it has been set, otherwise `None`
+    /// Gets the system token details (if set), otherwise returns `None`
     #[action]
     #[allow(non_snake_case)]
-    fn getSysToken() -> Option<TID> {
+    fn getSysToken() -> Option<TokenRecord> {
         unimplemented!()
     }
 
