@@ -6,12 +6,6 @@ pub mod interfaces {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
     #[fracpack(fracpack_mod = "fracpack")]
-    pub struct SingleAuth {
-        pub authorizer: AccountNumber,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-    #[fracpack(fracpack_mod = "fracpack")]
     pub struct WeightedAuthorizer {
         pub account: AccountNumber,
         pub weight: u8,
@@ -19,16 +13,9 @@ pub mod interfaces {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
     #[fracpack(fracpack_mod = "fracpack")]
-    pub struct MultiAuth {
+    pub struct DynamicAuthPolicy {
         pub threshold: u8,
         pub authorizers: Vec<WeightedAuthorizer>,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-    #[fracpack(fracpack_mod = "fracpack")]
-    pub enum DynamicAuthPolicy {
-        Single(SingleAuth),
-        Multi(MultiAuth),
     }
 }
 
@@ -46,7 +33,7 @@ pub mod AuthDynIntf {
     use crate::{services::auth_dyn::interfaces::DynamicAuthPolicy, AccountNumber};
 
     #[action]
-    pub fn get_policy(account: AccountNumber) -> Option<DynamicAuthPolicy> {
+    pub fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
         unimplemented!()
     }
 
