@@ -12,8 +12,8 @@ mod service {
     use tokens::{
         helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
-            Balance, BalanceTable, ConfigRow, ConfigTable, SharedBalance, SharedBalanceTable,
-            Token, TokenTable, UserConfig, UserConfigTable,
+            Balance, BalanceTable, ConfigRow, ConfigTable, Token, TokenTable, UserConfig,
+            UserConfigTable,
         },
     };
 
@@ -88,7 +88,6 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, UserPendingRecord>> {
             self.check_user_auth(user)?;
 
-            // wrong table
             TableQuery::subindex::<u64>(
                 UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
                 &(user, token_id),
