@@ -34,7 +34,7 @@ interface admin {
     ///
     /// Parameters:
     /// * `length` - Length of symbol to stop selling
-    delete: func(length: u8) -> result<_, error>;
+    del-length: func(length: u8) -> result<_, error>;
 
 
 }

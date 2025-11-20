@@ -305,7 +305,7 @@ pub mod service {
     }
 
     #[action]
-    fn delete(length: u8) {
+    fn delLength(length: u8) {
         check(
             get_sender() == get_service(),
             "only symbols account can delete lengths",

@@ -65,7 +65,7 @@ pub mod Service {
     }
 
     #[action]
-    fn delete(length: u8) {
+    fn delLength(length: u8) {
         unimplemented!()
     }
 
