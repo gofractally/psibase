@@ -141,14 +141,16 @@ pub mod tables {
                 check_some(Tokens::call().getSysToken(), "system token must be defined").id;
 
             if sender != crate::Wrapper::SERVICE {
-                let price = DiffAdjust::call().increment(length_record.nftId, 1).into();
+                let price = Quantity::from(DiffAdjust::call().increment(length_record.nftId, 1));
 
-                Tokens::call().debit(
-                    billing_token,
-                    sender,
-                    price,
-                    "symbol purchase".to_string().try_into().unwrap(),
-                );
+                if price.value > 0 {
+                    Tokens::call().debit(
+                        billing_token,
+                        sender,
+                        price,
+                        "symbol purchase".to_string().try_into().unwrap(),
+                    );
+                }
             }
 
             crate::Wrapper::emit()
