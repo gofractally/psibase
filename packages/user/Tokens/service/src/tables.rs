@@ -451,7 +451,7 @@ pub mod tables {
                 self.debitor,
                 self.token_id,
                 self.shared_bal_id,
-            ))
+            ));
 
             if !is_manual_debit {
                 self.debit(quantity, memo);
