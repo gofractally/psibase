@@ -83,6 +83,12 @@ impl Symbol for ConfigPlugin {
 
         symbol::plugin::admin::sell_length(length, initial_price, target, floor_price)
     }
+
+    fn del_length(length: u8) -> Result<(), Error> {
+        set_propose_latch(Some("symbol"))?;
+
+        symbol::plugin::admin::del_length(length)
+    }
 }
 
 bindings::export!(ConfigPlugin with_types_in bindings);
