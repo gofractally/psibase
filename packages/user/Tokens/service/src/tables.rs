@@ -502,14 +502,12 @@ pub mod tables {
 
         fn add_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance + quantity;
-            if self.balance == 0.into() {
-                UserPendingRecord::add(
-                    self.creditor,
-                    self.debitor,
-                    self.token_id,
-                    self.shared_bal_id,
-                );
-            }
+            UserPendingRecord::add(
+                self.creditor,
+                self.debitor,
+                self.token_id,
+                self.shared_bal_id,
+            );
             self.save();
         }
 
