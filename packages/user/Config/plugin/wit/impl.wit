@@ -7,13 +7,16 @@ world impl {
     include branding:plugin/imports;
     include transact:plugin/imports;
     include packages:plugin/imports;
-    
+
+
     import tokens:plugin/admin;
     import packages:plugin/private-api;
+    import symbol:plugin/admin;
 
     export branding;
     export producers;
     export packaging;
     export settings;
+    export symbol;
 
 }

@@ -23,6 +23,7 @@ use psibase::{AccountNumber, Memo};
 use bindings::evaluations::plugin::admin::close;
 use bindings::evaluations::plugin::user as EvaluationsUser;
 
+use crate::bindings::accounts;
 use crate::errors::ErrorType;
 use crate::graphql::{get_guild, GuildHelper};
 use crate::helpers::get_sender_app;
@@ -92,6 +93,12 @@ impl AdminFractal for FractallyPlugin {
             guild_account: guild_account.parse().unwrap(),
             name,
             mission,
+            council_role: accounts::plugin::api::gen_rand_account(Some("c-"))?
+                .as_str()
+                .into(),
+            rep_role: accounts::plugin::api::gen_rand_account(Some("r-"))?
+                .as_str()
+                .into(),
         }
         .packed();
         add_action_to_transaction(
@@ -124,6 +131,12 @@ impl AdminGuild for FractallyPlugin {
             fractal: guild.fractal,
             display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
+            council_role: accounts::plugin::api::gen_rand_account(Some("c-"))?
+                .as_str()
+                .into(),
+            rep_role: accounts::plugin::api::gen_rand_account(Some("r-"))?
+                .as_str()
+                .into(),
         }
         .packed();
 

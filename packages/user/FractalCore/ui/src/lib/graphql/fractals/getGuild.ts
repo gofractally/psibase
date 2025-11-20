@@ -8,7 +8,7 @@ import { graphql } from "../../graphql";
 export const zGuild = z.object({
     account: zAccount,
     displayName: z.string(),
-    council: zAccount.array(),
+    council: zAccount.array().nullable(),
     rep: z.object({ member: zAccount }).nullable(),
     evalInstance: z
         .object({

@@ -1,5 +1,7 @@
 use psibase::AccountNumber;
 
+use crate::tables::tables::{Fractal, Guild};
+
 /// Translates a vector of rank numbers into a sorted list of accounts based on their `AccountNumber` values.
 ///
 /// This function takes a vector of rank numbers (`group_result`) from an evaluation and maps them to a corresponding
@@ -42,4 +44,11 @@ pub fn parse_rank_to_accounts(
         .into_iter()
         .map(|rank_number| group_members[rank_number as usize])
         .collect()
+}
+
+pub fn is_user_account(sender: AccountNumber) -> bool {
+    Fractal::get(sender).is_none()
+        && Guild::get(sender).is_none()
+        && Guild::get_by_rep_role(sender).is_none()
+        && Guild::get_by_council_role(sender).is_none()
 }
