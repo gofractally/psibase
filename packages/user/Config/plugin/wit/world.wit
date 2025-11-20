@@ -49,6 +49,10 @@ interface symbol {
     /// Start selling symbols of a certain length
     sell-length: func(length: u8, initial-price: u64, target: u32, floor-price: u64) -> result<_, error>;
 
+    /// Delete symbol length, preventing further sales.
+    ///
+    /// Parameters:
+    /// * `length` - Length of symbol to stop selling
     del-length: func(length: u8) -> result<_, error>;
 }
 
