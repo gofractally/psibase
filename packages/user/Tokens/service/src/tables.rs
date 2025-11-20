@@ -431,7 +431,9 @@ pub mod tables {
         }
 
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
-            check(quantity.value > 0, "debit quantity must be greater than 0");
+            if quantity.value == 0 {
+                return;
+            }
 
             crate::Wrapper::emit().history().balChanged(
                 self.token_id,
