@@ -46,7 +46,7 @@ namespace UserService
          using Account    = psibase::AccountNumber;
          struct History
          {
-            void symCreated(SID symbol, Account owner, Quantity cost) {}
+            void symEvent(SID symbol, Account actor, uint8_t action) {}
          };
          struct Ui{};
          struct Merkle{};
