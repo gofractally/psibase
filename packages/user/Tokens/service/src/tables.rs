@@ -452,7 +452,6 @@ pub mod tables {
                 self.token_id,
                 self.shared_bal_id,
             ))
-            .unwrap();
 
             if !is_manual_debit {
                 self.debit(quantity, memo);
@@ -483,12 +482,6 @@ pub mod tables {
 
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
-
-            if self.balance == 0.into() {
-                let upt = UserPendingTable::new();
-                upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
-                upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
-            }
         }
 
         pub fn reject(&mut self, memo: Memo) {
@@ -504,16 +497,11 @@ pub mod tables {
                 );
                 self.sub_balance(balance);
                 Balance::get_or_new(self.creditor, self.token_id).add_balance(balance);
-
-                if self.balance == 0.into() {
-                    let upt = UserPendingTable::new();
-                    upt.erase(&(self.creditor, self.token_id, self.shared_bal_id));
-                    upt.erase(&(self.debitor, self.token_id, self.shared_bal_id));
-                }
             }
         }
 
         fn add_balance(&mut self, quantity: Quantity) {
+            self.balance = self.balance + quantity;
             if self.balance == 0.into() {
                 UserPendingRecord::add(
                     self.creditor,
@@ -521,14 +509,7 @@ pub mod tables {
                     self.token_id,
                     self.shared_bal_id,
                 );
-                UserPendingRecord::add(
-                    self.debitor,
-                    self.creditor,
-                    self.token_id,
-                    self.shared_bal_id,
-                );
             }
-            self.balance = self.balance + quantity;
             self.save();
         }
 
@@ -753,12 +734,9 @@ pub mod tables {
             }
         }
         fn add(creditor: AccountNumber, debitor: AccountNumber, token_id: TID, shared_bal_id: u64) {
-            UserPendingTable::new()
-                .put(&UserPendingRecord::new(creditor, token_id, shared_bal_id))
-                .unwrap();
-            UserPendingTable::new()
-                .put(&UserPendingRecord::new(debitor, token_id, shared_bal_id))
-                .unwrap();
+            let upt = UserPendingTable::new();
+            upt.put(&UserPendingRecord::new(creditor, token_id, shared_bal_id));
+            upt.put(&UserPendingRecord::new(debitor, token_id, shared_bal_id));
         }
         fn remove(
             creditor: AccountNumber,
@@ -766,8 +744,9 @@ pub mod tables {
             token_id: TID,
             shared_bal_id: u64,
         ) {
-            UserPendingTable::new().erase(&(creditor, token_id, shared_bal_id));
-            UserPendingTable::new().erase(&(debitor, token_id, shared_bal_id));
+            let upt = UserPendingTable::new();
+            upt.erase(&(creditor, token_id, shared_bal_id));
+            upt.erase(&(debitor, token_id, shared_bal_id));
         }
     }
 }
