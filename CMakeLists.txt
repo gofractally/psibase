@@ -135,7 +135,7 @@ if(DEFINED WASI_SDK_PREFIX)
         CpuLimit Db Events EventIndex Explorer Invite Nft
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
-        RHttpServer RSetCode RTransact SetCode Symbol
+        RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
@@ -441,6 +441,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Symbol.psi
+    PATH packages/user/Symbol
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Credentials.psi
     PATH packages/system/Credentials
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
@@ -477,6 +483,7 @@ cargo_psibase_package(
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractals.psi
@@ -836,18 +843,6 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Symbol.psi
-    NAME Symbol
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Symbol service"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
-    SERVICE symbol
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Symbol-schema.json
-        INIT
-    DEPENDS wasm
-)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
@@ -931,8 +926,7 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Initial token users"
-    ACCOUNTS alice bob
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 

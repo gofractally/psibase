@@ -194,17 +194,6 @@ namespace UserService
       /// * `memo`     - Memo
       void recall(TID tokenId, psibase::AccountNumber from, Quantity amount, Memo memo);
 
-      /// Map a symbol to a token
-      ///
-      /// By default, tokens are only identifiable by their TID.
-      /// Symbols may be mapped to improve usability. Once a symbol
-      /// is mapped, it is permanent.
-      ///
-      /// # Arguments
-      /// * `token_id` - Unique token identifier
-      /// * `symbol` - Symbol e.g. "BTC"
-      void mapSymbol(TID tokenId, SID symbol);
-
       // Read-only interface:
 
       /// Lookup token details
@@ -214,7 +203,6 @@ namespace UserService
       ///
       /// Returns token information including current, burned supply and precision
       TokenRecord getToken(TID tokenId);
-      SID         getTokenSym(TID tokenId);
 
       /// Get user token balance
       ///
@@ -346,12 +334,10 @@ namespace UserService
       method(getUserConf, account, index),
       method(setSysToken, tokenId),
       method(getSysToken),
-      method(getTokenSym, tokenId),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),
       method(getTokenConf, tokenId, index),
-      method(mapSymbol, tokenId, symbol),
     );
    PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,

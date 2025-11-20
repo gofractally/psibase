@@ -14,51 +14,31 @@ namespace UserService
 {
    using SID = psibase::AccountNumber;
 
+   struct Mapping
+   {
+      TID                         tokenId;
+      SID                         symbolId;
+      friend std::strong_ordering operator<=>(const Mapping&, const Mapping&) = default;
+   };
+   PSIO_REFLECT(Mapping, tokenId, symbolId);
+   using MappingByTokenTable = psibase::Table<Mapping, &Mapping::tokenId>;
+   PSIO_REFLECT_TYPENAME(MappingByTokenTable)
+   using MappingBySymbolTable = psibase::Table<Mapping, &Mapping::symbolId>;
+   PSIO_REFLECT_TYPENAME(MappingBySymbolTable)
+
    struct SymbolLengthRecord
    {
       uint8_t  symbolLength;
-      uint8_t  targetCreatedPerDay;
-      Quantity floorPrice;
-      Quantity activePrice;
-
-      uint8_t            createCounter;
-      psibase::BlockTime lastPriceUpdateTime;
+      uint64_t nftId;
    };
-   PSIO_REFLECT(SymbolLengthRecord,
-                symbolLength,
-                targetCreatedPerDay,
-                floorPrice,
-                activePrice,
-                createCounter,
-                lastPriceUpdateTime);
+   PSIO_REFLECT(SymbolLengthRecord, symbolLength, nftId);
    using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
    PSIO_REFLECT_TYPENAME(SymbolLengthTable)
 
-   struct PriceAdjustmentRecord
-   {
-      uint8_t key;
-      uint8_t increasePct;
-      uint8_t decreasePct;
-   };
-   PSIO_REFLECT(PriceAdjustmentRecord, key, increasePct, decreasePct);
-   using PriceAdjustmentSingleton =
-       psibase::Table<PriceAdjustmentRecord, &PriceAdjustmentRecord::key>;
-   PSIO_REFLECT_TYPENAME(PriceAdjustmentSingleton)
-
-   struct SaleDetails
-   {
-      Quantity               salePrice;  // 0 == NFS
-      psibase::AccountNumber seller;
-
-      friend std::strong_ordering operator<=>(const SaleDetails&, const SaleDetails&) = default;
-   };
-   PSIO_REFLECT(SaleDetails, salePrice, seller);
-
    struct SymbolRecord
    {
-      SID         symbolId;
-      NID         ownerNft;
-      SaleDetails saleDetails;
+      SID symbolId;
+      NID ownerNft;
 
       static bool isValidKey(SID testSymbol)
       {
@@ -68,7 +48,7 @@ namespace UserService
 
       friend std::strong_ordering operator<=>(const SymbolRecord&, const SymbolRecord&) = default;
    };
-   PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails);
+   PSIO_REFLECT(SymbolRecord, symbolId, ownerNft);
    using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
    PSIO_REFLECT_TYPENAME(SymbolTable)
 }  // namespace UserService
