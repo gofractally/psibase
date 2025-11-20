@@ -30,6 +30,13 @@ interface admin {
     /// * `floor-price` - The minimum price in the network form
     sell-length: func(length: u8, initial-price: u64, target: u32, floor-price: u64) -> result<_, error>;
 
+    /// Delete symbol length, preventing further sales.
+    ///
+    /// Parameters:
+    /// * `length` - Length of symbol to stop selling
+    delete: func(length: u8) -> result<_, error>;
+
+
 }
 
 world imports {

@@ -50,6 +50,11 @@ pub mod tables {
             )
         }
 
+        pub fn delete(&self) {
+            DiffAdjust::call().delete(self.nftId);
+            SymbolLengthTable::read_write().erase(&self.symbolLength);
+        }
+
         pub fn add(symbol_length: u8, initial_price: u64, target: u32, floor_price: u64) -> Self {
             check_none(
                 Self::get(symbol_length),
@@ -295,6 +300,15 @@ pub mod service {
             "only symbols account can sell lengths",
         );
         SymbolLength::add(length, initial_price.value, target, floor_price.value);
+    }
+
+    #[action]
+    fn delete(length: u8) {
+        check(
+            get_sender() == get_service(),
+            "only symbols account can delete lengths",
+        );
+        SymbolLength::get_assert(length).delete();
     }
 
     #[action]

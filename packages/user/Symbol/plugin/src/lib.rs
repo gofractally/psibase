@@ -28,7 +28,7 @@ define_trust! {
     functions {
         Medium => [create],
         High => [map_symbol],
-        Max => [sell_length],
+        Max => [sell_length, delete],
     }
 }
 
@@ -96,6 +96,17 @@ impl Admin for SymbolPlugin {
             symbol::action_structs::sellLength::ACTION_NAME,
             &packed_args,
         )
+    }
+
+    fn delete(length: u8) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::delete,
+            vec!["config".to_string()],
+        )?;
+
+        let packed_args = symbol::action_structs::delete { length }.packed();
+
+        add_action_to_transaction(symbol::action_structs::delete::ACTION_NAME, &packed_args)
     }
 }
 

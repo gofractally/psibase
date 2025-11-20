@@ -65,6 +65,11 @@ pub mod Service {
     }
 
     #[action]
+    fn delete(length: u8) {
+        unimplemented!()
+    }
+
+    #[action]
     fn getSymbol(symbol: AccountNumber) -> SymbolRecord {
         unimplemented!()
     }
