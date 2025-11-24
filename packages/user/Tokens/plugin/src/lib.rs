@@ -1,15 +1,14 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::str::FromStr;
 mod errors;
 use errors::ErrorType;
 
 use bindings::exports::tokens::plugin as Exports;
 use Exports::types::Decimal;
 use Exports::{
-    admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers, issuer::Guest as Issuer,
-    user::Guest as User, user_config::Guest as UserConfig,
+    admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers,
+    issuer::Guest as Issuer, user::Guest as User, user_config::Guest as UserConfig,
 };
 
 use bindings::host::common::server;
@@ -18,8 +17,9 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
 use psibase::services::tokens::Quantity;
-use psibase::{fracpack::Pack, services::tokens, AccountNumber, FlagsType};
+use psibase::{fracpack::Pack, services::tokens, FlagsType};
 pub mod query {
+    pub mod fetch_network_token;
     pub mod fetch_token;
 }
 
@@ -42,7 +42,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [decimal_to_u64, u64_to_decimal],
+        None => [decimal_to_u64, u64_to_decimal, fetch_network_token],
         Low => [],
         Medium => [create, enable_user_keep_zero_balances, enable_balance_manual_debit, enable_balance_keep_zero_balances, del_balance_config],
         High => [recall, mint, map_symbol, enable_token_untransferable, enable_token_unrecallable, credit, uncredit, debit, reject, burn, enable_user_manual_debit, graphql],
@@ -136,17 +136,6 @@ impl Issuer for TokensPlugin {
         add_action_to_transaction(Actions::mint::ACTION_NAME, &packed_args)
     }
 
-    fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::map_symbol)?;
-
-        let packed_args = Actions::mapSymbol {
-            token_id,
-            symbol: AccountNumber::from_str(symbol.as_str()).unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(Actions::mapSymbol::ACTION_NAME, &packed_args)
-    }
-
     fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {
         assert_authorized(FunctionName::enable_token_untransferable)?;
         Self::set_token_flag(token_id, TokenFlags::UNTRANSFERABLE, enable)
@@ -159,6 +148,12 @@ impl Issuer for TokensPlugin {
 }
 
 impl Helpers for TokensPlugin {
+    fn fetch_network_token() -> Result<u32, Error> {
+        assert_authorized(FunctionName::fetch_network_token)?;
+        query::fetch_network_token::fetch_network_token()
+            .map_err(|error: ErrorType| Error::from(ErrorType::QueryError(error.to_string())))
+    }
+
     fn decimal_to_u64(token_id: u32, amount: String) -> Result<u64, Error> {
         assert_authorized(FunctionName::decimal_to_u64)?;
         let token = query::fetch_token::fetch_token(token_id)?;

@@ -8,7 +8,6 @@ pub mod service {
     use crate::tables::tables::{ConfigRow, *};
     use psibase::services::events;
     use psibase::services::nft::{NamedBit, Wrapper as Nfts};
-    use psibase::services::symbol::Service::Wrapper as Symbol;
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{get_sender, AccountNumber, Memo};
 
@@ -94,57 +93,6 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> Token {
         Token::get_assert(token_id)
-    }
-
-    /// Lookup token symbol
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    ///
-    /// Returns token symbol
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        check_some(
-            Token::get_assert(token_id).symbol,
-            "token does not have symbol",
-        )
-    }
-
-    /// Map a symbol to a token
-    ///
-    /// By default, tokens are only identifiable by their TID.
-    /// Symbols may be mapped to improve usability. Once a symbol
-    /// is mapped, it is permanent.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        let mut token = Token::get_assert(token_id);
-
-        token.map_symbol(symbol);
-
-        let symbol_owner_nft = Symbol::call().getSymbol(symbol).ownerNft;
-        check(symbol_owner_nft != 0, "Symbol does not exist");
-
-        Nfts::call().debit(
-            symbol_owner_nft,
-            format!(
-                "Mapping symbol {} to token {}",
-                symbol.to_string(),
-                token_id
-            ),
-        );
-        Nfts::call().burn(symbol_owner_nft);
-
-        Wrapper::emit().history().configured(
-            token.id,
-            "named".to_string(),
-            Memo::new(format!("{}", symbol.to_string())).unwrap(),
-        );
     }
 
     /// Get user's token-specific balance configuration
