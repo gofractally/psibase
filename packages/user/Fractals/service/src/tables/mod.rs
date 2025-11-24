@@ -11,7 +11,7 @@ mod guild_member;
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
 
     use serde::{Deserialize, Serialize};
 
@@ -27,6 +27,8 @@ pub mod tables {
         pub mission: String,
         pub legislature: AccountNumber,
         pub judiciary: AccountNumber,
+        pub token: Option<TID>,
+        pub ranked_guilds: Vec<AccountNumber>,
     }
 
     impl Fractal {

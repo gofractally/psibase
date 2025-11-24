@@ -364,6 +364,112 @@ pub mod service {
         FractalMember::get_assert(fractal, member).exile();
     }
 
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can exile members",
+        );
+        // FractalMember::get_assert(fractal, member).init_token();
+
+        // To change:
+        // Setting of a guild schedule can occur, but no scores are actually set
+        // until a token exists. The UI will allow ranking but will tell users
+        // that it doesn't really matter. set pending score doesn't actually set it, keeps it as None
+        //
+        //
+        // Create a token of hardcoded supply
+        // mint the entire amount
+        // Throw the entire amount over to token stream
+        //
+        // WHen distributing we call claim
+        // Loop through each guild according to their index
+        // distribute tokens to guild members from the allocated guild tokens
+        // to each member
+        //
+        // People who join before token are citizens
+        // People who join after token are visa holders
+        // until they get citizenship.
+
+        //
+        // Tourist Visa fee
+        // Application fee
+        //
+        //
+        // Promoting to citizen
+        // Code laws:
+        // Set by the fractal legislature
+        // Have been a tourist visa for 6 months
+
+        // Human:
+        //
+
+        // Does the member of the guild apply for citizenship?
+        // John applies to become a citizen and meets the code rules
+        // he is first on the list of the guild
+        // if the guild approves it then the legislature approves their citzenship
+        //
+
+        // Later:
+        // Add fees.
+        // Founders have no recruitment
+        //
+    }
+
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can distribute",
+        );
+
+        // Claim vested tokens
+        // Fractal -> Guild 1, Guild 2, Guild 3.
+
+        // get_guilds(fractal);
+        // same algo to determine to each guild to each member
+        //
+        // James - 3
+        // John - 2.8
+        // Brandon - 2.7
+        //
+        // James - 3
+        // John - 0.8
+        // Brandon - 0.7
+
+        // Guilds are number 1 - 12
+        // First guild, score 12, length - position
+
+        // Guilds calculation
+        // x - n - Position - length
+        // y - m - fib(12) = 200
+        //
+        // Software Dev - 6 -> 200
+        // Marketing - 5 -> 160
+        // HR - 4 -> 122
+        //
+        // SUM -> 122 + 160 + 200
+        // Distribution for each is
+        // Software Dev -> 200 / 488 -> % -> % of the tokens we have to distribute
+        // Marketing -> 160 / 488 -> % -> % of the tokens
+
+        // Member calculation
+        // x - n - Guild member score
+        // y - m - the sum of all possible ns
+        //
+        // John -> 4.88 -> fib(4.88) -> 444
+        // James -> 4.5 -> fib(4.5) -> 344
+        // Brandon -> 3
+        // Dan -> 3
+        //
+        // Add all the fibbactis together
+        // John gets 444 / 1203 -> 25%
+        //
+        //
+
+        // FractalMember::get_assert(fractal, member).init_token();
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 
