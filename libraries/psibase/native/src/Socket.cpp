@@ -22,6 +22,22 @@ bool Socket::canAutoClose() const
    return false;
 }
 
+void Socket::replace(Writer& writer, std::shared_ptr<Socket>&& other)
+{
+   if (auto sockets = weak_sockets.lock())
+   {
+      SocketRow row{id, other->info()};
+      other->id = id;
+      {
+         std::lock_guard l{sockets->mutex};
+         other->weak_sockets  = std::move(weak_sockets);
+         sockets->sockets[id] = std::move(other);
+      }
+      sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
+                                        psio::to_frac(row));
+   }
+}
+
 bool AutoCloseSocket::canAutoClose() const
 {
    return true;
@@ -120,7 +136,7 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
       sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
 
-   p->send(buf);
+   p->send(writer, buf);
    return 0;
 }
 void Sockets::add(Writer&                        writer,

@@ -17,9 +17,12 @@ namespace psibase
    struct Socket
    {
       ~Socket();
-      virtual void           send(std::span<const char>) = 0;
-      virtual bool           canAutoClose() const;
-      virtual SocketInfo     info() const = 0;
+      virtual void       send(Writer&, std::span<const char>) = 0;
+      virtual bool       canAutoClose() const;
+      virtual SocketInfo info() const = 0;
+
+      void replace(Writer& writer, std::shared_ptr<Socket>&& other);
+
       std::int32_t           id;
       bool                   closed = false;
       bool                   once   = false;

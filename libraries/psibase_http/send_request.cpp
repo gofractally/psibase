@@ -160,7 +160,7 @@ namespace
                 << action.service.str() << "::close failed: " << e.what();
          }
       }
-      virtual void send(std::span<const char>) override
+      virtual void send(Writer&, std::span<const char>) override
       {
          abortMessage("Cannot send additional requests through a client socket");
       }
