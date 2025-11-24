@@ -148,18 +148,31 @@ extern "C" [[clang::export_name("recv")]] void recv()
       row = requests.get(socket.unpack());
       if (row)
       {
-         requests.remove(*row);
+         if (row->type == SocketType::http)
+         {
+            requests.remove(*row);
+            socketAutoClose(socket, true);
+         }
       }
-      socketAutoClose(socket, true);
    }
 
    if (row)
    {
-      call(Action{.sender  = XHttp::service,
-                  .service = row->service,
-                  .method  = row->method,
-                  .rawData = psio::to_frac(
-                      std::tuple(socket, psio::view<const psibase::HttpReply>(data)))});
+      if (row->type == SocketType::http)
+      {
+         call(Action{.sender  = XHttp::service,
+                     .service = row->service,
+                     .method  = row->method,
+                     .rawData = psio::to_frac(
+                         std::tuple(socket, psio::view<const psibase::HttpReply>(data)))});
+      }
+      else
+      {
+         act->sender()  = XHttp::service;
+         act->service() = row->service;
+         act->method()  = row->method;
+         psibase::call(act.data(), act.size());
+      }
       return;
    }
 
@@ -207,8 +220,21 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
 
 void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
 {
-   check(getSender() == HttpServer::service, "Wrong sender");
-   check(socket == producer_multicast, "Cannot call send on this socket");
+   if (socket == producer_multicast)
+   {
+      check(getSender() == HttpServer::service, "Wrong sender");
+   }
+   else
+   {
+      auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+      std::optional<ResponseHandlerRow> row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         row = requests.get(socket);
+      }
+      if (!row || row->service != getSender() || row->type != SocketType::websocket)
+         abortMessage("Wrong sender");
+   }
    psibase::socketSend(socket, data);
 }
 
@@ -230,7 +256,7 @@ std::int32_t XHttp::sendRequest(HttpRequest                   request,
    check(sock >= 0, "Failed to open socket");
    PSIBASE_SUBJECTIVE_TX
    {
-      requests.put({sock, sender, callback, err});
+      requests.put({sock, SocketType::http, sender, callback, err});
       socketAutoClose(sock, false);
    }
    return sock;
@@ -279,6 +305,39 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
       abortMessage("Must set autoClose before sending a response");
    }
    socketSend(socket, psio::to_frac(result));
+}
+
+void XHttp::accept(std::int32_t              socket,
+                   const psibase::HttpReply& reply,
+                   psibase::MethodNumber     callback,
+                   psibase::MethodNumber     err)
+{
+   auto sender   = getSender();
+   auto owned    = Temporary{}.open<PendingRequestTable>();
+   auto handlers = open<ResponseHandlerTable>();
+
+   if (auto row = owned.get(socket))
+   {
+      if (row->owner != sender)
+      {
+         abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
+      }
+      owned.remove(*row);
+   }
+   else
+   {
+      abortMessage("Must set autoClose before sending a response");
+   }
+
+   PSIBASE_SUBJECTIVE_TX
+   {
+      handlers.put({.socket  = socket,
+                    .type    = SocketType::websocket,
+                    .service = sender,
+                    .method  = callback,
+                    .err     = err});
+   }
+   socketSend(socket, psio::to_frac(reply));
 }
 
 std::string XHttp::rootHost(psio::view<const std::string> host)
