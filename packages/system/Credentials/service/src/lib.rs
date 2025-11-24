@@ -173,7 +173,7 @@ pub mod service {
         _authorizers: Vec<AccountNumber>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
-        false
+        abort_message("isAuthSys not supported");
     }
 
     #[action]
@@ -183,8 +183,9 @@ pub mod service {
         _authorizers: Vec<AccountNumber>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
-        true
+        abort_message("isRejectSys not supported");
     }
+
 
     /// Creates a credential
     ///
