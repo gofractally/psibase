@@ -119,33 +119,112 @@ namespace
       return ch >= 0x21 && ch <= 0x7e && separators.find(ch) == std::string_view::npos;
    }
 
-   // Returns nullopt if the field is present, but with incorrect format
-   std::optional<std::vector<std::string_view>> getTokens(const HttpRequest& request,
-                                                          std::string_view   name)
+   bool isWS(char ch)
    {
-      auto result = request.getHeaderValues(name);
-      for (const auto& s : result)
+      std::string_view ws = " \t";
+      return ws.find(ch) != std::string_view::npos;
+   }
+
+   bool parseToken(auto& iter, auto end)
+   {
+      if (iter == end)
+         return false;
+      if (!isTokenChar(*iter))
+         return false;
+      ++iter;
+      while (iter != end && isTokenChar(*iter))
+         ++iter;
+      return true;
+   }
+
+   bool parseQuotedToken(auto& begin, auto end)
+   {
+      if (begin == end)
+         return false;
+      if (*begin != '"')
+         return false;
+      auto iter = begin;
+      ++iter;
+      // tokens cannot be empty
+      if (iter != end && *iter == '"')
+         return false;
+      while (true)
       {
-         for (char ch : s)
+         if (iter == end)
+            return false;
+         if (*iter == '"')
          {
-            if (!isTokenChar(ch))
-            {
-               return {};
-            }
+            ++iter;
+            break;
+         }
+         if (*iter == '\\')
+         {
+            ++iter;
+            if (iter == end)
+               return false;
+         }
+         if (!isTokenChar(*iter))
+            return false;
+         ++iter;
+      }
+      begin = iter;
+      return true;
+   }
+
+   void parseOWS(auto& iter, auto end)
+   {
+      while (iter != end && isWS(*iter))
+         ++iter;
+   }
+
+   bool isToken(std::string_view value)
+   {
+      auto iter = value.begin();
+      auto end  = value.end();
+      return parseToken(iter, end) && iter == end;
+   }
+
+   bool isExtension(std::string_view value)
+   {
+      auto iter = value.begin();
+      auto end  = value.end();
+      if (!parseToken(iter, end))
+         return false;
+      parseOWS(iter, end);
+      while (iter != end)
+      {
+         if (*iter++ != ';')
+            return false;
+         parseOWS(iter, end);
+         if (!parseToken(iter, end))
+            return false;
+         parseOWS(iter, end);
+         if (iter != end && *iter == '=')
+         {
+            ++iter;
+            parseOWS(iter, end);
+            if (!parseQuotedToken(iter, end) && !parseToken(iter, end))
+               return false;
+            parseOWS(iter, end);
          }
       }
-      return result;
+      return true;
    }
 
    std::optional<std::vector<std::string_view>> requestSubprotocols(const HttpRequest& request)
    {
-      return getTokens(request, "Sec-WebSocket-Protocol");
+      auto result = request.getHeaderValues("Sec-WebSocket-Protocol");
+      if (!std::ranges::all_of(result, isToken))
+         return std::nullopt;
+      return result;
    }
 
    std::optional<std::vector<std::string_view>> requestExtensions(const HttpRequest& request)
    {
-      // WRONG
-      return getTokens(request, "Sec-WebSocket-Extensions");
+      auto result = request.getHeaderValues("Sec-WebSocket-Extensions");
+      if (!std::ranges::all_of(result, isExtension))
+         return std::nullopt;
+      return result;
    }
 }  // namespace
 
