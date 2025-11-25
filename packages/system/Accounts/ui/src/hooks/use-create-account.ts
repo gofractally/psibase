@@ -5,7 +5,7 @@ import { getSupervisor } from "@psibase/common-lib";
 const supervisor = getSupervisor();
 
 export const useCreateAccount = (
-    options: UseMutationOptions<unknown, Error, string> = {},
+    options: UseMutationOptions<string, Error, string> = {},
 ) => {
     return useMutation({
         mutationFn: async (accountName: string) => {
@@ -20,4 +20,3 @@ export const useCreateAccount = (
         ...options,
     });
 };
-
