@@ -211,6 +211,14 @@ namespace
       return true;
    }
 
+   // \pre value is an extension
+   std::string_view extensionName(std::string_view value)
+   {
+      auto iter = value.begin();
+      parseToken(iter, value.end());
+      return std::string_view{value.begin(), iter};
+   }
+
    std::optional<std::vector<std::string_view>> requestSubprotocols(const HttpRequest& request)
    {
       auto result = request.getHeaderValues("Sec-WebSocket-Protocol");
@@ -255,23 +263,26 @@ bool psibase::isWebSocketHandshake(const HttpRequest& request, const HttpReply& 
       return false;
    if (!isWebSocketHandshake(reply))
       return false;
-   // Further validation. If this fails, assume that the
-   // service is trying to create a websocket, but got it
-   // wrong.
    auto accept = reply.getHeader("Sec-WebSocket-Accept");
    if (!accept || *accept != acceptKey(*key))
       return false;
    // Check that the subprotocol is valid if it exists
    if (auto replySubprotocol = reply.getHeader("Sec-WebSocket-Protocol"))
    {
-      if (std::ranges::find(*subprotocols, replySubprotocol) == subprotocols->end())
-         abortMessage("reply contains subprotocol that was not present in request");
+      if (!subprotocols ||
+          std::ranges::find(*subprotocols, replySubprotocol) == subprotocols->end())
+         return false;
    }
    for (const auto& ext : reply.getHeaderValues("Sec-WebSocket-Extensions"))
    {
-      if (std::ranges::find(*extensions, ext) == extensions->end())
-         abortMessage("reply contains extension " + std::string(ext) +
-                      " that was not present in request");
+      // TODO: each extension requires custom validation
+      if (!isExtension(ext))
+         return false;
+      auto name = extensionName(ext);
+      if (!extensions ||
+          std::ranges::find_if(*extensions, [&](std::string_view reqExt)
+                               { return extensionName(reqExt) == name; }) == extensions->end())
+         return false;
    }
    return true;
 }

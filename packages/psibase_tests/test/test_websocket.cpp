@@ -97,3 +97,63 @@ TEST_CASE("WebSocket handshake - request")
       CHECK(!isWebSocketHandshake(request));
    }
 }
+
+TEST_CASE("WebSocket handshake")
+{
+   HttpRequest request{.host    = "psibase.io",
+                       .method  = "GET",
+                       .target  = "/",
+                       .headers = {{"Upgrade", "websocket"},
+                                   {"Connection", "Upgrade"},
+                                   {"Sec-WebSocket-Version", "13"},
+                                   {"Sec-WebSocket-Key", "sQN6///XJAsC1PG65sSp6g=="}}};
+   HttpReply   reply{.status  = HttpStatus::switchingProtocols,
+                     .headers = {{"Upgrade", "websocket"},
+                                 {"Connection", "Upgrade"},
+                                 {"Sec-WebSocket-Accept", "sheIH7v3LLVMBsRlVsv6J3nOKfs="}}};
+   SECTION("basic")
+   {
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+   SECTION("subprotocol ignored")
+   {
+      request.headers.push_back({"Sec-WebSocket-Protocol", "chat, superchat"});
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+   SECTION("subprotocol accepted")
+   {
+      request.headers.push_back({"Sec-WebSocket-Protocol", "chat, superchat"});
+      reply.headers.push_back({"Sec-WebSocket-Protocol", "superchat"});
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+   SECTION("subprotocol multiple")
+   {
+      request.headers.push_back({"Sec-WebSocket-Protocol", "chat"});
+      request.headers.push_back({"Sec-WebSocket-Protocol", "superchat"});
+      reply.headers.push_back({"Sec-WebSocket-Protocol", "superchat"});
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+   SECTION("subprotocol wrong")
+   {
+      request.headers.push_back({"Sec-WebSocket-Protocol", "chat, superchat"});
+      reply.headers.push_back({"Sec-WebSocket-Protocol", "hyperchat"});
+      CHECK(!isWebSocketHandshake(request, reply));
+   }
+   SECTION("extension ignored")
+   {
+      request.headers.push_back({"Sec-WebSocket-Extensions", "foo, bar;baz=2"});
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+   SECTION("extension accepted")
+   {
+      request.headers.push_back({"Sec-WebSocket-Extensions", "foo, bar;baz=2"});
+      reply.headers.push_back({"Sec-WebSocket-Extensions", "foo"});
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+   SECTION("extension accepted")
+   {
+      request.headers.push_back({"Sec-WebSocket-Extensions", "foo, bar;baz=2"});
+      reply.headers.push_back({"Sec-WebSocket-Extensions", "foo, bar"});
+      CHECK(isWebSocketHandshake(request, reply));
+   }
+}
