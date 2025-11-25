@@ -14,4 +14,6 @@ world impl {
     export admin-fractal;
     export user-fractal;
     export user-eval;
+    export queries;
+    export types;
 }
