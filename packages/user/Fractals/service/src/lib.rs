@@ -416,7 +416,7 @@ pub mod service {
             Fractal::get_assert(fractal).legislature == get_sender(),
             "only the legislature can rank guilds",
         );
-        FractalToken::get_assert(fractal).set_guild_ranks(guilds);
+        FractalToken::get_assert(fractal).set_ranked_guilds(guilds);
     }
 
     #[event(history)]

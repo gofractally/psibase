@@ -98,7 +98,7 @@ impl FractalToken {
         }
     }
 
-    pub fn set_guild_ranks(&mut self, guilds: Vec<AccountNumber>) {
+    pub fn set_ranked_guilds(&mut self, guilds: Vec<AccountNumber>) {
         let mut seen = HashSet::new();
         for guild in guilds.clone() {
             if !seen.insert(guild) {
