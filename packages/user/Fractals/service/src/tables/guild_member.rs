@@ -1,5 +1,5 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{check_none, check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
@@ -19,6 +19,8 @@ impl GuildMember {
     }
 
     pub fn add(guild: AccountNumber, member: AccountNumber) {
+        check_none(Self::get(guild, member), "member already exists");
+
         Self::new(guild, member).save();
     }
 

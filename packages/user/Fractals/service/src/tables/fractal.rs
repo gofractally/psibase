@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table};
 
-use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
+use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable, Guild};
 
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -56,11 +56,23 @@ impl Fractal {
             )
             .collect()
     }
+
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
+        DynamicAuthPolicy::from_sole_authorizer(self.legislature)
+    }
 }
 
 #[ComplexObject]
 impl Fractal {
     async fn memberships(&self) -> Vec<FractalMember> {
         self.members()
+    }
+
+    async fn legislature(&self) -> Guild {
+        Guild::get_assert(self.legislature)
+    }
+
+    async fn judiciary(&self) -> Guild {
+        Guild::get_assert(self.judiciary)
     }
 }
