@@ -37,34 +37,36 @@ const qs = {
             }
         }
     `,
-    userCredits: (username: string) => `
-        userCredits(user: "${username}") {
+    userPending: (username: string, tokenId: number) => `
+        userPending(user: "${username}", tokenId: ${tokenId}) {
             nodes {
-                token {
-                    id
-                    symbol
-                    precision
+                sharedBal {
+                    token {
+                        id
+                        symbol
+                        precision
+                    }
+                    balance
+                    creditor
+                    debitor
                 }
-                balance
-                creditor
-                debitor
             }
         }
     `,
-    userDebits: (username: string) => `
-        userDebits(user: "${username}") {
-            nodes {
-                token {
-                    id
-                    symbol
-                    precision
-                }
-                balance
-                creditor
-                debitor
-            }
-        }
-    `,
+    // userDebits: (username: string) => `
+    //     userDebits(user: "${username}") {
+    //         nodes {
+    //             token {
+    //                 id
+    //                 symbol
+    //                 precision
+    //             }
+    //             balance
+    //             creditor
+    //             debitor
+    //         }
+    //     }
+    // `,
     userSettings: (username: string) => `
         userSettings(user: "${username}") {
             settings {
@@ -207,24 +209,25 @@ const zLineOfCreditSchema = z.object({
 });
 
 const zOpenLinesOfCreditResSchema = z.object({
-    userCredits: zLineOfCreditSchema,
-    userDebits: zLineOfCreditSchema,
+    userPending: zLineOfCreditSchema,
 });
 
 export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
 
 export const fetchOpenLinesOfCredit = async (username: string) => {
     const query = `{
-        ${qs.userCredits(username)}
-        ${qs.userDebits(username)}
+        ${qs.userPending(username, 1)}
     }`;
 
+    console.info("Calling query:", query);
     const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
         query,
     );
+    console.info("Query response:", res);
     const parsed = zOpenLinesOfCreditResSchema.parse(res);
+    console.info("Query response parsed:", parsed);
     return {
-        credits: parsed.userCredits.nodes,
-        debits: parsed.userDebits.nodes,
+        credits: parsed.userPending.nodes,
+        debits: parsed.userPending.nodes,
     };
 };

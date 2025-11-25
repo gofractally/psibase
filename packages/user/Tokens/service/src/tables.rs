@@ -451,7 +451,8 @@ pub mod tables {
                 self.debitor,
                 self.token_id,
                 self.shared_bal_id,
-            ));
+            ))
+            .unwrap();
 
             if !is_manual_debit {
                 self.debit(quantity, memo);
@@ -733,8 +734,10 @@ pub mod tables {
         }
         fn add(creditor: AccountNumber, debitor: AccountNumber, token_id: TID, shared_bal_id: u64) {
             let upt = UserPendingTable::new();
-            upt.put(&UserPendingRecord::new(creditor, token_id, shared_bal_id));
-            upt.put(&UserPendingRecord::new(debitor, token_id, shared_bal_id));
+            upt.put(&UserPendingRecord::new(creditor, token_id, shared_bal_id))
+                .unwrap();
+            upt.put(&UserPendingRecord::new(debitor, token_id, shared_bal_id))
+                .unwrap();
         }
         fn remove(
             creditor: AccountNumber,

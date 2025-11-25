@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <cstdio>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/testUtils.hpp>
@@ -827,15 +828,22 @@ TEST_CASE("GraphQL Queries")
 
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
-   auto userCredits = t.post(
+   auto userPending = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{std::format(
-           R"( query {{ userPending(user: "alice", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance debitor }} }} }} }} }} )",
+           R"( query {{ userPending(user: "bob", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance creditor debitor }} }} }} }} }} )",
            sysToken)},
-       token_a);
+       token_b);
+   printf(
+       "query: %s",
+       std::format(
+           R"( query {{ userPending(user: "bob", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance debitor }} }} }} }} }} )",
+           sysToken)
+           .c_str());
+   printf("res: %s", std::string(userPending.body.begin(), userPending.body.end()).c_str());
    CHECK(
-       std::string(userCredits.body.begin(), userCredits.body.end()) ==
-       R"({"data":{"userPending":{"edges":[{"node":{"sharedBal":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","debitor":"bob"}}}]}}})");
+       std::string(userPending.body.begin(), userPending.body.end()) ==
+       R"({"data":{"userPending":{"edges":[{"node":{"sharedBal":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice","debitor":"bob"}}}]}}})");
 
    auto userDebits = t.post(
        Tokens::service, "/graphql",

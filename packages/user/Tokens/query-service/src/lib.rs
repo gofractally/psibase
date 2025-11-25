@@ -80,7 +80,7 @@ mod service {
         async fn user_pending(
             &self,
             user: AccountNumber,
-            token_id: TID,
+            token_id: Option<TID>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
@@ -88,16 +88,33 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, UserPendingRecord>> {
             self.check_user_auth(user)?;
 
-            TableQuery::subindex::<u64>(
-                UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
-                &(user, token_id),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
+            println!("user: {:?}", user);
+            println!("token_id: {:?}", token_id);
+            let res = if token_id.is_some() {
+                TableQuery::subindex::<u64>(
+                    UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
+                    &(user, token_id.unwrap()),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            } else {
+                TableQuery::subindex::<(TID, u64)>(
+                    UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
+                    &(user),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            };
+            // println!("res: {:#?}", res.);
+            res
         }
 
         /// Returns the specified user's current balances for all of their tokens.
