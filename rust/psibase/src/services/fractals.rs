@@ -196,6 +196,41 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    #[action]
+    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
+        unimplemented!()
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 

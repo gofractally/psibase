@@ -403,6 +403,22 @@ pub mod service {
         FractalToken::get_assert(fractal).distribute_tokens();
     }
 
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    #[action]
+    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can rank guilds",
+        );
+        FractalToken::get_assert(fractal).set_guild_ranks(guilds);
+    }
+
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 

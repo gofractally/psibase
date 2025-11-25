@@ -1,7 +1,9 @@
-use psibase::{check_none, check_some, AccountNumber, Table};
+use std::collections::HashSet;
+
+use psibase::{abort_message, check, check_none, check_some, AccountNumber, Table};
 
 use crate::helpers::distribute_by_weight;
-use crate::tables::tables::{FractalToken, FractalTokenTable, GuildMember};
+use crate::tables::tables::{FractalToken, FractalTokenTable, Guild, GuildMember};
 
 use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens};
 
@@ -94,6 +96,22 @@ impl FractalToken {
                 );
             }
         }
+    }
+
+    pub fn set_guild_ranks(&mut self, guilds: Vec<AccountNumber>) {
+        let mut seen = HashSet::new();
+        for guild in guilds.clone() {
+            if !seen.insert(guild) {
+                abort_message("duplicate ranked guild detected");
+            }
+            check(
+                Guild::get_assert(guild).fractal == self.fractal,
+                "cannot rank foreign guilds",
+            );
+        }
+        check(guilds.len() <= 12, "only up to 12 guilds can be ranked");
+        self.ranked_guilds = guilds;
+        self.save();
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
