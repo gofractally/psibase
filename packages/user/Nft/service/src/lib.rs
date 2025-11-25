@@ -181,7 +181,7 @@ pub mod service {
     #[action]
     pub fn mint() -> NID {
         let nft = NftRecord::add();
-        // Wrapper::emit().history().minted(new_id, issuer);
+        Wrapper::emit().history().minted(nft.id, get_sender());
         nft.id
     }
 
@@ -189,7 +189,7 @@ pub mod service {
     pub fn burn(nft_id: NID) {
         let nft = NftRecord::get_assert(nft_id);
         check(nft.owner == get_sender(), "missing required auth");
-        NftTable::new().erase(&nft_id);
+        NftTable::read_write().erase(&nft_id);
         Wrapper::emit().history().burned(nft_id, nft.owner);
     }
 
@@ -209,22 +209,22 @@ pub mod service {
             .history()
             .credited(nft_id, sender, receiver, memo.clone());
 
-        if !manual_debit {
-            nft.owner = receiver;
-            Wrapper::emit()
-                .merkle()
-                .transferred(nft_id, sender, receiver, memo);
-        } else {
-            CreditTable::new()
+        if manual_debit {
+            CreditTable::read_write()
                 .put(&CreditRecord {
                     nft_id,
                     creditor: sender,
                     debitor: receiver,
                 })
                 .unwrap();
+        } else {
+            nft.owner = receiver;
+            Wrapper::emit()
+                .merkle()
+                .transferred(nft_id, sender, receiver, memo);
         }
 
-        NftTable::new().put(&nft).unwrap();
+        NftTable::read_write().put(&nft).unwrap();
         receiver_holder.save();
     }
 
