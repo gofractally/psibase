@@ -826,34 +826,30 @@ TEST_CASE("GraphQL Queries")
        std::string(userBalances.body.begin(), userBalances.body.end()) ==
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
+   REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 500e4, memo).succeeded());
+   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
+   REQUIRE(bob.to<Tokens>().credit(sysToken, alice, 200e4, memo).succeeded());
+
+   auto userPendingRes =
+       R"({"data":{"userPending":{"edges":[{"node":{"sharedBal":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice","debitor":"bob"}}},{"node":{"sharedBal":{"symbol":"psi","tokenId":1,"precision":4,"balance":"200.0000","creditor":"bob","debitor":"alice"}}}]}}})";
+
    auto userPending = t.post(
+       Tokens::service, "/graphql",
+       GraphQLBody{std::format(
+           R"( query {{ userPending(user: "alice", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance creditor debitor }} }} }} }} }} )",
+           sysToken)},
+       token_a);
+   CHECK(std::string(userPending.body.begin(), userPending.body.end()) == userPendingRes);
+
+   userPending = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{std::format(
            R"( query {{ userPending(user: "bob", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance creditor debitor }} }} }} }} }} )",
            sysToken)},
        token_b);
-   printf(
-       "query: %s",
-       std::format(
-           R"( query {{ userPending(user: "bob", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance debitor }} }} }} }} }} )",
-           sysToken)
-           .c_str());
-   printf("res: %s", std::string(userPending.body.begin(), userPending.body.end()).c_str());
-   CHECK(
-       std::string(userPending.body.begin(), userPending.body.end()) ==
-       R"({"data":{"userPending":{"edges":[{"node":{"sharedBal":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice","debitor":"bob"}}}]}}})");
-
-   auto userDebits = t.post(
-       Tokens::service, "/graphql",
-       GraphQLBody{std::format(
-           R"( query {{ userPending(user: "bob", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance creditor }} }} }} }} }} )",
-           sysToken)},
-       token_b);
-   CHECK(
-       std::string(userDebits.body.begin(), userDebits.body.end()) ==
-       R"({"data":{"userPending":{"edges":[{"node":{"sharedBal":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice"}}}]}}})");
+   CHECK(std::string(userPending.body.begin(), userPending.body.end()) == userPendingRes);
 
    auto userTokens = t.post(
        Tokens::service, "/graphql",

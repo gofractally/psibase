@@ -440,20 +440,6 @@ pub mod tables {
                     UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::MANUAL_DEBIT),
                 );
 
-            let upt = UserPendingTable::new();
-            upt.put(&UserPendingRecord::new(
-                self.creditor,
-                self.token_id,
-                self.shared_bal_id,
-            ))
-            .unwrap();
-            upt.put(&UserPendingRecord::new(
-                self.debitor,
-                self.token_id,
-                self.shared_bal_id,
-            ))
-            .unwrap();
-
             if !is_manual_debit {
                 self.debit(quantity, memo);
             }

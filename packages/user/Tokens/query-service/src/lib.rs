@@ -88,9 +88,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, UserPendingRecord>> {
             self.check_user_auth(user)?;
 
-            println!("user: {:?}", user);
-            println!("token_id: {:?}", token_id);
-            let res = if token_id.is_some() {
+            if token_id.is_some() {
                 TableQuery::subindex::<u64>(
                     UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
                     &(user, token_id.unwrap()),
@@ -112,9 +110,7 @@ mod service {
                 .after(after)
                 .query()
                 .await
-            };
-            // println!("res: {:#?}", res.);
-            res
+            }
         }
 
         /// Returns the specified user's current balances for all of their tokens.
