@@ -17,49 +17,6 @@ pub mod service {
     use psibase::*;
     use psibase::{fracpack::Pack, services::auth_dyn};
 
-    fn configure_new_fractal_account(fractal_account: AccountNumber) {
-        accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
-
-        let set_proxy = Action {
-            sender: fractal_account,
-            service: sites::SERVICE,
-            method: sites::action_structs::setProxy::ACTION_NAME.into(),
-            rawData: sites::action_structs::setProxy {
-                proxy: "fractal-core".into(),
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_policy = Action {
-            sender: fractal_account,
-            service: auth_dyn::SERVICE,
-            method: auth_dyn::action_structs::set_mgmt::ACTION_NAME.into(),
-            rawData: auth_dyn::action_structs::set_mgmt {
-                account: fractal_account,
-                manager: Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_auth_serv = Action {
-            sender: fractal_account,
-            service: accounts::SERVICE,
-            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: accounts::action_structs::setAuthServ {
-                authService: auth_dyn::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        // Create the fractal account, proxy it to fractal-core for a default UI
-        transact::Wrapper::call().runAs(set_proxy, vec![]);
-        transact::Wrapper::call().runAs(set_policy, vec![]);
-        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
-    }
-
     /// Creates a new account and fractal.
     ///
     /// # Arguments
@@ -81,7 +38,6 @@ pub mod service {
         let sender = get_sender();
 
         Fractal::add(fractal_account, name, mission, guild_account);
-        configure_new_fractal_account(fractal_account);
 
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
         let genesis_guild = Guild::add(
