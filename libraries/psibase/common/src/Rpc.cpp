@@ -219,6 +219,11 @@ namespace psibase
       }
    }
 
+   void HttpRequest::removeHeader(std::string_view name)
+   {
+      std::erase_if(headers, [name](const HttpHeader& header) { return header.matches(name); });
+   }
+
    bool isLocalhost(const HttpRequest& request)
    {
       std::string_view domain = request.host;

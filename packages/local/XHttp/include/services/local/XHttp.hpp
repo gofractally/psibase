@@ -13,6 +13,7 @@ namespace LocalService
    enum class SocketType : std::uint8_t
    {
       http,
+      handshake,
       websocket,
    };
 
@@ -60,6 +61,16 @@ namespace LocalService
                                std::optional<psibase::TLSInfo>        tls,
                                std::optional<psibase::SocketEndpoint> endpoint);
 
+      /// Opens a websocket connection and returns the new socket. The
+      /// request method must be GET. The required headers for the websocket
+      /// handshake will be added to the request if they are not already
+      /// provided. If the connection is successfully established...
+      std::int32_t websocket(psibase::HttpRequest                   request,
+                             psibase::MethodNumber                  callback,
+                             psibase::MethodNumber                  err,
+                             std::optional<psibase::TLSInfo>        tls,
+                             std::optional<psibase::SocketEndpoint> endpoint);
+
       /// Enables or disables automatic closing of the socket
       /// when the transaction context exits.
       ///
@@ -76,6 +87,16 @@ namespace LocalService
                   psibase::MethodNumber     callback,
                   psibase::MethodNumber     err);
 
+      /// Changes the callback for a socket. The sender must be the owner
+      /// of the socket.
+      void setCallback(std::int32_t          socket,
+                       psibase::MethodNumber callback,
+                       psibase::MethodNumber err);
+
+      /// Close a socket. The socket should be either a websocket
+      /// or a pending http request.
+      void close(std::int32_t socket);
+
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
 
@@ -85,9 +106,12 @@ namespace LocalService
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
                 method(sendRequest, request, callback, err, tls, endpoint),
+                method(websocket, request, callback, err, tls, endpoint),
                 method(autoClose, socket, value),
                 method(sendReply, socket, response),
                 method(accept, socket, reply, callback, err),
+                method(setCallback, socket, callback, err),
+                method(close, socket),
                 method(rootHost, host),
                 method(startSession))
 

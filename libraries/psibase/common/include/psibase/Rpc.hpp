@@ -82,6 +82,9 @@ namespace psibase
 
       /// Removes a cookie
       void removeCookie(std::string_view name);
+
+      /// Removes a header
+      void removeHeader(std::string_view name);
    };
 
    /// Checks if the host indicates a development chain
