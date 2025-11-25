@@ -24,6 +24,7 @@ members = [
     "user/FractalCore/plugin",
     "user/Workshop/plugin",
     "user/Config/plugin",
+    "user/Nft/plugin",
 ]
 resolver = "2"
 

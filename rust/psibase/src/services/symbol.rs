@@ -45,7 +45,7 @@ pub mod Service {
     use crate::{services::tokens::Quantity, AccountNumber};
 
     #[action]
-    fn init(billing_token: TID) {
+    fn init() {
         unimplemented!()
     }
 
@@ -56,6 +56,16 @@ pub mod Service {
 
     #[action]
     fn exists(symbol: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn sellLength(length: u8, initial_price: Quantity, target: u32, floor_price: Quantity) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn delLength(length: u8) {
         unimplemented!()
     }
 
@@ -95,7 +105,7 @@ pub mod Service {
     }
 
     #[event(history)]
-    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {
+    fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {
         unimplemented!()
     }
 }

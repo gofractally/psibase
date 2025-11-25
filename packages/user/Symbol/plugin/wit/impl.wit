@@ -6,6 +6,7 @@ world impl {
     include permissions:plugin/imports;
     include tokens:plugin/imports;
     include staged-tx:plugin/imports;
+    include nft:plugin/imports;
 
 
     export api;

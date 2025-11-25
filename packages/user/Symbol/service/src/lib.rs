@@ -3,46 +3,23 @@
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
+    use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::nft::{NftRecord, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
+    use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord};
     use psibase::{
-        check, check_some, get_sender, services::nft::NID, AccountNumber, Fracpack, Table, ToSchema,
+        AccountNumber, Fracpack, Table, ToSchema, check, check_some, get_sender, services::nft::NID,
     };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
-    pub struct Config {
-        pub billing_token: TID,
-    }
+    use crate::service::{CREATED, MAPPED};
 
-    impl Config {
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {}
+    impl InitRow {
         #[primary_key]
         fn pk(&self) {}
-
-        fn new(billing_token: TID) -> Self {
-            Self { billing_token }
-        }
-
-        pub fn set(billing_token: TID) -> Self {
-            check_none(Self::get(), "config is already set");
-            let new_instance = Self::new(billing_token);
-            new_instance.save();
-            new_instance
-        }
-
-        pub fn get() -> Option<Self> {
-            ConfigTable::read().get_index_pk().get(&())
-        }
-
-        pub fn get_assert() -> Self {
-            check_some(Self::get(), "Config not found")
-        }
-
-        pub fn save(&self) {
-            ConfigTable::read_write().put(&self).unwrap();
-        }
     }
 
     #[table(name = "SymbolLengthTable", index = 1)]
@@ -51,6 +28,9 @@ pub mod tables {
     pub struct SymbolLength {
         #[primary_key]
         pub symbolLength: u8,
+        
+        /// The owner of this NFT can change the price behavior for symbols of this length
+        #[graphql(name = "priceNftId")]
         pub nftId: NID,
     }
 
@@ -67,21 +47,45 @@ pub mod tables {
         }
 
         pub fn get_assert(symbol_length: u8) -> Self {
-            check_some(Self::get(symbol_length), "symbol length not supported")
+            check_some(
+                Self::get(symbol_length),
+                format!("symbol length of {} not supported", symbol_length).as_str(),
+            )
         }
 
-        pub fn add(symbol_length: u8) -> Self {
-            let nft_id = psibase::services::diff_adjust::Wrapper::call()
-                .create(10000000, 86400, 24, 24, 0, 50000);
+        pub fn delete(&self) {
+            DiffAdjust::call().delete(self.nftId);
+            SymbolLengthTable::read_write().erase(&self.symbolLength);
+        }
+
+        pub fn add(symbol_length: u8, initial_price: u64, target: u32, floor_price: u64) -> Self {
+            check_none(
+                Self::get(symbol_length),
+                "sale of symbol length already exists",
+            );
+            check(
+                symbol_length >= 3 && symbol_length <= 7,
+                "symbol length must be between 3 - 7 chars",
+            );
+
+            const TIME_WINDOW: u32 = 86_400; // 1 day (seconds)
+            const RATE_OF_CHANGE: u32 = 50_000; // 5 percent (ppm)
+
+            let nft_id = DiffAdjust::call().create(
+                initial_price,
+                TIME_WINDOW,
+                target,
+                target,
+                floor_price,
+                RATE_OF_CHANGE,
+            );
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();
             new_instance
         }
 
         pub fn price(&self) -> Quantity {
-            psibase::services::diff_adjust::Wrapper::call()
-                .get_diff(self.nftId)
-                .into()
+            DiffAdjust::call().get_diff(self.nftId).into()
         }
 
         fn save(&self) {
@@ -94,14 +98,12 @@ pub mod tables {
         pub async fn current_price(&self) -> Decimal {
             Decimal::new(
                 self.price(),
-                Tokens::call()
-                    .getToken(Config::get_assert().billing_token)
-                    .precision,
+                check_some(Tokens::call().getSysToken(), "system token must be defined").precision,
             )
         }
 
         pub async fn billing_token(&self) -> TokenRecord {
-            Tokens::call().getToken(Config::get_assert().billing_token)
+            check_some(Tokens::call().getSysToken(), "system token must be defined")
         }
     }
 
@@ -128,7 +130,7 @@ pub mod tables {
             check_some(Self::get(symbol), "Symbol does not exist")
         }
 
-        pub fn add(symbol: AccountNumber, billable: bool) -> Self {
+        pub fn add(symbol: AccountNumber) -> Self {
             check_none(Symbol::get(symbol), "Symbol already exists");
             let length_record = SymbolLength::get(symbol.to_string().len() as u8);
             check(
@@ -137,41 +139,33 @@ pub mod tables {
                 "Symbol may only contain 3 to 7 lowercase alphabetic characters",
             );
             let length_record = length_record.unwrap();
-            let recipient = get_sender();
-            let billing_token = Config::get_assert().billing_token;
+            let sender = get_sender();
+            let billing_token =
+                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
 
-            let on_created = |quantity: Quantity| {
-                crate::Wrapper::emit().history().symCreated(
-                    symbol,
-                    recipient,
-                    Decimal::new(quantity, Tokens::call().getToken(billing_token).precision)
-                        .to_string(),
-                );
-            };
+            if sender != crate::Wrapper::SERVICE {
+                let price = Quantity::from(DiffAdjust::call().increment(length_record.nftId, 1));
 
-            if billable {
-                let price = psibase::services::diff_adjust::Wrapper::call()
-                    .increment(length_record.nftId, 1)
-                    .into();
-
-                Tokens::call().debit(
-                    billing_token,
-                    recipient,
-                    price,
-                    "symbol purchase".to_string().try_into().unwrap(),
-                );
-
-                on_created(price);
-            } else {
-                on_created(0.into());
+                if price.value > 0 {
+                    Tokens::call().debit(
+                        billing_token,
+                        sender,
+                        price,
+                        "symbol purchase".to_string().try_into().unwrap(),
+                    );
+                }
             }
+
+            crate::Wrapper::emit()
+                .history()
+                .symEvent(symbol, sender, CREATED);
 
             let new_instance = Self::new(symbol, Nft::call().mint());
             new_instance.save();
 
             Nft::call().credit(
                 new_instance.ownerNft,
-                recipient,
+                sender,
                 format!("This NFT conveys ownership of symbol: {}", symbol).into(),
             );
 
@@ -180,15 +174,23 @@ pub mod tables {
 
         pub fn map_symbol(&mut self, token_id: TID) {
             let token_owner_nft = Tokens::call().getToken(token_id).nft_id;
+            let symbol_owner_nft = self.ownerNft;
             check(
                 Nft::call().getNft(token_owner_nft).owner == get_sender(),
                 "Missing required authority",
             );
+            check(
+                Nft::call().getNft(symbol_owner_nft).owner == get_sender(),
+                "Missing required authority",
+            );
 
-            let symbol_owner_nft = self.ownerNft;
             Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
             Nft::call().burn(symbol_owner_nft);
             Mapping::add(token_id, self.symbolId);
+
+            crate::Wrapper::emit()
+                .history()
+                .symEvent(self.symbolId, get_sender(), MAPPED);
         }
 
         fn save(&self) {
@@ -199,7 +201,7 @@ pub mod tables {
     #[ComplexObject]
     impl Symbol {
         pub async fn owner_nft(&self) -> NftRecord {
-            psibase::services::nft::Wrapper::call().getNft(self.ownerNft)
+            Nft::call().getNft(self.ownerNft)
         }
 
         pub async fn mapping(&self) -> Option<Mapping> {
@@ -266,36 +268,62 @@ pub mod tables {
 
 #[psibase::service(name = "symbol", tables = "tables")]
 pub mod service {
-    use crate::tables::{Config, Mapping, Symbol, SymbolLength};
+    use crate::tables::{InitRow, InitTable, Mapping, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
     use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
+
+    use psibase::services::events;
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
-    fn init(billing_token: TID) {
-        Tokens::call().getToken(billing_token); // Validate token exists
-        check_none(Config::get(), "service already initialized");
-        check(
-            get_sender() == "root".into() || get_sender() == Wrapper::SERVICE,
-            "only root or symbol account can call init",
-        );
+    fn init() {
+        let table = InitTable::new();
 
-        Config::set(billing_token);
-        Tokens::call_from(Wrapper::SERVICE).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-        Nft::call_from(Wrapper::SERVICE).setUserConf(0, true);
+        if InitTable::read().get_index_pk().get(&()).is_none() {
+            table.put(&InitRow {}).unwrap();
 
-        // Populate default settings for each token symbol length
-        for length in 3u8..7 {
-            SymbolLength::add(length);
+            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+            Nft::call().setUserConf("manualDebit".into(), true);
+
+            let add_index = |method: &str, column: u8| {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            };
+
+            add_index("symEvent", 0);
+            add_index("symEvent", 1);
         }
     }
 
     #[action]
+    fn sellLength(length: u8, initial_price: Quantity, target: u32, floor_price: Quantity) {
+        check_some(Tokens::call().getSysToken(), "system token must be defined");
+        check(
+            get_sender() == get_service(),
+            "only symbols account can sell lengths",
+        );
+        SymbolLength::add(length, initial_price.value, target, floor_price.value);
+    }
+
+    #[action]
+    fn delLength(length: u8) {
+        check(
+            get_sender() == get_service(),
+            "only symbols account can delete lengths",
+        );
+        SymbolLength::get_assert(length).delete();
+    }
+
+    #[action]
     fn create(symbol: AccountNumber) {
-        Symbol::add(symbol, get_sender() != Wrapper::SERVICE);
+        Symbol::add(symbol);
     }
 
     #[action]
@@ -346,9 +374,14 @@ pub mod service {
 
     #[pre_action(exclude(init, getByToken))]
     fn check_init() {
-        check_some(Config::get(), "service not initialized");
+        check_some(
+            InitTable::read().get_index_pk().get(&()),
+            "service not inited",
+        );
     }
 
+    pub const CREATED: u8 = 0;
+    pub const MAPPED: u8 = 1;
     #[event(history)]
-    fn symCreated(symbol: SID, owner: AccountNumber, cost: String) {}
+    fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {}
 }

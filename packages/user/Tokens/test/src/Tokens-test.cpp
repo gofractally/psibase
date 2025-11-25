@@ -40,6 +40,11 @@ SCENARIO("Using system token")
       Quantity userBalance{1'000'000'00e4};
 
       uint32_t sysToken = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+      t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
       CHECK(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, true);
@@ -690,9 +695,17 @@ SCENARIO("Mapping a symbol to a token")
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      auto sysToken    = Tokens::sysToken;
-      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, userBalance, memo);
+      auto sysToken    = sysIssuer.create(Precision{4}, userBalance).returnVal();
+
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+
+      REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
+      REQUIRE(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
+      REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
+      REQUIRE(t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 5000).succeeded());
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
@@ -700,8 +713,6 @@ SCENARIO("Mapping a symbol to a token")
       aliceTokens.mint(newToken, userBalance, memo);
 
       auto symbolCtx = t.from("symbol"_a);
-
-      CHECK(symbolCtx.to<Symbol>().init(sysToken).succeeded());
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.to<Symbol>().getPrice(3).returnVal();
@@ -816,10 +827,9 @@ TEST_CASE("GraphQL Queries")
    auto bob   = t.from(t.addAccount("bob"_a));
 
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
-   sysIssuer.create(Precision{4}, 1'000'000'000e4);
-
-   auto sysToken = Tokens::sysToken;
-   CHECK(symbolCtx.to<Symbol>().init(sysToken).succeeded());
+   auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+   t.from(Symbol::service).to<Nft>().debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "");
+   t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
 
    auto userBalance = 1'000'000e4;
 
@@ -829,12 +839,17 @@ TEST_CASE("GraphQL Queries")
    REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
    t.finishBlock();
 
-   auto userBalaces = t.post(
+   auto token_a = t.login(alice, Tokens::service);
+   auto token_b = t.login(bob, Tokens::service);
+
+   auto userBalances = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"});
+           R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"},
+       token_a);
+
    CHECK(
-       std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
+       std::string(userBalances.body.begin(), userBalances.body.end()) ==
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
@@ -842,7 +857,8 @@ TEST_CASE("GraphQL Queries")
    auto userCredits = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userCredits(user: "alice") { edges { node { symbol tokenId precision balance debitor } } } } )"});
+           R"( query { userCredits(user: "alice") { edges { node { symbol tokenId precision balance debitor } } } } )"},
+       token_a);
    CHECK(
        std::string(userCredits.body.begin(), userCredits.body.end()) ==
        R"({"data":{"userCredits":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000.0000","debitor":"bob"}}]}}})");
@@ -850,7 +866,8 @@ TEST_CASE("GraphQL Queries")
    auto userDebits = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userDebits(user: "bob") { edges { node { symbol tokenId precision balance creditor } } } } )"});
+           R"( query { userDebits(user: "bob") { edges { node { symbol tokenId precision balance creditor } } } } )"},
+       token_b);
    CHECK(
        std::string(userDebits.body.begin(), userDebits.body.end()) ==
        R"({"data":{"userDebits":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice"}}]}}})");

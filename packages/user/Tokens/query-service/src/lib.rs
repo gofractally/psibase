@@ -11,8 +11,8 @@ mod service {
     use tokens::{
         helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
-            Balance, BalanceTable, SharedBalance, SharedBalanceTable, Token, TokenTable,
-            UserConfig, UserConfigTable,
+            Balance, BalanceTable, ConfigRow, ConfigTable, SharedBalance, SharedBalanceTable,
+            Token, TokenTable, UserConfig, UserConfigTable,
         },
     };
 
@@ -29,10 +29,31 @@ mod service {
         }
     }
 
-    struct Query;
+    struct Query {
+        user: Option<AccountNumber>,
+    }
+
+    impl Query {
+        fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
+            Ok(())
+        }
+    }
 
     #[Object]
     impl Query {
+        /// Returns the token service global configuration
+        async fn config(&self) -> Option<ConfigRow> {
+            ConfigTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&())
+        }
+
         /// Given a token id, return a record that represents token
         /// configuration, ownership, and supply details.
         async fn token(&self, token_id: String) -> Option<Token> {
@@ -64,6 +85,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+            self.check_user_auth(user)?;
+
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
                 &user,
@@ -87,6 +110,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+            self.check_user_auth(user)?;
+
             TableQuery::subindex::<(AccountNumber, u32)>(
                 SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_debitor(),
                 &(user),
@@ -108,6 +133,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Balance>> {
+            self.check_user_auth(user)?;
+
             TableQuery::subindex::<u32>(
                 BalanceTable::with_service(tokens::SERVICE).get_index_pk(),
                 &(user),
@@ -127,6 +154,8 @@ mod service {
             token_id: String,
         ) -> async_graphql::Result<Balance> {
             let token_id = token_id_to_number(token_id);
+
+            self.check_user_auth(user)?;
 
             Ok(BalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -213,6 +242,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+            self.check_user_auth(account)?;
+
             let precision = TokenTable::with_service(tokens::SERVICE)
                 .get_index_pk()
                 .get(&token_id)
@@ -298,9 +329,18 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
+        check(
+            get_sender() == AccountNumber::from("http-server"),
+            "permission denied: tokens::serveSys only callable by 'http-server'",
+        );
+
         // Services graphql queries
-        None.or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_graphql(&request, Query { user }))
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
     }

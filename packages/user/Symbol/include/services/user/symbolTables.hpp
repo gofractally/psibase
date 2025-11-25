@@ -14,21 +14,31 @@ namespace UserService
 {
    using SID = psibase::AccountNumber;
 
+   struct Mapping
+   {
+      TID                         tokenId;
+      SID                         symbolId;
+      friend std::strong_ordering operator<=>(const Mapping&, const Mapping&) = default;
+   };
+   PSIO_REFLECT(Mapping, tokenId, symbolId);
+   using MappingByTokenTable = psibase::Table<Mapping, &Mapping::tokenId>;
+   PSIO_REFLECT_TYPENAME(MappingByTokenTable)
+   using MappingBySymbolTable = psibase::Table<Mapping, &Mapping::symbolId>;
+   PSIO_REFLECT_TYPENAME(MappingBySymbolTable)
+
    struct SymbolLengthRecord
    {
       uint8_t  symbolLength;
-      uint64_t  nftId;
+      uint64_t nftId;
    };
-   PSIO_REFLECT(SymbolLengthRecord,
-                symbolLength,
-                nftId);
+   PSIO_REFLECT(SymbolLengthRecord, symbolLength, nftId);
    using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
    PSIO_REFLECT_TYPENAME(SymbolLengthTable)
 
    struct SymbolRecord
    {
-      SID         symbolId;
-      NID         ownerNft;
+      SID symbolId;
+      NID ownerNft;
 
       static bool isValidKey(SID testSymbol)
       {

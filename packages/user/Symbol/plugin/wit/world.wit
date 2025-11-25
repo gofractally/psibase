@@ -3,19 +3,39 @@ package symbol:plugin;
 interface api {
     use host:types/types.{error};
 
-    /// Create / purchase a new symbol
-    /// Requires symbol to purchase and deposit amount of billable token
+    /// Creates a new symbol. An NFT representing ownership of this symbol will be credited to the creator account.
+    ///
+    /// Parameters:
+    /// * `symbol` - The symbol to create
+    /// * `deposit` - The max amount of system tokens that can be billed to pay for the creation of the symbol
     create: func(symbol: string, deposit: string) -> result<_, error>;
 
-    /// Maps a symbol to a token ID
+    /// Maps a symbol to a token ID. This mapping is permanent (The ownership NFT will be burned).
+    ///
+    /// Parameters:
+    /// * `token-id` - The token ID to map the symbol to
+    /// * `symbol` - The symbol to map
     map-symbol: func(token-id: u32, symbol: string) -> result<_, error>;
 }
 
 interface admin {
     use host:types/types.{error};
 
-    /// Initialize the symbol service and specify which token to bill in
-    init: func(token-id: u32) -> result<_, error>;
+    /// Start selling symbols of a certain length
+    ///
+    /// Parameters:
+    /// * `length` - Length of symbol to start selling
+    /// * `initial-price` - Initial price in the network token
+    /// * `target` - Target amount to sell in 24 hour period
+    /// * `floor-price` - The minimum price in the network form
+    sell-length: func(length: u8, initial-price: u64, target: u32, floor-price: u64) -> result<_, error>;
+
+    /// Delete symbol length, preventing further sales.
+    ///
+    /// Parameters:
+    /// * `length` - Length of symbol to stop selling
+    del-length: func(length: u8) -> result<_, error>;
+
 
 }
 

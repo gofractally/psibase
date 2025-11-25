@@ -290,6 +290,7 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
+    nft
     fractal-core
     config
     producers
@@ -432,6 +433,13 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthDyn.psi
+    PATH packages/system/AuthDyn
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
+
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
@@ -810,6 +818,19 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Nft.psi
+    NAME Nft
+    VERSION ${PSIBASE_VERSION}.0
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    SERVICE nft
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
+        INIT
+        DATA ${Plugins_OUTPUT_FILE_nft} /plugin.wasm
+    DEPENDS wasm
+    DEPENDS ${Plugins_DEP}
+)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
@@ -918,8 +939,7 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Initial token users"
-    ACCOUNTS alice bob
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
@@ -1022,7 +1042,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact Homepage WebCrypto Workshop Config
 )
@@ -1032,7 +1052,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
 )
@@ -1077,7 +1097,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
+    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XRun XSites XTransact)
@@ -1087,6 +1107,7 @@ install(
           ${SERVICE_DIR}/Accounts.psi
           ${SERVICE_DIR}/Aes.psi
           ${SERVICE_DIR}/AuthAny.psi
+          ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/Base64.psi
