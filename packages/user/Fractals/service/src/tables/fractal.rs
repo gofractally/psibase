@@ -1,8 +1,10 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{check_none, check_some, AccountNumber, Table, ToServiceSchema};
 
 use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
 
+use psibase::services::token_stream::Wrapper as TokenStream;
+use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl Fractal {
@@ -21,6 +23,9 @@ impl Fractal {
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
+            ranked_guilds: vec![],
+            token: None,
+            stream_id: None,
         }
     }
 
@@ -31,6 +36,27 @@ impl Fractal {
         genesis_guild: AccountNumber,
     ) {
         Self::new(account, name, mission, genesis_guild).save();
+    }
+
+    pub fn init_token(&mut self) {
+        check_none(self.token, "fractal already has a token");
+        check_none(self.stream_id, "fractal already has a stream");
+        let token_supply = Quantity::from(2100000000);
+
+        let token_id = Tokens::call().create(2.try_into().unwrap(), token_supply);
+        Tokens::call().mint(token_id, token_supply, "Fractal token initiation".into());
+        let stream_id = TokenStream::call().create(86400 * 7 * 52 * 25, token_id);
+        Tokens::call().credit(
+            token_id,
+            TokenStream::SERVICE,
+            token_supply,
+            "Stream".into(),
+        );
+        TokenStream::call().deposit(stream_id, token_supply);
+
+        self.stream_id = Some(stream_id);
+        self.token = Some(token_id);
+        self.save();
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {

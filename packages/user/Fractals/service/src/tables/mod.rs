@@ -28,6 +28,7 @@ pub mod tables {
         pub legislature: AccountNumber,
         pub judiciary: AccountNumber,
         pub token: Option<TID>,
+        pub stream_id: Option<u32>,
         pub ranked_guilds: Vec<AccountNumber>,
     }
 

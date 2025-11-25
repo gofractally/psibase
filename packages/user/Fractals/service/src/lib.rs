@@ -366,10 +366,12 @@ pub mod service {
 
     #[action]
     fn init_token(fractal: AccountNumber) {
+        let fractal = Fractal::get_assert(fractal);
         check(
-            Fractal::get_assert(fractal).legislature == get_sender(),
+            fractal.legislature == get_sender(),
             "only the legislature can exile members",
         );
+
         // FractalMember::get_assert(fractal, member).init_token();
 
         // To change:
@@ -418,8 +420,9 @@ pub mod service {
 
     #[action]
     fn dist_token(fractal: AccountNumber) {
+        let fractal = Fractal::get_assert(fractal);
         check(
-            Fractal::get_assert(fractal).legislature == get_sender(),
+            fractal.legislature == get_sender(),
             "only the legislature can distribute",
         );
 
