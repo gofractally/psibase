@@ -1,0 +1,24 @@
+[package]
+name = "symbol"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-symbol"
+plugin = "symbol-plugin"
+postinstall = [{ sender = "symbol", service = "symbol", method = "init" }]
+
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+
+
+[dev-dependencies]
+symbol-pkg = { path = "..", version = "0.22.0" }
