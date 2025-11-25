@@ -1,8 +1,12 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::services::tokens::{Quantity, TID};
+use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
+use crate::tables::tables::{
+    FractalToken, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
+};
+use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -15,6 +19,7 @@ impl GuildMember {
             pending_score: None,
             score: 0,
             created_at: now,
+            stream_id: None,
         }
     }
 
@@ -33,8 +38,11 @@ impl GuildMember {
     }
 
     pub fn set_pending_score(&mut self, incoming_score: u32) {
-        self.pending_score = Some(incoming_score * 10000);
-        self.save();
+        let guild = Guild::get_assert(self.guild);
+        if FractalToken::get(guild.fractal).is_some() {
+            self.pending_score = Some(incoming_score * 10000);
+            self.save();
+        }
     }
 
     pub fn save_pending_score(&mut self) {
@@ -48,18 +56,44 @@ impl GuildMember {
         self.remove();
     }
 
-    pub fn guild_memberships(member: AccountNumber) -> Vec<Self> {
+    pub fn memberships_of_member(member: AccountNumber) -> Vec<Self> {
         GuildMemberTable::read()
             .get_index_by_member()
             .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
             .collect()
     }
 
+    pub fn memberships_of_guild(guild: AccountNumber) -> Vec<Self> {
+        GuildMemberTable::read()
+            .get_index_pk()
+            .range((guild, AccountNumber::from(0))..=(guild, AccountNumber::from(u64::MAX)))
+            .collect()
+    }
+
     pub fn remove_all_by_member(member: AccountNumber) {
         let table = GuildMemberTable::read_write();
-        for membership in Self::guild_memberships(member) {
+        for membership in Self::memberships_of_member(member) {
             table.remove(&membership);
         }
+    }
+
+    pub fn deposit_stream(&mut self, token_id: TID, amount: Quantity, memo: Memo) {
+        let stream_id = self.stream_id.unwrap_or_else(|| self.init_stream(token_id));
+        psibase::services::tokens::Wrapper::call().credit(
+            token_id,
+            TokenStream::SERVICE,
+            amount,
+            memo,
+        );
+        TokenStream::call().deposit(stream_id, amount);
+    }
+
+    pub fn init_stream(&mut self, token_id: TID) -> u32 {
+        check_none(self.stream_id, "member already has stream");
+        let stream = TokenStream::call().create(86400 * 7 * 12, token_id);
+        self.stream_id = Some(stream);
+        self.save();
+        stream
     }
 
     fn remove(&self) {

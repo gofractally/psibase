@@ -8,8 +8,8 @@ pub mod service {
     use crate::tables::{
         fractal_member::MemberStatus,
         tables::{
-            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
-            GuildMember,
+            EvaluationInstance, Fractal, FractalMember, FractalToken, Guild, GuildApplication,
+            GuildAttest, GuildMember,
         },
     };
 
@@ -215,7 +215,13 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        FractalMember::add(fractal, sender, MemberStatus::Visa);
+        let member_status = if FractalToken::get(fractal).is_some() {
+            MemberStatus::Visa
+        } else {
+            MemberStatus::Citizen
+        };
+
+        FractalMember::add(fractal, sender, member_status);
 
         Wrapper::emit().history().joined_fractal(fractal, sender);
     }
@@ -364,132 +370,37 @@ pub mod service {
         FractalMember::get_assert(fractal, member).exile();
     }
 
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
     #[action]
     fn init_token(fractal: AccountNumber) {
-        let fractal = Fractal::get_assert(fractal);
+        let mut fractal = Fractal::get_assert(fractal);
         check(
             fractal.legislature == get_sender(),
             "only the legislature can exile members",
         );
 
-        // FractalMember::get_assert(fractal, member).init_token();
-
-        // To change:
-        // Setting of a guild schedule can occur, but no scores are actually set
-        // until a token exists. The UI will allow ranking but will tell users
-        // that it doesn't really matter. set pending score doesn't actually set it, keeps it as None
-        //
-        //
-        // Create a token of hardcoded supply
-        // mint the entire amount
-        // Throw the entire amount over to token stream
-        //
-        // WHen distributing we call claim
-        // Loop through each guild according to their index
-        // distribute tokens to guild members from the allocated guild tokens
-        // to each member
-        //
-        // People who join before token are citizens
-        // People who join after token are visa holders
-        // until they get citizenship.
-
-        //
-        // Tourist Visa fee
-        // Application fee
-        //
-        //
-        // Promoting to citizen
-        // Code laws:
-        // Set by the fractal legislature
-        // Have been a tourist visa for 6 months
-
-        // Human:
-        //
-
-        // Does the member of the guild apply for citizenship?
-        // John applies to become a citizen and meets the code rules
-        // he is first on the list of the guild
-        // if the guild approves it then the legislature approves their citzenship
-        //
-
-        // Later:
-        // Add fees.
-        // Founders have no recruitment
-        //
+        fractal.init_token();
     }
 
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
-        let fractal = Fractal::get_assert(fractal);
         check(
-            fractal.legislature == get_sender(),
+            Fractal::get_assert(fractal).legislature == get_sender(),
             "only the legislature can distribute",
         );
-
-        // Claim vested tokens
-        // Fractal -> Guild 1, Guild 2, Guild 3.
-
-        // get_guilds(fractal);
-        // same algo to determine to each guild to each member
-        //
-        // James - 3
-        // John - 2.8
-        // Brandon - 2.7
-        //
-        // James - 3
-        // John - 0.8
-        // Brandon - 0.7
-
-        // Guilds are number 1 - 12
-        // First guild, score 12, length - position
-
-        // Guilds calculation
-        // x - n - Position - length
-        // y - m - fib(12) = 200
-        //
-        // Software Dev - 6 -> 200
-        // Marketing - 5 -> 160
-        // HR - 4 -> 122
-        //
-        // SUM -> 122 + 160 + 200
-        // Distribution for each is
-        // Software Dev -> 200 / 488 -> % -> % of the tokens we have to distribute
-        // Marketing -> 160 / 488 -> % -> % of the tokens
-
-        // Member calculation
-        // x - n - Guild member score
-        // y - m - the sum of all possible ns
-        //
-        // John -> 4.88 -> fib(4.88) -> 444
-        // James -> 4.5 -> fib(4.5) -> 344
-        // Brandon -> 3
-        // Dan -> 3
-        //
-        // Add all the fibbactis together
-        // John gets 444 / 1203 -> 25%
-        //
-        //
-
-        // FractalMember::get_assert(fractal, member).init_token();
-
-        pub fn fibonacci_binet_exact(n: u64) -> u64 {
-            if n == 0 {
-                return 0;
-            }
-            if n == 1 {
-                return 1;
-            }
-
-            let phi = (1.0 + 5.0_f64.sqrt()) / 2.0;
-            let psi = (1.0 - 5.0_f64.sqrt()) / 2.0; // conjugate
-            let sqrt5 = 5.0_f64.sqrt();
-
-            // Full Binet: F_n = (φ^n - ψ^n) / √5
-            // Since |ψ| < 1, ψ^n is tiny for large n
-            let term1 = phi.powi(n as i32);
-            let term2 = psi.powi(n as i32);
-            ((term1 - term2) / sqrt5).round() as u64
-        }
+        FractalToken::get_assert(fractal).distribute_tokens();
     }
 
     #[event(history)]
