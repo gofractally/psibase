@@ -2,6 +2,7 @@ mod evaluation_instance;
 mod fractal;
 mod fractal_exile;
 pub mod fractal_member;
+mod fractal_token;
 mod guild;
 mod guild_application;
 mod guild_attest;
@@ -11,7 +12,7 @@ mod guild_member;
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
 
     use serde::{Deserialize, Serialize};
 
@@ -107,6 +108,7 @@ pub mod tables {
         pub score: u32,
         pub pending_score: Option<u32>,
         pub created_at: psibase::TimePointSec,
+        pub stream_id: Option<u32>,
     }
 
     impl GuildMember {
@@ -196,6 +198,23 @@ pub mod tables {
         #[secondary_key(1)]
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
             (self.member, self.fractal)
+        }
+    }
+
+    #[table(name = "FractalTokenTable", index = 8)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct FractalToken {
+        #[primary_key]
+        pub fractal: AccountNumber,
+        pub token: TID,
+        pub stream_id: u32,
+        pub ranked_guilds: Vec<AccountNumber>,
+    }
+
+    impl FractalToken {
+        #[secondary_key(1)]
+        fn by_token(&self) -> TID {
+            self.token
         }
     }
 }

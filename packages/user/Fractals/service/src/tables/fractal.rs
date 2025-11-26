@@ -1,7 +1,9 @@
 use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
-use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
+use crate::tables::tables::{
+    Fractal, FractalMember, FractalMemberTable, FractalTable, FractalToken,
+};
 
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -31,6 +33,14 @@ impl Fractal {
         genesis_guild: AccountNumber,
     ) {
         Self::new(account, name, mission, genesis_guild).save();
+    }
+
+    pub fn token(&self) -> Option<FractalToken> {
+        FractalToken::get(self.account)
+    }
+
+    pub fn init_token(&mut self) {
+        FractalToken::add(self.account);
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {

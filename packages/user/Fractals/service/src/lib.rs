@@ -8,8 +8,8 @@ pub mod service {
     use crate::tables::{
         fractal_member::MemberStatus,
         tables::{
-            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
-            GuildMember,
+            EvaluationInstance, Fractal, FractalMember, FractalToken, Guild, GuildApplication,
+            GuildAttest, GuildMember,
         },
     };
 
@@ -215,7 +215,13 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        FractalMember::add(fractal, sender, MemberStatus::Visa);
+        let member_status = if FractalToken::get(fractal).is_some() {
+            MemberStatus::Visa
+        } else {
+            MemberStatus::Citizen
+        };
+
+        FractalMember::add(fractal, sender, member_status);
 
         Wrapper::emit().history().joined_fractal(fractal, sender);
     }
@@ -362,6 +368,55 @@ pub mod service {
             "only the legislature can exile members",
         );
         FractalMember::get_assert(fractal, member).exile();
+    }
+
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        let mut fractal = Fractal::get_assert(fractal);
+        check(
+            fractal.legislature == get_sender(),
+            "only the legislature initialise fractal token",
+        );
+
+        fractal.init_token();
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can distribute",
+        );
+        FractalToken::get_assert(fractal).distribute_tokens();
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    #[action]
+    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can rank guilds",
+        );
+        FractalToken::get_assert(fractal).set_ranked_guilds(guilds);
     }
 
     #[event(history)]

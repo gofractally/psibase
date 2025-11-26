@@ -175,9 +175,11 @@ impl EvaluationInstance {
     }
 
     pub fn set_pending_scores(&self, pending_score: u32) {
-        self.guild_members().into_iter().for_each(|mut account| {
-            account.set_pending_score(pending_score);
-        });
+        GuildMember::memberships_of_guild(self.guild)
+            .into_iter()
+            .for_each(|mut account| {
+                account.set_pending_score(pending_score);
+            });
     }
 
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
