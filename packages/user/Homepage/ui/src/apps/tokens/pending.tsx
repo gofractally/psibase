@@ -79,6 +79,13 @@ export const PendingPageContents = () => {
         );
     }
 
+    const counterParty =(pt: LineOfCredit) => {
+        if (pt.creditor === currentUser) {
+            return pt.debitor;
+        }
+        return pt.creditor;
+    };
+
     return (
         <GlowingCard>
             <CardHeader>
@@ -101,30 +108,32 @@ export const PendingPageContents = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {pendingTransactions.map((pt, index) => (
-                            <TableRow key={`${currentUser ?? ""}-${index}`}>
-                                <TableCell className="font-medium">
-                                    <CellCounterparty
-                                        account={currentUser ?? ""}
-                                        currentUser={currentUser}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <CellIncoming
-                                        debit={pt}
-                                        counterParty={pt.debitor}
-                                        currentUser={currentUser}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <CellOutgoing
-                                        credit={pt}
-                                        counterParty={pt.creditor}
-                                        currentUser={currentUser}
-                                    />
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        {pendingTransactions.map((pt, index) => {
+                            const cntrParty = counterParty(pt);
+                            return (
+                                <TableRow key={`${cntrParty}-${index}`}>
+                                    <TableCell className="font-medium">
+                                        <CellCounterparty
+                                            account={cntrParty}
+                                            currentUser={currentUser}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <CellIncoming
+                                            debit={pt}
+                                            counterParty={cntrParty}
+                                            currentUser={currentUser}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <CellOutgoing
+                                            credit={pt}
+                                            counterParty={cntrParty}
+                                            currentUser={currentUser}
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                        );})}
                     </TableBody>
                 </Table>
             </CardContent>
