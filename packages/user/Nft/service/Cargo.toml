@@ -8,10 +8,7 @@ publish.workspace = true
 [package.metadata.psibase]
 server = "r-nft"
 plugin = "nft-plugin"
-data = [{ src = "../ui/dist", dst = "/" }]
-postinstall = [
-    { sender = "nft", service = "nft", method = "init", data = {} },
-]
+postinstall = [{ sender = "nft", service = "nft", method = "init", data = {} }]
 
 [dependencies]
 psibase.workspace = true

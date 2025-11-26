@@ -286,7 +286,7 @@ pub mod service {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf("manualDebit".into(), true);
+            Nft::call().setUserConf(0, true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

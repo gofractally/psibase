@@ -70,7 +70,6 @@ exclude = [
     "Permissions/plugin",
     "WebCrypto/plugin",
     "FractalCore/plugin",
-    "Nft/plugin",
     "Workshop/plugin",
     "Config/plugin",
 ]

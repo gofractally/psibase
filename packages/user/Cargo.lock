@@ -1988,6 +1988,7 @@ version = "0.22.0"
 dependencies = [
  "nft",
  "nft-plugin",
+ "psibase-user-workspace-hack",
  "r-nft",
 ]
 

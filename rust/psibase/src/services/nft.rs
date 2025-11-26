@@ -50,15 +50,13 @@ pub struct CreditRecord {
     creditor: AccountNumber,
 }
 
-pub type NamedBit = crate::MethodNumber;
 pub const MANUAL_DEBIT: u64 = crate::method_raw!("manualDebit");
 
 #[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::NamedBit;
     use super::NID;
-    use crate::{AccountNumber, HttpReply, HttpRequest, MethodNumber};
+    use crate::{AccountNumber, Memo, MethodNumber};
 
     #[action]
     fn init() {
@@ -81,17 +79,17 @@ mod service {
     }
 
     #[action]
-    fn uncredit(nftId: crate::services::nft::NID, memo: String) {
+    fn uncredit(nftId: crate::services::nft::NID, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn debit(nftId: crate::services::nft::NID, memo: String) {
+    fn debit(nftId: crate::services::nft::NID, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn setUserConf(flag: u8, enable: bool) {
+    fn setUserConf(index: u8, enable: bool) {
         unimplemented!()
     }
 
@@ -116,12 +114,7 @@ mod service {
     }
 
     #[action]
-    fn getUserConf(account: AccountNumber, flag: NamedBit) -> bool {
-        unimplemented!()
-    }
-
-    #[action]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+    fn getUserConf(account: AccountNumber, index: u8) -> bool {
         unimplemented!()
     }
 

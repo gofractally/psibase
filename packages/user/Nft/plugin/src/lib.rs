@@ -63,7 +63,7 @@ impl User for NftPlugin {
         trust::assert_authorized(trust::FunctionName::uncredit)?;
 
         let packed_args = Nft::action_structs::uncredit {
-            memo,
+            memo: memo.as_str().into(),
             nftId: nft_id,
         }
         .packed();
@@ -75,7 +75,7 @@ impl User for NftPlugin {
         trust::assert_authorized(trust::FunctionName::debit)?;
 
         let packed_args = Nft::action_structs::debit {
-            memo,
+            memo: memo.as_str().into(),
             nftId: nft_id,
         }
         .packed();
@@ -96,11 +96,7 @@ impl UserConfig for NftPlugin {
     fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::enable_user_manual_debit)?;
 
-        let packed_args = Nft::action_structs::setUserConf {
-            flag: "manualDebit".into(),
-            enable,
-        }
-        .packed();
+        let packed_args = Nft::action_structs::setUserConf { index: 0, enable }.packed();
 
         add_action_to_transaction(Nft::action_structs::setUserConf::ACTION_NAME, &packed_args)
     }
