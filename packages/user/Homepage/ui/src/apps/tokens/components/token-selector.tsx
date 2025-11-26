@@ -20,7 +20,6 @@ export const TokenSelector = ({
     onClickAvailableBalance?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     onChange?: (value: string) => void;
 }) => {
-    console.info("TokenSelector().selectedToken:", selectedToken);
     return (
         <div className="@lg:flex-row flex flex-1 flex-col items-center justify-between gap-2">
             <CustomSelect

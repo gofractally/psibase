@@ -22,7 +22,6 @@ export const useUserLinesOfCredit = (
     username: z.infer<typeof zAccount> | undefined | null,
     tokenId: number | undefined = undefined,
 ) => {
-    console.info("useUserLinesOfCredit().tokenId:", tokenId);
     return useQuery<LineOfCredit[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,

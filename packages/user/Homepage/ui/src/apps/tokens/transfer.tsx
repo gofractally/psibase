@@ -45,7 +45,6 @@ const TransferPageContents = () => {
         value: typeof defaultTransferValues;
         meta: { addToContacts: boolean; closeConfirmationModal: () => void };
     }) => {
-        console.info("TransferPageContents().handleConfirm().selectedToken:", selectedToken);
         const selectedTokenId = selectedToken.id.toString();
 
         if (meta.addToContacts) {

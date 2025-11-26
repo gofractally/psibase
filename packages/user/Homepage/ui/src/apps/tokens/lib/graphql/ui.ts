@@ -37,9 +37,7 @@ const qs = {
             }
         }
     `,
-    userPending: (username: string, tokenId: number | undefined) => {
-        console.info("userPending().tokenId:", tokenId);
-        return `
+    userPending: (username: string, tokenId: number | undefined) => `
         userPending(user: "${username}"${tokenId ? ", tokenId:" + tokenId : ""}) {
             nodes {
                 sharedBal {
@@ -54,8 +52,7 @@ const qs = {
                 }
             }
         }
-    `
-    },
+    `,
     userSettings: (username: string) => `
         userSettings(user: "${username}") {
             settings {
@@ -209,9 +206,7 @@ const zOpenLinesOfCreditResSchema = z.object({
 
 export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
 
-// TODO: replace token_id with null/empty and fix query to work with not token_id
 export const fetchOpenLinesOfCredit = async (username: string, tokenId: number | undefined) => {
-    console.info("fetchOpenLinesOfCredit().tokenId:", tokenId);
     const query = `{
         ${qs.userPending(username, tokenId)}
     }`;

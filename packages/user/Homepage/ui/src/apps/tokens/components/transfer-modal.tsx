@@ -95,7 +95,6 @@ export const TransferModal = withForm({
 
         const quantity = useMemo(() => {
             if (!selectedToken) return null;
-            console.info("about to blow up? selectedToken:", selectedToken);
             const { precision, id, symbol } = selectedToken;
             try {
                 return new Quantity(amount.amount, precision, id, symbol);
