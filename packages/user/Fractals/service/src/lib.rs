@@ -382,7 +382,7 @@ pub mod service {
         let mut fractal = Fractal::get_assert(fractal);
         check(
             fractal.legislature == get_sender(),
-            "only the legislature can exile members",
+            "only the legislature initialise fractal token",
         );
 
         fractal.init_token();

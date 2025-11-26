@@ -2,31 +2,12 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Table};
 
-use crate::helpers::distribute_by_weight;
+use crate::helpers::{distribute_by_weight, fibonacci_binet_exact};
 use crate::tables::tables::{FractalToken, FractalTokenTable, Guild, GuildMember};
 
 use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens};
 
 use psibase::services::token_stream::Wrapper as TokenStream;
-
-pub fn fibonacci_binet_exact(n: u64) -> u64 {
-    if n == 0 {
-        return 0;
-    }
-    if n == 1 {
-        return 1;
-    }
-
-    let phi = (1.0 + 5.0_f64.sqrt()) / 2.0;
-    let psi = (1.0 - 5.0_f64.sqrt()) / 2.0; // conjugate
-    let sqrt5 = 5.0_f64.sqrt();
-
-    // Full Binet: F_n = (φ^n - ψ^n) / √5
-    // Since |ψ| < 1, ψ^n is tiny for large n
-    let term1 = phi.powi(n as i32);
-    let term2 = psi.powi(n as i32);
-    ((term1 - term2) / sqrt5).round() as u64
-}
 
 impl FractalToken {
     fn new(fractal: AccountNumber, supply: Quantity, precision: Precision) -> Self {
