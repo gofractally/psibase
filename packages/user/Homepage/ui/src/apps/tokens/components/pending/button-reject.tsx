@@ -1,4 +1,4 @@
-import type { LineOfCredit } from "../../hooks/tokensPlugin/use-user-lines-of-credit";
+import type { PendingBalance } from "../../hooks/tokensPlugin/use-user-lines-of-credit";
 import type { PendingActionProps } from "../../pending";
 
 import { Loader2, X } from "lucide-react";
@@ -47,7 +47,7 @@ export const RejectButton = ({
         }
     };
 
-    const handleReject = async (pt: LineOfCredit) => {
+    const handleReject = async (pt: PendingBalance) => {
         try {
             await mutateAsync({
                 tokenId: pt.balance.tokenNumber.toString(),

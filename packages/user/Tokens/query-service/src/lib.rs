@@ -8,11 +8,12 @@ mod service {
     use psibase::services::{nft::Wrapper as Nfts, tokens::TID};
 
     use psibase::*;
+    use tokens::tables::tables::{UserPendingRecord, UserPendingTable};
     use tokens::{
         helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
-            Balance, BalanceTable, ConfigRow, ConfigTable, SharedBalance, SharedBalanceTable,
-            Token, TokenTable, UserConfig, UserConfigTable,
+            Balance, BalanceTable, ConfigRow, ConfigTable, Token, TokenTable, UserConfig,
+            UserConfigTable,
         },
     };
 
@@ -75,53 +76,41 @@ mod service {
         }
 
         /// Given a user account, return a list of records that represent the
-        /// user's current pending outgoing credits. These are tokens that have
-        /// yet to be claimed (debited) by the receiver.
-        async fn user_credits(
+        /// user's current pending transfers, including both debits and credits.
+        async fn user_pending(
             &self,
             user: AccountNumber,
+            token_id: Option<TID>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
+        ) -> async_graphql::Result<Connection<RawKey, UserPendingRecord>> {
             self.check_user_auth(user)?;
 
-            TableQuery::subindex::<(AccountNumber, u32)>(
-                SharedBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
-                &user,
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
-        }
-
-        /// Given a user account, return a list of records that represent the
-        /// user's current pending incoming debits. These are tokens that were
-        /// credited to the user but have yet to be debited (claimed).
-        async fn user_debits(
-            &self,
-            user: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, SharedBalance>> {
-            self.check_user_auth(user)?;
-
-            TableQuery::subindex::<(AccountNumber, u32)>(
-                SharedBalanceTable::with_service(tokens::SERVICE).get_index_by_debitor(),
-                &(user),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
+            if token_id.is_some() {
+                TableQuery::subindex::<u64>(
+                    UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
+                    &(user, token_id.unwrap()),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            } else {
+                TableQuery::subindex::<(TID, u64)>(
+                    UserPendingTable::with_service(tokens::SERVICE).get_index_pk(),
+                    &(user),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            }
         }
 
         /// Returns the specified user's current balances for all of their tokens.

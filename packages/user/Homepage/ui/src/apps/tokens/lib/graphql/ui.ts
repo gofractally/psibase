@@ -37,31 +37,19 @@ const qs = {
             }
         }
     `,
-    userCredits: (username: string) => `
-        userCredits(user: "${username}") {
+    userPending: (username: string, tokenId: number | undefined) => `
+        userPending(user: "${username}"${tokenId ? ", tokenId:" + tokenId : ""}) {
             nodes {
-                token {
-                    id
-                    symbol
-                    precision
+                sharedBal {
+                    token {
+                        id
+                        symbol
+                        precision
+                    }
+                    balance
+                    creditor
+                    debitor
                 }
-                balance
-                creditor
-                debitor
-            }
-        }
-    `,
-    userDebits: (username: string) => `
-        userDebits(user: "${username}") {
-            nodes {
-                token {
-                    id
-                    symbol
-                    precision
-                }
-                balance
-                creditor
-                debitor
             }
         }
     `,
@@ -191,7 +179,7 @@ export const fetchUserTokenBalanceChanges = async (
 };
 
 // Open Lines of Credit
-export const zLineOfCreditNodeSchema = z.object({
+export const zSharedBalSchema = z.object({
     token: z.object({
         id: z.number(),
         symbol: z.string().nullable(),
@@ -202,29 +190,29 @@ export const zLineOfCreditNodeSchema = z.object({
     debitor: zAccount,
 });
 
-const zLineOfCreditSchema = z.object({
-    nodes: z.array(zLineOfCreditNodeSchema),
+export type SharedBalNode = z.infer<typeof zSharedBalSchema>;
+
+export const zPendingBalanceNodeSchema = z.object({
+    sharedBal: zSharedBalSchema,
+});
+
+const zPendingBalanceSchema = z.object({
+    nodes: z.array(zPendingBalanceNodeSchema),
 });
 
 const zOpenLinesOfCreditResSchema = z.object({
-    userCredits: zLineOfCreditSchema,
-    userDebits: zLineOfCreditSchema,
+    userPending: zPendingBalanceSchema,
 });
 
-export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
+export type PendingBalanceNode = z.infer<typeof zPendingBalanceNodeSchema>;
 
-export const fetchOpenLinesOfCredit = async (username: string) => {
+export const fetchOpenLinesOfCredit = async (username: string, tokenId: number | undefined) => {
     const query = `{
-        ${qs.userCredits(username)}
-        ${qs.userDebits(username)}
+        ${qs.userPending(username, tokenId)}
     }`;
 
     const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
         query,
     );
-    const parsed = zOpenLinesOfCreditResSchema.parse(res);
-    return {
-        credits: parsed.userCredits.nodes,
-        debits: parsed.userDebits.nodes,
-    };
+    return zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: PendingBalanceNode) => node.sharedBal);
 };
