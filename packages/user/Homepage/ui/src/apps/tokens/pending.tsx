@@ -47,11 +47,7 @@ export const PendingPageContents = () => {
         useUserLinesOfCredit(currentUser);
 
     const pendingTransactions = data?.filter(
-        (pt) => {
-            console.info("about to read pendingTxs1: pt:", JSON.stringify(pt, null, 2));
-            return pt.credit?.balance.tokenNumber === selectedToken.id ||
-            pt.debit?.balance.tokenNumber === selectedToken.id;
-        }
+        (pt) => pt.balance.tokenNumber === selectedToken?.id || -1
     );
 
     if (isLoading || isPending) {
@@ -106,24 +102,24 @@ export const PendingPageContents = () => {
                     </TableHeader>
                     <TableBody>
                         {pendingTransactions.map((pt, index) => (
-                            <TableRow key={`${pt.counterParty}-${index}`}>
+                            <TableRow key={`${currentUser ?? ""}-${index}`}>
                                 <TableCell className="font-medium">
                                     <CellCounterparty
-                                        account={pt.counterParty}
+                                        account={currentUser ?? ""}
                                         currentUser={currentUser}
                                     />
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <CellIncoming
-                                        debit={pt.debit}
-                                        counterParty={pt.counterParty}
+                                        debit={pt}
+                                        counterParty={pt.debitor}
                                         currentUser={currentUser}
                                     />
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <CellOutgoing
-                                        credit={pt.credit}
-                                        counterParty={pt.counterParty}
+                                        credit={pt}
+                                        counterParty={pt.creditor}
                                         currentUser={currentUser}
                                     />
                                 </TableCell>

@@ -16,7 +16,7 @@ import { TokenSelector } from "./components/token-selector";
 import { AutoDebitSwitch } from "./components/transfer/auto-debit-switch";
 import { UntransferableTokenWarning } from "./components/transfer/untransferable-warning";
 import { useTransferActions } from "./hooks/use-transfer-actions";
-import { useUserLinesOfCredit } from "./hooks/tokensPlugin/use-user-lines-of-credit";
+import { LineOfCredit, useUserLinesOfCredit } from "./hooks/tokensPlugin/use-user-lines-of-credit";
 
 export interface TokensOutletContext {
     selectedToken: Token;
@@ -28,16 +28,14 @@ export const TokensLayout = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
     const { data, isLoading: isLoadingBalances } =
         useUserTokenBalances(currentUserData);
-    const { data: locData, isError, error, isPending } =
+    const { data: locDataRaw, isError, error, isPending } =
         useUserLinesOfCredit(currentUserData);
 
     const currentUser = isSuccess ? currentUserData : null;
 
+    let locBals: LineOfCredit[] = locDataRaw ?? [];
     const tokens = useMemo(() => data || [], [data]);
-    console.info("tokens: ", JSON.stringify(tokens, null, 2));
-    console.info("locData: ", JSON.stringify(locData, null, 2));
-    const isNoTokens = currentUser && tokens.length == 0 && locData?.length == 0;
-    console.info("isNoTokens: ", isNoTokens);
+    const isNoTokens = currentUser && tokens.length == 0 && locBals?.length == 0;
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 
@@ -45,8 +43,8 @@ export const TokensLayout = () => {
 
     useEffect(() => {
         if (selectedTokenId) return;
-        if (tokens.length === 0) return;
-        setSelectedTokenId(tokens[0].id.toString());
+        if (tokens.length === 0 && locBals.length === 0) return;
+        setSelectedTokenId(tokens[0]?.id.toString() || locBals[0]?.id.toString());
     }, [selectedTokenId, tokens]);
 
     const handleTokenSelect = (tokenId: string) => {
@@ -56,7 +54,9 @@ export const TokensLayout = () => {
 
     const selectedToken = tokens.find(
         (balance) => balance.id == Number(selectedTokenId),
-    );
+    ) || {
+        ...locBals.find((bal) => bal.id == Number(selectedTokenId))
+    } as Token;
 
     const isLoading = !isSuccess || isLoadingBalances;
 

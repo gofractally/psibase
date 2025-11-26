@@ -226,12 +226,8 @@ export const fetchOpenLinesOfCredit = async (username: string, tokenId: number =
         ${qs.userPending(username, tokenId)}
     }`;
 
-    console.info("Calling query:", query);
     const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
         query,
     );
-    console.info("Query response:", res);
-    const parsed = zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: LineOfCreditNode) => node.sharedBal);
-    console.info("Query response parsed:", parsed);
-    return parsed;
+    return zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: LineOfCreditNode) => node.sharedBal);
 };

@@ -14,18 +14,14 @@ export interface LineOfCredit {
     balance: Quantity;
     creditor: z.infer<typeof zAccount>;
     debitor: z.infer<typeof zAccount>;
-}
-
-interface Output {
-    counterParty: z.infer<typeof zAccount>;
-    credit: LineOfCredit | undefined;
-    debit: LineOfCredit | undefined;
+    id: number;
+    label: string;
 }
 
 export const useUserLinesOfCredit = (
     username: z.infer<typeof zAccount> | undefined | null,
 ) => {
-    return useQuery<Output[]>({
+    return useQuery<LineOfCredit[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,
         queryFn: async () => {
@@ -42,40 +38,12 @@ export const useUserLinesOfCredit = (
                     balance: quan,
                     creditor: loc.creditor,
                     debitor: loc.debitor,
+                    id: loc.token.id,
+                    label: loc.token.symbol ?? "ID:" + loc.token.id,
                 };
             };
 
-            // TODO: remove credits and debits
-            const credits: LineOfCredit[] = res.map(transformLOC);
-            const debits: LineOfCredit[] = res.map(transformLOC);
-
-            const creditCounterParties = credits.map(
-                (credit) => credit.debitor,
-            );
-            const debitCounterParties = debits.map((debit) => debit.creditor);
-            const counterParties = new Set([
-                ...creditCounterParties,
-                ...debitCounterParties,
-            ]);
-            console.info("Counter parties:", counterParties);
-            const pendingTransactions = Array.from(counterParties).map(
-                (counterParty) => {
-                    const credit = credits.find(
-                        (credit) => credit.debitor === counterParty,
-                    );
-                    const debit = debits.find(
-                        (debit) => debit.creditor === counterParty,
-                    );
-                    return {
-                        counterParty,
-                        credit,
-                        debit,
-                    };
-                },
-            );
-            console.info("Pending transactions:", pendingTransactions);
-
-            return pendingTransactions;
+            return res.map(transformLOC);
         },
     });
 };
