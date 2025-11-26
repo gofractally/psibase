@@ -1,5 +1,5 @@
 use async_graphql::ComplexObject;
-use psibase::{AccountNumber, Table};
+use psibase::{check_none, AccountNumber, Table};
 
 use crate::tables::tables::{Fractal, FractalExile, FractalExileTable};
 
@@ -9,6 +9,7 @@ impl FractalExile {
     }
 
     pub fn add(fractal: AccountNumber, member: AccountNumber) {
+        check_none(Self::get(fractal, member), "member is already exiled");
         Self::new(fractal, member).save();
     }
 

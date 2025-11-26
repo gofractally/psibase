@@ -52,6 +52,7 @@ impl FractalMember {
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
         );
+        check_none(Self::get(fractal, account), "account is already a member");
 
         let new_instance = Self::new(fractal, account, status);
         new_instance.save();

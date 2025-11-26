@@ -18,6 +18,10 @@ interface admin-guild {
     set-eval-schedule: func(guild-account: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32) -> result<_, error>;
     start-eval: func(guild-account: string) -> result<_, error>;
     close-eval: func(guild-account: string) -> result<_, error>;
+
+    set-guild-rep: func(guild-account: string, rep: string) -> result<_, error>;
+    resign-guild-rep: func(guild-account: string) -> result<_, error>;
+    remove-guild-rep: func(guild-account: string) -> result<_, error>;
 }
 
 interface user-fractal {
@@ -45,7 +49,22 @@ interface user-eval {
     attest: func(guild-account: string, group-number: u32) -> result<_, error>;
 }
 
+interface types {
+    record guild {
+        fractal: string,
+        evaluation-id: option<u32>,
+        council-role: string,
+        rep-role: string
+    }
+}
 
+interface queries {
+    use types.{guild};
+    use host:types/types.{error};
+
+
+    get-guild: func(guild-account: string) -> result<guild, error>;
+}
 
 
 
@@ -59,5 +78,7 @@ world imports {
     import admin-guild;
     import user-guild;
     import user-eval;
+    import queries;
+    import types;
 
 }

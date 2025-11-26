@@ -44,13 +44,14 @@ define_trust! {
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
+            - Resign, remove or set a new Guild representative
         ",
     }
     functions {
         None => [get_group_users],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
+        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
 
@@ -66,6 +67,31 @@ impl AdminFractal for FractalCorePlugin {
 }
 
 impl AdminGuild for FractalCorePlugin {
+    fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_guild_rep)?;
+
+        set_propose_latch(Some(&guild_account))?;
+
+        FractalsPlugin::admin_guild::set_guild_rep(&guild_account, &rep)
+    }
+
+    fn resign_guild_rep(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::resign_guild_rep)?;
+
+        let guild = FractalsPlugin::queries::get_guild(&guild_account)?;
+        set_propose_latch(Some(&guild.rep_role))?;
+
+        FractalsPlugin::admin_guild::resign_guild_rep(&guild_account)
+    }
+
+    fn remove_guild_rep(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::remove_guild_rep)?;
+        let guild = FractalsPlugin::queries::get_guild(&guild_account)?;
+        set_propose_latch(Some(&guild.council_role))?;
+
+        FractalsPlugin::admin_guild::remove_guild_rep(&guild_account)
+    }
+
     fn set_schedule(
         guild_account: String,
         registration: u32,

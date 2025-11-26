@@ -1,6 +1,7 @@
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
+    use crate::services::auth_dyn::policy::DynamicAuthPolicy;
     use crate::AccountNumber;
     use crate::Memo;
 
@@ -11,12 +12,16 @@ pub mod Service {
     /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
         guild_account: AccountNumber,
         name: String,
         mission: String,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
     ) {
         unimplemented!()
     }
@@ -191,8 +196,59 @@ pub mod Service {
     /// * `fractal` - The account number of the fractal.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
+    fn create_guild(
+        fractal: AccountNumber,
+        guild_account: AccountNumber,
+        display_name: Memo,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
+    ) {
+        unimplemented!()
+    }
+
+    /// Set a new representative of the Guild.
+    ///
+    /// # Arguments
+    /// * `new_representative` - The account number of the new representative.
+    #[action]
+    fn set_g_rep(new_representative: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Resign as representative of a guild.
+    ///
+    /// Called by current representative of guild.
+    #[action]
+    fn resign_g_rep() {
+        unimplemented!()
+    }
+
+    /// Forcibly remove the current representative of the guild.
+    ///
+    /// Called by council role account of the guild.
+    #[action]
+    fn remove_g_rep() {
+        unimplemented!()
+    }
+
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+        unimplemented!()
+    }
+
+    /// Has policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn has_policy(account: AccountNumber) -> bool {
         unimplemented!()
     }
 
