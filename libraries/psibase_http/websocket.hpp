@@ -98,6 +98,7 @@ namespace psibase::http
       std::unique_ptr<WebSocketImplBase> impl;
       std::deque<std::vector<char>>      outbox;
       boost::beast::flat_buffer          input;
+      psibase::loggers::common_logger    logger;
    };
 
    template <typename Stream>
@@ -150,6 +151,7 @@ namespace psibase::http
                 if (ec)
                 {
                    // TODO: close socket
+                   PSIBASE_LOG(self->logger, warning) << ec.message();
                 }
                 else
                 {
