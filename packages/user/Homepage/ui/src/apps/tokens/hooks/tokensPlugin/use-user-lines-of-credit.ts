@@ -10,7 +10,7 @@ import { zAccount } from "@/lib/zod/Account";
 
 import { Quantity } from "@shared/lib/quantity";
 
-export interface LineOfCredit {
+export interface PendingBalance {
     balance: Quantity;
     creditor: z.infer<typeof zAccount>;
     debitor: z.infer<typeof zAccount>;
@@ -22,12 +22,12 @@ export const useUserLinesOfCredit = (
     username: z.infer<typeof zAccount> | undefined | null,
     tokenId: number | undefined = undefined,
 ) => {
-    return useQuery<LineOfCredit[]>({
+    return useQuery<PendingBalance[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,
         queryFn: async () => {
             const res = await fetchOpenLinesOfCredit(zAccount.parse(username), tokenId);
-            const transformLOC = (loc: SharedBalNode): LineOfCredit => {
+            const transformLOC = (loc: SharedBalNode): PendingBalance => {
                 const quan = new Quantity(
                     loc.balance,
                     loc.token.precision,

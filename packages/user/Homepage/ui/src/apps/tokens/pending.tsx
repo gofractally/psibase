@@ -22,14 +22,14 @@ import { AcceptButton } from "./components/pending/button-accept";
 import { CancelButton } from "./components/pending/button-cancel";
 import { RejectButton } from "./components/pending/button-reject";
 import {
-    type LineOfCredit,
+    type PendingBalance,
     useUserLinesOfCredit,
 } from "./hooks/tokensPlugin/use-user-lines-of-credit";
 import { TokensOutletContext } from "./layout";
 
 export interface PendingActionProps {
     currentUser: string | null;
-    pt: LineOfCredit;
+    pt: PendingBalance;
     counterParty: string;
 }
 
@@ -46,7 +46,7 @@ export const PendingPageContents = () => {
     const { data, isError, error, isPending } =
         useUserLinesOfCredit(currentUser, selectedToken?.id);
 
-    const pendingTransactions: LineOfCredit[] = data?.filter(
+    const pendingBalances: PendingBalance[] = data?.filter(
         (pt) => pt.balance.tokenNumber === selectedToken?.id
     ) ?? [];
 
@@ -69,7 +69,7 @@ export const PendingPageContents = () => {
         );
     }
 
-    if (!pendingTransactions || pendingTransactions.length === 0) {
+    if (!pendingBalances || pendingBalances.length === 0) {
         return (
             <GlowingCard>
                 <CardContent className="text-muted-foreground py-8 text-center">
@@ -79,7 +79,7 @@ export const PendingPageContents = () => {
         );
     }
 
-    const counterParty =(pt: LineOfCredit) => {
+    const counterParty =(pt: PendingBalance) => {
         if (pt.creditor === currentUser) {
             return pt.debitor;
         }
@@ -108,26 +108,26 @@ export const PendingPageContents = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {pendingTransactions.map((pt: LineOfCredit, index: number) => {
-                            const cntrParty = counterParty(pt);
+                        {pendingBalances.map((pb: PendingBalance, index: number) => {
+                            const cntrParty = counterParty(pb);
                             return (
                                 <TableRow key={`${cntrParty}-${index}`}>
                                     <TableCell className="font-medium">
                                         <CellCounterparty
-                                            account={cntrParty}
+                                            counterParty={cntrParty}
                                             currentUser={currentUser}
                                         />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <CellIncoming
-                                            debit={pt}
+                                            pendingBalance={pb}
                                             counterParty={cntrParty}
                                             currentUser={currentUser}
                                         />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <CellOutgoing
-                                            credit={pt}
+                                            pendingBalance={pb}
                                             counterParty={cntrParty}
                                             currentUser={currentUser}
                                         />
@@ -142,18 +142,18 @@ export const PendingPageContents = () => {
 };
 
 const CellCounterparty = ({
-    account,
+    counterParty,
     currentUser,
 }: {
-    account: string;
+    counterParty: string;
     currentUser: string | null;
 }) => {
     const { data: contacts } = useContacts(currentUser);
-    const contact = contacts?.find((contact) => contact.account === account);
+    const contact = contacts?.find((contact) => contact.account === counterParty);
     return (
         <div className="flex items-center gap-2">
             <Avatar
-                account={account}
+                account={counterParty}
                 className="@xl:h-5 @xl:w-5 h-8 w-8"
                 alt="Counterparty avatar"
             />
@@ -161,31 +161,31 @@ const CellCounterparty = ({
                 <div className="@xl:flex-row @xl:gap-1 flex flex-col">
                     <div className="font-medium">{contact.nickname}</div>
                     <div className="text-muted-foreground italic">
-                        {account}
+                        {counterParty}
                     </div>
                 </div>
             ) : (
-                <div className="italic">{account}</div>
+                <div className="italic">{counterParty}</div>
             )}
         </div>
     );
 };
 
 const CellIncoming = ({
-    debit,
+    pendingBalance,
     counterParty,
     currentUser,
 }: {
-    debit?: LineOfCredit;
+    pendingBalance?: PendingBalance;
     counterParty: string;
     currentUser: string | null;
 }) => {
     return (
         <div className="flex items-center justify-end gap-2">
-            {debit ? (
+            {currentUser === pendingBalance?.debitor ? (
                 <>
                     <span className="font-mono">
-                        {debit.balance.format({
+                        {pendingBalance.balance.format({
                             fullPrecision: true,
                             includeLabel: false,
                         })}
@@ -193,20 +193,20 @@ const CellIncoming = ({
                     <span
                         className={cn(
                             "text-muted-foreground",
-                            !debit.balance.hasTokenSymbol() && "italic",
+                            !pendingBalance.balance.hasTokenSymbol() && "italic",
                         )}
                     >
-                        {debit.balance.getDisplayLabel()}
+                        {pendingBalance.balance.getDisplayLabel()}
                     </span>
                     <div className="flex gap-1">
                         <AcceptButton
                             currentUser={currentUser}
-                            pt={debit}
+                            pt={pendingBalance}
                             counterParty={counterParty}
                         />
                         <RejectButton
                             currentUser={currentUser}
-                            pt={debit}
+                            pt={pendingBalance}
                             counterParty={counterParty}
                         />
                     </div>
@@ -219,20 +219,20 @@ const CellIncoming = ({
 };
 
 const CellOutgoing = ({
-    credit,
+    pendingBalance,
     counterParty,
     currentUser,
 }: {
-    credit?: LineOfCredit;
+    pendingBalance?: PendingBalance;
     counterParty: string;
     currentUser: string | null;
 }) => {
     return (
         <div className="flex items-center justify-end gap-2">
-            {credit ? (
+            {currentUser === pendingBalance?.creditor ? (
                 <>
                     <span className="font-mono">
-                        {credit.balance.format({
+                        {pendingBalance.balance.format({
                             fullPrecision: true,
                             includeLabel: false,
                         })}
@@ -240,14 +240,14 @@ const CellOutgoing = ({
                     <span
                         className={cn(
                             "text-muted-foreground",
-                            !credit.balance.hasTokenSymbol() && "italic",
+                            !pendingBalance.balance.hasTokenSymbol() && "italic",
                         )}
                     >
-                        {credit.balance.getDisplayLabel()}
+                        {pendingBalance.balance.getDisplayLabel()}
                     </span>
                     <CancelButton
                         currentUser={currentUser}
-                        pt={credit}
+                        pt={pendingBalance}
                         counterParty={counterParty}
                     />
                 </>

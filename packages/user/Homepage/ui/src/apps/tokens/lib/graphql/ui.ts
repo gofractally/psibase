@@ -192,19 +192,19 @@ export const zSharedBalSchema = z.object({
 
 export type SharedBalNode = z.infer<typeof zSharedBalSchema>;
 
-export const zLineOfCreditNodeSchema = z.object({
+export const zPendingBalanceNodeSchema = z.object({
     sharedBal: zSharedBalSchema,
 });
 
-const zLineOfCreditSchema = z.object({
-    nodes: z.array(zLineOfCreditNodeSchema),
+const zPendingBalanceSchema = z.object({
+    nodes: z.array(zPendingBalanceNodeSchema),
 });
 
 const zOpenLinesOfCreditResSchema = z.object({
-    userPending: zLineOfCreditSchema,
+    userPending: zPendingBalanceSchema,
 });
 
-export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
+export type PendingBalanceNode = z.infer<typeof zPendingBalanceNodeSchema>;
 
 export const fetchOpenLinesOfCredit = async (username: string, tokenId: number | undefined) => {
     const query = `{
@@ -214,5 +214,5 @@ export const fetchOpenLinesOfCredit = async (username: string, tokenId: number |
     const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
         query,
     );
-    return zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: LineOfCreditNode) => node.sharedBal);
+    return zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: PendingBalanceNode) => node.sharedBal);
 };
