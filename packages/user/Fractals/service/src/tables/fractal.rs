@@ -67,7 +67,6 @@ impl Fractal {
             .into(),
         };
 
-        // Create the fractal account, proxy it to fractal-core for a default UI
         transact::Wrapper::call().runAs(set_proxy, vec![]);
         transact::Wrapper::call().runAs(set_policy, vec![]);
         transact::Wrapper::call().runAs(set_auth_serv, vec![]);
