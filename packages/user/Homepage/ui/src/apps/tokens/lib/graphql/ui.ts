@@ -193,7 +193,7 @@ export const fetchUserTokenBalanceChanges = async (
 };
 
 // Open Lines of Credit
-export const zLineOfCreditNodeSchema = z.object({
+export const zSharedBalSchema = z.object({
     token: z.object({
         id: z.number(),
         symbol: z.string().nullable(),
@@ -202,6 +202,12 @@ export const zLineOfCreditNodeSchema = z.object({
     balance: z.string(),
     creditor: zAccount,
     debitor: zAccount,
+});
+
+export type SharedBalNode = z.infer<typeof zSharedBalSchema>;
+
+export const zLineOfCreditNodeSchema = z.object({
+    sharedBal: zSharedBalSchema,
 });
 
 const zLineOfCreditSchema = z.object({
@@ -214,9 +220,10 @@ const zOpenLinesOfCreditResSchema = z.object({
 
 export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
 
-export const fetchOpenLinesOfCredit = async (username: string) => {
+// TODO: replace token_id with null/empty and fix query to work with not token_id
+export const fetchOpenLinesOfCredit = async (username: string, tokenId: number = 2) => {
     const query = `{
-        ${qs.userPending(username, 1)}
+        ${qs.userPending(username, tokenId)}
     }`;
 
     console.info("Calling query:", query);
@@ -224,10 +231,7 @@ export const fetchOpenLinesOfCredit = async (username: string) => {
         query,
     );
     console.info("Query response:", res);
-    const parsed = zOpenLinesOfCreditResSchema.parse(res);
+    const parsed = zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: LineOfCreditNode) => node.sharedBal);
     console.info("Query response parsed:", parsed);
-    return {
-        credits: parsed.userPending.nodes,
-        debits: parsed.userPending.nodes,
-    };
+    return parsed;
 };

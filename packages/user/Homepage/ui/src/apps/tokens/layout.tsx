@@ -16,6 +16,7 @@ import { TokenSelector } from "./components/token-selector";
 import { AutoDebitSwitch } from "./components/transfer/auto-debit-switch";
 import { UntransferableTokenWarning } from "./components/transfer/untransferable-warning";
 import { useTransferActions } from "./hooks/use-transfer-actions";
+import { useUserLinesOfCredit } from "./hooks/tokensPlugin/use-user-lines-of-credit";
 
 export interface TokensOutletContext {
     selectedToken: Token;
@@ -27,11 +28,16 @@ export const TokensLayout = () => {
     const { data: currentUserData, isSuccess } = useCurrentUser();
     const { data, isLoading: isLoadingBalances } =
         useUserTokenBalances(currentUserData);
+    const { data: locData, isError, error, isPending } =
+        useUserLinesOfCredit(currentUserData);
 
     const currentUser = isSuccess ? currentUserData : null;
 
-    const tokens = useMemo(() => data ?? [], [data]);
-    const isNoTokens = currentUser && tokens.length == 0;
+    const tokens = useMemo(() => data || [], [data]);
+    console.info("tokens: ", JSON.stringify(tokens, null, 2));
+    console.info("locData: ", JSON.stringify(locData, null, 2));
+    const isNoTokens = currentUser && tokens.length == 0 && locData?.length == 0;
+    console.info("isNoTokens: ", isNoTokens);
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 

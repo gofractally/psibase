@@ -1,5 +1,5 @@
 import {
-    LineOfCreditNode,
+    SharedBalNode,
     fetchOpenLinesOfCredit,
 } from "@/apps/tokens/lib/graphql/ui";
 import { useQuery } from "@tanstack/react-query";
@@ -30,7 +30,7 @@ export const useUserLinesOfCredit = (
         enabled: !!username,
         queryFn: async () => {
             const res = await fetchOpenLinesOfCredit(zAccount.parse(username));
-            const transformLOC = (loc: LineOfCreditNode): LineOfCredit => {
+            const transformLOC = (loc: SharedBalNode): LineOfCredit => {
                 const quan = new Quantity(
                     loc.balance,
                     loc.token.precision,
@@ -45,8 +45,9 @@ export const useUserLinesOfCredit = (
                 };
             };
 
-            const credits: LineOfCredit[] = res.credits.map(transformLOC);
-            const debits: LineOfCredit[] = res.debits.map(transformLOC);
+            // TODO: remove credits and debits
+            const credits: LineOfCredit[] = res.map(transformLOC);
+            const debits: LineOfCredit[] = res.map(transformLOC);
 
             const creditCounterParties = credits.map(
                 (credit) => credit.debitor,
@@ -56,7 +57,7 @@ export const useUserLinesOfCredit = (
                 ...creditCounterParties,
                 ...debitCounterParties,
             ]);
-
+            console.info("Counter parties:", counterParties);
             const pendingTransactions = Array.from(counterParties).map(
                 (counterParty) => {
                     const credit = credits.find(
@@ -72,6 +73,7 @@ export const useUserLinesOfCredit = (
                     };
                 },
             );
+            console.info("Pending transactions:", pendingTransactions);
 
             return pendingTransactions;
         },

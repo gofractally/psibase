@@ -47,9 +47,11 @@ export const PendingPageContents = () => {
         useUserLinesOfCredit(currentUser);
 
     const pendingTransactions = data?.filter(
-        (pt) =>
-            pt.credit?.balance.tokenNumber === selectedToken.id ||
-            pt.debit?.balance.tokenNumber === selectedToken.id,
+        (pt) => {
+            console.info("about to read pendingTxs1: pt:", JSON.stringify(pt, null, 2));
+            return pt.credit?.balance.tokenNumber === selectedToken.id ||
+            pt.debit?.balance.tokenNumber === selectedToken.id;
+        }
     );
 
     if (isLoading || isPending) {
