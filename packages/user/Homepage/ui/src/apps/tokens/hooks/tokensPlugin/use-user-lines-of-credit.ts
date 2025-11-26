@@ -18,7 +18,7 @@ export interface PendingBalance {
     label: string;
 }
 
-export const useUserLinesOfCredit = (
+export const useUserPendingBalance = (
     username: z.infer<typeof zAccount> | undefined | null,
     tokenId: number | undefined = undefined,
 ) => {
@@ -27,24 +27,24 @@ export const useUserLinesOfCredit = (
         enabled: !!username,
         queryFn: async () => {
             const res = await fetchOpenLinesOfCredit(zAccount.parse(username), tokenId);
-            const transformLOC = (loc: SharedBalNode): PendingBalance => {
+            const xformShardBalNode = (sbn: SharedBalNode): PendingBalance => {
                 const quan = new Quantity(
-                    loc.balance,
-                    loc.token.precision,
-                    loc.token.id,
-                    loc.token.symbol,
+                    sbn.balance,
+                    sbn.token.precision,
+                    sbn.token.id,
+                    sbn.token.symbol,
                 );
 
                 return {
                     balance: quan,
-                    creditor: loc.creditor,
-                    debitor: loc.debitor,
-                    id: loc.token.id,
-                    label: loc.token.symbol ?? "ID:" + loc.token.id,
+                    creditor: sbn.creditor,
+                    debitor: sbn.debitor,
+                    id: sbn.token.id,
+                    label: sbn.token.symbol ?? "ID:" + sbn.token.id,
                 };
             };
 
-            return res.map(transformLOC);
+            return res.map(xformShardBalNode);
         },
     });
 };

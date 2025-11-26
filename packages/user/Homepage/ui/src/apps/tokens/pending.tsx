@@ -23,7 +23,7 @@ import { CancelButton } from "./components/pending/button-cancel";
 import { RejectButton } from "./components/pending/button-reject";
 import {
     type PendingBalance,
-    useUserLinesOfCredit,
+    useUserPendingBalance,
 } from "./hooks/tokensPlugin/use-user-lines-of-credit";
 import { TokensOutletContext } from "./layout";
 
@@ -44,7 +44,7 @@ export const PendingPageContents = () => {
     const { currentUser, isLoading, selectedToken } = context;
 
     const { data, isError, error, isPending } =
-        useUserLinesOfCredit(currentUser, selectedToken?.id);
+        useUserPendingBalance(currentUser, selectedToken?.id);
 
     const pendingBalances: PendingBalance[] = data?.filter(
         (pt) => pt.balance.tokenNumber === selectedToken?.id
