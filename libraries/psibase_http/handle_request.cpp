@@ -333,37 +333,7 @@ namespace psibase::http
          auto result = psio::from_frac<HttpReply>(data);
          if (isWebsocketUpgrade(req, result))
          {
-            auto newSocket = std::make_shared<WebSocket>(session->server);
-            Socket::replace(writer, newSocket);
-            (*session)(
-                websocket_upgrade{}, std::move(req),
-                [newSocket = std::move(newSocket)](auto&& socket) mutable
-                {
-                   WebSocket::setImpl(
-                       std::move(newSocket),
-                       std::make_unique<WebSocketImpl<std::remove_cvref_t<decltype(socket)>>>(
-                           std::move(socket)));
-                },
-                websocket::stream_base::decorator(
-                    [reply = std::move(result)](auto& rep)
-                    {
-                       for (const auto& h : reply.headers)
-                       {
-                          if (h.matches("Sec-WebSocket-Accept") || h.matches("Upgrade"))
-                          {
-                             // Beast sets these headers
-                          }
-                          else if (h.matches("Connection"))
-                          {
-                             // Connection may contain additional tokens besides websocket
-                             rep.set(bhttp::field::connection, h.value);
-                          }
-                          else
-                          {
-                             rep.insert(h.name, h.value);
-                          }
-                       }
-                    }));
+            acceptWebSocket(writer, std::move(result));
          }
          else
          {
@@ -402,6 +372,45 @@ namespace psibase::http
                 }
                 if (session->can_read())
                    session->do_read();
+             });
+      }
+      void acceptWebSocket(Writer& writer, HttpReply&& result)
+      {
+         auto self      = this->shared_from_this();
+         auto newSocket = std::make_shared<WebSocket>(session->server);
+         Socket::replace(writer, newSocket);
+         session->post(
+             [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result)]
+             {
+                (*self->session)(
+                    websocket_upgrade{}, std::move(self->req),
+                    [newSocket = std::move(newSocket)](auto&& socket) mutable
+                    {
+                       WebSocket::setImpl(
+                           std::move(newSocket),
+                           std::make_unique<WebSocketImpl<std::remove_cvref_t<decltype(socket)>>>(
+                               std::move(socket)));
+                    },
+                    websocket::stream_base::decorator(
+                        [reply = std::move(result)](auto& rep)
+                        {
+                           for (const auto& h : reply.headers)
+                           {
+                              if (h.matches("Sec-WebSocket-Accept") || h.matches("Upgrade"))
+                              {
+                                 // Beast sets these headers
+                              }
+                              else if (h.matches("Connection"))
+                              {
+                                 // Connection may contain additional tokens besides websocket
+                                 rep.set(bhttp::field::connection, h.value);
+                              }
+                              else
+                              {
+                                 rep.insert(h.name, h.value);
+                              }
+                           }
+                        }));
              });
       }
       virtual SocketInfo info() const override
