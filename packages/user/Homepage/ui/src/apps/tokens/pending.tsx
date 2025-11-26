@@ -46,9 +46,9 @@ export const PendingPageContents = () => {
     const { data, isError, error, isPending } =
         useUserLinesOfCredit(currentUser, selectedToken?.id);
 
-    const pendingTransactions = data?.filter(
+    const pendingTransactions: LineOfCredit[] = data?.filter(
         (pt) => pt.balance.tokenNumber === selectedToken?.id
-    );
+    ) ?? [];
 
     if (isLoading || isPending) {
         return (
@@ -108,7 +108,7 @@ export const PendingPageContents = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {pendingTransactions.map((pt, index) => {
+                        {pendingTransactions.map((pt: LineOfCredit, index: number) => {
                             const cntrParty = counterParty(pt);
                             return (
                                 <TableRow key={`${cntrParty}-${index}`}>
