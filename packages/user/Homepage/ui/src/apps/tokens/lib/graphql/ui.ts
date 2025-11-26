@@ -37,8 +37,10 @@ const qs = {
             }
         }
     `,
-    userPending: (username: string, tokenId: number) => `
-        userPending(user: "${username}", tokenId: ${tokenId}) {
+    userPending: (username: string, tokenId: number | undefined) => {
+        console.info("userPending().tokenId:", tokenId);
+        return `
+        userPending(user: "${username}"${tokenId ? ", tokenId:" + tokenId : ""}) {
             nodes {
                 sharedBal {
                     token {
@@ -52,21 +54,8 @@ const qs = {
                 }
             }
         }
-    `,
-    // userDebits: (username: string) => `
-    //     userDebits(user: "${username}") {
-    //         nodes {
-    //             token {
-    //                 id
-    //                 symbol
-    //                 precision
-    //             }
-    //             balance
-    //             creditor
-    //             debitor
-    //         }
-    //     }
-    // `,
+    `
+    },
     userSettings: (username: string) => `
         userSettings(user: "${username}") {
             settings {
@@ -221,7 +210,8 @@ const zOpenLinesOfCreditResSchema = z.object({
 export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
 
 // TODO: replace token_id with null/empty and fix query to work with not token_id
-export const fetchOpenLinesOfCredit = async (username: string, tokenId: number = 2) => {
+export const fetchOpenLinesOfCredit = async (username: string, tokenId: number | undefined) => {
+    console.info("fetchOpenLinesOfCredit().tokenId:", tokenId);
     const query = `{
         ${qs.userPending(username, tokenId)}
     }`;

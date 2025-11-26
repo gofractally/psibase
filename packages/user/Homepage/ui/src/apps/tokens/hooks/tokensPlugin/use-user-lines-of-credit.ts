@@ -20,12 +20,14 @@ export interface LineOfCredit {
 
 export const useUserLinesOfCredit = (
     username: z.infer<typeof zAccount> | undefined | null,
+    tokenId: number | undefined = undefined,
 ) => {
+    console.info("useUserLinesOfCredit().tokenId:", tokenId);
     return useQuery<LineOfCredit[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,
         queryFn: async () => {
-            const res = await fetchOpenLinesOfCredit(zAccount.parse(username));
+            const res = await fetchOpenLinesOfCredit(zAccount.parse(username), tokenId);
             const transformLOC = (loc: SharedBalNode): LineOfCredit => {
                 const quan = new Quantity(
                     loc.balance,

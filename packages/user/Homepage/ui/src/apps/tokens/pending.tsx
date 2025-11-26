@@ -43,12 +43,15 @@ export const PendingPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
     const { currentUser, isLoading, selectedToken } = context;
 
+    // TODO: remove this "1" once things are working
     const { data, isError, error, isPending } =
-        useUserLinesOfCredit(currentUser);
+        useUserLinesOfCredit(currentUser, 1);
 
     const pendingTransactions = data?.filter(
-        (pt) => pt.balance.tokenNumber === selectedToken?.id || -1
+        (pt) => pt.balance.tokenNumber === selectedToken?.id
     );
+    console.info("PendingPageContents().selectedToken:", selectedToken);
+    console.info("PendingPageContents().pendingTransactions:", pendingTransactions);
 
     if (isLoading || isPending) {
         return (
