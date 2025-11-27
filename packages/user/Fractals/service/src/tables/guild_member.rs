@@ -4,8 +4,9 @@ use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
-    FractalToken, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
+    ConsensusReward, Fractal, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
 };
+use crate::ONE_WEEK;
 use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -13,18 +14,22 @@ impl GuildMember {
     fn new(guild: AccountNumber, member: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
+        let token_id = Fractal::get_assert(Guild::get_assert(guild).fractal).token_id;
         Self {
             guild,
             member,
             pending_score: None,
             score: 0,
             created_at: now,
-            stream_id: None,
+            stream_id: TokenStream::call().create(ONE_WEEK * 13, token_id),
         }
     }
 
-    pub fn add(guild: AccountNumber, member: AccountNumber) {
-        Self::new(guild, member).save();
+    pub fn add(guild: AccountNumber, member: AccountNumber) -> Self {
+        check_none(Self::get(guild, member), "guild member already exists");
+        let new_instance = Self::new(guild, member);
+        new_instance.save();
+        new_instance
     }
 
     pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {
@@ -39,7 +44,7 @@ impl GuildMember {
 
     pub fn set_pending_score(&mut self, incoming_score: u32) {
         let guild = Guild::get_assert(self.guild);
-        if FractalToken::get(guild.fractal).is_some() {
+        if ConsensusReward::get(guild.fractal).is_some() {
             self.pending_score = Some(incoming_score * 10000);
             self.save();
         }
@@ -77,23 +82,14 @@ impl GuildMember {
         }
     }
 
-    pub fn deposit_stream(&mut self, token_id: TID, amount: Quantity, memo: Memo) {
-        let stream_id = self.stream_id.unwrap_or_else(|| self.init_stream(token_id));
+    pub fn deposit_stream(&self, token_id: TID, amount: Quantity, memo: Memo) {
         psibase::services::tokens::Wrapper::call().credit(
             token_id,
             TokenStream::SERVICE,
             amount,
             memo,
         );
-        TokenStream::call().deposit(stream_id, amount);
-    }
-
-    pub fn init_stream(&mut self, token_id: TID) -> u32 {
-        check_none(self.stream_id, "member already has stream");
-        let stream = TokenStream::call().create(86400 * 7 * 12, token_id);
-        self.stream_id = Some(stream);
-        self.save();
-        stream
+        TokenStream::call().deposit(self.stream_id, amount);
     }
 
     fn remove(&self) {

@@ -1,8 +1,8 @@
+mod consensus_reward;
 mod evaluation_instance;
 mod fractal;
 mod fractal_exile;
 pub mod fractal_member;
-mod fractal_token;
 mod guild;
 mod guild_application;
 mod guild_attest;
@@ -22,19 +22,14 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
+        #[primary_key]
         pub account: AccountNumber,
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
         pub legislature: AccountNumber,
         pub judiciary: AccountNumber,
-    }
-
-    impl Fractal {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
+        pub token_id: TID,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]
@@ -108,7 +103,7 @@ pub mod tables {
         pub score: u32,
         pub pending_score: Option<u32>,
         pub created_at: psibase::TimePointSec,
-        pub stream_id: Option<u32>,
+        pub stream_id: u32,
     }
 
     impl GuildMember {
@@ -201,20 +196,14 @@ pub mod tables {
         }
     }
 
-    #[table(name = "FractalTokenTable", index = 8)]
+    #[table(name = "ConsensusRewardTable", index = 8)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct FractalToken {
+    pub struct ConsensusReward {
         #[primary_key]
         pub fractal: AccountNumber,
-        pub token: TID,
         pub stream_id: u32,
         pub ranked_guilds: Vec<AccountNumber>,
-    }
-
-    impl FractalToken {
-        #[secondary_key(1)]
-        fn by_token(&self) -> TID {
-            self.token
-        }
+        pub last_distributed: psibase::TimePointSec,
+        pub dist_interval_secs: u32,
     }
 }

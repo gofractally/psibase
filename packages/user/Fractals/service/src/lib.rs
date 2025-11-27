@@ -2,13 +2,17 @@ pub mod helpers;
 mod scoring;
 pub mod tables;
 
+pub const ONE_DAY: u32 = 86400;
+pub const ONE_WEEK: u32 = ONE_DAY * 7;
+pub const ONE_YEAR: u32 = ONE_WEEK * 52;
+
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
 
     use crate::tables::{
         fractal_member::MemberStatus,
         tables::{
-            EvaluationInstance, Fractal, FractalMember, FractalToken, Guild, GuildApplication,
+            ConsensusReward, EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication,
             GuildAttest, GuildMember,
         },
     };
@@ -82,13 +86,7 @@ pub mod service {
 
         Fractal::add(fractal_account, name, mission, guild_account);
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
-        let genesis_guild = Guild::add(
-            fractal_account,
-            guild_account,
-            sender,
-            "Genesis".to_string().try_into().unwrap(),
-        );
-        GuildMember::add(genesis_guild.account, sender);
+        Guild::add(fractal_account, guild_account, sender, "Genesis".into());
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -215,7 +213,7 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        let member_status = if FractalToken::get(fractal).is_some() {
+        let member_status = if ConsensusReward::get(fractal).is_some() {
             MemberStatus::Visa
         } else {
             MemberStatus::Citizen
@@ -396,11 +394,7 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
-        check(
-            Fractal::get_assert(fractal).legislature == get_sender(),
-            "only the legislature can distribute",
-        );
-        FractalToken::get_assert(fractal).distribute_tokens();
+        ConsensusReward::get_assert(fractal).distribute_tokens();
     }
 
     /// Distribute token for a fractal.
@@ -416,7 +410,7 @@ pub mod service {
             Fractal::get_assert(fractal).legislature == get_sender(),
             "only the legislature can rank guilds",
         );
-        FractalToken::get_assert(fractal).set_ranked_guilds(guilds);
+        ConsensusReward::get_assert(fractal).set_ranked_guilds(guilds);
     }
 
     #[event(history)]
