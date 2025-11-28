@@ -1,27 +1,22 @@
 use async_graphql::ComplexObject;
-use psibase::services::tokens::{Quantity, TID};
-use psibase::{check_none, check_some, AccountNumber, Memo, Table};
+use psibase::{check_none, check_some, AccountNumber, Table};
 
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
-    ConsensusReward, Fractal, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
+    ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
 };
-use crate::ONE_WEEK;
-use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
     fn new(guild: AccountNumber, member: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
-        let token_id = Fractal::get_assert(Guild::get_assert(guild).fractal).token_id;
         Self {
             guild,
             member,
             pending_score: None,
             score: 0,
             created_at: now,
-            stream_id: TokenStream::call().create(ONE_WEEK * 13, token_id),
         }
     }
 
@@ -80,16 +75,6 @@ impl GuildMember {
         for membership in Self::memberships_of_member(member) {
             table.remove(&membership);
         }
-    }
-
-    pub fn deposit_stream(&self, token_id: TID, amount: Quantity, memo: Memo) {
-        psibase::services::tokens::Wrapper::call().credit(
-            token_id,
-            TokenStream::SERVICE,
-            amount,
-            memo,
-        );
-        TokenStream::call().deposit(self.stream_id, amount);
     }
 
     fn remove(&self) {

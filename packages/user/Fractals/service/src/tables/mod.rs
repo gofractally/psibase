@@ -40,6 +40,7 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
+        pub stream_id: u32,
     }
 
     impl FractalMember {
@@ -103,7 +104,6 @@ pub mod tables {
         pub score: u32,
         pub pending_score: Option<u32>,
         pub created_at: psibase::TimePointSec,
-        pub stream_id: u32,
     }
 
     impl GuildMember {

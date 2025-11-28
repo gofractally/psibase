@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::helpers::{distribute_by_weight, fibonacci_binet_exact};
-use crate::tables::tables::{ConsensusReward, ConsensusRewardTable, Fractal, Guild, GuildMember};
+use crate::tables::tables::{
+    ConsensusReward, ConsensusRewardTable, Fractal, FractalMember, Guild, GuildMember,
+};
 use crate::{ONE_WEEK, ONE_YEAR};
 
 use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
@@ -25,16 +27,16 @@ impl ConsensusReward {
     }
 
     fn deposit_stream(&self, amount: Quantity, memo: Memo) {
-        Tokens::call().credit(self.fractal_token_id(), TokenStream::SERVICE, amount, memo);
+        Tokens::call().credit(self.fractal().token_id, TokenStream::SERVICE, amount, memo);
         TokenStream::call().deposit(self.stream_id, amount);
     }
 
-    fn withdraw_stream(&self) -> Quantity {
+    fn claim_stream(&self) -> Quantity {
         let claimable = TokenStream::call().claim(self.stream_id);
         check(claimable.value != 0, "nothing to claim");
 
         Tokens::call().debit(
-            self.fractal_token_id(),
+            self.fractal().token_id,
             TokenStream::SERVICE,
             claimable,
             "Reward claim".into(),
@@ -43,6 +45,7 @@ impl ConsensusReward {
     }
 
     pub fn add(fractal: AccountNumber, token_id: TID, allocation: Quantity) -> Self {
+        check(allocation.value > 0, "allocation must be greater than 0");
         check_none(
             Self::get(fractal),
             "fractal consensus reward already exists",
@@ -56,8 +59,8 @@ impl ConsensusReward {
         new_instance
     }
 
-    fn fractal_token_id(&self) -> TID {
-        Fractal::get_assert(self.fractal).token_id
+    fn fractal(&self) -> Fractal {
+        Fractal::get_assert(self.fractal)
     }
 
     fn check_can_distribute(&mut self) {
@@ -87,8 +90,8 @@ impl ConsensusReward {
     pub fn distribute_tokens(&mut self) {
         self.check_can_distribute();
 
-        let claimed = self.withdraw_stream();
-        let fractal_token_id = self.fractal_token_id();
+        let claimed = self.claim_stream();
+        let fractal_token_id = self.fractal().token_id;
 
         let ranked_guilds = self.ranked_guilds.clone();
         let ranked_guilds_length = ranked_guilds.len() as u64;
@@ -111,8 +114,8 @@ impl ConsensusReward {
 
             total_dust += member_dust;
 
-            for (member, reward) in rewarded_members {
-                member.deposit_stream(
+            for (membership, reward) in rewarded_members {
+                FractalMember::get_assert(self.fractal, membership.member).deposit_stream(
                     fractal_token_id,
                     reward.into(),
                     "Guild member reward".into(),
@@ -120,7 +123,9 @@ impl ConsensusReward {
             }
         }
 
-        self.deposit_stream(total_dust.into(), "Dust return".into());
+        if total_dust > 0 {
+            self.deposit_stream(total_dust.into(), "Dust return".into());
+        }
     }
 
     pub fn set_ranked_guilds(&mut self, guilds: Vec<AccountNumber>) {
