@@ -331,9 +331,23 @@ namespace psibase::http
       void send(Writer& writer, std::span<const char> data) override
       {
          auto result = psio::from_frac<HttpReply>(data);
-         if (isWebsocketUpgrade(req, result))
+         if (result.status == HttpStatus::switchingProtocols)
          {
-            acceptWebSocket(writer, std::move(result));
+            if (isWebsocketUpgrade(req, result))
+            {
+               acceptWebSocket(writer, std::move(result));
+            }
+            else
+            {
+               autoCloseImpl("Invalid protocol upgrade");
+               throw std::runtime_error("Invalid protocol upgrade");
+            }
+         }
+         else if (static_cast<std::uint16_t>(result.status) < 200 ||
+                  static_cast<std::uint16_t>(result.status) > 599)
+         {
+            autoCloseImpl("Invalid status code");
+            throw std::runtime_error("Invalid status code");
          }
          else
          {
