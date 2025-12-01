@@ -196,7 +196,6 @@ void XProxy::close(std::int32_t socket)
          table.remove(*row);
          table.remove(*row2);
          to<XHttp>().close(row->to);
-         to<XHttp>().close(socket);
       }
    }
 }

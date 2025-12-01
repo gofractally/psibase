@@ -2,6 +2,8 @@
 
 #include <boost/asio/dispatch.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
+#include <boost/beast/websocket/error.hpp>
+#include <boost/beast/websocket/rfc6455.hpp>
 #include <deque>
 #include <memory>
 #include <mutex>
@@ -25,11 +27,12 @@ namespace psibase::http
    {
       virtual ~WebSocketImplBase()                          = default;
       virtual void startWrite(std::shared_ptr<WebSocket>&&) = 0;
+      virtual void close(std::shared_ptr<WebSocket>&& self) = 0;
    };
 
    struct WebSocket : AutoCloseSocket, std::enable_shared_from_this<WebSocket>
    {
-      explicit WebSocket(server_state& state) : state(state) {}
+      explicit WebSocket(server_state& server) : server(server) {}
       template <typename I>
       static void setImpl(std::shared_ptr<WebSocket>&& self, std::unique_ptr<I>&& impl)
       {
@@ -46,13 +49,28 @@ namespace psibase::http
          ptr->readLoop(std::move(self));
       }
 
-      void autoClose(const std::optional<std::string>& message) noexcept override {}
+      void autoClose(const std::optional<std::string>& message) noexcept override
+      {
+         bool needClose = false;
+         {
+            std::lock_guard l{mutex};
+            if (state == StateType::normal)
+            {
+               state     = StateType::closing;
+               needClose = true;
+            }
+         }
+         if (needClose)
+            impl->close(shared_from_this());
+      }
       void send(Writer&, std::span<const char> data) override
       {
          std::vector<char> copy(data.begin(), data.end());
          bool              first;
          {
             std::lock_guard l{mutex};
+            if (state != StateType::normal)
+               return;
             first = impl && outbox.empty();
             outbox.push_back(std::move(copy));
          }
@@ -63,9 +81,9 @@ namespace psibase::http
       }
       void handleMessage(std::span<const char> data)
       {
-         auto system = state.sharedState->getSystemContext();
+         auto system = server.sharedState->getSystemContext();
 
-         psio::finally f{[&]() { state.sharedState->addSystemContext(std::move(system)); }};
+         psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
          BlockContext  bc{*system, system->sharedDatabase.getHead(),
                          system->sharedDatabase.createWriter(), true};
          bc.start();
@@ -92,13 +110,73 @@ namespace psibase::http
                 << action.service.str() << "::recv failed: " << e.what();
          }
       }
-      SocketInfo                         info() const override { return WebSocketInfo{}; }
-      server_state&                      state;
+      void handleClose()
+      {
+         auto system = server.sharedState->getSystemContext();
+
+         psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+         BlockContext  bc{*system, system->sharedDatabase.getHead(),
+                         system->sharedDatabase.createWriter(), true};
+         bc.start();
+
+         SignedTransaction trx;
+         TransactionTrace  trace;
+
+         Action action{
+             .sender  = AccountNumber(),
+             .service = proxyServiceNum,
+             .rawData = psio::convert_to_frac(std::tuple(this->id)),
+         };
+
+         try
+         {
+            auto& atrace = bc.execAsyncExport("close", std::move(action), trace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::close succeeded";
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, warning)
+                << action.service.str() << "::close failed: " << e.what();
+         }
+      }
+      void error(const std::error_code& ec)
+      {
+         StateType oldState;
+         {
+            std::lock_guard l{mutex};
+            oldState = state;
+            state    = StateType::error;
+         }
+         if (oldState != StateType::error)
+         {
+            if (ec == make_error_code(boost::beast::websocket::error::closed))
+            {
+               PSIBASE_LOG(logger, info) << ec.message();
+            }
+            else
+            {
+               PSIBASE_LOG(logger, warning) << ec.message();
+            }
+         }
+         if (oldState == StateType::normal)
+            handleClose();
+      }
+      SocketInfo info() const override { return WebSocketInfo{}; }
+      enum class StateType : std::uint8_t
+      {
+         normal,
+         closing,
+         error,
+      };
+      server_state&                      server;
       std::mutex                         mutex;
       std::unique_ptr<WebSocketImplBase> impl;
       std::deque<std::vector<char>>      outbox;
       boost::beast::flat_buffer          input;
       psibase::loggers::common_logger    logger;
+      StateType                          state = StateType::normal;
    };
 
    template <typename Stream>
@@ -112,10 +190,47 @@ namespace psibase::http
              stream.get_executor(), [self = std::move(self)]() mutable
              { static_cast<WebSocketImpl*>(self->impl.get())->writeLoop(std::move(self)); });
       }
+      void close(std::shared_ptr<WebSocket>&& self) override
+      {
+         PSIBASE_LOG(self->logger, debug) << "closing websocket";
+         boost::asio::dispatch(
+             stream.get_executor(),
+             [self = std::move(self)]() mutable
+             {
+                {
+                   std::lock_guard l{self->mutex};
+                   if (self->state != WebSocket::StateType::closing)
+                      return;
+                }
+                auto ptr = static_cast<WebSocketImpl*>(self->impl.get());
+                ptr->stream.async_close(
+                    boost::beast::websocket::close_code::normal,
+                    [self = std::move(self)](const std::error_code& ec)
+                    {
+                       if (ec)
+                          self->error(ec);
+                       else
+                          self->error(make_error_code(boost::beast::websocket::error::closed));
+                    });
+             });
+      }
       void writeLoop(std::shared_ptr<WebSocket>&& self)
       {
+         const std::vector<char>* data;
+         {
+            std::lock_guard l{self->mutex};
+            if (self->state != WebSocket::StateType::normal)
+            {
+               self->outbox.clear();
+               return;
+            }
+            else
+            {
+               data = &self->outbox.front();
+            }
+         }
          stream.binary(true);
-         auto buffer = boost::asio::buffer(self->outbox.front());
+         auto buffer = boost::asio::buffer(*data);
          stream.async_write(
              buffer,
              [self = std::move(self)](const std::error_code& ec,
@@ -126,8 +241,11 @@ namespace psibase::http
                    std::lock_guard l{self->mutex};
                    if (ec)
                    {
+                      if (ec != make_error_code(boost::asio::error::operation_aborted))
+                      {
+                         self->error(ec);
+                      }
                       self->outbox.clear();
-                      // TODO: close socket
                    }
                    else
                    {
@@ -150,8 +268,10 @@ namespace psibase::http
              {
                 if (ec)
                 {
-                   // TODO: close socket
-                   PSIBASE_LOG(self->logger, warning) << ec.message();
+                   if (ec != make_error_code(boost::asio::error::operation_aborted))
+                   {
+                      self->error(ec);
+                   }
                 }
                 else
                 {

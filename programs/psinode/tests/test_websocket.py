@@ -18,13 +18,6 @@ def websocket_url(node, path='/', service=None):
         host = url.host
     return urllib3.util.Url('ws', url.auth, host, url.port, path).url
 
-def echo(connection):
-    try:
-        for msg in connection:
-            connection.send(msg)
-    except websockets.exceptions.ConnectionClosedError:
-        pass
-
 class TestWebSocket(unittest.TestCase):
     @testutil.psinode_test
     def test_echo(self, cluster):
@@ -44,6 +37,11 @@ class TestWebSocket(unittest.TestCase):
 
         XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
 
+        done = threading.Event()
+        def echo(connection):
+            for msg in connection:
+                connection.send(msg)
+            done.set()
         server = websockets.sync.server.serve(echo, host='127.0.0.1', port=0)
 
         t = threading.Thread(target=server.serve_forever)
@@ -58,6 +56,7 @@ class TestWebSocket(unittest.TestCase):
                     websocket.send(message)
                     self.assertEqual(websocket.recv(decode=True), message)
         finally:
+            done.wait(timeout=10)
             server.shutdown()
             t.join()
 
