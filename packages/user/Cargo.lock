@@ -1150,6 +1150,7 @@ dependencies = [
  "custom_error",
  "hex",
  "indexmap",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "serde",
  "serde-aux",
@@ -2333,6 +2334,7 @@ dependencies = [
  "pem",
  "percent-encoding",
  "pkcs8",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
  "rand_core 0.6.4",
@@ -2366,6 +2368,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "psibase-macros-lib",
+ "psibase-rust-workspace-hack",
  "psibase_names",
  "quote",
  "syn 1.0.109",
@@ -2380,9 +2383,16 @@ dependencies = [
  "darling 0.20.11",
  "proc-macro-error",
  "proc-macro2",
+ "psibase-rust-workspace-hack",
  "quote",
  "syn 2.0.106",
 ]
+
+[[package]]
+name = "psibase-rust-workspace-hack"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
 
 [[package]]
 name = "psibase-user-workspace-hack"
@@ -2412,12 +2422,14 @@ name = "psibase_macros"
 version = "0.22.0"
 dependencies = [
  "psibase-macros-derive",
+ "psibase-rust-workspace-hack",
 ]
 
 [[package]]
 name = "psibase_names"
 version = "0.22.0"
 dependencies = [
+ "psibase-rust-workspace-hack",
  "seahash",
 ]
 
