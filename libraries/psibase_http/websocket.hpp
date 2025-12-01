@@ -74,6 +74,7 @@ namespace psibase::http
             first = impl && outbox.empty();
             outbox.push_back(std::move(copy));
          }
+         PSIBASE_LOG(logger, debug) << "Sending message: " << data.size() << " bytes";
          if (first)
          {
             impl->startWrite(shared_from_this());
