@@ -38,6 +38,16 @@ void Socket::replace(Writer& writer, std::shared_ptr<Socket>&& other)
    }
 }
 
+void Socket::writeInfo(Writer& writer)
+{
+   if (auto sockets = weak_sockets.lock())
+   {
+      SocketRow row{id, info()};
+      sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
+                                        psio::to_frac(row));
+   }
+}
+
 bool AutoCloseSocket::canAutoClose() const
 {
    return true;

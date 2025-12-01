@@ -74,6 +74,11 @@ namespace psibase
       return "SocketEndpoint";
    }
 
+   inline constexpr bool use_json_string_for_gql(SocketEndpoint*)
+   {
+      return true;
+   }
+
    std::string to_string(const IPV4Endpoint&);
    std::string to_string(const IPV6Endpoint&);
    std::string to_string(const LocalEndpoint&);

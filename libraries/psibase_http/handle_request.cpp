@@ -377,7 +377,7 @@ namespace psibase::http
       void acceptWebSocket(Writer& writer, HttpReply&& result)
       {
          auto self      = this->shared_from_this();
-         auto newSocket = std::make_shared<WebSocket>(session->server);
+         auto newSocket = std::make_shared<WebSocket>(session->server, this->info());
          Socket::replace(writer, newSocket);
          session->post(
              [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result)]

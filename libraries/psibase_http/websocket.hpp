@@ -32,7 +32,7 @@ namespace psibase::http
 
    struct WebSocket : AutoCloseSocket, std::enable_shared_from_this<WebSocket>
    {
-      explicit WebSocket(server_state& server) : server(server) {}
+      explicit WebSocket(server_state& server, SocketInfo&& info);
       template <typename I>
       static void setImpl(std::shared_ptr<WebSocket>&& self, std::unique_ptr<I>&& impl)
       {
@@ -163,7 +163,7 @@ namespace psibase::http
          if (oldState == StateType::normal)
             handleClose();
       }
-      SocketInfo info() const override { return WebSocketInfo{}; }
+      SocketInfo info() const override { return savedInfo; }
       enum class StateType : std::uint8_t
       {
          normal,
@@ -171,6 +171,7 @@ namespace psibase::http
          error,
       };
       server_state&                      server;
+      SocketInfo                         savedInfo;
       std::mutex                         mutex;
       std::unique_ptr<WebSocketImplBase> impl;
       std::deque<std::vector<char>>      outbox;

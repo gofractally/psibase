@@ -22,6 +22,7 @@ namespace psibase
       virtual SocketInfo info() const = 0;
 
       void replace(Writer& writer, std::shared_ptr<Socket>&& other);
+      void writeInfo(Writer& writer);
 
       std::int32_t           id;
       bool                   closed = false;

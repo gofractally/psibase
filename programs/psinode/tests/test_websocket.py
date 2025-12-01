@@ -36,6 +36,7 @@ class TestWebSocket(unittest.TestCase):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
         XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        XAdmin(a).install(os.path.join(testutil.test_packages(), "XSocketList.psi"))
 
         done = threading.Event()
         def echo(connection):
@@ -55,6 +56,31 @@ class TestWebSocket(unittest.TestCase):
                 for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
                     websocket.send(message)
                     self.assertEqual(websocket.recv(decode=True), message)
+
+                # There should be one unix and one http websocket
+
+                sockets = a.graphql(service='x-sock-list', query='''
+                query {
+                    sockets {
+                        edges {
+                            node {
+                                fd
+                                info {
+                                    ... on WebSocketInfo {
+                                        endpoint
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                ''')
+
+            sockets = [edge['node']['info'].get('endpoint') for edge in sockets['sockets']['edges']]
+            sockets = [socket for socket in sockets if socket is not None]
+            expected = ['', "127.0.0.1:%d" % server.socket.getsockname()[1]]
+            self.assertCountEqual(sockets, expected)
+
         finally:
             done.wait(timeout=10)
             server.shutdown()
