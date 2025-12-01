@@ -14,6 +14,8 @@ fn fetch_guild(guild: AccountNumber) -> Result<Guild, Error> {
                 fractal {{
                     account
                 }}
+                councilRole
+                repRole
             }}
         }}"#,
         guild
@@ -37,6 +39,8 @@ pub struct Data {
 pub struct Guild {
     pub eval_instance: Option<EvalInstance>,
     pub fractal: Fractal,
+    pub council_role: AccountNumber,
+    pub rep_role: AccountNumber,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -64,11 +68,15 @@ impl TryFrom<String> for Response {
 pub struct GuildHelper {
     pub fractal: AccountNumber,
     pub evaluation_id: Option<u32>,
+    pub council_role: AccountNumber,
+    pub rep_role: AccountNumber,
 }
 
 impl From<Guild> for GuildHelper {
     fn from(value: Guild) -> Self {
         Self {
+            council_role: value.council_role,
+            rep_role: value.rep_role,
             fractal: value.fractal.account,
             evaluation_id: value.eval_instance.map(|instance| instance.evaluation_id),
         }
