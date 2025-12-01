@@ -1,6 +1,5 @@
 use async_graphql::ComplexObject;
 use psibase::services::tokens::Quantity;
-use psibase::{check_some, AccountNumber, Table};
 use std::str::FromStr;
 
 use crate::tables::tables::{
@@ -10,7 +9,7 @@ use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
 
-use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable, Guild};
+use crate::tables::tables::Guild;
 
 use psibase::services::tokens::Decimal;
 use psibase::services::tokens::Wrapper as Tokens;
