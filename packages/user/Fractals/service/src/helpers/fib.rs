@@ -22,23 +22,11 @@
 /// S = 10^8.
 /// \]
 /// 
-/// Any real number \(r\) is represented by an integer
+/// Any real number \(r\) is represented by an integer with this internal scale
 /// 
 /// \[
 /// \tilde r = \mathrm{round}(r \cdot S), \qquad r \approx \tilde r / S.
 /// \]
-/// 
-/// External callers provide \(x\) with 4 decimal digits of precision:
-/// 
-/// - the input `x_times_1e4` is the integer \(x_{10^4} = \mathrm{round}(x \cdot 10^4)\).
-/// 
-/// We convert this to the internal scale \(S\) by
-/// 
-/// \[
-/// \tilde x = x_{10^4} \cdot \frac{S}{10^4} = x_{10^4} \cdot 10^4,
-/// \]
-/// 
-/// so \(\tilde x\) represents the same real \(x\) but in scale \(S\).
 /// 
 /// ---
 /// 
@@ -108,12 +96,6 @@
 ///   \approx \frac{\widetilde{\ln\varphi} \cdot \tilde x}{S}.
 /// \]
 /// 
-/// In code this is implemented as one integer multiply and one divide:
-/// 
-/// - `y_scaled = round(LN_PHI_S * x_fixed / S)`
-/// 
-/// where `LN_PHI_S` is \(\widetilde{\ln\varphi}\).
-/// 
 /// ---
 /// 
 /// #### 4. Fixed-point `exp` via Taylor series
@@ -147,30 +129,9 @@
 /// `S = 1e8`, `K = 25` is enough to get less than \(10^{-4}\) absolute error in
 /// the final Fibonacci value.
 /// 
-/// #### 5. Multiplying by \(1/\sqrt{5}\) and rescaling
+/// ---
 /// 
-/// From the exponential step we obtain
-/// 
-/// \[
-/// \tilde E \approx e^y \cdot S = \varphi^x \cdot S.
-/// \]
-/// 
-/// To apply the factor \(1/\sqrt{5}\), we use its scaled representation:
-/// 
-/// \[
-/// \widetilde{1/\sqrt{5}} = \mathrm{round}\left(\frac{1}{\sqrt{5}} \cdot S\right).
-/// \]
-/// 
-/// The scaled Fibonacci value is then
-/// 
-/// \[
-/// \tilde F
-///   \approx \frac{\tilde E \cdot \widetilde{1/\sqrt{5}}}{S}
-///   \approx \frac{\varphi^x}{\sqrt{5}} \cdot S
-///   \approx F(x) \cdot S.
-/// \]
-/// 
-/// #### 7. Summary
+/// #### 5. Summary
 /// 
 /// - Represent all reals as integers scaled by \(S = 10^8\).
 /// - Rewrite the continuous Fibonacci approximation as
