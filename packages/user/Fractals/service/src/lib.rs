@@ -6,7 +6,7 @@ pub const ONE_DAY: u32 = 86400;
 pub const ONE_WEEK: u32 = ONE_DAY * 7;
 pub const ONE_YEAR: u32 = ONE_WEEK * 52;
 
-#[psibase::service(tables = "tables::tables")]
+#[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
     use crate::tables::{
@@ -17,54 +17,8 @@ pub mod service {
         },
     };
 
-    use psibase::fracpack::Pack;
-    use psibase::services::{accounts, auth_delegate, sites, transact};
+    use psibase::services::auth_dyn;
     use psibase::*;
-
-    fn configure_new_fractal_account(fractal_account: AccountNumber) {
-        accounts::Wrapper::call().newAccount(
-            fractal_account,
-            AccountNumber::from("auth-any"),
-            true,
-        );
-        let set_proxy = Action {
-            sender: fractal_account,
-            service: sites::SERVICE,
-            method: sites::action_structs::setProxy::ACTION_NAME.into(),
-            rawData: sites::action_structs::setProxy {
-                proxy: "fractal-core".into(),
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_owner = Action {
-            sender: fractal_account,
-            service: auth_delegate::SERVICE,
-            method: auth_delegate::action_structs::setOwner::ACTION_NAME.into(),
-            rawData: auth_delegate::action_structs::setOwner {
-                owner: get_sender(),
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_auth_serv = Action {
-            sender: fractal_account,
-            service: accounts::SERVICE,
-            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: accounts::action_structs::setAuthServ {
-                authService: auth_delegate::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        // Create the fractal account, proxy it to fractal-core for a default UI
-        transact::Wrapper::call().runAs(set_proxy, vec![]);
-        transact::Wrapper::call().runAs(set_owner, vec![]);
-        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
-    }
 
     /// Creates a new account and fractal.
     ///
@@ -73,20 +27,30 @@ pub mod service {
     /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
         guild_account: AccountNumber,
         name: String,
         mission: String,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
     ) {
         let sender = get_sender();
 
-        configure_new_fractal_account(fractal_account);
-
         Fractal::add(fractal_account, name, mission, guild_account);
+
         FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
-        Guild::add(fractal_account, guild_account, sender, "Genesis".into());
+        Guild::add(
+            fractal_account,
+            guild_account,
+            sender,
+            "Genesis".to_string().try_into().unwrap(),
+            council_role,
+            rep_role,
+        );
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -99,11 +63,12 @@ pub mod service {
     #[action]
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
         let guild = Guild::get_assert(guild_account);
+        let sender = get_sender();
         check_some(
-            FractalMember::get(guild.fractal, get_sender()),
+            FractalMember::get(guild.fractal, sender),
             "must be a member of a fractal to apply for its guild",
         );
-        GuildApplication::add(guild.account, get_sender(), extra_info);
+        GuildApplication::add(guild.account, sender, extra_info);
     }
 
     /// Set guild display name
@@ -203,15 +168,7 @@ pub mod service {
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
-        check(sender != fractal, "a fractal cannot join itself");
-        check_none(
-            FractalMember::get(fractal, sender),
-            "you are already a member",
-        );
-        check_none(
-            Fractal::get(sender),
-            "a fractal cannot join another fractal",
-        );
+        check_none(account_policy(fractal), "account cannot be managed");
 
         let member_status = if ConsensusReward::get(fractal).is_some() {
             MemberStatus::Visa
@@ -345,13 +302,29 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
+    /// * `council_role` - Council role account.
+    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
+    fn create_guild(
+        fractal: AccountNumber,
+        guild_account: AccountNumber,
+        display_name: Memo,
+        council_role: AccountNumber,
+        rep_role: AccountNumber,
+    ) {
+        let sender = get_sender();
         check(
-            FractalMember::get_assert(fractal, get_sender()).is_citizen(),
+            FractalMember::get_assert(fractal, sender).is_citizen(),
             "must be a citizen to create a guild",
         );
-        Guild::add(fractal, guild_account, get_sender(), display_name);
+        Guild::add(
+            fractal,
+            guild_account,
+            sender,
+            display_name,
+            council_role,
+            rep_role,
+        );
     }
 
     /// Exile a fractal member.
@@ -411,6 +384,65 @@ pub mod service {
             "only the legislature can rank guilds",
         );
         ConsensusReward::get_assert(fractal).set_ranked_guilds(guilds);
+    }
+
+    /// Set a new representative of the Guild.
+    ///
+    /// # Arguments
+    /// * `new_representative` - The account number of the new representative.
+    #[action]
+    fn set_g_rep(new_representative: AccountNumber) {
+        Guild::get_assert(get_sender()).set_representative(new_representative);
+    }
+
+    /// Resign as representative of a guild.
+    ///
+    /// Called by current representative of guild.
+    #[action]
+    fn resign_g_rep() {
+        check_some(
+            Guild::get_by_rep_role(get_sender()),
+            "sender must be representative role account of guild",
+        )
+        .remove_representative();
+    }
+
+    /// Forcibly remove the current representative of the guild.
+    ///
+    /// Called by council role account of the guild.
+    #[action]
+    fn remove_g_rep() {
+        check_some(
+            Guild::get_by_council_role(get_sender()),
+            "sender must be council role account of guild",
+        )
+        .remove_representative();
+    }
+
+    fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
+        Fractal::get(account)
+            .map(|fractal| fractal.auth_policy())
+            .or(Guild::get(account).map(|guild| guild.guild_auth()))
+            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
+            .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth()))
+    }
+
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn get_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
+        check_some(account_policy(account), "account not supported")
+    }
+
+    /// Has policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn has_policy(account: AccountNumber) -> bool {
+        account_policy(account).is_some()
     }
 
     #[event(history)]
