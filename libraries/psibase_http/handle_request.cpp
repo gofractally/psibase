@@ -410,7 +410,8 @@ namespace psibase::http
                         {
                            for (const auto& h : reply.headers)
                            {
-                              if (h.matches("Sec-WebSocket-Accept") || h.matches("Upgrade"))
+                              if (h.matches("Sec-WebSocket-Accept") || h.matches("Upgrade") ||
+                                  h.matches("Sec-WebSocket-Extensions"))
                               {
                                  // Beast sets these headers
                               }
@@ -839,7 +840,11 @@ namespace psibase::http
                auto header =
                    HttpHeader{std::string(iter->name_string()), std::string(iter->value())};
 
-               if (!is_private_header(header.name))
+               if (header.matches("Sec-WebSocket-Extensions"))
+               {
+                  // TODO: pass through any extensions that we recognize
+               }
+               else if (!is_private_header(header.name))
                {
                   data.headers.emplace_back(std::move(header));
                }

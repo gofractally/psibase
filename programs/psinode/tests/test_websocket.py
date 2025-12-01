@@ -86,5 +86,40 @@ class TestWebSocket(unittest.TestCase):
             server.shutdown()
             t.join()
 
+    @testutil.psinode_test
+    def test_deflate(self, cluster):
+        '''
+        This checks that the permessage-deflate extension can be requested from
+        the server. If the implementation does not support this extension, it
+        should be ignored.
+        '''
+        (a,) = cluster.complete(*testutil.generate_names(1))
+
+        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+
+        done = threading.Event()
+        def echo(connection):
+            for msg in connection:
+                connection.send(msg)
+            done.set()
+        server = websockets.sync.server.serve(echo, host='127.0.0.1', port=0)
+
+        t = threading.Thread(target=server.serve_forever)
+        t.start()
+        try:
+            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.socket.getsockname()[1]}) as reply:
+                reply.raise_for_status()
+
+            url = websocket_url(a, '/', service='x-proxy')
+            with websockets.sync.client.unix_connect(a.socketpath, url, compression='deflate') as websocket:
+                for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
+                    websocket.send(message)
+                    self.assertEqual(websocket.recv(decode=True), message)
+
+        finally:
+            done.wait(timeout=10)
+            server.shutdown()
+            t.join()
+
 if __name__ == '__main__':
     testutil.main()

@@ -87,7 +87,11 @@ namespace
       {
          auto requestPtr = std::make_shared<bhttp::request<bhttp::vector_body<char>>>();
          if (isWebSocketHandshake(req))
+         {
+            // TODO: pass through any extensions that we recognize
+            req.removeHeader("Sec-WebSocket-Extensions");
             this->request = std::make_shared<HttpRequest>(req);
+         }
          auto& request = *requestPtr;
          request.method_string(req.method);
          request.target(std::move(req.target));
