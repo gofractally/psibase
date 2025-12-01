@@ -134,56 +134,18 @@
 /// \]
 /// 
 /// We truncate this to some finite \(K\) (e.g. \(K = 25\)) and compute the terms
-/// iteratively. Let
+/// iteratively.
 /// 
-/// - \(\text{term}_k^{\text{real}} = t^k / k!\),
-/// - \(\tilde{\text{term}}_k = \text{term}_k^{\text{real}} \cdot S\) (scaled integer).
-/// 
-/// We have
-/// 
-/// \[
-/// \text{term}_0^{\text{real}} = 1 \quad\Rightarrow\quad
-/// \tilde{\text{term}}_0 = S.
-/// \]
-/// 
-/// For \(k \ge 1\),
-/// 
-/// \[
-/// \text{term}_k^{\text{real}} =
-///   \text{term}_{k-1}^{\text{real}} \cdot \frac{t}{k}.
-/// \]
-/// 
-/// Converting to scaled form:
-/// 
-/// \[
-/// \tilde{\text{term}}_k
-///   = \text{term}_k^{\text{real}} \cdot S
-///   = \left(\frac{\tilde{\text{term}}_{k-1}}{S}\right)
-///     \left(\frac{\tilde t}{S}\right)
-///     \frac{S}{k}
-///   = \frac{\tilde{\text{term}}_{k-1} \cdot \tilde t}{k \cdot S}.
-/// \]
-/// 
-/// So the integer recurrence is
-/// 
-/// \[
-/// \tilde{\text{term}}_k =
-///   \frac{\tilde{\text{term}}_{k-1} \cdot \tilde t}{k \cdot S}.
-/// \]
-/// 
-/// The scaled approximation of \(e^t\) is then
+/// The scaled approximation of \(e^t\) is
 /// 
 /// \[
 /// \widetilde{e^t}
-///   \approx \sum_{k=0}^{K} \tilde{\text{term}}_k
 ///   \approx e^t \cdot S.
 /// \]
 /// 
 /// For our usage (\(t = x \ln\varphi\) with \(x\) in a moderate range) and
 /// `S = 1e8`, `K = 25` is enough to get less than \(10^{-4}\) absolute error in
 /// the final Fibonacci value.
-/// 
-/// ---
 /// 
 /// #### 5. Multiplying by \(1/\sqrt{5}\) and rescaling
 /// 
