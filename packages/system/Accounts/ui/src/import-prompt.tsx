@@ -34,16 +34,19 @@ import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 import { useImportExisting } from "./hooks/use-import-existing";
+import { useImportKey } from "./hooks/use-import-key";
+import { b64ToPem, validateB64 } from "./lib/keys";
 
 const supervisor = getSupervisor();
 
 export const ImportPrompt = () => {
     const navigate = useNavigate();
 
+    const [authService, setAuthService] = useState<string>("auth-sig");
+
     // modal state
     const [showCreate, setShowCreate] = useState(false);
     const [showCannotCreate, setShowCannotCreate] = useState(false);
-
     const [createName, setCreateName] = useState("");
 
     // queries
@@ -53,6 +56,7 @@ export const ImportPrompt = () => {
         useCanCreateAccount();
 
     // mutations
+    const importKeyMutation = useImportKey();
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
     const connectAccountMutation = useConnectAccount();
@@ -72,8 +76,11 @@ export const ImportPrompt = () => {
         }
     };
 
-    const handleImportAndLogin = async (account: string) => {
+    const handleImportAndLogin = async (account: string, b64: string) => {
+        const pemFormatted = b64ToPem(b64);
+
         try {
+            await importKeyMutation.mutateAsync(pemFormatted);
             await importExistingMutation.mutateAsync(account);
             await connectAccountMutation.mutateAsync(account);
             prompt.finished();
@@ -87,20 +94,46 @@ export const ImportPrompt = () => {
             account: {
                 account: "",
             },
+            privateKey: "",
         },
         validators: {
             onChange: z.object({
                 account: z.object({
                     account: zAccount.or(z.literal("")),
                 }),
+                privateKey: z.string(),
+            }),
+            onSubmit: z.object({
+                account: z.object({
+                    account: zAccount,
+                }),
+                privateKey: z.string().refine(
+                    (val) => {
+                        if (authService !== "auth-sig") return true;
+                        return validateB64(val);
+                    },
+                    {
+                        message:
+                            authService === "auth-sig"
+                                ? "Private key must be a valid base64 string"
+                                : "Invalid private key",
+                    },
+                ),
             }),
         },
         onSubmit: async (data) => {
-            await handleImportAndLogin(data.value.account.account);
+            await handleImportAndLogin(
+                data.value.account.account,
+                data.value.privateKey,
+            );
         },
     });
 
     const isSubmitting = useStore(form.store, (state) => state.isSubmitting);
+    // const isAccountValidating = useStore(
+    //     form.store,
+    //     (state) => state.fieldMeta["account.account"]?.isValidating,
+    // );
 
     // if (loading) {
     //     return (
@@ -136,7 +169,7 @@ export const ImportPrompt = () => {
                                     Use your {networkName} account
                                 </div>
                             </div>
-                            <div className="flex-1">
+                            <div className="flex flex-1 flex-col gap-4">
                                 <FieldAccountExisting
                                     form={form}
                                     fields="account"
@@ -145,7 +178,36 @@ export const ImportPrompt = () => {
                                     placeholder="Account name"
                                     disabled={isSubmitting}
                                     supervisor={supervisor}
+                                    onValidate={(account) => {
+                                        const authService =
+                                            account?.authService;
+                                        if (!authService) return;
+
+                                        setAuthService(authService); // so that we know whether to render the private key field
+
+                                        if (authService === "auth-any") {
+                                            // clear any validation errors on the hidden private key field so that the form can be submitted
+                                            form.validateField(
+                                                "privateKey",
+                                                "change",
+                                            );
+                                        }
+                                    }}
                                 />
+                                {authService === "auth-sig" && (
+                                    <form.AppField
+                                        name="privateKey"
+                                        children={(field) => {
+                                            return (
+                                                <field.TextField
+                                                    type="password"
+                                                    label="Private key"
+                                                    placeholder="Enter your private key"
+                                                />
+                                            );
+                                        }}
+                                    />
+                                )}
                             </div>
                         </CardContent>
                         <CardFooter className="mt-4 flex flex-1 justify-between">

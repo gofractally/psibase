@@ -1,4 +1,3 @@
-// import { useStore } from "@tanstack/react-form";
 import { User, UserX } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
@@ -42,6 +41,7 @@ import { withFieldGroup } from "./app-form";
  *     placeholder="Enter account name"
  *     disabled={isDisabled}
  *     supervisor={supervisor}
+ *     onValidate={(account) => ...}
  * />
  * ```
  *
@@ -50,6 +50,7 @@ import { withFieldGroup } from "./app-form";
  * @param placeholder - Placeholder text for the input
  * @param disabled - Whether the field is disabled
  * @param supervisor - Consuming app's supervisor instance for account validation
+ * @param onValidate - Callback with validated account meta
  * @returns A field for entering an existing account name with validation
  */
 export const FieldAccountExisting = withFieldGroup({
@@ -62,6 +63,9 @@ export const FieldAccountExisting = withFieldGroup({
         placeholder: undefined as string | undefined,
         disabled: false,
         supervisor: undefined as Supervisor | undefined,
+        onValidate: undefined as
+            | ((account: z.infer<typeof zGetAccountReturn>) => void)
+            | undefined,
     },
     render: function Render({
         group,
@@ -70,12 +74,11 @@ export const FieldAccountExisting = withFieldGroup({
         description,
         placeholder,
         supervisor,
+        onValidate,
     }) {
         const [isValidating, setIsValidating] = useState(false);
-        // TODO: can we just use...
-        // const isValidating = useStore(group.form.store, (state) => state.isValidating);
-        // ?
         const [userNotFound, setUserNotFound] = useState(false);
+
         return (
             <group.AppField
                 name="account"
@@ -104,27 +107,25 @@ export const FieldAccountExisting = withFieldGroup({
                     onChange: () => setIsValidating(true),
                     onChangeAsyncDebounceMs: 500,
                     onChangeAsync: async ({ value }) => {
-                        const exists = await doesAccountExist(
-                            value,
-                            supervisor!,
-                        );
+                        const account = await lookUpAccount(value, supervisor!);
+                        onValidate?.(account);
                         setIsValidating(false);
-                        setUserNotFound(!exists);
-                        return;
+                        const notFound = !account?.accountNum;
+                        setUserNotFound(notFound);
                     },
                     onSubmit: ({ fieldApi }) => {
                         const errors = fieldApi.parseValueWithSchema(zAccount);
                         if (errors) return errors;
                     },
                     onSubmitAsync: async ({ value }) => {
-                        const exists = await doesAccountExist(
-                            value,
-                            supervisor!,
-                        );
+                        const account = await lookUpAccount(value, supervisor!);
+                        onValidate?.(account);
                         setIsValidating(false);
-                        setUserNotFound(!exists);
-                        if (exists) return;
-                        return "Account does not exist";
+                        const notFound = !account?.accountNum;
+                        setUserNotFound(notFound);
+                        if (notFound) {
+                            return "Account does not exist";
+                        }
                     },
                 }}
             />
@@ -140,10 +141,10 @@ const zGetAccountReturn = z
     })
     .optional();
 
-export const doesAccountExist = async (
+export const lookUpAccount = async (
     accountName: string,
     supervisor: Supervisor,
-): Promise<boolean> => {
+): Promise<z.infer<typeof zGetAccountReturn>> => {
     try {
         const res = zGetAccountReturn.parse(
             await supervisor.functionCall({
@@ -154,11 +155,11 @@ export const doesAccountExist = async (
             }),
         );
 
-        return Boolean(res?.accountNum);
+        return res;
     } catch (e) {
         // TODO: read this error, actually throw if there's something wrong, other than being invalid
         console.error(e);
-        return false;
+        return undefined;
     }
 };
 

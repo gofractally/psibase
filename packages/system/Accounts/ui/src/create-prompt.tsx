@@ -120,6 +120,7 @@ export const CreatePrompt = () => {
                                     placeholder="Account name"
                                     disabled={isSubmitting}
                                     supervisor={supervisor}
+                                    onValidate={undefined}
                                 />
                             </div>
                         </CardContent>
