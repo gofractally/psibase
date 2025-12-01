@@ -100,14 +100,13 @@ namespace psibase::http
          try
          {
             auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::recv succeeded";
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+            PSIBASE_LOG(logger, debug) << action.service.str() << "::recv succeeded";
          }
          catch (std::exception& e)
          {
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, warning)
-                << action.service.str() << "::recv failed: " << e.what();
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+            PSIBASE_LOG(logger, warning) << action.service.str() << "::recv failed: " << e.what();
          }
       }
       void handleClose()
@@ -131,14 +130,13 @@ namespace psibase::http
          try
          {
             auto& atrace = bc.execAsyncExport("close", std::move(action), trace);
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::close succeeded";
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+            PSIBASE_LOG(logger, debug) << action.service.str() << "::close succeeded";
          }
          catch (std::exception& e)
          {
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, warning)
-                << action.service.str() << "::close failed: " << e.what();
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+            PSIBASE_LOG(logger, warning) << action.service.str() << "::close failed: " << e.what();
          }
       }
       void error(const std::error_code& ec)
@@ -171,7 +169,7 @@ namespace psibase::http
          error,
       };
       server_state&                      server;
-      SocketInfo                         savedInfo;
+      WebSocketInfo                      savedInfo;
       std::mutex                         mutex;
       std::unique_ptr<WebSocketImplBase> impl;
       std::deque<std::vector<char>>      outbox;
