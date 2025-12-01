@@ -378,7 +378,7 @@ pub mod tables {
         }
 
         fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
-            let shared_creditor_bal_ids = UserPendingTable::new()
+            let shared_creditor_bal_ids = UserPendingTable::read()
                 .get_index_pk()
                 .range((creditor, token_id, 0_u64)..(creditor, token_id, u64::MAX))
                 .map(|bal| bal.shared_bal_id)

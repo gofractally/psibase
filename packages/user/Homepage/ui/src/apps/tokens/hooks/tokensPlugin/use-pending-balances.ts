@@ -27,7 +27,7 @@ export const useUserPendingBalance = (
         enabled: !!username,
         queryFn: async () => {
             const res = await fetchOpenLinesOfCredit(zAccount.parse(username), tokenId);
-            const xformShardBalNode = (sbn: SharedBalNode): PendingBalance => {
+            const xformSharedBalNode = (sbn: SharedBalNode): PendingBalance => {
                 const quan = new Quantity(
                     sbn.balance,
                     sbn.token.precision,
@@ -44,7 +44,7 @@ export const useUserPendingBalance = (
                 };
             };
 
-            return res.map(xformShardBalNode);
+            return res.map(xformSharedBalNode);
         },
     });
 };

@@ -1,4 +1,4 @@
-import type { PendingBalance } from "../../hooks/tokensPlugin/use-user-lines-of-credit";
+import type { PendingBalance } from "../../hooks/tokensPlugin/use-pending-balances";
 import type { PendingActionProps } from "../../pending";
 
 import { ArrowDown, Loader2 } from "lucide-react";
