@@ -1,11 +1,19 @@
-use psibase::{abort_message, check_none, check_some, AccountNumber, Table};
+use psibase::{
+    abort_message, check_none, check_some,
+    services::tokens::{Quantity, TID},
+    AccountNumber, Memo, Table,
+};
 
-use crate::tables::tables::{
-    Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
-    GuildAttest, GuildMember,
+use crate::{
+    tables::tables::{
+        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
+        GuildAttest, GuildMember,
+    },
+    ONE_WEEK,
 };
 
 use async_graphql::ComplexObject;
+use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::transact::Wrapper as TransactSvc;
 
 #[derive(PartialEq)]
@@ -39,11 +47,15 @@ impl FractalMember {
 impl FractalMember {
     fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
+
+        let token_id = Fractal::get_assert(fractal).token_id;
+
         Self {
             account,
             fractal,
             created_at: now,
             member_status: status as StatusU8,
+            stream_id: TokenStream::call().create(ONE_WEEK * 13, token_id),
         }
     }
 
@@ -52,6 +64,7 @@ impl FractalMember {
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
         );
+        check_none(Self::get(fractal, account), "account is already a member");
 
         let new_instance = Self::new(fractal, account, status);
         new_instance.save();
@@ -67,6 +80,16 @@ impl FractalMember {
 
     pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
         check_some(Self::get(fractal, account), "member does not exist")
+    }
+
+    pub fn deposit_stream(&self, token_id: TID, amount: Quantity, memo: Memo) {
+        psibase::services::tokens::Wrapper::call().credit(
+            token_id,
+            TokenStream::SERVICE,
+            amount,
+            memo,
+        );
+        TokenStream::call().deposit(self.stream_id, amount);
     }
 
     pub fn is_citizen(&self) -> bool {

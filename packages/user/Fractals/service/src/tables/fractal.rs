@@ -1,11 +1,22 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::services::tokens::Quantity;
+use std::str::FromStr;
 
 use crate::tables::tables::{
-    Fractal, FractalMember, FractalMemberTable, FractalTable, FractalToken,
+    ConsensusReward, Fractal, FractalMember, FractalMemberTable, FractalTable,
+};
+use psibase::{
+    check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
 
+use crate::tables::tables::Guild;
+
+use psibase::services::tokens::Decimal;
+use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
+use psibase::services::{accounts, sites, transact};
+use psibase::Action;
+use psibase::{fracpack::Pack, services::auth_dyn};
 
 impl Fractal {
     fn new(
@@ -16,6 +27,8 @@ impl Fractal {
     ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
+        let max_supply = Decimal::from_str("21000000.0000").unwrap();
+
         Self {
             account,
             created_at: now,
@@ -23,7 +36,51 @@ impl Fractal {
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
+            token_id: Tokens::call().create(max_supply.precision, max_supply.quantity),
         }
+    }
+
+    fn create_account(&self) {
+        let fractal_account = self.account;
+        accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
+
+        let set_proxy = Action {
+            sender: fractal_account,
+            service: sites::SERVICE,
+            method: sites::action_structs::setProxy::ACTION_NAME.into(),
+            rawData: sites::action_structs::setProxy {
+                proxy: "fractal-core".into(),
+            }
+            .packed()
+            .into(),
+        };
+
+        let set_policy = Action {
+            sender: fractal_account,
+            service: auth_dyn::SERVICE,
+            method: auth_dyn::action_structs::set_mgmt::ACTION_NAME.into(),
+            rawData: auth_dyn::action_structs::set_mgmt {
+                account: fractal_account,
+                manager: crate::Wrapper::SERVICE,
+            }
+            .packed()
+            .into(),
+        };
+
+        let set_auth_serv = Action {
+            sender: fractal_account,
+            service: accounts::SERVICE,
+            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+            rawData: accounts::action_structs::setAuthServ {
+                authService: auth_dyn::Wrapper::SERVICE,
+            }
+            .packed()
+            .into(),
+        };
+
+        transact::Wrapper::call().runAs(set_proxy, vec![]);
+        transact::Wrapper::call().runAs(set_policy, vec![]);
+        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
     }
 
     pub fn add(
@@ -31,16 +88,28 @@ impl Fractal {
         name: String,
         mission: String,
         genesis_guild: AccountNumber,
-    ) {
-        Self::new(account, name, mission, genesis_guild).save();
-    }
-
-    pub fn token(&self) -> Option<FractalToken> {
-        FractalToken::get(self.account)
+    ) -> Self {
+        check_none(Self::get(account), "fractal already exists");
+        let new_instance = Self::new(account, name, mission, genesis_guild);
+        // Save the fractal first prior to creating an account for it
+        // as AuthDyn expects `has_policy` to return true when setting the fractals
+        // auth service to AuthDyn.
+        new_instance.save();
+        new_instance.create_account();
+        new_instance
     }
 
     pub fn init_token(&mut self) {
-        FractalToken::add(self.account);
+        let total_supply = Tokens::call().getToken(self.token_id).max_issued_supply;
+        let quarter_supply: Quantity = (total_supply.value / 4).into();
+
+        Tokens::call().mint(
+            self.token_id,
+            quarter_supply,
+            "Token intitialisation".into(),
+        );
+
+        ConsensusReward::add(self.account, self.token_id, quarter_supply);
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -66,11 +135,23 @@ impl Fractal {
             )
             .collect()
     }
+
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
+        DynamicAuthPolicy::from_sole_authorizer(self.legislature)
+    }
 }
 
 #[ComplexObject]
 impl Fractal {
     async fn memberships(&self) -> Vec<FractalMember> {
         self.members()
+    }
+
+    async fn legislature(&self) -> Guild {
+        Guild::get_assert(self.legislature)
+    }
+
+    async fn judiciary(&self) -> Guild {
+        Guild::get_assert(self.judiciary)
     }
 }
