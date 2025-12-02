@@ -163,14 +163,10 @@
 /// \]
 /// 
 /// In our case \(|t| < \ln\varphi \approx 0.48\), so \(e^{|t|}\) is \(O(1)\) and
-/// \(|t|^{K+1} / (K+1)!\) decays very quickly as \(K\) increases. With the chosen
-/// \(K\) and the configured input range (as enforced in the code by `MAX_INPUT_SCALED`), 
-/// this remainder term is smaller than \(10^{-4}\). In practice this means:
-/// 
-/// - the dominant sources of error are fixed-point rounding of constants and
-///   intermediate products, and  
-/// - the Taylor truncation itself is negligible relative to the \(10^{-4}\)
-///   absolute error tolerance for \(F(x)\) over the supported domain.
+/// \(|t|^{K+1} / (K+1)!\) decays very quickly as \(K\) increases. For the chosen
+/// \(K\), the next Taylor term is on the order of \(10^{-12}\), which is comparable
+/// to the internal fixed-point unit \(1/S\). In other words, the truncation error
+/// is no larger than the normal rounding error from the fixed-point scale \(S\). 
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
