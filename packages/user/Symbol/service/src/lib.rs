@@ -166,7 +166,7 @@ pub mod tables {
             Nft::call().credit(
                 new_instance.ownerNft,
                 sender,
-                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+                format!("This NFT conveys ownership of symbol: {}", symbol).as_str().into(),
             );
 
             new_instance

@@ -74,7 +74,7 @@ mod service {
     }
 
     #[action]
-    fn credit(nftId: crate::services::nft::NID, receiver: AccountNumber, memo: String) {
+    fn credit(nftId: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 

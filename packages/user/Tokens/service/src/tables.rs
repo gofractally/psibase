@@ -88,7 +88,7 @@ pub mod tables {
                 Nfts::call().credit(
                     new_instance.nft_id,
                     creator,
-                    format!("NFT for token ID {}", new_instance.id),
+                    format!("NFT for token ID {}", new_instance.id).as_str().into(),
                 );
             }
 
