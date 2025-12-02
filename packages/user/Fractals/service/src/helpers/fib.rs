@@ -142,6 +142,35 @@
 /// \[
 /// F(x) \approx \frac{\varphi^x}{\sqrt{5}}.
 /// \]
+/// 
+/// ---
+/// 
+/// #### 6. Error analysis
+/// 
+/// For the fractional part we approximate
+/// 
+/// \[
+/// e^t = \sum_{k=0}^{\infty} \frac{t^k}{k!}
+/// \]
+/// 
+/// by truncating after \(K\) terms. The standard remainder bound for the Taylor
+/// series of \(e^t\) is
+/// 
+/// \[
+/// \bigl|R_K(t)\bigr|
+///   = \left|\;e^t - \sum_{k=0}^{K} \frac{t^k}{k!}\right|
+///   \le e^{|t|} \frac{|t|^{K+1}}{(K+1)!}.
+/// \]
+/// 
+/// In our case \(|t| < \ln\varphi \approx 0.48\), so \(e^{|t|}\) is \(O(1)\) and
+/// \(|t|^{K+1} / (K+1)!\) decays very quickly as \(K\) increases. With the chosen
+/// \(K\) and the configured input range (as enforced in the code by `MAX_INPUT_SCALED`), 
+/// this remainder term is smaller than \(10^{-4}\). In practice this means:
+/// 
+/// - the dominant sources of error are fixed-point rounding of constants and
+///   intermediate products, and  
+/// - the Taylor truncation itself is negligible relative to the \(10^{-4}\)
+///   absolute error tolerance for \(F(x)\) over the supported domain.
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
