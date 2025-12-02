@@ -1,158 +1,147 @@
-/// ### Algorithm derivation
-/// 
+/// ### Algorithm derivation (fixed-point Binet approximation)
+///
 /// We want a *continuous* Fibonacci function based on the usual Binet-style
-/// approximation using fixed-point integer arithmetic.
-/// 
+/// approximation
+///
 /// \[
 /// F(x) \approx \frac{\varphi^x}{\sqrt{5}}
 /// \quad\text{with}\quad
 /// \varphi = \frac{1 + \sqrt{5}}{2}.
 /// \]
-/// 
+///
 /// To make this deterministic and avoid floating point at runtime, we implement
 /// everything in fixed-point integer arithmetic.
-/// 
+///
 /// ---
-/// 
+///
 /// #### 1. Fixed-point representation
-/// 
+///
 /// Choose a global internal scale
-/// 
+///
 /// \[
 /// S = 10^8.
 /// \]
-/// 
+///
 /// Any real number \(r\) is represented by an integer with this internal scale
-/// 
+///
 /// \[
 /// \tilde r = \mathrm{round}(r \cdot S), \qquad r \approx \tilde r / S.
 /// \]
-/// 
+///
 /// ---
-/// 
+///
 /// #### 2. Rewriting \(\varphi^x\)
-/// 
-/// We rewrite the exponential term using `exp`:
-/// 
+///
+/// We use the identity
+///
 /// \[
-/// \varphi^x = e^{x \ln \varphi}.
+/// \varphi^x = \varphi^{\lfloor x \rfloor} \cdot \varphi^{x - \lfloor x \rfloor}.
 /// \]
-/// 
+///
+/// This splits the exponent into:
+///
+/// - an **integer part**, where exponentiation is exact and efficient, and  
+/// - a **fractional part**, which remains in the interval \([0, 1)\).
+///
+/// The fractional exponent is always small, so its exponential can be computed
+/// with fewer Taylor terms and better accuracy.
+///
 /// Let
-/// 
+///
 /// \[
 /// c_{\ln\varphi} = \ln \varphi,
 /// \qquad
 /// c_{1/\sqrt{5}} = \frac{1}{\sqrt{5}}.
 /// \]
-/// 
+///
 /// We store these constants in scaled form:
-/// 
+///
 /// \[
 /// \widetilde{\ln\varphi} = \mathrm{round}(c_{\ln\varphi} \cdot S),
 /// \qquad
 /// \widetilde{1/\sqrt{5}} = \mathrm{round}(c_{1/\sqrt{5}} \cdot S).
 /// \]
-/// 
+///
 /// At runtime we never recompute logs or square-roots; we just use their
 /// precomputed scaled integers.
-/// 
+///
 /// ---
-/// 
-/// #### 3. Computing \(y = x \ln \varphi\) in fixed-point
-/// 
-/// The real value is
-/// 
+///
+/// #### 3. Integer exponent via lookup table
+///
+/// The integer portion of the exponent, \(n = \lfloor x \rfloor\), is handled by
+/// precomputing a table of scaled values
+///
 /// \[
-/// y = x \ln \varphi.
+/// \widetilde{\varphi^{2^k}} = \mathrm{round}(\varphi^{2^k} \cdot S),
 /// \]
-/// 
-/// Using the scaled representations
-/// 
-/// \[
-/// x \approx \tilde x / S,
-/// \qquad
-/// \ln \varphi \approx \widetilde{\ln\varphi} / S,
-/// \]
-/// 
-/// we have
-/// 
-/// \[
-/// y \approx \left(\frac{\widetilde{\ln\varphi}}{S}\right)
-///            \left(\frac{\tilde x}{S}\right)
-///     = \frac{\widetilde{\ln\varphi} \cdot \tilde x}{S^2}.
-/// \]
-/// 
-/// We also want a scaled version of \(y\),
-/// 
-/// \[
-/// \tilde y \approx y \cdot S,
-/// \]
-/// 
-/// so
-/// 
-/// \[
-/// \tilde y
-///   \approx \frac{\widetilde{\ln\varphi} \cdot \tilde x}{S}.
-/// \]
-/// 
+///
+/// for all powers of two needed to cover the full range of possible integer
+/// exponents.
+///
 /// ---
-/// 
-/// #### 4. Fixed-point `exp` via Taylor series
-/// 
-/// We now need \(e^y\) where \(y = \tilde y / S\).
-/// Define
-/// 
+///
+/// #### 4. Fractional exponent via fixed-point `exp` (Taylor series)
+///
+/// Let the fractional part be
+///
 /// \[
-/// t = y,
-/// \qquad
-/// \tilde t = t \cdot S = \tilde y.
+/// f = x - \lfloor x \rfloor \quad\text{with}\quad 0 \le f < 1.
 /// \]
-/// 
-/// The Taylor series for the exponential is
-/// 
+///
+/// Then
+///
 /// \[
-/// e^t = \sum_{k=0}^{\infty} \frac{t^k}{k!}.
+/// \varphi^{f} = e^{f \ln\varphi}.
 /// \]
-/// 
-/// We truncate this to some finite \(K\) (e.g. \(K = 25\)) and compute the terms
-/// iteratively.
-/// 
-/// The scaled approximation of \(e^t\) is
-/// 
+///
+/// Since \(f\) is always in \([0, 1)\), the argument to the exponential is
+///
 /// \[
-/// \widetilde{e^t}
-///   \approx e^t \cdot S.
+/// t = f \ln\varphi,
+/// \qquad |t| < \ln\varphi \approx 0.48,
 /// \]
-/// 
-/// For our usage (\(t = x \ln\varphi\) with \(x\) in a moderate range) and
-/// `S = 1e8`, `K = 25` is enough to get less than \(10^{-4}\) absolute error in
-/// the final Fibonacci value.
-/// 
+///
+/// which is small enough for the Taylor expansion of \(e^t\) to converge very
+/// rapidly in fixed-point arithmetic.
+///
+/// We compute a scaled value
+///
+/// \[
+/// \widetilde{e^t} \approx e^t \cdot S
+/// \]
+///
+/// using a truncated Taylor series, typically with \(K = 25\) terms. For our input
+/// range, this achieves better than \(10^{-4}\) absolute error in the final
+/// Fibonacci value.
+///
 /// ---
-/// 
-/// #### 5. Summary
-/// 
-/// - Represent all reals as integers scaled by \(S = 10^8\).
-/// - Rewrite the continuous Fibonacci approximation as
-/// 
-///   \[
-///   F(x) \approx \frac{e^{x \ln\varphi}}{\sqrt{5}}.
-///   \]
-/// 
-/// - Precompute scaled constants \(\widetilde{\ln\varphi}\) and
-///   \(\widetilde{1/\sqrt{5}}\).
-/// - For an input `x_times_1e4`, convert to internal scale, compute
-/// 
-///   - `y_scaled ≈ (x * ln(phi)) * S`,
-///   - `exp_scaled ≈ exp(y) * S` via the truncated Taylor series above,
-///   - `fib_scaled ≈ exp_scaled * (1/sqrt(5))`.
-/// 
-/// - Finally, convert `fib_scaled` from scale `S` to scale `10^4` and return it.
-/// 
-/// All runtime math is integer-only, so the algorithm is deterministic across platforms while still
-/// closely approximating the continuous Binet formula
-/// \(\displaystyle F(x) \approx \varphi^x / \sqrt{5}\).
+///
+/// #### 5. Final combination and scaling
+///
+/// The continuous Fibonacci approximation is then
+///
+/// \[
+/// F(x)
+///   \approx \frac{\varphi^n}{\sqrt{5}}
+///           \cdot \varphi^{f}.
+/// \]
+///
+/// In fixed-point form:
+///
+/// 1. compute \(\widetilde{\varphi^n}\) from the lookup table,  
+/// 2. compute \(\widetilde{e^t} \approx \widetilde{\varphi^f}\),  
+/// 3. multiply them in scale \(S\),  
+/// 4. multiply by \(\widetilde{1/\sqrt{5}}\),  
+/// 5. rescale from \(S = 10^8\) down to \(10^4\) for the public API.
+///
+/// All runtime math uses only integer operations with explicit rounding, ensuring
+/// deterministic behavior across platforms while still closely approximating the
+/// continuous Binet formula
+///
+/// \[
+/// F(x) \approx \frac{\varphi^x}{\sqrt{5}}.
+/// \]
 
 /// Precomputed scaled integer for ln(φ)
 /// ~ 0.48121183 at scale 1e8
@@ -163,33 +152,84 @@ const LN_PHI_S: u128 = 48_121_183;
 const INV_SQRT5_S: u128 = 44_721_360;
 
 // Internal fixed-point scales
-const S: u128 = 100_000_000; // 8 decimal places
+const S: u128 = 1_000_000_000_000; // 12 decimal places
 const EXTERNAL_S: u128 = 10_000; // 4 decimal places
+
+// PHI_POW2_TABLE[k] ≈ φ^(2^k) * S, with S = 1e8
+const PHI_POW2_TABLE: [u128; 8] = [
+    161_803_399,                                    // k=0, 2^0  = 1
+    261_803_399,                                    // k=1, 2^1  = 2
+    685_410_197,                                    // k=2, 2^2  = 4
+    4_697_871_376,                                  // k=3, 2^3  = 8
+    220_699_954_690,                                // k=4, 2^4  = 16
+    487_084_699_999_979,                            // k=5, 2^5  = 32
+    2_372_515_049_740_700_000_000,                  // k=6, 2^6  = 64
+    56_288_276_612_461_161_951_372_364_700_000_000, // k=7, 2^7  = 128
+];
 
 /// Calculate the Fibonacci value for a given x in a continuous function
 /// (rather than the typical discrete fib sequence).
 ///
 /// # Arguments
 ///
-/// * `x` - The input value scaled by 10_000, eg. (fib(1.4142) -> 14142)
+/// * `x` - The input value scaled by 10_000, eg. (fib(1.4142) -> fib(14142))
+///         Inputs should be 0.0 ≤ x ≤ ~140.0 (scaled by 10_000)
 pub fn continuous_fibonacci(x: u32) -> u64 {
-    // Convert external EXTERNAL_S-scaled x to internal S-scaled x.
-    let x: u128 = (x as u128) * (S / EXTERNAL_S);
+    // Split x into integer and fractional parts:
+    let int_x: u32 = x / (EXTERNAL_S as u32);
+    let frac_x_ext: u32 = x % (EXTERNAL_S as u32);
 
-    // y_scaled ≈ (x * ln(phi)) * S  (still scaled by S)
-    let y_scaled = mul_ratio_rounded(LN_PHI_S, x, S);
+    // We only support integer exponents that fit into the PHI_POW2_TABLE range
+    psibase::check(int_x < (1u32 << PHI_POW2_TABLE.len()), "int_x out of bounds");
 
-    // exp_scaled ≈ exp(x * ln(phi)) * S = φ^x * S
-    let exp_scaled = exp_taylor_scaled(y_scaled);
+    // φ^n in fixed-point: φ^int_x * S
+    let phi_int_scaled: u128 = phi_integer_power_scaled(int_x);
+
+    // Fractional part f in internal scale:
+    //
+    // f_real = frac_x_ext / EXTERNAL_S
+    // f_scaled = f_real * S = frac_x_ext * (S / EXTERNAL_S)
+    let frac_scaled: u128 = (frac_x_ext as u128) * (S / EXTERNAL_S);
+
+    // t = f * ln(phi), with everything in scale S:
+    // t_scaled ≈ (LN_PHI_S * f_scaled) / S
+    let t_scaled: u128 = mul_ratio_rounded(LN_PHI_S, frac_scaled, S);
+
+    // exp_scaled ≈ exp(t_real) * S = φ^f * S
+    let phi_frac_scaled: u128 = exp_taylor_scaled(t_scaled);
+
+    // Combine integer and fractional exponent parts:
+    // φ^x = φ^n * φ^f, all in fixed-point scale S.
+    let phi_x_scaled: u128 = mul_ratio_rounded(phi_int_scaled, phi_frac_scaled, S);
 
     // fib_scaled ≈ φ^x / sqrt(5) * S
-    let fib_scaled = mul_ratio_rounded(exp_scaled, INV_SQRT5_S, S);
+    let fib_scaled: u128 = mul_ratio_rounded(phi_x_scaled, INV_SQRT5_S, S);
 
     // Convert back to EXTERNAL_S scale with rounding.
-    let factor = S / EXTERNAL_S; // 1e4
+    let factor = S / EXTERNAL_S;
     let result = div_rounded(fib_scaled, factor);
 
     result as u64
+}
+
+/// Computes φ^n in fixed-point, returning φ^n * S.
+///
+/// - `n` is the integer exponent
+fn phi_integer_power_scaled(mut n: u32) -> u128 {
+    // Start from 1.0 in scale S.
+    let mut result: u128 = S;
+
+    let mut bit_index: usize = 0;
+    while n > 0 {
+        if (n & 1) != 0 {
+            // result *= φ^(2^bit_index), rescaled back to S.
+            result = mul_ratio_rounded(result, PHI_POW2_TABLE[bit_index], S);
+        }
+        n >>= 1;
+        bit_index += 1;
+    }
+
+    result
 }
 
 /// Multiply by a rational factor with rounding:
@@ -233,6 +273,7 @@ fn exp_taylor_scaled(t: u128) -> u128 {
     sum
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,7 +289,7 @@ mod tests {
 
     #[test]
     fn check_accuracy() {
-        let max_x_scaled: u32 = 15 * (EXTERNAL_S as u32);
+        let max_x_scaled: u32 = 17 * (EXTERNAL_S as u32);
 
         for x_scaled in 0..=max_x_scaled {
             let x = x_scaled as f64 / EXTERNAL_S as f64;
