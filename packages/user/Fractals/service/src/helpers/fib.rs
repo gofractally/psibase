@@ -146,6 +146,7 @@
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
 const EXTERNAL_S: u128 = 10_000; // 4 decimal places
+const MAX_INPUT_SCALED: u32 = 37 * (EXTERNAL_S as u32); // Determined by manual testing
 
 /// Precomputed scaled integer for ln(φ)
 /// ln(phi) * S ≈ 0.48121182505960347 * 1e12
@@ -174,12 +175,11 @@ const PHI_POW2_TABLE: [u128; 7] = [
 /// * `x` - The input value scaled by 10_000, eg. (fib(1.4142) -> fib(14142))
 ///         Inputs should be 0.0 ≤ x ≤ ~140.0 (scaled by 10_000)
 pub fn continuous_fibonacci(x: u32) -> u64 {
+    psibase::check(x <= MAX_INPUT_SCALED, "x out of bounds");
+
     // Split x into integer and fractional parts:
     let int_x: u32 = x / (EXTERNAL_S as u32);
     let frac_x_ext: u32 = x % (EXTERNAL_S as u32);
-
-    // We only support integer exponents that fit into the PHI_POW2_TABLE range
-    psibase::check(int_x < (1u32 << PHI_POW2_TABLE.len()), "int_x out of bounds");
 
     // φ^n in fixed-point: φ^int_x * S
     let phi_int_scaled: u128 = phi_integer_power_scaled(int_x);
