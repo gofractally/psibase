@@ -143,28 +143,27 @@
 /// F(x) \approx \frac{\varphi^x}{\sqrt{5}}.
 /// \]
 
-/// Precomputed scaled integer for ln(φ)
-/// ~ 0.48121183 at scale 1e8
-const LN_PHI_S: u128 = 48_121_183;
-
-/// Precomputed scaled integer for 1/√5
-/// ~ 0.44721360 at scale 1e8
-const INV_SQRT5_S: u128 = 44_721_360;
-
-// Internal fixed-point scales
-const S: u128 = 1_000_000_000_000; // 12 decimal places
+// Fixed-point scales
+const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
 const EXTERNAL_S: u128 = 10_000; // 4 decimal places
 
-// PHI_POW2_TABLE[k] ≈ φ^(2^k) * S, with S = 1e8
-const PHI_POW2_TABLE: [u128; 8] = [
-    161_803_399,                                    // k=0, 2^0  = 1
-    261_803_399,                                    // k=1, 2^1  = 2
-    685_410_197,                                    // k=2, 2^2  = 4
-    4_697_871_376,                                  // k=3, 2^3  = 8
-    220_699_954_690,                                // k=4, 2^4  = 16
-    487_084_699_999_979,                            // k=5, 2^5  = 32
-    2_372_515_049_740_700_000_000,                  // k=6, 2^6  = 64
-    56_288_276_612_461_161_951_372_364_700_000_000, // k=7, 2^7  = 128
+/// Precomputed scaled integer for ln(φ)
+/// ln(phi) * S ≈ 0.48121182505960347 * 1e12
+const LN_PHI_S: u128 = 481_211_825_060;
+
+/// Precomputed scaled integer for 1/√5
+/// (1/sqrt(5)) * S ≈ 0.4472135954999579 * 1e12
+const INV_SQRT5_S: u128 = 447_213_595_500;
+
+// PHI_POW2_TABLE[k] ≈ φ^(2^k) * S, with S = 1e12
+const PHI_POW2_TABLE: [u128; 7] = [
+    1_618_033_988_750,                                    // k=0, 2^0  = 1
+    2_618_033_988_750,                                    // k=1, 2^1  = 2
+    6_854_101_966_250,                                    // k=2, 2^2  = 4
+    46_978_713_763_748,                                   // k=3, 2^3  = 8
+    2_206_999_546_896_146,                                // k=4, 2^4  = 16
+    4_870_846_999_999_794_697,                            // k=5, 2^5  = 32
+    23_725_150_497_407_000_000_000_000,                   // k=6, 2^6  = 64
 ];
 
 /// Calculate the Fibonacci value for a given x in a continuous function
@@ -289,7 +288,7 @@ mod tests {
 
     #[test]
     fn check_accuracy() {
-        let max_x_scaled: u32 = 17 * (EXTERNAL_S as u32);
+        let max_x_scaled: u32 = 37 * (EXTERNAL_S as u32);
 
         for x_scaled in 0..=max_x_scaled {
             let x = x_scaled as f64 / EXTERNAL_S as f64;
