@@ -19,7 +19,7 @@
 /// Choose a global internal scale
 ///
 /// \[
-/// S = 10^8.
+/// S = 10^12.
 /// \]
 ///
 /// Any real number \(r\) is represented by an integer with this internal scale
@@ -111,7 +111,7 @@
 /// \widetilde{e^t} \approx e^t \cdot S
 /// \]
 ///
-/// using a truncated Taylor series, typically with \(K = 25\) terms. For our input
+/// using a truncated Taylor series, typically with \(K = 11\) terms. For our input
 /// range, this achieves better than \(10^{-4}\) absolute error in the final
 /// Fibonacci value.
 ///
@@ -133,7 +133,7 @@
 /// 2. compute \(\widetilde{e^t} \approx \widetilde{\varphi^f}\),  
 /// 3. multiply them in scale \(S\),  
 /// 4. multiply by \(\widetilde{1/\sqrt{5}}\),  
-/// 5. rescale from \(S = 10^8\) down to \(10^4\) for the public API.
+/// 5. rescale from \(S = 10^12\) down to \(10^4\) for the public API.
 ///
 /// All runtime math uses only integer operations with explicit rounding, ensuring
 /// deterministic behavior across platforms while still closely approximating the
