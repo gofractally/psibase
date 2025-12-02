@@ -1,181 +1,181 @@
-/// ### Algorithm derivation (fixed-point Binet approximation)
-///
-/// We want a *continuous* Fibonacci function based on the usual Binet-style
-/// approximation
-///
-/// \[
-/// F(x) \approx \frac{\varphi^x}{\sqrt{5}}
-/// \quad\text{with}\quad
-/// \varphi = \frac{1 + \sqrt{5}}{2}.
-/// \]
-///
-/// To make this deterministic and avoid floating point at runtime, we implement
-/// everything in fixed-point integer arithmetic.
-///
-/// ---
-///
-/// #### 1. Fixed-point representation
-///
-/// Choose a global internal scale
-///
-/// \[
-/// S = 10^12.
-/// \]
-///
-/// Any real number \(r\) is represented by an integer with this internal scale
-///
-/// \[
-/// \tilde r = \mathrm{round}(r \cdot S), \qquad r \approx \tilde r / S.
-/// \]
-///
-/// ---
-///
-/// #### 2. Rewriting \(\varphi^x\)
-///
-/// We use the identity
-///
-/// \[
-/// \varphi^x = \varphi^{\lfloor x \rfloor} \cdot \varphi^{x - \lfloor x \rfloor}.
-/// \]
-///
-/// This splits the exponent into:
-///
-/// - an **integer part**, where exponentiation is exact and efficient, and  
-/// - a **fractional part**, which remains in the interval \([0, 1)\).
-///
-/// The fractional exponent is always small, so its exponential can be computed
-/// with fewer Taylor terms and better accuracy.
-///
-/// Let
-///
-/// \[
-/// c_{\ln\varphi} = \ln \varphi,
-/// \qquad
-/// c_{1/\sqrt{5}} = \frac{1}{\sqrt{5}}.
-/// \]
-///
-/// We store these constants in scaled form:
-///
-/// \[
-/// \widetilde{\ln\varphi} = \mathrm{round}(c_{\ln\varphi} \cdot S),
-/// \qquad
-/// \widetilde{1/\sqrt{5}} = \mathrm{round}(c_{1/\sqrt{5}} \cdot S).
-/// \]
-///
-/// At runtime we never recompute logs or square-roots; we just use their
-/// precomputed scaled integers.
-///
-/// ---
-///
-/// #### 3. Integer exponent via lookup table
-///
-/// The integer portion of the exponent, \(n = \lfloor x \rfloor\), is handled by
-/// precomputing a table of scaled values
-///
-/// \[
-/// \widetilde{\varphi^{2^k}} = \mathrm{round}(\varphi^{2^k} \cdot S),
-/// \]
-///
-/// for all powers of two needed to cover the full range of possible integer
-/// exponents.
-///
-/// ---
-///
-/// #### 4. Fractional exponent via fixed-point `exp` (Taylor series)
-///
-/// Let the fractional part be
-///
-/// \[
-/// f = x - \lfloor x \rfloor \quad\text{with}\quad 0 \le f < 1.
-/// \]
-///
-/// Then
-///
-/// \[
-/// \varphi^{f} = e^{f \ln\varphi}.
-/// \]
-///
-/// Since \(f\) is always in \([0, 1)\), the argument to the exponential is
-///
-/// \[
-/// t = f \ln\varphi,
-/// \qquad |t| < \ln\varphi \approx 0.48,
-/// \]
-///
-/// which is small enough for the Taylor expansion of \(e^t\) to converge very
-/// rapidly in fixed-point arithmetic.
-///
-/// We compute a scaled value
-///
-/// \[
-/// \widetilde{e^t} \approx e^t \cdot S
-/// \]
-///
-/// using a truncated Taylor series, typically with \(K = 11\) terms. For our input
-/// range, this achieves better than \(10^{-4}\) absolute error in the final
-/// Fibonacci value.
-///
-/// ---
-///
-/// #### 5. Final combination and scaling
-///
-/// The continuous Fibonacci approximation is then
-///
-/// \[
-/// F(x)
-///   \approx \frac{\varphi^n}{\sqrt{5}}
-///           \cdot \varphi^{f}.
-/// \]
-///
-/// In fixed-point form:
-///
-/// 1. compute \(\widetilde{\varphi^n}\) from the lookup table,  
-/// 2. compute \(\widetilde{e^t} \approx \widetilde{\varphi^f}\),  
-/// 3. multiply them in scale \(S\),  
-/// 4. multiply by \(\widetilde{1/\sqrt{5}}\),  
-/// 5. rescale from \(S = 10^12\) down to \(10^4\) for the public API.
-///
-/// All runtime math uses only integer operations with explicit rounding, ensuring
-/// deterministic behavior across platforms while still closely approximating the
-/// continuous Binet formula
-///
-/// \[
-/// F(x) \approx \frac{\varphi^x}{\sqrt{5}}.
-/// \]
-/// 
-/// ---
-/// 
-/// #### 6. Error analysis
-/// 
-/// For the fractional part we approximate
-/// 
-/// \[
-/// e^t = \sum_{k=0}^{\infty} \frac{t^k}{k!}
-/// \]
-/// 
-/// by truncating after \(K\) terms. The standard remainder bound for the Taylor
-/// series of \(e^t\) is
-/// 
-/// \[
-/// \bigl|R_K(t)\bigr|
-///   = \left|\;e^t - \sum_{k=0}^{K} \frac{t^k}{k!}\right|
-///   \le e^{|t|} \frac{|t|^{K+1}}{(K+1)!}.
-/// \]
-/// 
-/// In our case \(|t| < \ln\varphi \approx 0.48\), so \(e^{|t|}\) is \(O(1)\) and
-/// \(|t|^{K+1} / (K+1)!\) decays very quickly as \(K\) increases. For the chosen
-/// \(K\), the next Taylor term is on the order of \(10^{-12}\), which is comparable
-/// to the internal fixed-point unit \(1/S\). In other words, the truncation error
-/// is no larger than the normal rounding error from the fixed-point scale \(S\).
-/// 
-/// In addition to truncation, the Taylor evaluation also incurs one error in the
-/// input value \(t\) itself (already rounded to scale \(S\)), and rounding errors 
-/// from each multiply, divide, and add when forming the terms. These effects 
-/// introduce errors of roughly \(1/S\) in the input and \(O(K/S)\) from the \(K\) 
-/// terms. Since the Taylor truncation error is smaller than both of these fixed-
-/// point rounding contributions, the overall accuracy in the supported input range
-/// is governed primarily by the rounding behavior of the fixed-point arithmetic 
-/// rather than by the Taylor cutoff.
+//! ### Algorithm derivation (fixed-point Binet approximation)
+//!
+//! We want a *continuous* Fibonacci function based on the usual Binet-style
+//! approximation
+//!
+//! \\[
+//! F(x) \approx \frac{\varphi^x}{\sqrt{5}}
+//! \quad\text{with}\quad
+//! \varphi = \frac{1 + \sqrt{5}}{2}.
+//! \\]
+//!
+//! To make this deterministic and avoid floating point at runtime, we implement
+//! everything in fixed-point integer arithmetic.
+//!
+//! ---
+//!
+//! #### 1. Fixed-point representation
+//!
+//! Choose a global internal scale
+//!
+//! \\[
+//! S = 10^12.
+//! \\]
+//!
+//! Any real number \\(r\\) is represented by an integer with this internal scale
+//!
+//! \\[
+//! \tilde r = \mathrm{round}(r \cdot S), \qquad r \approx \tilde r / S.
+//! \\]
+//!
+//! ---
+//!
+//! #### 2. Rewriting \\(\varphi^x\\)
+//!
+//! We use the identity
+//!
+//! \\[
+//! \varphi^x = \varphi^{\lfloor x \rfloor} \cdot \varphi^{x - \lfloor x \rfloor}.
+//! \\]
+//!
+//! This splits the exponent into:
+//!
+//! - an **integer part**, where exponentiation is exact and efficient, and  
+//! - a **fractional part**, which remains in the interval \\([0, 1)\\).
+//!
+//! The fractional exponent is always small, so its exponential can be computed
+//! with fewer Taylor terms and better accuracy.
+//!
+//! Let
+//!
+//! \\[
+//! c_{\ln\varphi} = \ln \varphi,
+//! \qquad
+//! c_{1/\sqrt{5}} = \frac{1}{\sqrt{5}}.
+//! \\]
+//!
+//! We store these constants in scaled form:
+//!
+//! \\[
+//! \widetilde{\ln\varphi} = \mathrm{round}(c_{\ln\varphi} \cdot S),
+//! \qquad
+//! \widetilde{1/\sqrt{5}} = \mathrm{round}(c_{1/\sqrt{5}} \cdot S).
+//! \\]
+//!
+//! At runtime we never recompute logs or square-roots; we just use their
+//! precomputed scaled integers.
+//!
+//! ---
+//!
+//! #### 3. Integer exponent via lookup table
+//!
+//! The integer portion of the exponent, \\(n = \lfloor x \rfloor\\), is handled by
+//! precomputing a table of scaled values
+//!
+//! \\[
+//! \widetilde{\varphi^{2^k}} = \mathrm{round}(\varphi^{2^k} \cdot S),
+//! \\]
+//!
+//! for all powers of two needed to cover the full range of possible integer
+//! exponents.
+//!
+//! ---
+//!
+//! #### 4. Fractional exponent via fixed-point `exp` (Taylor series)
+//!
+//! Let the fractional part be
+//!
+//! \\[
+//! f = x - \lfloor x \rfloor \quad\text{with}\quad 0 \le f < 1.
+//! \\]
+//!
+//! Then
+//!
+//! \\[
+//! \varphi^{f} = e^{f \ln\varphi}.
+//! \\]
+//!
+//! Since \\(f\\) is always in \\([0, 1)\\), the argument to the exponential is
+//!
+//! \\[
+//! t = f \ln\varphi,
+//! \qquad |t| < \ln\varphi \approx 0.48,
+//! \\]
+//!
+//! which is small enough for the Taylor expansion of \\(e^t\\) to converge very
+//! rapidly in fixed-point arithmetic.
+//!
+//! We compute a scaled value
+//!
+//! \\[
+//! \widetilde{e^t} \approx e^t \cdot S
+//! \\]
+//!
+//! using a truncated Taylor series, typically with \\(K = 11\\) terms. For our input
+//! range, this achieves better than \\(10^{-4}\\) absolute error in the final
+//! Fibonacci value.
+//!
+//! ---
+//!
+//! #### 5. Final combination and scaling
+//!
+//! The continuous Fibonacci approximation is then
+//!
+//! \\[
+//! F(x)
+//!   \approx \frac{\varphi^n}{\sqrt{5}}
+//!           \cdot \varphi^{f}.
+//! \\]
+//!
+//! In fixed-point form:
+//!
+//! 1. compute \\(\widetilde{\varphi^n}\\) from the lookup table,  
+//! 2. compute \\(\widetilde{e^t} \approx \widetilde{\varphi^f}\\),  
+//! 3. multiply them in scale \\(S\\),  
+//! 4. multiply by \\(\widetilde{1/\sqrt{5}}\\),  
+//! 5. rescale from \\(S = 10^{12}\\) down to \\(10^4\\) for the public API.
+//!
+//! All runtime math uses only integer operations with explicit rounding, ensuring
+//! deterministic behavior across platforms while still closely approximating the
+//! continuous Binet formula
+//!
+//! \\[
+//! F(x) \approx \frac{\varphi^x}{\sqrt{5}}.
+//! \\]
+//! 
+//! ---
+//! 
+//! #### 6. Error analysis
+//! 
+//! For the fractional part we approximate
+//! 
+//! \\[
+//! e^t = \sum_{k=0}^{\infty} \frac{t^k}{k!}
+//! \\]
+//! 
+//! by truncating after \\(K\\) terms. The standard remainder bound for the Taylor
+//! series of \\(e^t\\) is
+//! 
+//! \\[
+//! \bigl|R_K(t)\bigr|
+//!   = \left|e^t - \sum_{k=0}^{K} \frac{t^k}{k!}\right|
+//!   \le e^{|t|} \frac{|t|^{K+1}}{(K+1)!}
+//! \\]
+//! 
+//! In our case \\(|t| < \ln\varphi \approx 0.48\\), so \\(e^{|t|}\\) is \\(O(1)\\) and
+//! \\(|t|^{K+1} / (K+1)!\\) decays very quickly as \\(K\\) increases. For the chosen
+//! \\(K\\), the next Taylor term is on the order of \\(10^{-12}\\), which is comparable
+//! to the internal fixed-point unit \\(1/S\\). In other words, the truncation error
+//! is no larger than the normal rounding error from the fixed-point scale \\(S\\).
+//! 
+//! In addition to truncation, the Taylor evaluation also incurs one error in the
+//! input value \\(t\\) itself (already rounded to scale \\(S\\)), and rounding errors 
+//! from each multiply, divide, and add when forming the terms. These effects 
+//! introduce errors of roughly \\(1/S\\) in the input and \\(O(K/S)\\) from the \\(K\\) 
+//! terms. Since the Taylor truncation error is smaller than both of these fixed-
+//! point rounding contributions, the overall accuracy in the supported input range
+//! is governed primarily by the rounding behavior of the fixed-point arithmetic 
+//! rather than by the Taylor cutoff.
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
