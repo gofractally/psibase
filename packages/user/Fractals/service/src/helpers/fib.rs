@@ -166,7 +166,16 @@
 /// \(|t|^{K+1} / (K+1)!\) decays very quickly as \(K\) increases. For the chosen
 /// \(K\), the next Taylor term is on the order of \(10^{-12}\), which is comparable
 /// to the internal fixed-point unit \(1/S\). In other words, the truncation error
-/// is no larger than the normal rounding error from the fixed-point scale \(S\). 
+/// is no larger than the normal rounding error from the fixed-point scale \(S\).
+/// 
+/// In addition to truncation, the Taylor evaluation also incurs one error in the
+/// input value \(t\) itself (already rounded to scale \(S\)), and rounding errors 
+/// from each multiply, divide, and add when forming the terms. These effects 
+/// introduce errors of roughly \(1/S\) in the input and \(O(K/S)\) from the \(K\) 
+/// terms. Since the Taylor truncation error is smaller than both of these fixed-
+/// point rounding contributions, the overall accuracy in the supported input range
+/// is governed primarily by the rounding behavior of the fixed-point arithmetic 
+/// rather than by the Taylor cutoff.
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
