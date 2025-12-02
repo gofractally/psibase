@@ -6,11 +6,13 @@
 //! \\[
 //! F(x) \approx \frac{\varphi^x}{\sqrt{5}}
 //! \quad\text{with}\quad
-//! \varphi = \frac{1 + \sqrt{5}}{2}.
+//! \varphi = \frac{1 + \sqrt{5}}{2}
 //! \\]
 //!
-//! To make this deterministic and avoid floating point at runtime, we implement
-//! everything in fixed-point integer arithmetic.
+//! In particular, we intentionally use only the leading \\(\varphi^x/\sqrt{5}\\)
+//! term from Binet's formula and discard the smaller \\(\psi^x/\sqrt{5}\\) term.
+//! The reference implementation and tests in this crate are all written
+//! against this one-term approximation.
 //!
 //! ---
 //!
@@ -19,13 +21,13 @@
 //! Choose a global internal scale
 //!
 //! \\[
-//! S = 10^12.
+//! S = 10^{12}
 //! \\]
 //!
 //! Any real number \\(r\\) is represented by an integer with this internal scale
 //!
 //! \\[
-//! \tilde r = \mathrm{round}(r \cdot S), \qquad r \approx \tilde r / S.
+//! \tilde r = \mathrm{round}(r \cdot S), \qquad r \approx \tilde r / S
 //! \\]
 //!
 //! ---
@@ -35,7 +37,7 @@
 //! We use the identity
 //!
 //! \\[
-//! \varphi^x = \varphi^{\lfloor x \rfloor} \cdot \varphi^{x - \lfloor x \rfloor}.
+//! \varphi^x = \varphi^{\lfloor x \rfloor} \cdot \varphi^{x - \lfloor x \rfloor}
 //! \\]
 //!
 //! This splits the exponent into:
@@ -51,15 +53,15 @@
 //! \\[
 //! c_{\ln\varphi} = \ln \varphi,
 //! \qquad
-//! c_{1/\sqrt{5}} = \frac{1}{\sqrt{5}}.
+//! c_{1/\sqrt{5}} = \frac{1}{\sqrt{5}}
 //! \\]
 //!
 //! We store these constants in scaled form:
 //!
 //! \\[
-//! \widetilde{\ln\varphi} = \mathrm{round}(c_{\ln\varphi} \cdot S),
+//! \widetilde{\ln\varphi} = \mathrm{round}(c_{\ln\varphi} \cdot S)
 //! \qquad
-//! \widetilde{1/\sqrt{5}} = \mathrm{round}(c_{1/\sqrt{5}} \cdot S).
+//! \widetilde{1/\sqrt{5}} = \mathrm{round}(c_{1/\sqrt{5}} \cdot S)
 //! \\]
 //!
 //! At runtime we never recompute logs or square-roots; we just use their
@@ -73,7 +75,7 @@
 //! precomputing a table of scaled values
 //!
 //! \\[
-//! \widetilde{\varphi^{2^k}} = \mathrm{round}(\varphi^{2^k} \cdot S),
+//! \widetilde{\varphi^{2^k}} = \mathrm{round}(\varphi^{2^k} \cdot S)
 //! \\]
 //!
 //! for all powers of two needed to cover the full range of possible integer
@@ -86,24 +88,25 @@
 //! Let the fractional part be
 //!
 //! \\[
-//! f = x - \lfloor x \rfloor \quad\text{with}\quad 0 \le f < 1.
+//! f = x - \lfloor x \rfloor \quad\text{with}\quad 0 \le f < 1
 //! \\]
 //!
 //! Then
 //!
 //! \\[
-//! \varphi^{f} = e^{f \ln\varphi}.
+//! \varphi^{f} = e^{f \ln\varphi}
 //! \\]
 //!
 //! Since \\(f\\) is always in \\([0, 1)\\), the argument to the exponential is
 //!
 //! \\[
 //! t = f \ln\varphi,
-//! \qquad |t| < \ln\varphi \approx 0.48,
+//! \qquad 0 \le t < \ln\varphi \approx 0.48
 //! \\]
 //!
-//! which is small enough for the Taylor expansion of \\(e^t\\) to converge very
-//! rapidly in fixed-point arithmetic.
+//! In this crate we therefore only ever call the exponential with
+//! \\(0 \le t \le \ln\varphi\\). This interval is small enough for the Taylor
+//! expansion of \\(e^t\\) to converge rapidly.
 //!
 //! We compute a scaled value
 //!
@@ -111,7 +114,7 @@
 //! \widetilde{e^t} \approx e^t \cdot S
 //! \\]
 //!
-//! using a truncated Taylor series, typically with \\(K = 11\\) terms. For our input
+//! using a truncated Taylor series, with \\(K = 11\\) terms. For our input
 //! range, this achieves better than \\(10^{-4}\\) absolute error in the final
 //! Fibonacci value.
 //!
@@ -124,7 +127,7 @@
 //! \\[
 //! F(x)
 //!   \approx \frac{\varphi^n}{\sqrt{5}}
-//!           \cdot \varphi^{f}.
+//!           \cdot \varphi^{f}
 //! \\]
 //!
 //! In fixed-point form:
@@ -137,45 +140,74 @@
 //!
 //! All runtime math uses only integer operations with explicit rounding, ensuring
 //! deterministic behavior across platforms while still closely approximating the
-//! continuous Binet formula
-//!
-//! \\[
-//! F(x) \approx \frac{\varphi^x}{\sqrt{5}}.
-//! \\]
+//! continuous Binet formula.
 //! 
 //! ---
-//! 
+//!
 //! #### 6. Error analysis
-//! 
+//!
 //! For the fractional part we approximate
-//! 
+//!
 //! \\[
 //! e^t = \sum_{k=0}^{\infty} \frac{t^k}{k!}
 //! \\]
+//!
+//! by truncating the series after \\(K\\) terms.
+//!
+//! The total error in the scaled value \\(\widetilde{e^t} \approx e^t \cdot S\\)
+//! comes from three sources:
+//!
+//! 1. **Rounding when forming \\(t\\) (≈ \\(0.81/S\\))**
+//!
+//!    Because \\(t\\) is stored in fixed-point form at scale \\(S\\), its initial
+//!    rounding error is at most \\(0.5/S\\). This translates into at most
+//!
+//!    \\[
+//!    |\Delta e^t| \le e^{\ln\varphi} \frac{0.5}{S}
+//!      = \varphi \frac{0.5}{S} \approx \frac{0.81}{S}
+//!    \\]
+//!
+//! 2. **Rounding inside the Taylor recurrence (≈ \\(5.5/S\\))**
+//!
+//!    Each term in the recurrence
+//!
+//!    \\[
+//!    \text{term}\_k = \text{round}\left(
+//!        \frac{\text{term}\_{k-1} \cdot t}{k}
+//!    \right)
+//!    \\]
+//!
+//!    produces at most another \\(0.5/S\\) of rounding. Because the factor
+//!    \\(t/k\\) is always less than \\(\ln\varphi\\), previously accumulated
+//!    rounding does not grow without bound. Starting from zero error, the
+//!    recurrence \\(e\_k \approx (t/k)\,e\_{k-1} + 0.5\\) quickly drives each
+//!    \\(e\_k\\) toward about \\(0.5/S\\). Summed over \\(K\\) steps this gives
+//!    an overall contribution of roughly \\(0.5K/S\\), with \\(K/S\\) as a
+//!    simple worst-case bound. In this implementation with \\(K = 11\\), this
+//!    corresponds to total error ≈ \\(5.5/S\\).
 //! 
-//! by truncating after \\(K\\) terms. The standard remainder bound for the Taylor
-//! series of \\(e^t\\) is
-//! 
-//! \\[
-//! \bigl|R_K(t)\bigr|
-//!   = \left|e^t - \sum_{k=0}^{K} \frac{t^k}{k!}\right|
-//!   \le e^{|t|} \frac{|t|^{K+1}}{(K+1)!}
-//! \\]
-//! 
-//! In our case \\(|t| < \ln\varphi \approx 0.48\\), so \\(e^{|t|}\\) is \\(O(1)\\) and
-//! \\(|t|^{K+1} / (K+1)!\\) decays very quickly as \\(K\\) increases. For the chosen
-//! \\(K\\), the next Taylor term is on the order of \\(10^{-12}\\), which is comparable
-//! to the internal fixed-point unit \\(1/S\\). In other words, the truncation error
-//! is no larger than the normal rounding error from the fixed-point scale \\(S\\).
-//! 
-//! In addition to truncation, the Taylor evaluation also incurs one error in the
-//! input value \\(t\\) itself (already rounded to scale \\(S\\)), and rounding errors 
-//! from each multiply, divide, and add when forming the terms. These effects 
-//! introduce errors of roughly \\(1/S\\) in the input and \\(O(K/S)\\) from the \\(K\\) 
-//! terms. Since the Taylor truncation error is smaller than both of these fixed-
-//! point rounding contributions, the overall accuracy in the supported input range
-//! is governed primarily by the rounding behavior of the fixed-point arithmetic 
-//! rather than by the Taylor cutoff.
+//! 3. **Truncation of the Taylor series (≈ \\(0.33/S\\))**
+//!
+//!    Stopping the series after \\(K\\) terms leaves a remainder bounded by
+//!
+//!    \\[
+//!    \bigl|R_K(t)\bigr| \le e^{t} \frac{t^{K+1}}{(K+1)!}
+//!    \\]
+//!
+//!    On our input range \\(0 \le t \le \ln\varphi\\) this gives the uniform
+//!    bound
+//!
+//!    \\[
+//!    \bigl|R_K(t)\bigr| \le \varphi \frac{(\ln\varphi)^{K+1}}{(K+1)!}
+//!    \\]
+//!
+//!    As \\(K\\) increases this quantity shrinks very rapidly. In the 
+//!    implementation we choose \\(K = 11\\), for which the worst-case
+//!    truncation remainder is approximately \\(0.33/S\\).
+//!
+//! Therefore, the rounding error accumulated inside the \\(K\\)-step Taylor
+//! recurrence provides the dominant contribution to the total error.
+
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
@@ -207,7 +239,6 @@ const PHI_POW2_TABLE: [u128; 7] = [
 /// # Arguments
 ///
 /// * `x` - The input value scaled by 10_000, eg. (fib(1.4142) -> fib(14142))
-///         Inputs should be 0.0 ≤ x ≤ ~140.0 (scaled by 10_000)
 pub fn continuous_fibonacci(x: u32) -> u64 {
     psibase::check(x <= MAX_INPUT_SCALED, "x out of bounds");
 
