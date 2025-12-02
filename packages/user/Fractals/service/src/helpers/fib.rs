@@ -252,7 +252,7 @@ fn div_rounded(numer: u128, denom: u128) -> u128 {
 ///
 ///     e^t ≈ Σ_{k=0}^{K} t^k / k!
 fn exp_taylor_scaled(t: u128) -> u128 {
-    const MAX_K: u32 = 25;
+    const MAX_K: u32 = 11;
 
     let t_scaled = t;
 
