@@ -64,7 +64,11 @@ namespace LocalService
       /// Opens a websocket connection and returns the new socket. The
       /// request method must be GET. The required headers for the websocket
       /// handshake will be added to the request if they are not already
-      /// provided. If the connection is successfully established...
+      /// provided. If the connection is successfully established, calls
+      /// `sender::callback(socket, reply)`. If the request fails without
+      /// a response, calls `sender::err(socket, nullopt)`. If the response
+      /// does not complete a websocket handshake, calls
+      /// `sender::err(socket, optional(reply))`
       std::int32_t websocket(psibase::HttpRequest                   request,
                              psibase::MethodNumber                  callback,
                              psibase::MethodNumber                  err,
