@@ -212,7 +212,7 @@
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
 const EXTERNAL_S: u128 = 10_000; // 4 decimal places
-const MAX_INPUT_SCALED: u32 = 37 * (EXTERNAL_S as u32); // Determined by manual testing
+const MAX_INPUT_SCALED: u32 = 32 * (EXTERNAL_S as u32); // Power of 2 (scaled) nearest to the max input for which the output is accurate.
 
 /// Precomputed scaled integer for ln(φ)
 /// ln(phi) * S ≈ 0.48121182505960347 * 1e12
@@ -353,7 +353,8 @@ mod tests {
 
     #[test]
     fn check_accuracy() {
-        let max_x_scaled: u32 = 37 * (EXTERNAL_S as u32);
+        let max_x_scaled: u32 = 32 * (EXTERNAL_S as u32);
+        // 1e-4 accuracy experimentally determined to break at input 37.381
 
         for x_scaled in 0..=max_x_scaled {
             let x = x_scaled as f64 / EXTERNAL_S as f64;
