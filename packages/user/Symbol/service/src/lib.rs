@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
-    use psibase::services::nft::{NftRecord, Wrapper as Nft};
+    use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord};
     use psibase::{

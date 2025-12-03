@@ -11,7 +11,7 @@ pub type NID = u32;
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
-pub struct NftRecord {
+pub struct Nft {
     pub id: NID,
     pub issuer: AccountNumber,
     pub owner: AccountNumber,
@@ -34,15 +34,15 @@ pub struct NftHolderRecord {
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
     nftId: NID,
-    debitor: AccountNumber,
     creditor: AccountNumber,
+    debitor: AccountNumber,
 }
 
 #[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::NID;
-    use crate::{AccountNumber, Memo, MethodNumber};
+    use crate::{AccountNumber, Memo};
 
     #[action]
     fn init() {
@@ -80,7 +80,7 @@ mod service {
     }
 
     #[action]
-    fn getNft(nftId: crate::services::nft::NID) -> super::NftRecord {
+    fn getNft(nftId: crate::services::nft::NID) -> super::Nft {
         unimplemented!()
     }
 
@@ -112,21 +112,23 @@ mod service {
     fn burned(nftId: NID, owner: AccountNumber) {
         unimplemented!()
     }
+
     #[event(history)]
-    fn userConfSet(account: AccountNumber, flag: MethodNumber, enable: bool) {
+    fn credited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
         unimplemented!()
     }
     #[event(history)]
-    fn credited(nftId: NID, sender: AccountNumber, receiver: AccountNumber, memo: String) {
-        unimplemented!()
-    }
-    #[event(history)]
-    fn uncredited(nftId: NID, sender: AccountNumber, receiver: AccountNumber, memo: String) {
+    fn uncredited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
         unimplemented!()
     }
 
     #[event(merkle)]
     fn transferred(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
+        unimplemented!()
+    }
+
+    #[event(history)]
+    fn userConfSet(account: AccountNumber, index: u8, enable: bool) {
         unimplemented!()
     }
 }

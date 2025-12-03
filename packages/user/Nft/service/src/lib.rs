@@ -208,7 +208,7 @@ pub mod tables {
                 self.nftId,
                 self.creditor,
                 self.debitor,
-                memo,
+                memo.to_string(),
             );
             self.erase();
         }
@@ -315,8 +315,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn burn(nft_id: NID) {
-        let nft = Nft::get_assert(nft_id);
+    pub fn burn(nftId: NID) {
+        let nft = Nft::get_assert(nftId);
         nft.check_is_owner(get_sender());
         nft.burn();
     }
@@ -348,19 +348,19 @@ pub mod service {
     }
 
     #[action]
-    pub fn uncredit(nft_id: NID, memo: Memo) {
+    pub fn uncredit(nftId: NID, memo: Memo) {
         check_some(
-            CreditRecord::get(nft_id),
+            CreditRecord::get(nftId),
             "Nothing to uncredit. Must first credit.",
         )
         .uncredit(memo);
     }
 
     #[action]
-    pub fn debit(nft_id: NID, memo: Memo) {
-        Nft::get_assert(nft_id);
+    pub fn debit(nftId: NID, memo: Memo) {
+        Nft::get_assert(nftId);
         let credit_record = check_some(
-            CreditRecord::get(nft_id),
+            CreditRecord::get(nftId),
             "Nothing to debit. Must first be credited.",
         );
         check(
@@ -384,29 +384,29 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    pub fn getNft(nft_id: NID) -> Nft {
-        Nft::get_assert(nft_id)
+    pub fn getNft(nftId: NID) -> Nft {
+        Nft::get_assert(nftId)
     }
 
     #[action]
-    pub fn exists(nft_id: NID) -> bool {
-        Nft::get(nft_id).is_some()
+    pub fn exists(nftId: NID) -> bool {
+        Nft::get(nftId).is_some()
     }
 
     #[event(history)]
-    pub fn minted(nft_id: NID, issuer: AccountNumber) {}
+    pub fn minted(nftId: NID, issuer: AccountNumber) {}
 
     #[event(history)]
-    pub fn burned(nft_id: NID, owner: AccountNumber) {}
+    pub fn burned(nftId: NID, owner: AccountNumber) {}
 
     #[event(history)]
-    pub fn credited(nftId: NID, sender: AccountNumber, receiver: AccountNumber, memo: String) {}
+    pub fn credited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
 
     #[event(history)]
-    pub fn uncredited(nftId: NID, sender: AccountNumber, receiver: AccountNumber, memo: String) {}
+    pub fn uncredited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
 
     #[event(merkle)]
-    pub fn transferred(nft_id: NID, from: AccountNumber, to: AccountNumber, memo: Memo) {}
+    pub fn transferred(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
 
     #[event(history)]
     pub fn userConfSet(account: AccountNumber, index: u8, enable: bool) {}
