@@ -132,7 +132,7 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
-        CpuLimit Db Events EventIndex Explorer Invite Nft
+        CpuLimit Db Events EventIndex Explorer Invite
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
@@ -486,6 +486,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Nft.psi
+    PATH packages/user/Nft
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -812,19 +818,7 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Nft.psi
-    NAME Nft
-    VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
-    SERVICE nft
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
-        INIT
-        DATA ${Plugins_OUTPUT_FILE_nft} /plugin.wasm
-    DEPENDS wasm
-    DEPENDS ${Plugins_DEP}
-)
+
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi

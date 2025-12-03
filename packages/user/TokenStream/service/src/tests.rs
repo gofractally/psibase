@@ -114,10 +114,10 @@ mod tests {
             Nfts::push_from(&self.chain, sender).credit(
                 stream_nft_id,
                 recipient,
-                "Giving tokenstream NFT".to_string(),
+                "Giving tokenstream NFT".into(),
             );
             Nfts::push_from(&self.chain, recipient)
-                .debit(stream_nft_id, "claiming tokenstream NFT".to_string());
+                .debit(stream_nft_id, "claiming tokenstream NFT".into());
         }
 
         fn stream(&self, stream_nft_id: u32) -> Stream {
@@ -206,8 +206,8 @@ mod tests {
             .unwrap();
 
         // Check claim fails when no vesting has yet occured
-        Nfts::push_from(&chain, ALICE).credit(id, BOB, "memo".to_string());
-        Nfts::push_from(&chain, BOB).debit(id, "memo".to_string());
+        Nfts::push_from(&chain, ALICE).credit(id, BOB, "memo".into());
+        Nfts::push_from(&chain, BOB).debit(id, "memo".into());
         assert!(TokenStream::push_from(&chain, BOB)
             .claim(id)
             .get()

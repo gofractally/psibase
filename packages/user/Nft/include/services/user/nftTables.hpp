@@ -1,5 +1,6 @@
 #pragma once
 #include <compare>
+#include <cstdint>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/Table.hpp>
@@ -11,9 +12,7 @@ namespace UserService
    struct NftHolderRecord
    {
       psibase::AccountNumber account;
-      psibase::Bitset<8>     config;
-
-      using Configurations = psibase::Enum<psibase::EnumElement{"manualDebit"}>;
+      uint8_t                config;
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };

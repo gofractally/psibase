@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
-    use psibase::services::nft::{NftRecord, Wrapper as Nft};
+    use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord};
     use psibase::{
@@ -166,7 +166,7 @@ pub mod tables {
             Nft::call().credit(
                 new_instance.ownerNft,
                 sender,
-                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+                format!("This NFT conveys ownership of symbol: {}", symbol).as_str().into(),
             );
 
             new_instance
@@ -286,7 +286,7 @@ pub mod service {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf("manualDebit".into(), true);
+            Nft::call().setUserConf(0, true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

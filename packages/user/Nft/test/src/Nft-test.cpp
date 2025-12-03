@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <cstdint>
 #include <psibase/DefaultTestChain.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/Accounts.hpp>
@@ -17,7 +18,7 @@ using std::vector;
 
 namespace
 {
-   constexpr auto manualDebit = "manualDebit"_m;
+   constexpr uint8_t manualDebit = 0;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
