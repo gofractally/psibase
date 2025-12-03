@@ -25,14 +25,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { Input } from "@shared/shadcn/ui/input";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
-import { useCreateAccount } from "./hooks/use-create-account";
-import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { useImportKey } from "./hooks/use-import-key";
 import { b64ToPem, validateB64 } from "./lib/keys";
@@ -45,36 +42,17 @@ export const ImportPrompt = () => {
     const [authService, setAuthService] = useState<string>("auth-sig");
 
     // modal state
-    const [showCreate, setShowCreate] = useState(false);
     const [showCannotCreate, setShowCannotCreate] = useState(false);
-    const [createName, setCreateName] = useState("");
 
     // queries
     const { data: networkName } = useBranding();
-    const { refetch: refetchAccounts } = useGetAllAccounts();
     const { data: canCreate = false, isPending: isPendingCanCreate } =
         useCanCreateAccount();
 
     // mutations
     const importKeyMutation = useImportKey();
     const importExistingMutation = useImportExisting();
-    const createAccountMutation = useCreateAccount();
     const connectAccountMutation = useConnectAccount();
-
-    const handleCreate = async () => {
-        const name = createName.trim();
-        if (!name) return;
-        try {
-            const privateKey = await createAccountMutation.mutateAsync(name);
-            console.log("privateKey", privateKey);
-            await refetchAccounts();
-            setShowCreate(false);
-            setCreateName("");
-            navigate("/plugin/web/prompt/connect");
-        } catch {
-            console.error("Create account failed");
-        }
-    };
 
     const handleImportAndLogin = async (account: string, b64: string) => {
         const pemFormatted = b64ToPem(b64);
@@ -202,7 +180,7 @@ export const ImportPrompt = () => {
                                                 <field.TextField
                                                     type="password"
                                                     label="Private key"
-                                                    placeholder="Enter your private key"
+                                                    placeholder="Private key"
                                                 />
                                             );
                                         }}
@@ -220,7 +198,9 @@ export const ImportPrompt = () => {
                                         variant="link"
                                         onClick={async () => {
                                             if (canCreate) {
-                                                setShowCreate(true);
+                                                navigate(
+                                                    "/plugin/web/prompt/create",
+                                                );
                                             } else {
                                                 setShowCannotCreate(true);
                                             }
@@ -241,29 +221,6 @@ export const ImportPrompt = () => {
                     </BrandedGlowingCard>
                 </form>
             </form.AppForm>
-
-            <Dialog
-                open={showCreate}
-                onOpenChange={(open) => !open && setShowCreate(false)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create new account</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex items-center gap-2">
-                        <Input
-                            className="text-foreground placeholder:text-muted-foreground flex-1"
-                            placeholder="Enter account name"
-                            value={createName}
-                            onChange={(e) => setCreateName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") handleCreate();
-                            }}
-                        />
-                        <Button onClick={handleCreate}>Create</Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
 
             <Dialog
                 open={showCannotCreate}
