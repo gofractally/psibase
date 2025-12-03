@@ -41,17 +41,20 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Nft>> {
-            TableQuery::subindex::<NID>(NftTable::with_service(crate::SERVICE).get_index_pk(), &())
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-                .await
+            TableQuery::subindex::<NID>(
+                NftTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
+                &(),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn userConf(&self, user: AccountNumber) -> NftHolder {
-            NftHolderTable::with_service(crate::SERVICE)
+            NftHolderTable::with_service(psibase::services::nft::SERVICE)
                 .get_index_pk()
                 .get(&user)
                 .unwrap_or(NftHolder {
@@ -69,7 +72,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Nft>> {
             TableQuery::subindex::<NID>(
-                NftTable::with_service(crate::SERVICE).get_index_by_issuer(),
+                NftTable::with_service(psibase::services::nft::SERVICE).get_index_by_issuer(),
                 &(user),
             )
             .first(first)
@@ -89,7 +92,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Nft>> {
             TableQuery::subindex::<NID>(
-                NftTable::with_service(crate::SERVICE).get_index_by_owner(),
+                NftTable::with_service(psibase::services::nft::SERVICE).get_index_by_owner(),
                 &(user),
             )
             .first(first)
@@ -121,7 +124,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, CreditRecord>> {
             TableQuery::subindex::<NID>(
-                CreditTable::with_service(crate::SERVICE).get_index_by_creditor(),
+                CreditTable::with_service(psibase::services::nft::SERVICE).get_index_by_creditor(),
                 &(user),
             )
             .first(first)
@@ -141,7 +144,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, CreditRecord>> {
             TableQuery::subindex::<NID>(
-                CreditTable::with_service(crate::SERVICE).get_index_by_debitor(),
+                CreditTable::with_service(psibase::services::nft::SERVICE).get_index_by_debitor(),
                 &(user),
             )
             .first(first)

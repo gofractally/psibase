@@ -1,6 +1,3 @@
-// TODO: tables
-// TODO: events
-
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -24,19 +21,10 @@ pub struct NftRecord {
     Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "BitsetU8Input")]
-struct BitsetU8 {
-    value: u8,
-}
-
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
-)]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
     account: AccountNumber,
-    config: BitsetU8, // todo: Implement Bitset
+    config: u8,
 }
 
 #[derive(
@@ -49,8 +37,6 @@ pub struct CreditRecord {
     debitor: AccountNumber,
     creditor: AccountNumber,
 }
-
-pub const MANUAL_DEBIT: u64 = crate::method_raw!("manualDebit");
 
 #[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]

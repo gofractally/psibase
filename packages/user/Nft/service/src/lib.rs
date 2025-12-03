@@ -3,11 +3,11 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         abort_message, check, check_none, check_some, define_flags, get_sender, AccountNumber,
-        ConfigRow, FlagsType, Fracpack, Memo, Table, ToSchema,
+        FlagsType, Fracpack, Memo, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
-    pub type NID = u64;
+    pub type NID = u32;
 
     define_flags!(NftHolderFlags, u8, {
         manual_debit,
@@ -85,7 +85,7 @@ pub mod tables {
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
-            check(self.owner == account, "Missing required auth");
+            check(self.owner == account, "Missing required authority");
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
@@ -147,6 +147,7 @@ pub mod tables {
         pub creditor: AccountNumber,
         pub debitor: AccountNumber,
     }
+
     impl CreditRecord {
         #[secondary_key(1)]
         fn by_creditor(&self) -> (AccountNumber, NID) {
@@ -171,7 +172,7 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
-            check_some(Self::get(nft_id), "no credit record")
+            check_some(Self::get(nft_id), "Nothing to uncredit. Must first credit.")
         }
 
         pub fn add(
@@ -265,15 +266,41 @@ pub mod tables {
 #[psibase::service(name = "nft", tables = "tables", recursive = true)]
 pub mod service {
     use crate::tables::*;
-    use psibase::{check, check_some, get_sender, AccountNumber, Memo};
+    use psibase::{
+        check, check_some, get_sender, services::events, AccountNumber, DbId, Memo, MethodNumber,
+    };
 
-    pub type NID = u64;
+    pub type NID = u32;
 
     #[action]
     fn init() {
         if InitRow::get().is_none() {
             InitRow::add();
             NftHolder::get_or_default(get_sender()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
+
+            let add_index = |method: &str, column: u8| {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            };
+
+            add_index("minted", 0);
+            add_index("minted", 1);
+            add_index("burned", 0);
+            add_index("burned", 1);
+            add_index("userConfSet", 0);
+            add_index("credited", 0);
+            add_index("credited", 1);
+            add_index("credited", 2);
+            add_index("uncredited", 0);
+            add_index("uncredited", 1);
+            add_index("uncredited", 2);
+            add_index("transferred", 0);
+            add_index("transferred", 1);
+            add_index("transferred", 2);
         }
     }
 
@@ -322,15 +349,23 @@ pub mod service {
 
     #[action]
     pub fn uncredit(nft_id: NID, memo: Memo) {
-        CreditRecord::get_assert(nft_id).uncredit(memo);
+        check_some(
+            CreditRecord::get(nft_id),
+            "Nothing to uncredit. Must first credit.",
+        )
+        .uncredit(memo);
     }
 
     #[action]
     pub fn debit(nft_id: NID, memo: Memo) {
-        let credit_record = CreditRecord::get_assert(nft_id);
+        Nft::get_assert(nft_id);
+        let credit_record = check_some(
+            CreditRecord::get(nft_id),
+            "Nothing to debit. Must first be credited.",
+        );
         check(
             credit_record.debitor == get_sender(),
-            "missing required auth",
+            "Missing required authority",
         );
         credit_record.debit(memo);
     }
