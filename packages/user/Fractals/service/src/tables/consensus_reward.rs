@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::helpers::{distribute_by_weight, fibonacci_binet_exact};
+use crate::helpers::{distribute_by_weight, continuous_fibonacci};
 use crate::tables::tables::{
     ConsensusReward, ConsensusRewardTable, Fractal, FractalMember, Guild, GuildMember,
 };
@@ -100,7 +100,7 @@ impl ConsensusReward {
 
         let (ranked_guilds, guild_dust) = distribute_by_weight(
             ranked_guilds,
-            |index, _| fibonacci_binet_exact(ranked_guilds_length - index as u64),
+            |index, _| continuous_fibonacci(ranked_guilds_length as u32 - index as u32),
             claimed.value,
         );
         total_dust += guild_dust;
@@ -108,7 +108,7 @@ impl ConsensusReward {
         for (guild, guild_distribution) in ranked_guilds {
             let (rewarded_members, member_dust) = distribute_by_weight(
                 GuildMember::memberships_of_guild(guild),
-                |_, member| fibonacci_binet_exact(member.score as u64),
+                |_, member| continuous_fibonacci(member.score as u32),
                 guild_distribution,
             );
 
