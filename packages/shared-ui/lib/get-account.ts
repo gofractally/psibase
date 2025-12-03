@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-const zGetAccountReturn = z
+export const zGetAccountReturn = z
     .object({
         accountNum: z.string(),
         authService: z.string(),

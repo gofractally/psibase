@@ -2,9 +2,8 @@ import { User, UserX } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
-import { Supervisor } from "@psibase/common-lib";
-
 import { Avatar } from "@shared/components/avatar";
+import { getAccount, zGetAccountReturn } from "@shared/lib/get-account";
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { withFieldGroup } from "./app-form";
@@ -40,7 +39,6 @@ import { withFieldGroup } from "./app-form";
  *     description={undefined} // NOTE: TS will compalin if you do not provide ALL specified props
  *     placeholder="Enter account name"
  *     disabled={isDisabled}
- *     supervisor={supervisor}
  *     onValidate={(account) => ...}
  * />
  * ```
@@ -49,7 +47,6 @@ import { withFieldGroup } from "./app-form";
  * @param description - Optional description text
  * @param placeholder - Placeholder text for the input
  * @param disabled - Whether the field is disabled
- * @param supervisor - Consuming app's supervisor instance for account validation
  * @param onValidate - Callback with validated account meta
  * @returns A field for entering an existing account name with validation
  */
@@ -62,7 +59,6 @@ export const FieldAccountExisting = withFieldGroup({
         description: undefined as string | undefined,
         placeholder: undefined as string | undefined,
         disabled: false,
-        supervisor: undefined as Supervisor | undefined,
         onValidate: undefined as
             | ((account: z.infer<typeof zGetAccountReturn>) => void)
             | undefined,
@@ -73,7 +69,6 @@ export const FieldAccountExisting = withFieldGroup({
         label,
         description,
         placeholder,
-        supervisor,
         onValidate,
     }) {
         const [isValidating, setIsValidating] = useState(false);
@@ -107,7 +102,7 @@ export const FieldAccountExisting = withFieldGroup({
                     onChange: () => setIsValidating(true),
                     onChangeAsyncDebounceMs: 500,
                     onChangeAsync: async ({ value }) => {
-                        const account = await lookUpAccount(value, supervisor!);
+                        const account = await getAccount(value);
                         onValidate?.(account);
                         setIsValidating(false);
                         const notFound = !account?.accountNum;
@@ -118,7 +113,7 @@ export const FieldAccountExisting = withFieldGroup({
                         if (errors) return errors;
                     },
                     onSubmitAsync: async ({ value }) => {
-                        const account = await lookUpAccount(value, supervisor!);
+                        const account = await getAccount(value);
                         onValidate?.(account);
                         setIsValidating(false);
                         const notFound = !account?.accountNum;
@@ -132,36 +127,6 @@ export const FieldAccountExisting = withFieldGroup({
         );
     },
 });
-
-const zGetAccountReturn = z
-    .object({
-        accountNum: z.string(),
-        authService: z.string(),
-        resourceBalance: z.boolean().or(z.bigint()),
-    })
-    .optional();
-
-export const lookUpAccount = async (
-    accountName: string,
-    supervisor: Supervisor,
-): Promise<z.infer<typeof zGetAccountReturn>> => {
-    try {
-        const res = zGetAccountReturn.parse(
-            await supervisor.functionCall({
-                method: "getAccount",
-                params: [accountName],
-                service: "accounts",
-                intf: "api",
-            }),
-        );
-
-        return res;
-    } catch (e) {
-        // TODO: read this error, actually throw if there's something wrong, other than being invalid
-        console.error(e);
-        return undefined;
-    }
-};
 
 const UserStartContent = ({
     userNotFound,

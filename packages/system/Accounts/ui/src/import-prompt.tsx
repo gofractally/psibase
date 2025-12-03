@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { getSupervisor, prompt } from "@psibase/common-lib";
+import { prompt } from "@psibase/common-lib";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
@@ -33,8 +33,6 @@ import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { useImportKey } from "./hooks/use-import-key";
 import { b64ToPem, validateB64 } from "./lib/keys";
-
-const supervisor = getSupervisor();
 
 export const ImportPrompt = () => {
     const navigate = useNavigate();
@@ -155,7 +153,6 @@ export const ImportPrompt = () => {
                                     description={undefined}
                                     placeholder="Account name"
                                     disabled={isSubmitting}
-                                    supervisor={supervisor}
                                     onValidate={(account) => {
                                         const authService =
                                             account?.authService;
