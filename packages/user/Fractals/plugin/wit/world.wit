@@ -77,11 +77,6 @@ interface queries {
 }
 
 
-
-
-
-
-
 world imports {
     import admin-fractal;
     import user-fractal;
