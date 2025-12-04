@@ -63,6 +63,7 @@ interface types {
         fractal: string,
         legislature: string,
         judiciary: string,
+        token-id: u32,
     }
 }
 

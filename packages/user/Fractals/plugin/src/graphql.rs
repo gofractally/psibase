@@ -90,7 +90,6 @@ pub mod guild {
         fetch_guild(guild.as_str().into()).map(|guild| GuildHelper::from(guild))
     }
 }
-
 pub mod fractal {
     use crate::bindings::host::types::types as HostTypes;
     use crate::bindings::host::types::types::Error;
@@ -103,6 +102,7 @@ pub mod fractal {
             r#"query {{
                 fractal(fractal: "{}") {{
                     account
+                    tokenId
                     legislature {{
                         account
                     }}
@@ -131,6 +131,7 @@ pub mod fractal {
     #[serde(rename_all = "camelCase")]
     pub struct FractalData {
         pub account: AccountNumber,
+        pub token_id: u32,
         pub legislature: GuildRef,
         pub judiciary: GuildRef,
     }
@@ -156,6 +157,7 @@ pub mod fractal {
 
     pub struct FractalHelper {
         pub account: AccountNumber,
+        pub token_id: u32,
         pub legislature: AccountNumber,
         pub judiciary: AccountNumber,
     }
@@ -164,6 +166,7 @@ pub mod fractal {
         fn from(value: FractalData) -> Self {
             Self {
                 account: value.account,
+                token_id: value.token_id,
                 legislature: value.legislature.account,
                 judiciary: value.judiciary.account,
             }

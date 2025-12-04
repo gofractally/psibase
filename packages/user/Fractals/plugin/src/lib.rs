@@ -455,6 +455,7 @@ impl Queries for FractallyPlugin {
             fractal: fractal.account.to_string(),
             judiciary: fractal.judiciary.to_string(),
             legislature: fractal.legislature.to_string(),
+            token_id: fractal.token_id,
         })
     }
 }
