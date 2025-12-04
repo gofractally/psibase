@@ -19,6 +19,7 @@
         "@tanstack/react-table": "^8.20.4",
         "class-variance-authority": "^0.7.0",
         "framer-motion": "^11.2.11",
+        "jszip": "^3.10.1",
         "lucide-react": "^0.475.0",
         "react": "^19.1.0",
         "react-confetti-explosion": "^2.1.2",
@@ -32,6 +33,7 @@
         "zod": "^3.24.2"
     },
     "devDependencies": {
+        "@types/jszip": "^3.4.1",
         "@types/node": "^22.15.0",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",

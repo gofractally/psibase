@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import JSZip from "jszip";
 import { util } from "wasm-transpiled";
 import { z } from "zod";
 
@@ -243,6 +244,163 @@ class Chain {
     public async getTransactStats(): Promise<TransactStatsType> {
         const url = siblingUrl(null, "transact", "/stats");
         return TransactStats.parse(await getJson(url));
+    }
+
+    public async installNodeLocalPackage(file: File): Promise<{
+        success: boolean;
+        installed: string[];
+        failed?: { name: string; error: string };
+        notAttempted: string[];
+    }> {
+        const installed: string[] = [];
+        const allServices: string[] = [];
+
+        try {
+            const zip = await JSZip.loadAsync(file);
+
+            zip.folder("service")?.forEach((relativePath) => {
+                if (relativePath.endsWith(".wasm")) {
+                    const serviceName = relativePath.replace(".wasm", "");
+                    allServices.push(serviceName);
+                }
+            });
+
+            const invalidServices = allServices.filter(
+                (name) => !name.startsWith("x-"),
+            );
+            if (invalidServices.length > 0) {
+                throw new Error(
+                    `Invalid service name(s): ${invalidServices.join(", ")}. ` +
+                        `Only node-local services with "x-" prefix can be installed via this method.`,
+                );
+            }
+
+            // Install services
+            for (const serviceName of allServices) {
+                const wasmFile = zip.file(`service/${serviceName}.wasm`);
+                if (!wasmFile) {
+                    throw new Error(
+                        `Service ${serviceName} .wasm file not found in package`,
+                    );
+                }
+
+                const wasmData = await wasmFile.async("arraybuffer");
+
+                const response = await fetch(`/services/${serviceName}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/wasm",
+                    },
+                    body: wasmData,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(
+                        `Failed to install service ${serviceName}: ${response.status} ${errorText}`,
+                    );
+                }
+
+                installed.push(serviceName);
+            }
+
+            // Install data files
+            const dataFolder = zip.folder("data");
+            if (dataFolder) {
+                const dataFiles: Array<{ path: string; data: ArrayBuffer }> =
+                    [];
+
+                dataFolder.forEach(async (relativePath, file) => {
+                    if (!file.dir) {
+                        dataFiles.push({
+                            path: relativePath,
+                            data: await file.async("arraybuffer"),
+                        });
+                    }
+                });
+
+                await Promise.all(
+                    dataFiles.map(async (item) => {
+                        // Await file read
+                        const data = await item.data;
+                        return { path: item.path, data };
+                    }),
+                );
+
+                // Data files are stored as: data/<service><path>
+                for (const { path, data } of dataFiles) {
+                    // Format: <servicename>/<filepath>
+                    const firstSlash = path.indexOf("/");
+                    if (firstSlash === -1) {
+                        console.warn(`Invalid data file path: ${path}`);
+                        continue;
+                    }
+                    const serviceName = path.substring(0, firstSlash);
+                    const filePath = path.substring(firstSlash);
+
+                    let contentType = "application/octet-stream";
+                    if (filePath.endsWith(".html")) {
+                        contentType = "text/html";
+                    } else if (filePath.endsWith(".js")) {
+                        contentType = "application/javascript";
+                    } else if (filePath.endsWith(".css")) {
+                        contentType = "text/css";
+                    } else if (filePath.endsWith(".json")) {
+                        contentType = "application/json";
+                    } else if (filePath.endsWith(".wasm")) {
+                        contentType = "application/wasm";
+                    } else if (
+                        filePath.endsWith(".png") ||
+                        filePath.endsWith(".jpg") ||
+                        filePath.endsWith(".jpeg") ||
+                        filePath.endsWith(".gif")
+                    ) {
+                        contentType = `image/${filePath.split(".").pop()}`;
+                    }
+
+                    // PUT to the service subdomain
+                    const url = siblingUrl(null, serviceName, filePath);
+                    const response = await fetch(url, {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": contentType,
+                        },
+                        body: data,
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(
+                            `Failed to upload data file ${filePath} to ${serviceName}: ${response.status} ${errorText}`,
+                        );
+                    }
+                }
+            }
+
+            return {
+                success: true,
+                installed,
+                notAttempted: [],
+            };
+        } catch (error) {
+            // Return partial success with failure information
+            const notAttempted = allServices.filter(
+                (s) => !installed.includes(s),
+            );
+            return {
+                success: false,
+                installed,
+                failed: {
+                    name:
+                        notAttempted.length > 0
+                            ? notAttempted[0]
+                            : "unknown",
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                },
+                notAttempted: notAttempted.slice(1),
+            };
+        }
     }
 }
 
