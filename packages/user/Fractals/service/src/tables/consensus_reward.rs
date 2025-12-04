@@ -110,15 +110,15 @@ impl ConsensusReward {
 
         let mut total_dust = 0u64;
 
-        let (ranked_guilds, guild_dust) = distribute_by_weight(
+        let (guild_distributions, guild_dust) = distribute_by_weight(
             ranked_guilds,
             |index, _| continuous_fibonacci(ranked_guilds_length as u32 - index as u32),
             claimed.value,
         );
         total_dust += guild_dust;
 
-        for (guild, guild_distribution) in ranked_guilds {
-            let (rewarded_members, member_dust) = distribute_by_weight(
+        for (guild, guild_distribution) in guild_distributions {
+            let (member_distributions, member_dust) = distribute_by_weight(
                 GuildMember::memberships_of_guild(guild),
                 |_, member| continuous_fibonacci(member.score as u32),
                 guild_distribution,
@@ -126,7 +126,7 @@ impl ConsensusReward {
 
             total_dust += member_dust;
 
-            for (membership, reward) in rewarded_members {
+            for (membership, reward) in member_distributions {
                 FractalMember::get_assert(self.fractal, membership.member)
                     .deposit_stream(reward.into(), "Guild member reward".into());
             }
