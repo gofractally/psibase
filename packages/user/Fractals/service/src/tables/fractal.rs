@@ -117,7 +117,10 @@ impl Fractal {
     }
 
     pub fn get_assert(fractal: AccountNumber) -> Self {
-        check_some(Self::get(fractal), "fractal does not exist")
+        check_some(
+            Self::get(fractal),
+            &format!("fractal {} does not exist", fractal.to_string()),
+        )
     }
 
     fn save(&self) {
@@ -153,5 +156,9 @@ impl Fractal {
 
     async fn judiciary(&self) -> Guild {
         Guild::get_assert(self.judiciary)
+    }
+
+    async fn reward(&self) -> Option<ConsensusReward> {
+        ConsensusReward::get(self.account)
     }
 }

@@ -6,6 +6,7 @@ interface admin-fractal {
 
     exile-member: func(fractal: string, member: string) -> result<_, error>;
     set-dist-interval: func(fractal: string, distribution-interval: u32) -> result<_, error>;
+    init-token: func(fractal: string) -> result<_, error>;
 
 }
 

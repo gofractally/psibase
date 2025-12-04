@@ -6,6 +6,7 @@ interface admin-fractal {
     create-fractal: func(fractal-account: string, guild-account: string, name: string, mission: string) -> result<_, error>;
     exile-member: func(member: string) -> result<_, error>;
     set-dist-interval: func(distribution-interval: u32) -> result<_, error>;
+    init-token: func() -> result<_, error>;
 }
 
 interface admin-guild {
@@ -57,14 +58,21 @@ interface types {
         council-role: string,
         rep-role: string
     }
+
+    record fractal {
+        fractal: string,
+        legislature: string,
+        judiciary: string,
+    }
 }
 
 interface queries {
-    use types.{guild};
+    use types.{guild, fractal};
     use host:types/types.{error};
 
 
     get-guild: func(guild-account: string) -> result<guild, error>;
+    get-fractal: func(fractal-account: string) -> result<fractal, error>;
 }
 
 

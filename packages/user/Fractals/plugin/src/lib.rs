@@ -27,7 +27,8 @@ use bindings::evaluations::plugin::user as EvaluationsUser;
 use crate::bindings::accounts;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::errors::ErrorType;
-use crate::graphql::{get_guild, GuildHelper};
+use crate::graphql::fractal::get_fractal;
+use crate::graphql::guild::{get_guild, GuildHelper};
 use crate::helpers::get_sender_app;
 use crate::trust::{assert_authorized, assert_authorized_with_whitelist};
 use psibase::define_trust;
@@ -61,6 +62,7 @@ define_trust! {
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
+            - Initialise fractal token
             - Resign, remove or set a new Guild representative
             ",
     }
@@ -68,7 +70,7 @@ define_trust! {
         None => [get_group_users],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [exile_member, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+        High => [exile_member, set_dist_interval, init_token, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
 }
@@ -121,6 +123,19 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::exile_member::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn init_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::init_token)?;
+
+        let packed_args = fractals::action_structs::init_token {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::init_token::ACTION_NAME,
             &packed_args,
         )
     }
@@ -431,6 +446,15 @@ impl Queries for FractallyPlugin {
             evaluation_id: guild.evaluation_id,
             council_role: guild.council_role.to_string(),
             rep_role: guild.rep_role.to_string(),
+        })
+    }
+
+    fn get_fractal(fractal_account: String) -> Result<types::Fractal, Error> {
+        let fractal = get_fractal(fractal_account)?;
+        Ok(types::Fractal {
+            fractal: fractal.account.to_string(),
+            judiciary: fractal.judiciary.to_string(),
+            legislature: fractal.legislature.to_string(),
         })
     }
 }

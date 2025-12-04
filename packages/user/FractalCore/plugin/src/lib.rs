@@ -45,6 +45,7 @@ define_trust! {
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
+            - Initialise fractal token
             - Resign, remove or set a new Guild representative
         ",
     }
@@ -52,7 +53,7 @@ define_trust! {
         None => [get_group_users],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        High => [exile_member, set_dist_interval, init_token, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
 
@@ -61,16 +62,29 @@ struct FractalCorePlugin;
 impl AdminFractal for FractalCorePlugin {
     fn set_dist_interval(fractal_account: String, interval: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::set_dist_interval)?;
-        set_propose_latch(Some(&fractal_account))?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&fractal_account)?;
+        set_propose_latch(Some(&fractal.legislature))?;
 
         FractalsPlugin::admin_fractal::set_dist_interval(interval)
     }
 
     fn exile_member(fractal_account: String, member_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
-        set_propose_latch(Some(&fractal_account))?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&fractal_account)?;
+        set_propose_latch(Some(&fractal.judiciary))?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
+    }
+
+    fn init_token(fractal_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::init_token)?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&fractal_account)?;
+        set_propose_latch(Some(&fractal.legislature))?;
+
+        FractalsPlugin::admin_fractal::init_token()
     }
 }
 

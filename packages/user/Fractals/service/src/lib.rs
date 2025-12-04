@@ -192,7 +192,10 @@ pub mod service {
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
-        check_none(account_policy(fractal), "account cannot be managed");
+        check_none(
+            account_policy(fractal),
+            &format!("account {} cannot be managed", fractal),
+        );
 
         let member_status = if ConsensusReward::get(fractal).is_some() {
             MemberStatus::Visa
@@ -359,7 +362,7 @@ pub mod service {
     #[action]
     fn exile_member(fractal: AccountNumber, member: AccountNumber) {
         check(
-            Fractal::get_assert(fractal).legislature == get_sender(),
+            Fractal::get_assert(fractal).judiciary == get_sender(),
             "only the legislature can exile members",
         );
         FractalMember::get_assert(fractal, member).exile();

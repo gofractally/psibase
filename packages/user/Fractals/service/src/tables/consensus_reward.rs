@@ -4,7 +4,7 @@ use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo,
 
 use crate::constants::{
     FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
-    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, ONE_DAY, ONE_WEEK,
+    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, ONE_WEEK,
 };
 use crate::helpers::{continuous_fibonacci, distribute_by_weight, MAX_FIB_INPUT};
 use crate::tables::tables::{
@@ -30,7 +30,12 @@ impl ConsensusReward {
     }
 
     fn deposit_stream(&self, amount: Quantity, memo: Memo) {
-        Tokens::call().credit(self.fractal().token_id, TokenStream::SERVICE, amount, memo);
+        Tokens::call().credit(
+            self.fractal_detail().token_id,
+            TokenStream::SERVICE,
+            amount,
+            memo,
+        );
         TokenStream::call().deposit(self.stream_id, amount);
     }
 
@@ -39,7 +44,7 @@ impl ConsensusReward {
         check(claimable.value != 0, "nothing to claim");
 
         Tokens::call().debit(
-            self.fractal().token_id,
+            self.fractal_detail().token_id,
             TokenStream::SERVICE,
             claimable,
             "Reward claim".into(),
@@ -62,7 +67,7 @@ impl ConsensusReward {
         new_instance
     }
 
-    fn fractal(&self) -> Fractal {
+    fn fractal_detail(&self) -> Fractal {
         Fractal::get_assert(self.fractal)
     }
 

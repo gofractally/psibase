@@ -211,7 +211,7 @@ pub mod tables {
     }
 
     #[table(name = "ConsensusRewardTable", index = 8)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ConsensusReward {
         #[primary_key]
         pub fractal: AccountNumber,
