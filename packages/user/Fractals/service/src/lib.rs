@@ -11,6 +11,8 @@ pub mod constants {
     pub const TOKEN_PRECISION: u8 = 4;
     pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
     pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
+    pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
+    pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]

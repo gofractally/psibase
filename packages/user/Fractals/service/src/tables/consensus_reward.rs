@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::constants::{FRACTAL_STREAM_HALF_LIFE, ONE_DAY, ONE_WEEK};
+use crate::constants::{
+    FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, ONE_DAY, ONE_WEEK,
+};
 use crate::helpers::{continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
     ConsensusReward, ConsensusRewardTable, Fractal, FractalMember, Guild, GuildMember,
@@ -81,11 +84,11 @@ impl ConsensusReward {
 
     pub fn set_distribution_interval(&mut self, seconds: u32) {
         check(
-            seconds >= ONE_DAY,
+            MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS >= ONE_DAY,
             "distribution must be greater or equal to a day",
         );
         check(
-            seconds <= ONE_WEEK * 8,
+            MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS <= ONE_WEEK * 8,
             "distribution must be less than or equal to 8 weeks",
         );
         self.dist_interval_secs = seconds;
