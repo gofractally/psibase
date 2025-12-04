@@ -4,8 +4,8 @@ use crate::serialize_as_str;
 use crate::services::tokens::{Precision, Quantity, TokensError};
 
 pub struct Decimal {
-    pub quantity: Quantity,
-    pub precision: Precision,
+    quantity: Quantity,
+    precision: Precision,
 }
 
 serialize_as_str!(Decimal, "decimal");
