@@ -133,7 +133,6 @@ const zGetAccountReturn = z
     .object({
         accountNum: z.string(),
         authService: z.string(),
-        resourceBalance: z.boolean().or(z.bigint()),
     })
     .optional();
 

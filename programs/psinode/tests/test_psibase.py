@@ -374,14 +374,14 @@ class TestPsibase(unittest.TestCase):
         a.wait(new_block())
 
         # This should be None because the transaction was only proposed
-        result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService resourceBalance { value } } }''')
+        result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService } }''')
         self.assertEqual(result, {'getAccount': None})
 
         for tx in staged_tx.get_staged(proposer='bbbbbbb123'):
             staged_tx.accept('aaaaaaa123', tx, keys=[key])
 
         a.wait(new_block())
-        result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService resourceBalance { value } } }''')
+        result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService } }''')
         self.assertIsNotNone(result['getAccount'])
 
     def assertResponse(self, response, expected):

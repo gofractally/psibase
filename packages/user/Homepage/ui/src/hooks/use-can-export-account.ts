@@ -22,7 +22,6 @@ export const useCanExportAccount = (account?: string | null) =>
                 .object({
                     accountNum: z.string(),
                     authService: zAccount,
-                    resourceBalance: z.bigint(),
                 })
                 .parse(response);
 

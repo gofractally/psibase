@@ -125,21 +125,6 @@ namespace SystemService
       return getAccount(name) != std::nullopt;
    }
 
-   void Accounts::billCpu(AccountNumber name, std::chrono::nanoseconds amount)
-   {
-      Tables tables{getReceiver()};
-
-      auto accountTable = tables.open<AccountTable>();
-      auto accountIndex = accountTable.getIndex<0>();
-      auto row          = accountIndex.get(name);
-      check(!!row, "account " + name.str() + " does not exist");
-      if (row->resourceBalance)
-      {
-         row->resourceBalance->billCpu(amount);
-         accountTable.put(*row);
-      }
-   }
-
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::Accounts)

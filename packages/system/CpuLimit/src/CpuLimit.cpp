@@ -21,24 +21,22 @@ namespace SystemService
 
    void CpuLimit::setCpuLimit(psibase::AccountNumber account)
    {
-      // Look up available CPU balance
-      auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
-      auto row          = accountIndex.get(account);
-      check(!!row, "account does not exist");
-      if (row->resourceBalance)
-      {
-         auto limit = row->resourceBalance->cpuLimit();
-         // add leeway with saturation
-         if (limit <= std::chrono::nanoseconds::max() - leeway)
-         {
-            limit += leeway;
-         }
-         else
-         {
-            limit = std::chrono::nanoseconds::max();
-         }
-         psibase::raw::setMaxTransactionTime(limit.count());
-      }
+      // TODO: Lookup up available CPU balance
+
+      // if (row->resourceBalance)
+      // {
+      //    auto limit = 0;
+      //    // add leeway with saturation
+      //    if (limit <= std::chrono::nanoseconds::max() - leeway)
+      //    {
+      //       limit += leeway;
+      //    }
+      //    else
+      //    {
+      //       limit = std::chrono::nanoseconds::max();
+      //    }
+      //    psibase::raw::setMaxTransactionTime(limit.count());
+      // }
    }
 }  // namespace SystemService
 
