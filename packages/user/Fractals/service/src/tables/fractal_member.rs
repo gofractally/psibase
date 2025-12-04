@@ -5,11 +5,11 @@ use psibase::{
 };
 
 use crate::{
+    constants::MEMBER_STREAM_HALF_LIFE,
     tables::tables::{
         Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
         GuildAttest, GuildMember,
     },
-    ONE_WEEK,
 };
 
 use async_graphql::ComplexObject;
@@ -55,7 +55,7 @@ impl FractalMember {
             fractal,
             created_at: now,
             member_status: status as StatusU8,
-            stream_id: TokenStream::call().create(ONE_WEEK * 13, token_id),
+            stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
         }
     }
 

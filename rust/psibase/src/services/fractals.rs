@@ -26,6 +26,16 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set Fractal distribution interval
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_interval` - New fractal distribution interval.
+    #[action]
+    fn set_dist_int(fractal: AccountNumber, distribution_interval: u32) {
+        unimplemented!()
+    }
+
     /// Apply to join a guild
     ///
     /// # Arguments

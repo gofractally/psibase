@@ -5,6 +5,8 @@ interface admin-fractal {
     use host:types/types.{error};
 
     exile-member: func(fractal: string, member: string) -> result<_, error>;
+    set-dist-interval: func(fractal: string, distribution-interval: u32) -> result<_, error>;
+
 }
 
 interface user-fractal {

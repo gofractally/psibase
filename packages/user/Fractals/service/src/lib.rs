@@ -2,9 +2,16 @@ pub mod helpers;
 mod scoring;
 pub mod tables;
 
-pub const ONE_DAY: u32 = 86400;
-pub const ONE_WEEK: u32 = ONE_DAY * 7;
-pub const ONE_YEAR: u32 = ONE_WEEK * 52;
+pub mod constants {
+    pub const ONE_DAY: u32 = 86400;
+    pub const ONE_WEEK: u32 = ONE_DAY * 7;
+    const ONE_YEAR: u32 = ONE_WEEK * 52;
+
+    pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
+    pub const TOKEN_PRECISION: u8 = 4;
+    pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
+    pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
+}
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
@@ -69,6 +76,20 @@ pub mod service {
             "must be a member of a fractal to apply for its guild",
         );
         GuildApplication::add(guild.account, sender, extra_info);
+    }
+
+    /// Set Fractal distribution interval
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_interval` - New fractal distribution interval.
+    #[action]
+    fn set_dist_int(fractal: AccountNumber, distribution_interval: u32) {
+        check(
+            get_sender() == Fractal::get_assert(fractal).legislature,
+            "must be legislature",
+        );
+        ConsensusReward::get_assert(fractal).set_distribution_interval(distribution_interval);
     }
 
     /// Set guild display name

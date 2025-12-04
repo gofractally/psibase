@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
+use crate::constants::{FRACTAL_STREAM_HALF_LIFE, ONE_DAY, ONE_WEEK};
 use crate::helpers::{continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
     ConsensusReward, ConsensusRewardTable, Fractal, FractalMember, Guild, GuildMember,
 };
-use crate::{ONE_WEEK, ONE_YEAR};
 
 use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -20,7 +20,7 @@ impl ConsensusReward {
         Self {
             fractal,
             ranked_guilds: vec![],
-            stream_id: TokenStream::call().create(ONE_YEAR * 25, token_id),
+            stream_id: TokenStream::call().create(FRACTAL_STREAM_HALF_LIFE, token_id),
             dist_interval_secs: ONE_WEEK,
             last_distributed: now,
         }
@@ -84,6 +84,19 @@ impl ConsensusReward {
             let whole_interval_seconds = whole_intervals_elapsed * distribution_interval;
             self.last_distributed = (self.last_distributed.seconds + whole_interval_seconds).into();
         }
+        self.save();
+    }
+
+    pub fn set_distribution_interval(&mut self, seconds: u32) {
+        check(
+            seconds >= ONE_DAY,
+            "distribution must be greater or equal to a day",
+        );
+        check(
+            seconds <= ONE_WEEK * 8,
+            "distribution must be less than or equal to 8 weeks",
+        );
+        self.dist_interval_secs = seconds;
         self.save();
     }
 

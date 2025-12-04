@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
-use psibase::services::tokens::Quantity;
-use std::str::FromStr;
+use psibase::services::tokens::{Precision, Quantity};
 
+use crate::constants::{TOKEN_PRECISION, TOKEN_SUPPLY};
 use crate::tables::tables::{
     ConsensusReward, Fractal, FractalMember, FractalMemberTable, FractalTable,
 };
@@ -11,7 +11,6 @@ use psibase::{
 
 use crate::tables::tables::Guild;
 
-use psibase::services::tokens::Decimal;
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, sites, transact};
@@ -27,16 +26,17 @@ impl Fractal {
     ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
-        let max_supply = Decimal::from_str("21000000.0000").unwrap();
+        let max_supply: Quantity = TOKEN_SUPPLY.into();
+        let precision: Precision = TOKEN_PRECISION.try_into().unwrap();
 
         Self {
+            token_id: Tokens::call().create(precision, max_supply),
             account,
             created_at: now,
             mission,
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
-            token_id: Tokens::call().create(max_supply.precision, max_supply.quantity),
         }
     }
 
