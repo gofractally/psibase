@@ -125,8 +125,9 @@ impl ConsensusReward {
     }
 
     pub fn set_ranked_guilds(&mut self, guilds: Vec<AccountNumber>) {
+        check(guilds.len() <= 32, "only up to 32 guilds can be ranked");
         let mut seen = HashSet::new();
-        for guild in guilds.clone() {
+        for &guild in &guilds {
             if !seen.insert(guild) {
                 abort_message("duplicate ranked guild detected");
             }
@@ -135,7 +136,6 @@ impl ConsensusReward {
                 "cannot rank foreign guilds",
             );
         }
-        check(guilds.len() <= 12, "only up to 12 guilds can be ranked");
         self.ranked_guilds = guilds;
         self.save();
     }
