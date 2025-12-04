@@ -9,6 +9,7 @@ import { CreatePage } from "./pages/create-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { JoinPage } from "./pages/join-page";
 import { KeysPage } from "./pages/keys-page";
+import { NodeLocalPage } from "./pages/node-local-page";
 import { SetupPage } from "./pages/setup-page";
 import { PeersPage } from "./peers/peers-page";
 
@@ -41,6 +42,7 @@ export const Routing = () => {
                 <Route path="configuration" element={<ConfigurationPage />} />
                 <Route path="peers" element={<PeersPage />} />
                 <Route path="logs" element={<LogsPage />} />
+                <Route path="packages" element={<NodeLocalPage />} />
                 <Route path="keys-and-devices" element={<KeysPage />} />
                 <Route
                     path=""
