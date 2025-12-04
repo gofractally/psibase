@@ -1,11 +1,17 @@
-use psibase::{abort_message, check_none, check_some, AccountNumber, Table};
+use psibase::{
+    abort_message, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
+};
 
-use crate::tables::tables::{
-    Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
-    GuildAttest, GuildMember,
+use crate::{
+    constants::MEMBER_STREAM_HALF_LIFE,
+    tables::tables::{
+        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
+        GuildAttest, GuildMember,
+    },
 };
 
 use async_graphql::ComplexObject;
+use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::transact::Wrapper as TransactSvc;
 
 #[derive(PartialEq)]
@@ -39,11 +45,15 @@ impl FractalMember {
 impl FractalMember {
     fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
+
+        let token_id = Fractal::get_assert(fractal).token_id;
+
         Self {
             account,
             fractal,
             created_at: now,
             member_status: status as StatusU8,
+            stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
         }
     }
 
@@ -68,6 +78,16 @@ impl FractalMember {
 
     pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
         check_some(Self::get(fractal, account), "member does not exist")
+    }
+
+    pub fn deposit_stream(&self, amount: Quantity, memo: Memo) {
+        psibase::services::tokens::Wrapper::call().credit(
+            Fractal::get_assert(self.fractal).token_id,
+            TokenStream::SERVICE,
+            amount,
+            memo,
+        );
+        TokenStream::call().deposit(self.stream_id, amount);
     }
 
     pub fn is_citizen(&self) -> bool {

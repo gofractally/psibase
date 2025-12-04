@@ -26,6 +26,16 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set Fractal distribution interval
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_interval` - New fractal distribution interval.
+    #[action]
+    fn set_dist_int(fractal: AccountNumber, distribution_interval: u32) {
+        unimplemented!()
+    }
+
     /// Apply to join a guild
     ///
     /// # Arguments
@@ -249,6 +259,41 @@ pub mod Service {
     /// * `account` - Account being checked.
     #[action]
     fn has_policy(account: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    #[action]
+    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
         unimplemented!()
     }
 

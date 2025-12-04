@@ -1,10 +1,17 @@
 use async_graphql::ComplexObject;
+use psibase::services::tokens::{Precision, Quantity};
+
+use crate::constants::{TOKEN_PRECISION, TOKEN_SUPPLY};
+use crate::tables::tables::{
+    ConsensusReward, Fractal, FractalMember, FractalMemberTable, FractalTable,
+};
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
 
-use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable, Guild};
+use crate::tables::tables::Guild;
 
+use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, sites, transact};
 use psibase::Action;
@@ -19,7 +26,11 @@ impl Fractal {
     ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
+        let max_supply: Quantity = TOKEN_SUPPLY.into();
+        let precision: Precision = TOKEN_PRECISION.try_into().unwrap();
+
         Self {
+            token_id: Tokens::call().create(precision, max_supply),
             account,
             created_at: now,
             mission,
@@ -88,12 +99,28 @@ impl Fractal {
         new_instance
     }
 
+    pub fn init_token(&mut self) {
+        let total_supply = Tokens::call().getToken(self.token_id).max_issued_supply;
+        let quarter_supply: Quantity = (total_supply.value / 4).into();
+
+        Tokens::call().mint(
+            self.token_id,
+            quarter_supply,
+            "Token intitialisation".into(),
+        );
+
+        ConsensusReward::add(self.account, self.token_id, quarter_supply);
+    }
+
     pub fn get(fractal: AccountNumber) -> Option<Self> {
         FractalTable::read().get_index_pk().get(&(fractal))
     }
 
     pub fn get_assert(fractal: AccountNumber) -> Self {
-        check_some(Self::get(fractal), "fractal does not exist")
+        check_some(
+            Self::get(fractal),
+            &format!("fractal {} does not exist", fractal.to_string()),
+        )
     }
 
     fn save(&self) {
@@ -129,5 +156,9 @@ impl Fractal {
 
     async fn judiciary(&self) -> Guild {
         Guild::get_assert(self.judiciary)
+    }
+
+    async fn reward(&self) -> Option<ConsensusReward> {
+        ConsensusReward::get(self.account)
     }
 }

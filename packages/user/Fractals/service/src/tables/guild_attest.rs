@@ -20,7 +20,7 @@ impl GuildAttest {
         }
     }
 
-    pub fn add(
+    pub fn set(
         guild: AccountNumber,
         member: AccountNumber,
         attestee: AccountNumber,

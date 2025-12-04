@@ -1,3 +1,4 @@
+mod consensus_reward;
 mod evaluation_instance;
 mod fractal;
 mod fractal_exile;
@@ -11,7 +12,7 @@ mod guild_member;
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
 
     use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,7 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
+        #[primary_key]
         pub account: AccountNumber,
         pub created_at: TimePointSec,
         pub name: String,
@@ -29,13 +31,7 @@ pub mod tables {
         pub legislature: AccountNumber,
         #[graphql(skip)]
         pub judiciary: AccountNumber,
-    }
-
-    impl Fractal {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
+        pub token_id: TID,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]
@@ -46,6 +42,7 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
+        pub stream_id: u32,
     }
 
     impl FractalMember {
@@ -211,5 +208,16 @@ pub mod tables {
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
             (self.member, self.fractal)
         }
+    }
+
+    #[table(name = "ConsensusRewardTable", index = 8)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct ConsensusReward {
+        #[primary_key]
+        pub fractal: AccountNumber,
+        pub stream_id: u32,
+        pub ranked_guilds: Vec<AccountNumber>,
+        pub last_distributed: psibase::TimePointSec,
+        pub dist_interval_secs: u32,
     }
 }

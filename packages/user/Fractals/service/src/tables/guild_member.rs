@@ -1,8 +1,11 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
+use crate::helpers::FIB_SCALE;
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
+use crate::tables::tables::{
+    ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
+};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -18,10 +21,11 @@ impl GuildMember {
         }
     }
 
-    pub fn add(guild: AccountNumber, member: AccountNumber) {
-        check_none(Self::get(guild, member), "member already exists");
-
-        Self::new(guild, member).save();
+    pub fn add(guild: AccountNumber, member: AccountNumber) -> Self {
+        check_none(Self::get(guild, member), "guild member already exists");
+        let new_instance = Self::new(guild, member);
+        new_instance.save();
+        new_instance
     }
 
     pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {
@@ -35,8 +39,11 @@ impl GuildMember {
     }
 
     pub fn set_pending_score(&mut self, incoming_score: u32) {
-        self.pending_score = Some(incoming_score * 10000);
-        self.save();
+        let guild = Guild::get_assert(self.guild);
+        if ConsensusReward::get(guild.fractal).is_some() {
+            self.pending_score = Some(incoming_score * FIB_SCALE as u32);
+            self.save();
+        }
     }
 
     pub fn save_pending_score(&mut self) {
@@ -50,16 +57,23 @@ impl GuildMember {
         self.remove();
     }
 
-    pub fn guild_memberships(member: AccountNumber) -> Vec<Self> {
+    pub fn memberships_of_member(member: AccountNumber) -> Vec<Self> {
         GuildMemberTable::read()
             .get_index_by_member()
             .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
             .collect()
     }
 
+    pub fn memberships_of_guild(guild: AccountNumber) -> Vec<Self> {
+        GuildMemberTable::read()
+            .get_index_pk()
+            .range((guild, AccountNumber::from(0))..=(guild, AccountNumber::from(u64::MAX)))
+            .collect()
+    }
+
     pub fn remove_all_by_member(member: AccountNumber) {
         let table = GuildMemberTable::read_write();
-        for membership in Self::guild_memberships(member) {
+        for membership in Self::memberships_of_member(member) {
             table.remove(&membership);
         }
     }
