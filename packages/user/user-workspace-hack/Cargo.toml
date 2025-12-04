@@ -46,23 +46,14 @@ zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 getrandom = { version = "0.3", default-features = false, features = ["std"] }
-libc = { version = "0.2" }
-once_cell = { version = "1" }
-portable-atomic = { version = "1" }
 
 [target.aarch64-unknown-linux-gnu.dependencies]
 getrandom = { version = "0.3", default-features = false, features = ["std"] }
-libc = { version = "0.2" }
-once_cell = { version = "1" }
-portable-atomic = { version = "1" }
 
 [target.wasm32-wasip1.dependencies]
 getrandom = { version = "0.3", default-features = false, features = ["std"] }
 
 [target.aarch64-apple-darwin.dependencies]
 getrandom = { version = "0.3", default-features = false, features = ["std"] }
-libc = { version = "0.2" }
-once_cell = { version = "1" }
-portable-atomic = { version = "1" }
 
 ### END HAKARI SECTION

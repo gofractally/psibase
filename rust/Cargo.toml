@@ -6,19 +6,19 @@ members = [
     "fracpack",
     "gen-cpp-doc",
     "md2man",
-    "psibase_macros",
     "psibase",
+    "psibase_macros",
     # must be present for `caro hakari` to find the workspace-hack
     "rust-workspace-hack",
     "test_contract",
     "test_contract_2",
+    "test_fracpack",
+    "test_fracpack_macros",
     "test_package/plugin",
     "test_package/query",
     "test_package/service",
-    "test_fracpack",
-    "test_fracpack_macros",
-    "test_subjective",
     "test_psibase_macros",
+    "test_subjective",
 ]
 
 default-members = [
