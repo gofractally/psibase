@@ -13,6 +13,7 @@ pub mod constants {
     pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
     pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
     pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
+    pub const MAX_COUNCIL_SIZE: u8 = 6;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
@@ -159,9 +160,9 @@ pub mod service {
             GuildMember::get(guild.account, sender),
             "must be member of the guild to attest",
         );
-        GuildAttest::add(guild.account, member, sender, comment, endorses);
+        GuildAttest::set(guild.account, member, sender, comment, endorses);
 
-        if guild_account == sender || guild.rep.is_some_and(|rep| rep == sender) {
+        if guild_account == sender {
             application.conclude(endorses)
         }
     }

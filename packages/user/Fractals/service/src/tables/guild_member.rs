@@ -1,6 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
+use crate::helpers::FIB_SCALE;
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
     ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
@@ -40,7 +41,7 @@ impl GuildMember {
     pub fn set_pending_score(&mut self, incoming_score: u32) {
         let guild = Guild::get_assert(self.guild);
         if ConsensusReward::get(guild.fractal).is_some() {
-            self.pending_score = Some(incoming_score * 10000);
+            self.pending_score = Some(incoming_score * FIB_SCALE as u32);
             self.save();
         }
     }

@@ -6,7 +6,7 @@ use crate::constants::{
     FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
     MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, ONE_DAY, ONE_WEEK,
 };
-use crate::helpers::{continuous_fibonacci, distribute_by_weight};
+use crate::helpers::{continuous_fibonacci, distribute_by_weight, MAX_FIB_INPUT};
 use crate::tables::tables::{
     ConsensusReward, ConsensusRewardTable, Fractal, FractalMember, Guild, GuildMember,
 };
@@ -133,7 +133,10 @@ impl ConsensusReward {
     }
 
     pub fn set_ranked_guilds(&mut self, guilds: Vec<AccountNumber>) {
-        check(guilds.len() <= 32, "only up to 32 guilds can be ranked");
+        check(
+            guilds.len() <= MAX_FIB_INPUT as usize,
+            &format!("only up to {} guilds can be ranked", MAX_FIB_INPUT),
+        );
         let mut seen = HashSet::new();
         for &guild in &guilds {
             if !seen.insert(guild) {
