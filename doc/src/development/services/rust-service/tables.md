@@ -139,7 +139,7 @@ fn serveSys(request: HttpRequest) -> Option<HttpReply> {
 Redeploy the service and test it out:
 
 ```
-cargo psibase deploy -ip
+cargo psibase install -r
 
 curl http://messages.psibase.localhost:8080/messages/0/99999999 | jq
 curl http://messages.psibase.localhost:8080/messages/20/30 | jq
