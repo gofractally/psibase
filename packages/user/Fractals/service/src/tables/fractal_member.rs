@@ -1,7 +1,5 @@
 use psibase::{
-    abort_message, check_none, check_some,
-    services::tokens::{Quantity, TID},
-    AccountNumber, Memo, Table,
+    abort_message, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
 };
 
 use crate::{
