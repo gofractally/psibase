@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::helpers::{distribute_by_weight, continuous_fibonacci};
+use crate::helpers::{continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
     ConsensusReward, ConsensusRewardTable, Fractal, FractalMember, Guild, GuildMember,
 };
@@ -91,7 +91,6 @@ impl ConsensusReward {
         self.check_can_distribute();
 
         let claimed = self.claim_stream();
-        let fractal_token_id = self.fractal().token_id;
 
         let ranked_guilds = self.ranked_guilds.clone();
         let ranked_guilds_length = ranked_guilds.len() as u64;
@@ -115,11 +114,8 @@ impl ConsensusReward {
             total_dust += member_dust;
 
             for (membership, reward) in rewarded_members {
-                FractalMember::get_assert(self.fractal, membership.member).deposit_stream(
-                    fractal_token_id,
-                    reward.into(),
-                    "Guild member reward".into(),
-                );
+                FractalMember::get_assert(self.fractal, membership.member)
+                    .deposit_stream(reward.into(), "Guild member reward".into());
             }
         }
 

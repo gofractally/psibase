@@ -82,9 +82,9 @@ impl FractalMember {
         check_some(Self::get(fractal, account), "member does not exist")
     }
 
-    pub fn deposit_stream(&self, token_id: TID, amount: Quantity, memo: Memo) {
+    pub fn deposit_stream(&self, amount: Quantity, memo: Memo) {
         psibase::services::tokens::Wrapper::call().credit(
-            token_id,
+            Fractal::get_assert(self.fractal).token_id,
             TokenStream::SERVICE,
             amount,
             memo,
