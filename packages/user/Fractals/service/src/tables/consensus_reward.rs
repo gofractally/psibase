@@ -67,14 +67,6 @@ impl ConsensusReward {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let distribution_interval = self.dist_interval_secs as i64;
-        check(
-            distribution_interval > 0,
-            "distribution interval must be greator than 0",
-        );
-        check(
-            now.seconds > self.last_distributed.seconds,
-            "cannot distribute in the past",
-        );
         let seconds_elapsed = now.seconds - self.last_distributed.seconds;
         let whole_intervals_elapsed = seconds_elapsed / distribution_interval;
 
