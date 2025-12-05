@@ -7,6 +7,7 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 
 const QueryKey = {
     currentUser: () => ["currentUser"] as const,
+    virtualServer: () => ["virtualServer"] as const,
     branding: () => ["branding"] as const,
     snapshotSeconds: () => ["snapshotSeconds"] as const,
     brandingFiles: () => ["brandingFiles"] as const,
@@ -22,6 +23,7 @@ const QueryKey = {
         ["transactionHistory", id] as const,
     sources: () => ["sources"] as const,
     candidates: () => ["candidates"] as const,
+    tokens: () => ["tokens"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
