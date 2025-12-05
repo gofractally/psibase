@@ -1788,7 +1788,7 @@ async fn do_install_local<T: Read + Seek>(
                         .install_local(&node_args.api, &mut client, compression_level)
                         .await?;
                     old_manifest
-                        .remove_local(&node_args.api, &mut client)
+                        .upgrade_local(&node_args.api, &mut client, package.manifest())
                         .await?;
                     delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
                     post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;

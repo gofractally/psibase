@@ -25,7 +25,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::x_packages;
+use crate::services::{x_admin, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -773,13 +773,13 @@ impl<R: Read + Seek> PackagedService<R> {
         &mut self,
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
-        compression_level: u32,
+        _compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         for (account, index, _info) in &self.services {
             crate::as_text(
                 client
                     .put(
-                        x_packages::SERVICE
+                        x_admin::SERVICE
                             .url(base_url)?
                             .join(&format!("/services/{}", account))?,
                     )
@@ -790,7 +790,7 @@ impl<R: Read + Seek> PackagedService<R> {
         }
 
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
-        for (_sender, index) in &self.data {
+        for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
             let file_name = file.name().to_string();
             let path = data_re
@@ -802,15 +802,17 @@ impl<R: Read + Seek> PackagedService<R> {
 
             if let Some(t) = mime_guess::from_path(path).first() {
                 let content = read(&mut file)?;
-                let (content, content_encoding) =
-                    compress_content(&content, t.essence_str(), compression_level);
-                let mut builder = client
-                    .put(x_packages::SERVICE.url(base_url)?.join(path)?)
+                // Don't encode the content, for now, because XSites doesn't
+                // implement decoding.
+                // let (content, content_encoding) =
+                //    compress_content(&content, t.essence_str(), compression_level);
+                let builder = client
+                    .put(sender.url(base_url)?.join(path)?)
                     .header("Content-Type", t.essence_str().to_string())
                     .body(content);
-                if let Some(content_encoding) = content_encoding {
-                    builder = builder.header("Content-Encoding", content_encoding)
-                }
+                // if let Some(content_encoding) = content_encoding {
+                //     builder = builder.header("Content-Encoding", content_encoding)
+                // }
                 crate::as_text(builder).await?;
             } else {
                 Err(Error::UnknownFileType {
@@ -968,7 +970,7 @@ impl PackageManifest {
 #[cfg(not(target_family = "wasm"))]
 impl PackageManifest {
     // This removes every part of self that is not overwritten by other
-    pub async fn upgrade_local<T: ActionSink>(
+    pub async fn upgrade_local(
         &self,
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
@@ -986,7 +988,7 @@ impl PackageManifest {
             if other_info.is_none() {
                 crate::as_text(
                     client.delete(
-                        x_packages::SERVICE
+                        x_admin::SERVICE
                             .url(base_url)?
                             .join(&format!("/services/{}", service))?,
                     ),
@@ -1008,7 +1010,7 @@ impl PackageManifest {
         for (service, _info) in &self.services {
             crate::as_text(
                 client.delete(
-                    x_packages::SERVICE
+                    x_admin::SERVICE
                         .url(base_url)?
                         .join(&format!("/services/{}", service))?,
                 ),
