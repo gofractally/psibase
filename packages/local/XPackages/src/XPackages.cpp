@@ -38,7 +38,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
       return reply;
 
    auto target = req.path();
-   if (target == "/preinstall")
+   if (target == "/preinstall" || target == "/prerm")
    {
       if (req.method != "POST")
          return HttpReply::methodNotAllowed(req);
@@ -58,11 +58,12 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
              .depends     = std::move(package.depends),
              .accounts    = std::move(package.accounts),
              .sha256      = std::move(package.sha256),
+             .removing    = target == "/prerm",
          });
       }
       return HttpReply{};
    }
-   else if (target == "/postinstall")
+   else if (target == "/postinstall" || target == "/postrm")
    {
       if (req.method != "POST")
          return HttpReply::methodNotAllowed(req);
@@ -79,14 +80,10 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
          auto pending = pendingTable.get(std::tie(package.name, package.version, package.sha256));
          if (pending)
             pendingTable.remove(*pending);
-         table.put({
-             .name        = std::move(package.name),
-             .version     = std::move(package.version),
-             .description = std::move(package.description),
-             .depends     = std::move(package.depends),
-             .accounts    = std::move(package.accounts),
-             .sha256      = std::move(package.sha256),
-         });
+         if (target == "/postrm")
+            table.erase(package.name);
+         else
+            table.put(package);
       }
       return HttpReply{};
    }

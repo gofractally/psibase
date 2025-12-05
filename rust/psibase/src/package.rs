@@ -965,6 +965,60 @@ impl PackageManifest {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+impl PackageManifest {
+    // This removes every part of self that is not overwritten by other
+    pub async fn upgrade_local<T: ActionSink>(
+        &self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        other: PackageManifest,
+    ) -> Result<(), anyhow::Error> {
+        let new_files: HashSet<_> = other.data.into_iter().collect();
+        for file in &self.data {
+            if !new_files.contains(file) {
+                crate::as_text(client.delete(file.account.url(base_url)?.join(&file.filename)?))
+                    .await?;
+            }
+        }
+        for (service, _info) in &self.services {
+            let other_info = other.services.get(service);
+            if other_info.is_none() {
+                crate::as_text(
+                    client.delete(
+                        x_packages::SERVICE
+                            .url(base_url)?
+                            .join(&format!("/services/{}", service))?,
+                    ),
+                )
+                .await?;
+            }
+        }
+        Ok(())
+    }
+    pub async fn remove_local(
+        &self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+    ) -> Result<(), anyhow::Error> {
+        for file in &self.data {
+            crate::as_text(client.delete(file.account.url(base_url)?.join(&file.filename)?))
+                .await?;
+        }
+        for (service, _info) in &self.services {
+            crate::as_text(
+                client.delete(
+                    x_packages::SERVICE
+                        .url(base_url)?
+                        .join(&format!("/services/{}", service))?,
+                ),
+            )
+            .await?;
+        }
+        Ok(())
+    }
+}
+
 // Two packages shall not create the same account
 // Accounts used in any way during installation must be part of the package or
 // its direct dependencies
