@@ -1,10 +1,19 @@
 package accounts:plugin;
 
 interface types {
+    use host:types/types.{pem};
+
     record account {
         account-num: string,
         auth-service: string,
         resource-balance: option<u64>,
+    }
+
+    record credential {
+        /// The name of the account
+        account: string,
+        /// The private key in PEM format used to authorize the account
+        key: pem,
     }
 }
 

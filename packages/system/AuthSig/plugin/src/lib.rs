@@ -15,7 +15,7 @@ use bindings::host::types::types::{Keypair, Pem};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
-use bindings::exports::auth_sig::plugin::{actions::Guest as Actions, keyvault::Guest as KeyVault};
+use bindings::exports::auth_sig::plugin::{actions::Guest as Actions, keyvault::Guest as KeyVault, api::Guest as Api};
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
 // Services
@@ -44,7 +44,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize],
         Low => [import_key],
         Medium => [create_account],
         High => [set_key, sign],
@@ -153,6 +153,25 @@ impl Actions for AuthSig {
         HostCrypto::import_key(&keypair.private_key)?;
 
         Ok(keypair.private_key)
+    }
+}
+
+impl Api for AuthSig {
+    fn can_authorize(private_key: Pem, account_name: String) -> bool {
+        if let Err(e) = assert_authorized(FunctionName::can_authorize) {
+            panic!("Auth failure: {}", e.message);
+        }
+
+        let Ok(specified_pubkey) = Self::pub_from_priv(private_key) else { 
+            println!("Failed to convert specified private key to public key.");
+            return false 
+        };
+        let Ok(actual_pubkey) = get_pubkey(&account_name) else { 
+            println!("Failed to retrieve public key for specified account");
+            return false 
+        };
+
+        specified_pubkey == actual_pubkey
     }
 }
 
