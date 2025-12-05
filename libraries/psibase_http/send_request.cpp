@@ -1,4 +1,5 @@
 #include "send_request.hpp"
+#include "websocket.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -8,10 +9,12 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
+#include <boost/beast/websocket/stream.hpp>
 #include <psibase/BlockContext.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/SocketInfo.hpp>
+#include <psibase/WebSocket.hpp>
 #include <psibase/http.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
@@ -28,11 +31,50 @@ using local_stream = boost::beast::basic_stream<boost::asio::local::stream_proto
 
 namespace psibase::http
 {
+   SocketEndpoint toSocketEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
+   SocketEndpoint toSocketEndpoint(const boost::asio::local::stream_protocol::endpoint& endpoint);
+
    std::pair<beast::string_view, beast::string_view> split_port(beast::string_view host);
-}
+   struct completed_handshake
+   {
+   };
+}  // namespace psibase::http
+
+// This is a hack to allow constructing constructing a websocket with
+// the handshake already completed.
+#define COMPLETED_HANDSHAKE(Stream)                                                               \
+   template <>                                                                                    \
+   template <>                                                                                    \
+   boost::beast::websocket::stream<Stream>::stream(                                               \
+       completed_handshake&&, Stream&& s, const HttpRequest& request,                             \
+       bhttp::response<bhttp::vector_body<char>>&& reply)                                         \
+       : stream(std::move(s))                                                                     \
+   {                                                                                              \
+      boost::beast::websocket::response_type response{                                            \
+          reply.result(), reply.version(), std::string(reply.body().begin(), reply.body().end()), \
+          static_cast<bhttp::fields&&>(reply)};                                                   \
+      error_code       ec;                                                                        \
+      std::string_view key = request.getHeader("Sec-WebSocket-Key").value();                      \
+      impl_->on_response(response, {key.begin(), key.end()}, ec);                                 \
+      if (ec)                                                                                     \
+         throw std::system_error(ec);                                                             \
+   }
+
+COMPLETED_HANDSHAKE(boost::beast::tcp_stream)
+COMPLETED_HANDSHAKE(local_stream)
+COMPLETED_HANDSHAKE(boost::beast::ssl_stream<boost::beast::tcp_stream>)
 
 namespace
 {
+   static constexpr bool isSecure(const auto&)
+   {
+      return false;
+   }
+   template <typename Stream>
+   static constexpr bool isSecure(const boost::beast::ssl_stream<Stream>&)
+   {
+      return true;
+   }
    template <typename Stream>
    struct HttpClientSocket : AutoCloseSocket
    {
@@ -43,8 +85,14 @@ namespace
       }
       void do_write(std::shared_ptr<HttpClientSocket>&& self, HttpRequest&& req)
       {
-         auto  requestPtr = std::make_shared<bhttp::request<bhttp::vector_body<char>>>();
-         auto& request    = *requestPtr;
+         auto requestPtr = std::make_shared<bhttp::request<bhttp::vector_body<char>>>();
+         if (isWebSocketHandshake(req))
+         {
+            // TODO: pass through any extensions that we recognize
+            req.removeHeader("Sec-WebSocket-Extensions");
+            this->request = std::make_shared<HttpRequest>(req);
+         }
+         auto& request = *requestPtr;
          request.method_string(req.method);
          request.target(std::move(req.target));
          request.version(11);
@@ -92,6 +140,8 @@ namespace
                                    system->sharedDatabase.createWriter(), true};
                    bc.start();
 
+                   self->writeInfo(*bc.writer);
+
                    SignedTransaction trx;
                    TransactionTrace  trace;
 
@@ -114,6 +164,21 @@ namespace
                        .service = proxyServiceNum,
                        .rawData = psio::convert_to_frac(std::tuple(self->id, psio::to_frac(reply))),
                    };
+
+                   if (self->request && isWebSocketHandshake(*self->request, reply))
+                   {
+                      auto newSocket         = std::make_shared<WebSocket>(server, self->info());
+                      const HttpRequest& req = *self->request;
+                      // TODO: We must wait for the request to be completely sent before moving
+                      // the stream.
+                      auto impl =
+                          std::make_unique<WebSocketImpl<boost::beast::websocket::stream<Stream>>>(
+                              boost::beast::websocket::stream<Stream>(completed_handshake{},
+                                                                      std::move(self->stream), req,
+                                                                      std::move(breply)));
+                      self->replace(*bc.writer, newSocket);
+                      WebSocket::setImpl(std::move(newSocket), std::move(impl));
+                   }
 
                    try
                    {
@@ -160,16 +225,19 @@ namespace
                 << action.service.str() << "::close failed: " << e.what();
          }
       }
-      virtual void send(std::span<const char>) override
+      virtual void send(Writer&, std::span<const char>) override
       {
          abortMessage("Cannot send additional requests through a client socket");
       }
-      virtual SocketInfo info() const override { return HttpClientSocketInfo{}; }
-      virtual void       autoClose(const std::optional<std::string>& message) noexcept override {}
-      Stream             stream;
+      virtual SocketInfo   info() const override { return savedInfo; }
+      virtual void         autoClose(const std::optional<std::string>& message) noexcept override {}
+      Stream               stream;
+      HttpClientSocketInfo savedInfo;
       boost::beast::http::response_parser<boost::beast::http::vector_body<char>> parser;
       boost::beast::flat_buffer                                                  buffer;
       psibase::loggers::common_logger                                            logger;
+      // This is only set if the request looks like a websocket upgrade
+      std::shared_ptr<HttpRequest> request;
    };
 
    struct StringEndpoint
@@ -339,6 +407,9 @@ void psibase::http::send_request(boost::asio::io_context&        context,
       }
       else
       {
+         socket->savedInfo.endpoint =
+             toSocketEndpoint(get_lowest_layer(socket->stream).socket().remote_endpoint());
+         socket->savedInfo.tls = isSecure(socket->stream) ? std::optional<TLSInfo>() : std::nullopt;
          socket->do_write(std::shared_ptr{socket}, std::move(req));
          socket->do_read(std::move(socket), state);
       }

@@ -15,6 +15,11 @@ namespace psibase
       PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
 
       bool matches(std::string_view h) const;
+
+      static std::optional<std::string_view> get(const std::vector<HttpHeader>&,
+                                                 std::string_view name);
+      static std::vector<std::string_view>   split(const std::vector<HttpHeader>&,
+                                                   std::string_view name);
    };
 
    /// An HTTP Request
@@ -72,8 +77,14 @@ namespace psibase
       /// The value returned is not validated or decoded
       std::optional<std::string_view> getHeader(std::string_view name) const;
 
+      /// Searches for all instances of a header by name and splits at commas
+      std::vector<std::string_view> getHeaderValues(std::string_view name) const;
+
       /// Removes a cookie
       void removeCookie(std::string_view name);
+
+      /// Removes a header
+      void removeHeader(std::string_view name);
    };
 
    /// Checks if the host indicates a development chain
@@ -173,6 +184,20 @@ namespace psibase
       std::string             contentType;  ///< "application/json", "text/html", ...
       T                       body;         ///< Response body
       std::vector<HttpHeader> headers;      ///< HTTP Headers
+
+      /// Searches for a header by name (case-insensitive)
+      ///
+      /// The value returned is not validated or decoded
+      std::optional<std::string_view> getHeader(std::string_view name) const
+      {
+         return HttpHeader::get(headers, name);
+      }
+
+      /// Searches for all instances of a header by name and splits at commas
+      std::vector<std::string_view> getHeaderValues(std::string_view name) const
+      {
+         return HttpHeader::split(headers, name);
+      }
 
       static BasicHttpReply methodNotAllowed(const HttpRequest& req);
 

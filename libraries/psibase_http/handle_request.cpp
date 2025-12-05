@@ -1,6 +1,8 @@
 #include "http_session_base.hpp"
+#include "websocket.hpp"
 #include "websocket_log_session.hpp"
 
+#include <boost/asio/dispatch.hpp>
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/type_erasure/is_empty.hpp>
@@ -9,6 +11,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/TransactionContext.hpp>
+#include <psibase/WebSocket.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
@@ -21,6 +24,24 @@ using steady_clock  = std::chrono::steady_clock;
 
 namespace psibase::http
 {
+   bool isWebsocketUpgrade(const http_session_base::request_type& req, const HttpReply& reply)
+   {
+      if (!websocket::is_upgrade(req))
+         return false;
+      if (!isWebSocketHandshake(reply))
+         return false;
+      HttpRequest request{
+          .host = req[bhttp::field::host], .method = req.method_string(), .target = req.target()};
+
+      // TODO: only copy the headers that are actually used
+      for (auto iter = req.begin(); iter != req.end(); ++iter)
+      {
+         request.headers.emplace_back(
+             HttpHeader{std::string(iter->name_string()), std::string(iter->value())});
+      }
+
+      return isWebSocketHandshake(request, reply);
+   }
 
    // Private HTTP headers that are not forwarded to wasm
    const std::unordered_set<std::string> private_headers = {"proxy-authorization"};
@@ -307,10 +328,32 @@ namespace psibase::http
             autoCloseImpl(message.value_or("service did not send a response"));
          }
       }
-      void send(std::span<const char> data) override
+      void send(Writer& writer, std::span<const char> data) override
       {
-         sendImpl([result = psio::from_frac<HttpReply>(data)](HttpSocket* self) mutable
-                  { return self->callback(std::move(result)); });
+         auto result = psio::from_frac<HttpReply>(data);
+         if (result.status == HttpStatus::switchingProtocols)
+         {
+            if (isWebsocketUpgrade(req, result))
+            {
+               acceptWebSocket(writer, std::move(result));
+            }
+            else
+            {
+               autoCloseImpl("Invalid protocol upgrade");
+               throw std::runtime_error("Invalid protocol upgrade");
+            }
+         }
+         else if (static_cast<std::uint16_t>(result.status) < 200 ||
+                  static_cast<std::uint16_t>(result.status) > 599)
+         {
+            autoCloseImpl("Invalid status code");
+            throw std::runtime_error("Invalid status code");
+         }
+         else
+         {
+            sendImpl([result = std::move(result)](HttpSocket* self) mutable
+                     { return self->callback(std::move(result)); });
+         }
       }
       void sendImpl(auto make_reply)
       {
@@ -343,6 +386,46 @@ namespace psibase::http
                 }
                 if (session->can_read())
                    session->do_read();
+             });
+      }
+      void acceptWebSocket(Writer& writer, HttpReply&& result)
+      {
+         auto self      = this->shared_from_this();
+         auto newSocket = std::make_shared<WebSocket>(session->server, this->info());
+         Socket::replace(writer, newSocket);
+         session->post(
+             [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result)]
+             {
+                (*self->session)(
+                    websocket_upgrade{}, std::move(self->req),
+                    [newSocket = std::move(newSocket)](auto&& socket) mutable
+                    {
+                       WebSocket::setImpl(
+                           std::move(newSocket),
+                           std::make_unique<WebSocketImpl<std::remove_cvref_t<decltype(socket)>>>(
+                               std::move(socket)));
+                    },
+                    websocket::stream_base::decorator(
+                        [reply = std::move(result)](auto& rep)
+                        {
+                           for (const auto& h : reply.headers)
+                           {
+                              if (h.matches("Sec-WebSocket-Accept") || h.matches("Upgrade") ||
+                                  h.matches("Sec-WebSocket-Extensions"))
+                              {
+                                 // Beast sets these headers
+                              }
+                              else if (h.matches("Connection"))
+                              {
+                                 // Connection may contain additional tokens besides websocket
+                                 rep.set(bhttp::field::connection, h.value);
+                              }
+                              else
+                              {
+                                 rep.insert(h.name, h.value);
+                              }
+                           }
+                        }));
              });
       }
       virtual SocketInfo info() const override
@@ -757,7 +840,11 @@ namespace psibase::http
                auto header =
                    HttpHeader{std::string(iter->name_string()), std::string(iter->value())};
 
-               if (!is_private_header(header.name))
+               if (header.matches("Sec-WebSocket-Extensions"))
+               {
+                  // TODO: pass through any extensions that we recognize
+               }
+               else if (!is_private_header(header.name))
                {
                   data.headers.emplace_back(std::move(header));
                }

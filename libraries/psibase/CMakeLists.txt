@@ -24,6 +24,7 @@ function(add suffix)
         common/src/semver.cpp
         common/src/zip.cpp
         common/src/fileUtil.cpp
+        common/src/WebSocket.cpp
     )
 
     if(DEFINED IS_WASM)

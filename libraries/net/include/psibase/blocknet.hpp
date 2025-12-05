@@ -244,7 +244,7 @@ namespace psibase::net
       {
          ProducerMulticastSocket(blocknet* self) : self(self) {}
          blocknet* self;
-         void      send(std::span<const char> data)
+         void      send(Writer&, std::span<const char> data)
          {
             boost::asio::post(
                 self->_ioctx,

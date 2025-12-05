@@ -33,7 +33,9 @@ namespace psibase::http
              boost::beast::bind_front_handler(
                  &http_session::on_write, derived_session().shared_from_this(), msg.need_eof()));
       }
-      void accept_websocket(request_type&& request, accept_p2p_websocket_t&& next) override
+      void accept_websocket(request_type&&                                    request,
+                            accept_p2p_websocket_t&&                          next,
+                            boost::beast::websocket::stream_base::decorator&& decorator) override
       {
          using ws_type = boost::beast::websocket::stream<decltype(derived_session().stream)>;
          struct op
@@ -49,6 +51,7 @@ namespace psibase::http
                 std::move(next)});
 
          auto p = ptr.get();
+         ptr->stream.set_option(std::move(decorator));
          // Capture only the stream, not self, because after returning, there is
          // no longer anything keeping the session alive
          p->stream.async_accept(p->request, std::function<void(const std::error_code&)>(

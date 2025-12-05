@@ -213,20 +213,31 @@ namespace psibase::http
    }
 
    void http_session_base::operator()(websocket_upgrade,
-                                      request_type&&         msg,
-                                      accept_p2p_websocket_t f)
+                                      request_type&&                                    msg,
+                                      accept_p2p_websocket_t                            f,
+                                      boost::beast::websocket::stream_base::decorator&& decorator)
    {
       struct work_impl : work
       {
-         http_session_base&     self;
-         request_type           request;
-         accept_p2p_websocket_t next;
+         http_session_base&                              self;
+         request_type                                    request;
+         boost::beast::websocket::stream_base::decorator decorator;
+         accept_p2p_websocket_t                          next;
 
-         work_impl(http_session_base& self, request_type&& msg, accept_p2p_websocket_t&& f)
-             : self(self), request(std::move(msg)), next(std::move(f))
+         work_impl(http_session_base&                                self,
+                   request_type&&                                    msg,
+                   boost::beast::websocket::stream_base::decorator&& decorator,
+                   accept_p2p_websocket_t&&                          f)
+             : self(self),
+               request(std::move(msg)),
+               decorator(std::move(decorator)),
+               next(std::move(f))
          {
          }
-         void operator()() { self.accept_websocket(std::move(request), std::move(next)); }
+         void operator()()
+         {
+            self.accept_websocket(std::move(request), std::move(next), std::move(decorator));
+         }
       };
 
       {
@@ -237,7 +248,8 @@ namespace psibase::http
       }
 
       // Allocate and store the work
-      items.push_back(boost::make_unique<work_impl>(*this, std::move(msg), std::move(f)));
+      items.push_back(
+          boost::make_unique<work_impl>(*this, std::move(msg), std::move(decorator), std::move(f)));
 
       // If there was no previous work, start this one
       if (items.size() == 1)

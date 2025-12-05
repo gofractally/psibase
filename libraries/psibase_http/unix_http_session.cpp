@@ -4,6 +4,11 @@
 
 namespace psibase::http
 {
+   SocketEndpoint toSocketEndpoint(const boost::asio::local::stream_protocol::endpoint& endpoint)
+   {
+      return LocalEndpoint{endpoint.path()};
+   }
+
    unix_http_session::unix_http_session(server_state&                                 server,
                                         boost::asio::local::stream_protocol::socket&& socket)
        : http_session<unix_http_session>(server), stream(std::move(socket))
@@ -24,7 +29,7 @@ namespace psibase::http
 
    SocketEndpoint unix_http_session::remote_endpoint() const
    {
-      return LocalEndpoint{stream.socket().remote_endpoint().path()};
+      return toSocketEndpoint(stream.socket().remote_endpoint());
    }
 
    template class http_session<unix_http_session>;
