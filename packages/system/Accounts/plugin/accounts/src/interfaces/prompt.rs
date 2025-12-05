@@ -1,3 +1,6 @@
+use psibase::services::auth_sig;
+
+use crate::bindings::accounts::plugin::types::Credential;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::exports::accounts::plugin::prompt::Guest as Prompt;
@@ -5,7 +8,6 @@ use crate::bindings::host::{auth::api as HostAuth, common::client as Client, typ
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
-use crate::helpers::assert_valid_account;
 use crate::plugin::AccountsPlugin;
 
 impl Prompt for AccountsPlugin {
@@ -23,11 +25,37 @@ impl Prompt for AccountsPlugin {
         false
     }
 
-    fn import_existing(account: String) {
+    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<String>> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        assert_valid_account(&account);
-        AppsTable::new(&Client::get_receiver()).connect(&account);
+        let mut invalid_accounts = Vec::new();
+        for credential in credentials {
+            match AccountsPlugin::get_account(credential.account.to_string()) {
+                Ok(Some(account)) => {
+                    if account.auth_service != auth_sig::SERVICE.to_string() {
+                        invalid_accounts.push(credential.account);
+                        continue;
+                    }
+
+                    let valid = AuthSig::api::can_authorize(&credential.key, &credential.account.to_string());
+                    if !valid {
+                        invalid_accounts.push(credential.account);
+                        continue;
+                    }
+                    
+                    AppsTable::new(&Client::get_receiver()).connect(&credential.account);
+                }
+                _ => {
+                    invalid_accounts.push(credential.account);
+                }
+            }
+        }
+
+        if invalid_accounts.is_empty() {
+            Ok(())
+        } else {
+            Err(invalid_accounts)
+        }
     }
 
     fn create_account(account_name: String) -> Result<String, Error> {
@@ -45,8 +73,6 @@ impl Prompt for AccountsPlugin {
             //       creation was successful.
             return Err(ErrorType::CannotCreateAccount().into());
         }
-
-        AppsTable::new(&Client::get_receiver()).connect(&account_name);
 
         Ok(private_key)
     }

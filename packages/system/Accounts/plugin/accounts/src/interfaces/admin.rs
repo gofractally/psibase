@@ -13,12 +13,7 @@ use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::trust::*;
 use std::collections::HashSet;
-
-fn assert_valid_account(account: &str) {
-    let account_details =
-        AccountsPlugin::get_account(account.to_string()).expect("Get account failed");
-    assert!(account_details.is_some(), "Invalid account name");
-}
+use crate::helpers::assert_valid_account;
 
 fn prune_invalid_accounts(accounts: Vec<String>) {
     let app = AppsTable::new(&Client::get_receiver());

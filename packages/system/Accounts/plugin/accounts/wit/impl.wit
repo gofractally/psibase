@@ -24,6 +24,7 @@ interface admin {
 
 interface prompt {
     use host:types/types.{error};
+    use types.{credential};
 
     /// Returns whether or not an account can currently be created.
     ///
@@ -32,12 +33,23 @@ interface prompt {
     /// * The user is responding to an invite that can be redeemed to create an account
     can-create-account: func() -> bool;
 
-    /// Import a pre-existing account to this device
-    import-existing: func(account: string);
+    /// Import a pre-existing account(s) to this device.
+    /// 
+    /// Importing an account requires both the name of the account and its corresponding private 
+    /// key in PEM format. The private key will be verified to ensure that it can be used to 
+    /// authorize the account.
+    /// 
+    /// Returns:
+    /// * On success, returns nothing,
+    /// * If any credentials fail validation, returns a list of the account names that failed validation.
+    /// 
+    /// Any credentials that fails validation will not be imported.
+    import-existing: func(credentials: list<credential>) -> result<_, list<string>>;
 
     /// Creates a new account, returns the private key used to authorize it.
     ///
-    /// The new account will also be imported onto this device.
+    /// The new account will NOT be automatically imported onto this device. It is required
+    ///   to explicitly import the account using the `import-existing` function.
     ///
     /// If there is already a user logged into the top-level app, then the account will be 
     ///   created by that user. Otherwise, if there is currently an active invite that can 
