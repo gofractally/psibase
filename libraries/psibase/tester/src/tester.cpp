@@ -156,8 +156,9 @@ namespace
       auto                     packages = registry.resolve(packageNames);
       std::vector<HttpRequest> requests;
       tester::raw::checkoutSubjective(self.nativeHandle());
-      for (const auto& package : packages)
+      for (const auto& info : packages)
       {
+         auto package = registry.get(info);
          for (const auto& [account, header, serviceInfo] : package.services)
          {
             auto file = package.archive.getEntry(header);
