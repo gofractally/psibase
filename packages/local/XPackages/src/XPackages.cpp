@@ -13,7 +13,11 @@ namespace
 {
    struct Query
    {
-      auto installed() const { return XPackages{}.open<LocalPackagesTable>().getIndex<0>(); }
+      auto installed() const
+      {
+         checkoutSubjective();
+         return XPackages{}.open<LocalPackagesTable>().getIndex<0>();
+      }
    };
    PSIO_REFLECT(Query, method(installed))
 

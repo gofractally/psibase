@@ -1,6 +1,6 @@
 use crate::{
-    allow_cors_with_origin, check, generate_action_templates, HttpReply,
-    HttpRequest, ProcessActionStruct, ToServiceSchema, WithActionStruct,
+    allow_cors_with_origin, check, generate_action_templates, HttpReply, HttpRequest,
+    ProcessActionStruct, ToServiceSchema, WithActionStruct,
 };
 use async_graphql::{
     http::{receive_body, GraphiQLSource},

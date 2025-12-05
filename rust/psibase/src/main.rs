@@ -1,11 +1,14 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
+use flate2::write::GzEncoder;
 use fracpack::Pack;
 use futures::future::{join_all, try_join_all};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
+use psibase::services::{
+    accounts, auth_delegate, packages, sites, staged_tx, transact, x_packages,
+};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
     get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
@@ -324,6 +327,11 @@ struct InstallArgs {
     /// Install the package even if it is already installed
     #[clap(long)]
     reinstall: bool,
+
+    /// Instead of installing to the chain, install a local
+    /// package to a single node
+    #[clap(long)]
+    local: bool,
 
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
@@ -1592,7 +1600,11 @@ async fn do_install<T: Read + Seek>(
 
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let installed = if args.local {
+        PackageList::local_installed(&args.node_args.api, &mut client).await?
+    } else {
+        PackageList::installed(&args.node_args.api, &mut client).await?
+    };
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
@@ -1608,18 +1620,92 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         .resolve_changes(&package_registry, &packages, args.reinstall)
         .await?;
 
-    do_install(
-        client,
-        package_registry,
-        to_install,
-        args.sender.into(),
-        &args.node_args,
-        &args.sig_args,
-        &args.tx_args,
-        &args.key,
-        args.compression_level,
-    )
-    .await
+    if args.local {
+        do_install_local(
+            client,
+            package_registry,
+            to_install,
+            &args.node_args,
+            args.compression_level,
+        )
+        .await
+    } else {
+        do_install(
+            client,
+            package_registry,
+            to_install,
+            args.sender.into(),
+            &args.node_args,
+            &args.sig_args,
+            &args.tx_args,
+            &args.key,
+            args.compression_level,
+        )
+        .await
+    }
+}
+
+async fn do_install_local<T: Read + Seek>(
+    mut client: reqwest::Client,
+    package_registry: JointRegistry<T>,
+    to_install: Vec<PackageOp>,
+    node_args: &NodeArgs,
+    compression_level: u32,
+) -> Result<(), anyhow::Error> {
+    for op in to_install {
+        match op {
+            PackageOp::Install(info) => {
+                psibase::as_text(
+                    client
+                        .post(
+                            x_packages::SERVICE
+                                .url(&node_args.api)?
+                                .join("/preinstall")?,
+                        )
+                        .json(&info),
+                )
+                .await?;
+                let mut package = package_registry.get_by_info(&info).await?;
+                let manifest = package.manifest();
+                let mut manifest_encoder =
+                    GzEncoder::new(Vec::new(), flate2::Compression::default());
+                serde_json::to_writer(&mut manifest_encoder, &manifest)?;
+                psibase::as_text(
+                    client
+                        .put(
+                            x_packages::SERVICE
+                                .url(&node_args.api)?
+                                .join(&format!("/manifest/{}", info.sha256))?,
+                        )
+                        .body(manifest_encoder.finish()?)
+                        .header("Content-Type", "application/json")
+                        .header("Content-Encoding", "gzip"),
+                )
+                .await?;
+                package
+                    .install_local(&node_args.api, &mut client, compression_level)
+                    .await?;
+
+                psibase::as_text(
+                    client
+                        .post(
+                            x_packages::SERVICE
+                                .url(&node_args.api)?
+                                .join("/postinstall")?,
+                        )
+                        .json(&info),
+                )
+                .await?;
+            }
+            PackageOp::Replace(_old, _new) => {
+                unimplemented!()
+            }
+            PackageOp::Remove(_meta) => {
+                unimplemented!()
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
@@ -1846,6 +1932,13 @@ async fn show_package<T: PackageRegistry + ?Sized>(
                 println!("status: version {} installed", alt_version);
             } else {
                 println!("status: not installed");
+            }
+        }
+        PackageOrigin::Local { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: upgrade to {} available", alt_version);
+            } else {
+                println!("status: installed");
             }
         }
     }

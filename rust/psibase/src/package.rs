@@ -25,6 +25,8 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
+use crate::services::x_packages;
+#[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
 use std::io::Write;
@@ -163,6 +165,28 @@ pub struct InstalledPackageInfo {
 }
 
 impl InstalledPackageInfo {
+    pub fn meta(&self) -> Meta {
+        Meta {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LocalPackageInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub depends: Vec<PackageRef>,
+    pub accounts: Vec<AccountNumber>,
+    pub sha256: Checksum256,
+}
+
+impl LocalPackageInfo {
     pub fn meta(&self) -> Meta {
         Meta {
             name: self.name.clone(),
@@ -739,6 +763,59 @@ impl<R: Read + Seek> PackagedService<R> {
                     )
                     .await?,
                 );
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn install_local(
+        &mut self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        compression_level: u32,
+    ) -> Result<(), anyhow::Error> {
+        for (account, index, _info) in &self.services {
+            crate::as_text(
+                client
+                    .put(
+                        x_packages::SERVICE
+                            .url(base_url)?
+                            .join(&format!("/services/{}", account))?,
+                    )
+                    .body(read(&mut self.archive.by_index(*index)?)?)
+                    .header("Content-Type", "application/wasm"),
+            )
+            .await?;
+        }
+
+        let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
+        for (_sender, index) in &self.data {
+            let mut file = self.archive.by_index(*index)?;
+            let file_name = file.name().to_string();
+            let path = data_re
+                .captures(&file_name)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str();
+
+            if let Some(t) = mime_guess::from_path(path).first() {
+                let content = read(&mut file)?;
+                let (content, content_encoding) =
+                    compress_content(&content, t.essence_str(), compression_level);
+                let mut builder = client
+                    .put(x_packages::SERVICE.url(base_url)?.join(path)?)
+                    .header("Content-Type", t.essence_str().to_string())
+                    .body(content);
+                if let Some(content_encoding) = content_encoding {
+                    builder = builder.header("Content-Encoding", content_encoding)
+                }
+                crate::as_text(builder).await?;
+            } else {
+                Err(Error::UnknownFileType {
+                    path: file.name().to_string(),
+                })?
             }
         }
         Ok(())
@@ -1326,6 +1403,7 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
 pub enum PackageOrigin {
     Installed { owner: AccountNumber },
     Repo { sha256: Checksum256, file: String },
+    Local { sha256: Checksum256 },
 }
 
 #[derive(Default)]
@@ -1355,6 +1433,23 @@ struct InstalledConnection {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledQuery {
     installed: InstalledConnection,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LocalPackageEdge {
+    node: LocalPackageInfo,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LocalPackageConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<LocalPackageEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LocalPackageQuery {
+    installed: LocalPackageConnection,
 }
 
 #[allow(non_snake_case)]
@@ -1439,6 +1534,18 @@ pub async fn get_installed_manifest(
 }
 
 #[cfg(not(target_family = "wasm"))]
+pub async fn get_local_manifest(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    sha256: &Checksum256,
+) -> Result<PackageManifest, anyhow::Error> {
+    let url = x_packages::SERVICE
+        .url(base_url)?
+        .join(&format!("/manifest/{}", sha256))?;
+    crate::as_json(client.get(url)).await
+}
+
+#[cfg(not(target_family = "wasm"))]
 pub async fn get_manifest<T: PackageRegistry + ?Sized>(
     reg: &T,
     base_url: &reqwest::Url,
@@ -1456,6 +1563,7 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
                 .await?;
             Ok(package.manifest())
         }
+        PackageOrigin::Local { sha256 } => get_local_manifest(base_url, client, sha256).await,
     }
 }
 
@@ -1497,6 +1605,27 @@ impl PackageList {
         }
         Ok(result)
     }
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn local_installed(
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+    ) -> Result<Self, anyhow::Error> {
+        let mut end_cursor: Option<String> = None;
+        let mut result = PackageList::new();
+        loop {
+            let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                .await.with_context(|| "Failed to list installed packages")?;
+            for edge in data.installed.edges {
+                result.insert_local(edge.node);
+            }
+            if !data.installed.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(data.installed.pageInfo.endCursor);
+        }
+        Ok(result)
+    }
     pub fn from_registry<T: PackageRegistry + ?Sized>(reg: &T) -> Result<Self, anyhow::Error> {
         let mut result = PackageList::new();
         for package in reg.index()? {
@@ -1523,6 +1652,14 @@ impl PackageList {
     }
     pub fn insert_installed(&mut self, info: InstalledPackageInfo) {
         self.insert(info.meta(), PackageOrigin::Installed { owner: info.owner });
+    }
+    pub fn insert_local(&mut self, info: LocalPackageInfo) {
+        self.insert(
+            info.meta(),
+            PackageOrigin::Local {
+                sha256: info.sha256,
+            },
+        )
     }
 
     pub fn contains_package(&self, name: &str) -> bool {
