@@ -328,8 +328,7 @@ struct InstallArgs {
     #[clap(long)]
     reinstall: bool,
 
-    /// Instead of installing to the chain, install a local
-    /// package to a single node
+    /// Instead of installing to the chain, install local packages to a single node
     #[clap(long)]
     local: bool,
 
@@ -370,6 +369,10 @@ struct UpgradeArgs {
     #[clap(long)]
     latest: bool,
 
+    /// Instead of installing to the chain, install local packages to a single node
+    #[clap(long)]
+    local: bool,
+
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
@@ -401,6 +404,10 @@ struct ListArgs {
     /// Account that would install the packages
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
     sender: ExactAccountNumber,
+
+    /// Search for node-local packages instead of on-chain packages
+    #[clap(long)]
+    local: bool,
 }
 
 #[derive(Args, Debug)]
@@ -1813,7 +1820,11 @@ async fn do_install_local<T: Read + Seek>(
 
 async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let installed = if args.local {
+        PackageList::local_installed(&args.node_args.api, &mut client).await?
+    } else {
+        PackageList::installed(&args.node_args.api, &mut client).await?
+    };
     let mut package_registry = JointRegistry::new();
 
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
@@ -1839,18 +1850,30 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
         )
         .await?;
 
-    do_install(
-        client,
-        package_registry,
-        to_install,
-        args.sender.into(),
-        &args.node_args,
-        &args.sig_args,
-        &args.tx_args,
-        &args.key,
-        args.compression_level,
-    )
-    .await
+    if args.local {
+        do_install_local(
+            client,
+            package_registry,
+            installed,
+            to_install,
+            &args.node_args,
+            args.compression_level,
+        )
+        .await
+    } else {
+        do_install(
+            client,
+            package_registry,
+            to_install,
+            args.sender.into(),
+            &args.node_args,
+            &args.sig_args,
+            &args.tx_args,
+            &args.key,
+            args.compression_level,
+        )
+        .await
+    }
 }
 
 async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
@@ -1862,8 +1885,11 @@ async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
         args.updates = true;
     }
     // Load the lists of packages that we need
-    let installed =
-        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    let installed = if args.local {
+        PackageList::local_installed(&args.node_args.api, &mut client).await?
+    } else {
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?
+    };
     let reglist = if args.updates || args.available {
         let package_registry = get_package_registry(
             &args.node_args.api,
@@ -1913,6 +1939,16 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
     }
     let mut packages =
         handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+
+    // Locally installed packages might not be accessible, and we
+    // can't reliably identify the error, because access may be
+    // blocked by proxies.
+    if let Ok(local) = PackageList::local_installed(&args.node_args.api, &mut client).await {
+        for (meta, origin) in local.into_info() {
+            packages.insert(meta, origin)
+        }
+    }
+
     let package_registry = get_package_registry(
         &args.node_args.api,
         Some(args.sender.into()),
@@ -2092,8 +2128,13 @@ fn handle_unbooted<T: Default>(list: Result<T, anyhow::Error>) -> Result<T, anyh
 
 async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed =
+    let mut installed =
         handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    if let Ok(local) = PackageList::local_installed(&args.node_args.api, &mut client).await {
+        for (meta, origin) in local.into_info() {
+            installed.insert(meta, origin)
+        }
+    }
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
