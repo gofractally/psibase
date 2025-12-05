@@ -13,6 +13,7 @@ import { Button } from "@shared/shadcn/ui/button";
 import {
     CardAction,
     CardContent,
+    CardDescription,
     CardFooter,
     CardTitle,
 } from "@shared/shadcn/ui/card";
@@ -48,8 +49,8 @@ export const ImportPrompt = () => {
         useCanCreateAccount();
 
     // mutations
-    const importKeyMutation = useImportKey();
-    const importExistingMutation = useImportExisting();
+    const importKeyMutation = useImportKey(); // shouldn't need this, as...
+    const importExistingMutation = useImportExisting(); // this will take a private key and it will validate it belongs to the account
     const connectAccountMutation = useConnectAccount();
 
     const handleImportAndLogin = async (account: string, b64: string) => {
@@ -141,9 +142,9 @@ export const ImportPrompt = () => {
                                 <CardTitle className="text-3xl font-normal">
                                     Sign in
                                 </CardTitle>
-                                <div className="text-muted-foreground">
+                                <CardDescription>
                                     Use your {networkName} account
-                                </div>
+                                </CardDescription>
                             </div>
                             <div className="flex flex-1 flex-col gap-4">
                                 <FieldAccountExisting
