@@ -216,7 +216,7 @@ pub mod tables {
         pub fn uncredit(&self, memo: Memo) {
             check(
                 Nft::get_assert(self.nftId).owner == get_sender(),
-                "must be owner to uncredit",
+                "Only the creditor may perform this action",
             );
 
             super::Wrapper::emit().history().uncredited(
@@ -365,6 +365,7 @@ pub mod service {
 
     #[action]
     pub fn uncredit(nftId: NID, memo: Memo) {
+        Nft::get_assert(nftId);
         check_some(
             CreditRecord::get(nftId),
             "Nothing to uncredit. Must first credit.",
