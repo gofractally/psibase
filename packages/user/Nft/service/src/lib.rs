@@ -298,9 +298,25 @@ pub mod service {
             add_index("uncredited", 0);
             add_index("uncredited", 1);
             add_index("uncredited", 2);
-            add_index("transferred", 0);
-            add_index("transferred", 1);
-            add_index("transferred", 2);
+
+            events::Wrapper::call().addIndex(
+                DbId::MerkleEvent,
+                Wrapper::SERVICE,
+                MethodNumber::from("transferred"),
+                0,
+            );
+            events::Wrapper::call().addIndex(
+                DbId::MerkleEvent,
+                Wrapper::SERVICE,
+                MethodNumber::from("transferred"),
+                1,
+            );
+            events::Wrapper::call().addIndex(
+                DbId::MerkleEvent,
+                Wrapper::SERVICE,
+                MethodNumber::from("transferred"),
+                2,
+            );
         }
     }
 
