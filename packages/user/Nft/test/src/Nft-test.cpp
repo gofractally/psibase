@@ -124,9 +124,9 @@ SCENARIO("Transferring NFTs")
       {
          NID invalidId = 99;
          CHECK(a.credit(invalidId, bob, "memo").failed(nftDNE));
-         CHECK(a.uncredit(invalidId, "memo").failed(nftDNE));
-         CHECK(a.debit(invalidId, "memo").failed(nftDNE));
-         CHECK(a.debit(invalidId, "memo").failed(nftDNE));
+         CHECK(a.uncredit(invalidId, "memo").failed(uncreditRequiresCredit));
+         CHECK(a.debit(invalidId, "memo").failed(debitRequiresCredit));
+         CHECK(a.debit(invalidId, "memo").failed(debitRequiresCredit));
       }
       AND_GIVEN("Alice has minted an NFT")
       {
