@@ -279,45 +279,30 @@ pub mod service {
             InitRow::add();
             NftHolder::get_or_default(get_sender()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
 
-            let add_index = |method: &str, column: u8| {
+            let add_index = |method: &str, column: u8, db_id: DbId| {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    db_id,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
                 );
             };
 
-            add_index("minted", 0);
-            add_index("minted", 1);
-            add_index("burned", 0);
-            add_index("burned", 1);
-            add_index("userConfSet", 0);
-            add_index("credited", 0);
-            add_index("credited", 1);
-            add_index("credited", 2);
-            add_index("uncredited", 0);
-            add_index("uncredited", 1);
-            add_index("uncredited", 2);
+            add_index("minted", 0, DbId::HistoryEvent);
+            add_index("minted", 1, DbId::HistoryEvent);
+            add_index("burned", 0, DbId::HistoryEvent);
+            add_index("burned", 1, DbId::HistoryEvent);
+            add_index("userConfSet", 0, DbId::HistoryEvent);
+            add_index("credited", 0, DbId::HistoryEvent);
+            add_index("credited", 1, DbId::HistoryEvent);
+            add_index("credited", 2, DbId::HistoryEvent);
+            add_index("uncredited", 0, DbId::HistoryEvent);
+            add_index("uncredited", 1, DbId::HistoryEvent);
+            add_index("uncredited", 2, DbId::HistoryEvent);
 
-            events::Wrapper::call().addIndex(
-                DbId::MerkleEvent,
-                Wrapper::SERVICE,
-                MethodNumber::from("transferred"),
-                0,
-            );
-            events::Wrapper::call().addIndex(
-                DbId::MerkleEvent,
-                Wrapper::SERVICE,
-                MethodNumber::from("transferred"),
-                1,
-            );
-            events::Wrapper::call().addIndex(
-                DbId::MerkleEvent,
-                Wrapper::SERVICE,
-                MethodNumber::from("transferred"),
-                2,
-            );
+            add_index("transferred", 0, DbId::MerkleEvent);
+            add_index("transferred", 1, DbId::MerkleEvent);
+            add_index("transferred", 2, DbId::MerkleEvent);
         }
     }
 
@@ -353,20 +338,17 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
     fn getNftHolder(account: AccountNumber) -> NftHolder {
         NftHolder::get_or_default(account)
     }
 
     #[action]
-    #[allow(non_snake_case)]
     fn getCredRecord(nftId: NID) -> CreditRecord {
         CreditRecord::get_assert(nftId)
     }
 
     #[action]
     pub fn uncredit(nftId: NID, memo: Memo) {
-        Nft::get_assert(nftId);
         check_some(
             CreditRecord::get(nftId),
             "Nothing to uncredit. Must first credit.",
@@ -376,7 +358,6 @@ pub mod service {
 
     #[action]
     pub fn debit(nftId: NID, memo: Memo) {
-        Nft::get_assert(nftId);
         let credit_record = check_some(
             CreditRecord::get(nftId),
             "Nothing to debit. Must first be credited.",
@@ -389,19 +370,16 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
     pub fn setUserConf(index: u8, enable: bool) {
         NftHolder::get_or_default(get_sender()).set_flag(index.into(), enable);
     }
 
     #[action]
-    #[allow(non_snake_case)]
     pub fn getUserConf(account: AccountNumber, index: u8) -> bool {
         NftHolder::get_or_default(account).get_flag(index.into())
     }
 
     #[action]
-    #[allow(non_snake_case)]
     pub fn getNft(nftId: NID) -> Nft {
         Nft::get_assert(nftId)
     }
