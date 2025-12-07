@@ -6,9 +6,9 @@ pub mod tables {
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord};
+    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
     use psibase::{
-        AccountNumber, Fracpack, Table, ToSchema, check, check_some, get_sender, services::nft::NID,
+        check, check_some, get_sender, services::nft::NID, AccountNumber, Fracpack, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub mod tables {
     pub struct SymbolLength {
         #[primary_key]
         pub symbolLength: u8,
-        
+
         /// The owner of this NFT can change the price behavior for symbols of this length
         #[graphql(name = "priceNftId")]
         pub nftId: NID,
@@ -166,7 +166,9 @@ pub mod tables {
             Nft::call().credit(
                 new_instance.ownerNft,
                 sender,
-                format!("This NFT conveys ownership of symbol: {}", symbol).as_str().into(),
+                format!("This NFT conveys ownership of symbol: {}", symbol)
+                    .as_str()
+                    .into(),
             );
 
             new_instance
@@ -275,7 +277,7 @@ pub mod service {
 
     use psibase::services::events;
 
-    use psibase::services::nft::Wrapper as Nft;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
@@ -286,7 +288,7 @@ pub mod service {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(0, true);
+            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

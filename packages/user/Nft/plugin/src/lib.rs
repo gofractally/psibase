@@ -8,10 +8,10 @@ use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::{define_trust, FlagsType};
 
-use psibase::services::nft as Nft;
+use psibase::services::nft::{self as Nft, NftHolderFlags};
 
 define_trust! {
     descriptions {
@@ -96,7 +96,11 @@ impl UserConfig for NftPlugin {
     fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::enable_user_manual_debit)?;
 
-        let packed_args = Nft::action_structs::setUserConf { index: 0, enable }.packed();
+        let packed_args = Nft::action_structs::setUserConf {
+            index: NftHolderFlags::MANUAL_DEBIT.index(),
+            enable,
+        }
+        .packed();
 
         add_action_to_transaction(Nft::action_structs::setUserConf::ACTION_NAME, &packed_args)
     }
