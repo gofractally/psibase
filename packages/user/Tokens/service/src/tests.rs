@@ -64,6 +64,7 @@ mod tests {
         a.credit(tid, bob, 12345.into(), memo.clone());
         assert_eq!(0, a.getBalance(tid, alice).get().unwrap().value);
         assert_eq!(12345, get_shared_balance(&chain, tid, alice, bob).value);
+        assert_eq!(0, get_shared_balance(&chain, tid, bob, alice).value);
 
         // Bob can debit most of the balance, leaving 5 left.
         b.debit(tid, alice, 12340.into(), memo.clone());
