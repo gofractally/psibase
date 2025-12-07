@@ -158,7 +158,7 @@ impl Fractal {
         Guild::get_assert(self.judiciary)
     }
 
-    async fn reward(&self) -> Option<ConsensusReward> {
+    async fn consensus_reward(&self) -> Option<ConsensusReward> {
         ConsensusReward::get(self.account)
     }
 }
