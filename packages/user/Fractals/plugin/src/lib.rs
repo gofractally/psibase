@@ -140,11 +140,11 @@ impl AdminFractal for FractallyPlugin {
         )
     }
 
-    fn set_dist_interval(distribution_interval_sec: u32) -> Result<(), Error> {
+    fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::set_dist_interval)?;
         let packed_args = fractals::action_structs::set_dist_int {
             fractal: get_sender_app()?,
-            distribution_interval_sec,
+            distribution_interval_secs,
         }
         .packed();
         add_action_to_transaction(

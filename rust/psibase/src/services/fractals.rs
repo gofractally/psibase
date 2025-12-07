@@ -30,9 +30,9 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `fractal` - Fractal to update.
-    /// * `distribution_interval` - New fractal distribution interval.
+    /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
-    fn set_dist_int(fractal: AccountNumber, distribution_interval: u32) {
+    fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
         unimplemented!()
     }
 
