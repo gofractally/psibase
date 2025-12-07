@@ -211,8 +211,8 @@
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
-pub const EXTERNAL_S: u128 = 10_000; // 4 decimal places
-pub const MAX_INPUT_UNSCALED: u32 = 32;
+const EXTERNAL_S: u128 = 10_000; // 4 decimal places
+const MAX_INPUT_UNSCALED: u32 = 32;
 const MAX_INPUT_SCALED: u32 = MAX_INPUT_UNSCALED * (EXTERNAL_S as u32); // Power of 2 (scaled) nearest to the max input for which the output is accurate.
 
 /// Precomputed scaled integer for ln(φ)

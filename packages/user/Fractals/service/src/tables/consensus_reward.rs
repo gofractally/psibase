@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::constants::{
-    FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, MAX_GUILD_RANKING,
+    FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, MAX_RANKED_GUILDS,
     MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, ONE_WEEK,
 };
 use crate::helpers::{continuous_fibonacci, distribute_by_weight};
@@ -139,8 +139,8 @@ impl ConsensusReward {
 
     pub fn set_ranked_guilds(&mut self, guilds: Vec<AccountNumber>) {
         check(
-            guilds.len() <= MAX_GUILD_RANKING as usize,
-            &format!("only up to {} guilds can be ranked", MAX_GUILD_RANKING),
+            guilds.len() <= MAX_RANKED_GUILDS as usize,
+            &format!("only up to {} guilds can be ranked", MAX_RANKED_GUILDS),
         );
         let mut seen = HashSet::new();
         for &guild in &guilds {

@@ -115,6 +115,7 @@ pub mod tables {
         #[graphql(skip)]
         pub guild: AccountNumber,
         pub member: AccountNumber,
+        #[graphql(skip)]
         pub score: u32,
         pub pending_score: Option<u32>,
         pub created_at: psibase::TimePointSec,

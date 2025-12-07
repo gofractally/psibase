@@ -1,6 +1,7 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
+use crate::constants::MAX_GROUP_SIZE;
 use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
@@ -99,7 +100,7 @@ impl EvaluationInstance {
             finish_by,
             // TODO: Change back to 4,5,6;
             vec![2, 3, 4, 5, 6],
-            6,
+            MAX_GROUP_SIZE,
             true,
         );
 

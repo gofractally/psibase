@@ -14,11 +14,12 @@ pub mod constants {
     pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
     pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
     pub const MAX_COUNCIL_SIZE: u8 = 6;
+    pub const MAX_GROUP_SIZE: u8 = 6;
 
     // Max limit capped by continuous_fibonacci
-    pub const MAX_GUILD_RANKING: u8 = 32;
+    pub const MAX_RANKED_GUILDS: u8 = 32;
     // Expected scaling for use of the continuous_fibonacci func
-    pub const FIB_SCALE: u32 = 10_000;
+    pub const SCORE_SCALE: u32 = 10_000;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
