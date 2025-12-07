@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
-use crate::helpers::FIB_SCALE;
+use crate::constants::FIB_SCALE;
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
     ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
