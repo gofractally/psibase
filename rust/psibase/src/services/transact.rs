@@ -26,6 +26,12 @@ pub struct ServiceMethod {
     pub method: crate::MethodNumber,
 }
 
+impl ServiceMethod {
+    pub fn new(service: crate::AccountNumber, method: crate::MethodNumber) -> Self {
+        Self { service, method }
+    }
+}
+
 type CallbackType = u32;
 
 /// Authenticate actions
@@ -60,6 +66,8 @@ type CallbackType = u32;
 )]
 #[allow(non_snake_case, unused_variables)]
 pub mod auth_interface {
+    use crate::services::transact::ServiceMethod;
+
     /// The database is in read-only mode. This flag is only
     /// used for `topActionReq`.
     ///
@@ -170,6 +178,7 @@ pub mod auth_interface {
     fn isAuthSys(
         sender: crate::AccountNumber,
         authorizers: Vec<crate::AccountNumber>,
+        method: ServiceMethod,
         authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
@@ -190,6 +199,7 @@ pub mod auth_interface {
     fn isRejectSys(
         sender: crate::AccountNumber,
         rejecters: Vec<crate::AccountNumber>,
+        method: ServiceMethod,
         authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()

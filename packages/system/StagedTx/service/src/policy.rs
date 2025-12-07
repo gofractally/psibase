@@ -1,5 +1,6 @@
 use psibase::services::accounts::Wrapper as Accounts;
 use psibase::services::transact::auth_interface::auth_action_structs;
+use psibase::services::transact::ServiceMethod;
 use psibase::{AccountNumber, Caller, MethodNumber, ServiceCaller};
 
 use crate::service::Wrapper;
@@ -24,23 +25,25 @@ impl StagedTxPolicy {
         })
     }
 
-    pub fn does_auth(&self, accepters: Vec<AccountNumber>) -> bool {
+    pub fn does_auth(&self, accepters: Vec<AccountNumber>, method: ServiceMethod) -> bool {
         self.service_caller.call(
             MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),
             auth_action_structs::isAuthSys {
                 sender: self.user,
                 authorizers: accepters,
+                method,
                 authSet: None,
             },
         )
     }
 
-    pub fn does_reject(&self, rejecters: Vec<AccountNumber>) -> bool {
+    pub fn does_reject(&self, rejecters: Vec<AccountNumber>, method: ServiceMethod) -> bool {
         self.service_caller.call(
             MethodNumber::from(auth_action_structs::isRejectSys::ACTION_NAME),
             auth_action_structs::isRejectSys {
                 sender: self.user,
                 rejecters,
+                method,
                 authSet: None,
             },
         )

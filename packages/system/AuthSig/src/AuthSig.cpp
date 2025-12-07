@@ -7,6 +7,7 @@
 #include <services/system/Spki.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/VerifySig.hpp>
+#include "services/system/Transact.hpp"
 
 using namespace psibase;
 
@@ -86,13 +87,15 @@ namespace SystemService
       }
 
       bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
-                              std::vector<psibase::AccountNumber> authorizers)
+                              std::vector<psibase::AccountNumber> authorizers,
+                              ServiceMethod                       method)
       {
          return std::ranges::contains(authorizers, sender);
       }
 
       bool AuthSig::isRejectSys(psibase::AccountNumber              sender,
-                                std::vector<psibase::AccountNumber> rejecters)
+                                std::vector<psibase::AccountNumber> rejecters,
+                                ServiceMethod                       method)
       {
          return std::ranges::contains(rejecters, sender);
       }

@@ -2,6 +2,7 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::auth_dyn::int_wrapper;
+    use psibase::services::transact::ServiceMethod;
     use psibase::{
         check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack,
         Table, ToSchema,
@@ -38,8 +39,8 @@ pub mod tables {
             int_wrapper::call_to(self.manager).has_policy(self.account)
         }
 
-        pub fn dynamic_policy(&self) -> DynamicAuthPolicy {
-            int_wrapper::call_to(self.manager).get_policy(self.account)
+        pub fn dynamic_policy(&self, service_method: ServiceMethod) -> DynamicAuthPolicy {
+            int_wrapper::call_to(self.manager).get_policy(self.account, service_method)
         }
 
         pub fn set(account: AccountNumber, policy: AccountNumber) -> Self {
@@ -130,9 +131,10 @@ pub mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
         authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, authSet, true)
+        is_auth(sender, authorizers, method, authSet, true)
     }
 
     #[action]
@@ -140,14 +142,16 @@ pub mod service {
     fn isRejectSys(
         sender: AccountNumber,
         rejecters: Vec<AccountNumber>,
+        method: ServiceMethod,
         authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, rejecters, authSet, false)
+        is_auth(sender, rejecters, method, authSet, false)
     }
 
     fn is_auth_other(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
         auth_set: Vec<AccountNumber>,
         is_approval: bool,
     ) -> bool {
@@ -156,15 +160,16 @@ pub mod service {
         let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
 
         if is_approval {
-            auth_service.isAuthSys(sender, authorizers, Some(auth_set))
+            auth_service.isAuthSys(sender, authorizers, method, Some(auth_set))
         } else {
-            auth_service.isRejectSys(sender, authorizers, Some(auth_set))
+            auth_service.isRejectSys(sender, authorizers, method, Some(auth_set))
         }
     }
 
     fn is_auth(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
         auth_set: Option<Vec<AccountNumber>>,
         is_approval: bool,
     ) -> bool {
@@ -175,7 +180,7 @@ pub mod service {
         }
         auth_set.push(sender);
 
-        let policy = Management::get_assert(sender).dynamic_policy();
+        let policy = Management::get_assert(sender).dynamic_policy(method);
         check(policy.threshold != 0, "multi auth threshold cannot be 0");
 
         let total_possible_weight = policy
@@ -211,6 +216,7 @@ pub mod service {
             let is_auth = is_auth_other(
                 weight_authorizer.account,
                 authorizers.clone(),
+                method,
                 auth_set.clone(),
                 is_approval,
             );

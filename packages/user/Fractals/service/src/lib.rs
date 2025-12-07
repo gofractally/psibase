@@ -13,7 +13,10 @@ pub mod service {
         },
     };
 
-    use psibase::services::auth_dyn;
+    use psibase::services::{
+        auth_dyn::{self, policy::DynamicAuthPolicy},
+        transact::ServiceMethod,
+    };
     use psibase::*;
 
     /// Creates a new account and fractal.
@@ -377,8 +380,18 @@ pub mod service {
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
-    fn get_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
-        check_some(account_policy(account), "account not supported")
+    fn get_policy(
+        account: AccountNumber,
+        method: ServiceMethod,
+    ) -> auth_dyn::policy::DynamicAuthPolicy {
+        use psibase::services::accounts as Accounts;
+        if method.service == Accounts::SERVICE
+            && method.method == Accounts::action_structs::setAuthServ::ACTION_NAME.into()
+        {
+            DynamicAuthPolicy::impossible()
+        } else {
+            check_some(account_policy(account), "account not supported")
+        }
     }
 
     /// Has policy action used by AuthDyn service.

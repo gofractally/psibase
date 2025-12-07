@@ -3,6 +3,7 @@
 #include <ranges>
 #include <services/system/Accounts.hpp>
 #include <services/system/Producers.hpp>
+#include "services/system/Transact.hpp"
 
 using namespace psibase;
 using namespace SystemService;
@@ -58,12 +59,14 @@ namespace
    using IndirectCheckFunc =
        bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
                                                      std::vector<AccountNumber>,
+                                                     ServiceMethod,
                                                      std::optional<std::vector<AccountNumber>>);
 
    bool checkOverlapping(std::vector<AccountNumber> producers,
                          std::vector<AccountNumber> authorizers,
                          std::size_t                threshold,
                          IndirectCheckFunc          indirectCheck,
+                         ServiceMethod              method,
                          std::vector<AccountNumber> authSet)
    {
       // We only check for indirect auth if there are insufficient direct auths.
@@ -82,7 +85,8 @@ namespace
          auto toAuth = Actor<SystemService::AuthInterface>{
              SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
 
-         if ((toAuth.*indirectCheck)(account, authorizers, std::optional(std::move(authSet))) &&
+         if ((toAuth.*indirectCheck)(account, authorizers, method,
+                                     std::optional(std::move(authSet))) &&
              ++numOverlapping >= threshold)
          {
             return true;
@@ -252,6 +256,7 @@ namespace SystemService
 
    bool Producers::isAuthSys(AccountNumber                             sender,
                              std::vector<AccountNumber>                authorizers,
+                             ServiceMethod                             method,
                              std::optional<std::vector<AccountNumber>> authSet_opt)
    {
       auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
@@ -270,11 +275,12 @@ namespace SystemService
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
-                              &Actor<AuthInterface>::isAuthSys, std::move(authSet));
+                              &Actor<AuthInterface>::isAuthSys, method, std::move(authSet));
    }
 
    bool Producers::isRejectSys(AccountNumber                             sender,
                                std::vector<AccountNumber>                rejecters,
+                               ServiceMethod                             method,
                                std::optional<std::vector<AccountNumber>> authSet_opt)
    {
       auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
@@ -296,7 +302,7 @@ namespace SystemService
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(rejecters), threshold,
-                              &Actor<AuthInterface>::isRejectSys, std::move(authSet));
+                              &Actor<AuthInterface>::isRejectSys, method, std::move(authSet));
    }
 
 }  // namespace SystemService

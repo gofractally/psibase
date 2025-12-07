@@ -115,7 +115,11 @@ mod service {
     /// * `true`: If the sender is among the authorizers
     /// * `false`: If the sender is not among the authorizers
     #[action]
-    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
+    ) -> bool {
         unimplemented!()
     }
 
@@ -129,7 +133,11 @@ mod service {
     /// * `true`: If the sender is among the rejecters
     /// * `false`: If the sender is not among the rejecters
     #[action]
-    fn isRejectSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn isRejectSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
+    ) -> bool {
         unimplemented!()
     }
 

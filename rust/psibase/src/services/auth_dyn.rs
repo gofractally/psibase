@@ -65,10 +65,13 @@ pub mod policy {
 )]
 #[allow(non_snake_case, unused_variables)]
 pub mod AuthDynIntf {
-    use crate::{services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber};
+    use crate::{
+        services::{auth_dyn::policy::DynamicAuthPolicy, transact::ServiceMethod},
+        AccountNumber,
+    };
 
     #[action]
-    pub fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+    pub fn get_policy(account: AccountNumber, method: ServiceMethod) -> DynamicAuthPolicy {
         unimplemented!()
     }
 
@@ -109,6 +112,7 @@ mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
         auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
@@ -118,6 +122,7 @@ mod service {
     fn isRejectSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
+        method: ServiceMethod,
         auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
