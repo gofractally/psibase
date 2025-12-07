@@ -55,22 +55,20 @@ define_trust! {
             High trust grants the abilities of all lower trust levels, plus these abilities:
             - Proposing a vote in evaluation cycle
             - Exiling a fractal member
-            - Set the fractal token distribution schedule
             - Setting the guild evaluation schedule
             - Setting the guild display name
             - Setting the guild bio
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
-            - Initialise fractal token
             - Resign, remove or set a new Guild representative
             ",
     }
     functions {
-        None => [get_group_users],
+        None => [get_group_users, exile_member, set_dist_interval, init_token],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [exile_member, set_dist_interval, init_token, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
 }

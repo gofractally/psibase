@@ -4,9 +4,9 @@ package fractal-core:plugin;
 interface admin-fractal {
     use host:types/types.{error};
 
-    exile-member: func(fractal: string, member: string) -> result<_, error>;
-    set-dist-interval: func(fractal: string, distribution-interval: u32) -> result<_, error>;
-    init-token: func(fractal: string) -> result<_, error>;
+    exile-member: func(member: string) -> result<_, error>;
+    set-dist-interval: func(distribution-interval: u32) -> result<_, error>;
+    init-token: func() -> result<_, error>;
 
 }
 
