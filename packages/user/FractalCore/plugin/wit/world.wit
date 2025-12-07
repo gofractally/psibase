@@ -42,6 +42,10 @@ interface admin-guild {
     start-eval: func(guild-account: string) -> result<_, error>;
     close-eval: func(guild-account: string) -> result<_, error>;
 
+    set-guild-rep: func(guild-account: string, rep: string) -> result<_, error>;
+    resign-guild-rep: func(guild-account: string) -> result<_, error>;
+    remove-guild-rep: func(guild-account: string) -> result<_, error>;
+
 
 }
 

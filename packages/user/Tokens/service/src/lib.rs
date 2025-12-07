@@ -24,7 +24,10 @@ pub mod service {
         let table = InitTable::new();
 
         if table.get_index_pk().get(&()).is_none() {
-            let init_instance = InitRow { last_used_id: 0 };
+            let init_instance = InitRow {
+                last_used_id: 0,
+                last_used_shared_bal_id: 0,
+            };
             table.put(&init_instance).unwrap();
 
             Nfts::call().setUserConf(0, true);

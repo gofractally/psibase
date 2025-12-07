@@ -4,9 +4,11 @@ version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
-edition = "2021"
+edition.workspace = true
 description = "Psibase name conversion functions"
-license = "MIT"
+license.workspace = true
+publish.workspace = true
 
 [dependencies]
 seahash = "4.1.0"
+psibase-rust-workspace-hack.workspace = true

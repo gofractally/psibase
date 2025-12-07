@@ -78,41 +78,6 @@ struct Args {
 }
 
 #[derive(Parser, Debug)]
-struct DeployCommand {
-    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
-    #[clap(
-        short = 'a',
-        long,
-        value_name = "URL_OR_HOST_ALIAS",
-        env = "PSINODE_URL"
-    )]
-    api: Option<String>,
-
-    /// Account to deploy service on
-    account: Option<ExactAccountNumber>,
-
-    /// Create the account if it doesn't exist. Also set the account to
-    /// authenticate using this key, even if the account already existed.
-    #[clap(short = 'c', long, value_name = "KEY")]
-    create_account: Option<String>,
-
-    /// Create the account if it doesn't exist. The account won't be secured;
-    /// anyone can authorize as this account without signing. Caution: this option
-    /// should not be used on production or public chains.
-    #[clap(short = 'i', long)]
-    create_insecure_account: bool,
-
-    /// Register the service with HttpServer. This allows the service to host a
-    /// website, serve RPC requests, and serve GraphQL requests.
-    #[clap(short = 'p', long)]
-    register_proxy: bool,
-
-    /// Sender to use when creating the account.
-    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
-    sender: ExactAccountNumber,
-}
-
-#[derive(Parser, Debug)]
 struct InstallCommand {
     /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
     #[clap(
@@ -155,9 +120,6 @@ enum Command {
 
     /// Build and run tests
     Test(TestCommand),
-
-    /// Build and deploy a service
-    Deploy(DeployCommand),
 
     /// Build and install a psibase package
     Install(InstallCommand),
@@ -716,62 +678,6 @@ async fn test(
     Ok(())
 }
 
-async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Error> {
-    let files = build(args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
-    if files.is_empty() {
-        Err(anyhow!("Nothing found to deploy"))?
-    }
-    if files.len() > 1 {
-        Err(anyhow!("Expected a single library"))?
-    }
-
-    let schema = build_schema(args, &[root], &vec![]).await?;
-    let mut schema_file = tempfile::NamedTempFile::new()?;
-    serde_json::to_writer(&mut schema_file, &schema)?;
-
-    let account = if let Some(account) = opts.account {
-        account.to_string()
-    } else {
-        files[0]
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .replace('_', "-")
-            .replace(".wasm", "")
-    };
-
-    let mut command = std::process::Command::new(&args.psibase);
-
-    command.arg("deploy");
-    if let Some(api) = &opts.api {
-        command.args(["--api", api.as_str()]);
-    }
-    if let Some(key) = &opts.create_account {
-        command.args(["--create-account", key.as_str()]);
-    }
-    if opts.create_insecure_account {
-        command.arg("--create-insecure-account");
-    }
-    if opts.register_proxy {
-        command.arg("--register-proxy");
-    }
-    command.arg("--sender");
-    command.arg(opts.sender.to_string());
-    command.arg(&account);
-    command.arg(&files[0]);
-    command.arg(schema_file.path());
-
-    let msg = format!("Failed running: {:?}", command);
-    if !command.status().context(msg.clone())?.success() {
-        Err(anyhow! {msg})?;
-    }
-
-    pretty("Deployed", &account);
-
-    Ok(())
-}
-
 async fn install(
     args: &Args,
     opts: &InstallCommand,
@@ -864,12 +770,6 @@ async fn main2() -> Result<(), Error> {
             };
             test(&args, opts, &MetadataIndex::new(&metadata), root).await?;
             pretty("Done", "All tests passed");
-        }
-        Command::Deploy(opts) => {
-            let Some(root) = root else {
-                Err(anyhow!("Don't know how to deploy workspace"))?
-            };
-            deploy(&args, opts, root).await?;
         }
         Command::Install(opts) => {
             let Some(root) = root else {
