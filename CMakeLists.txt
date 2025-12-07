@@ -290,7 +290,6 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
-    nft
     fractal-core
     config
     producers
