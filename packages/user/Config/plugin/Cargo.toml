@@ -29,3 +29,4 @@ world = "impl"
 "packages:plugin" = { path = "../../Packages/plugin/wit/world.wit" }
 "symbol:plugin" = { path = "../../Symbol/plugin/wit/world.wit" }
 "tokens:plugin" = { path = "../../Tokens/plugin/wit/admin.wit" }
+"virtual-server:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }

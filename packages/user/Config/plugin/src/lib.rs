@@ -4,9 +4,15 @@ use bindings::*;
 
 use exports::config::plugin::{
     branding::Guest as Branding, packaging::Guest as Packaging, producers::Guest as Producers,
-    settings::Guest as Settings, symbol::Guest as Symbol,
+    settings::Guest as Settings, symbol::Guest as Symbol, virtual_server::Guest as VirtualServer,
 };
 use host::types::types::Error;
+
+use exports::config::plugin::virtual_server::{NetworkVariables, ServerSpecs};
+
+use virtual_server::plugin::types::{
+    NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
+};
 
 use staged_tx::plugin::proposer::set_propose_latch;
 
@@ -94,6 +100,42 @@ impl Symbol for ConfigPlugin {
         set_propose_latch(Some("symbol"))?;
 
         symbol::plugin::admin::del_length(length)
+    }
+}
+
+impl VirtualServer for ConfigPlugin {
+    fn init_billing(fee_receiver: String) -> Result<(), Error> {
+        set_propose_latch(Some("virtual-server"))?;
+
+        virtual_server::plugin::admin::init_billing(&fee_receiver)
+    }
+
+    fn set_specs(specs: ServerSpecs) -> Result<(), Error> {
+        set_propose_latch(Some("virtual-server"))?;
+
+        let specs = DestServerSpecs {
+            net_bps: specs.net_bps,
+            storage_bytes: specs.storage_bytes,
+        };
+        virtual_server::plugin::admin::set_specs(specs)
+    }
+
+    fn set_network_variables(variables: NetworkVariables) -> Result<(), Error> {
+        set_propose_latch(Some("virtual-server"))?;
+
+        let variables = DestNetworkVariables {
+            block_replay_factor: variables.block_replay_factor,
+            per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
+            obj_storage_bytes: variables.obj_storage_bytes,
+            memory_ratio: variables.memory_ratio,
+        };
+        virtual_server::plugin::admin::set_network_variables(variables)
+    }
+
+    fn enable_billing(enabled: bool) -> Result<(), Error> {
+        set_propose_latch(Some("virtual-server"))?;
+
+        virtual_server::plugin::admin::enable_billing(enabled)
     }
 }
 

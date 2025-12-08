@@ -7,7 +7,7 @@ world impl {
     include branding:plugin/imports;
     include transact:plugin/imports;
     include packages:plugin/imports;
-
+    include virtual-server:plugin/imports;
 
     import tokens:plugin/admin;
     import packages:plugin/private-api;
@@ -18,5 +18,5 @@ world impl {
     export packaging;
     export settings;
     export symbol;
-
+    export virtual-server;
 }
