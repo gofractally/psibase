@@ -148,7 +148,7 @@ impl Issuer for TokensPlugin {
 }
 
 impl Helpers for TokensPlugin {
-    fn fetch_network_token() -> Result<u32, Error> {
+    fn fetch_network_token() -> Result<Option<u32>, Error> {
         assert_authorized(FunctionName::fetch_network_token)?;
         query::fetch_network_token::fetch_network_token()
             .map_err(|error: ErrorType| Error::from(ErrorType::QueryError(error.to_string())))
@@ -175,15 +175,21 @@ impl User for TokensPlugin {
     fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
 
-        let packed_args = Actions::credit {
-            amount: Self::decimal_to_u64(token_id, amount)?.into(),
-            memo: memo.try_into().unwrap(),
-            debitor: debitor.as_str().into(),
-            token_id,
-        }
-        .packed();
+        let amount: Quantity = Self::decimal_to_u64(token_id, amount)?.into();
 
-        add_action_to_transaction(Actions::credit::ACTION_NAME, &packed_args)
+        if amount.value > 0 {
+            let packed_args = Actions::credit {
+                amount,
+                memo: memo.try_into().unwrap(),
+                debitor: debitor.as_str().into(),
+                token_id,
+            }
+            .packed();
+
+            add_action_to_transaction(Actions::credit::ACTION_NAME, &packed_args)
+        } else {
+            Ok(())
+        }
     }
 
     fn uncredit(

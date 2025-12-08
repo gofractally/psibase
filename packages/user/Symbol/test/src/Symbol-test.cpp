@@ -9,6 +9,7 @@
 #include "services/user/Nft.hpp"
 #include "services/user/Symbol.hpp"
 #include "services/user/Tokens.hpp"
+#include "services/user/symbolErrors.hpp"
 
 using namespace psibase;
 using namespace UserService;
@@ -80,19 +81,19 @@ SCENARIO("Buying a symbol")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"aBc"};
-         CHECK(a.create(symbolId).failed(invalidSymbol));
+         CHECK(a.create(symbolId).failed(notForSale));
       }
       THEN("Alice cannot create a symbol with fewer than 3 characters")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"ab"};
-         CHECK(a.create(symbolId).failed(invalidSymbol));
+         CHECK(a.create(symbolId).failed(notForSale));
       }
       THEN("Alice cannot create a symbol with greater than 7 characters")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"abcdefgh"};
-         CHECK(a.create(symbolId).failed(invalidSymbol));
+         CHECK(a.create(symbolId).failed(notForSale));
       }
       THEN("Alice can create a symbol")
       {

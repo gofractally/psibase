@@ -4,12 +4,10 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::check_none;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
-    use psibase::services::nft::{NftRecord, Wrapper as Nft};
+    use psibase::services::nft::{NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord};
-    use psibase::{
-        AccountNumber, Fracpack, Table, ToSchema, check, check_some, get_sender, services::nft::NID,
-    };
+    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
+    use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
     use crate::service::{CREATED, MAPPED};
@@ -28,7 +26,7 @@ pub mod tables {
     pub struct SymbolLength {
         #[primary_key]
         pub symbolLength: u8,
-        
+
         /// The owner of this NFT can change the price behavior for symbols of this length
         #[graphql(name = "priceNftId")]
         pub nftId: NID,
@@ -132,18 +130,20 @@ pub mod tables {
 
         pub fn add(symbol: AccountNumber) -> Self {
             check_none(Symbol::get(symbol), "Symbol already exists");
-            let length_record = SymbolLength::get(symbol.to_string().len() as u8);
             check(
-                length_record.is_some()
-                    && symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
-                "Symbol may only contain 3 to 7 lowercase alphabetic characters",
+                symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
+                "Symbol may only contain lowercase alphabetic characters",
             );
-            let length_record = length_record.unwrap();
             let sender = get_sender();
-            let billing_token =
-                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
 
             if sender != crate::Wrapper::SERVICE {
+                let length_record = check_some(
+                    SymbolLength::get(symbol.to_string().len() as u8),
+                    "Symbol length is not for sale",
+                );
+                let billing_token =
+                    check_some(Tokens::call().getSysToken(), "system token must be defined").id;
+
                 let price = Quantity::from(DiffAdjust::call().increment(length_record.nftId, 1));
 
                 if price.value > 0 {
@@ -172,17 +172,20 @@ pub mod tables {
             new_instance
         }
 
+        fn check_is_owner_of_nft(nft_id: NID, user: AccountNumber) {
+            check(
+                Nft::call().getNft(nft_id).owner == user,
+                "Missing required authority",
+            );
+        }
+
         pub fn map_symbol(&mut self, token_id: TID) {
             let token_owner_nft = Tokens::call().getToken(token_id).nft_id;
             let symbol_owner_nft = self.ownerNft;
-            check(
-                Nft::call().getNft(token_owner_nft).owner == get_sender(),
-                "Missing required authority",
-            );
-            check(
-                Nft::call().getNft(symbol_owner_nft).owner == get_sender(),
-                "Missing required authority",
-            );
+            let sender = get_sender();
+
+            Self::check_is_owner_of_nft(token_owner_nft, sender);
+            Self::check_is_owner_of_nft(symbol_owner_nft, sender);
 
             Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
             Nft::call().burn(symbol_owner_nft);
