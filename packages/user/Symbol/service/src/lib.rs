@@ -167,8 +167,8 @@ pub mod tables {
                 new_instance.ownerNft,
                 sender,
                 format!("This NFT conveys ownership of symbol: {}", symbol)
-                    .as_str()
-                    .into(),
+                    .try_into()
+                    .unwrap(),
             );
 
             new_instance
