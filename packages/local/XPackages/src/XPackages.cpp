@@ -13,13 +13,29 @@ namespace
 {
    struct Query
    {
-      auto installed() const
+      auto installed(const std::optional<std::string>& gt,
+                     const std::optional<std::string>& ge,
+                     const std::optional<std::string>& lt,
+                     const std::optional<std::string>& le,
+                     std::optional<uint32_t>           first,
+                     std::optional<uint32_t>           last,
+                     const std::optional<std::string>& before,
+                     const std::optional<std::string>& after) const
       {
-         checkoutSubjective();
-         return XPackages{}.open<LocalPackagesTable>().getIndex<0>();
+         using NodeType = LocalPackage;
+         using EdgeType = Edge<NodeType, psio::reflect<NodeType>::name + "Edge">;
+         using ConnType = Connection<NodeType, psio::reflect<NodeType>::name + "Connection",
+                                     psio::reflect<NodeType>::name + "Edge">;
+         ConnType result;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            result = makeConnection<ConnType>(XPackages{}.open<LocalPackagesTable>().getIndex<0>(),
+                                              gt, ge, lt, le, first, last, before, after);
+         }
+         return result;
       }
    };
-   PSIO_REFLECT(Query, method(installed))
+   PSIO_REFLECT(Query, method(installed, gt, ge, lt, le, first, last, before, after))
 
    HttpReply error(HttpStatus status, std::string_view msg)
    {
