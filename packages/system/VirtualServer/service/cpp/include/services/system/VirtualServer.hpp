@@ -1,0 +1,23 @@
+#pragma once
+
+#include <psibase/Service.hpp>
+#include <psibase/psibase.hpp>
+
+namespace SystemService
+{
+   struct VirtualServer : public psibase::Service
+   {
+      static constexpr auto service = psibase::AccountNumber("virtual-server");
+
+      void useNetSys(psibase::AccountNumber user, uint64_t amount_bytes);
+      void useCpuSys(psibase::AccountNumber user, std::chrono::nanoseconds amount_ns);
+
+      uint8_t getMaxPeers();
+   };
+
+   PSIO_REFLECT(VirtualServer,
+                method(useNetSys, user, amount_bytes),
+                method(useCpuSys, user, cpuUsage),
+                method(getMaxPeers))
+
+}  // namespace SystemService

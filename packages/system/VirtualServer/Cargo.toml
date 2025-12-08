@@ -1,0 +1,29 @@
+[package]
+name = "virtual-server-pkg"
+description = "Defines the virtual server used for resource monitoring and metering"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "VirtualServer"
+services = ["virtual-server"]
+
+[package.metadata.psibase.dependencies]
+Sites = "0.22.0"
+Accounts = "0.22.0"
+Nft = "0.22.0"
+Tokens = "0.22.0"
+Transact = "0.22.0"
+Producers = "0.22.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+virtual-server = { path = "service", version = "0.22.0" }
+virtual-server-plugin = { path = "plugin", version = "0.22.0" }
+psibase-system-workspace-hack.workspace = true
