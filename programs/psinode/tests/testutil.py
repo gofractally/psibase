@@ -21,7 +21,7 @@ def psinode_test(f):
                     result = f(self, cluster)
                     if inspect.isawaitable(result):
                         import asyncio
-                        asyncio.run(result)
+                        asyncio.run(asyncio.wait_for(result, 300))
                 except requests.exceptions.HTTPError as e:
                     print(e.response.text)
                     raise
