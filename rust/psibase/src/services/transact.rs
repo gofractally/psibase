@@ -323,9 +323,9 @@ mod service {
         unimplemented!()
     }
 
-    /// Indicates that the virtual server has been initialized
+    /// Enable/disable resource monitoring
     #[action]
-    fn initVServer() {
+    fn resMonitoring(enable: bool) {
         unimplemented!()
     }
 

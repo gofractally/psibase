@@ -504,15 +504,13 @@ namespace SystemService
       return enforceAuth;
    }
 
-   // TODO: rename
-   // Consider: resMonitoring(enable: bool)
-   void Transact::initVServer()
+   void Transact::resMonitoring(bool enable)
    {
       check(getSender() == VirtualServer::service, "Wrong sender");
 
       Transact::Tables(Transact::service)
           .open<ResMonitoringConfigTable>()  //
-          .put({.enabled = true});
+          .put({.enabled = enable});
    }
 
    static void processTransactionImpl(

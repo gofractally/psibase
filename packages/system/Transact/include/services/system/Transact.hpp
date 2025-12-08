@@ -353,8 +353,8 @@ namespace SystemService
       bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
 
-      /// Indicates that the virtual server has been initialized
-      void initVServer();
+      /// Enable/disable resource monitoring
+      void resMonitoring(bool enable);
 
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
@@ -387,7 +387,7 @@ namespace SystemService
                 method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
-                method(initVServer),
+                method(resMonitoring, enable),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),

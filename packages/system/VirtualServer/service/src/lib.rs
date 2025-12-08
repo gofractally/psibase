@@ -60,7 +60,7 @@ mod service {
         Nft::call().setUserConf("manualDebit".into(), true);
         Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Wrapper::call().set_specs(MIN_SERVER_SPECS);
-        Transact::call().initVServer();
+        Transact::call().resMonitoring(true);
     }
 
     #[pre_action(exclude(init))]
