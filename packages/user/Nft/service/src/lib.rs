@@ -268,7 +268,8 @@ pub mod tables {
 pub mod service {
     use crate::tables::*;
     use psibase::{
-        check, check_some, get_sender, services::events, AccountNumber, DbId, Memo, MethodNumber,
+        check, check_some, get_sender, get_service, services::events, AccountNumber, DbId, Memo,
+        MethodNumber,
     };
 
     pub type NID = u32;
@@ -277,7 +278,7 @@ pub mod service {
     fn init() {
         if InitRow::get().is_none() {
             InitRow::add();
-            NftHolder::get_or_default(get_sender()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
+            NftHolder::get_or_default(get_service()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
 
             let add_index = |method: &str, column: u8, db_id: DbId| {
                 events::Wrapper::call().addIndex(
