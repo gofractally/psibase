@@ -152,6 +152,17 @@ impl PackageInfo {
             accounts: self.accounts.clone(),
         }
     }
+    pub fn is_local(&self) -> Option<bool> {
+        if self.accounts.is_empty() {
+            None
+        } else {
+            Some(
+                self.accounts
+                    .iter()
+                    .any(|account| account.to_string().starts_with("x-")),
+            )
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -1456,6 +1467,33 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
     }
 }
 
+pub struct FilteredRegistry<T: PackageRegistry> {
+    source: T,
+    local: bool,
+}
+
+impl<T: PackageRegistry> FilteredRegistry<T> {
+    pub fn new(source: T, local: bool) -> Self {
+        FilteredRegistry { source, local }
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: PackageRegistry> PackageRegistry for FilteredRegistry<T> {
+    type R = T::R;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        let mut result = self.source.index()?;
+        result.retain(|info| info.is_local() != Some(!self.local));
+        Ok(result)
+    }
+    async fn get_by_info(
+        &self,
+        info: &PackageInfo,
+    ) -> Result<PackagedService<Self::R>, anyhow::Error> {
+        self.source.get_by_info(info).await
+    }
+}
+
 pub enum PackageOrigin {
     Installed { owner: AccountNumber },
     Repo { sha256: Checksum256, file: String },
@@ -1634,6 +1672,24 @@ fn max_version(versions: &HashMap<String, (Meta, PackageOrigin)>) -> Result<&str
     Ok(&*result)
 }
 
+fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyhow::Error> {
+    for package in packages {
+        match package {
+            PackageOp::Install(info) | PackageOp::Replace(_, info) => {
+                if info.is_local() == Some(!local) {
+                    Err(anyhow!(
+                        "{} is{} a local package",
+                        &info.name,
+                        if local { " not" } else { "" }
+                    ))?
+                }
+            }
+            PackageOp::Remove(_) => {}
+        }
+    }
+    Ok(())
+}
+
 impl PackageList {
     pub fn new() -> PackageList {
         PackageList {
@@ -1742,10 +1798,11 @@ impl PackageList {
         reg: &T,
         packages: &[String],
         reinstall: bool,
+        local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
-        solve_dependencies(
+        let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
@@ -1753,17 +1810,20 @@ impl PackageList {
             reinstall,
             PackagePreference::Latest,
             PackagePreference::Current,
-        )
+        )?;
+        check_destination(&result, local)?;
+        Ok(result)
     }
     pub async fn resolve_upgrade<T: PackageRegistry + ?Sized>(
         &self,
         reg: &T,
         packages: &[String],
         pref: PackagePreference,
+        local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
-        solve_dependencies(
+        let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
@@ -1775,7 +1835,9 @@ impl PackageList {
             } else {
                 PackagePreference::Current
             },
-        )
+        )?;
+        check_destination(&result, local)?;
+        Ok(result)
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
         let mut result = vec![];

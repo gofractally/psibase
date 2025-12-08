@@ -16,10 +16,11 @@ use psibase::{
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, AutoAbort, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageInfo, PackageList,
-    PackageOp, PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService,
-    PrettyAction, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
+    PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
+    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1624,7 +1625,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     )
     .await?;
     let to_install = installed
-        .resolve_changes(&package_registry, &packages, args.reinstall)
+        .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
     if args.local {
@@ -1847,6 +1848,7 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             } else {
                 PackagePreference::Compatible
             },
+            args.local,
         )
         .await?;
 
@@ -1898,7 +1900,7 @@ async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
             client.clone(),
         )
         .await?;
-        PackageList::from_registry(&package_registry)?
+        PackageList::from_registry(&FilteredRegistry::new(package_registry, args.local))?
     } else {
         PackageList::new()
     };

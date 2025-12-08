@@ -170,7 +170,8 @@ impl Chain {
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
         let packages =
-            block_on(PackageList::new().resolve_changes(&registry, &package_names, false)).unwrap();
+            block_on(PackageList::new().resolve_changes(&registry, &package_names, false, true))
+                .unwrap();
         let mut requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
