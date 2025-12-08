@@ -14,28 +14,28 @@ pub mod tables {
         manual_debit,
     });
 
-    #[table(name = "InitTable", index = 0)]
+    #[table(name = "ConfigTable", index = 0)]
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct InitRow {
+    pub struct ConfigRow {
         pub next_id: NID,
     }
 
-    impl InitRow {
+    impl ConfigRow {
         #[primary_key]
         fn pk(&self) {}
 
         pub fn add() {
-            check_none(Self::get(), "init row already exists");
+            check_none(Self::get(), "config row already exists");
             let new_instance = Self { next_id: 0 };
             new_instance.save();
         }
 
         pub fn get() -> Option<Self> {
-            InitTable::read().get_index_pk().get(&())
+            ConfigTable::read().get_index_pk().get(&())
         }
 
         pub fn get_assert() -> Self {
-            check_some(Self::get(), "init row does not exist")
+            check_some(Self::get(), "config row does not exist")
         }
 
         pub fn get_next_id(&mut self) -> NID {
@@ -49,7 +49,7 @@ pub mod tables {
         }
 
         fn save(&self) {
-            InitTable::read_write().put(&self).unwrap();
+            ConfigTable::read_write().put(&self).unwrap();
         }
     }
 
@@ -75,7 +75,7 @@ pub mod tables {
 
         pub fn new(owner_and_issuer: AccountNumber) -> Self {
             Self {
-                id: InitRow::get_assert().get_next_id(),
+                id: ConfigRow::get_assert().get_next_id(),
                 issuer: owner_and_issuer,
                 owner: owner_and_issuer,
             }
@@ -91,7 +91,7 @@ pub mod tables {
 
         pub fn get_assert(nft_id: NID) -> Self {
             Self::get(nft_id).unwrap_or_else(|| {
-                if nft_id <= InitRow::get_assert().next_id {
+                if nft_id <= ConfigRow::get_assert().next_id {
                     abort_message("NFT was burned")
                 } else {
                     abort_message("NFT does not exist")
@@ -276,8 +276,8 @@ pub mod service {
 
     #[action]
     fn init() {
-        if InitRow::get().is_none() {
-            InitRow::add();
+        if ConfigRow::get().is_none() {
+            ConfigRow::add();
             NftHolder::get_or_default(get_service()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
 
             let add_index = |method: &str, column: u8, db_id: DbId| {
@@ -309,7 +309,7 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        check_some(InitRow::get(), "service not initialized");
+        check_some(ConfigRow::get(), "service not initialized");
     }
 
     #[action]
