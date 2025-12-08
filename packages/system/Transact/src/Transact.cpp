@@ -5,6 +5,7 @@
 #include <services/system/CpuLimit.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VirtualServer.hpp>
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/crypto.hpp>
@@ -21,35 +22,6 @@ static constexpr auto maxTrxLifetime = psibase::Seconds{60 * 60};  // 1 hour
 
 namespace SystemService
 {
-
-   namespace
-   {
-
-      struct ResourceMetering
-      {
-         static std::optional<Actor<MeteringInterface>> getMeterServ()
-         {
-            auto row = Transact::Tables(Transact::service).open<MeteringServiceTable>().get({});
-            if (row)
-            {
-               return std::optional(
-                   Actor<MeteringInterface>(Transact::service, row->meteringService));
-            }
-            return std::nullopt;
-         }
-
-         static void useNet(psibase::AccountNumber user, uint64_t amount_bytes)
-         {
-            auto meterServ = getMeterServ();
-            if (!meterServ)
-               return;
-
-            meterServ->useNetSys(user, amount_bytes);
-         }
-      };
-
-   }  // namespace
-
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
       auto statusTable = open<TransactStatusTable>();
@@ -414,14 +386,6 @@ namespace SystemService
       return {};
    }
 
-   void Transact::setMeterServ(psibase::AccountNumber meteringService)
-   {
-      check(getSender() == getReceiver(), "Wrong sender");
-      auto tables = Transact::Tables(Transact::service);
-      auto table  = tables.open<MeteringServiceTable>();
-      table.put({meteringService});
-   }
-
    namespace
    {
       bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
@@ -523,6 +487,13 @@ namespace SystemService
                            ServiceMethod{act.service(), act.method()}, std::vector<ServiceMethod>{},
                            claims);
       }
+
+      bool isResMonitoring()
+      {
+         auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
+         auto config = table.get({});
+         return config && config->enabled;
+      }
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
@@ -531,6 +502,17 @@ namespace SystemService
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
       return enforceAuth;
+   }
+
+   // TODO: rename
+   // Consider: resMonitoring(enable: bool)
+   void Transact::initVServer()
+   {
+      check(getSender() == VirtualServer::service, "Wrong sender");
+
+      Transact::Tables(Transact::service)
+          .open<ResMonitoringConfigTable>()  //
+          .put({.enabled = true});
    }
 
    static void processTransactionImpl(
@@ -543,7 +525,12 @@ namespace SystemService
       auto trx = psio::view<const Transaction>(psio::prevalidated{t});
       auto id  = sha256(t.data(), t.size());
 
-      ResourceMetering::useNet(trx.actions()[0].sender(), t.size());
+      if (isResMonitoring())
+      {
+         uint64_t      netUsage = t.size();
+         AccountNumber sender   = trx.actions()[0].sender();
+         to<VirtualServer>().useNetSys(sender, netUsage);
+      }
 
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
@@ -596,7 +583,10 @@ namespace SystemService
       if (enforceAuth)
       {
          std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
-         accounts.billCpu(trx.actions()[0].sender(), cpuUsage);
+         if (isResMonitoring())
+         {
+            to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage);
+         }
       }
 
       trxData = std::span<const char>{};

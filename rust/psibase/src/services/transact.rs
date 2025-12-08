@@ -323,6 +323,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Indicates that the virtual server has been initialized
+    #[action]
+    fn initVServer() {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {

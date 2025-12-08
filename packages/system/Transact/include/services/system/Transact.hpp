@@ -15,13 +15,6 @@ namespace SystemService
    };
    PSIO_REFLECT(ServiceMethod, service, method)
 
-   /// Resource metering interface
-   struct MeteringInterface
-   {
-      void useNetSys(psibase::AccountNumber user, uint64_t amount_bytes);
-   };
-   PSIO_REFLECT(MeteringInterface, method(useNetSys, user, amount_bytes))
-
    /// Authenticate actions
    ///
    /// [Transact] calls into auth services using this interface
@@ -203,6 +196,14 @@ namespace SystemService
    using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(TransactStatusTable)
 
+   struct ResMonitoringConfig
+   {
+      bool enabled = false;
+   };
+   PSIO_REFLECT(ResMonitoringConfig, enabled)
+   using ResMonitoringConfigTable = psibase::Table<ResMonitoringConfig, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(ResMonitoringConfigTable)
+
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
    {
@@ -250,14 +251,6 @@ namespace SystemService
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(SnapshotInfoTable)
 
-   struct MeteringService
-   {
-      psibase::AccountNumber meteringService;
-   };
-   PSIO_REFLECT(MeteringService, meteringService)
-   using MeteringServiceTable = psibase::Table<MeteringService, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(MeteringServiceTable)
-
    /// All transactions enter the chain through this service
    ///
    /// This privileged service dispatches top-level actions to other
@@ -276,11 +269,11 @@ namespace SystemService
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isPrivileged;
 
       using Tables = psibase::ServiceTables<TransactStatusTable,
+                                            ResMonitoringConfigTable,
                                             BlockSummaryTable,
                                             IncludedTrxTable,
                                             CallbacksTable,
-                                            SnapshotInfoTable,
-                                            MeteringServiceTable>;
+                                            SnapshotInfoTable>;
 
       /// This action enables the boot procedure to be split across multiple blocks
       ///
@@ -360,6 +353,9 @@ namespace SystemService
       bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
 
+      /// Indicates that the virtual server has been initialized
+      void initVServer();
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -380,11 +376,6 @@ namespace SystemService
       /// This is *not* the currently executing block time.
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
-
-      /// Set the metering service
-      ///
-      /// The metering service is the service to which all resource consumption metrics are reported.
-      void setMeterServ(psibase::AccountNumber meteringService);
    };
    PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),
@@ -396,12 +387,12 @@ namespace SystemService
                 method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
+                method(initVServer),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime),
-                method(setMeterServ, meteringService),
                 //
    )
 
