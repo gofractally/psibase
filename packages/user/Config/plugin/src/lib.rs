@@ -73,6 +73,12 @@ impl Packaging for ConfigPlugin {
 }
 
 impl Symbol for ConfigPlugin {
+    fn create(symbol: String) -> Result<(), Error> {
+        set_propose_latch(Some("symbol"))?;
+
+        symbol::plugin::api::create(&symbol, "0")
+    }
+
     fn sell_length(
         length: u8,
         initial_price: u64,
