@@ -18,7 +18,7 @@ using std::vector;
 
 namespace
 {
-   constexpr uint8_t manualDebit = Nft::manualDebit;
+   constexpr auto manualDebit = Nft::manualDebit;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
