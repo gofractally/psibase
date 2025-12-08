@@ -98,6 +98,7 @@ mod service {
         };
         table.put(&config).unwrap();
 
+        Nft::call().debit(config.res, "".into());
         tok.mint(config.res, sys.max_issued_supply, "".into());
         tok.setTokenConf(config.res, TokenFlags::UNTRANSFERABLE.index(), true);
     }
