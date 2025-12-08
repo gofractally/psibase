@@ -581,13 +581,17 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
 
     fn is_user_action(act: &Action) -> bool {
         use crate::{
-            self as psibase, method,
-            services::{accounts, cpu_limit, db, events, transact},
+            self as psibase, account, method,
+            services::{cpu_limit, db, events, transact},
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
-            || act.sender == transact::SERVICE && act.method == method!("useNetSys")
-            || act.service == accounts::SERVICE && act.method == method!("billCpu")
+            || act.sender == transact::SERVICE
+                && act.service == account!("virtual-server")
+                && act.method == method!("useNetSys")
+            || act.sender == transact::SERVICE
+                && act.service == account!("virtual-server")
+                && act.method == method!("useCpuSys")
             || act.service == events::SERVICE && act.method == method!("sync"))
     }
 

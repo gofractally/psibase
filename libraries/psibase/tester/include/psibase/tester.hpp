@@ -33,9 +33,13 @@ namespace psibase
          return false;
       if (action.service == AccountNumber{"cpu-limit"})
          return false;
-      if (action.sender == AccountNumber{"transact"} && action.method == MethodNumber{"useNetSys"})
+      if (action.sender == AccountNumber{"transact"} &&
+          action.service == AccountNumber{"virtual-server"} &&
+          action.method == MethodNumber{"useNetSys"})
          return false;
-      if (action.service == AccountNumber{"accounts"} && action.method == MethodNumber{"billCpu"})
+      if (action.sender == AccountNumber{"transact"} &&
+          action.service == AccountNumber{"virtual-server"} &&
+          action.method == MethodNumber{"useCpuSys"})
          return false;
       if (action.service == AccountNumber{"events"} && action.method == MethodNumber{"sync"})
          return false;
