@@ -58,6 +58,7 @@ function(add suffix)
         StagedTx/service/cpp/include
         Transact/include
         VerifySig/include
+        VirtualServer/service/cpp/include
     )
 endfunction(add)
 

@@ -2941,6 +2941,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "virtual-server"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde-aux",
+ "serde_json",
+ "virtual-server-pkg",
+]
+
+[[package]]
+name = "virtual-server-pkg"
+version = "0.22.0"
+dependencies = [
+ "psibase-system-workspace-hack",
+ "virtual-server",
+ "virtual-server-plugin",
+]
+
+[[package]]
+name = "virtual-server-plugin"
+version = "0.22.0"
+dependencies = [
+ "psibase",
+ "psibase-system-workspace-hack",
+ "serde",
+ "serde_json",
+ "virtual-server",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "want"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
