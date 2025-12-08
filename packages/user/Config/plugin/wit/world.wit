@@ -41,6 +41,9 @@ interface producers {
 
     /// Set the producers for the current consensus mode.
     set-producers: func(prods: list<string>) -> result<_, error>;
+
+    /// Sets the maximum number of producers for the network
+    set-max-prods: func(max-prods: u8) -> result<_, error>;
 }
 
 interface symbol {

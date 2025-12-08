@@ -44,6 +44,12 @@ impl Producers for ConfigPlugin {
 
         producers::plugin::api::set_producers(&prods[..])
     }
+
+    fn set_max_prods(max_prods: u8) -> Result<(), Error> {
+        set_propose_latch(Some("producers"))?;
+
+        producers::plugin::api::set_max_prods(max_prods)
+    }
 }
 
 impl Branding for ConfigPlugin {

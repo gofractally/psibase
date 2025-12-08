@@ -176,6 +176,14 @@ impl Api for ProducersPlugin {
         )
         .unwrap();
     }
+
+    fn set_max_prods(max_prods: u8) -> Result<(), Error> {
+        assert!(Client::get_sender() == "config");
+        add_action_to_transaction(
+            Actions::setMaxProds::ACTION_NAME,
+            &Actions::setMaxProds { max_prods }.packed(),
+        )
+    }
 }
 
 bindings::export!(ProducersPlugin with_types_in bindings);

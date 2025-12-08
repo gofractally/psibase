@@ -124,10 +124,14 @@ namespace SystemService
       check(getSender() == getReceiver(), "sender must match service account");
       auto table  = Native::tables().open<StatusRow>();
       auto status = table.get({});
+
+      auto maxProds = getMaxProds();
       std::visit(
-          [](const auto& c)
+          [maxProds](const auto& c)
           {
              check(!c.producers.empty(), "There must be at least one producer");
+             check(c.producers.size() <= maxProds,
+                   "Maximum producers (" + std::to_string(maxProds) + ") exceeded");
              checkVerifyServices(c.producers);
           },
           consensus);
@@ -146,6 +150,10 @@ namespace SystemService
       auto table  = Native::tables().open<StatusRow>();
       auto status = table.get({});
       check(!prods.empty(), "There must be at least one producer");
+
+      uint8_t maxProds = getMaxProds();
+      check(prods.size() <= maxProds,
+            "Maximum producers (" + std::to_string(maxProds) + ") exceeded");
       checkVerifyServices(prods);
       check(!!status, "Missing status row");
       check(!status->consensus.next || status->consensus.next->blockNum == status->current.blockNum,
@@ -188,6 +196,22 @@ namespace SystemService
       return ::getProducers()                          //
              | std::views::transform(&Producer::name)  //
              | std::ranges::to<std::vector>();
+   }
+
+   void Producers::setMaxProds(uint8_t maxProds)
+   {
+      check(getSender() == getReceiver(), "sender must match service account");
+      auto table = Tables().open<ProdsConfigTable>();
+      table.put(ProdsConfig{maxProds});
+   }
+
+   uint8_t Producers::getMaxProds()
+   {
+      auto table  = Tables().open<ProdsConfigTable>();
+      auto config = table.get({});
+      if (!config)
+         return DEFAULT_MAX_PRODS;
+      return config->maxProds;
    }
 
    uint32_t Producers::getThreshold(AccountNumber account)
