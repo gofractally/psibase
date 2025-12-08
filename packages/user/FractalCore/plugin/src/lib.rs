@@ -62,13 +62,13 @@ define_trust! {
 struct FractalCorePlugin;
 
 impl AdminFractal for FractalCorePlugin {
-    fn set_dist_interval(interval: u32) -> Result<(), Error> {
+    fn set_dist_interval(interval_seconds: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::set_dist_interval)?;
 
         let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
         set_propose_latch(Some(&fractal.legislature))?;
 
-        FractalsPlugin::admin_fractal::set_dist_interval(interval)
+        FractalsPlugin::admin_fractal::set_dist_interval(interval_seconds)
     }
 
     fn exile_member(member_account: String) -> Result<(), Error> {
