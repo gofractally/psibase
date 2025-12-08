@@ -19,6 +19,7 @@ Nft = "0.22.0"
 Tokens = "0.22.0"
 Transact = "0.22.0"
 Producers = "0.22.0"
+HttpServer = "0.22.0"
 
 [lib]
 crate-type = ["rlib"]
