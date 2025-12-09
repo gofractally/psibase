@@ -2,9 +2,11 @@ import {
     Calendar,
     CalendarArrowDownIcon,
     Contact,
+    Gavel,
     Landmark,
     LucideIcon,
     PlusCircleIcon,
+    Scale,
     SettingsIcon,
     Users,
 } from "lucide-react";
@@ -50,19 +52,29 @@ export const staticFractalMenus: MenuItem[] = [
                 icon: Users,
                 path: "members",
             },
-        ],
-    },
-    {
-        groupLabel: "Guilds",
-        path: "guilds",
-        menus: [
             {
                 title: "Guilds",
                 icon: Landmark,
-                path: "",
+                path: "guilds",
             },
         ],
     },
+    {
+        groupLabel: "Branches",
+        path: "",
+        menus: [
+            {
+                title: "Legislative",
+                icon: Scale,
+                path: "legislative"
+            },
+            {
+                title: "Judicial",
+                icon: Gavel,
+                path: "judicial"
+            }
+        ]
+    }
 ];
 
 export function NavMain() {
@@ -121,7 +133,7 @@ export function NavMain() {
         },
     ];
 
-    const isBrowse = !location.pathname.startsWith("/guild") || location.pathname == '/guilds/'
+    const isBrowse = !location.pathname.startsWith("/guild") || location.pathname == '/guilds'
 
     const menus = isBrowse ? staticFractalMenus : guildMenus;
 
