@@ -20,6 +20,12 @@ async def echo(connection):
     async for msg in connection:
         await connection.send(msg)
 
+def decode(arg):
+    if isinstance(arg, bytes):
+        return arg.decode()
+    else:
+        return arg
+
 class TestWebSocket(unittest.TestCase):
     @testutil.psinode_test
     async def test_echo(self, cluster):
@@ -31,7 +37,7 @@ class TestWebSocket(unittest.TestCase):
         async with websockets.unix_connect(a.socketpath, url) as websocket:
             for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
                 await websocket.send(message)
-                self.assertEqual(await websocket.recv(decode=True), message)
+                self.assertEqual(decode(await websocket.recv()), message)
 
     @testutil.psinode_test
     async def test_proxy(self, cluster):
@@ -48,7 +54,7 @@ class TestWebSocket(unittest.TestCase):
             async with websockets.unix_connect(a.socketpath, url, compression=None) as websocket:
                 for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
                     await websocket.send(message)
-                    self.assertEqual(await websocket.recv(decode=True), message)
+                    self.assertEqual(decode(await websocket.recv()), message)
 
                 # There should be one unix and one http websocket
 
@@ -93,7 +99,7 @@ class TestWebSocket(unittest.TestCase):
             async with websockets.unix_connect(a.socketpath, url, compression='deflate') as websocket:
                 for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
                     await websocket.send(message)
-                    self.assertEqual(await websocket.recv(decode=True), message)
+                    self.assertEqual(decode(await websocket.recv()), message)
 
 if __name__ == '__main__':
     testutil.main()
