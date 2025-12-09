@@ -1,4 +1,5 @@
 import { useMemo, useRef } from "react";
+import z from "zod";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -24,13 +25,24 @@ export const VirtualServer = () => {
         CPU: "",
     });
 
+    // Zod schema for validating and coercing form values to numbers
+    const serverSpecsSchema = z.object({
+        netBandwidth: z.coerce.number().int().nonnegative(),
+        storage: z.coerce.number().int().nonnegative(),
+    });
+
     const form = useAppForm({
         defaultValues: initialValues.current,
         onSubmit: async (data: { value: VirtualServerFormData }) => {
-            // TODO: Implement save logic for VS fields
+            // Parse and validate using Zod - this converts strings to numbers
+            const parsed = serverSpecsSchema.parse({
+                netBandwidth: data.value.netBandwidth,
+                storage: data.value.storage,
+            });
+
             console.log("Saving Virtual Server resources:", data.value);
             initialValues.current = { ...data.value };
-            await setServerSpecs([data.value.netBandwidth, data.value.storage]);
+            await setServerSpecs([parsed.netBandwidth, parsed.storage]);
             // await setNetworkVariables([data.value.blockReplayFactor, data.value.perBlockSysCPU, data.value.objStorageBytes, data.value.memoryRatio]);
             form.reset(data.value);
         },
@@ -56,7 +68,7 @@ export const VirtualServer = () => {
                 form.handleSubmit();
             }}
         >
-            <div className="rounded-lg border p-4">
+            <div className="rounded-lg border p-4 hidden">
                 <div className="mb-4">
                     <h3 className="text-base font-medium">Virtual Server v1</h3>
                     <p className="text-muted-foreground text-sm">
@@ -65,7 +77,22 @@ export const VirtualServer = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <form.Field name="netBandwidth">
+                    <form.Field
+                        name="netBandwidth"
+                        validators={{
+                            onChange: z
+                                .string()
+                                .refine(
+                                    (val) => {
+                                        const num = Number(val);
+                                        return !isNaN(num) && Number.isInteger(num) && num >= 0;
+                                    },
+                                    {
+                                        message: "Net Bandwidth must be a positive integer",
+                                    },
+                                ),
+                        }}
+                    >
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(field: any) => (
                             <div>
@@ -84,7 +111,22 @@ export const VirtualServer = () => {
                         )}
                     </form.Field>
 
-                    <form.Field name="memory">
+                    <form.Field
+                        name="memory"
+                        validators={{
+                            onChange: z
+                                .string()
+                                .refine(
+                                    (val) => {
+                                        const num = Number(val);
+                                        return !isNaN(num) && Number.isInteger(num) && num >= 0;
+                                    },
+                                    {
+                                        message: "Memory must be a positive integer",
+                                    },
+                                ),
+                        }}
+                    >
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(field: any) => (
                             <div>
@@ -103,7 +145,22 @@ export const VirtualServer = () => {
                         )}
                     </form.Field>
 
-                    <form.Field name="storage">
+                    <form.Field
+                        name="storage"
+                        validators={{
+                            onChange: z
+                                .string()
+                                .refine(
+                                    (val) => {
+                                        const num = Number(val);
+                                        return !isNaN(num) && Number.isInteger(num) && num >= 0;
+                                    },
+                                    {
+                                        message: "Storage must be a positive integer",
+                                    },
+                                ),
+                        }}
+                    >
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(field: any) => (
                             <div>
@@ -212,6 +269,7 @@ export const VirtualServer = () => {
                                 <p className="text-muted-foreground text-sm">
                                     Storage is the overflow home of database (when in-memory cache is fully utilitized).
                                 </p>
+                                <p>
                                 <Input
                                     type="text"
                                     value={field.state.value}
@@ -223,6 +281,8 @@ export const VirtualServer = () => {
                                     className="mt-1 w-36 inline"
                                 />
                                 <span className="text-muted-foreground text-sm ml-2">for pruneable data</span>
+                                </p>
+                                <p>
                                 <Input
                                     type="text"
                                     value={field.state.value}
@@ -234,6 +294,7 @@ export const VirtualServer = () => {
                                     className="mt-1 w-36 inline"
                                 />
                                 <span className="text-muted-foreground text-sm ml-2">for disk cache</span>
+                                </p>
                             </div>
                         )}
                     </form.Field>

@@ -9,7 +9,7 @@ export const useSetFeeReceiverAccount = () =>
     usePluginMutation<[string]>(
         {
             service: CONFIG,
-            method: "setFeeReceiverAccount",
+            method: "initBilling",
             intf: "virtualServer",
         },
         {

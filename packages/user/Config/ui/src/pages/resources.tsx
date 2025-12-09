@@ -45,21 +45,20 @@ const useSystemToken = () => {
                     configQuery,
                     siblingUrl(null, "tokens", "/graphql"),
                 );
+                console.info("configRes", configRes);
 
                 if (!configRes.config?.sysTid) {
                     return null;
                 }
 
                 const sysTid = configRes.config.sysTid;
-
+                console.info("sysTid", sysTid);
                 // Then, get the token details
                 const tokenQuery = `
                     query {
                         token(tokenId: "${sysTid}") {
                             id
-                            symbol {
-                                symbolId
-                            }
+                            symbol
                         }
                     }
                 `;
@@ -68,6 +67,7 @@ const useSystemToken = () => {
                     tokenQuery,
                     siblingUrl(null, "tokens", "/graphql"),
                 );
+                console.info("tokenRes", tokenRes);
 
                 if (!tokenRes.token) {
                     return null;
@@ -87,6 +87,7 @@ const useSystemToken = () => {
 
 export const Resources = () => {
     const { data: systemToken, isLoading: systemTokenLoading } = useSystemToken();
+    console.info("systemToken", systemToken);
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">

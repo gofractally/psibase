@@ -6,7 +6,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
 import { useAppForm } from "@/components/forms/app-form";
-import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
+// import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
 
 interface SystemTokenInfo {
@@ -28,7 +28,7 @@ export const Billing = ({
     systemToken,
     systemTokenLoading,
 }: BillingProps) => {
-    const { mutateAsync: setEnableBilling } = useSetEnableBilling();
+    // const { mutateAsync: setEnableBilling } = useSetEnableBilling();
     const { mutateAsync: setFeeReceiverAccount } = useSetFeeReceiverAccount();
 
     const initialValues = useRef<BillingFormData>({
@@ -42,7 +42,7 @@ export const Billing = ({
             // TODO: Implement save logic for billing fields
             console.log("Saving billing settings:", data.value);
             initialValues.current = { ...data.value };
-            await setEnableBilling([data.value.enableBilling]);
+            // await setEnableBilling([data.value.enableBilling]);
             await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount]);
             form.reset(data.value);
         },
