@@ -19,9 +19,9 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 
 
 export const Judicial = () => {
-    const { data: fractal, error } = useFractal();
+    const { data: fractal, error: fractalError } = useFractal();
 
-    const { data } = useGuild(fractal?.fractal?.judiciary.account)
+    const { data, error: guildError } = useGuild(fractal?.fractal?.judiciary.account)
 
     const [showModal, setShowModal] = useState(false);
 
@@ -29,6 +29,7 @@ export const Judicial = () => {
 
     const isAdministrativeUser = currentUser == data?.rep?.member || (typeof currentUser == 'string' && data?.council?.includes(currentUser));
 
+    const error = fractalError || guildError;
     if (error) {
         return <ErrorCard error={error} />
     }

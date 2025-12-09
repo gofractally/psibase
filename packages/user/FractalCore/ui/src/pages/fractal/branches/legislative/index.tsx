@@ -13,10 +13,11 @@ import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
 
 export const Legislative = () => {
-    const { data: fractal, error } = useFractal();
+    const { data: fractal, error: fractalError } = useFractal();
 
-    const { data } = useGuild(fractal?.fractal?.legislature.account)
+    const { data, error: guildError } = useGuild(fractal?.fractal?.legislature.account)
 
+    const error = fractalError || guildError;
     if (error) {
         return <ErrorCard error={error} />
     }
