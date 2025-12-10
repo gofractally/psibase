@@ -10,7 +10,6 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::fracpack::Pack;
 use psibase::{define_trust, AccountNumber};
 
-use crate::errors::ErrorType;
 use crate::graphql::fetch_symbol_owner_nft;
 
 mod errors;
