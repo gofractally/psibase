@@ -38,17 +38,21 @@ impl GuildMember {
         check_some(Self::get(guild, member), "guild member does not exist")
     }
 
-    pub fn set_pending_score(&mut self, incoming_score: u32) {
+    pub fn set_pending_score(&mut self, incoming_score: u8) {
         let guild = Guild::get_assert(self.guild);
         if ConsensusReward::get(guild.fractal).is_some() {
-            self.pending_score = Some(incoming_score * SCORE_SCALE as u32);
+            self.pending_score = Some(incoming_score);
             self.save();
         }
     }
 
     pub fn save_pending_score(&mut self) {
         self.pending_score.take().map(|pending_score| {
-            self.score = calculate_ema_u32(pending_score, self.score, Fraction::new(1, 6));
+            self.score = calculate_ema_u32(
+                pending_score as u32 * SCORE_SCALE,
+                self.score,
+                Fraction::new(1, 6),
+            );
             self.save();
         });
     }
