@@ -78,12 +78,12 @@ impl ConsensusReward {
         let seconds_elapsed = now.seconds - self.last_distributed.seconds;
         let whole_intervals_elapsed = seconds_elapsed / distribution_interval;
 
-        if whole_intervals_elapsed == 0 {
-            abort_message("must wait for interval period before token distribution");
-        } else {
-            let whole_interval_seconds = whole_intervals_elapsed * distribution_interval;
-            self.last_distributed = (self.last_distributed.seconds + whole_interval_seconds).into();
-        }
+        check(
+            whole_intervals_elapsed > 0,
+            "must wait for interval period before token distribution",
+        );
+        let whole_interval_seconds = whole_intervals_elapsed * distribution_interval;
+        self.last_distributed = (self.last_distributed.seconds + whole_interval_seconds).into();
         self.save();
     }
 
