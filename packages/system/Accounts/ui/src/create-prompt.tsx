@@ -1,5 +1,4 @@
 import { useStore } from "@tanstack/react-form";
-import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -24,6 +23,8 @@ import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 
 import { BrandedGlowingCard } from "./components/branded-glowing-card";
+import { CopyButton } from "./components/copy-button";
+import { PasswordVisibilityButton } from "./components/password-visibility-button";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
@@ -232,6 +233,23 @@ export const CreatePrompt = () => {
                         </div>
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
+                                <Label>Account Name</Label>
+                                <div className="mb-2 flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Input
+                                            type="text"
+                                            value={createdAccount}
+                                            readOnly
+                                            onFocus={(e) => e.target.select()}
+                                        />
+                                        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
+                                            <CopyButton
+                                                text={createdAccount}
+                                                ariaLabel="Copy account name"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                                 <Label>Private Key</Label>
                                 <div className="flex gap-2">
                                     <div className="relative flex-1">
@@ -247,49 +265,18 @@ export const CreatePrompt = () => {
                                             onFocus={(e) => e.target.select()}
                                         />
                                         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7"
-                                                onClick={() =>
+                                            <PasswordVisibilityButton
+                                                showPassword={showPassword}
+                                                onToggle={() =>
                                                     setShowPassword(
                                                         !showPassword,
                                                     )
                                                 }
-                                                aria-label={
-                                                    showPassword
-                                                        ? "Hide password"
-                                                        : "Show password"
-                                                }
-                                            >
-                                                {showPassword ? (
-                                                    <EyeOff className="h-4 w-4" />
-                                                ) : (
-                                                    <Eye className="h-4 w-4" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7"
-                                                onClick={async () => {
-                                                    try {
-                                                        await navigator.clipboard.writeText(
-                                                            key,
-                                                        );
-                                                    } catch (err) {
-                                                        console.error(
-                                                            "Failed to copy:",
-                                                            err,
-                                                        );
-                                                    }
-                                                }}
-                                                aria-label="Copy private key"
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                            </Button>
+                                            />
+                                            <CopyButton
+                                                text={key}
+                                                ariaLabel="Copy private key"
+                                            />
                                         </div>
                                     </div>
                                 </div>
