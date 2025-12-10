@@ -1,4 +1,5 @@
 import { CircleUserRound } from "lucide-react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { prompt } from "@psibase/common-lib";
@@ -15,14 +16,18 @@ export const ConnectPrompt = () => {
     const navigate = useNavigate();
 
     // queries
-    const { data: accounts = [], isPending: isPendingAccounts } =
-        useGetAllAccounts();
+    const { data: accounts, isPending, isSuccess } = useGetAllAccounts();
 
     // mutations
     const connectAccountMutation = useConnectAccount();
 
-    const loading = isPendingAccounts;
     const accountsList = Array.isArray(accounts) ? accounts : [];
+
+    useEffect(() => {
+        if (isSuccess && accounts?.length === 0) {
+            navigate("/plugin/web/prompt/import");
+        }
+    }, [accounts, navigate, isSuccess]);
 
     const handleLogin = async (accountName: string) => {
         try {
@@ -33,7 +38,7 @@ export const ConnectPrompt = () => {
         }
     };
 
-    if (loading) {
+    if (isPending) {
         return (
             <BrandedGlowingCard>
                 <CardContent className="flex flex-col">
