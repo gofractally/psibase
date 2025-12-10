@@ -14,6 +14,8 @@ pub mod constants {
     pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
     pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
     pub const MAX_COUNCIL_SIZE: u8 = 6;
+
+    pub const MIN_GROUP_SIZE: u8 = 4;
     pub const MAX_GROUP_SIZE: u8 = 6;
 
     // Max limit capped by continuous_fibonacci
@@ -199,11 +201,14 @@ pub mod service {
         let sender = get_sender();
 
         check_none(
-            account_policy(fractal),
-            &format!("account {} cannot be managed", fractal),
+            account_policy(sender),
+            "managed accounts cannot join a fractal",
         );
 
-        let member_status = if ConsensusReward::get(fractal).is_some() {
+        // Give founding members (members joined prior to token minting) immediate citizenship
+        // otherwise visa.
+        let fractal_has_token = ConsensusReward::get(fractal).is_some();
+        let member_status = if fractal_has_token {
             MemberStatus::Visa
         } else {
             MemberStatus::Citizen
