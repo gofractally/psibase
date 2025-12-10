@@ -657,7 +657,7 @@ async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> 
             if let Some(found) = built.get(p) {
                 index.push(found.clone());
             } else {
-                let info = build_package(args, metadata, Some(id)).await?;
+                let info = build_package(args, metadata, Some(p.repr.as_str())).await?;
                 built.insert(p, info.clone());
                 index.push(info);
             }
