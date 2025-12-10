@@ -22,6 +22,10 @@ pub mod constants {
     pub const MAX_RANKED_GUILDS: u8 = 32;
     // Expected scaling for use of the continuous_fibonacci func
     pub const SCORE_SCALE: u32 = 10_000;
+
+    // Determine score sensitivity
+    pub const EMA_ALPHA_NUMERATOR: u32 = 1;
+    pub const EMA_ALPHA_DENOMINATOR: u32 = 6;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
@@ -408,7 +412,11 @@ pub mod service {
         ConsensusReward::get_assert(fractal).distribute_tokens();
     }
 
-    /// Distribute token for a fractal.
+    /// Rank guilds for a fractal
+    ///
+    /// This action assigns the fractal's consensus reward distribution to the provided
+    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
+    /// guilds in the vector receive progressively larger shares.
     ///
     /// Must be called by legislature.  
     ///

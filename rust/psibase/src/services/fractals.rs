@@ -285,7 +285,11 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Distribute token for a fractal.
+    /// Rank guilds for a fractal
+    ///
+    /// This action assigns the fractal's consensus reward distribution to the provided
+    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
+    /// guilds in the vector receive progressively larger shares.
     ///
     /// Must be called by legislature.  
     ///

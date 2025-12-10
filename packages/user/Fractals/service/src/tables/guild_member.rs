@@ -1,7 +1,10 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
-use crate::constants::{MAX_GROUP_SIZE, SCORE_SCALE};
+use crate::constants::{
+    EMA_ALPHA_DENOMINATOR, EMA_ALPHA_NUMERATOR, EMA_DEMONINATOR_SENSITIVITY, MAX_GROUP_SIZE,
+    SCORE_SCALE,
+};
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
     ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
@@ -51,7 +54,7 @@ impl GuildMember {
             self.score = calculate_ema_u32(
                 pending_score as u32 * SCORE_SCALE,
                 self.score,
-                Fraction::new(1, 6),
+                Fraction::new(EMA_ALPHA_NUMERATOR, EMA_ALPHA_DENOMINATOR),
             );
             self.save();
         });
