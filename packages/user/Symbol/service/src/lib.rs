@@ -2,12 +2,12 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::check_none;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::nft::{NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
     use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{check_none, get_service};
     use serde::{Deserialize, Serialize};
 
     use crate::service::{CREATED, MAPPED};
@@ -49,6 +49,24 @@ pub mod tables {
                 Self::get(symbol_length),
                 format!("symbol length of {} not supported", symbol_length).as_str(),
             )
+        }
+
+        pub fn bill_sender(&self) {
+            let sender = get_sender();
+            let billing_token =
+                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
+
+            let price = Quantity::from(DiffAdjust::call().increment(self.nftId, 1));
+
+            if price.value > 0 {
+                Tokens::call().debit(
+                    billing_token,
+                    sender,
+                    price,
+                    "symbol purchase".to_string().try_into().unwrap(),
+                );
+                Tokens::call().reject(billing_token, sender, "Dust return".try_into().unwrap())
+            }
         }
 
         pub fn delete(&self) {
@@ -136,25 +154,13 @@ pub mod tables {
             );
             let sender = get_sender();
 
-            if sender != crate::Wrapper::SERVICE {
-                let length_record = check_some(
+            let is_self = sender == get_service();
+            if !is_self {
+                check_some(
                     SymbolLength::get(symbol.to_string().len() as u8),
                     "Symbol length is not for sale",
-                );
-                let billing_token =
-                    check_some(Tokens::call().getSysToken(), "system token must be defined").id;
-
-                let price = Quantity::from(DiffAdjust::call().increment(length_record.nftId, 1));
-
-                if price.value > 0 {
-                    Tokens::call().debit(
-                        billing_token,
-                        sender,
-                        price,
-                        "symbol purchase".to_string().try_into().unwrap(),
-                    );
-                    Tokens::call().reject(billing_token, sender, "Dust return".try_into().unwrap())
-                }
+                )
+                .bill_sender();
             }
 
             crate::Wrapper::emit()
@@ -164,11 +170,13 @@ pub mod tables {
             let new_instance = Self::new(symbol, Nft::call().mint());
             new_instance.save();
 
-            Nft::call().credit(
-                new_instance.ownerNft,
-                sender,
-                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
-            );
+            if !is_self {
+                Nft::call().credit(
+                    new_instance.ownerNft,
+                    get_sender(),
+                    format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+                );
+            }
 
             new_instance
         }
