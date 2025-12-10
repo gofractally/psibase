@@ -18,6 +18,8 @@ pub mod constants {
     pub const MIN_GROUP_SIZE: u8 = 4;
     pub const MAX_GROUP_SIZE: u8 = 6;
 
+    pub const GUILD_EVALUATION_GROUP_SIZE: u8 = MAX_GROUP_SIZE;
+
     // Max limit capped by continuous_fibonacci
     pub const MAX_RANKED_GUILDS: u8 = 32;
     // Expected scaling for use of the continuous_fibonacci func

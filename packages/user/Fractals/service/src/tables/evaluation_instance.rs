@@ -1,7 +1,7 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
-use crate::constants::MAX_GROUP_SIZE;
+use crate::constants::{GUILD_EVALUATION_GROUP_SIZE, MAX_GROUP_SIZE};
 use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
@@ -103,7 +103,7 @@ impl EvaluationInstance {
             submission,
             finish_by,
             allowed_group_sizes,
-            MAX_GROUP_SIZE,
+            GUILD_EVALUATION_GROUP_SIZE,
             true,
         );
 
