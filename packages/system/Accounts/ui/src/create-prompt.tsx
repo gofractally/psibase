@@ -20,6 +20,7 @@ import {
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+import { Progress } from "@shared/shadcn/ui/progress";
 
 import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useConnectAccount } from "./hooks/use-connect-account";
@@ -141,17 +142,25 @@ export const CreatePrompt = () => {
         }
     };
 
-    if (step === "1_CREATE") {
-        return (
-            <createForm.AppForm>
-                <form
-                    id="create-account-form"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        createForm.handleSubmit();
-                    }}
-                >
-                    <BrandedGlowingCard>
+    return (
+        <BrandedGlowingCard>
+            <div className="-mt-6 px-6">
+                <Progress
+                    value={
+                        step === "1_CREATE" ? 33 : step === "2_SAVE" ? 67 : 100
+                    }
+                />
+            </div>
+            {step === "1_CREATE" && (
+                <createForm.AppForm>
+                    <form
+                        id="create-account-form"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            createForm.handleSubmit();
+                        }}
+                        className="flex flex-col gap-6"
+                    >
                         <CardContent className="flex flex-col">
                             <div className="mb-6 flex-1 space-y-2">
                                 <CardTitle className="text-3xl font-normal">
@@ -180,140 +189,142 @@ export const CreatePrompt = () => {
                                 />
                             </CardAction>
                         </CardFooter>
-                    </BrandedGlowingCard>
-                </form>
-            </createForm.AppForm>
-        );
-    }
+                    </form>
+                </createForm.AppForm>
+            )}
 
-    if (step === "2_SAVE") {
-        return (
-            <BrandedGlowingCard>
-                <CardContent className="flex flex-col gap-8">
-                    <div>
-                        <CardTitle className="text-3xl font-normal">
-                            Secure your {networkName} account
-                        </CardTitle>
-                        <CardDescription>
-                            Your{" "}
-                            <span className="font-semibold">Private Key</span>{" "}
-                            serves as your account password allowing you to sign
-                            into your account from any browser or device.{" "}
-                            <span className="font-semibold">
-                                Store it safely and securely
-                            </span>
-                            , as it cannot be recovered if you lose it.
-                        </CardDescription>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-2">
-                            <Label>Private Key</Label>
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <Input
-                                        type={
-                                            showPassword ? "text" : "password"
-                                        }
-                                        value={key}
-                                        readOnly
-                                        className="pr-20"
-                                        onFocus={(e) => e.target.select()}
-                                    />
-                                    <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7"
-                                            onClick={() =>
-                                                setShowPassword(!showPassword)
-                                            }
-                                            aria-label={
+            {step === "2_SAVE" && (
+                <>
+                    <CardContent className="flex flex-col gap-8">
+                        <div>
+                            <CardTitle className="text-3xl font-normal">
+                                Secure your {networkName} account
+                            </CardTitle>
+                            <CardDescription>
+                                Your{" "}
+                                <span className="font-semibold">
+                                    Private Key
+                                </span>{" "}
+                                serves as your account password allowing you to
+                                sign into your account from any browser or
+                                device.{" "}
+                                <span className="font-semibold">
+                                    Store it safely and securely
+                                </span>
+                                , as it cannot be recovered if you lose it.
+                            </CardDescription>
+                        </div>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <Label>Private Key</Label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Input
+                                            type={
                                                 showPassword
-                                                    ? "Hide password"
-                                                    : "Show password"
+                                                    ? "text"
+                                                    : "password"
                                             }
-                                        >
-                                            {showPassword ? (
-                                                <EyeOff className="h-4 w-4" />
-                                            ) : (
-                                                <Eye className="h-4 w-4" />
-                                            )}
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7"
-                                            onClick={async () => {
-                                                try {
-                                                    await navigator.clipboard.writeText(
-                                                        key,
-                                                    );
-                                                } catch (err) {
-                                                    console.error(
-                                                        "Failed to copy:",
-                                                        err,
-                                                    );
+                                            value={key}
+                                            readOnly
+                                            className="pr-20"
+                                            onFocus={(e) => e.target.select()}
+                                        />
+                                        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() =>
+                                                    setShowPassword(
+                                                        !showPassword,
+                                                    )
                                                 }
-                                            }}
-                                            aria-label="Copy private key"
-                                        >
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
+                                                aria-label={
+                                                    showPassword
+                                                        ? "Hide password"
+                                                        : "Show password"
+                                                }
+                                            >
+                                                {showPassword ? (
+                                                    <EyeOff className="h-4 w-4" />
+                                                ) : (
+                                                    <Eye className="h-4 w-4" />
+                                                )}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={async () => {
+                                                    try {
+                                                        await navigator.clipboard.writeText(
+                                                            key,
+                                                        );
+                                                    } catch (err) {
+                                                        console.error(
+                                                            "Failed to copy:",
+                                                            err,
+                                                        );
+                                                    }
+                                                }}
+                                                aria-label="Copy private key"
+                                            >
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+                                <Checkbox
+                                    id="acknowledge"
+                                    checked={acknowledged}
+                                    onCheckedChange={(checked) =>
+                                        setAcknowledged(checked === true)
+                                    }
+                                    className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
+                                />
+                                <div className="grid gap-1.5 font-normal">
+                                    <p className="text-sm font-medium leading-none">
+                                        Do not lose this!
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        I understand that if I lose my private
+                                        key, I may permanently lose access to my{" "}
+                                        {networkName} account.
+                                    </p>
+                                </div>
+                            </Label>
                         </div>
+                    </CardContent>
+                    <CardFooter className="flex flex-1 justify-end">
+                        <CardAction>
+                            <Button
+                                type="button"
+                                onClick={() => setStep("3_CONFIRM")}
+                                disabled={!acknowledged}
+                            >
+                                Continue
+                            </Button>
+                        </CardAction>
+                    </CardFooter>
+                </>
+            )}
 
-                        <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
-                            <Checkbox
-                                id="acknowledge"
-                                checked={acknowledged}
-                                onCheckedChange={(checked) =>
-                                    setAcknowledged(checked === true)
-                                }
-                                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
-                            />
-                            <div className="grid gap-1.5 font-normal">
-                                <p className="text-sm font-medium leading-none">
-                                    Do not lose this!
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    I understand that if I lose my private key,
-                                    I may permanently lose access to my{" "}
-                                    {networkName} account.
-                                </p>
-                            </div>
-                        </Label>
-                    </div>
-                </CardContent>
-                <CardFooter className="flex flex-1 justify-end">
-                    <CardAction>
-                        <Button
-                            type="button"
-                            onClick={() => setStep("3_CONFIRM")}
-                            disabled={!acknowledged}
-                        >
-                            Continue
-                        </Button>
-                    </CardAction>
-                </CardFooter>
-            </BrandedGlowingCard>
-        );
-    }
-
-    if (step === "3_CONFIRM") {
-        return (
-            <importForm.AppForm>
-                <form
-                    id="import-account-form"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        importForm.handleSubmit();
-                    }}
-                >
-                    <BrandedGlowingCard>
+            {step === "3_CONFIRM" && (
+                <importForm.AppForm>
+                    <form
+                        id="import-account-form"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            importForm.handleSubmit();
+                        }}
+                        className="flex flex-col gap-6"
+                    >
                         <CardContent className="flex flex-col">
                             <div className="mb-6 flex-1 space-y-2">
                                 <CardTitle className="text-3xl font-normal">
@@ -369,11 +380,9 @@ export const CreatePrompt = () => {
                                 />
                             </CardAction>
                         </CardFooter>
-                    </BrandedGlowingCard>
-                </form>
-            </importForm.AppForm>
-        );
-    }
-
-    return null;
+                    </form>
+                </importForm.AppForm>
+            )}
+        </BrandedGlowingCard>
+    );
 };
