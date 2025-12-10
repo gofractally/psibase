@@ -8,7 +8,7 @@ import { useFractalAccount } from "./use-fractal-account";
 
 export const useExile = () => {
     const fractalAccount = useFractalAccount();
-    return usePluginMutation<[member: Account]>(
+    return usePluginMutation<[fractal: Account, member: Account]>(
         {
             intf: "adminFractal",
             method: "exileMember",

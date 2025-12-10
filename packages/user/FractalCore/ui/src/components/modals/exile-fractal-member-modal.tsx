@@ -6,8 +6,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useAppForm } from "../form/app-form";
+import { useAppForm } from '@shared/components/form/app-form'
+import { FieldAccountExisting } from '@shared/components/form/field-account-existing'
+
 import { useExile } from "@/hooks/fractals/use-exile";
+import { zAccount } from "@/lib/zod/Account";
+import { supervisor } from "@/supervisor";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const ExileFractalMemberModal = ({
     show,
@@ -18,17 +23,23 @@ export const ExileFractalMemberModal = ({
 }) => {
     const { mutateAsync: exileMember } = useExile();
 
+    const fractalAccount = useFractalAccount();
+
     const form = useAppForm({
         defaultValues: {
-            member: "",
+            exile: {
+                member: ""
+            },
         },
-        onSubmit: async ({ value: { member } }) => {
-            await exileMember([member]);
+        onSubmit: async ({ value: { exile: { member } } }) => {
+            await exileMember([fractalAccount, member]);
             openChange(false);
         },
         validators: {
             onChange: z.object({
-                member: z.string(),
+                exile: z.object({
+                    member: zAccount,
+                })
             }),
         },
     });
@@ -51,16 +62,19 @@ export const ExileFractalMemberModal = ({
                         }}
                         className="mt-3 w-full space-y-6"
                     >
-                        <form.AppField
-                            name="member"
-                            children={(field) => (
-                                <field.TextField label="Member" />
-                            )}
+                        <FieldAccountExisting
+                            form={form}
+                            fields={{ account: 'exile.member' }}
+                            label="Recipient Account"
+                            description={undefined}
+                            placeholder="Enter account name"
+                            disabled={false}
+                            supervisor={supervisor}
                         />
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Exile", "Exiling", "Exhiled"]}
+                                labels={["Exile", "Exiling"]}
                             />
                         </form.AppForm>
                     </form>
