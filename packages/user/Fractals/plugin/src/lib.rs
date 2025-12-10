@@ -28,7 +28,7 @@ use crate::bindings::accounts;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::errors::ErrorType;
 use crate::graphql::fractal::get_fractal;
-use crate::graphql::guild::{get_guild, GuildHelper};
+use crate::graphql::guild::{get_guild, Guild};
 use crate::helpers::get_sender_app;
 use crate::trust::{assert_authorized, assert_authorized_with_whitelist};
 use psibase::define_trust;
@@ -73,7 +73,7 @@ define_trust! {
     }
 }
 
-impl GuildHelper {
+impl Guild {
     fn assert_authorized(&self, function: FunctionName) -> Result<(), Error> {
         assert_authorized_with_whitelist(function, vec![self.fractal.to_string()])
     }
