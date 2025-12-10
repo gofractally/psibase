@@ -23,8 +23,14 @@ interface admin {
 }
 
 interface prompt {
-    use host:types/types.{error};
-    use types.{credential};
+    use host:types/types.{error, pem};
+    
+    record credential {
+        /// The name of the account
+        account: string,
+        /// The private key in PEM format used to authorize the account
+        key: pem,
+    }
 
     /// Returns whether or not an account can currently be created.
     ///
