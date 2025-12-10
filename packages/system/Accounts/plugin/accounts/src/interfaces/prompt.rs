@@ -1,9 +1,6 @@
-use psibase::services::auth_sig;
-
-use crate::bindings::accounts::plugin::types::Credential;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
-use crate::bindings::exports::accounts::plugin::prompt::Guest as Prompt;
+use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{auth::api as HostAuth, common::client as Client, types::types::Error};
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
@@ -32,17 +29,20 @@ impl Prompt for AccountsPlugin {
         for credential in credentials {
             match AccountsPlugin::get_account(credential.account.to_string()) {
                 Ok(Some(account)) => {
-                    if account.auth_service != auth_sig::SERVICE.to_string() {
-                        invalid_accounts.push(credential.account);
-                        continue;
-                    }
+                    let valid = match account.auth_service.as_str() {
+                        "auth-any" => true,
+                        "auth-sig" => AuthSig::api::can_authorize(
+                            &credential.key,
+                            &credential.account.to_string(),
+                        ),
+                        _ => false,
+                    };
 
-                    let valid = AuthSig::api::can_authorize(&credential.key, &credential.account.to_string());
                     if !valid {
                         invalid_accounts.push(credential.account);
                         continue;
                     }
-                    
+
                     AppsTable::new(&Client::get_receiver()).connect(&credential.account);
                 }
                 _ => {
