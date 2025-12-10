@@ -1,3 +1,4 @@
+use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
@@ -6,9 +7,9 @@ use psibase::{
 use crate::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable, Guild};
 
 use psibase::services::transact::Wrapper as TransactSvc;
-use psibase::services::{accounts, sites, transact};
-use psibase::Action;
+use psibase::services::{accounts, fractals, sites, transact};
 use psibase::{fracpack::Pack, services::auth_dyn};
+use psibase::{Action, RawKey, TableQuery};
 
 impl Fractal {
     fn new(
@@ -102,16 +103,6 @@ impl Fractal {
             .expect("failed to save");
     }
 
-    pub fn members(&self) -> Vec<FractalMember> {
-        FractalMemberTable::read()
-            .get_index_pk()
-            .range(
-                (self.account, AccountNumber::new(0))
-                    ..=(self.account, AccountNumber::new(u64::MAX)),
-            )
-            .collect()
-    }
-
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(self.legislature)
     }
@@ -119,8 +110,23 @@ impl Fractal {
 
 #[ComplexObject]
 impl Fractal {
-    async fn memberships(&self) -> Vec<FractalMember> {
-        self.members()
+    async fn memberships(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<RawKey, FractalMember>> {
+        TableQuery::subindex::<AccountNumber>(
+            FractalMemberTable::with_service(fractals::SERVICE).get_index_pk(),
+            &(self.account),
+        )
+        .first(first)
+        .last(last)
+        .before(before)
+        .after(after)
+        .query()
+        .await
     }
 
     async fn legislature(&self) -> Guild {
