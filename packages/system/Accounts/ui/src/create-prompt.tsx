@@ -151,6 +151,10 @@ export const CreatePrompt = () => {
             prompt.finished();
         } catch {
             console.error("Import and login failed");
+            importForm.fieldInfo.privateKey.instance?.setErrorMap({
+                onSubmit:
+                    "Error signing in. Check your private key and try again.",
+            });
         }
     };
 
