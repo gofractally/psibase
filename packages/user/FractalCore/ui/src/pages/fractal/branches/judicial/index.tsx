@@ -50,7 +50,7 @@ export const Judicial = () => {
                         Powers
                     </div>
                     <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Exile members who violate the Fractal constition or bylaws.</li>
+                        <li>Exile members who violate the Fractal constitution or bylaws.</li>
                         <li>Administer the arbitration system</li>
                         <li>Resolve disputes with finality</li>
                     </ul>
