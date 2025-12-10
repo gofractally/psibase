@@ -1,3 +1,4 @@
+import { useStore } from "@tanstack/react-form";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
@@ -91,6 +92,11 @@ export const CreatePrompt = () => {
         }
     };
 
+    const createdAccount = useStore(
+        createForm.store,
+        (state) => state.values.account,
+    );
+
     const importForm = useAppForm({
         defaultValues: {
             account: {
@@ -107,7 +113,13 @@ export const CreatePrompt = () => {
             }),
             onSubmit: z.object({
                 account: z.object({
-                    account: zAccount,
+                    account: zAccount.refine(
+                        (val) => val.trim() === createdAccount?.trim(),
+                        {
+                            message:
+                                "Account name must match the account name you just created",
+                        },
+                    ),
                 }),
                 privateKey: z.string().refine(
                     (val) => {
@@ -132,10 +144,10 @@ export const CreatePrompt = () => {
 
         try {
             await importExistingMutation.mutateAsync({
-                account,
+                account: account.trim(),
                 key: pemFormatted,
             });
-            await connectAccountMutation.mutateAsync(account);
+            await connectAccountMutation.mutateAsync(account.trim());
             prompt.finished();
         } catch {
             console.error("Import and login failed");
