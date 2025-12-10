@@ -385,11 +385,6 @@ namespace psibase
          to_json(sender, stream);
          stream.write(',');
 
-         to_json("service", stream);
-         stream.write(':');
-         to_json(service, stream);
-         stream.write(',');
-
          to_json("filename", stream);
          stream.write(':');
          to_json(path, stream);
