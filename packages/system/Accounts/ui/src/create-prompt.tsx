@@ -133,7 +133,7 @@ export const CreatePrompt = () => {
         },
         onSubmit: async (data) => {
             await handleImportAndLogin(
-                data.value.account.account,
+                data.value.account.account.trim(),
                 data.value.privateKey,
             );
         },
@@ -144,10 +144,10 @@ export const CreatePrompt = () => {
 
         try {
             await importExistingMutation.mutateAsync({
-                account: account.trim(),
+                account: account,
                 key: pemFormatted,
             });
-            await connectAccountMutation.mutateAsync(account.trim());
+            await connectAccountMutation.mutateAsync(account);
             prompt.finished();
         } catch {
             console.error("Import and login failed");

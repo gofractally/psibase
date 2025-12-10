@@ -56,13 +56,17 @@ export const ImportPrompt = () => {
 
         try {
             await importExistingMutation.mutateAsync({
-                account,
+                account: account,
                 key: pemFormatted,
             });
             await connectAccountMutation.mutateAsync(account);
             prompt.finished();
         } catch {
             console.error("Import and login failed");
+            form.fieldInfo.privateKey.instance?.setErrorMap({
+                onSubmit:
+                    "Error signing in. Check your private key and try again.",
+            });
         }
     };
 
@@ -100,31 +104,13 @@ export const ImportPrompt = () => {
         },
         onSubmit: async (data) => {
             await handleImportAndLogin(
-                data.value.account.account,
+                data.value.account.account.trim(),
                 data.value.privateKey,
             );
         },
     });
 
     const isSubmitting = useStore(form.store, (state) => state.isSubmitting);
-    // const isAccountValidating = useStore(
-    //     form.store,
-    //     (state) => state.fieldMeta["account.account"]?.isValidating,
-    // );
-
-    // if (loading) {
-    //     return (
-    //         <BrandedGlowingCard>
-    //             <CardContent className="flex flex-col">
-    //                 <Skeleton className="mb-6 h-8 w-[200px]" />
-    //                 <div className="space-y-2">
-    //                     <Skeleton className="h-4 w-[250px]" />
-    //                     <Skeleton className="h-4 w-[200px]" />
-    //                 </div>
-    //             </CardContent>
-    //         </BrandedGlowingCard>
-    //     );
-    // }
 
     return (
         <>
