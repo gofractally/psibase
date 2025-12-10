@@ -32,7 +32,6 @@ import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";
-import { useImportKey } from "./hooks/use-import-key";
 import { b64ToPem, validateB64 } from "./lib/keys";
 
 export const ImportPrompt = () => {
@@ -49,7 +48,6 @@ export const ImportPrompt = () => {
         useCanCreateAccount();
 
     // mutations
-    const importKeyMutation = useImportKey(); // shouldn't need this, as...
     const importExistingMutation = useImportExisting(); // this will take a private key and it will validate it belongs to the account
     const connectAccountMutation = useConnectAccount();
 
@@ -57,8 +55,10 @@ export const ImportPrompt = () => {
         const pemFormatted = b64ToPem(b64);
 
         try {
-            await importKeyMutation.mutateAsync(pemFormatted);
-            await importExistingMutation.mutateAsync(account);
+            await importExistingMutation.mutateAsync({
+                account,
+                key: pemFormatted,
+            });
             await connectAccountMutation.mutateAsync(account);
             prompt.finished();
         } catch {

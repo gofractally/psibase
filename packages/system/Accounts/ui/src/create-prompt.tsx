@@ -1,11 +1,11 @@
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { prompt } from "@psibase/common-lib";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
 import { getAccount } from "@shared/lib/get-account";
 import { zAccount } from "@shared/lib/schemas/account";
@@ -25,13 +25,15 @@ import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
-import { pemToB64 } from "./lib/keys";
+import { b64ToPem, pemToB64, validateB64 } from "./lib/keys";
 
 export const CreatePrompt = () => {
     const [key, setKey] = useState<string>("");
+    const [step, setStep] = useState<"1_CREATE" | "2_SAVE" | "3_CONFIRM">(
+        "1_CREATE",
+    );
     const [showPassword, setShowPassword] = useState(false);
     const [acknowledged, setAcknowledged] = useState(false);
-    const navigate = useNavigate();
 
     const { data: networkName } = useBranding();
 
@@ -39,17 +41,7 @@ export const CreatePrompt = () => {
     const createAccountMutation = useCreateAccount();
     const connectAccountMutation = useConnectAccount();
 
-    const _handleImportAndLogin = async (account: string) => {
-        try {
-            await importExistingMutation.mutateAsync(account);
-            await connectAccountMutation.mutateAsync(account);
-            prompt.finished();
-        } catch {
-            console.error("Import and login failed");
-        }
-    };
-
-    const form = useAppForm({
+    const createForm = useAppForm({
         defaultValues: {
             account: "",
         },
@@ -81,6 +73,7 @@ export const CreatePrompt = () => {
         try {
             const privateKey = await createAccountMutation.mutateAsync(name);
             setKey(pemToB64(privateKey));
+            setStep("2_SAVE");
         } catch (error) {
             console.error("Create account failed:");
             console.error(
@@ -90,21 +83,72 @@ export const CreatePrompt = () => {
                 error instanceof Error &&
                 error.message.includes("Invalid account name")
             ) {
-                form.fieldInfo.account.instance?.setErrorMap({
+                createForm.fieldInfo.account.instance?.setErrorMap({
                     onSubmit: "This account name is not available",
                 });
             }
         }
     };
 
-    if (!key) {
+    const importForm = useAppForm({
+        defaultValues: {
+            account: {
+                account: "",
+            },
+            privateKey: "",
+        },
+        validators: {
+            onChange: z.object({
+                account: z.object({
+                    account: zAccount.or(z.literal("")),
+                }),
+                privateKey: z.string(),
+            }),
+            onSubmit: z.object({
+                account: z.object({
+                    account: zAccount,
+                }),
+                privateKey: z.string().refine(
+                    (val) => {
+                        return validateB64(val);
+                    },
+                    {
+                        message: "Private key must be a valid base64 string",
+                    },
+                ),
+            }),
+        },
+        onSubmit: async (data) => {
+            await handleImportAndLogin(
+                data.value.account.account,
+                data.value.privateKey,
+            );
+        },
+    });
+
+    const handleImportAndLogin = async (account: string, b64: string) => {
+        const pemFormatted = b64ToPem(b64);
+
+        try {
+            await importExistingMutation.mutateAsync({
+                account,
+                key: pemFormatted,
+            });
+            await connectAccountMutation.mutateAsync(account);
+            prompt.finished();
+        } catch {
+            console.error("Import and login failed");
+        }
+    };
+
+    if (step === "1_CREATE") {
         return (
-            <form.AppForm>
+            <createForm.AppForm>
                 <form
                     id="create-account-form"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        form.handleSubmit();
+                        createForm.handleSubmit();
                     }}
                 >
                     <BrandedGlowingCard>
@@ -119,7 +163,7 @@ export const CreatePrompt = () => {
                                     contain letters, numbers, and underscores.
                                 </CardDescription>
                             </div>
-                            <form.AppField
+                            <createForm.AppField
                                 name="account"
                                 children={(field) => (
                                     <field.TextField
@@ -131,126 +175,205 @@ export const CreatePrompt = () => {
                         </CardContent>
                         <CardFooter className="flex flex-1 justify-end">
                             <CardAction>
-                                <form.SubmitButton
+                                <createForm.SubmitButton
                                     labels={["Create", "Creating..."]}
                                 />
                             </CardAction>
                         </CardFooter>
                     </BrandedGlowingCard>
                 </form>
-            </form.AppForm>
+            </createForm.AppForm>
         );
     }
 
-    return (
-        <BrandedGlowingCard>
-            <CardContent className="flex flex-col gap-8">
-                <div>
-                    <CardTitle className="text-3xl font-normal">
-                        Secure your {networkName} account
-                    </CardTitle>
-                    <CardDescription>
-                        Your <span className="font-semibold">Private Key</span>{" "}
-                        serves as your account password allowing you to sign
-                        into your account from any browser or device.{" "}
-                        <span className="font-semibold">
-                            Store it safely and securely
-                        </span>
-                        , as it cannot be recovered if you lose it.
-                    </CardDescription>
-                </div>
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                        <Label>Private Key</Label>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <Input
-                                    type={showPassword ? "text" : "password"}
-                                    value={key}
-                                    readOnly
-                                    className="pr-20"
-                                    onFocus={(e) => e.target.select()}
-                                />
-                                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        onClick={() =>
-                                            setShowPassword(!showPassword)
+    if (step === "2_SAVE") {
+        return (
+            <BrandedGlowingCard>
+                <CardContent className="flex flex-col gap-8">
+                    <div>
+                        <CardTitle className="text-3xl font-normal">
+                            Secure your {networkName} account
+                        </CardTitle>
+                        <CardDescription>
+                            Your{" "}
+                            <span className="font-semibold">Private Key</span>{" "}
+                            serves as your account password allowing you to sign
+                            into your account from any browser or device.{" "}
+                            <span className="font-semibold">
+                                Store it safely and securely
+                            </span>
+                            , as it cannot be recovered if you lose it.
+                        </CardDescription>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-2">
+                            <Label>Private Key</Label>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <Input
+                                        type={
+                                            showPassword ? "text" : "password"
                                         }
-                                        aria-label={
-                                            showPassword
-                                                ? "Hide password"
-                                                : "Show password"
-                                        }
-                                    >
-                                        {showPassword ? (
-                                            <EyeOff className="h-4 w-4" />
-                                        ) : (
-                                            <Eye className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        onClick={async () => {
-                                            try {
-                                                await navigator.clipboard.writeText(
-                                                    key,
-                                                );
-                                            } catch (err) {
-                                                console.error(
-                                                    "Failed to copy:",
-                                                    err,
-                                                );
+                                        value={key}
+                                        readOnly
+                                        className="pr-20"
+                                        onFocus={(e) => e.target.select()}
+                                    />
+                                    <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() =>
+                                                setShowPassword(!showPassword)
                                             }
-                                        }}
-                                        aria-label="Copy private key"
-                                    >
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
+                                            aria-label={
+                                                showPassword
+                                                    ? "Hide password"
+                                                    : "Show password"
+                                            }
+                                        >
+                                            {showPassword ? (
+                                                <EyeOff className="h-4 w-4" />
+                                            ) : (
+                                                <Eye className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={async () => {
+                                                try {
+                                                    await navigator.clipboard.writeText(
+                                                        key,
+                                                    );
+                                                } catch (err) {
+                                                    console.error(
+                                                        "Failed to copy:",
+                                                        err,
+                                                    );
+                                                }
+                                            }}
+                                            aria-label="Copy private key"
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
-                        <Checkbox
-                            id="acknowledge"
-                            checked={acknowledged}
-                            onCheckedChange={(checked) =>
-                                setAcknowledged(checked === true)
-                            }
-                            className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
-                        />
-                        <div className="grid gap-1.5 font-normal">
-                            <p className="text-sm font-medium leading-none">
-                                Do not lose this!
-                            </p>
-                            <p className="text-muted-foreground text-sm">
-                                I understand that if I lose my private key, I
-                                may permanently lose access to my {networkName}{" "}
-                                account.
-                            </p>
-                        </div>
-                    </Label>
-                </div>
-            </CardContent>
-            <CardFooter className="flex flex-1 justify-end">
-                <CardAction>
-                    <Button
-                        type="button"
-                        onClick={() => navigate("/plugin/web/prompt/import")}
-                        disabled={!acknowledged}
-                    >
-                        Sign In
-                    </Button>
-                </CardAction>
-            </CardFooter>
-        </BrandedGlowingCard>
-    );
+                        <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
+                            <Checkbox
+                                id="acknowledge"
+                                checked={acknowledged}
+                                onCheckedChange={(checked) =>
+                                    setAcknowledged(checked === true)
+                                }
+                                className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
+                            />
+                            <div className="grid gap-1.5 font-normal">
+                                <p className="text-sm font-medium leading-none">
+                                    Do not lose this!
+                                </p>
+                                <p className="text-muted-foreground text-sm">
+                                    I understand that if I lose my private key,
+                                    I may permanently lose access to my{" "}
+                                    {networkName} account.
+                                </p>
+                            </div>
+                        </Label>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex flex-1 justify-end">
+                    <CardAction>
+                        <Button
+                            type="button"
+                            onClick={() => setStep("3_CONFIRM")}
+                            disabled={!acknowledged}
+                        >
+                            Continue
+                        </Button>
+                    </CardAction>
+                </CardFooter>
+            </BrandedGlowingCard>
+        );
+    }
+
+    if (step === "3_CONFIRM") {
+        return (
+            <importForm.AppForm>
+                <form
+                    id="import-account-form"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        importForm.handleSubmit();
+                    }}
+                >
+                    <BrandedGlowingCard>
+                        <CardContent className="flex flex-col">
+                            <div className="mb-6 flex-1 space-y-2">
+                                <CardTitle className="text-3xl font-normal">
+                                    Sign in
+                                </CardTitle>
+                                <CardDescription>
+                                    Use your {networkName} account
+                                </CardDescription>
+                            </div>
+                            <div className="flex flex-1 flex-col gap-4">
+                                <importForm.Subscribe
+                                    selector={(state) => [state.isSubmitting]}
+                                >
+                                    {([isSubmitting]) => (
+                                        <FieldAccountExisting
+                                            form={importForm}
+                                            fields="account"
+                                            label="Account name"
+                                            description={undefined}
+                                            placeholder="Account name"
+                                            disabled={isSubmitting}
+                                            onValidate={undefined}
+                                        />
+                                    )}
+                                </importForm.Subscribe>
+                                <importForm.AppField
+                                    name="privateKey"
+                                    children={(field) => {
+                                        return (
+                                            <field.TextField
+                                                type="password"
+                                                label="Private key"
+                                                placeholder="Private key"
+                                            />
+                                        );
+                                    }}
+                                />
+                            </div>
+                        </CardContent>
+                        <CardFooter className="mt-4 flex flex-1 justify-between">
+                            <CardAction>
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    onClick={() => setStep("2_SAVE")}
+                                >
+                                    Back
+                                </Button>
+                            </CardAction>
+                            <CardAction>
+                                <importForm.SubmitButton
+                                    labels={["Confirm", "Confirming..."]}
+                                />
+                            </CardAction>
+                        </CardFooter>
+                    </BrandedGlowingCard>
+                </form>
+            </importForm.AppForm>
+        );
+    }
+
+    return null;
 };
