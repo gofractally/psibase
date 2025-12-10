@@ -3,7 +3,7 @@ use psibase::services::tokens::{Precision, Quantity};
 
 use crate::constants::{TOKEN_PRECISION, TOKEN_SUPPLY};
 use crate::tables::tables::{
-    ConsensusReward, Fractal, FractalMember, FractalMemberTable, FractalTable,
+    Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
@@ -109,7 +109,7 @@ impl Fractal {
             "Token intitialisation".into(),
         );
 
-        ConsensusReward::add(self.account, self.token_id, quarter_supply);
+        RewardConsensus::add(self.account, quarter_supply);
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -158,7 +158,7 @@ impl Fractal {
         Guild::get_assert(self.judiciary)
     }
 
-    async fn consensus_reward(&self) -> Option<ConsensusReward> {
-        ConsensusReward::get(self.account)
+    async fn consensus_reward(&self) -> Option<RewardConsensus> {
+        RewardConsensus::get(self.account)
     }
 }

@@ -36,8 +36,8 @@ pub mod service {
     use crate::tables::{
         fractal_member::MemberStatus,
         tables::{
-            ConsensusReward, EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication,
-            GuildAttest, GuildMember,
+            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
+            GuildMember, RewardConsensus,
         },
     };
 
@@ -106,7 +106,9 @@ pub mod service {
             get_sender() == Fractal::get_assert(fractal).legislature,
             "must be legislature",
         );
-        ConsensusReward::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
+        RewardConsensus::get_assert(fractal)
+            .reward_stream()
+            .set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set guild display name
@@ -211,10 +213,10 @@ pub mod service {
             "managed accounts cannot join a fractal",
         );
 
-        // Give founding members (members joined prior to token minting) immediate citizenship
+        // Give founding members (members joined prior to live token) immediate citizenship
         // otherwise visa.
-        let fractal_has_token = ConsensusReward::get(fractal).is_some();
-        let member_status = if fractal_has_token {
+        let is_live_token = RewardConsensus::get(fractal).is_some();
+        let member_status = if is_live_token {
             MemberStatus::Visa
         } else {
             MemberStatus::Citizen
@@ -411,7 +413,7 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
-        ConsensusReward::get_assert(fractal).distribute_tokens();
+        RewardConsensus::get_assert(fractal).distribute_tokens();
     }
 
     /// Rank guilds for a fractal
@@ -431,7 +433,7 @@ pub mod service {
             Fractal::get_assert(fractal).legislature == get_sender(),
             "only the legislature can rank guilds",
         );
-        ConsensusReward::get_assert(fractal).set_ranked_guilds(guilds);
+        RewardConsensus::get_assert(fractal).set_ranked_guilds(guilds);
     }
 
     /// Set a new representative of the Guild.

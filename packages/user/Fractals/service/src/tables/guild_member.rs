@@ -4,7 +4,7 @@ use psibase::{check_none, check_some, AccountNumber, Table};
 use crate::constants::{EMA_ALPHA_DENOMINATOR, EMA_ALPHA_NUMERATOR, MAX_GROUP_SIZE, SCORE_SCALE};
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
-    ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,
+    Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable, RewardConsensus,
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -40,7 +40,11 @@ impl GuildMember {
 
     pub fn set_pending_score(&mut self, incoming_score: u8) {
         let guild = Guild::get_assert(self.guild);
-        if ConsensusReward::get(guild.fractal).is_some() {
+
+        let is_live_token = RewardConsensus::get(guild.fractal).is_some();
+        // Ignore any pending scores unless there is a live token
+        // Otherwise accumulating a score will create a pre-mine effect when it goes live.
+        if is_live_token {
             self.pending_score = Some(incoming_score);
             self.save();
         }

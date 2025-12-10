@@ -1,4 +1,3 @@
-mod consensus_reward;
 mod evaluation_instance;
 mod fractal;
 mod fractal_exile;
@@ -7,6 +6,8 @@ mod guild;
 mod guild_application;
 mod guild_attest;
 mod guild_member;
+mod reward_consensus;
+mod reward_stream;
 
 #[psibase::service_tables]
 pub mod tables {
@@ -211,14 +212,29 @@ pub mod tables {
         }
     }
 
-    #[table(name = "ConsensusRewardTable", index = 8)]
+    #[table(name = "RewardStreamTable", index = 8)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ConsensusReward {
+    pub struct RewardStream {
         #[primary_key]
-        pub fractal: AccountNumber,
         pub stream_id: u32,
-        pub ranked_guilds: Vec<AccountNumber>,
+        pub fractal: AccountNumber,
         pub last_distributed: psibase::TimePointSec,
         pub dist_interval_secs: u32,
+    }
+
+    impl RewardStream {
+        #[secondary_key(1)]
+        fn by_fractal(&self) -> (AccountNumber, u32) {
+            (self.fractal, self.stream_id)
+        }
+    }
+
+    #[table(name = "RewardConsensusTable", index = 9)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct RewardConsensus {
+        #[primary_key]
+        pub fractal: AccountNumber,
+        pub ranked_guilds: Vec<AccountNumber>,
+        pub reward_stream_id: u32,
     }
 }
