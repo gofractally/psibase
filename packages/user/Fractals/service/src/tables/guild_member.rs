@@ -1,10 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
-use crate::constants::{
-    EMA_ALPHA_DENOMINATOR, EMA_ALPHA_NUMERATOR, EMA_DEMONINATOR_SENSITIVITY, MAX_GROUP_SIZE,
-    SCORE_SCALE,
-};
+use crate::constants::{EMA_ALPHA_DENOMINATOR, EMA_ALPHA_NUMERATOR, MAX_GROUP_SIZE, SCORE_SCALE};
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
     ConsensusReward, Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable,

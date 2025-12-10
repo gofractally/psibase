@@ -405,8 +405,6 @@ pub mod service {
 
     /// Distribute token for a fractal.
     ///
-    /// Must be called by legislature.  
-    ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     #[action]
