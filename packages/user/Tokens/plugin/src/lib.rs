@@ -173,11 +173,11 @@ impl Helpers for TokensPlugin {
 
 impl User for TokensPlugin {
     fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
-
         let amount: Quantity = Self::decimal_to_u64(token_id, amount)?.into();
-
+        
         if amount.value > 0 {
+            assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
+            
             let packed_args = Actions::credit {
                 amount,
                 memo: memo.try_into().unwrap(),
