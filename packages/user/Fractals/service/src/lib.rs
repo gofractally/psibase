@@ -371,6 +371,8 @@ pub mod service {
 
     /// Exile a fractal member.
     ///
+    /// Must be called by judiciary.  
+    ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
@@ -378,7 +380,7 @@ pub mod service {
     fn exile_member(fractal: AccountNumber, member: AccountNumber) {
         check(
             Fractal::get_assert(fractal).judiciary == get_sender(),
-            "only the legislature can exile members",
+            "only the judiciary can exile members",
         );
         FractalMember::get_assert(fractal, member).exile();
     }
