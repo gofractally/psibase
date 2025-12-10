@@ -146,7 +146,7 @@ pub mod tables {
             check_some(Self::get(symbol), "Symbol does not exist")
         }
 
-        pub fn add(symbol: AccountNumber) -> Self {
+        pub fn add(symbol: AccountNumber, recipient: AccountNumber) -> Self {
             check_none(Symbol::get(symbol), "Symbol already exists");
             check(
                 symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
@@ -154,8 +154,8 @@ pub mod tables {
             );
             let sender = get_sender();
 
-            let is_self = sender == get_service();
-            if !is_self {
+            let is_billable = sender != get_service();
+            if is_billable {
                 check_some(
                     SymbolLength::get(symbol.to_string().len() as u8),
                     "Symbol length is not for sale",
@@ -170,13 +170,11 @@ pub mod tables {
             let new_instance = Self::new(symbol, Nft::call().mint());
             new_instance.save();
 
-            if !is_self {
-                Nft::call().credit(
-                    new_instance.ownerNft,
-                    get_sender(),
-                    format!("This NFT conveys ownership of symbol: {}", symbol).into(),
-                );
-            }
+            Nft::call().credit(
+                new_instance.ownerNft,
+                recipient,
+                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+            );
 
             new_instance
         }
@@ -335,7 +333,12 @@ pub mod service {
 
     #[action]
     fn create(symbol: AccountNumber) {
-        Symbol::add(symbol);
+        Symbol::add(symbol, get_sender());
+    }
+
+    #[action]
+    fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
+        Symbol::add(symbol, recipient);
     }
 
     #[action]

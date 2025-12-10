@@ -76,6 +76,23 @@ impl Api for SymbolPlugin {
 }
 
 impl Admin for SymbolPlugin {
+    fn create(symbol: String, recipient: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::create,
+            vec!["config".to_string()],
+        )?;
+
+        let packed_args = symbol::action_structs::admin_create {
+            symbol: AccountNumber::from(symbol.as_str()),
+            recipient: AccountNumber::from(recipient.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(
+            symbol::action_structs::admin_create::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn sell_length(
         length: u8,
         initial_price: u64,

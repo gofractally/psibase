@@ -12,7 +12,6 @@ world impl {
     import tokens:plugin/admin;
     import packages:plugin/private-api;
     import symbol:plugin/admin;
-    import symbol:plugin/api;
 
 
     export branding;
