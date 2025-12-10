@@ -90,11 +90,11 @@ impl ConsensusReward {
     pub fn set_distribution_interval(&mut self, seconds: u32) {
         check(
             seconds >= MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
-            "distribution must be greater or equal to a day",
+            "distribution interval too short",
         );
         check(
             seconds <= MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
-            "distribution must be less than or equal to 8 weeks",
+            "distribution interval too long",
         );
         self.dist_interval_secs = seconds;
         self.save();
