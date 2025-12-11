@@ -26,7 +26,6 @@ pub mod constants {
     pub const SCORE_SCALE: u32 = 10_000;
 
     // Determine score sensitivity
-    pub const EMA_ALPHA_NUMERATOR: u32 = 1;
     pub const EMA_ALPHA_DENOMINATOR: u32 = 6;
 }
 
