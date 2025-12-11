@@ -66,6 +66,8 @@ if(DEFINED IS_WASM)
     add_subdirectory(Sites)
     add_subdirectory(Symbol)
     add_subdirectory(Tokens)
+
+    add_subdirectory(BrotliCodec/test)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS on)
