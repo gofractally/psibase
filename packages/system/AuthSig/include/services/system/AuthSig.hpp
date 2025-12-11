@@ -83,7 +83,7 @@ namespace SystemService
          /// * `false`: If the sender is not among the authorizers
          bool isAuthSys(psibase::AccountNumber              sender,
                         std::vector<psibase::AccountNumber> authorizers,
-                        ServiceMethod                       method);
+                        std::optional<ServiceMethod>        method);
 
          /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
          /// transaction from a specified sender.
@@ -96,7 +96,7 @@ namespace SystemService
          /// * `false`: If the sender is not among the rejecters
          bool isRejectSys(psibase::AccountNumber              sender,
                           std::vector<psibase::AccountNumber> rejecters,
-                          ServiceMethod                       method);
+                          std::optional<ServiceMethod>        method);
 
          /// Create a new account using this auth service configured with the specified public key.
          void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);

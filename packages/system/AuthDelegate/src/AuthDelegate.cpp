@@ -35,7 +35,7 @@ namespace SystemService
 
    bool AuthDelegate::isAuthSys(psibase::AccountNumber                             sender,
                                 std::vector<psibase::AccountNumber>                authorizers,
-                                ServiceMethod                                      method,
+                                std::optional<ServiceMethod>                       method,
                                 std::optional<std::vector<psibase::AccountNumber>> authSet_opt)
    {
       auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
@@ -52,13 +52,13 @@ namespace SystemService
          return true;
 
       auto _ = recurse();
-      return authServiceOf(owner).isAuthSys(owner, std::move(authorizers), method,
+      return authServiceOf(owner).isAuthSys(owner, std::move(authorizers), std::nullopt,
                                             std::optional(std::move(authSet)));
    }
 
    bool AuthDelegate::isRejectSys(psibase::AccountNumber                             sender,
                                   std::vector<psibase::AccountNumber>                rejecters,
-                                  ServiceMethod                                      method,
+                                  std::optional<ServiceMethod>                       method,
                                   std::optional<std::vector<psibase::AccountNumber>> authSet_opt)
    {
       auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
@@ -75,7 +75,7 @@ namespace SystemService
          return true;
 
       auto _ = recurse();
-      return authServiceOf(owner).isRejectSys(owner, std::move(rejecters), method,
+      return authServiceOf(owner).isRejectSys(owner, std::move(rejecters), std::nullopt,
                                               std::make_optional(authSet));
    }
 

@@ -153,7 +153,7 @@ namespace SystemService
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
       bool isAuthSys(psibase::AccountNumber                             sender,
                      std::vector<psibase::AccountNumber>                authorizers,
-                     ServiceMethod                                      method,
+                     std::optional<ServiceMethod>                       method,
                      std::optional<std::vector<psibase::AccountNumber>> authSet);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
@@ -169,7 +169,7 @@ namespace SystemService
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
       bool isRejectSys(psibase::AccountNumber                             sender,
                        std::vector<psibase::AccountNumber>                rejecters,
-                       ServiceMethod                                      method,
+                       std::optional<ServiceMethod>                       method,
                        std::optional<std::vector<psibase::AccountNumber>> authSet);
    };
    PSIO_REFLECT(AuthInterface,

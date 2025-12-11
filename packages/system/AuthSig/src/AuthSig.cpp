@@ -88,14 +88,14 @@ namespace SystemService
 
       bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
                               std::vector<psibase::AccountNumber> authorizers,
-                              ServiceMethod                       method)
+                              std::optional<ServiceMethod>        method)
       {
          return std::ranges::contains(authorizers, sender);
       }
 
       bool AuthSig::isRejectSys(psibase::AccountNumber              sender,
                                 std::vector<psibase::AccountNumber> rejecters,
-                                ServiceMethod                       method)
+                                std::optional<ServiceMethod>        method)
       {
          return std::ranges::contains(rejecters, sender);
       }

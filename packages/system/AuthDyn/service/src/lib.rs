@@ -131,10 +131,10 @@ pub mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, method, authSet, true)
+        method.is_some_and(|method| is_auth(sender, authorizers, method, authSet, true))
     }
 
     #[action]
@@ -142,10 +142,10 @@ pub mod service {
     fn isRejectSys(
         sender: AccountNumber,
         rejecters: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, rejecters, method, authSet, false)
+        method.is_some_and(|method| is_auth(sender, rejecters, method, authSet, false))
     }
 
     fn is_auth_other(

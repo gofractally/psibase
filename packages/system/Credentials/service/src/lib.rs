@@ -171,7 +171,7 @@ pub mod service {
     fn isAuthSys(
         _sender: AccountNumber,
         _authorizers: Vec<AccountNumber>,
-        _method: ServiceMethod,
+        _method: Option<ServiceMethod>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         abort_message("isAuthSys not supported");
@@ -182,7 +182,7 @@ pub mod service {
     fn isRejectSys(
         _sender: AccountNumber,
         _authorizers: Vec<AccountNumber>,
-        _method: ServiceMethod,
+        _method: Option<ServiceMethod>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         abort_message("isRejectSys not supported");
