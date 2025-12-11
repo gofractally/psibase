@@ -46,6 +46,10 @@ members = [
     "TokenStream/service",
     "TokenStream/plugin",
     "TokenStream/query-service",
+    "Nft",
+    "Nft/service",
+    "Nft/plugin",
+    "Nft/query-service",
 ]
 
 exclude = [
