@@ -14,7 +14,7 @@ interface user-fractal {
     use host:types/types.{error};
 
     join: func() -> result<_, error>;
-
+    dist-token: func() -> result<_, error>;
 }
 
 interface user-eval {
