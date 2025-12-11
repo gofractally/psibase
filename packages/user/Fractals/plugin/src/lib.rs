@@ -325,6 +325,18 @@ impl UserFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        let packed_args = fractals::action_structs::dist_token {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::dist_token::ACTION_NAME,
+            &packed_args,
+        )
+    }
 }
 
 impl UserGuild for FractallyPlugin {
