@@ -45,7 +45,6 @@ const useSystemToken = () => {
                     configQuery,
                     siblingUrl(null, "tokens", "/graphql"),
                 );
-                console.info("configRes", configRes);
 
                 if (!configRes.config?.sysTid) {
                     return null;
