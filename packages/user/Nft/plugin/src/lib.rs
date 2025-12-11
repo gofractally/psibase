@@ -50,7 +50,7 @@ impl User for NftPlugin {
         trust::assert_authorized(trust::FunctionName::credit)?;
 
         let packed_args = Nft::action_structs::credit {
-            memo: memo.as_str().into(),
+            memo: memo.try_into().unwrap(),
             nftId: nft_id,
             debitor: receiver.as_str().into(),
         }
