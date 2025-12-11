@@ -16,15 +16,16 @@ pub mod constants {
     pub const COUNCIL_SEATS: u8 = 6;
 
     pub const MIN_GROUP_SIZE: u8 = 4;
-    pub const MAX_GROUP_SIZE: u8 = 6;
+    pub const MAX_GROUP_SIZE: u8 = 10;
 
-    pub const GUILD_EVALUATION_GROUP_SIZE: u8 = MAX_GROUP_SIZE;
+    pub const GUILD_EVALUATION_GROUP_SIZE: u8 = 6;
 
     pub const DEFAULT_RANKED_GUILD_SLOT_COUNT: u8 = 12;
     pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
 
-    // Max limit capped by continuous_fibonacci
-    pub const MAX_RANKED_GUILDS: u8 = 32;
+    // Simple limitation + also related to fibonacci function limit.
+    pub const MAX_RANKED_GUILDS: u8 = 25;
+
     // Expected scaling for use of the continuous_fibonacci func
     pub const SCORE_SCALE: u32 = 10_000;
 
@@ -108,9 +109,7 @@ pub mod service {
             get_sender() == Fractal::get_assert(fractal).legislature,
             "must be legislature",
         );
-        RewardConsensus::get_assert(fractal)
-            .reward_stream()
-            .set_distribution_interval(distribution_interval_secs);
+        RewardConsensus::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set guild display name

@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::constants::{DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
+use crate::constants::{COUNCIL_SEATS, DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
+use crate::helpers::fib::EXTERNAL_S;
 use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
     Fractal, FractalMember, Guild, GuildMember, RewardConsensus, RewardConsensusTable, RewardStream,
@@ -82,6 +83,12 @@ impl RewardConsensus {
 
     pub fn distribute_tokens(&mut self) {
         let claimed = self.reward_stream().withdraw();
+        // The first few indices of the fibonacci function have higher error than indices later in the curve,
+        // so we offset the input to incur reduced error.
+        const FIB_SCALE: u32 = EXTERNAL_S as u32;
+        const MAX_FIB: u32 = 32;
+        const OFFSET: u32 = MAX_FIB - MAX_RANKED_GUILDS as u32;
+
         let mut tokens_to_recycle = 0_u64;
 
         let ranked_guild_slots = to_fixed_vec(
@@ -93,19 +100,22 @@ impl RewardConsensus {
 
         let (weighted_guild_slots, guild_dust) = distribute_by_weight(
             leveled_guild_slots,
-            |_, (level, _)| continuous_fibonacci(*level as u32),
+            |_, (level, _)| continuous_fibonacci((*level as u32 + OFFSET) * FIB_SCALE),
             claimed.value,
         );
 
         tokens_to_recycle += guild_dust;
 
-        for ((_, guild), guild_distribution) in weighted_guild_slots {
+        for ((_, guild), slot_distribution) in weighted_guild_slots {
             match guild {
                 Some(guild) => {
                     let (member_distributions, member_dust) = distribute_by_weight(
-                        GuildMember::memberships_of_guild(guild),
-                        |_, member| continuous_fibonacci(member.score as u32),
-                        guild_distribution,
+                        GuildMember::memberships_of_guild(guild)
+                            .into_iter()
+                            .filter(|member| member.score > 0)
+                            .collect(),
+                        |_, member| continuous_fibonacci(member.score + FIB_SCALE * OFFSET),
+                        slot_distribution,
                     );
 
                     tokens_to_recycle += member_dust;
@@ -115,7 +125,7 @@ impl RewardConsensus {
                             .deposit_stream(reward.into(), "Guild member reward".into());
                     }
                 }
-                None => tokens_to_recycle += guild_distribution,
+                None => tokens_to_recycle += slot_distribution,
             }
         }
 
@@ -153,7 +163,11 @@ impl RewardConsensus {
         self.save();
     }
 
-    pub fn reward_stream(&self) -> RewardStream {
+    pub fn set_distribution_interval(&mut self, seconds: u32) {
+        self.reward_stream().set_distribution_interval(seconds);
+    }
+
+    fn reward_stream(&self) -> RewardStream {
         RewardStream::get_assert(self.reward_stream_id)
     }
 }
