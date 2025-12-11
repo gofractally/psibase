@@ -234,7 +234,8 @@ pub mod tables {
     pub struct RewardConsensus {
         #[primary_key]
         pub fractal: AccountNumber,
-        pub ranked_guilds: Vec<AccountNumber>,
         pub reward_stream_id: u32,
+        pub ranked_guilds: Vec<AccountNumber>,
+        pub ranked_guild_slot_count: u8,
     }
 }

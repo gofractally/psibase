@@ -20,6 +20,9 @@ pub mod constants {
 
     pub const GUILD_EVALUATION_GROUP_SIZE: u8 = MAX_GROUP_SIZE;
 
+    pub const DEFAULT_RANKED_GUILD_SLOT_COUNT: u8 = 12;
+    pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
+
     // Max limit capped by continuous_fibonacci
     pub const MAX_RANKED_GUILDS: u8 = 32;
     // Expected scaling for use of the continuous_fibonacci func
@@ -404,6 +407,24 @@ pub mod service {
         );
 
         fractal.init_token();
+    }
+
+    /// Set ranked guild slots.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `slots_count` - The number of ranked guild slots.
+    #[action]
+    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
+        let fractal = Fractal::get_assert(fractal);
+        check(
+            fractal.legislature == get_sender(),
+            "only the legislature initialise fractal token",
+        );
+
+        RewardConsensus::get_assert(fractal.account).set_ranked_guild_slot_count(slots_count);
     }
 
     /// Distribute token for a fractal.

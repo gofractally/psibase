@@ -68,7 +68,7 @@ define_trust! {
         None => [get_group_users, exile_member, set_dist_interval, init_token],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+        High => [propose, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
 }
@@ -86,6 +86,20 @@ impl Guild {
 struct FractallyPlugin;
 
 impl AdminFractal for FractallyPlugin {
+    fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_ranked_guild_slots)?;
+
+        let packed_args = fractals::action_structs::set_rank_g_s {
+            fractal: get_sender_app()?,
+            slots_count,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::set_rank_g_s::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_fractal(
         fractal_account: String,
         guild_account: String,

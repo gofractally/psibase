@@ -1,7 +1,8 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
-use crate::constants::{GUILD_EVALUATION_GROUP_SIZE};
+use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
+use crate::helpers::assign_decreasing_levels;
 use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
@@ -194,8 +195,12 @@ impl EvaluationInstance {
             group_members.into_iter().map(|user| user.user).collect(),
         );
 
-        for (index, account) in fractal_group_result.into_iter().enumerate() {
-            let level = (6 as usize) - index;
+        let guild_member_levels = assign_decreasing_levels(
+            fractal_group_result,
+            Some(GUILD_EVALUATION_GROUP_SIZE.into()),
+        );
+
+        for (level, account) in guild_member_levels {
             GuildMember::get_assert(self.guild, account).set_pending_score(level as u8);
         }
     }

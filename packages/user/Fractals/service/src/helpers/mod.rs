@@ -5,5 +5,5 @@ pub mod parse_rank_to_accounts;
 
 pub use distribute::distribute_by_weight;
 pub use fib::continuous_fibonacci;
-pub use misc::two_thirds_plus_one;
+pub use misc::{assign_decreasing_levels, two_thirds_plus_one};
 pub use parse_rank_to_accounts::parse_rank_to_accounts;

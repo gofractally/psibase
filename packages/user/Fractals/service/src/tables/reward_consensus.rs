@@ -2,10 +2,11 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::constants::MAX_RANKED_GUILDS;
-use crate::helpers::{continuous_fibonacci, distribute_by_weight};
+use crate::constants::{DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
+use crate::helpers::misc::to_fixed_vec;
+use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
-    RewardConsensus, RewardConsensusTable, Fractal, FractalMember, Guild, GuildMember, RewardStream,
+    Fractal, FractalMember, Guild, GuildMember, RewardConsensus, RewardConsensusTable, RewardStream,
 };
 
 use psibase::services::tokens::Quantity;
@@ -18,6 +19,7 @@ impl RewardConsensus {
             fractal,
             reward_stream_id: RewardStream::add(fractal, token_id).stream_id,
             ranked_guilds: vec![],
+            ranked_guild_slot_count: DEFAULT_RANKED_GUILD_SLOT_COUNT,
         }
     }
 
@@ -51,43 +53,52 @@ impl RewardConsensus {
 
     pub fn distribute_tokens(&mut self) {
         let claimed = self.reward_stream().withdraw();
+        let mut tokens_to_recycle = 0_u64;
 
-        let ranked_guilds = self.ranked_guilds.clone();
-        let ranked_guilds_length = ranked_guilds.len() as u64;
+        let ranked_guild_slots = to_fixed_vec(
+            self.ranked_guilds.clone(),
+            self.ranked_guild_slot_count as usize,
+        );
 
-        let mut total_dust = 0u64;
+        let leveled_guild_slots = assign_decreasing_levels(ranked_guild_slots, None);
 
-        let (guild_distributions, guild_dust) = distribute_by_weight(
-            ranked_guilds,
-            |index, _| continuous_fibonacci(ranked_guilds_length as u32 - index as u32),
+        let (weighted_guild_slots, guild_dust) = distribute_by_weight(
+            leveled_guild_slots,
+            |_, (level, _)| continuous_fibonacci(*level as u32),
             claimed.value,
         );
-        total_dust += guild_dust;
 
-        for (guild, guild_distribution) in guild_distributions {
-            let (member_distributions, member_dust) = distribute_by_weight(
-                GuildMember::memberships_of_guild(guild),
-                |_, member| continuous_fibonacci(member.score as u32),
-                guild_distribution,
-            );
+        tokens_to_recycle += guild_dust;
 
-            total_dust += member_dust;
+        for ((_, guild), guild_distribution) in weighted_guild_slots {
+            match guild {
+                Some(guild) => {
+                    let (member_distributions, member_dust) = distribute_by_weight(
+                        GuildMember::memberships_of_guild(guild),
+                        |_, member| continuous_fibonacci(member.score as u32),
+                        guild_distribution,
+                    );
 
-            for (membership, reward) in member_distributions {
-                FractalMember::get_assert(self.fractal, membership.member)
-                    .deposit_stream(reward.into(), "Guild member reward".into());
+                    tokens_to_recycle += member_dust;
+
+                    for (membership, reward) in member_distributions {
+                        FractalMember::get_assert(self.fractal, membership.member)
+                            .deposit_stream(reward.into(), "Guild member reward".into());
+                    }
+                }
+                None => tokens_to_recycle += guild_distribution,
             }
         }
 
-        if total_dust > 0 {
-            self.deposit(total_dust.into(), "Dust return".into());
+        if tokens_to_recycle > 0 {
+            self.deposit(tokens_to_recycle.into(), "Token reward recycle".into());
         }
     }
 
     pub fn set_ranked_guilds(&mut self, guilds: Vec<AccountNumber>) {
         check(
-            guilds.len() <= MAX_RANKED_GUILDS as usize,
-            &format!("only up to {} guilds can be ranked", MAX_RANKED_GUILDS),
+            guilds.len() <= self.ranked_guild_slot_count as usize,
+            "ranked guilds exceeds allocated slots",
         );
         let mut seen = HashSet::new();
         for &guild in &guilds {
@@ -100,6 +111,16 @@ impl RewardConsensus {
             );
         }
         self.ranked_guilds = guilds;
+        self.save();
+    }
+
+    pub fn set_ranked_guild_slot_count(&mut self, slots_count: u8) {
+        check(slots_count > 0, "slots count must be above 0");
+        check(
+            slots_count <= MAX_RANKED_GUILDS,
+            "slots count breaches max limit",
+        );
+        self.ranked_guild_slot_count = slots_count;
         self.save();
     }
 

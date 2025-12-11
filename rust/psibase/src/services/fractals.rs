@@ -244,6 +244,18 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set ranked guild slots.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `slots_count` - The number of ranked guild slots.
+    #[action]
+    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
+        unimplemented!()
+    }
+
     /// Get policy action used by AuthDyn service.
     ///
     /// # Arguments
