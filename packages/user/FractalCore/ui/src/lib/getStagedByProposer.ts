@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
 import { graphql } from "./graphql";
 import { Account } from "./zod/Account";
 
@@ -26,7 +24,7 @@ export const getStagedByProposer = async (account: Account) => {
                 }
         }
     }`,
-        siblingUrl(null, "staged-tx", "/graphql"),
+        "staged-tx",
     );
 
     return zRes.parse(res).getStagedByProposer.nodes;
