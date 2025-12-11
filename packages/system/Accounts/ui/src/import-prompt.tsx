@@ -61,8 +61,9 @@ export const ImportPrompt = () => {
             });
             await connectAccountMutation.mutateAsync(account);
             prompt.finished();
-        } catch {
+        } catch (e) {
             console.error("Import and login failed");
+            console.error(e);
             form.fieldInfo.privateKey.instance?.setErrorMap({
                 onSubmit:
                     "Error signing in. Check your private key and try again.",
