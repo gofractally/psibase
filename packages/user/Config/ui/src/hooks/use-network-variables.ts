@@ -36,6 +36,8 @@ export const useNetworkVariables = () => {
                 siblingUrl(null, "virtual-server", "/graphql"),
             );
 
+            console.info("useNetworkVariables res.getNetworkVariables:", res.getNetworkVariables);
+
             return res.getNetworkVariables;
         },
     });

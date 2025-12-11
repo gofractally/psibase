@@ -21,10 +21,11 @@ export const useSetNetworkVariables = () =>
         },
         {
             error: "Failed setting network variables",
-            loading: "Setting network variables..",
+            loading: "Setting network variables",
             success: "Set network variables",
             isStagable: true,
             onSuccess: (networkVariables, status) => {
+                console.info("onSuccess networkVariables:", networkVariables);
                 if (status.type == "executed") {
                     queryClient.setQueryData(
                         [...QueryKey.virtualServer(), "networkVariables"],

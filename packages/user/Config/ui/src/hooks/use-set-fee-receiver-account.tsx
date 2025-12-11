@@ -19,7 +19,13 @@ export const useSetFeeReceiverAccount = () =>
             isStagable: true,
             onSuccess: (feeReceiverAccount, status) => {
                 if (status.type == "executed") {
-                    queryClient.setQueryData(QueryKey.virtualServer(), feeReceiverAccount);
+                    queryClient.setQueryData(
+                        [...QueryKey.virtualServer(), "billingConfig"],
+                        (old: { feeReceiver: string | null; enabled: boolean } | undefined) => {
+                            if (!old) return { feeReceiver: feeReceiverAccount, enabled: false };
+                            return { ...old, feeReceiver: feeReceiverAccount };
+                        },
+                    );
                 }
             },
         },
