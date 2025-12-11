@@ -3,13 +3,42 @@ use std::collections::HashSet;
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::constants::{DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
-use crate::helpers::misc::to_fixed_vec;
 use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
     Fractal, FractalMember, Guild, GuildMember, RewardConsensus, RewardConsensusTable, RewardStream,
 };
 
 use psibase::services::tokens::Quantity;
+
+/// Creates a vector of fixed length, filling with `Some(item)` from the input
+/// and padding with `None` if the input is shorter.
+///
+/// If `items.len() > vector_length`, excess items are **discarded**.
+///
+/// # Examples
+///
+/// ```
+/// let input = vec!["alice", "bob"];
+/// let fixed = to_fixed_vec(input, 5);
+/// assert_eq!(
+///     fixed,
+///     vec![
+///         Some("alice"),
+///         Some("bob"),
+///         None,
+///         None,
+///         None
+///     ]
+/// );
+/// ```
+pub fn to_fixed_vec<T>(items: Vec<T>, vector_length: usize) -> Vec<Option<T>> {
+    items
+        .into_iter()
+        .map(Some)
+        .chain(std::iter::repeat_with(|| None)) // No Clone needed!
+        .take(vector_length)
+        .collect()
+}
 
 impl RewardConsensus {
     fn new(fractal: AccountNumber) -> Self {
