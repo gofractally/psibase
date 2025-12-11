@@ -1,8 +1,8 @@
 use psibase::{check, check_some, AccountNumber, Memo, Table};
 
 use crate::constants::{
-    FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
-    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, ONE_WEEK,
+    DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, FRACTAL_STREAM_HALF_LIFE,
+    MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
 };
 use crate::tables::tables::{Fractal, RewardStream, RewardStreamTable};
 
@@ -17,7 +17,7 @@ impl RewardStream {
 
         Self {
             stream_id: TokenStream::call().create(FRACTAL_STREAM_HALF_LIFE, token_id),
-            dist_interval_secs: ONE_WEEK,
+            dist_interval_secs: DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
             last_distributed: now,
             fractal,
         }
