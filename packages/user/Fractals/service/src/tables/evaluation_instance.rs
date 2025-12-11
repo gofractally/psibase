@@ -94,7 +94,7 @@ impl EvaluationInstance {
         interval_seconds: u32,
     ) {
         // TODO: Return to constants;
-        // let allowed_group_sizes: Vec<u8> = (MIN_GROUP_SIZE..=MAX_GROUP_SIZE).collect();
+        // let allowed_group_sizes: Vec<u8> = (MIN_GROUP_SIZE..=GUILD_EVALUATION_GROUP_SIZE).collect();
         let allowed_group_sizes: Vec<u8> = vec![2, 3, 4, 5, 6];
 
         let evaluation_id: u32 = psibase::services::evaluations::Wrapper::call().create(
