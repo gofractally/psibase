@@ -889,4 +889,5 @@ TEST_CASE("GraphQL Queries")
 TEST_CASE("tokens schema")
 {
    CHECK_SCHEMA(Tokens);
+   CHECK_SCHEMA(RTokens);
 }

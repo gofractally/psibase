@@ -1762,7 +1762,10 @@ namespace psio::schema_types
          return true;
       }
       bool match(const Float& lhs, const Float& rhs) { return lhs == rhs; }
-      bool match(const Int& lhs, const Int& rhs) { return lhs == rhs; }
+      bool match(const Int& lhs, const Int& rhs)
+      {
+         return lhs == rhs || (lhs.bits == 8 && rhs.bits == 8);
+      }
       bool match(const FracPack& lhs, const FracPack& rhs) { return match(*lhs.type, *rhs.type); }
       bool match(const FracPack& lhs, const List& rhs)
       {
