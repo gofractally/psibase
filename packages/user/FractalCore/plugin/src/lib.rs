@@ -52,7 +52,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [get_group_users],
+        None => [get_group_users, dist_token],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
         High => [exile_member, set_ranked_guild_slots, set_dist_interval, init_token, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
@@ -223,6 +223,11 @@ impl UserFractal for FractalCorePlugin {
     fn join() -> Result<(), Error> {
         assert_authorized(FunctionName::join)?;
         FractalsPlugin::user_fractal::join()
+    }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        FractalsPlugin::user_fractal::dist_token()
     }
 }
 
