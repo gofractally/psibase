@@ -10,13 +10,21 @@ namespace LocalService
    using SystemService::PendingRequestRow;
    using SystemService::PendingRequestTable;
 
+   enum class SocketType : std::uint8_t
+   {
+      http,
+      handshake,
+      websocket,
+   };
+
    struct ResponseHandlerRow
    {
       std::int32_t           socket;
+      SocketType             type;
       psibase::AccountNumber service;
       psibase::MethodNumber  method;
       psibase::MethodNumber  err;
-      PSIO_REFLECT(ResponseHandlerRow, socket, service, method, err)
+      PSIO_REFLECT(ResponseHandlerRow, socket, type, service, method, err)
    };
    using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
    PSIO_REFLECT_TYPENAME(ResponseHandlerTable)
@@ -53,6 +61,20 @@ namespace LocalService
                                std::optional<psibase::TLSInfo>        tls,
                                std::optional<psibase::SocketEndpoint> endpoint);
 
+      /// Opens a websocket connection and returns the new socket. The
+      /// request method must be GET. The required headers for the websocket
+      /// handshake will be added to the request if they are not already
+      /// provided. If the connection is successfully established, calls
+      /// `sender::callback(socket, reply)`. If the request fails without
+      /// a response, calls `sender::err(socket, nullopt)`. If the response
+      /// does not complete a websocket handshake, calls
+      /// `sender::err(socket, optional(reply))`
+      std::int32_t websocket(psibase::HttpRequest                   request,
+                             psibase::MethodNumber                  callback,
+                             psibase::MethodNumber                  err,
+                             std::optional<psibase::TLSInfo>        tls,
+                             std::optional<psibase::SocketEndpoint> endpoint);
+
       /// Enables or disables automatic closing of the socket
       /// when the transaction context exits.
       ///
@@ -61,6 +83,23 @@ namespace LocalService
 
       /// Sends an HTTP response. The socket must have autoClose enabled.
       void sendReply(std::int32_t socket, const psibase::HttpReply& response);
+
+      /// Accepts a websocket connection. The response must be a
+      /// valid websocket handshake for the request.
+      void accept(std::int32_t              socket,
+                  const psibase::HttpReply& reply,
+                  psibase::MethodNumber     callback,
+                  psibase::MethodNumber     err);
+
+      /// Changes the callback for a socket. The sender must be the owner
+      /// of the socket.
+      void setCallback(std::int32_t          socket,
+                       psibase::MethodNumber callback,
+                       psibase::MethodNumber err);
+
+      /// Close a socket. The socket should be either a websocket
+      /// or a pending http request.
+      void close(std::int32_t socket);
 
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
@@ -71,8 +110,12 @@ namespace LocalService
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
                 method(sendRequest, request, callback, err, tls, endpoint),
+                method(websocket, request, callback, err, tls, endpoint),
                 method(autoClose, socket, value),
                 method(sendReply, socket, response),
+                method(accept, socket, reply, callback, err),
+                method(setCallback, socket, callback, err),
+                method(close, socket),
                 method(rootHost, host),
                 method(startSession))
 

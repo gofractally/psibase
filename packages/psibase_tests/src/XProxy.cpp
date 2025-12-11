@@ -1,5 +1,6 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
+#include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
@@ -26,20 +27,35 @@ struct ProxyRow
 using ProxyTable = psibase::Table<ProxyRow, &ProxyRow::socket1>;
 PSIO_REFLECT_TYPENAME(ProxyTable)
 
+struct WebSocketRow
+{
+   std::int32_t from;
+   std::int32_t to;
+   PSIO_REFLECT(WebSocketRow, from, to)
+};
+using WebSocketTable = psibase::Table<WebSocketRow, &WebSocketRow::from, &WebSocketRow::to>;
+PSIO_REFLECT_TYPENAME(WebSocketTable)
+
 struct XProxy : psibase::Service
 {
    static constexpr auto service = psibase::AccountNumber{"x-proxy"};
    using Subjective              = psibase::SubjectiveTables<OriginServerTable>;
-   using Session                 = psibase::SessionTables<ProxyTable>;
+   using Session                 = psibase::SessionTables<ProxyTable, WebSocketTable>;
 
    std::optional<HttpReply> serveSys(HttpRequest req, std::optional<std::int32_t> socket);
    void                     onReply(std::int32_t socket, psibase::HttpReply reply);
-   void                     onError(std::int32_t socket);
+   void                     onAccept(std::int32_t socket, psibase::HttpReply reply);
+   void                     onError(std::int32_t socket, std::optional<psibase::HttpReply> reply);
+   void                     recv(std::int32_t socket, psio::view<const std::vector<char>> data);
+   void                     close(std::int32_t socket);
 };
 PSIO_REFLECT(XProxy,
              method(serveSys, request, socket),
              method(onReply, socket, reply),
-             method(onError, socket))
+             method(onAccept, socket, reply),
+             method(onError, socket, reply),
+             method(recv, socket, data),
+             method(close, socket))
 PSIBASE_REFLECT_TABLES(XProxy, XProxy::Subjective, XProxy::Session)
 
 std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
@@ -82,9 +98,18 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
       if (originServer)
       {
          req.host = originServer->host;
-         auto upstream =
-             to<XHttp>().sendRequest(req, MethodNumber{"onReply"}, MethodNumber{"onError"},
-                                     originServer->tls, originServer->endpoint);
+         std::int32_t upstream;
+         if (isWebSocketHandshake(req))
+         {
+            upstream = to<XHttp>().websocket(req, MethodNumber{"onAccept"}, MethodNumber{"onError"},
+                                             originServer->tls, originServer->endpoint);
+         }
+         else
+         {
+            upstream =
+                to<XHttp>().sendRequest(req, MethodNumber{"onReply"}, MethodNumber{"onError"},
+                                        originServer->tls, originServer->endpoint);
+         }
          auto requests = open<ProxyTable>();
          PSIBASE_SUBJECTIVE_TX
          {
@@ -112,23 +137,80 @@ void XProxy::onReply(std::int32_t socket, psibase::HttpReply reply)
    }
 }
 
-void XProxy::onError(std::int32_t socket)
+void XProxy::onAccept(std::int32_t socket, psibase::HttpReply reply)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   auto             table = open<ProxyTable>();
-   std::string_view msg{"Bad Gateway"};
-   HttpReply        reply{.status      = HttpStatus::badGateway,
-                          .contentType = "text/html",
-                          .body        = std::vector(msg.begin(), msg.end())};
+   auto                    table = open<ProxyTable>();
+   auto                    ws    = open<WebSocketTable>();
+   std::optional<ProxyRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = table.get(socket);
+      if (row)
+      {
+         to<XHttp>().autoClose(row->socket2, true);
+         to<XHttp>().setCallback(row->socket1, MethodNumber{"recv"}, MethodNumber{"close"});
+         table.remove(*row);
+         ws.put({row->socket1, row->socket2});
+         ws.put({row->socket2, row->socket1});
+      }
+   }
+   if (row)
+      to<XHttp>().accept(row->socket2, std::move(reply), MethodNumber{"recv"},
+                         MethodNumber{"close"});
+}
+
+void XProxy::onError(std::int32_t socket, std::optional<psibase::HttpReply> reply)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   auto table = open<ProxyTable>();
+   if (!reply)
+   {
+      std::string_view msg{"Bad Gateway"};
+      reply = {.status      = HttpStatus::badGateway,
+               .contentType = "text/html",
+               .body        = std::vector(msg.begin(), msg.end())};
+   }
    PSIBASE_SUBJECTIVE_TX
    {
       if (auto row = table.get(socket))
       {
          to<XHttp>().autoClose(row->socket2, true);
-         to<XHttp>().sendReply(row->socket2, std::move(reply));
+         to<XHttp>().sendReply(row->socket2, std::move(*reply));
          table.remove(*row);
       }
    }
+}
+
+void XProxy::close(std::int32_t socket)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   auto table = open<WebSocketTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (auto row = table.get(socket))
+      {
+         auto row2 = table.get(row->to);
+         check(row2.has_value(),
+               "upstream and downstream sockets must be added and removed atomically");
+         table.remove(*row);
+         table.remove(*row2);
+         to<XHttp>().close(row->to);
+      }
+   }
+}
+
+void XProxy::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   auto                        table = open<WebSocketTable>();
+   std::optional<WebSocketRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = table.get(socket);
+   }
+   if (row)
+      to<XHttp>().send(row->to, data);
 }
 
 PSIBASE_DISPATCH(XProxy)

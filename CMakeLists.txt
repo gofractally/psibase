@@ -139,7 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XProxy XSocketListService)
+        XProxy XSocketListService WSEcho)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1259,7 +1259,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/WSEcho.psi
+    NAME WSEcho
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Accepts websocket connections and echos all messages"
+    SERVICE x-echo
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/WSEcho.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/WSEcho-schema.json
+        SERVER x-echo
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho)
 
 ExternalProject_Add(
     rust

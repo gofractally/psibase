@@ -10,81 +10,21 @@
 #include <string>
 #include <string_view>
 
+#include "base64.hpp"
+
 namespace psibase
 {
    namespace
    {
-      constexpr std::array<char, 64> make_base64url_tab()
-      {
-         std::array<char, 64> result = {};
-         auto                 pos    = result.begin();
-         pos =
-             std::ranges::copy(std::ranges::views::iota('A', static_cast<char>('Z' + 1)), pos).out;
-         pos =
-             std::ranges::copy(std::ranges::views::iota('a', static_cast<char>('z' + 1)), pos).out;
-         pos =
-             std::ranges::copy(std::ranges::views::iota('0', static_cast<char>('9' + 1)), pos).out;
-         *pos++ = '-';
-         *pos++ = '_';
-         if (pos != result.end())
-            abortMessage("Size mismatch");
-         return result;
-      }
-      constexpr auto                         base64url_tab = make_base64url_tab();
-      constexpr std::array<std::int8_t, 256> make_base64url_invtab()
-      {
-         std::array<std::int8_t, 256> result = {};
-         for (auto& ch : result)
-         {
-            ch = -1;
-         }
-         std::int8_t i = 0;
-         for (auto ch : base64url_tab)
-         {
-            result[static_cast<unsigned char>(ch)] = i;
-            ++i;
-         }
-         return result;
-      }
-      constexpr auto     base64url_invtab = make_base64url_invtab();
-      constexpr unsigned mask(int bits)
-      {
-         return (unsigned(1) << bits) - 1;
-      }
-      // Encoding may add padding bits, decoding removes padding
-      template <int SrcBits, int DstBits, bool Encode>
-      void transcode(const auto& in, auto out)
-      {
-         unsigned buf  = 0;
-         int      bits = 0;
-         for (unsigned char ch : in)
-         {
-            buf = (buf << SrcBits) | ch;
-            bits += SrcBits;
-            while (bits >= DstBits)
-            {
-               bits -= DstBits;
-               out((buf >> bits) & mask(DstBits));
-            }
-         }
-         if constexpr (Encode)
-         {
-            if (bits != 0)
-            {
-               out((buf << (DstBits - bits)) & mask(DstBits));
-            }
-         }
-         else
-         {
-            psibase::check((buf & mask(bits)) == 0, "Invalid padding");
-         }
-      }
+      constexpr auto base64url_tab    = psibase::detail::base64Table('-', '_');
+      constexpr auto base64url_invtab = psibase::detail::invert(base64url_tab);
    }  // namespace
    std::string to_base64url(std::string_view s)
    {
       std::string result;
       result.reserve((s.size() * 4 + 2) / 3);
-      transcode<8, 6, true>(s, [&](unsigned ch) { result.push_back(base64url_tab[ch]); });
+      psibase::detail::transcode<8, 6, true>(
+          s, [&](unsigned ch) { result.push_back(base64url_tab[ch]); });
       return result;
    }
    std::string to_base64url(unsigned char* data, std::size_t size)
@@ -95,7 +35,7 @@ namespace psibase
    {
       std::string result;
       result.reserve(s.size() * 3 / 4);
-      transcode<6, 8, false>(
+      bool okay = psibase::detail::transcode<6, 8, false>(
           s | std::ranges::views::transform(
                   [](char ch)
                   {
@@ -110,6 +50,7 @@ namespace psibase
                      }
                   }),
           [&](unsigned ch) { result.push_back(static_cast<char>(ch)); });
+      psibase::check(okay, "Invalid padding");
       return result;
    }
 
