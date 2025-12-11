@@ -118,7 +118,7 @@ mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
     ) -> bool {
         unimplemented!()
     }
@@ -136,7 +136,7 @@ mod service {
     fn isRejectSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
     ) -> bool {
         unimplemented!()
     }

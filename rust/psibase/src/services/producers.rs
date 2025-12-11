@@ -77,7 +77,7 @@ mod service {
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
@@ -87,7 +87,7 @@ mod service {
     fn isRejectSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
