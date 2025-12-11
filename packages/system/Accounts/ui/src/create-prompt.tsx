@@ -89,6 +89,10 @@ export const CreatePrompt = () => {
                 createForm.fieldInfo.account.instance?.setErrorMap({
                     onSubmit: "This account name is not available",
                 });
+            } else {
+                createForm.fieldInfo.account.instance?.setErrorMap({
+                    onSubmit: "An unknown error occurred",
+                });
             }
         }
     };
@@ -150,8 +154,9 @@ export const CreatePrompt = () => {
             });
             await connectAccountMutation.mutateAsync(account);
             prompt.finished();
-        } catch {
+        } catch (e) {
             console.error("Import and login failed");
+            console.error(e);
             importForm.fieldInfo.privateKey.instance?.setErrorMap({
                 onSubmit:
                     "Error signing in. Check your private key and try again.",

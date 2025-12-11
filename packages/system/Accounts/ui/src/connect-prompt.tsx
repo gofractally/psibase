@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { prompt } from "@psibase/common-lib";
 
 import { Avatar } from "@shared/components/avatar";
+import { ErrorCard } from "@shared/components/error-card";
 import { CardContent, CardTitle } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
@@ -16,7 +17,13 @@ export const ConnectPrompt = () => {
     const navigate = useNavigate();
 
     // queries
-    const { data: accounts, isPending, isSuccess } = useGetAllAccounts();
+    const {
+        data: accounts,
+        isPending,
+        isSuccess,
+        isError,
+        error,
+    } = useGetAllAccounts();
 
     // mutations
     const connectAccountMutation = useConnectAccount();
@@ -33,10 +40,35 @@ export const ConnectPrompt = () => {
         try {
             await connectAccountMutation.mutateAsync(accountName);
             prompt.finished();
-        } catch {
+        } catch (e) {
             console.error("Login failed");
+            console.error(e);
         }
     };
+
+    if (isError && error) {
+        return (
+            <ErrorCard
+                error={
+                    new Error(
+                        "There was an error loading your accounts. Refresh the page to try again.",
+                    )
+                }
+            />
+        );
+    }
+
+    if (connectAccountMutation.isError && connectAccountMutation.error) {
+        return (
+            <ErrorCard
+                error={
+                    new Error(
+                        "There was an error logging in. Please try again.",
+                    )
+                }
+            />
+        );
+    }
 
     if (isPending) {
         return (
