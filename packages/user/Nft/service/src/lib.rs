@@ -8,6 +8,8 @@ pub mod tables {
     };
     use serde::{Deserialize, Serialize};
 
+    use async_graphql::ComplexObject;
+
     pub type NID = u32;
 
     define_flags!(NftHolderFlags, u8, {
@@ -133,6 +135,7 @@ pub mod tables {
 
     #[table(name = "NftHolderTable", index = 2)]
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[graphql(complex)]
     pub struct NftHolder {
         #[primary_key]
         pub account: AccountNumber,
@@ -260,6 +263,13 @@ pub mod tables {
 
         pub fn save(&self) {
             NftHolderTable::read_write().put(self).unwrap();
+        }
+    }
+
+    #[ComplexObject]
+    impl NftHolder {
+        pub async fn settings(&self) -> NftHolderFlagsJson {
+            NftHolderFlagsJson::from(psibase::Flags::new(self.config))
         }
     }
 }
