@@ -168,6 +168,7 @@ pub mod auth_interface {
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
     /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+    /// * `method`: The service and method being called.
     /// * `authSet`: The set of accounts that are already being checked for authorization.
     ///              If the sender is already in this set, then the function should return false.
     ///
@@ -178,7 +179,7 @@ pub mod auth_interface {
     fn isAuthSys(
         sender: crate::AccountNumber,
         authorizers: Vec<crate::AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
@@ -189,6 +190,7 @@ pub mod auth_interface {
     ///
     /// * `sender`: The sender account for the transaction potentially being rejected.
     /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+    /// * `method`: The service and method being called.
     /// * `authSet`: The set of accounts that are already being checked for authorization.
     ///              If the sender is already in this set, then the function should return false.
     ///
@@ -199,7 +201,7 @@ pub mod auth_interface {
     fn isRejectSys(
         sender: crate::AccountNumber,
         rejecters: Vec<crate::AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()

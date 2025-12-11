@@ -151,7 +151,6 @@ pub mod service {
     fn is_auth_other(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
         auth_set: Vec<AccountNumber>,
         is_approval: bool,
     ) -> bool {
@@ -160,9 +159,9 @@ pub mod service {
         let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
 
         if is_approval {
-            auth_service.isAuthSys(sender, authorizers, method, Some(auth_set))
+            auth_service.isAuthSys(sender, authorizers, None, Some(auth_set))
         } else {
-            auth_service.isRejectSys(sender, authorizers, method, Some(auth_set))
+            auth_service.isRejectSys(sender, authorizers, None, Some(auth_set))
         }
     }
 
@@ -216,7 +215,6 @@ pub mod service {
             let is_auth = is_auth_other(
                 weight_authorizer.account,
                 authorizers.clone(),
-                method,
                 auth_set.clone(),
                 is_approval,
             );
