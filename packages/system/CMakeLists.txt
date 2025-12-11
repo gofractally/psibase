@@ -76,4 +76,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)
     add_subdirectory(VerifySig)
+
+    add_subdirectory(Credentials/service/cpp/test)
 endif()
