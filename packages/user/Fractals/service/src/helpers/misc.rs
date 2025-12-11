@@ -9,17 +9,28 @@ pub fn two_thirds_plus_one(count: u8) -> u8 {
 /// # Example
 ///
 /// ```
-/// let items = vec!["Root", "Child", "Grandchild"];
-/// let leveled = assign_decreasing_levels(items, Some(3));
-/// assert_eq!(leveled, vec![(3, "Root"), (2, "Child"), (1, "Grandchild")]);
+/// let items = vec!["A", "B"];
+/// // Explicit start level
+/// let result = assign_decreasing_levels(items.clone(), Some(5));
+/// assert_eq!(result, vec![(5, "A"), (4, "B")]);
+///
+/// // Default: start from length
+/// let result = assign_decreasing_levels(items, None);
+/// assert_eq!(result, vec![(2, "A"), (1, "B")]);
 /// ```
 pub fn assign_decreasing_levels<T>(items: Vec<T>, from_level: Option<usize>) -> Vec<(usize, T)> {
-    let from_level = from_level.unwrap_or(items.len());
+    let from_level = from_level.map_or(items.len(), |from_level| {
+        psibase::check(
+            from_level >= items.len(),
+            "from level should be equal to or higher than items length",
+        );
+        from_level
+    });
     items
         .into_iter()
         .enumerate()
         .map(|(index, item)| {
-            let level = from_level.saturating_sub(index);
+            let level = from_level - index;
             (level, item)
         })
         .collect()
