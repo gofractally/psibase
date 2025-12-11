@@ -12,6 +12,12 @@ export const zFractal = z
         createdAt: zDateTime,
         name: z.string(),
         mission: z.string(),
+        judiciary: z.object({
+            account: zAccount,
+        }),
+        legislature: z.object({
+            account: zAccount,
+        }),
     })
     .or(z.null());
 
@@ -50,6 +56,12 @@ export const getFractal = async (owner: Account) => {
             createdAt
             mission
             name
+            judiciary { 
+                account
+            }
+            legislature { 
+                account
+            }
         }
         guilds(fractal: "${owner}") {
             nodes {
