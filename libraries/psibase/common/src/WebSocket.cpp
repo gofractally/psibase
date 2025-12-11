@@ -270,7 +270,7 @@ bool psibase::isWebSocketHandshake(const HttpRequest& request, const HttpReply& 
    if (auto replySubprotocol = reply.getHeader("Sec-WebSocket-Protocol"))
    {
       if (!subprotocols ||
-          std::ranges::find(*subprotocols, replySubprotocol) == subprotocols->end())
+          std::ranges::find(*subprotocols, *replySubprotocol) == subprotocols->end())
          return false;
    }
    for (const auto& ext : reply.getHeaderValues("Sec-WebSocket-Extensions"))
