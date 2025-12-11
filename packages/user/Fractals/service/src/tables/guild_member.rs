@@ -111,6 +111,6 @@ impl GuildMember {
     }
 
     pub async fn score(&self) -> f32 {
-        self.score as f32 / SCORE_SCALE as f32 / MAX_GROUP_SIZE as f32 * 100.0
+        self.score as f32 / SCORE_SCALE as f32 / GUILD_EVALUATION_GROUP_SIZE as f32 * 100.0
     }
 }
