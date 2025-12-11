@@ -13,7 +13,7 @@ pub mod constants {
     pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
     pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
     pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
-    pub const MAX_COUNCIL_SIZE: u8 = 6;
+    pub const COUNCIL_SEATS: u8 = 6;
 
     pub const MIN_GROUP_SIZE: u8 = 4;
     pub const MAX_GROUP_SIZE: u8 = 6;

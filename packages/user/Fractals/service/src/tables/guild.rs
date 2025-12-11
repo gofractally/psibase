@@ -3,7 +3,7 @@ use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
 use psibase::{check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::constants::MAX_COUNCIL_SIZE;
+use crate::constants::COUNCIL_SEATS;
 use crate::helpers::two_thirds_plus_one;
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
@@ -111,7 +111,7 @@ impl Guild {
                     ..=(self.account, u32::MAX, AccountNumber::new(u64::MAX)),
             )
             .rev()
-            .take(MAX_COUNCIL_SIZE as usize)
+            .take(COUNCIL_SEATS as usize)
             .filter(|member| member.score != 0)
             .collect();
 
