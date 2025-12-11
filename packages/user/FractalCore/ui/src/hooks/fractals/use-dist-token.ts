@@ -1,28 +1,27 @@
 import { queryClient } from "@/queryClient";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account } from "@/lib/zod/Account";
 
 import { usePluginMutation } from "../use-plugin-mutation";
 import { useFractalAccount } from "./use-fractal-account";
 
-export const useExile = () => {
+export const useDistToken = () => {
     const fractalAccount = useFractalAccount();
-    return usePluginMutation<[member: Account]>(
+    return usePluginMutation<[]>(
         {
-            intf: "adminFractal",
-            method: "exileMember",
+            intf: "userFractal",
+            method: "distToken",
             service: fractalAccount,
         },
         {
-            error: "Failed exile",
-            loading: "Exiling member",
-            success: "Exiled member",
+            error: "Failed token distribution",
+            loading: "Distributing",
+            success: "Distributed tokens",
             isStagable: true,
-            onSuccess: ([fractal], status) => {
+            onSuccess: (_, status) => {
                 if (status.type == "executed") {
                     queryClient.invalidateQueries({
-                        queryKey: QueryKey.members(fractal),
+                        queryKey: QueryKey.fractal(fractalAccount),
                     });
                 }
             },

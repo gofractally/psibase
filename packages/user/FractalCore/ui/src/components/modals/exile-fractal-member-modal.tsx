@@ -12,7 +12,6 @@ import { FieldAccountExisting } from '@shared/components/form/field-account-exis
 import { useExile } from "@/hooks/fractals/use-exile";
 import { zAccount } from "@/lib/zod/Account";
 import { supervisor } from "@/supervisor";
-import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 export const ExileFractalMemberModal = ({
     show,
@@ -23,8 +22,6 @@ export const ExileFractalMemberModal = ({
 }) => {
     const { mutateAsync: exileMember } = useExile();
 
-    const fractalAccount = useFractalAccount();
-
     const form = useAppForm({
         defaultValues: {
             exile: {
@@ -32,7 +29,7 @@ export const ExileFractalMemberModal = ({
             },
         },
         onSubmit: async ({ value: { exile: { member } } }) => {
-            await exileMember([fractalAccount, member]);
+            await exileMember([member]);
             openChange(false);
         },
         validators: {
