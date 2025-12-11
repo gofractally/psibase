@@ -102,12 +102,12 @@ namespace psibase::http
          {
             auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
             BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, debug) << action.service.str() << "::recv succeeded";
+            PSIBASE_LOG(logger, debug) << proxyServiceNum.str() << "::recv succeeded";
          }
          catch (std::exception& e)
          {
             BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, warning) << action.service.str() << "::recv failed: " << e.what();
+            PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::recv failed: " << e.what();
          }
       }
       void handleClose()
@@ -132,12 +132,12 @@ namespace psibase::http
          {
             auto& atrace = bc.execAsyncExport("close", std::move(action), trace);
             BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, debug) << action.service.str() << "::close succeeded";
+            PSIBASE_LOG(logger, debug) << proxyServiceNum.str() << "::close succeeded";
          }
          catch (std::exception& e)
          {
             BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, warning) << action.service.str() << "::close failed: " << e.what();
+            PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::close failed: " << e.what();
          }
       }
       void error(const std::error_code& ec)
