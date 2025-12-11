@@ -68,6 +68,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(Tokens)
 
     add_subdirectory(BrotliCodec/test)
+    add_subdirectory(Chainmail/test)
     add_subdirectory(Subgroups/service/cpp/test)
 endif()
 
