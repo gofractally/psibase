@@ -373,6 +373,7 @@ export const CreatePrompt = () => {
                                     type="button"
                                     variant="link"
                                     onClick={() => setStep("2_SAVE")}
+                                    className="-ml-4"
                                 >
                                     Back
                                 </Button>
