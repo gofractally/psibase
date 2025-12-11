@@ -11,6 +11,15 @@ export const zFractal = z
         account: zAccount,
         createdAt: zDateTime,
         name: z.string(),
+        consensusReward: z
+            .object({
+                rankedGuilds: zAccount.array(),
+                stream: z.object({
+                    lastDistributed: zDateTime,
+                    distIntervalSecs: z.number().int(),
+                }),
+            })
+            .nullable(),
         mission: z.string(),
         judiciary: z.object({
             account: zAccount,
@@ -56,6 +65,13 @@ export const getFractal = async (owner: Account) => {
             createdAt
             mission
             name
+            consensusReward {
+                rankedGuilds
+                stream {
+                    lastDistributed
+                    distIntervalSecs
+                }
+            }
             judiciary { 
                 account
             }

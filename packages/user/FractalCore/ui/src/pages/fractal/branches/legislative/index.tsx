@@ -11,13 +11,22 @@ import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ErrorCard } from "@/components/error-card";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { RewardConsensusSettings } from "./token-init";
 
 export const Legislative = () => {
     const { data: fractal, error: fractalError } = useFractal();
 
-    const { data, error: guildError } = useGuild(fractal?.fractal?.legislature.account)
+    const focusedGuild = fractal?.fractal?.legislature.account
+    const { data, error: guildError } = useGuild(focusedGuild)
 
     const error = fractalError || guildError;
+
+    const { data: currentUser } = useCurrentUser();
+
+    const isAdministrativeUser = currentUser == data?.rep?.member || (typeof currentUser == 'string' && data?.council?.includes(currentUser));
+
+
     if (error) {
         return <ErrorCard error={error} />
     }
@@ -52,6 +61,15 @@ export const Legislative = () => {
 
 
             <GuildOverviewCard guildAccount={data?.account} />
+
+            {isAdministrativeUser && <div className="border rounded-xl p-6">
+                <div className="text-lg py-2">
+                    Control Panel
+                </div>
+                <div>
+                    <RewardConsensusSettings />
+                </div>
+            </div>}
         </div>
     );
 };
