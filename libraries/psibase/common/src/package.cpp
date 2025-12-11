@@ -436,6 +436,18 @@ namespace psibase
 
    DirectoryRegistry::DirectoryRegistry(std::string_view path) : path(path) {}
 
+   std::vector<PackageInfo> DirectoryRegistry::index() const
+   {
+      std::vector<PackageInfo> result;
+      {
+         auto index_json = readWholeFile(path + "/index.json");
+         index_json.push_back('\0');
+         psio::json_token_stream stream(index_json.data());
+         from_json(result, stream);
+      }
+      return result;
+   }
+
    PackagedService DirectoryRegistry::get(std::string_view name) const
    {
       std::string filepath = path;
@@ -457,13 +469,7 @@ namespace psibase
        std::span<const std::string>   packages,
        std::span<const AccountNumber> priorityServices)
    {
-      std::vector<PackageInfo> index;
-      {
-         auto index_json = readWholeFile(path + "/index.json");
-         index_json.push_back('\0');
-         psio::json_token_stream stream(index_json.data());
-         from_json(index, stream);
-      }
+      std::vector<PackageInfo> index = this->index();
 
       std::ranges::sort(index, std::less<>());
       std::vector<PackageRef> in;

@@ -1,6 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
+#include <psibase/checkSchema.hpp>
 #include <psibase/testUtils.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/RTokens.hpp>
@@ -883,4 +884,9 @@ TEST_CASE("GraphQL Queries")
    CHECK(
        std::string(userTokens.body.begin(), userTokens.body.end()) ==
        R"({"data":{"userTokens":[{"id":1,"precision":4,"issuedSupply":"1000000.0000","maxIssuedSupply":"1000000000.0000","symbol":null}]}})");
+}
+
+TEST_CASE("tokens schema")
+{
+   CHECK_SCHEMA(Tokens);
 }

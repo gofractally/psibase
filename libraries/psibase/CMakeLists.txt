@@ -131,6 +131,7 @@ function(add suffix)
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             tester/src/testUtils.cpp
+            tester/src/checkSchema.cpp
             service/src/intrinsic.cpp
             service/src/ossl.c
             service/src/time.c
