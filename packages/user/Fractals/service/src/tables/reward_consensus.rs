@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
 
-use crate::constants::{COUNCIL_SEATS, DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
+use crate::constants::{DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
 use crate::helpers::fib::EXTERNAL_S;
 use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
