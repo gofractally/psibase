@@ -92,6 +92,19 @@ namespace SystemService
       ///
       /// * `id`: The ID of the database record containing the staged transaction
       StagedTx get_staged_tx(uint32_t id);
+
+      struct Events
+      {
+         struct History
+         {
+            void updated(
+                psibase::Checksum256   txid,       // The txid of the staged transaction
+                psibase::AccountNumber actor,      // The sender of the action causing the event
+                psibase::TimePointUSec datetime,   // The time of the event emission
+                std::string            event_type  // The type of event
+            );
+         };
+      };
    };
 
    // clang-format off
@@ -103,6 +116,10 @@ namespace SystemService
       method(reject, id, txid),
       method(execute, id, txid),
       method(get_staged_tx, id),
+   );
+   PSIBASE_REFLECT_EVENTS(StagedTxService);
+   PSIBASE_REFLECT_HISTORY_EVENTS(StagedTxService,
+      method(updated, txid, actor, datetime, event_type),
    );
    // clang-format on
 

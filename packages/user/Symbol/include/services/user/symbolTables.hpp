@@ -28,8 +28,8 @@ namespace UserService
 
    struct SymbolLengthRecord
    {
-      uint8_t  symbolLength;
-      uint64_t nftId;
+      uint8_t symbolLength;
+      NID     nftId;
    };
    PSIO_REFLECT(SymbolLengthRecord, symbolLength, nftId);
    using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;

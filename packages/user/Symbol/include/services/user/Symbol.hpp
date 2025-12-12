@@ -15,7 +15,7 @@ namespace UserService
    class Symbol : public psibase::Service
    {
      public:
-      using Tables = psibase::ServiceTables<SymbolTable, SymbolLengthTable, InitTable>;
+      using Tables = psibase::ServiceTables<InitTable, SymbolLengthTable, SymbolTable>;
 
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
@@ -71,7 +71,7 @@ namespace UserService
    );
    PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
-      method(symCreated, symbol, owner, cost),
+      method(symEvent, symbol, actor, action),
    );
    PSIBASE_REFLECT_UI_EVENTS(Symbol);
    PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);

@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/checkSchema.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
@@ -317,4 +318,9 @@ SCENARIO("Using symbol ownership NFT")
          }
       }
    }
+}
+
+TEST_CASE("symbol schema")
+{
+   CHECK_SCHEMA(Symbol);
 }

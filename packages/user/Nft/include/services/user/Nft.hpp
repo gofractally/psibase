@@ -13,7 +13,7 @@ namespace UserService
    class Nft : public psibase::Service
    {
      public:
-      using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
+      using Tables = psibase::ServiceTables<NftConfigTable, NftTable, NftHolderTable, CreditTable>;
 
       static constexpr auto         service     = psibase::AccountNumber("nft");
       static constexpr std::uint8_t manualDebit = 0;
@@ -27,8 +27,6 @@ namespace UserService
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
       void setUserConf(std::uint8_t flag, bool enable);
-
-      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
       // Read-only:
       NftRecord       getNft(NID nftId);
@@ -72,7 +70,6 @@ namespace UserService
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
       method(setUserConf, flag, enable),
-      method(serveSys, request),
 
       method(getNft, nftId),
       method(getNftHolder, account),

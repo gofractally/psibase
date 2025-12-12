@@ -1,6 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include <cstdint>
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/checkSchema.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
@@ -40,11 +41,7 @@ SCENARIO("Minting & burning nfts")
 
          AND_THEN("The NFT exists")
          {
-            NftRecord expected{
-                .id     = 1,         
-                .issuer = alice.id,  
-                .owner  = alice.id  
-            };
+            NftRecord expected{.id = 1, .issuer = alice.id, .owner = alice.id};
 
             auto nft = a.getNft(mint.returnVal()).returnVal();
 
@@ -246,4 +243,9 @@ SCENARIO("Transferring NFTs")
          }
       }
    }
+}
+
+TEST_CASE("nft schema")
+{
+   CHECK_SCHEMA(Nft);
 }

@@ -273,6 +273,8 @@ namespace psibase
 
       TestChain& operator=(const TestChain&) = delete;
 
+      static std::string defaultPackageDir();
+
       /**
        * Boots the chain.
        */

@@ -11,16 +11,24 @@
 
 namespace UserService
 {
+   struct TokensInitRecord
+   {
+      TID           last_used_id;
+      std::uint64_t last_used_shared_bal_id;
+   };
+   PSIO_REFLECT(TokensInitRecord, last_used_id, last_used_shared_bal_id)
+   using TokensInitTable = psibase::Table<TokensInitRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(TokensInitTable)
+
    struct TokenRecord
    {
-      TID                id;
-      NID                nft_id;
-      uint8_t            settings_value;
-      Precision          precision;
-      Quantity           issued_supply;
-      Quantity           burned_supply;
-      Quantity           max_issued_supply;
-      std::optional<SID> symbol;
+      TID       id;
+      NID       nft_id;
+      uint8_t   settings_value;
+      Precision precision;
+      Quantity  issued_supply;
+      Quantity  burned_supply;
+      Quantity  max_issued_supply;
 
       auto operator<=>(const TokenRecord&) const = default;
    };
@@ -31,22 +39,8 @@ namespace UserService
                 precision,
                 issued_supply,
                 burned_supply,
-                max_issued_supply,
-                symbol);
+                max_issued_supply);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
    PSIO_REFLECT_TYPENAME(TokenTable)
-
-   struct TokenHolderRecord
-   {
-      psibase::AccountNumber account;
-      psibase::Bitset<8>     config;
-
-      using Configurations = psibase::Enum<psibase::EnumElement{"manualDebit"}>;
-
-      auto operator<=>(const TokenHolderRecord&) const = default;
-   };
-   PSIO_REFLECT(TokenHolderRecord, account, config);
-   using TokenHolderTable = psibase::Table<TokenHolderRecord, &TokenHolderRecord::account>;
-   PSIO_REFLECT_TYPENAME(TokenHolderTable)
 
 }  // namespace UserService
