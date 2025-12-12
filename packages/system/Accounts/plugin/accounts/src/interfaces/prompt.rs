@@ -31,24 +31,18 @@ impl Prompt for AccountsPlugin {
                 Ok(Some(account)) => {
                     let valid = match account.auth_service.as_str() {
                         "auth-any" => true,
-                        "auth-sig" => AuthSig::api::can_authorize(
-                            &credential.key,
-                            &credential.account.to_string(),
-                        ),
+                        "auth-sig" => {
+                            AuthSig::api::can_authorize(
+                                &credential.key,
+                                &credential.account.to_string(),
+                            ) && AuthSig::keyvault::import_key(&credential.key).is_ok()
+                        }
                         _ => false,
                     };
 
                     if !valid {
                         invalid_accounts.push(credential.account);
                         continue;
-                    }
-
-                    match AuthSig::keyvault::import_key(&credential.key) {
-                        Ok(_pubkey) => {}
-                        Err(_e) => {
-                            invalid_accounts.push(credential.account);
-                            continue;
-                        }
                     }
 
                     AppsTable::new(&Client::get_receiver()).connect(&credential.account);
