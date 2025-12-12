@@ -96,6 +96,9 @@ function(add suffix)
         target_mapped_include_directories(psibase-service-base${suffix} PUBLIC service/include)
 
         file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
+        if (NOT "${LIBCLANG_RT_BUILTINS}")
+            file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a)
+        endif()
 
         # Service with simple malloc/free
         add_library(psibase-service-simple-malloc${suffix} INTERFACE)
