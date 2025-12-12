@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <cstdint>
 #include <psibase/DefaultTestChain.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/Accounts.hpp>
@@ -17,7 +18,7 @@ using std::vector;
 
 namespace
 {
-   constexpr auto manualDebit = "manualDebit"_m;
+   constexpr auto manualDebit = Nft::manualDebit;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
@@ -123,9 +124,9 @@ SCENARIO("Transferring NFTs")
       {
          NID invalidId = 99;
          CHECK(a.credit(invalidId, bob, "memo").failed(nftDNE));
-         CHECK(a.uncredit(invalidId, "memo").failed(nftDNE));
-         CHECK(a.debit(invalidId, "memo").failed(nftDNE));
-         CHECK(a.debit(invalidId, "memo").failed(nftDNE));
+         CHECK(a.uncredit(invalidId, "memo").failed(uncreditRequiresCredit));
+         CHECK(a.debit(invalidId, "memo").failed(debitRequiresCredit));
+         CHECK(a.debit(invalidId, "memo").failed(debitRequiresCredit));
       }
       AND_GIVEN("Alice has minted an NFT")
       {

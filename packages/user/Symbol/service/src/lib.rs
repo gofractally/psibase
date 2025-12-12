@@ -3,7 +3,7 @@
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
-    use psibase::services::nft::{NftRecord, Wrapper as Nft, NID};
+    use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
     use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
@@ -173,7 +173,9 @@ pub mod tables {
             Nft::call().credit(
                 new_instance.ownerNft,
                 recipient,
-                format!("This NFT conveys ownership of symbol: {}", symbol).into(),
+                format!("This NFT conveys ownership of symbol: {}", symbol)
+                    .as_str()
+                    .into(),
             );
 
             new_instance
@@ -285,7 +287,7 @@ pub mod service {
 
     use psibase::services::events;
 
-    use psibase::services::nft::Wrapper as Nft;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
@@ -296,7 +298,7 @@ pub mod service {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf("manualDebit".into(), true);
+            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

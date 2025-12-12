@@ -315,15 +315,15 @@ SCENARIO("Interactions with the Issuer NFT")
 
          THEN("Alice may not mint new tokens")
          {
-            CHECK(a.mint(tokenId, quantity, memo).failed(nftDNE));
+            CHECK(a.mint(tokenId, quantity, memo).failed(nftBurned));
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
-            CHECK(alice.to<Nft>().credit(nft.id, bob, memo).failed(nftDNE));
+            CHECK(alice.to<Nft>().credit(nft.id, bob, memo).failed(nftBurned));
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, quantity, memo).failed(nftDNE));
+            CHECK(a.recall(tokenId, bob, quantity, memo).failed(nftBurned));
          }
          THEN("Alice may not update the token inflation")
          {  //
@@ -331,7 +331,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not update the token recallability")
          {
-            CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, true).failed(nftDNE));
+            CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, true).failed(nftBurned));
          }
       }
    }
@@ -732,7 +732,7 @@ SCENARIO("Mapping a symbol to a token")
 
          THEN("Alice is unable to map the symbol to the token")
          {
-            CHECK(aliceSymbol.mapSymbol(newToken, symbolId).failed(nftDNE));
+            CHECK(aliceSymbol.mapSymbol(newToken, symbolId).failed(nftBurned));
          }
       }
       WHEN("Alice burns the token owner NFT")

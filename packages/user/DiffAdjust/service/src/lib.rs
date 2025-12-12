@@ -84,7 +84,7 @@ pub mod tables {
         ) -> Self {
             let nft_id = Nft::call().mint();
             let sender = get_sender();
-            Nft::call().credit(nft_id, sender, "RateLimit administration NFT".to_string());
+            Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
             let last_updated = TransactSvc::call().currentBlock().time.seconds();
 
