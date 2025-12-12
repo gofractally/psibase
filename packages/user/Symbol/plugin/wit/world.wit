@@ -21,6 +21,13 @@ interface api {
 interface admin {
     use host:types/types.{error};
 
+    /// Creates a new symbol. An NFT representing ownership of this symbol will be credited to the recipient account.
+    ///
+    /// Parameters:
+    /// * `symbol` - The symbol to create
+    /// * `recipient` - The account to receive the ownership NFT
+    create: func(symbol: string, recipient: string) -> result<_, error>;
+
     /// Start selling symbols of a certain length
     ///
     /// Parameters:
