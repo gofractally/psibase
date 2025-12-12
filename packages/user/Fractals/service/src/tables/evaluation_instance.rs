@@ -1,6 +1,8 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
+use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
+use crate::helpers::assign_decreasing_levels;
 use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
@@ -92,14 +94,17 @@ impl EvaluationInstance {
         finish_by: u32,
         interval_seconds: u32,
     ) {
+        // TODO: Return to constants;
+        // let allowed_group_sizes: Vec<u8> = (MIN_GROUP_SIZE..=GUILD_EVALUATION_GROUP_SIZE).collect();
+        let allowed_group_sizes: Vec<u8> = vec![2, 3, 4, 5, 6];
+
         let evaluation_id: u32 = psibase::services::evaluations::Wrapper::call().create(
             registration,
             deliberation,
             submission,
             finish_by,
-            // TODO: Change back to 4,5,6;
-            vec![2, 3, 4, 5, 6],
-            6,
+            allowed_group_sizes,
+            GUILD_EVALUATION_GROUP_SIZE,
             true,
         );
 
@@ -174,10 +179,12 @@ impl EvaluationInstance {
             .collect()
     }
 
-    pub fn set_pending_scores(&self, pending_score: u32) {
-        self.guild_members().into_iter().for_each(|mut account| {
-            account.set_pending_score(pending_score);
-        });
+    pub fn set_pending_scores(&self, pending_score: u8) {
+        GuildMember::memberships_of_guild(self.guild)
+            .into_iter()
+            .for_each(|mut account| {
+                account.set_pending_score(pending_score);
+            });
     }
 
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
@@ -188,9 +195,13 @@ impl EvaluationInstance {
             group_members.into_iter().map(|user| user.user).collect(),
         );
 
-        for (index, account) in fractal_group_result.into_iter().enumerate() {
-            let level = (6 as usize) - index;
-            GuildMember::get_assert(self.guild, account).set_pending_score(level as u32);
+        let guild_member_levels = assign_decreasing_levels(
+            fractal_group_result,
+            Some(GUILD_EVALUATION_GROUP_SIZE.into()),
+        );
+
+        for (level, account) in guild_member_levels {
+            GuildMember::get_assert(self.guild, account).set_pending_score(level as u8);
         }
     }
 
