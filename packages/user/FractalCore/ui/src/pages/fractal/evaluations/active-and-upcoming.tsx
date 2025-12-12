@@ -5,9 +5,7 @@ import { EmptyBlock } from "@/components/empty-block";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
-
 import {
     Table,
     TableBody,
@@ -20,20 +18,12 @@ import {
 export const ActiveAndUpcoming = () => {
     const { data: guild, isPending: isGuildPending } = useGuild();
 
-    const { data: currentUser } = useCurrentUser();
 
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
-    const isAuthority = !!(
-        guild &&
-        currentUser &&
-        (guild.rep?.member == currentUser ||
-            guild.council.includes(currentUser))
-    );
-    console.log({ isAuthority });
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center justify-between">
                 <h1 className="text-lg font-semibold">Active & upcoming</h1>
             </div>
