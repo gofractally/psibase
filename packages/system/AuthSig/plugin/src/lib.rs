@@ -15,7 +15,9 @@ use bindings::host::types::types::{Keypair, Pem};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
-use bindings::exports::auth_sig::plugin::{actions::Guest as Actions, keyvault::Guest as KeyVault, api::Guest as Api};
+use bindings::exports::auth_sig::plugin::{
+    actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
+};
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
 // Services
@@ -150,8 +152,6 @@ impl Actions for AuthSig {
             .packed(),
         )?;
 
-        HostCrypto::import_key(&keypair.private_key)?;
-
         Ok(keypair.private_key)
     }
 }
@@ -162,13 +162,13 @@ impl Api for AuthSig {
             panic!("Auth failure: {}", e.message);
         }
 
-        let Ok(specified_pubkey) = Self::pub_from_priv(private_key) else { 
+        let Ok(specified_pubkey) = Self::pub_from_priv(private_key) else {
             println!("Failed to convert specified private key to public key.");
-            return false 
+            return false;
         };
-        let Ok(actual_pubkey) = get_pubkey(&account_name) else { 
+        let Ok(actual_pubkey) = get_pubkey(&account_name) else {
             println!("Failed to retrieve public key for specified account");
-            return false 
+            return false;
         };
 
         specified_pubkey == actual_pubkey

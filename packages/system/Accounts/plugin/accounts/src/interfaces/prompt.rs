@@ -43,6 +43,14 @@ impl Prompt for AccountsPlugin {
                         continue;
                     }
 
+                    match AuthSig::keyvault::import_key(&credential.key) {
+                        Ok(_pubkey) => {}
+                        Err(_e) => {
+                            invalid_accounts.push(credential.account);
+                            continue;
+                        }
+                    }
+
                     AppsTable::new(&Client::get_receiver()).connect(&credential.account);
                 }
                 _ => {
