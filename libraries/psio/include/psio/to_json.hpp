@@ -38,8 +38,8 @@ namespace psio
    void to_json(std::string_view sv, S& stream)
    {
       stream.write('"');
-      auto begin = sv.begin();
-      auto end   = sv.end();
+      auto begin = sv.data();
+      auto end   = sv.data() + sv.size();
       while (begin != end)
       {
          auto pos = begin;

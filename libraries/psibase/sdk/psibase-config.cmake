@@ -69,6 +69,9 @@ function(add_libs suffix)
     )
 
     file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasi/libclang_rt.builtins-wasm32.a)
+    if ("${LIBCLANG_RT_BUILTINS}" STREQUAL "")
+        file(GLOB LIBCLANG_RT_BUILTINS ${WASI_SDK_PREFIX}/lib/clang/*/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a)
+    endif()
 
     # Service with simple malloc/free
     add_library(Psibase::service-simple-malloc${suffix} INTERFACE IMPORTED)
