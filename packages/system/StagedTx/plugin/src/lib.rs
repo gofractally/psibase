@@ -20,7 +20,29 @@ use db::*;
 use serde::{Deserialize, Serialize};
 
 mod errors;
+use crate::trust::*;
 use errors::ErrorType;
+
+psibase::define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "",
+        High => "
+        🚨 WARNING 🚨 
+        This approval will grant the caller the ability to accept/reject transactions on your behalf! Make sure you completely trust the caller's legitimacy.
+
+        High trust grants these abilities:
+            - Accept staged transactions
+            - Reject staged transactions
+        ",
+    }
+    functions {
+        None => [execute],
+        Low => [],
+        High => [accept, reject, remove],
+        Max => [set_propose_latch, propose],
+    }
+}
 
 fn validate_account(account: &str) -> Result<(), Error> {
     match get_account(account) {
@@ -110,9 +132,10 @@ struct StagedTxPlugin;
 
 impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
-        if Client::get_sender() != Client::get_active_app() {
-            return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
-        }
+        assert_authorized_with_whitelist(
+            FunctionName::set_propose_latch,
+            vec![Client::get_active_app()],
+        )?;
 
         if let Some(acc) = &account {
             validate_account(acc)?;
@@ -127,8 +150,7 @@ impl Proposer for StagedTxPlugin {
     }
 
     fn propose(actions: Vec<Action>, auto_exec: bool) -> Result<(), Error> {
-        let packages = psibase::services::packages::SERVICE.to_string();
-        get_assert_caller("propose", &[&packages])?;
+        assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
 
         add_action_to_transaction(
             propose::ACTION_NAME,
@@ -141,6 +163,7 @@ impl Proposer for StagedTxPlugin {
     }
 
     fn remove(id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::remove)?;
         add_action_to_transaction(
             remove::ACTION_NAME,
             &remove {
@@ -154,6 +177,11 @@ impl Proposer for StagedTxPlugin {
 
 impl Respondent for StagedTxPlugin {
     fn accept(id: u32) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::accept,
+            vec!["config".into(), "workshop".into()],
+        )?;
+
         add_action_to_transaction(
             accept::ACTION_NAME,
             &accept {
@@ -165,6 +193,11 @@ impl Respondent for StagedTxPlugin {
     }
 
     fn reject(id: u32) -> Result<(), Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::reject,
+            vec!["config".into(), "workshop".into()],
+        )?;
+
         add_action_to_transaction(
             reject::ACTION_NAME,
             &reject {
@@ -176,6 +209,7 @@ impl Respondent for StagedTxPlugin {
     }
 
     fn execute(id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::execute)?;
         add_action_to_transaction(
             execute::ACTION_NAME,
             &execute {

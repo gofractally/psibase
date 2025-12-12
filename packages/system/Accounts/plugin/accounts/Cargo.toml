@@ -10,6 +10,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 psibase-plugin-workspace-hack.workspace = true
+rand = "0.9.1"
 
 [lib]
 crate-type = ["cdylib"]
@@ -27,7 +28,6 @@ world = "impl"
 "host:prompt" = { path = "../../../../user/Host/plugin/prompt/wit/world.wit" }
 "transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../../user/ClientData/plugin/wit/world.wit" }
-"accounts:account-tokens" = { path = "../account_tokens/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
 "auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }

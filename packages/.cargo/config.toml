@@ -1,0 +1,3 @@
+[build]
+# This setting cascades through the *directory tree*; it doesn't just apply to workspace members.
+target = "wasm32-wasip1"

@@ -38,6 +38,8 @@ function(add suffix)
     service(XSocketListService "${suffix}" src/XSocketListService.cpp)
     service(VerifyWithCall "${suffix}" src/VerifyWithCall.cpp)
     service(Loop "${suffix}" src/Loop.cpp)
+    service(XProxy "${suffix}" src/XProxy.cpp)
+    service(WSEcho "${suffix}" src/WSEcho.cpp)
 endfunction(add)
 
 add_library(services_test INTERFACE)

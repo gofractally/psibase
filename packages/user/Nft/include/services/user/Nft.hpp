@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -14,7 +15,8 @@ namespace UserService
      public:
       using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
 
-      static constexpr auto service = psibase::AccountNumber("nft");
+      static constexpr auto         service     = psibase::AccountNumber("nft");
+      static constexpr std::uint8_t manualDebit = 0;
 
       Nft(psio::shared_view_ptr<psibase::Action> action);
 
@@ -24,7 +26,7 @@ namespace UserService
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
-      void setUserConf(psibase::EnumElement flag, bool enable);
+      void setUserConf(std::uint8_t flag, bool enable);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
@@ -33,7 +35,7 @@ namespace UserService
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
+      bool            getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 
      public:
       struct Events
@@ -45,7 +47,7 @@ namespace UserService
          {
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId, Account owner) {}
-            void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
+            void userConfSet(Account account, std::uint8_t flag, bool enable) {}
             void credited(NID nftId, Account sender, Account receiver, MemoView memo) {}
             void uncredited(NID nftId, Account sender, Account receiver, MemoView memo) {}
          };

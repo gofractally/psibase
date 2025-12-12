@@ -1,42 +1,44 @@
 #pragma once
 
+#include <cstdint>
+#include <optional>
 #include <psibase/psibase.hpp>
 
 #include <services/system/CommonTables.hpp>
 #include <services/user/symbolErrors.hpp>
 #include <services/user/symbolTables.hpp>
 #include <services/user/tokenTypes.hpp>
+#include "psibase/AccountNumber.hpp"
 
 namespace UserService
 {
    class Symbol : public psibase::Service
    {
      public:
-      using Tables = psibase::
-          ServiceTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
+      using Tables = psibase::ServiceTables<SymbolTable, SymbolLengthTable, InitTable>;
 
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
       Symbol(psio::shared_view_ptr<psibase::Action> action);
 
-      //void setAdjustRates(uint8_t increasePct, uint8_t decreasePct);
-      //void configSymType(uint8_t symbolLength, Quantity startPrice, Quantity floorPrice, uint8_t targetCreatedPerDay);
-
       void init();
 
-      void create(SID newSymbol, Quantity maxDebit);
-      void listSymbol(SID symbol, Quantity price);
-      void buySymbol(SID symbol);
-      void unlistSymbol(SID symbol);
+      void create(SID newSymbol);
 
-      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
-
-      SymbolRecord       getSymbol(SID symbol);
-      bool               exists(SID symbol);
-      Quantity           getPrice(uint8_t numChars);
-      SymbolLengthRecord getSymbolType(uint8_t numChars);
-      void               updatePrices();
+      SymbolRecord           getSymbol(SID symbol);
+      bool                   exists(SID symbol);
+      Quantity               getPrice(uint8_t numChars);
+      SymbolLengthRecord     getSymbolType(uint8_t numChars);
+      void                   mapSymbol(TID tokenId, SID symbol);
+      void                   sellLength(uint8_t  length,
+                                        Quantity initial_price,
+                                        uint32_t target,
+                                        Quantity floor_price);
+      SID                    getTokenSym(TID tokenId);
+      std::optional<Mapping> getByToken(TID token_id);
+      std::optional<Mapping> getMapBySym(psibase::AccountNumber symbol);
+      void                   delLength(uint8_t length);
 
       // clang-format off
       struct Events
@@ -44,8 +46,7 @@ namespace UserService
          using Account    = psibase::AccountNumber;
          struct History
          {
-            void symCreated(SID symbol, Account owner, Quantity cost) {}
-            void symSold(SID symbol, Account buyer, Account seller, Quantity cost) {}
+            void symEvent(SID symbol, Account actor, uint8_t action) {}
          };
          struct Ui{};
          struct Merkle{};
@@ -56,22 +57,21 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Symbol,
       method(init),
-      method(create, newSymbol, maxDebit),
-      method(listSymbol, symbol, price),
-      method(buySymbol, symbol),
-      method(unlistSymbol, symbol),
-      method(serveSys, request),
-
+      method(create, newSymbol),
+      method(mapSymbol, tokenId, symbol),
+      method(sellLength, length, initial_price, target, floor_price),
       method(getSymbol, symbol),
       method(exists, symbol),
       method(getPrice, numChars),
+      method(getTokenSym, tokenId),
       method(getSymbolType, numChars),
-      method(updatePrices)
+      method(getByToken, token_id),
+      method(getMapBySym, symbol),
+      method(delLength, length),
    );
    PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
       method(symCreated, symbol, owner, cost),
-      method(symSold, symbol, buyer, seller, cost),
    );
    PSIBASE_REFLECT_UI_EVENTS(Symbol);
    PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);

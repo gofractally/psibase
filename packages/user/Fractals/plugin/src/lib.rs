@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractals::plugin::admin_guild::Guest as AdminGuild;
+use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::exports::fractals::plugin::user_guild::Guest as UserGuild;
 
 use bindings::exports::fractals::plugin::user_eval::Guest as UserEval;
@@ -23,6 +24,8 @@ use psibase::{AccountNumber, Memo};
 use bindings::evaluations::plugin::admin::close;
 use bindings::evaluations::plugin::user as EvaluationsUser;
 
+use crate::bindings::accounts;
+use crate::bindings::exports::fractals::plugin::types;
 use crate::errors::ErrorType;
 use crate::graphql::{get_guild, GuildHelper};
 use crate::helpers::get_sender_app;
@@ -57,13 +60,15 @@ define_trust! {
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
+            - Resign, remove or set a new Guild representative
             ",
     }
     functions {
         None => [get_group_users],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild],
+        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+],
     }
 }
 
@@ -92,6 +97,12 @@ impl AdminFractal for FractallyPlugin {
             guild_account: guild_account.parse().unwrap(),
             name,
             mission,
+            council_role: accounts::plugin::api::gen_rand_account(Some("c-"))?
+                .as_str()
+                .into(),
+            rep_role: accounts::plugin::api::gen_rand_account(Some("r-"))?
+                .as_str()
+                .into(),
         }
         .packed();
         add_action_to_transaction(
@@ -124,6 +135,12 @@ impl AdminGuild for FractallyPlugin {
             fractal: guild.fractal,
             display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
+            council_role: accounts::plugin::api::gen_rand_account(Some("c-"))?
+                .as_str()
+                .into(),
+            rep_role: accounts::plugin::api::gen_rand_account(Some("r-"))?
+                .as_str()
+                .into(),
         }
         .packed();
 
@@ -193,6 +210,42 @@ impl AdminGuild for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::set_schedule::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account)?;
+        guild.assert_authorized(FunctionName::set_guild_rep)?;
+
+        let packed_args = fractals::action_structs::set_g_rep {
+            new_representative: rep.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_g_rep::ACTION_NAME,
+            &packed_args,
+        )
+    }
+    fn resign_guild_rep(guild_account: String) -> Result<(), Error> {
+        get_guild(guild_account)?.assert_authorized(FunctionName::resign_guild_rep)?;
+
+        let packed_args = fractals::action_structs::resign_g_rep {}.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::resign_g_rep::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn remove_guild_rep(guild_account: String) -> Result<(), Error> {
+        get_guild(guild_account)?.assert_authorized(FunctionName::remove_guild_rep)?;
+
+        let packed_args = fractals::action_structs::remove_g_rep {}.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::remove_g_rep::ACTION_NAME,
             &packed_args,
         )
     }
@@ -353,6 +406,18 @@ impl UserEval for FractallyPlugin {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::attest)?;
         EvaluationsUser::attest(&"fractals".to_string(), guild.eval_id()?, group_number)
+    }
+}
+
+impl Queries for FractallyPlugin {
+    fn get_guild(guild_account: String) -> Result<types::Guild, Error> {
+        let guild = get_guild(guild_account)?;
+        Ok(types::Guild {
+            fractal: guild.fractal.to_string(),
+            evaluation_id: guild.evaluation_id,
+            council_role: guild.council_role.to_string(),
+            rep_role: guild.rep_role.to_string(),
+        })
     }
 }
 

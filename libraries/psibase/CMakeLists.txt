@@ -9,6 +9,7 @@ function(add suffix)
     add_library(psibase${suffix})
     target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix} services_local)
     target_sources(psibase${suffix} PRIVATE
+        common/src/api.cpp
         common/src/block.cpp
         common/src/crypto.cpp
         common/src/KvMerkle.cpp
@@ -23,6 +24,7 @@ function(add suffix)
         common/src/semver.cpp
         common/src/zip.cpp
         common/src/fileUtil.cpp
+        common/src/WebSocket.cpp
     )
 
     if(DEFINED IS_WASM)

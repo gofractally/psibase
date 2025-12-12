@@ -4,10 +4,8 @@ use crate::bindings::host::common::server::post_graphql_get_json;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
-use crate::bindings::accounts::account_tokens::{api::*, types::ConnectionToken};
 use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::*;
-use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
@@ -23,43 +21,6 @@ fn prune_invalid_accounts(accounts: Vec<String>) {
 }
 
 impl Admin for AccountsPlugin {
-    fn login_direct(app: String, user: String) {
-        assert_authorized(FunctionName::login_direct).unwrap();
-
-        println!("WARNING: login_direct is deprecated");
-
-        assert_valid_account(&user);
-
-        // We want to authenticate as the user who is logging in to the 3rd-party app.
-        // So we need to log in as this user in accounts because accounts is the active app
-        // (because we redirected to accounts to do the login).
-        AppsTable::new(&Client::get_receiver()).login(&user);
-
-        AppsTable::new(&app).login(&user);
-        UserTable::new(&user).add_connected_app(&app);
-
-        if HostAuth::set_logged_in_user(&user, &app).is_err() {
-            AppsTable::new(&app).logout();
-            UserTable::new(&user).remove_connected_app(&app);
-        }
-
-        // Logging out to reverse accounts login above
-        AppsTable::new(&Client::get_receiver()).logout();
-    }
-
-    fn decode_connection_token(token: String) -> Option<ConnectionToken> {
-        println!("WARNING: decode_connection_token is deprecated");
-
-        if let Some(token) = deserialize_token(&token) {
-            match token {
-                Token::ConnectionToken(t) => return Some(t),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    }
-
     fn get_connected_apps(user: String) -> Vec<String> {
         assert_authorized_with_whitelist(FunctionName::get_connected_apps, vec!["homepage".into()])
             .unwrap();

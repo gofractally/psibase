@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::helpers::to_fixed;
     use crate::Wrapper;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
@@ -63,6 +64,7 @@ mod tests {
         a.credit(tid, bob, 12345.into(), memo.clone());
         assert_eq!(0, a.getBalance(tid, alice).get().unwrap().value);
         assert_eq!(12345, get_shared_balance(&chain, tid, alice, bob).value);
+        assert_eq!(0, get_shared_balance(&chain, tid, bob, alice).value);
 
         // Bob can debit most of the balance, leaving 5 left.
         b.debit(tid, alice, 12340.into(), memo.clone());
@@ -113,5 +115,44 @@ mod tests {
         assert_eq!(0, b.getBalance(tid, bob).get()?.value);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_to_fixed() {
+        // test_padding_fractional
+        assert_eq!(to_fixed("123.4", 2), "123.40");
+        assert_eq!(to_fixed("123", 2), "123.00");
+        assert_eq!(to_fixed("0.5", 3), "0.500");
+
+        // test_truncating_fractional
+        assert_eq!(to_fixed("123.456", 2), "123.45");
+        assert_eq!(to_fixed("123.456789", 3), "123.456");
+
+        // test_removing_leading_zeros
+        assert_eq!(to_fixed("00123.4", 2), "123.40");
+        assert_eq!(to_fixed("000123", 2), "123.00");
+        assert_eq!(to_fixed("000.5", 3), "0.500");
+
+        // test_zero_precision
+        assert_eq!(to_fixed("123.4", 0), "123");
+        assert_eq!(to_fixed("00123.456", 0), "123");
+        assert_eq!(to_fixed("0.5", 0), "0");
+
+        // test_zero_integer_part
+        assert_eq!(to_fixed("0.5", 2), "0.50");
+        assert_eq!(to_fixed("0", 2), "0.00");
+        assert_eq!(to_fixed("000", 3), "0.000");
+
+        // test_only_fractional_part
+        assert_eq!(to_fixed(".5", 2), "0.50");
+        assert_eq!(to_fixed(".123", 3), "0.123");
+
+        // test_exact_precision
+        assert_eq!(to_fixed("123.45", 2), "123.45");
+        assert_eq!(to_fixed("0.123", 3), "0.123");
+
+        // test_large_precision
+        assert_eq!(to_fixed("123.4", 8), "123.40000000");
+        assert_eq!(to_fixed("0", 5), "0.00000");
     }
 }

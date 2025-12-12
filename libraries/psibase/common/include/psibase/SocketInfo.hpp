@@ -74,6 +74,11 @@ namespace psibase
       return "SocketEndpoint";
    }
 
+   inline constexpr bool use_json_string_for_gql(SocketEndpoint*)
+   {
+      return true;
+   }
+
    std::string to_string(const IPV4Endpoint&);
    std::string to_string(const IPV6Endpoint&);
    std::string to_string(const LocalEndpoint&);
@@ -132,8 +137,24 @@ namespace psibase
       PSIO_REFLECT(HttpSocketInfo, endpoint, tls)
       friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
    };
+   struct WebSocketInfo
+   {
+      std::optional<SocketEndpoint> endpoint;
+      std::optional<TLSInfo>        tls;
+      PSIO_REFLECT(WebSocketInfo, endpoint, tls)
+      friend bool operator==(const WebSocketInfo&, const WebSocketInfo&) = default;
+   };
 
-   using SocketInfo = std::variant<ProducerMulticastSocketInfo, HttpSocketInfo>;
+   struct HttpClientSocketInfo
+   {
+      std::optional<SocketEndpoint> endpoint;
+      std::optional<TLSInfo>        tls;
+      PSIO_REFLECT(HttpClientSocketInfo, endpoint, tls)
+      friend bool operator==(const HttpClientSocketInfo&, const HttpClientSocketInfo&) = default;
+   };
+
+   using SocketInfo = std::
+       variant<ProducerMulticastSocketInfo, HttpSocketInfo, HttpClientSocketInfo, WebSocketInfo>;
 
    inline auto get_gql_name(SocketInfo*)
    {

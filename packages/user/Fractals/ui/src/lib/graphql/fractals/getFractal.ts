@@ -28,7 +28,7 @@ const zFractalRes = z.object({
                     })
                     .optional(),
                 displayName: z.string(),
-                council: z.array(zAccount),
+                council: z.array(zAccount).nullable(),
                 bio: z.string(),
                 evalInstance: z
                     .object({

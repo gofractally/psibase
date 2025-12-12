@@ -4,11 +4,10 @@ pub use tables::tables::{BalanceFlags, TokenFlags};
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::*;
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
+    use crate::tables::tables::{ConfigRow, *};
     use psibase::services::events;
-    use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::symbol::Service::Wrapper as Symbol;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{get_sender, AccountNumber, Memo};
 
@@ -25,10 +24,13 @@ pub mod service {
         let table = InitTable::new();
 
         if table.get_index_pk().get(&()).is_none() {
-            let init_instance = InitRow { last_used_id: 0 };
+            let init_instance = InitRow {
+                last_used_id: 0,
+                last_used_shared_bal_id: 0,
+            };
             table.put(&init_instance).unwrap();
 
-            Nfts::call().setUserConf(psibase::NamedBit::from("manualDebit"), true);
+            Nfts::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
@@ -94,57 +96,6 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> Token {
         Token::get_assert(token_id)
-    }
-
-    /// Lookup token symbol
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    ///
-    /// Returns token symbol
-    #[action]
-    #[allow(non_snake_case)]
-    fn getTokenSym(token_id: TID) -> AccountNumber {
-        check_some(
-            Token::get_assert(token_id).symbol,
-            "token does not have symbol",
-        )
-    }
-
-    /// Map a symbol to a token
-    ///
-    /// By default, tokens are only identifiable by their TID.
-    /// Symbols may be mapped to improve usability. Once a symbol
-    /// is mapped, it is permanent.
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `symbol` - Symbol e.g. "BTC"
-    #[action]
-    #[allow(non_snake_case)]
-    fn mapSymbol(token_id: TID, symbol: AccountNumber) {
-        let mut token = Token::get_assert(token_id);
-
-        token.map_symbol(symbol);
-
-        let symbol_owner_nft = Symbol::call().getSymbol(symbol).ownerNft;
-        check(symbol_owner_nft != 0, "Symbol does not exist");
-
-        Nfts::call().debit(
-            symbol_owner_nft,
-            format!(
-                "Mapping symbol {} to token {}",
-                symbol.to_string(),
-                token_id
-            ),
-        );
-        Nfts::call().burn(symbol_owner_nft);
-
-        Wrapper::emit().history().configured(
-            token.id,
-            "named".to_string(),
-            Memo::new(format!("{}", symbol.to_string())).unwrap(),
-        );
     }
 
     /// Get user's token-specific balance configuration
@@ -511,6 +462,38 @@ pub mod service {
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
         SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
+    }
+
+    /// Sets the system token
+    ///
+    /// # Arguments
+    /// * `token_id` - Identifier of a previously created token
+    ///
+    /// # Notes
+    /// * Only the service account can set the system token
+    /// * The system token can only be set once (changing system token is not yet supported)
+    #[action]
+    #[allow(non_snake_case)]
+    fn setSysToken(tokenId: TID) {
+        check(get_sender() == get_service(), "Unauthorized");
+        check(Token::get(tokenId).is_some(), "Token DNE");
+
+        let config_table = ConfigTable::new();
+        check(
+            config_table.get_index_pk().get(&()).is_none(),
+            "Changing system token is not supported",
+        );
+        config_table.put(&ConfigRow { sys_tid: tokenId }).unwrap();
+    }
+
+    /// Gets the system token details (if set), otherwise returns `None`
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSysToken() -> Option<Token> {
+        ConfigTable::read()
+            .get_index_pk()
+            .get(&())
+            .map(|row| Token::get_assert(row.sys_tid))
     }
 
     #[event(history)]

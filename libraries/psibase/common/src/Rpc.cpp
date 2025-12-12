@@ -91,6 +91,43 @@ namespace psibase
       return std::ranges::equal(name, h, {}, ::tolower, ::tolower);
    }
 
+   std::optional<std::string_view> HttpHeader::get(const std::vector<HttpHeader>& headers,
+                                                   std::string_view               name)
+   {
+      for (const auto& header : headers)
+      {
+         if (header.matches(name))
+         {
+            return header.value;
+         }
+      }
+      return {};
+   }
+
+   std::vector<std::string_view> HttpHeader::split(const std::vector<HttpHeader>& headers,
+                                                   std::string_view               name)
+   {
+      std::vector<std::string_view> result;
+      for (const auto& header : headers)
+      {
+         if (header.matches(name))
+         {
+            for (auto range : header.value | std::views::split(','))
+            {
+               std::string_view value = split2sv(range);
+
+               auto low  = value.find_first_not_of(" \t");
+               auto high = value.find_last_not_of(" \t");
+               if (low == std::string::npos)
+                  result.push_back("");
+               else
+                  result.push_back(value.substr(low, high - low + 1));
+            }
+         }
+      }
+      return result;
+   }
+
    std::pair<std::string, std::string> HttpRequest::readQueryItem(std::string_view& query)
    {
       auto end   = query.find('&');
@@ -138,19 +175,17 @@ namespace psibase
 
    std::optional<std::string_view> HttpRequest::getHeader(std::string_view name) const
    {
-      for (const auto& header : headers)
-      {
-         if (header.matches(name))
-         {
-            return header.value;
-         }
-      }
-      return {};
+      return HttpHeader::get(headers, name);
+   }
+
+   std::vector<std::string_view> HttpRequest::getHeaderValues(std::string_view name) const
+   {
+      return HttpHeader::split(headers, name);
    }
 
    void HttpRequest::removeCookie(std::string_view name)
    {
-      for (auto iter = headers.begin(), end = headers.end(); iter != end;)
+      for (auto iter = headers.begin(); iter != headers.end();)
       {
          auto& header = *iter;
          if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
@@ -162,11 +197,8 @@ namespace psibase
                std::string_view kv  = split2sv(kvrange);
                auto             pos = kv.find('=');
                check(pos != std::string_view::npos, "Invalid cookie");
-               bool matched = false;
                auto leading = kv.find_first_not_of(" \t");
                auto key     = kv.substr(leading, pos - leading);
-               auto value   = kv.substr(pos + 1);
-               matched      = key == name;
                if (key != name)
                {
                   if (first)
@@ -178,13 +210,18 @@ namespace psibase
             }
             if (newValue.empty())
             {
-               headers.erase(iter);
+               iter = headers.erase(iter);
                continue;
             }
             header.value = std::move(newValue);
          }
          ++iter;
       }
+   }
+
+   void HttpRequest::removeHeader(std::string_view name)
+   {
+      std::erase_if(headers, [name](const HttpHeader& header) { return header.matches(name); });
    }
 
    bool isLocalhost(const HttpRequest& request)
@@ -224,6 +261,31 @@ namespace psibase
       {
          return std::string_view(request.host);
       }
+   }
+
+   SplitURL splitURL(std::string_view uri)
+   {
+      std::string_view scheme;
+      if (uri.starts_with("http://"))
+      {
+         scheme = uri.substr(0, 4);
+         uri    = uri.substr(7);
+      }
+      else if (uri.starts_with("https://"))
+      {
+         scheme = uri.substr(0, 5);
+         uri    = uri.substr(8);
+      }
+      else
+      {
+         return {};
+      }
+      auto pos         = uri.find('/');
+      auto authority   = uri.substr(0, pos);
+      auto path        = pos == std::string::npos ? "/" : uri.substr(pos);
+      auto enduserinfo = authority.find('@');
+      auto host = enduserinfo == std::string::npos ? authority : authority.substr(enduserinfo + 1);
+      return {scheme, host, path};
    }
 
    std::vector<HttpHeader> allowCors(std::string_view origin)

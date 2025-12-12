@@ -45,6 +45,9 @@ impl Api for Credentials {
 
 impl HookActionAuth for Credentials {
     fn on_action_auth_claims(action: Action) -> Result<Vec<Claim>, Error> {
+        if Client::get_sender() != "transact" {
+            return Err(Unauthorized("on_action_auth_proofs").into());
+        }
         let pubkey = public_keys().get(&action.service);
 
         if let Some(pubkey) = pubkey {

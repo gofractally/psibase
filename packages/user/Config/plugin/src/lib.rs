@@ -2,11 +2,10 @@
 mod bindings;
 use bindings::*;
 
-use exports::config::plugin::branding::Guest as Branding;
-use exports::config::plugin::packaging::Guest as Packaging;
-use exports::config::plugin::producers::Guest as Producers;
-use exports::config::plugin::settings::Guest as Settings;
-
+use exports::config::plugin::{
+    branding::Guest as Branding, packaging::Guest as Packaging, producers::Guest as Producers,
+    settings::Guest as Settings, symbol::Guest as Symbol,
+};
 use host::types::types::Error;
 
 use staged_tx::plugin::proposer::set_propose_latch;
@@ -18,6 +17,12 @@ impl Settings for ConfigPlugin {
         set_propose_latch(Some("transact"))?;
 
         transact::plugin::network::set_snapshot_time(seconds)
+    }
+
+    fn set_system_token(token_id: u32) -> Result<(), Error> {
+        set_propose_latch(Some("tokens"))?;
+
+        Ok(tokens::plugin::admin::set_sys_token(token_id))
     }
 }
 
@@ -64,6 +69,25 @@ impl Packaging for ConfigPlugin {
         let _ = packages::plugin::private_api::set_account_sources(&accounts);
 
         Ok(())
+    }
+}
+
+impl Symbol for ConfigPlugin {
+    fn sell_length(
+        length: u8,
+        initial_price: u64,
+        target: u32,
+        floor_price: u64,
+    ) -> Result<(), Error> {
+        set_propose_latch(Some("symbol"))?;
+
+        symbol::plugin::admin::sell_length(length, initial_price, target, floor_price)
+    }
+
+    fn del_length(length: u8) -> Result<(), Error> {
+        set_propose_latch(Some("symbol"))?;
+
+        symbol::plugin::admin::del_length(length)
     }
 }
 

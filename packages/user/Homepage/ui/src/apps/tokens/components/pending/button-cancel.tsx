@@ -1,4 +1,4 @@
-import type { LineOfCredit } from "../../hooks/tokensPlugin/use-user-lines-of-credit";
+import type { PendingBalance } from "../../hooks/tokensPlugin/use-pending-balances";
 import type { PendingActionProps } from "../../pending";
 
 import { Loader2, Undo2 } from "lucide-react";
@@ -47,7 +47,7 @@ export const CancelButton = ({
         }
     };
 
-    const handleRecall = async (pt: LineOfCredit) => {
+    const handleRecall = async (pt: PendingBalance) => {
         try {
             await mutateAsync({
                 tokenId: pt.balance.tokenNumber.toString(),

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
+import { supervisor } from "@/supervisor";
 import { zAccount } from "@/lib/zod/Account";
 
 const qs = {
@@ -36,31 +37,19 @@ const qs = {
             }
         }
     `,
-    userCredits: (username: string) => `
-        userCredits(user: "${username}") {
+    userPending: (username: string, tokenId: number | undefined) => `
+        userPending(user: "${username}"${tokenId ? ", tokenId:" + tokenId : ""}) {
             nodes {
-                token {
-                    id
-                    symbol
-                    precision
+                sharedBal {
+                    token {
+                        id
+                        symbol
+                        precision
+                    }
+                    balance
+                    creditor
+                    debitor
                 }
-                balance
-                creditor
-                debitor
-            }
-        }
-    `,
-    userDebits: (username: string) => `
-        userDebits(user: "${username}") {
-            nodes {
-                token {
-                    id
-                    symbol
-                    precision
-                }
-                balance
-                creditor
-                debitor
             }
         }
     `,
@@ -71,6 +60,21 @@ const qs = {
             }
         }
     `,
+};
+
+const graphqlViaPlugin = async <T>(query: string): Promise<T> => {
+    const result = await supervisor.functionCall({
+        service: "tokens",
+        plugin: "plugin",
+        intf: "authorized",
+        method: "graphql",
+        params: [query],
+    });
+    const response = JSON.parse(result) as { data: T; errors?: Array<{ message: string }> };
+    if (response.errors) {
+        throw new Error(response.errors[0].message);
+    }
+    return response.data;
 };
 
 const zUserSettingsSchema = z.object({
@@ -110,9 +114,8 @@ export type UserTokenBalanceNode = z.infer<typeof zUserTokenBalanceNodeSchema>;
 
 export const fetchUserTokenBalances = async (username: string) => {
     const query = `{${qs.userTokenBalances(username)}}`;
-    const res = await graphql<z.infer<typeof zUserTokenBalanceSchema>>(
+    const res = await graphqlViaPlugin<z.infer<typeof zUserTokenBalanceSchema>>(
         query,
-        "tokens",
     );
     const parsed = zUserTokenBalanceSchema.parse(res);
     return parsed.userBalances.nodes;
@@ -168,16 +171,15 @@ export const fetchUserTokenBalanceChanges = async (
     tokenId: number,
 ) => {
     const query = `{${qs.userTokenBalanceChanges(username, tokenId)}}`;
-    const res = await graphql<z.infer<typeof zBalChangeResSchema>>(
+    const res = await graphqlViaPlugin<z.infer<typeof zBalChangeResSchema>>(
         query,
-        "tokens",
     );
     const parsed = zBalChangeResSchema.parse(res);
     return parsed.balChanges.nodes;
 };
 
 // Open Lines of Credit
-export const zLineOfCreditNodeSchema = z.object({
+export const zSharedBalSchema = z.object({
     token: z.object({
         id: z.number(),
         symbol: z.string().nullable(),
@@ -188,30 +190,29 @@ export const zLineOfCreditNodeSchema = z.object({
     debitor: zAccount,
 });
 
-const zLineOfCreditSchema = z.object({
-    nodes: z.array(zLineOfCreditNodeSchema),
+export type SharedBalNode = z.infer<typeof zSharedBalSchema>;
+
+export const zPendingBalanceNodeSchema = z.object({
+    sharedBal: zSharedBalSchema,
+});
+
+const zPendingBalanceSchema = z.object({
+    nodes: z.array(zPendingBalanceNodeSchema),
 });
 
 const zOpenLinesOfCreditResSchema = z.object({
-    userCredits: zLineOfCreditSchema,
-    userDebits: zLineOfCreditSchema,
+    userPending: zPendingBalanceSchema,
 });
 
-export type LineOfCreditNode = z.infer<typeof zLineOfCreditNodeSchema>;
+export type PendingBalanceNode = z.infer<typeof zPendingBalanceNodeSchema>;
 
-export const fetchOpenLinesOfCredit = async (username: string) => {
+export const fetchOpenLinesOfCredit = async (username: string, tokenId: number | undefined) => {
     const query = `{
-        ${qs.userCredits(username)}
-        ${qs.userDebits(username)}
+        ${qs.userPending(username, tokenId)}
     }`;
 
-    const res = await graphql<z.infer<typeof zOpenLinesOfCreditResSchema>>(
+    const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
         query,
-        "tokens",
     );
-    const parsed = zOpenLinesOfCreditResSchema.parse(res);
-    return {
-        credits: parsed.userCredits.nodes,
-        debits: parsed.userDebits.nodes,
-    };
+    return zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: PendingBalanceNode) => node.sharedBal);
 };

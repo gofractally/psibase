@@ -131,20 +131,186 @@ namespace
    }
 }  // namespace
 
+#ifndef PSIBASE_GENERATE_SCHEMA
+
 extern "C" [[clang::export_name("recv")]] void recv()
 {
-   auto act       = getCurrentActionView();
+   psibase::internal::receiver = XHttp::service;
+   auto act                    = getCurrentActionView();
+
+   auto [socket, data] =
+       psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
+   // if this is a response to an HTTP request, send it to the owner
+   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+   std::optional<ResponseHandlerRow> row;
+   bool                              accepted;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = requests.get(socket.unpack());
+      if (row)
+      {
+         if (row->type == SocketType::http)
+         {
+            requests.remove(*row);
+            socketAutoClose(socket, true);
+         }
+         else if (row->type == SocketType::handshake)
+         {
+            auto sockets = Native::session(KvMode::read).open<SocketTable>();
+            auto info    = sockets.get(socket.unpack());
+            check(info.has_value(), "Missing SocketInfo for " + std::to_string(socket.unpack()));
+            accepted = std::holds_alternative<WebSocketInfo>(info->info);
+            if (accepted)
+            {
+               row->type = SocketType::websocket;
+               requests.put(*row);
+               row->type = SocketType::handshake;
+            }
+            else
+            {
+               requests.remove(*row);
+               socketAutoClose(socket, true);
+            }
+         }
+      }
+   }
+
+   if (row)
+   {
+      if (row->type == SocketType::http)
+      {
+         call(Action{.sender  = XHttp::service,
+                     .service = row->service,
+                     .method  = row->method,
+                     .rawData = psio::to_frac(
+                         std::tuple(socket, psio::view<const psibase::HttpReply>(data)))});
+      }
+      else if (row->type == SocketType::handshake)
+      {
+         call(Action{.sender  = XHttp::service,
+                     .service = row->service,
+                     .method  = accepted ? row->method : row->err,
+                     .rawData = psio::to_frac(std::tuple(
+                         socket, std::optional(psio::view<const psibase::HttpReply>(data))))});
+      }
+      else
+      {
+         act->sender()  = XHttp::service;
+         act->service() = row->service;
+         act->method()  = row->method;
+         psibase::call(act.data(), act.size());
+      }
+      return;
+   }
+
    act->sender()  = XHttp::service;
    act->service() = HttpServer::service;
    act->method()  = MethodNumber{"recv"};
    psibase::call(act.data(), act.size());
 }
 
+extern "C" [[clang::export_name("close")]] void closeSocket()
+{
+   psibase::internal::receiver = XHttp::service;
+   auto act                    = getCurrentActionView();
+
+   auto [socket] = psio::view<const std::tuple<std::int32_t>>(act->rawData());
+   // if this is a response to an HTTP request, send it to the owner
+   auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+   std::optional<ResponseHandlerRow> row;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      row = requests.get(socket.unpack());
+      if (row)
+      {
+         requests.remove(*row);
+      }
+      socketAutoClose(socket, true);
+   }
+
+   if (row)
+   {
+      call(Action{.sender  = XHttp::service,
+                  .service = row->service,
+                  .method  = row->err,
+                  .rawData = psio::to_frac(std::tuple(socket))});
+      return;
+   }
+
+   act->sender()  = XHttp::service;
+   act->service() = HttpServer::service;
+   act->method()  = MethodNumber{"close"};
+   psibase::call(act.data(), act.size());
+}
+
+#endif
+
 void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
 {
-   check(getSender() == HttpServer::service, "Wrong sender");
-   check(socket == producer_multicast, "Cannot call send on this socket");
+   if (socket == producer_multicast)
+   {
+      check(getSender() == HttpServer::service, "Wrong sender");
+   }
+   else
+   {
+      auto                              requests = XHttp{}.open<ResponseHandlerTable>();
+      std::optional<ResponseHandlerRow> row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         row = requests.get(socket);
+      }
+      if (!row || row->service != getSender() || row->type != SocketType::websocket)
+         abortMessage("Wrong sender");
+   }
    psibase::socketSend(socket, data);
+}
+
+std::int32_t XHttp::sendRequest(HttpRequest                   request,
+                                MethodNumber                  callback,
+                                MethodNumber                  err,
+                                std::optional<TLSInfo>        tls,
+                                std::optional<SocketEndpoint> endpoint)
+{
+   auto sender    = getSender();
+   auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (!codeTable.get(sender))
+         abortMessage("Only local services can use sendRequest");
+   }
+   auto requests = Session{}.open<ResponseHandlerTable>();
+   auto sock     = socketOpen(request, tls, endpoint);
+   check(sock >= 0, "Failed to open socket");
+   PSIBASE_SUBJECTIVE_TX
+   {
+      requests.put({sock, SocketType::http, sender, callback, err});
+      socketAutoClose(sock, false);
+   }
+   return sock;
+}
+
+std::int32_t XHttp::websocket(HttpRequest                   request,
+                              MethodNumber                  callback,
+                              MethodNumber                  err,
+                              std::optional<TLSInfo>        tls,
+                              std::optional<SocketEndpoint> endpoint)
+{
+   auto sender    = getSender();
+   auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (!codeTable.get(sender))
+         abortMessage("Only local services can use sendRequest");
+   }
+   auto requests = Session{}.open<ResponseHandlerTable>();
+   auto sock     = socketOpen(request, tls, endpoint);
+   check(sock >= 0, "Failed to open socket");
+   PSIBASE_SUBJECTIVE_TX
+   {
+      requests.put({sock, SocketType::handshake, sender, callback, err});
+      socketAutoClose(sock, false);
+   }
+   return sock;
 }
 
 void XHttp::autoClose(std::int32_t socket, bool value)
@@ -173,6 +339,20 @@ void XHttp::autoClose(std::int32_t socket, bool value)
    }
 }
 
+void XHttp::close(std::int32_t socket)
+{
+   auto sender   = getSender();
+   auto requests = Session{}.open<ResponseHandlerTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto row = requests.get(socket);
+      if (!row || row->service != sender)
+         abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
+      requests.remove(*row);
+      socketAutoClose(socket, true);
+   }
+}
+
 void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 {
    auto sender = getSender();
@@ -190,6 +370,56 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
       abortMessage("Must set autoClose before sending a response");
    }
    socketSend(socket, psio::to_frac(result));
+}
+
+void XHttp::accept(std::int32_t              socket,
+                   const psibase::HttpReply& reply,
+                   psibase::MethodNumber     callback,
+                   psibase::MethodNumber     err)
+{
+   auto sender   = getSender();
+   auto owned    = Temporary{}.open<PendingRequestTable>();
+   auto handlers = open<ResponseHandlerTable>();
+
+   if (auto row = owned.get(socket))
+   {
+      if (row->owner != sender)
+      {
+         abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
+      }
+      owned.remove(*row);
+   }
+   else
+   {
+      abortMessage("Must set autoClose before sending a response");
+   }
+
+   PSIBASE_SUBJECTIVE_TX
+   {
+      handlers.put({.socket  = socket,
+                    .type    = SocketType::websocket,
+                    .service = sender,
+                    .method  = callback,
+                    .err     = err});
+   }
+   socketSend(socket, psio::to_frac(reply));
+}
+
+void XHttp::setCallback(std::int32_t          socket,
+                        psibase::MethodNumber callback,
+                        psibase::MethodNumber err)
+{
+   auto sender   = getSender();
+   auto requests = Session{}.open<ResponseHandlerTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto row = requests.get(socket);
+      if (!row || row->service != sender)
+         abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
+      row->method = callback;
+      row->err    = err;
+      requests.put(*row);
+   }
 }
 
 std::string XHttp::rootHost(psio::view<const std::string> host)

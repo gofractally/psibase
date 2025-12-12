@@ -889,6 +889,7 @@ dependencies = [
  "async-graphql",
  "diff-adjust-pkg",
  "psibase",
+ "psibase-user-workspace-hack",
  "psibase_macros",
  "serde",
  "serde_json",
@@ -1149,6 +1150,7 @@ dependencies = [
  "custom_error",
  "hex",
  "indexmap",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "serde",
  "serde-aux",
@@ -1969,6 +1971,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "nft-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nft-pkg"
+version = "0.22.0"
+dependencies = [
+ "nft",
+ "nft-plugin",
+ "psibase-user-workspace-hack",
+ "r-nft",
+]
+
+[[package]]
+name = "nft-plugin"
+version = "0.22.0"
+dependencies = [
+ "nft",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,6 +2369,7 @@ dependencies = [
  "pem",
  "percent-encoding",
  "pkcs8",
+ "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
  "rand_core 0.6.4",
@@ -2365,6 +2403,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "psibase-macros-lib",
+ "psibase-rust-workspace-hack",
  "psibase_names",
  "quote",
  "syn 1.0.109",
@@ -2379,9 +2418,16 @@ dependencies = [
  "darling 0.20.11",
  "proc-macro-error",
  "proc-macro2",
+ "psibase-rust-workspace-hack",
  "quote",
  "syn 2.0.106",
 ]
+
+[[package]]
+name = "psibase-rust-workspace-hack"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
 
 [[package]]
 name = "psibase-user-workspace-hack"
@@ -2390,12 +2436,10 @@ dependencies = [
  "generic-array",
  "getrandom 0.3.3",
  "indexmap",
- "libc",
  "libsecp256k1-core",
  "memchr",
  "num-traits",
  "once_cell",
- "portable-atomic",
  "proc-macro2",
  "quote",
  "serde",
@@ -2411,12 +2455,14 @@ name = "psibase_macros"
 version = "0.22.0"
 dependencies = [
  "psibase-macros-derive",
+ "psibase-rust-workspace-hack",
 ]
 
 [[package]]
 name = "psibase_names"
 version = "0.22.0"
 dependencies = [
+ "psibase-rust-workspace-hack",
  "seahash",
 ]
 
@@ -2436,6 +2482,7 @@ dependencies = [
  "async-graphql",
  "diff-adjust",
  "psibase",
+ "psibase-user-workspace-hack",
  "serde",
  "serde_json",
 ]
@@ -2475,6 +2522,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-nft"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "nft",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "r-profiles"
 version = "0.22.0"
 dependencies = [
@@ -2497,6 +2556,19 @@ dependencies = [
  "registry-pkg",
  "serde",
  "serde-aux",
+]
+
+[[package]]
+name = "r-symbol"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde-aux",
+ "serde_json",
+ "symbol",
 ]
 
 [[package]]
@@ -3133,6 +3205,41 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "symbol"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+ "symbol-pkg",
+]
+
+[[package]]
+name = "symbol-pkg"
+version = "0.22.0"
+dependencies = [
+ "psibase-user-workspace-hack",
+ "r-symbol",
+ "symbol",
+ "symbol-plugin",
+]
+
+[[package]]
+name = "symbol-plugin"
+version = "0.22.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "symbol",
+ "wit-bindgen-rt",
+]
 
 [[package]]
 name = "syn"

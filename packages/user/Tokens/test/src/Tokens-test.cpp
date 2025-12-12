@@ -7,6 +7,7 @@
 #include <services/user/Tokens.hpp>
 
 #include "services/user/Symbol.hpp"
+#include "services/user/tokenTypes.hpp"
 
 using namespace psibase;
 using namespace psibase::benchmarking;
@@ -37,8 +38,15 @@ SCENARIO("Using system token")
       auto     sysIssuer = t.from(Symbol::service).to<Tokens>();
       Quantity userBalance{1'000'000'00e4};
 
-      auto sysToken = Tokens::sysToken;
+      uint32_t sysToken = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+      t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
       CHECK(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
+
+      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, true);
 
       THEN("The system token is untradeable by default")
       {
@@ -307,15 +315,15 @@ SCENARIO("Interactions with the Issuer NFT")
 
          THEN("Alice may not mint new tokens")
          {
-            CHECK(a.mint(tokenId, quantity, memo).failed(nftDNE));
+            CHECK(a.mint(tokenId, quantity, memo).failed(nftBurned));
          }
          THEN("Alice may not credit the issuer NFT to anyone")
          {
-            CHECK(alice.to<Nft>().credit(nft.id, bob, memo).failed(nftDNE));
+            CHECK(alice.to<Nft>().credit(nft.id, bob, memo).failed(nftBurned));
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, quantity, memo).failed(nftDNE));
+            CHECK(a.recall(tokenId, bob, quantity, memo).failed(nftBurned));
          }
          THEN("Alice may not update the token inflation")
          {  //
@@ -323,7 +331,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not update the token recallability")
          {
-            CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, true).failed(nftDNE));
+            CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, true).failed(nftBurned));
          }
       }
    }
@@ -676,79 +684,91 @@ SCENARIO("Mapping a symbol to a token")
    {
       DefaultTestChain t;
 
-      auto alice = t.from(t.addAccount("alice"_a));
-      auto bob   = t.from(t.addAccount("bob"_a));
-      auto a     = alice.to<Tokens>();
-      auto b     = bob.to<Tokens>();
+      auto alice       = t.from(t.addAccount("alice"_a));
+      auto bob         = t.from(t.addAccount("bob"_a));
+      auto aliceTokens = alice.to<Tokens>();
+      auto aliceSymbol = alice.to<Symbol>();
+      auto bobTokens   = bob.to<Tokens>();
+      auto bobSymbol   = bob.to<Symbol>();
 
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      auto sysToken    = Tokens::sysToken;
-      sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
-      sysIssuer.mint(sysToken, userBalance, memo);
+      auto sysToken    = sysIssuer.create(Precision{4}, userBalance).returnVal();
+
+      REQUIRE(t.from(Symbol::service)
+                  .to<Nft>()
+                  .debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "")
+                  .succeeded());
+
+      REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
+      REQUIRE(sysIssuer.mint(sysToken, userBalance, memo).succeeded());
+      REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
+      REQUIRE(t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 5000).succeeded());
       sysIssuer.credit(sysToken, alice, userBalance, memo);
 
       // Mint a second token
-      auto newToken = a.create(Precision{4}, userBalance).returnVal();
-      a.mint(newToken, userBalance, memo);
+      auto newToken = aliceTokens.create(Precision{4}, userBalance).returnVal();
+      aliceTokens.mint(newToken, userBalance, memo);
+
+      auto symbolCtx = t.from("symbol"_a);
 
       // Purchase the symbol and claim the owner NFT
       auto symbolCost = alice.to<Symbol>().getPrice(3).returnVal();
-      a.credit(sysToken, Symbol::service, symbolCost, memo);
+      aliceTokens.credit(sysToken, Symbol::service, symbolCost, memo);
       auto symbolId = "abc"_a;
-      auto create   = alice.to<Symbol>().create(symbolId, symbolCost);
+      auto create   = alice.to<Symbol>().create(symbolId);
       CHECK(create.succeeded());
       auto symbolRecord = alice.to<Symbol>().getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
 
       THEN("Bob is unable to map the symbol to the token")
       {
-         CHECK(b.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
+         CHECK(bobSymbol.mapSymbol(newToken, symbolId).failed(missingRequiredAuth));
       }
       WHEN("Alice burns the symbol owner NFT")
       {
-         alice.to<Nft>().burn(nftId);
+         CHECK(alice.to<Nft>().burn(nftId).succeeded());
 
          THEN("Alice is unable to map the symbol to the token")
          {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(nftDNE));
+            CHECK(aliceSymbol.mapSymbol(newToken, symbolId).failed(nftBurned));
          }
       }
       WHEN("Alice burns the token owner NFT")
       {
-         auto tokenNft = a.getToken(newToken).returnVal().nft_id;
+         auto tokenNft = aliceTokens.getToken(newToken).returnVal().nft_id;
          alice.to<Nft>().burn(tokenNft);
 
          THEN("Alice is unable to map the symbol to the token")
          {
-            CHECK(a.mapSymbol(newToken, symbolId).failed(nftBurned));
+            CHECK(aliceSymbol.mapSymbol(newToken, symbolId).failed(nftBurned));
          }
       }
       THEN("Alice is unable to map a symbol to a nonexistent token")
       {
          TID invalidTokenId = 999;
-         CHECK(a.mapSymbol(invalidTokenId, symbolId).failed(tokenDNE));
+         CHECK(aliceSymbol.mapSymbol(invalidTokenId, symbolId).failed(tokenDNE));
       }
       THEN("Alice is unable to map a nonexistent symbol to a token")
       {
          SID invalidSymbolId = "zzz"_a;
-         CHECK(a.mapSymbol(newToken, invalidSymbolId).failed(symbolDNE));
+         CHECK(aliceSymbol.mapSymbol(newToken, invalidSymbolId).failed(symbolDNE));
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         CHECK(a.mapSymbol(newToken, symbolId).succeeded());
+         alice.to<Nft>().credit(nftId, Symbol::service, memo);
+         CHECK(aliceSymbol.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
          {
-            CHECK(a.getTokenSym(newToken).returnVal() == symbolId);
+            CHECK(aliceSymbol.getTokenSym(newToken).returnVal() == symbolId);
          }
       }
       WHEN("Alice maps the symbol to the token")
       {
          alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         a.mapSymbol(newToken, symbolId);
+         aliceSymbol.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
          {
@@ -758,13 +778,13 @@ SCENARIO("Mapping a symbol to a token")
 
          THEN("Alice may not map a new symbol to the same token")
          {
-            a.credit(sysToken, Symbol::service, symbolCost, memo);
+            CHECK(aliceTokens.credit(sysToken, Symbol::service, symbolCost, memo).succeeded());
             auto newSymbol = "bcd"_a;
-            alice.to<Symbol>().create(newSymbol, symbolCost);
+            alice.to<Symbol>().create(newSymbol);
             auto newNft = alice.to<Symbol>().getSymbol(newSymbol).returnVal().ownerNft;
 
-            alice.to<Nft>().credit(newNft, Tokens::service, memo);
-            CHECK(a.mapSymbol(newToken, newSymbol).failed(tokenHasSymbol));
+            CHECK(alice.to<Nft>().credit(newNft, Symbol::service, memo).succeeded());
+            CHECK(aliceSymbol.mapSymbol(newToken, newSymbol).succeeded());
          }
       }
    }
@@ -799,44 +819,62 @@ TEST_CASE("GraphQL Queries")
 {
    DefaultTestChain t;
 
+   auto symbolCtx = t.from("symbol"_a);
+
    auto alice = t.from(t.addAccount("alice"_a));
    auto a     = alice.to<Tokens>();
    auto bob   = t.from(t.addAccount("bob"_a));
 
-   auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
+   auto sysIssuer = t.from(Symbol::service).to<Tokens>();
+   auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
+   t.from(Symbol::service).to<Nft>().debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "");
+   t.from(Tokens::service).to<Tokens>().setSysToken(sysToken);
+
    auto userBalance = 1'000'000e4;
-   auto sysToken    = Tokens::sysToken;
+
    sysIssuer.mint(sysToken, userBalance, memo);
 
    REQUIRE(sysIssuer.credit(sysToken, alice, userBalance, memo).succeeded());
    REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
    t.finishBlock();
 
-   auto userBalaces = t.post(
+   auto token_a = t.login(alice, Tokens::service);
+   auto token_b = t.login(bob, Tokens::service);
+
+   auto userBalances = t.post(
        Tokens::service, "/graphql",
        GraphQLBody{
-           R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"});
-   CHECK(
-       std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
-       R"({"data":{"userBalances":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
+           R"( query { userBalances(user: "alice") { edges { node { symbol tokenId precision balance } } } } )"},
+       token_a);
 
+   CHECK(
+       std::string(userBalances.body.begin(), userBalances.body.end()) ==
+       R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
+
+   REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 500e4, memo).succeeded());
+   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
-   auto userCredits = t.post(
-       Tokens::service, "/graphql",
-       GraphQLBody{
-           R"( query { userCredits(user: "alice") { edges { node { symbol tokenId precision balance debitor } } } } )"});
-   CHECK(
-       std::string(userCredits.body.begin(), userCredits.body.end()) ==
-       R"({"data":{"userCredits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","debitor":"bob"}}]}}})");
+   REQUIRE(bob.to<Tokens>().credit(sysToken, alice, 200e4, memo).succeeded());
 
-   auto userDebits = t.post(
+   auto userPendingRes =
+       R"({"data":{"userPending":{"edges":[{"node":{"sharedBal":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice","debitor":"bob"}}},{"node":{"sharedBal":{"symbol":null,"tokenId":1,"precision":4,"balance":"200.0000","creditor":"bob","debitor":"alice"}}}]}}})";
+
+   auto userPending = t.post(
        Tokens::service, "/graphql",
-       GraphQLBody{
-           R"( query { userDebits(user: "bob") { edges { node { symbol tokenId precision balance creditor } } } } )"});
-   CHECK(
-       std::string(userDebits.body.begin(), userDebits.body.end()) ==
-       R"({"data":{"userDebits":{"edges":[{"node":{"symbol":"psi","tokenId":1,"precision":4,"balance":"1000.0000","creditor":"alice"}}]}}})");
+       GraphQLBody{std::format(
+           R"( query {{ userPending(user: "alice", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance creditor debitor }} }} }} }} }} )",
+           sysToken)},
+       token_a);
+   CHECK(std::string(userPending.body.begin(), userPending.body.end()) == userPendingRes);
+
+   userPending = t.post(
+       Tokens::service, "/graphql",
+       GraphQLBody{std::format(
+           R"( query {{ userPending(user: "bob", tokenId: {}) {{ edges {{ node {{ sharedBal {{ symbol tokenId precision balance creditor debitor }} }} }} }} }} )",
+           sysToken)},
+       token_b);
+   CHECK(std::string(userPending.body.begin(), userPending.body.end()) == userPendingRes);
 
    auto userTokens = t.post(
        Tokens::service, "/graphql",
@@ -844,5 +882,5 @@ TEST_CASE("GraphQL Queries")
            R"( query { userTokens(user: "symbol") { id precision issuedSupply maxIssuedSupply symbol } } )"});
    CHECK(
        std::string(userTokens.body.begin(), userTokens.body.end()) ==
-       R"({"data":{"userTokens":[{"id":1,"precision":4,"issuedSupply":"1000000.0000","maxIssuedSupply":"1000000000.0000","symbol":"psi"}]}})");
+       R"({"data":{"userTokens":[{"id":1,"precision":4,"issuedSupply":"1000000.0000","maxIssuedSupply":"1000000000.0000","symbol":null}]}})");
 }

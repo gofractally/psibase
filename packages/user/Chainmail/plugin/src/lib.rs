@@ -101,6 +101,7 @@ impl Api for ChainmailPlugin {
 
 impl Query for ChainmailPlugin {
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
+        assert_authorized(FunctionName::get_msgs)?;
         let inbox_msgs = query_messages_endpoint(sender, receiver.clone(), false)?;
         let mut saved_msgs = Self::get_saved_msgs(receiver)?;
 
@@ -119,10 +120,12 @@ impl Query for ChainmailPlugin {
         sender: Option<String>,
         receiver: Option<String>,
     ) -> Result<Vec<Message>, Error> {
+        assert_authorized(FunctionName::get_archived_msgs)?;
         Ok(query_messages_endpoint(sender, receiver, true)?)
     }
 
     fn get_saved_msgs(receiver: Option<String>) -> Result<Vec<Message>, Error> {
+        assert_authorized(FunctionName::get_saved_msgs)?;
         let rcvr = match receiver {
             Some(r) => r,
             None => AccountPlugin::api::get_current_user().expect("No receiver specified"),

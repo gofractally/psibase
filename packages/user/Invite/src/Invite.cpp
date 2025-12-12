@@ -77,8 +77,7 @@ void Invite::init()
    initTable.put(InitializedRecord{});
 
    // Configure manual debit for self on Token and NFT
-   auto manualDebit = psibase::EnumElement{"manualDebit"};
-   to<Nft>().setUserConf(manualDebit, true);
+   to<Nft>().setUserConf(Nft::manualDebit, true);
    to<Tokens>().setUserConf(Tokens::manualDebit, true);
 
    // Register event indices

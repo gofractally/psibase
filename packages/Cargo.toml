@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "system/Accounts/plugin/accounts/",
-    "system/Accounts/plugin/account_tokens/",
     "system/AuthAny/plugin/",
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",
@@ -11,6 +10,8 @@ members = [
     "user/Aes/plugin",
     "user/Base64/plugin",
     "user/ClientData/plugin",
+    "user/Config/plugin",
+    "user/FractalCore/plugin",
     "user/Host/plugin/auth",
     "user/Host/plugin/crypto",
     "user/Host/plugin/common",
@@ -18,13 +19,11 @@ members = [
     "user/Host/plugin/types",
     "user/Invite/plugin",
     "user/Kdf/plugin",
-    "user/Sites/plugin",
     "user/Packages/plugin",
     "user/Permissions/plugin",
+    "user/Sites/plugin",
     "user/WebCrypto/plugin",
-    "user/FractalCore/plugin",
     "user/Workshop/plugin",
-    "user/Config/plugin",
 ]
 resolver = "2"
 
