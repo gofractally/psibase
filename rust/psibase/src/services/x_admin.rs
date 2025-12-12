@@ -1,4 +1,4 @@
-#[crate::service(name = "accounts", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "x-admin", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::AccountNumber;
