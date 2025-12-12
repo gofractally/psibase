@@ -1853,16 +1853,7 @@ async fn show_package<T: PackageRegistry + ?Sized>(
     let mut services: Vec<_> = manifest.services.into_iter().collect();
     services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
     manifest.data.sort_by(|lhs, rhs| {
-        (
-            lhs.account.to_string(),
-            lhs.service.to_string(),
-            &lhs.filename,
-        )
-            .cmp(&(
-                rhs.account.to_string(),
-                rhs.service.to_string(),
-                &rhs.filename,
-            ))
+        (lhs.account.to_string(), &lhs.filename).cmp(&(rhs.account.to_string(), &rhs.filename))
     });
 
     for account in &package.accounts {
