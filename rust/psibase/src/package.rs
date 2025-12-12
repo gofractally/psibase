@@ -1,3 +1,5 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 use crate::services::{
     accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
     sites, transact,
