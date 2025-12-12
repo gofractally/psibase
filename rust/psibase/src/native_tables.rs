@@ -333,10 +333,18 @@ pub struct HttpClientSocketInfo {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+pub struct WebSocketInfo {
+    endpoint: Option<SocketEndpoint>,
+    tls: Option<TLSInfo>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub enum SocketInfo {
     ProducerMultiCastSocketInfo(ProducerMultiCastSocketInfo),
     HttpSocketInfo(HttpSocketInfo),
     HttpClientSocketInfo(HttpClientSocketInfo),
+    WebSocketInfo(WebSocketInfo),
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]

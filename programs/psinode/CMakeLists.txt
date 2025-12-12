@@ -72,6 +72,7 @@ if(Python_Interpreter_FOUND)
     set_tests_properties(psinode_test_block_signing PROPERTIES PROCESSORS 4)
     add_psinode_test(test_config)
     add_psinode_test(test_fetch)
+    add_psinode_test(test_websocket)
 endif()
 
 include(GNUInstallDirs)

@@ -23,6 +23,25 @@ mod service {
         unimplemented!()
     }
 
+    /// Opens a websocket connection and returns the new socket. The
+    /// request method must be GET. The required headers for the websocket
+    /// handshake will be added to the request if they are not already
+    /// provided. If the connection is successfully established, calls
+    /// `sender::callback(socket, reply)`. If the request fails without
+    /// a response, calls `sender::err(socket, None)`. If the response
+    /// does not complete a websocket handshake, calls
+    /// `sender::err(socket, Some(reply))`
+    #[action]
+    fn websocket(
+        request: HttpRequest,
+        callback: MethodNumber,
+        err: MethodNumber,
+        tls: Option<TLSInfo>,
+        endpoint: Option<SocketEndpoint>,
+    ) -> i32 {
+        unimplemented!();
+    }
+
     /// Enables or disables automatic closing of the socket
     /// when the transaction context exits.
     ///
@@ -35,6 +54,27 @@ mod service {
     /// Sends an HTTP response. The socket must have autoClose enabled.
     #[action]
     fn sendReply(socket: i32, response: HttpReply) {
+        unimplemented!()
+    }
+
+    /// Accepts a websocket connection. The response must be a
+    /// valid websocket handshake for the request.
+    #[action]
+    fn accept(socket: i32, reply: HttpReply, callback: MethodNumber, err: MethodNumber) {
+        unimplemented!()
+    }
+
+    /// Changes the callback for a socket. The sender must be the owner
+    /// of the socket.
+    #[action]
+    fn setCallback(socket: i32, callback: MethodNumber, err: MethodNumber) {
+        unimplemented!()
+    }
+
+    /// Close a socket. The socket should be either a websocket
+    /// or a pending http request.
+    #[action]
+    fn close(socket: i32) {
         unimplemented!()
     }
 

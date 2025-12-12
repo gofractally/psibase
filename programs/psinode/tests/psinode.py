@@ -530,7 +530,7 @@ class Node(API):
             self.child.terminate()
             try:
                 self.child.wait(timeout=10)
-            except TimeoutExpired:
+            except subprocess.TimeoutExpired:
                 self.child.kill()
                 self.child.wait()
 

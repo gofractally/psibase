@@ -132,14 +132,14 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
-        CpuLimit Db Events EventIndex Explorer Invite Nft
+        CpuLimit Db Events EventIndex Explorer Invite
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XProxy XSocketListService)
+        XPackages XProxy XSocketListService WSEcho)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -290,7 +290,6 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
-    nft
     fractal-core
     config
     producers
@@ -483,6 +482,12 @@ cargo_psibase_package(
     PATH packages/user/Evaluations
     TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${Evaluations_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Nft.psi
+    PATH packages/user/Nft
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -812,19 +817,7 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Nft.psi
-    NAME Nft
-    VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
-    SERVICE nft
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
-        INIT
-        DATA ${Plugins_OUTPUT_FILE_nft} /plugin.wasm
-    DEPENDS wasm
-    DEPENDS ${Plugins_DEP}
-)
+
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
@@ -1278,7 +1271,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/WSEcho.psi
+    NAME WSEcho
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Accepts websocket connections and echos all messages"
+    SERVICE x-echo
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/WSEcho.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/WSEcho-schema.json
+        SERVER x-echo
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho)
 
 ExternalProject_Add(
     rust
