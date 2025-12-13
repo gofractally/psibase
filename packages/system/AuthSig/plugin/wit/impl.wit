@@ -12,4 +12,5 @@ world impl {
 
     export keyvault;
     export actions;
+    export api;
 }

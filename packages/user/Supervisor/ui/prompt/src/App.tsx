@@ -113,6 +113,7 @@ export const App = () => {
             {iframeUrl && (
                 <iframe
                     src={iframeUrl}
+                    allow="clipboard-read; clipboard-write"
                     style={{
                         width: "100%",
                         height: "100dvh",

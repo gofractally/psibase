@@ -2,16 +2,15 @@ import * as React from "react";
 
 import { cn } from "@shared/lib/utils";
 
-export type TextInputProps = Omit<
-    React.InputHTMLAttributes<HTMLInputElement>,
-    "type"
-> & {
+export type TextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+    type?: "text" | "password";
     startContent?: React.ReactNode;
     endContent?: React.ReactNode;
     ref?: React.Ref<HTMLInputElement>;
 };
 
 export const TextInput = ({
+    type = "text",
     className,
     startContent,
     endContent,
@@ -34,7 +33,7 @@ export const TextInput = ({
             )}
             <input
                 ref={ref}
-                type="text"
+                type={type}
                 {...props}
                 className={cn(
                     "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground w-full border-0 bg-transparent px-3 py-1 text-base outline-none ring-0 focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed md:text-sm",

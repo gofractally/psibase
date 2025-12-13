@@ -2,6 +2,8 @@ import { supervisor } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { AuthServices } from "../types";
+
 export const useUnmanagedKeyPair = () =>
     useQuery({
         queryKey: ["generateKeypair"],
@@ -9,7 +11,7 @@ export const useUnmanagedKeyPair = () =>
             const res = await supervisor.functionCall({
                 method: "generateKeypair",
                 params: [],
-                service: "auth-sig",
+                service: AuthServices.AUTH_SIG,
                 intf: "keyvault",
             });
 

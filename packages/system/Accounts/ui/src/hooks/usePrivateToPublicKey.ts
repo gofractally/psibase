@@ -2,6 +2,8 @@ import { supervisor } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { AuthServices } from "../types";
+
 export const usePrivateToPublicKey = (key: string) =>
     useQuery<string>({
         queryKey: ["privateToPublicKey", key],
@@ -11,7 +13,7 @@ export const usePrivateToPublicKey = (key: string) =>
                 await supervisor.functionCall({
                     method: "pubFromPriv",
                     params: [key],
-                    service: "auth-sig",
+                    service: AuthServices.AUTH_SIG,
                     intf: "keyvault",
                 }),
             );

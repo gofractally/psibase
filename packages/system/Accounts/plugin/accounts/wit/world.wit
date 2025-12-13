@@ -1,6 +1,8 @@
 package accounts:plugin;
 
 interface types {
+    use host:types/types.{pem};
+
     record account {
         account-num: string,
         auth-service: string,

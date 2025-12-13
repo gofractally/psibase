@@ -14,6 +14,7 @@ import { useAccountsLookup } from "./hooks/useAccountsLookup";
 import { useDecodeB64 } from "./hooks/useB64";
 import { usePrivateToPublicKey } from "./hooks/usePrivateToPublicKey";
 import { supervisor } from "./main";
+import { AuthServices } from "./types";
 
 const ImportKeyParams = z.object({
     accounts: z.string().array(),
@@ -28,7 +29,7 @@ const useImportKey = () =>
             void (await supervisor.functionCall({
                 method: "importKey",
                 params: [privateKey],
-                service: "auth-sig",
+                service: AuthServices.AUTH_SIG,
                 intf: "keyvault",
             }));
 

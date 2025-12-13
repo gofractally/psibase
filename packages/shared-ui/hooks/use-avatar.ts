@@ -6,6 +6,7 @@ import { siblingUrl } from "@psibase/common-lib";
 import { AvatarType, generateAvatar } from "@shared/lib/create-identicon";
 
 import { useCacheBust } from "./use-cache-bust";
+import { useChainId } from "./use-chain-id";
 
 const defaultAvatar =
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23888888' d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8zm-1-4h2v2h-2zm0-10h2v8h-2z'/%3E%3C/svg%3E";
@@ -39,60 +40,65 @@ export const AvatarState = z.object({
 export const useAvatar = ({
     account,
     type = "identicon",
-    chainId = "2282d80c-1c8c-43b9-808d-13e3e8d580c7",
 }: {
     account?: string | null;
     type?: AvatarType;
-    chainId?: string;
 }) => {
-    const { bustData, bustedUser } = useCacheBust();
-
-    const [avatarState, setAvatarState] = useState<z.infer<typeof AvatarState>>(
-        {
-            avatarSrc: defaultAvatar,
-            type: "default",
-        },
+    const [existingImageUrl, setExistingImageUrl] = useState<string | null>(
+        null,
     );
+    const [isCheckingImageExists, setIsCheckingImageExists] = useState(false);
 
-    const loadAvatar = async (forceNoCache: boolean = false) => {
-        if (!account) {
-            setAvatarState({
-                avatarSrc: defaultAvatar,
-                type: "default",
-            });
-            return;
-        }
+    const { bustData, bustedUser } = useCacheBust();
+    const { data: chainId, isPending: isPendingChainId } = useChainId({
+        enabled: Boolean(account),
+    });
+
+    useEffect(() => {
+        if (!account || !chainId) return;
 
         const bustParam = bustedUser === account ? `?bust=${bustData}` : "";
         const initialUrl = generateAvatarUrl(account) + bustParam;
 
-        const isImageExists = await checkImageExists(initialUrl, forceNoCache);
+        const check = async () => {
+            setIsCheckingImageExists(true);
+            const exists = await checkImageExists(initialUrl, false);
+            if (exists) {
+                setExistingImageUrl(initialUrl);
+            }
+            setIsCheckingImageExists(false);
+        };
 
-        if (isImageExists) {
-            setAvatarState({
-                type: "uploaded",
-                avatarSrc: initialUrl,
-            });
-        } else if (chainId) {
-            setAvatarState({
-                type: "generated",
-                avatarSrc: generateAvatar(chainId, account, type),
-            });
-        } else {
-            setAvatarState({
-                type: "default",
-                avatarSrc: defaultAvatar,
-            });
-        }
-    };
-
-    const forceRefresh = async () => {
-        await loadAvatar(); // Re-run the avatar check logic
-    };
-
-    useEffect(() => {
-        loadAvatar();
+        check();
     }, [account, chainId, bustData, bustedUser]);
 
-    return { ...avatarState, forceRefresh };
+    if (!account) {
+        return {
+            avatarSrc: defaultAvatar,
+            type: "default",
+            isLoading: false,
+        };
+    }
+
+    if (isPendingChainId || isCheckingImageExists || !chainId) {
+        return {
+            avatarSrc: defaultAvatar,
+            type: "default",
+            isLoading: true,
+        };
+    }
+
+    if (existingImageUrl) {
+        return {
+            avatarSrc: existingImageUrl,
+            type: "uploaded",
+            isLoading: false,
+        };
+    }
+
+    return {
+        avatarSrc: generateAvatar(chainId, account, type),
+        type: "generated",
+        isLoading: false,
+    };
 };
