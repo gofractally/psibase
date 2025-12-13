@@ -18,7 +18,10 @@ use bindings::fractals::plugin as FractalsPlugin;
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 use trust::{assert_authorized, FunctionName};
 
-use crate::bindings::host::common::client::get_receiver;
+use crate::bindings::{
+    fractals::plugin::{queries::Fractal, queries::Guild},
+    host::common::client::get_receiver,
+};
 
 define_trust! {
     descriptions {
@@ -61,39 +64,71 @@ define_trust! {
 
 struct FractalCorePlugin;
 
+struct Latch;
+
+impl Latch {
+    fn get_self() -> String {
+        get_receiver()
+    }
+
+    fn latch(account: &str) -> Result<(), Error> {
+        set_propose_latch(Some(account))
+    }
+
+    fn get_fractal() -> Result<Fractal, Error> {
+        FractalsPlugin::queries::get_fractal(&Self::get_self())
+    }
+
+    fn get_guild(guild_account: &str) -> Result<Guild, Error> {
+        FractalsPlugin::queries::get_guild(guild_account)
+    }
+
+    pub fn legislature() -> Result<(), Error> {
+        Self::get_fractal().and_then(|fractal| Self::latch(&fractal.legislature))
+    }
+
+    pub fn judiciary() -> Result<(), Error> {
+        Self::get_fractal().and_then(|fractal| Self::latch(&fractal.judiciary))
+    }
+
+    pub fn guild(guild_account: &str) -> Result<(), Error> {
+        Self::latch(guild_account)
+    }
+
+    pub fn council(guild_account: &str) -> Result<(), Error> {
+        Self::get_guild(guild_account).and_then(|guild| Self::latch(&guild.council_role))
+    }
+
+    pub fn representative(guild_account: &str) -> Result<(), Error> {
+        Self::get_guild(guild_account).and_then(|guild| Self::latch(&guild.rep_role))
+    }
+}
+
 impl AdminFractal for FractalCorePlugin {
     fn set_min_scorers(min_scorers: u8) -> Result<(), Error> {
         assert_authorized(FunctionName::set_min_scorers)?;
-
-        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
-        set_propose_latch(Some(&fractal.legislature))?;
+        Latch::legislature()?;
 
         FractalsPlugin::admin_fractal::set_min_scorers(min_scorers)
     }
 
     fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
         assert_authorized(FunctionName::set_ranked_guild_slots)?;
-
-        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
-        set_propose_latch(Some(&fractal.legislature))?;
+        Latch::legislature()?;
 
         FractalsPlugin::admin_fractal::set_ranked_guild_slots(slots_count)
     }
 
     fn set_dist_interval(interval_seconds: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::set_dist_interval)?;
-
-        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
-        set_propose_latch(Some(&fractal.legislature))?;
+        Latch::legislature()?;
 
         FractalsPlugin::admin_fractal::set_dist_interval(interval_seconds)
     }
 
     fn exile_member(member_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
-
-        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
-        set_propose_latch(Some(&fractal.judiciary))?;
+        Latch::judiciary()?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
     }
@@ -103,7 +138,7 @@ impl AdminGuild for FractalCorePlugin {
     fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_guild_rep)?;
 
-        set_propose_latch(Some(&guild_account))?;
+        Latch::guild(&guild_account)?;
 
         FractalsPlugin::admin_guild::set_guild_rep(&guild_account, &rep)
     }
@@ -111,16 +146,15 @@ impl AdminGuild for FractalCorePlugin {
     fn resign_guild_rep(guild_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::resign_guild_rep)?;
 
-        let guild = FractalsPlugin::queries::get_guild(&guild_account)?;
-        set_propose_latch(Some(&guild.rep_role))?;
+        Latch::representative(&guild_account)?;
 
         FractalsPlugin::admin_guild::resign_guild_rep(&guild_account)
     }
 
     fn remove_guild_rep(guild_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::remove_guild_rep)?;
-        let guild = FractalsPlugin::queries::get_guild(&guild_account)?;
-        set_propose_latch(Some(&guild.council_role))?;
+
+        Latch::council(&guild_account)?;
 
         FractalsPlugin::admin_guild::remove_guild_rep(&guild_account)
     }
@@ -135,7 +169,7 @@ impl AdminGuild for FractalCorePlugin {
     ) -> Result<(), Error> {
         assert_authorized(FunctionName::set_schedule)?;
 
-        set_propose_latch(Some(&guild_account))?;
+        Latch::guild(&guild_account)?;
 
         FractalsPlugin::admin_guild::set_eval_schedule(
             &guild_account,
@@ -154,19 +188,19 @@ impl AdminGuild for FractalCorePlugin {
 
     fn set_display_name(guild_account: String, display_name: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_display_name)?;
-        set_propose_latch(Some(&guild_account))?;
+        Latch::guild(&guild_account)?;
         FractalsPlugin::admin_guild::set_display_name(&guild_account, &display_name)
     }
 
     fn set_bio(guild_account: String, bio: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_bio)?;
-        set_propose_latch(Some(&guild_account))?;
+        Latch::guild(&guild_account)?;
         FractalsPlugin::admin_guild::set_bio(&guild_account, &bio)
     }
 
     fn set_description(guild_account: String, description: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_description)?;
-        set_propose_latch(Some(&guild_account))?;
+        Latch::guild(&guild_account)?;
         FractalsPlugin::admin_guild::set_description(&guild_account, &description)
     }
 

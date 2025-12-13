@@ -457,6 +457,7 @@ impl Queries for FractallyPlugin {
         let guild = get_guild(guild_account)?;
         Ok(types::Guild {
             fractal: guild.fractal.to_string(),
+            guild: guild.guild.to_string(),
             evaluation_id: guild.evaluation_id,
             council_role: guild.council_role.to_string(),
             rep_role: guild.rep_role.to_string(),

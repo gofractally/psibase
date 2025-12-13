@@ -39,7 +39,8 @@ pub mod guild {
     #[serde(rename_all = "camelCase")]
     struct GuildQuery {
         pub eval_instance: Option<EvalInstance>,
-        pub fractal: FractalQuery,
+        pub fractal: AccountItem,
+        pub guild: AccountItem,
         pub council_role: AccountNumber,
         pub rep_role: AccountNumber,
     }
@@ -51,7 +52,7 @@ pub mod guild {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct FractalQuery {
+    struct AccountItem {
         pub account: AccountNumber,
     }
 
@@ -70,6 +71,7 @@ pub mod guild {
 
     pub struct Guild {
         pub fractal: AccountNumber,
+        pub guild: AccountNumber,
         pub evaluation_id: Option<u32>,
         pub council_role: AccountNumber,
         pub rep_role: AccountNumber,
@@ -80,6 +82,7 @@ pub mod guild {
             Self {
                 council_role: value.council_role,
                 rep_role: value.rep_role,
+                guild: value.guild.account,
                 fractal: value.fractal.account,
                 evaluation_id: value.eval_instance.map(|instance| instance.evaluation_id),
             }
