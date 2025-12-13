@@ -12,9 +12,11 @@ pub mod guild {
                     evalInstance {{
                         evaluationId
                     }}
+                    account
                     fractal {{
                         account
                     }}
+
                     councilRole
                         repRole
                     }}
@@ -40,7 +42,7 @@ pub mod guild {
     struct GuildQuery {
         pub eval_instance: Option<EvalInstance>,
         pub fractal: AccountItem,
-        pub guild: AccountItem,
+        pub account: AccountNumber,
         pub council_role: AccountNumber,
         pub rep_role: AccountNumber,
     }
@@ -82,7 +84,7 @@ pub mod guild {
             Self {
                 council_role: value.council_role,
                 rep_role: value.rep_role,
-                guild: value.guild.account,
+                guild: value.account,
                 fractal: value.fractal.account,
                 evaluation_id: value.eval_instance.map(|instance| instance.evaluation_id),
             }
