@@ -1,9 +1,9 @@
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
-use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
+use crate::constants::{GUILD_EVALUATION_GROUP_SIZE, TOKEN_SUPPLY};
 use crate::helpers::assign_decreasing_levels;
-use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
+use crate::tables::tables::{Fractal, Guild, GuildMember, GuildTable, RewardConsensus};
 use crate::{
     helpers::parse_rank_to_accounts,
     tables::tables::{EvaluationInstance, EvaluationInstanceTable},
@@ -40,6 +40,31 @@ impl EvaluationInstance {
             table.get_index_by_evaluation().get(&eval_id),
             "failed finding by eval id",
         )
+    }
+
+    pub fn finish_evaluation(&self) {
+        let eval_guild = Guild::get_assert(self.guild);
+        let fractal = Fractal::get_assert(eval_guild.fractal);
+
+        let should_init_consensus = RewardConsensus::get(fractal.account).is_none()
+            && fractal.legislature == eval_guild.account;
+
+        if should_init_consensus {
+            let has_enough_scores = GuildMember::memberships_of_guild(eval_guild.account)
+                .into_iter()
+                .filter(|m| m.pending_score.is_some_and(|s| s != 0))
+                .count()
+                >= fractal.minimum_required_scorers.into();
+
+            if !has_enough_scores {
+                self.set_pending_scores(None);
+                return;
+            }
+
+            RewardConsensus::add(fractal.account, (TOKEN_SUPPLY / 4).into());
+        }
+
+        self.save_pending_scores();
     }
 
     fn internal(&self) -> Option<Evaluation> {
@@ -169,22 +194,13 @@ impl EvaluationInstance {
     }
 
     fn guild_members(&self) -> Vec<GuildMember> {
-        let table = GuildMemberTable::read();
-
-        table
-            .get_index_pk()
-            .range(
-                (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
-            )
-            .collect()
+        GuildMember::memberships_of_guild(self.guild)
     }
 
-    pub fn set_pending_scores(&self, pending_score: u8) {
-        GuildMember::memberships_of_guild(self.guild)
-            .into_iter()
-            .for_each(|mut account| {
-                account.set_pending_score(pending_score);
-            });
+    pub fn set_pending_scores(&self, pending_score: Option<u8>) {
+        self.guild_members().into_iter().for_each(|mut account| {
+            account.set_pending_score(pending_score);
+        });
     }
 
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
@@ -201,7 +217,7 @@ impl EvaluationInstance {
         );
 
         for (level, account) in guild_member_levels {
-            GuildMember::get_assert(self.guild, account).set_pending_score(level as u8);
+            GuildMember::get_assert(self.guild, account).set_pending_score(Some(level as u8));
         }
     }
 

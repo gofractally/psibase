@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
-use psibase::{check_none, check_some, AccountNumber, Memo, Table};
+use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table};
 
 use crate::constants::COUNCIL_SEATS;
 use crate::helpers::two_thirds_plus_one;
@@ -64,6 +64,10 @@ impl Guild {
 
     pub fn get_assert(account: AccountNumber) -> Self {
         check_some(Self::get(account), "guild does not exist")
+    }
+
+    pub fn by_sender() -> Self {
+        Self::get_assert(get_sender())
     }
 
     pub fn guilds_of_fractal(fractal: AccountNumber) -> Vec<Self> {

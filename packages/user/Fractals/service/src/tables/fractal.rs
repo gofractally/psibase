@@ -2,7 +2,10 @@ use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::{TOKEN_PRECISION, TOKEN_SUPPLY};
+use crate::constants::{
+    DEFAULT_MINIMUM_REQUIRED_SCORERS, MAX_MINIMUM_REQUIRED_SCORERS, MIN_MINIMUM_REQUIRED_SCORERS,
+    TOKEN_PRECISION, TOKEN_SUPPLY,
+};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
@@ -15,8 +18,8 @@ use crate::tables::tables::Guild;
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, fractals, sites, transact};
+use psibase::{check, get_sender, Action, RawKey, TableQuery};
 use psibase::{fracpack::Pack, services::auth_dyn};
-use psibase::{Action, RawKey, TableQuery};
 
 impl Fractal {
     fn new(
@@ -38,6 +41,7 @@ impl Fractal {
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
+            minimum_required_scorers: DEFAULT_MINIMUM_REQUIRED_SCORERS,
         }
     }
 
@@ -100,17 +104,39 @@ impl Fractal {
         new_instance
     }
 
-    pub fn init_token(&mut self) {
-        let total_supply = Tokens::call().getToken(self.token_id).max_issued_supply;
-        let quarter_supply: Quantity = (total_supply.value / 4).into();
-
-        Tokens::call().mint(
-            self.token_id,
-            quarter_supply,
-            "Token intitialisation".into(),
+    pub fn check_sender_is_legislature(&self) {
+        check(
+            self.legislature == get_sender(),
+            "Requires legislature authority",
         );
+    }
 
-        RewardConsensus::add(self.account, quarter_supply);
+    pub fn check_sender_is_judiciary(&self) {
+        check(
+            self.judiciary == get_sender(),
+            "Requires judiciary authority",
+        );
+    }
+
+    pub fn check_sender_is_fractal(&self) {
+        check(self.account == get_sender(), "Requires fractal authority");
+    }
+
+    pub fn set_minimum_required_scorers(&mut self, minimum_required_scorers: u8) {
+        check_none(
+            RewardConsensus::get(self.account),
+            "reward consensus is already enabled, this setting is now redundant",
+        );
+        check(
+            minimum_required_scorers >= MIN_MINIMUM_REQUIRED_SCORERS,
+            "minimum scorers is too low",
+        );
+        check(
+            minimum_required_scorers <= MAX_MINIMUM_REQUIRED_SCORERS,
+            "maximum scorers is too high",
+        );
+        self.minimum_required_scorers = minimum_required_scorers;
+        self.save();
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {

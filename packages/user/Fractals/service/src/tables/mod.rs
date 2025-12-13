@@ -33,6 +33,7 @@ pub mod tables {
         #[graphql(skip)]
         pub judiciary: AccountNumber,
         pub token_id: TID,
+        pub minimum_required_scorers: u8,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]

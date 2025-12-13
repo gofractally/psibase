@@ -1,13 +1,9 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
-use crate::constants::{
-    EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE,
-};
+use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{
-    Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable, RewardConsensus,
-};
+use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -40,16 +36,9 @@ impl GuildMember {
         check_some(Self::get(guild, member), "guild member does not exist")
     }
 
-    pub fn set_pending_score(&mut self, incoming_score: u8) {
-        let guild = Guild::get_assert(self.guild);
-
-        let is_live_token = RewardConsensus::get(guild.fractal).is_some();
-        // Ignore any pending scores unless there is a live token
-        // Otherwise accumulating a score will create a pre-mine effect when it goes live.
-        if is_live_token {
-            self.pending_score = Some(incoming_score);
-            self.save();
-        }
+    pub fn set_pending_score(&mut self, pending_score: Option<u8>) {
+        self.pending_score = pending_score;
+        self.save();
     }
 
     pub fn save_pending_score(&mut self) {
