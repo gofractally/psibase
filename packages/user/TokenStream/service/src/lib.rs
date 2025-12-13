@@ -203,7 +203,7 @@ pub mod service {
         psibase::services::tokens::Wrapper::call().getToken(token_id);
         let stream = Stream::add(half_life_seconds, token_id);
         let sender = get_sender();
-        Nft::call().credit(stream.nft_id, sender, "Redeemer NFT of stream".to_string());
+        Nft::call().credit(stream.nft_id, sender, "Redeemer NFT of stream".into());
 
         Wrapper::emit()
             .history()

@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import requests
+import inspect
 
 MIN_ACCOUNT_LENGTH = 10
 
@@ -17,7 +18,10 @@ def psinode_test(f):
         with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_size=256*1024*1024) as cluster:
             try:
                 try:
-                    f(self, cluster)
+                    result = f(self, cluster)
+                    if inspect.isawaitable(result):
+                        import asyncio
+                        asyncio.run(asyncio.wait_for(result, 300))
                 except requests.exceptions.HTTPError as e:
                     print(e.response.text)
                     raise

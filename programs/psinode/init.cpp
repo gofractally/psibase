@@ -17,7 +17,7 @@ namespace
    {
       TempSocket() {}
       void autoClose(const std::optional<std::string>&) noexcept override {}
-      void send(std::span<const char> data) override
+      void send(Writer&, std::span<const char> data) override
       {
          auto reply = psio::from_frac<HttpReply>(data);
          if (reply.status == HttpStatus::ok)

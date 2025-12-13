@@ -177,7 +177,6 @@ impl InstalledPackageInfo {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PackageDataFile {
     pub account: AccountNumber,
-    pub service: AccountNumber,
     pub filename: String,
 }
 
@@ -501,11 +500,6 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
-            let service = if self.has_service(*sender) {
-                *sender
-            } else {
-                sites::SERVICE
-            };
             let file = self.archive.by_index(*index).unwrap();
             let path = data_re
                 .captures(file.name())
@@ -515,7 +509,6 @@ impl<R: Read + Seek> PackagedService<R> {
                 .as_str();
             manifest.push(PackageDataFile {
                 account: *sender,
-                service,
                 filename: path.to_string(),
             });
         }
@@ -849,8 +842,7 @@ impl PackageManifest {
         for file in &self.data {
             if !new_files.contains(file) {
                 out.push_action(
-                    sites::Wrapper::pack_from_to(file.account, file.service)
-                        .remove(file.filename.clone()),
+                    sites::Wrapper::pack_from(file.account).remove(file.filename.clone()),
                 )?;
             }
         }
@@ -870,10 +862,7 @@ impl PackageManifest {
     }
     pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
         for file in &self.data {
-            out.push_action(
-                sites::Wrapper::pack_from_to(file.account, file.service)
-                    .remove(file.filename.clone()),
-            )?;
+            out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone()))?;
         }
         for (service, info) in &self.services {
             if info.server.is_some() {

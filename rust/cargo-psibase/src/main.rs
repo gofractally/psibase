@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PackageInfo, Schema};
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File, OpenOptions};
 use std::path::Path;
@@ -72,6 +72,10 @@ struct Args {
     /// Path to psibase executable
     #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psibase(), env = "CARGO_PSIBASE_PSIBASE")]
     psibase: PathBuf,
+
+    /// Build only the specified packages
+    #[clap(short = 'p', long, global = true, value_name = "SPEC")]
+    package: Vec<String>,
 
     #[clap(subcommand)]
     command: Command,
@@ -620,58 +624,82 @@ fn get_test_packages<'a>(
     Ok(packages)
 }
 
-async fn test(
-    args: &Args,
-    opts: &TestCommand,
-    metadata: &MetadataIndex<'_>,
-    root: &str,
-) -> Result<(), Error> {
-    //
-    let packages = get_test_packages(metadata, root)?;
-    pretty("Packages", "building dependencies...");
-    let index = packages.build(args).await?;
+async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> Result<(), Error> {
+    let mut test_packages: Vec<(&str, PackageSet)> = Vec::new();
+    if args.package.is_empty() {
+        for id in &*metadata.metadata.workspace_default_members {
+            test_packages.push((id.repr.as_str(), get_test_packages(metadata, &id.repr)?));
+        }
+    } else {
+        for package in &args.package {
+            let id = &metadata
+                .metadata
+                .packages
+                .iter()
+                .find(|p| &p.name == package)
+                .ok_or_else(|| anyhow!("Could not find package {}", package))?
+                .id;
+            test_packages.push((id.repr.as_str(), get_test_packages(metadata, &id.repr)?));
+        }
+    }
 
-    // Write a package index specific to the crate
     let target_dir = args.target_dir.as_ref().map_or_else(
         || metadata.metadata.target_directory.as_std_path(),
         |p| p.as_path(),
     );
     let out_dir = target_dir.join("wasm32-wasip1/release/packages");
-    let index_file =
-        out_dir.join(metadata.packages.get(root).unwrap().name.clone() + "-index.json");
-    serde_json::to_writer(File::create(&index_file)?, &index)?;
+    let mut built: HashMap<&PackageId, PackageInfo> = HashMap::new();
+    let mut test_info = Vec::new();
+    pretty("Packages", "building dependencies...");
+    for (id, deps) in test_packages {
+        let mut index = Vec::new();
+        for p in &deps.packages {
+            if let Some(found) = built.get(p) {
+                index.push(found.clone());
+            } else {
+                let info = build_package(args, metadata, Some(p.repr.as_str())).await?;
+                built.insert(p, info.clone());
+                index.push(info);
+            }
+        }
 
-    pretty("Test", "building unit tests...");
-
-    let tests = build(
-        args,
-        &[root],
-        vec![
-            ("CARGO_PSIBASE_TEST", ""),
-            (
-                "CARGO_PSIBASE_PACKAGE_PATH",
-                index_file.canonicalize()?.to_str().unwrap(),
-            ),
-        ],
-        &["--tests"],
-        None,
-    )
-    .await?;
-    if tests.is_empty() {
-        return Err(anyhow!("No tests found"));
+        // Write a package index specific to the crate
+        let index_file =
+            out_dir.join(metadata.packages.get(id).unwrap().name.clone() + "-index.json");
+        serde_json::to_writer(File::create(&index_file)?, &index)?;
+        test_info.push((id, index_file));
     }
 
-    for test in tests {
-        pretty_path("Running", &test);
-        let mut command = std::process::Command::new(&args.psitest);
-        command.arg(test);
-        command.arg("--nocapture");
-        if let Some(ref filter) = opts.test_filter {
-            command.arg(filter);
-        }
-        let msg = format!("Failed running: {:?}", command);
-        if !command.status().context(msg.clone())?.success() {
-            return Err(anyhow! {msg});
+    for (id, index_file) in test_info {
+        pretty("Test", "building unit tests...");
+        let name = &metadata.packages.get(id).unwrap().name;
+        let tests = build(
+            args,
+            &[id],
+            vec![
+                ("CARGO_PSIBASE_TEST", ""),
+                (
+                    "CARGO_PSIBASE_PACKAGE_PATH",
+                    index_file.canonicalize()?.to_str().unwrap(),
+                ),
+            ],
+            &["--tests", "-p", name.as_str()],
+            None,
+        )
+        .await?;
+
+        for test in tests {
+            pretty_path("Running", &test);
+            let mut command = std::process::Command::new(&args.psitest);
+            command.arg(test);
+            command.arg("--nocapture");
+            if let Some(ref filter) = opts.test_filter {
+                command.arg(filter);
+            }
+            let msg = format!("Failed running: {:?}", command);
+            if !command.status().context(msg.clone())?.success() {
+                return Err(anyhow! {msg});
+            }
         }
     }
 
@@ -682,17 +710,25 @@ async fn install(
     args: &Args,
     opts: &InstallCommand,
     metadata: &MetadataIndex<'_>,
-    root: &str,
 ) -> Result<(), Error> {
-    let root = &metadata.packages.get(root).unwrap().id;
-
     let mut packages = PackageSet::new(metadata);
-    let root = &metadata.packages.get(&root.repr.as_str()).unwrap().id;
-    if !packages.try_insert(root)? {
-        Err(anyhow!(
-            "{} is not a psibase package",
-            &metadata.packages.get(&root.repr.as_str()).unwrap().name
-        ))?
+    if args.package.is_empty() {
+        for id in &*metadata.metadata.workspace_default_members {
+            packages.try_insert(id)?;
+        }
+    } else {
+        for package in &args.package {
+            let id = &metadata
+                .metadata
+                .packages
+                .iter()
+                .find(|p| &p.name == package)
+                .ok_or_else(|| anyhow!("Could not find package {}", package))?
+                .id;
+            if !packages.try_insert(id)? {
+                Err(anyhow!("{} is not a psibase package", package))?
+            }
+        }
     }
     packages.resolve_dependencies()?;
     let index = packages.build(args).await?;
@@ -743,39 +779,77 @@ async fn main2() -> Result<(), Error> {
     };
 
     let metadata = get_metadata(&args)?;
-    let root = metadata
-        .resolve
-        .as_ref()
-        .unwrap()
-        .root
-        .as_ref()
-        .map(|r| r.repr.as_str());
     check_psibase_version(&metadata);
 
     match &args.command {
         Command::Build {} => {
-            let Some(root) = root else {
-                Err(anyhow!("Don't know how to build workspace"))?
-            };
-            build(&args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
+            if args.package.is_empty() {
+                let index = MetadataIndex::new(&metadata);
+                for id in &*metadata.workspace_default_members {
+                    let package = &index.packages.get(id.repr.as_str()).unwrap().name;
+                    let mut extra_args = SERVICE_ARGS.to_owned();
+                    extra_args.extend(["-p", package.as_str()]);
+                    build(
+                        &args,
+                        &[id.repr.as_str()],
+                        vec![],
+                        &extra_args,
+                        Some(SERVICE_POLYFILL),
+                    )
+                    .await?;
+                }
+            } else {
+                for package in &args.package {
+                    let id = &metadata
+                        .packages
+                        .iter()
+                        .find(|p| &p.name == package)
+                        .ok_or_else(|| anyhow!("Could not find package {}", package))?
+                        .id
+                        .repr;
+                    let mut extra_args = SERVICE_ARGS.to_owned();
+                    extra_args.extend(["-p", package.as_str()]);
+                    build(
+                        &args,
+                        &[id.as_str()],
+                        vec![],
+                        &extra_args,
+                        Some(SERVICE_POLYFILL),
+                    )
+                    .await?;
+                }
+            }
             pretty("Done", "");
         }
         Command::Package {} => {
-            build_package(&args, &MetadataIndex::new(&metadata), root).await?;
+            let index = MetadataIndex::new(&metadata);
+            if args.package.is_empty() {
+                for id in &*metadata.workspace_default_members {
+                    let package = index.packages.get(id.repr.as_str()).unwrap();
+                    if package::get_metadata(package)?.is_package() {
+                        build_package(&args, &index, Some(id.repr.as_str())).await?;
+                    }
+                }
+            } else {
+                for package in &args.package {
+                    let id = &metadata
+                        .packages
+                        .iter()
+                        .find(|p| &p.name == package)
+                        .ok_or_else(|| anyhow!("Could not find package {}", package))?
+                        .id
+                        .repr;
+                    build_package(&args, &index, Some(id)).await?;
+                }
+            }
             pretty("Done", "");
         }
         Command::Test(opts) => {
-            let Some(root) = root else {
-                Err(anyhow!("Don't know how to test workspace"))?
-            };
-            test(&args, opts, &MetadataIndex::new(&metadata), root).await?;
+            test(&args, opts, &MetadataIndex::new(&metadata)).await?;
             pretty("Done", "All tests passed");
         }
         Command::Install(opts) => {
-            let Some(root) = root else {
-                Err(anyhow!("Don't know how to install workspace"))?
-            };
-            install(&args, opts, &MetadataIndex::new(&metadata), root).await?;
+            install(&args, opts, &MetadataIndex::new(&metadata)).await?;
         }
     };
 
